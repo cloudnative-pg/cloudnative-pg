@@ -47,6 +47,12 @@ const (
 	ConditionPasswordSecretChange DatabaseRoleConditionType = "PasswordSecretChange"
 )
 
+const (
+	// clientCertSecretSuffix is the suffix appended to a DatabaseRole name to form
+	// the name of the Secret holding its generated TLS client certificate.
+	clientCertSecretSuffix = "-client-cert"
+)
+
 // DatabaseRoleSpec represents a role in Postgres
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="name is immutable"
 // +kubebuilder:validation:XValidation:rule="!has(self.ensure) || self.ensure != 'absent'",message="ensure: absent is not supported for DatabaseRole; delete the resource with databaseRoleReclaimPolicy: delete instead"
@@ -56,6 +62,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!self.name.startsWith('cnpg_')",message="role names starting with cnpg_ are reserved by the operator"
 // +kubebuilder:validation:XValidation:rule="self.name.size() != 0",message="role name must not be empty"
 // +kubebuilder:validation:XValidation:rule="!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword",message="passwordSecret and disablePassword are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.clientCertificate) || !self.clientCertificate.enabled || self.login",message="clientCertificate requires the role to have login enabled"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
 	// in the `cluster.spec.managed.roles` definition.
@@ -70,6 +77,35 @@ type DatabaseRoleSpec struct {
 	// +kubebuilder:default:=retain
 	// +optional
 	ReclaimPolicy DatabaseRoleReclaimPolicy `json:"databaseRoleReclaimPolicy,omitempty"`
+
+	// ClientCertificate configures the operator to generate and renew a TLS client
+	// certificate for this role, signed by the cluster's client CA. The certificate
+	// is stored in a Secret named `<databaserole-name>-client-cert`.
+	// Requires login to be true.
+	// +optional
+	ClientCertificate *ClientCertificateConfiguration `json:"clientCertificate,omitempty"`
+}
+
+// ClientCertificateConfiguration configures operator-managed issuance of a TLS
+// client certificate for a DatabaseRole.
+type ClientCertificateConfiguration struct {
+	// Enabled turns on client certificate issuance for this role. When true,
+	// the role must have login enabled. Defaults to true when the block is present.
+	// +kubebuilder:default:=true
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// ClientCertificateState holds the observed state of the generated TLS client certificate.
+type ClientCertificateState struct {
+	// Expiration is the expiration time of the generated client certificate, in RFC3339 format.
+	// +optional
+	Expiration string `json:"expiration,omitempty"`
+
+	// Message contains a human-readable explanation of the current certificate status,
+	// such as why issuance was skipped or why an existing Secret was left untouched.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // DatabaseRoleStatus defines the observed state of a DatabaseRole
@@ -91,6 +127,11 @@ type DatabaseRoleStatus struct {
 	// last applied to the role; a change to it triggers reconciliation.
 	// +optional
 	SecretResourceVersion string `json:"secretResourceVersion,omitempty"`
+
+	// ClientCertificate holds the observed state of the generated TLS client
+	// certificate, when client certificate issuance is enabled.
+	// +optional
+	ClientCertificate *ClientCertificateState `json:"clientCertificate,omitempty"`
 
 	// Conditions for the DatabaseRole object
 	// +optional

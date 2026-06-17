@@ -22,6 +22,8 @@ spec:
   createdb: true
   createrole: false
   inherit: false
+  clientCertificate:
+    enabled: true
   replication: false
   bypassrls: false
   connectionLimit: 4

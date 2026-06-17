@@ -201,6 +201,132 @@ role as *unknown* rather than failed: the `applied` field is left unset (`nil`)
 with an explanatory message. The role is reconciled normally once the cluster
 is promoted to primary.
 
+### Client Certificate Generation
+
+The `DatabaseRole` resource supports opt-in generation of TLS client
+certificates, signed by the cluster's client CA and stored in a Kubernetes
+Secret. This enables [PostgreSQL `cert` authentication](https://www.postgresql.org/docs/current/auth-cert.html)
+as an alternative to passwords: no passwords to rotate manually, and private
+keys are stored as Kubernetes Secrets and never transmitted outside the cluster.
+
+To enable it, add a `clientCertificate` block to the spec:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: role-dante
+spec:
+  cluster:
+    name: cluster-example
+  name: dante
+  login: true
+  clientCertificate:
+    enabled: true
+  databaseRoleReclaimPolicy: retain
+```
+
+`clientCertificate.enabled` defaults to `true` when the block is present, so
+`clientCertificate: {}` is equivalent to enabling it. Set `enabled: false` to
+turn issuance off while keeping the block in place.
+
+:::important
+`login: true` is required when `clientCertificate` issuance is enabled. The
+operator enforces this via validation and will reject the resource otherwise.
+:::
+
+#### Generated Secret
+
+The operator creates a Secret named `<databaserole-name>-client-cert` in the
+same namespace. It contains two keys:
+
+| Key | Contents |
+|---|---|
+| `tls.crt` | PEM-encoded client certificate, signed by the cluster's client CA |
+| `tls.key` | PEM-encoded private key |
+
+The expiration time of the certificate is visible in
+`status.clientCertificate.expiration`:
+
+```yaml
+status:
+  clientCertificate:
+    expiration: "2026-07-01T12:00:00Z"
+```
+
+#### Configuring `pg_hba.conf`
+
+The operator generates the certificate but does **not** modify `pg_hba.conf`
+automatically. You must add a `hostssl` rule with the `cert` method to the
+cluster for the role to be able to authenticate:
+
+```yaml
+spec:
+  postgresql:
+    pg_hba:
+      - hostssl all dante all cert
+```
+
+A working connection string using the generated Secret would look like:
+
+```
+psql "host=<cluster>-rw.<namespace>.svc port=5432 dbname=<db> user=dante \
+  sslcert=/path/to/tls.crt sslkey=/path/to/tls.key \
+  sslrootcert=/path/to/ca.crt sslmode=verify-full"
+```
+
+#### Renewal
+
+Client certificates inherit the operator's global certificate settings: they
+are issued with a **90-day** lifetime by default and renewed automatically once
+they fall within **7 days** of expiry. Both values are operator-wide and
+configurable via the `CERTIFICATE_DURATION` and `EXPIRING_CHECK_THRESHOLD`
+operator settings; they are not configurable per `DatabaseRole`.
+
+Renewal is driven by the reconcile loop: the operator checks whether the
+certificate is approaching expiry and re-signs it if needed. Reconciles are
+scheduled at least once per hour when `clientCertificate` issuance is enabled,
+so renewal happens well before expiry even without a triggering event. The
+current expiration is always reflected in `status.clientCertificate.expiration`.
+
+#### Deletion and opt-out
+
+| Scenario | Result |
+|---|---|
+| `clientCertificate.enabled` set to `false`, or the `clientCertificate` block removed | The cert Secret is deleted; `status.clientCertificate` is cleared |
+| `DatabaseRole` deleted | The cert Secret is garbage-collected via owner reference, regardless of `databaseRoleReclaimPolicy` |
+
+:::note
+`databaseRoleReclaimPolicy: retain` retains the PostgreSQL role, not the generated
+Secret. The Secret is only meaningful while the operator is managing the role,
+so it is always cleaned up on deletion.
+:::
+
+#### Bring-your-own-CA limitation
+
+If the cluster's client CA Secret does not contain a private key (i.e. you
+supplied your own CA via `spec.certificates.clientCASecret`), the operator
+cannot sign new certificates. It will record the reason in
+`status.clientCertificate.message` and stop retrying:
+
+```yaml
+status:
+  clientCertificate:
+    message: 'client CA secret "my-ca" has no private key; bring-your-own-CA
+      clusters require manual certificate management'
+```
+
+In this case, you must issue and renew client certificates manually.
+
+:::note
+CNPG does not manage Certificate Revocation Lists (CRLs). If a certificate must
+be invalidated before it expires, rotate the cluster's client CA: on the next
+reconcile the operator detects that the existing certificates are no longer
+signed by the current CA and re-issues all managed client certificates.
+Alternatively, delete the certificate's Secret to have the operator issue a
+fresh one signed by the current CA.
+:::
+
 ---
 
 ## Inline managed roles

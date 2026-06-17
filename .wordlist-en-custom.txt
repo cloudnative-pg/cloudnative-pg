@@ -64,6 +64,7 @@ CONTAINERNAME
 CR's
 CRD
 CRDs
+CRLs
 CSI
 CSV
 CSVs
@@ -83,6 +84,9 @@ Certmanager
 CiliumNetworkPolicy
 ClassName
 ClientCASecret
+ClientCertificate
+ClientCertificateConfiguration
+ClientCertificateState
 ClientTLSSecret
 CloudNativePG
 CloudNativePG's
@@ -333,6 +337,7 @@ OptionSpec
 OwnNamespace
 PDB
 PDBs
+PEM
 PGAudit
 PGDATA
 PGDG
@@ -748,6 +753,8 @@ clientCASecret
 clientCaSecretVersion
 clientTLS
 clientTLSSecret
+clientcertificateconfiguration
+clientcertificatestate
 cloudNativePGCommitHash
 cloudNativePGOperatorHash
 cloudnative
