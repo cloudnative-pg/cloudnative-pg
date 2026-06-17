@@ -237,7 +237,7 @@ func printNamespaceEvents(clusterInfo *tabby.Tabby, eventList *eventsv1.EventLis
 // WAL archive file on the object store by copying and renaming an existing WAL archive file for the sake of more
 // control of testing. To make sure the forged one won't be a real WAL archive, we let the sequence in newWALName
 // to be big enough so that it can't be a real WAL archive name in an idle postgresql.
-func ForgeArchiveWalOnObjectStore(namespace, clusterName, clientPodName, existingWALName, newWALName string) error {
+func ForgeArchiveWalOnObjectStore(namespace, clusterName, clientRef, existingWALName, newWALName string) error {
 	// Forge a WAL archive by copying and renaming the 1st WAL archive
 	walBasePath := clusterName + "/" + clusterName + "/wals/0000000100000000"
 	existingWALPath := walBasePath + "/" + existingWALName + ".gz"
@@ -246,7 +246,7 @@ func ForgeArchiveWalOnObjectStore(namespace, clusterName, clientPodName, existin
 	_, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		namespace,
-		clientPodName,
+		clientRef,
 		forgeWALCmd))
 
 	return err
