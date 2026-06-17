@@ -76,7 +76,9 @@ const (
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
 	databaseRoleClusterKey        = ".spec.cluster.name"
-	usedPluginsClusterKey         = ".spec.usedPlugins"
+	// usedPluginsClusterKey is a synthetic index key, not a real Cluster spec field;
+	// it is populated by getPluginsNeededForReconcile.
+	usedPluginsClusterKey = ".spec.usedPlugins"
 )
 
 var apiSGVString = apiv1.SchemeGroupVersion.String()
