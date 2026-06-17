@@ -250,10 +250,7 @@ func (r *DatabaseRoleReconciler) deleteOwnedCertSecret(
 // result with no error means the certificate must be re-issued, typically
 // because the cluster's client CA was rotated.
 func clientCertSignedByCurrentCA(caSecret, certSecret *corev1.Secret) (bool, error) {
-	caPair, err := certs.ParseCASecret(caSecret)
-	if err != nil {
-		return false, fmt.Errorf("while parsing client CA secret %q: %w", caSecret.Name, err)
-	}
+	caPair := &certs.KeyPair{Certificate: caSecret.Data[certs.CACertKey]}
 
 	certPEM, ok := certSecret.Data[certs.TLSCertKey]
 	if !ok {
