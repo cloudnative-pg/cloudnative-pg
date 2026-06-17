@@ -172,23 +172,36 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 
 	origSecret := certSecret.DeepCopy()
 
-	// RenewLeafCertificate only re-signs on expiry or altDNSName changes, not
-	// on a CA rotation, so detect a CA change explicitly and re-issue.
+	// Detect a CA rotation explicitly: RenewLeafCertificate only re-signs on
+	// expiry or altDNSName changes. A parse or renewal error means the cert is
+	// corrupt; treat it as a re-issue trigger rather than error-looping.
+	certInvalid := false
+
 	signedByCurrentCA, err := clientCertSignedByCurrentCA(caSecret, certSecret)
 	if err != nil {
-		return false, fmt.Errorf("while validating client cert for role %q: %w", role.Spec.Name, err)
+		contextLogger.Warning("client cert is unreadable, re-issuing",
+			"secret", secretKey.Name, "err", err)
+		signedByCurrentCA = false
+		certInvalid = true
 	}
 
 	if signedByCurrentCA {
 		renewed, err := certs.RenewLeafCertificate(caSecret, certSecret, nil)
-		if err != nil {
-			return false, fmt.Errorf("while renewing client cert for role %q: %w", role.Spec.Name, err)
-		}
-		if !renewed {
+		if err == nil && !renewed {
 			return true, nil
 		}
-	} else {
-		contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
+		if err != nil {
+			contextLogger.Warning("client cert renewal failed, re-issuing",
+				"secret", secretKey.Name, "err", err)
+			signedByCurrentCA = false
+			certInvalid = true
+		}
+	}
+
+	if !signedByCurrentCA {
+		if !certInvalid {
+			contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
+		}
 		newSecret, err := generateCertificateFromCA(caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey)
 		if err != nil {
 			return false, fmt.Errorf("while re-signing client cert for role %q: %w", role.Spec.Name, err)
