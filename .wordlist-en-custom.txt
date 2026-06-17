@@ -483,6 +483,7 @@ SHA
 SLA
 SLSA
 SPDX
+SPDY
 SPoF
 SQLQuery
 SQLRefs
@@ -606,6 +607,7 @@ WALs
 WalBackupConfiguration
 WalClassName
 Wallner
+WebSocket
 XXu
 YXBw
 YY
@@ -705,6 +707,7 @@ barmanObjectStore
 barmancloud
 barmanobjectstore
 barmanobjectstoreconfiguration
+bartscheers
 baseDN
 basebackup
 bb
