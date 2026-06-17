@@ -91,4 +91,14 @@ var _ = Describe("operatorNamespaceServiceEndpointSlicePredicate", func() {
 			ObjectNew: newSlice("other-namespace", "some-plugin"),
 		})).To(BeFalse())
 	})
+
+	It("rejects all slices when operatorNamespace is empty", func() {
+		emptyNsPredicate := operatorNamespaceServiceEndpointSlicePredicate("")
+		slice := newSlice("cnpg-system", "some-plugin")
+		Expect(emptyNsPredicate.Create(event.CreateEvent{Object: slice})).To(BeFalse())
+		Expect(emptyNsPredicate.Update(event.UpdateEvent{
+			ObjectOld: slice,
+			ObjectNew: slice,
+		})).To(BeFalse())
+	})
 })
