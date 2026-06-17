@@ -119,13 +119,17 @@ var _ = Describe("databaserole_pki", func() {
 				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
 				firstExpiration := role.Status.ClientCertificate.Expiration
 
-				// Second reconcile: secret already exists, renewal check runs.
+				var certSecret corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
+				firstCertBytes := certSecret.Data[certs.TLSCertKey]
+
+				// Second reconcile: secret already exists, no renewal needed.
 				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
 
-				var certSecret corev1.Secret
 				Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
 				Expect(role.Status.ClientCertificate).NotTo(BeNil())
 				Expect(role.Status.ClientCertificate.Expiration).To(Equal(firstExpiration))
+				Expect(certSecret.Data[certs.TLSCertKey]).To(Equal(firstCertBytes))
 			},
 		)
 
