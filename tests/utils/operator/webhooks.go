@@ -133,6 +133,9 @@ func UpdateValidatingWebhookConf(
 }
 
 // checkWebhookSetup ensures that the operator has finished the webhook setup.
+// Webhook configuration names are resolved via configuration.Current, so
+// ENABLE_WEBHOOK_NAMESPACE_SUFFIX and OPERATOR_NAMESPACE must be set in the
+// test process environment to match the operator deployment under test.
 func checkWebhookSetup(
 	ctx context.Context,
 	crudClient client.Client,
