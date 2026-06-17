@@ -165,14 +165,23 @@ func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 // Callers must pass a fresh (non-cancelled) context; the previous run context
 // is already cancelled by the time this is called.
 // When invoked from the defer in cmd.go, controller-runtime has already waited
-// for all runnables — including PostgresLifecycle — to finish. PostgreSQL is
-// normally down by then. The exception is a failed in-place instance-manager
-// online upgrade: PostgresLifecycle skips the shutdown when
-// InstanceManagerIsUpgrading is set, so PostgreSQL may still be running when
-// this defer fires. The operator's onlineUpgradeFailOverDelay (30s) covers
-// the pod-restart window in that case so no other pod can promote.
+// for all runnables — including PostgresLifecycle — to finish, so PostgreSQL is
+// down and releasing the lease lets a replica promote at once.
+//
+// An in-place instance-manager online upgrade is the exception: PostgresLifecycle
+// keeps PostgreSQL running while InstanceManagerIsUpgrading is set, so this
+// instance is still the primary. Releasing then would blank the holder while we
+// keep serving writes, opening a window for a replica to promote. We keep the
+// lease held instead; the Identity is the pod name, which the replacement
+// instance manager reuses, so it re-adopts the lease with no hand-over and no
+// free-lease window.
 func (r *Runnable) Release(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
+
+	if r.instance.InstanceManagerIsUpgrading.Load() {
+		contextLogger.Info("Instance manager is upgrading in place, keeping the primary lease held")
+		return nil
+	}
 
 	record, _, err := r.lock.Get(ctx)
 	if errors.IsNotFound(err) {

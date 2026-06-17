@@ -171,6 +171,21 @@ var _ = Describe("Runnable.Release", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(released.Spec.LeaseTransitions).To(Equal(ptr.To(int32(7))))
 	})
+
+	It("keeps the lease held when an in-place instance-manager upgrade is in progress",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			createLease(ctx, kubeClient, thisPod)
+			// An in-place online upgrade restarts the instance manager while
+			// PostgreSQL keeps running, so this pod is still the primary and
+			// must not blank the holder on its way out.
+			r.instance.InstanceManagerIsUpgrading.Store(true)
+
+			Expect(r.Release(ctx)).To(Succeed())
+			// The holder is unchanged: the replacement instance manager re-adopts it.
+			Expect(getHolder(ctx, kubeClient)).To(Equal(thisPod))
+		})
 })
 
 var _ = Describe("Runnable.Acquire", func() {
