@@ -200,6 +200,11 @@ func RunController(
 
 	setupLog.Info("Operator configuration loaded", "configuration", conf)
 
+	if conf.EnableWebhookNamespaceSuffix && conf.OperatorNamespace == "" {
+		return fmt.Errorf("ENABLE_WEBHOOK_NAMESPACE_SUFFIX requires OPERATOR_NAMESPACE to be set " +
+			"as a pod environment variable (typically via the Downward API fieldRef.fieldPath = metadata.namespace)")
+	}
+
 	discoveryClient, err := utils.GetDiscoveryClient()
 	if err != nil {
 		return err
