@@ -207,7 +207,7 @@ The `DatabaseRole` resource supports opt-in generation of TLS client
 certificates, signed by the cluster's client CA and stored in a Kubernetes
 Secret. This enables [PostgreSQL `cert` authentication](https://www.postgresql.org/docs/current/auth-cert.html)
 as an alternative to passwords: no passwords to rotate manually, and private
-keys never leave the cluster.
+keys are stored as Kubernetes Secrets and never transmitted outside the cluster.
 
 To enable it, add a `clientCertificate` block to the spec:
 
