@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Backup
 metadata:
-  name: cluster-backup-standby
+  name: cluster-backup-pitr
 spec:
   cluster:
-    name: pg-backup-minio-standby
+    name: pg-backup-object-store

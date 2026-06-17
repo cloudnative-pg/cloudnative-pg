@@ -4,4 +4,4 @@ metadata:
   name: cluster-backup-02
 spec:
   cluster:
-    name: source-cluster-minio
+    name: source-cluster-object-store
