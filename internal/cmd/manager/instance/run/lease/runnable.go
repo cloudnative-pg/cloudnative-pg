@@ -165,7 +165,7 @@ func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 // Callers must pass a fresh (non-cancelled) context; the previous run context
 // is already cancelled by the time this is called.
 // When invoked from the defer in cmd.go, controller-runtime has already waited
-// for all runnables — including PostgresLifecycle — to finish, so PostgreSQL is
+// for all runnables (including PostgresLifecycle) to finish, so PostgreSQL is
 // down and releasing the lease lets a replica promote at once.
 //
 // An in-place instance-manager online upgrade is the exception: PostgresLifecycle
@@ -175,6 +175,12 @@ func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 // lease held instead; the Identity is the pod name, which the replacement
 // instance manager reuses, so it re-adopts the lease with no hand-over and no
 // free-lease window.
+//
+// This guard is reliable on a successful upgrade because reloadInstanceManager
+// replaces the process with syscall.Exec, which discards the deferred reset of
+// InstanceManagerIsUpgrading: the flag therefore stays set whenever this defer
+// can still run. Only a failed exec resets it, and there the operator's
+// online-upgrade failover delay covers the pod restart.
 func (r *Runnable) Release(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -237,7 +243,7 @@ const (
 	// the liveness probe to fence us if we are genuinely isolated.
 	leaseUnverifiable
 	// leasePreempted means the lease is held by a different (or empty) identity:
-	// we no longer own it. This is terminal — the primary must stop.
+	// we no longer own it. This is terminal: the primary must stop.
 	leasePreempted
 	// leaseStillHeld means we are still the holder: a transient renewal blip, retry.
 	leaseStillHeld
@@ -245,8 +251,8 @@ const (
 
 // classifyLeaseAfterRun decides what the primary should do after the
 // leader-election loop returns unexpectedly, based on the post-run read of the
-// lease. It is intentionally pure so the high-consequence preemption branch —
-// the one that stops PostgreSQL — can be unit-tested without driving a real
+// lease. It is intentionally pure so the high-consequence preemption branch
+// (the one that stops PostgreSQL) can be unit-tested without driving a real
 // election loop.
 func classifyLeaseAfterRun(
 	checkErr error,
@@ -398,7 +404,7 @@ func (r *Runnable) preAcquire(ctx context.Context) error {
 // then return in three distinct ways:
 //
 //  1. Clean shutdown: ctx is cancelled (e.g. manager shutting down). le.Run
-//     returns because it detects ctx.Done(). We return nil — Release() will be
+//     returns because it detects ctx.Done(). We return nil; Release() will be
 //     called by the deferred shutdown path in cmd.go.
 //
 //  2. Transient renewal failure: the primary cannot reach the Kubernetes API
@@ -414,7 +420,7 @@ func (r *Runnable) preAcquire(ctx context.Context) error {
 //     shuts down the manager and stops PostgreSQL.
 //
 // If the post-exit read itself fails (API server still unreachable), we log a
-// warning and loop — we have no evidence of preemption, and the liveness probe
+// warning and loop: we have no evidence of preemption, and the liveness probe
 // isolation checker will fence us if we are genuinely isolated. A retryPeriod-
 // sized timeout is used for the check to avoid blocking indefinitely.
 //
@@ -492,7 +498,7 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			// isolated, the liveness probe isolation checker will fence us.
 			contextLogger.Warning("Primary lease lost, cannot verify holder, retrying", "error", checkErr)
 		case leasePreempted:
-			// A different identity holds the lease — we have been preempted. This is
+			// A different identity holds the lease: we have been preempted. This is
 			// a terminal event: the returned error shuts down the manager and stops
 			// PostgreSQL. Log it explicitly at the point of detection so the cause
 			// is visible, rather than only surfacing as a generic manager error.
@@ -501,7 +507,7 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 				"newHolder", record.HolderIdentity)
 			return err
 		case leaseStillHeld:
-			// We still hold the lease — transient API server blip. Loop.
+			// We still hold the lease: transient API server blip. Loop.
 			contextLogger.Warning("Primary lease renewal failed transiently, retrying")
 		}
 	}
