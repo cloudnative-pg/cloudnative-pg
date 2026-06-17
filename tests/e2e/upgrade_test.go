@@ -157,7 +157,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 	})
 
-	// Check that the amount of backups is increasing on objectstore.
+	// Check that the amount of backups is increasing on the object store.
 	// This check relies on the fact that nothing is performing backups
 	// but a single scheduled backups during the check
 	AssertScheduledBackupsAreScheduled := func(serverName string) {
