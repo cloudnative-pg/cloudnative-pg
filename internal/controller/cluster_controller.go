@@ -1384,7 +1384,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
-	// Create a new index fields that allows mapping a cluster to all the
+	// Create a new index field that allows mapping a cluster to all the
 	// plugins that are required to reconcile it
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
