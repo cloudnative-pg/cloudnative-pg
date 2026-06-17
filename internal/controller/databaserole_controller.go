@@ -185,15 +185,17 @@ func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 		},
 	}
 
-	// Only consider secrets that carry a CA certificate, to avoid triggering
-	// a full role list on every unrelated secret change.
+	// Only consider secrets that carry both a CA certificate and a private key.
+	// Bring-your-own-CA secrets (cert-only) cannot be used to sign new certs,
+	// so a change to them does not need to trigger role reconciliation.
 	caSecretPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		secret, ok := obj.(*corev1.Secret)
 		if !ok {
 			return false
 		}
-		_, hasCA := secret.Data[certs.CACertKey]
-		return hasCA
+		_, hasCACert := secret.Data[certs.CACertKey]
+		_, hasCAKey := secret.Data[certs.CAPrivateKeyKey]
+		return hasCACert && hasCAKey
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
