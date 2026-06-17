@@ -44,12 +44,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
-	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -151,10 +151,10 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 						},
 					},
 					DestinationPath: "s3://pg-major-upgrade/",
-					EndpointURL:     "https://minio-service.minio:9000",
+					EndpointURL:     "https://object-store.object-store:9000",
 					EndpointCA: &apiv1.SecretKeySelector{
 						LocalObjectReference: apiv1.LocalObjectReference{
-							Name: "minio-server-ca-secret",
+							Name: "object-store-ca-secret",
 						},
 						Key: "ca.crt",
 					},
@@ -490,19 +490,19 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 		Expect(storageClass).ToNot(BeEmpty())
 
-		By("creating the certificates for MinIO", func() {
-			err := minioEnv.CreateCaSecret(env, namespace)
+		By("creating the certificates for the object store", func() {
+			err := objectStoreEnv.CreateCaSecret(env, namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("creating the credentials for minio", func() {
+		By("creating the credentials for the object store", func() {
 			_, err = secrets.CreateObjectStorageSecret(
 				env.Ctx,
 				env.Client,
 				namespace,
 				"backup-storage-creds",
-				"minio",
-				"minio123",
+				objectstore.AccessKeyID,
+				objectstore.SecretAccessKey,
 			)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -534,13 +534,13 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 
 		if cluster.Spec.Backup != nil {
-			By("verifying connectivity of barman to minio", func() {
+			By("verifying connectivity of barman to the object store", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func() (bool, error) {
-					connectionStatus, err := minio.TestBarmanConnectivity(
+					connectionStatus, err := objectstore.TestBarmanConnectivity(
 						cluster.Namespace, cluster.Name, primaryPod.Name,
-						"minio", "minio123", minioEnv.ServiceName)
+						objectstore.AccessKeyID, objectstore.SecretAccessKey, objectStoreEnv.ServiceName)
 					return connectionStatus, err
 				}, 60).Should(BeTrue())
 			})
@@ -652,7 +652,8 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		// Verify WAL archiving continues to work after the major upgrade
 		if cluster.Spec.Backup != nil {
 			By("Verifying WAL archiving works after the major upgrade")
-			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, cluster.Namespace, cluster.Name, cluster.Name)
+			objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+				cluster.Namespace, cluster.Name, cluster.Name)
 		}
 	},
 		Entry("PostGIS", postgisEntry),

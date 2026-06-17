@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Backup
 metadata:
-  name: cluster-backup-2
+  name: cluster-backup
 spec:
   cluster:
-    name: external-cluster-minio-1
+    name: pg-backup-object-store

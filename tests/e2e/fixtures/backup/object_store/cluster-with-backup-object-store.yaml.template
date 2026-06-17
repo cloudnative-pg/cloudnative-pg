@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup-minio-custom
+  name: pg-backup-object-store
 spec:
-  instances: 1
+  instances: 2
 
   postgresql:
     parameters:
@@ -21,6 +21,7 @@ spec:
   # - supervised: requires manual supervision to perform
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
 
   # Persistent storage configuration
   storage:
@@ -46,11 +47,11 @@ spec:
   backup:
     target: primary
     barmanObjectStore:
-        destinationPath: s3://pg-backup-minio-custom/
-        endpointURL: https://minio-service.minio:9000
+        destinationPath: s3://pg-backup-object-store/
+        endpointURL: https://object-store.object-store:9000
         endpointCA:
           key: ca.crt
-          name: minio-server-ca-secret
+          name: object-store-ca-secret
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds
@@ -62,9 +63,11 @@ spec:
           compression: gzip
         data:
           immediateCheckpoint: true
+          additionalCommandArgs:
+            - "--min-chunk-size=5MB"
+            - "--read-timeout=59"
         tags:
           retention: "30days"
         historyTags:
           retention: "30days"
-        serverName: pg-backup-minio-Custom-Name
     retentionPolicy: "30d"

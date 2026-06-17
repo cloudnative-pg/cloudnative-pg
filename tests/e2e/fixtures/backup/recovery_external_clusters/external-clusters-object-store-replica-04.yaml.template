@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup-minio
+  name: external-cluster-object-store-replica
 spec:
   instances: 2
 
@@ -13,7 +13,6 @@ spec:
       log_statement: 'ddl'
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
-      log_replication_commands: 'on'
 
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all
@@ -28,23 +27,22 @@ spec:
     size: 1Gi
 
   bootstrap:
-    initdb:
-      database: app
-      owner: app
+    recovery:
+      # cluster name in source cluster
+      source: source-cluster-object-store
 
-  monitoring:
-    customQueriesConfigMap:
-      - name: monitoring-01
-        key: additional-queries
-    customQueriesSecret:
-      - name: monitoring-01
-        key: additional-queries
+  replica:
+    enabled: true
+    source: source-cluster-object-store
 
-  backup:
-    target: primary
-    barmanObjectStore:
+  externalClusters:
+    - name: source-cluster-object-store
+      barmanObjectStore:
         destinationPath: s3://cluster-backups/
-        endpointURL: http://minio-service.backup-safety-1.svc.cluster.local:9000
+        endpointURL: https://object-store.object-store:9000
+        endpointCA:
+          key: ca.crt
+          name: object-store-ca-secret
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds
@@ -52,15 +50,3 @@ spec:
           secretAccessKey:
             name: backup-storage-creds
             key: KEY
-        wal:
-          compression: gzip
-        data:
-          immediateCheckpoint: true
-          additionalCommandArgs:
-            - "--min-chunk-size=5MB"
-            - "--read-timeout=60"
-        tags:
-          retention: "30days"
-        historyTags:
-          retention: "30days"
-    retentionPolicy: "30d"

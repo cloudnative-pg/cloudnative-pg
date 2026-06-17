@@ -48,8 +48,8 @@ const (
 	PodRollout                Timeout = "podRollout"
 	OperatorIsReady           Timeout = "operatorIsReady"
 	LargeObject               Timeout = "largeObject"
-	WalsInMinio               Timeout = "walsInMinio"
-	MinioInstallation         Timeout = "minioInstallation"
+	WalsInObjectStore         Timeout = "walsInObjectStore"
+	ObjectStoreInstallation   Timeout = "objectStoreInstallation"
 	BackupIsReady             Timeout = "backupIsReady"
 	DrainNode                 Timeout = "drainNode"
 	VolumeSnapshotIsReady     Timeout = "volumeSnapshotIsReady"
@@ -70,8 +70,8 @@ var DefaultTestTimeouts = map[Timeout]int{
 	PodRollout:                180,
 	OperatorIsReady:           120,
 	LargeObject:               300,
-	WalsInMinio:               60,
-	MinioInstallation:         300,
+	WalsInObjectStore:         60,
+	ObjectStoreInstallation:   300,
 	BackupIsReady:             180,
 	DrainNode:                 900,
 	VolumeSnapshotIsReady:     300,
