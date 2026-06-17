@@ -1321,6 +1321,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 				r.mapPluginEndpointSlicesToClusters(configuration.Current.OperatorNamespace),
 			),
 			builder.WithPredicates(
+				predicate.GenerationChangedPredicate{},
 				operatorNamespaceServiceEndpointSlicePredicate(configuration.Current.OperatorNamespace),
 			),
 		).
