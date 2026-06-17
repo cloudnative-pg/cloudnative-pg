@@ -489,7 +489,17 @@ func sslClient(namespace string) appsv1.Deployment {
 			MountPath: tlsVolumeMountPath,
 		},
 	)
-	podSpec.Containers[0].Env[0].Value = "https://object-store.object-store:9000"
+	endpointUpdated := false
+	for i := range podSpec.Containers[0].Env {
+		if podSpec.Containers[0].Env[i].Name == "AWS_ENDPOINT_URL" {
+			podSpec.Containers[0].Env[i].Value = "https://object-store.object-store:9000"
+			endpointUpdated = true
+			break
+		}
+	}
+	if !endpointUpdated {
+		panic("sslClient: AWS_ENDPOINT_URL not found in defaultClient env")
+	}
 	podSpec.Containers[0].Env = append(
 		podSpec.Containers[0].Env,
 		corev1.EnvVar{
