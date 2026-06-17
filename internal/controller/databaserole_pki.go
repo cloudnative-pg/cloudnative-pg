@@ -177,7 +177,7 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 	// corrupt; treat it as a re-issue trigger rather than error-looping.
 	certInvalid := false
 
-	signedByCurrentCA, err := clientCertSignedByCurrentCA(caSecret, certSecret)
+	signedByCurrentCA, err := clientCertSignedByCurrentCA(ctx, caSecret, certSecret)
 	if err != nil {
 		contextLogger.Warning("client cert is unreadable, re-issuing",
 			"secret", secretKey.Name, "err", err)
@@ -256,7 +256,7 @@ func (r *DatabaseRoleReconciler) deleteOwnedCertSecret(
 // does not mask a CA change; expiry is handled separately by renewal. A false
 // result with no error means the certificate must be re-issued, typically
 // because the cluster's client CA was rotated.
-func clientCertSignedByCurrentCA(caSecret, certSecret *corev1.Secret) (bool, error) {
+func clientCertSignedByCurrentCA(ctx context.Context, caSecret, certSecret *corev1.Secret) (bool, error) {
 	caPair := &certs.KeyPair{Certificate: caSecret.Data[certs.CACertKey]}
 
 	certPEM, ok := certSecret.Data[certs.TLSCertKey]
@@ -277,6 +277,8 @@ func clientCertSignedByCurrentCA(caSecret, certSecret *corev1.Secret) (bool, err
 		CurrentTime: leaf.NotBefore,
 	}
 	if err := certPair.IsValid(caPair, opts); err != nil {
+		log.FromContext(ctx).Debug("cert chain validation failed, treating as CA change",
+			"secret", certSecret.Name, "err", err)
 		return false, nil
 	}
 	return true, nil

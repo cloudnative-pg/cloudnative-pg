@@ -160,7 +160,7 @@ var _ = Describe("databaserole_pki", func() {
 			// The certificate must have been re-signed (bytes differ) and must
 			// now validate against the rotated CA, preserving the CN.
 			Expect(secondCert).NotTo(Equal(firstCert))
-			signed, err := clientCertSignedByCurrentCA(&caSecret, &secondSecret)
+			signed, err := clientCertSignedByCurrentCA(ctx, &caSecret, &secondSecret)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(signed).To(BeTrue())
 
