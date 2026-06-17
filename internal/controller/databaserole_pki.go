@@ -239,7 +239,7 @@ func (r *DatabaseRoleReconciler) deleteOwnedCertSecret(
 			"secret", secretKey.Name)
 		role.Status.ClientCertificate = &apiv1.ClientCertificateState{
 			Message: fmt.Sprintf(
-				"Secret %q already exists and is not owned by this DatabaseRole; manual cleanup required",
+				"Secret %q is not owned by this DatabaseRole and will not be deleted automatically",
 				secretKey.Name,
 			),
 		}
