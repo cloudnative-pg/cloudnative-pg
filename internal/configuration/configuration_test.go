@@ -170,7 +170,6 @@ var _ = Describe("Annotation and label inheritance", func() {
 		config := Data{}
 		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
 	})
-
 })
 
 var _ = Describe("Webhook configuration names", func() {
