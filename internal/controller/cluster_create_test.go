@@ -1653,7 +1653,12 @@ var _ = Describe("node serial allocation", func() {
 				Build()
 		}
 
-		forceStatusConflict := interceptor.Funcs{
+		// conflictOnSerialBump forces an optimistic-lock conflict only on the
+		// status write that advances LatestGeneratedNode to serial 2 (the value
+		// recordGeneratedNodeSerial persists for this 1->2 scale-up). The earlier
+		// RegisterPhase write, which leaves the counter at 1, is let through, so
+		// the Job and PVCs are created and only the final counter persist fails.
+		conflictOnSerialBump := interceptor.Funcs{
 			SubResourcePatch: func(
 				ctx context.Context,
 				cl k8client.Client,
@@ -1662,7 +1667,8 @@ var _ = Describe("node serial allocation", func() {
 				patch k8client.Patch,
 				opts ...k8client.SubResourcePatchOption,
 			) error {
-				if _, isCluster := obj.(*apiv1.Cluster); isCluster && subResourceName == "status" {
+				if c, isCluster := obj.(*apiv1.Cluster); isCluster && subResourceName == "status" &&
+					c.Status.LatestGeneratedNode >= 2 {
 					return apierrs.NewConflict(
 						schema.GroupResource{
 							Group:    apiv1.SchemeGroupVersion.Group,
@@ -1681,7 +1687,8 @@ var _ = Describe("node serial allocation", func() {
 				obj k8client.Object,
 				opts ...k8client.SubResourceUpdateOption,
 			) error {
-				if _, isCluster := obj.(*apiv1.Cluster); isCluster && subResourceName == "status" {
+				if c, isCluster := obj.(*apiv1.Cluster); isCluster && subResourceName == "status" &&
+					c.Status.LatestGeneratedNode >= 2 {
 					return apierrs.NewConflict(
 						schema.GroupResource{
 							Group:    apiv1.SchemeGroupVersion.Group,
@@ -1696,9 +1703,10 @@ var _ = Describe("node serial allocation", func() {
 		}
 
 		Context("joinReplicaInstance", func() {
-			It("does not advance LatestGeneratedNode when a status write fails", func(ctx SpecContext) {
+			It("does not advance LatestGeneratedNode when persisting the serial fails "+
+				"after the Job and PVCs are created", func(ctx SpecContext) {
 				cluster := newReplicaCluster()
-				cl := buildClient(cluster, nil, forceStatusConflict)
+				cl := buildClient(cluster, nil, conflictOnSerialBump)
 
 				r := &ClusterReconciler{
 					Client:   cl,
@@ -1708,6 +1716,17 @@ var _ = Describe("node serial allocation", func() {
 
 				_, err := r.joinReplicaInstance(ctx, nextNodeSerial(cluster), cluster)
 				Expect(err).To(HaveOccurred())
+
+				// The PVC for the new serial was created before the counter
+				// persist failed: resources are committed but the counter stays
+				// put. EnrichStatus reconciles this gap on a later loop.
+				var pvcs corev1.PersistentVolumeClaimList
+				Expect(cl.List(ctx, &pvcs, k8client.InNamespace(cluster.Namespace))).To(Succeed())
+				pvcNames := make([]string, 0, len(pvcs.Items))
+				for i := range pvcs.Items {
+					pvcNames = append(pvcNames, pvcs.Items[i].Name)
+				}
+				Expect(pvcNames).To(ContainElement(specs.GetInstanceName(cluster.Name, 2)))
 
 				var fetched apiv1.Cluster
 				Expect(cl.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fetched)).To(Succeed())
@@ -1778,7 +1797,7 @@ var _ = Describe("node serial allocation", func() {
 				jobName := specs.GetInstanceName(cluster.Name, 2) + "-join"
 				staleCache := interceptor.Funcs{
 					Create: func(
-						ctx context.Context,
+						_ context.Context,
 						_ k8client.WithWatch,
 						obj k8client.Object,
 						_ ...k8client.CreateOption,
