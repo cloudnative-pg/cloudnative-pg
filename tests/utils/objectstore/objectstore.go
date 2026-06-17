@@ -158,6 +158,7 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To(int32(1)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "object-store"},
 			},
