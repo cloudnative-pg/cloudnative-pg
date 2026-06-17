@@ -1185,16 +1185,13 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	}
 
 	// Wait long enough that a candidate primary can take over a lease whose
-	// previous holder did not release cleanly, in a single Acquire call.
-	// client-go's elector compares its own observedTime against
-	// LeaseDuration, so the take-over moment is at the first
-	// tryAcquireOrRenew call that lands past LeaseDuration. The renew loop
-	// uses sliding wait.JitterUntil with jitterFactor 1.2, so consecutive
-	// calls are spaced between RetryPeriod and 2.2*RetryPeriod. The
-	// worst-case take-over therefore lands LeaseDuration + 2.2*RetryPeriod
-	// after the candidate's first Get; sizing acquireTimeout to
-	// LeaseDuration + 3*RetryPeriod keeps the take-over inside a single
-	// Acquire call with a small margin for scheduling overhead.
+	// previous holder did not release cleanly, in a single Acquire call. The
+	// runnable's preAcquire loop polls jitter-free every RetryPeriod and takes
+	// over a still-held lease once it has observed the record unchanged for a
+	// full LeaseDuration, so the take-over moment lands at most one RetryPeriod
+	// past LeaseDuration (the poll granularity). Sizing acquireTimeout to
+	// LeaseDuration + 3*RetryPeriod keeps that take-over inside a single
+	// Acquire call with margin for the take-over write and scheduling overhead.
 	leaseDuration := cluster.GetPrimaryLeaseDuration()
 	retryPeriod := cluster.GetPrimaryLeaseRetryPeriod()
 	acquireTimeout := leaseDuration + 3*retryPeriod
@@ -1209,10 +1206,9 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	if err := r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			contextLogger.Warning("Primary lease not yet acquired, retrying")
-			// Retry quickly: the runnable's elector may have taken over
-			// right after our context fired (extreme jitter can push the
-			// take-over a fraction past acquireTimeout), in which case the
-			// next Acquire returns immediately via heldCh.
+			// Retry soon: the runnable's preAcquire loop may complete the
+			// take-over in the background just after our context fired, in
+			// which case the next Acquire returns immediately via heldCh.
 			return reconcile.Result{RequeueAfter: retryPeriod}, nil
 		}
 		return reconcile.Result{}, fmt.Errorf("acquiring primary lease: %w", err)
