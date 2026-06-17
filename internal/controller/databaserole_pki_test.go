@@ -290,7 +290,9 @@ var _ = Describe("databaserole_pki", func() {
 
 			// The unowned secret must still exist.
 			Expect(r.Get(ctx, certSecretKey(role), &corev1.Secret{})).To(Succeed())
-			Expect(role.Status.ClientCertificate).To(BeNil())
+			// Status must surface the conflict rather than silently dropping it.
+			Expect(role.Status.ClientCertificate).NotTo(BeNil())
+			Expect(role.Status.ClientCertificate.Message).To(ContainSubstring("not owned by this DatabaseRole"))
 		})
 	})
 
