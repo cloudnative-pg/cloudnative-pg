@@ -161,11 +161,12 @@ func checkWebhookSetup(
 
 	for _, webhook := range mutatingWebhookConfig.Webhooks {
 		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
-			return fmt.Errorf("secret %+v not match with ca bundle in %v: %v is not equal to %v",
+			return fmt.Errorf("CA bundle mismatch in %v: secret %v/%v (ca len=%d) does not match webhook config (bundle len=%d)",
 				configuration.Current.GetMutatingWebhookConfigurationName(),
-				secret,
-				string(ca),
-				string(webhook.ClientConfig.CABundle),
+				secret.Namespace,
+				secret.Name,
+				len(ca),
+				len(webhook.ClientConfig.CABundle),
 			)
 		}
 	}
@@ -177,8 +178,13 @@ func checkWebhookSetup(
 
 	for _, webhook := range validatingWebhookConfig.Webhooks {
 		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
-			return fmt.Errorf("secret not match with ca bundle in %v",
-				configuration.Current.GetValidatingWebhookConfigurationName())
+			return fmt.Errorf("CA bundle mismatch in %v: secret %v/%v (ca len=%d) does not match webhook config (bundle len=%d)",
+				configuration.Current.GetValidatingWebhookConfigurationName(),
+				secret.Namespace,
+				secret.Name,
+				len(ca),
+				len(webhook.ClientConfig.CABundle),
+			)
 		}
 	}
 
