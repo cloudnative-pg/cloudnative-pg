@@ -32,6 +32,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,6 +76,9 @@ const (
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
 	databaseRoleClusterKey        = ".spec.cluster.name"
+	// usedPluginsClusterKey is a synthetic index key, not a real Cluster spec field;
+	// it is populated by getPluginsNeededForReconcile.
+	usedPluginsClusterKey = ".spec.usedPlugins"
 )
 
 var apiSGVString = apiv1.SchemeGroupVersion.String()
@@ -128,6 +132,7 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;create;list;watch;delete;patch
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;delete;get;list;watch;update;patch
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -199,11 +204,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	ctx = cluster.SetInContext(ctx)
 
 	// Load the plugins required to bootstrap and reconcile this cluster
-	enabledPluginNames := apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
-	enabledPluginNames = append(
-		enabledPluginNames,
-		apiv1.GetExternalClustersEnabledPluginNames(cluster.Spec.ExternalClusters)...,
-	)
+	enabledPluginNames := getPluginsNeededForReconcile(cluster)
 
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPluginLoading()
@@ -269,6 +270,18 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	return result, nil
+}
+
+// getPluginsNeededForReconcile returns the names of the plugins that must be
+// loaded for the reconciliation loop to interact with this cluster, collected
+// from both the cluster's plugin configuration and its external clusters.
+func getPluginsNeededForReconcile(cluster *apiv1.Cluster) []string {
+	names := apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
+	names = append(
+		names,
+		apiv1.GetExternalClustersEnabledPluginNames(cluster.Spec.ExternalClusters)...,
+	)
+	return stringset.From(names).ToSortedList()
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
@@ -1249,7 +1262,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
@@ -1303,8 +1316,22 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			// The cluster only consumes spec.passwordSecret (to maintain the
 			// instance RBAC), so status-only changes are irrelevant here.
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
-		).
-		Complete(r)
+		)
+
+	if configuration.Current.OperatorNamespace != "" {
+		ctrlBuilder = ctrlBuilder.Watches(
+			&discoveryv1.EndpointSlice{},
+			handler.EnqueueRequestsFromMapFunc(
+				r.mapPluginEndpointSlicesToClusters(configuration.Current.OperatorNamespace),
+			),
+			builder.WithPredicates(
+				predicate.GenerationChangedPredicate{},
+				operatorNamespaceServiceEndpointSlicePredicate(configuration.Current.OperatorNamespace),
+			),
+		)
+	}
+
+	return ctrlBuilder.Complete(r)
 }
 
 // jobOwnerIndexFunc maps a job definition to its owning cluster and
@@ -1354,6 +1381,19 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 			}
 			return []string{"true"}
 		}); err != nil {
+		return err
+	}
+
+	// Create a new index field that allows mapping a cluster to all the
+	// plugins that are required to reconcile it
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Cluster{},
+		usedPluginsClusterKey, func(rawObj client.Object) []string {
+			cluster := rawObj.(*apiv1.Cluster)
+			return getPluginsNeededForReconcile(cluster)
+		},
+	); err != nil {
 		return err
 	}
 
