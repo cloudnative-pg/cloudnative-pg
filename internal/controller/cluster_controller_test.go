@@ -507,3 +507,112 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 			"kubelet-stale branch must stay event-less to avoid noise")
 	})
 })
+
+var _ = Describe("getPluginsNeededForReconcile", func() {
+	ptrBool := func(b bool) *bool { return &b }
+
+	It("returns an empty slice when no plugins or external clusters are configured", func() {
+		cluster := &apiv1.Cluster{}
+		Expect(getPluginsNeededForReconcile(cluster)).To(BeEmpty())
+	})
+
+	It("returns the names of enabled plugins from Spec.Plugins", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{Name: "plugin-a"},
+					{Name: "plugin-b", Enabled: ptrBool(true)},
+				},
+			},
+		}
+		Expect(getPluginsNeededForReconcile(cluster)).
+			To(ConsistOf("plugin-a", "plugin-b"))
+	})
+
+	It("skips plugins that are explicitly disabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{Name: "plugin-a"},
+					{Name: "plugin-b", Enabled: ptrBool(false)},
+				},
+			},
+		}
+		Expect(getPluginsNeededForReconcile(cluster)).
+			To(ConsistOf("plugin-a"))
+	})
+
+	It("includes plugins referenced by external clusters", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                "source",
+						PluginConfiguration: &apiv1.PluginConfiguration{Name: "plugin-ext"},
+					},
+					{Name: "no-plugin"},
+				},
+			},
+		}
+		Expect(getPluginsNeededForReconcile(cluster)).
+			To(ConsistOf("plugin-ext"))
+	})
+
+	It("merges plugins from Spec.Plugins and Spec.ExternalClusters", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{Name: "plugin-a"},
+					{Name: "plugin-disabled", Enabled: ptrBool(false)},
+				},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                "source",
+						PluginConfiguration: &apiv1.PluginConfiguration{Name: "plugin-ext"},
+					},
+				},
+			},
+		}
+		Expect(getPluginsNeededForReconcile(cluster)).
+			To(ConsistOf("plugin-a", "plugin-ext"))
+	})
+
+	It("includes external-cluster plugins even when explicitly disabled", func() {
+		// GetExternalClustersEnabledPluginNames does not consult
+		// PluginConfiguration.Enabled — any non-nil PluginConfiguration on an
+		// external cluster contributes its name. This test locks that in.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name: "source",
+						PluginConfiguration: &apiv1.PluginConfiguration{
+							Name:    "plugin-ext",
+							Enabled: ptrBool(false),
+						},
+					},
+				},
+			},
+		}
+		Expect(getPluginsNeededForReconcile(cluster)).
+			To(ConsistOf("plugin-ext"))
+	})
+
+	It("deduplicates plugin names that appear in both Spec.Plugins and external clusters", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{Name: "plugin-shared"},
+				},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                "source",
+						PluginConfiguration: &apiv1.PluginConfiguration{Name: "plugin-shared"},
+					},
+				},
+			},
+		}
+		Expect(getPluginsNeededForReconcile(cluster)).
+			To(Equal([]string{"plugin-shared"}))
+	})
+})
