@@ -153,6 +153,8 @@ func RunController(
 				},
 			},
 		}
+	} else {
+		setupLog.Info("Plugin EndpointSlice watch disabled: OPERATOR_NAMESPACE not set")
 	}
 
 	if conf.WatchNamespace != "" {
