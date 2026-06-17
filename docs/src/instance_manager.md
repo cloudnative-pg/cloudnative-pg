@@ -244,6 +244,13 @@ spec:
         connectionTimeout: "2000"
 ```
 
+:::info
+Primary isolation is distinct from the [safe primary election](failover.md#safe-primary-election)
+mechanism. The isolation check *fences* a primary that has lost connectivity to
+both the API server and the other instances, while the primary lease coordinates
+*which instance is allowed to promote*. The two mechanisms are complementary.
+:::
+
 ## Readiness Probe
 
 The readiness probe starts once the startup probe has successfully completed.

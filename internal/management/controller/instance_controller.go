@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	cnpgiclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
@@ -222,7 +223,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Instance promotion will not automatically load the changed configuration files.
 	// Therefore, it should not be counted as "a restart".
-	if err := r.reconcilePrimary(ctx, cluster); err != nil {
+	if result, err := r.reconcilePrimary(ctx, cluster); err != nil {
 		var tokenError *promotiontoken.TokenVerificationError
 		if errors.As(err, &tokenError) {
 			contextLogger.Warning(
@@ -233,6 +234,9 @@ func (r *InstanceReconciler) Reconcile(
 			// We should be waiting for WAL recovery to reach the LSN in the token
 			return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 		}
+		return reconcile.Result{}, err
+	} else if !result.IsZero() {
+		return result, nil
 	}
 
 	restarted, err := r.reconcileOldPrimary(ctx, cluster)
@@ -1173,17 +1177,47 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 }
 
 // Reconciler primary logic. DB needed.
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	if cluster.Status.TargetPrimary != r.instance.GetPodName() || cluster.IsReplica() {
-		return nil
+		return reconcile.Result{}, nil
+	}
+
+	// Wait long enough that a candidate primary can take over a lease whose
+	// previous holder did not release cleanly, in a single Acquire call. The
+	// runnable's preAcquire loop polls jitter-free every RetryPeriod and takes
+	// over a still-held lease once it has observed the record unchanged for a
+	// full LeaseDuration, so the take-over moment lands at most one RetryPeriod
+	// past LeaseDuration (the poll granularity). Sizing acquireTimeout to
+	// LeaseDuration + 3*RetryPeriod keeps that take-over inside a single
+	// Acquire call with margin for the take-over write and scheduling overhead.
+	leaseDuration := cluster.GetPrimaryLeaseDuration()
+	retryPeriod := cluster.GetPrimaryLeaseRetryPeriod()
+	acquireTimeout := leaseDuration + 3*retryPeriod
+	acquireCtx, acquireCancel := context.WithTimeout(ctx, acquireTimeout)
+	defer acquireCancel()
+	leaseConfig := lease.Config{
+		LeaseDuration:         leaseDuration,
+		RenewDeadline:         cluster.GetPrimaryLeaseRenewDeadline(),
+		RetryPeriod:           retryPeriod,
+		ReleasedLeaseDuration: cluster.GetPrimaryLeaseReleasedDuration(),
+	}
+	if err := r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			contextLogger.Warning("Primary lease not yet acquired, retrying")
+			// Retry soon: the runnable's preAcquire loop may complete the
+			// take-over in the background just after our context fired, in
+			// which case the next Acquire returns immediately via heldCh.
+			return reconcile.Result{RequeueAfter: retryPeriod}, nil
+		}
+		return reconcile.Result{}, fmt.Errorf("acquiring primary lease: %w", err)
 	}
 
 	oldCluster := cluster.DeepCopy()
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
-		return err
+		return reconcile.Result{}, err
 	}
 
 	// If I'm not the primary, let's promote myself
@@ -1193,14 +1227,14 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			// Report that a promotion is still ongoing on the cluster
 			cluster.Status.Phase = apiv1.PhaseReplicaClusterPromotion
 			if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-				return err
+				return reconcile.Result{}, err
 			}
-			return err
+			return reconcile.Result{}, err
 		}
 
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
 		if err := r.handlePromotion(ctx, cluster); err != nil {
-			return err
+			return reconcile.Result{}, err
 		}
 	}
 
@@ -1210,11 +1244,11 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-			return err
+			return reconcile.Result{}, err
 		}
 
 		if err := r.instance.DropConnections(); err != nil {
-			return err
+			return reconcile.Result{}, err
 		}
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
 	}
@@ -1223,7 +1257,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.Spec.ReplicaCluster.PromotionToken != cluster.Status.LastPromotionToken {
 		cluster.Status.LastPromotionToken = cluster.Spec.ReplicaCluster.PromotionToken
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-			return err
+			return reconcile.Result{}, err
 		}
 
 		contextLogger.Info("Updated last promotion token", "lastPromotionToken",
@@ -1231,12 +1265,13 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	}
 
 	// If it is already the current primary, everything is ok
-	return nil
+	return reconcile.Result{}, nil
 }
 
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
+
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down

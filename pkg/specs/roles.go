@@ -233,6 +233,21 @@ func CreateRole(opts RoleOptions) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
+				"coordination.k8s.io",
+			},
+			Resources: []string{
+				"leases",
+			},
+			Verbs: []string{
+				"get",
+				"update",
+			},
+			ResourceNames: []string{
+				opts.Cluster.Name,
+			},
+		},
+		{
+			APIGroups: []string{
 				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{

@@ -531,6 +531,54 @@ type ClusterSpec struct {
 	// in the PostgreSQL Pods.
 	// +optional
 	Probes *ProbesConfiguration `json:"probes,omitempty"`
+
+	// Configuration of the Kubernetes `Lease` used to coordinate safe primary
+	// election within the cluster. When omitted, the operator applies built-in
+	// defaults; tune these values only if you understand the consequences for
+	// failover timing.
+	// +optional
+	PrimaryLease *PrimaryLeaseConfiguration `json:"primaryLease,omitempty"`
+}
+
+// PrimaryLeaseConfiguration configures the timings of the Kubernetes `Lease`
+// that the primary instance holds and renews to coordinate a safe primary
+// election. These values map directly onto the underlying Kubernetes
+// leader-election parameters.
+type PrimaryLeaseConfiguration struct {
+	// How long, in seconds, the primary lease is considered valid before it
+	// expires and another instance may acquire it. It must be greater than
+	// `renewDeadlineSeconds`.
+	// Defaults to 15.
+	// +kubebuilder:default:=15
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty"`
+
+	// How long, in seconds, the current primary keeps retrying to renew the
+	// lease before giving up and stopping. It must be smaller than
+	// `leaseDurationSeconds`.
+	// Defaults to 10.
+	// +kubebuilder:default:=10
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	RenewDeadlineSeconds *int32 `json:"renewDeadlineSeconds,omitempty"`
+
+	// How frequently, in seconds, a non-holder instance retries acquiring or
+	// renewing the lease.
+	// Defaults to 5.
+	// +kubebuilder:default:=5
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	RetryPeriodSeconds *int32 `json:"retryPeriodSeconds,omitempty"`
+
+	// The TTL, in seconds, written when the primary explicitly releases the
+	// lease on a clean shutdown, allowing a replica to promote without waiting
+	// for the full lease duration to expire.
+	// Defaults to 1.
+	// +kubebuilder:default:=1
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	ReleasedLeaseDurationSeconds *int32 `json:"releasedLeaseDurationSeconds,omitempty"`
 }
 
 // ProbesConfiguration represent the configuration for the probes
@@ -1389,6 +1437,21 @@ const (
 	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,
 	// the minimum value is 1
 	DefaultStartupDelay = 3600
+
+	// DefaultPrimaryLeaseDurationSeconds is the default validity, in seconds, of the primary lease.
+	DefaultPrimaryLeaseDurationSeconds = 15
+
+	// DefaultPrimaryLeaseRenewDeadlineSeconds is the default deadline, in seconds, for the primary
+	// to renew its lease before giving up.
+	DefaultPrimaryLeaseRenewDeadlineSeconds = 10
+
+	// DefaultPrimaryLeaseRetryPeriodSeconds is the default interval, in seconds, between lease
+	// acquisition or renewal attempts.
+	DefaultPrimaryLeaseRetryPeriodSeconds = 5
+
+	// DefaultPrimaryLeaseReleasedDurationSeconds is the default TTL, in seconds, written when the
+	// primary explicitly releases its lease on a clean shutdown.
+	DefaultPrimaryLeaseReleasedDurationSeconds = 1
 )
 
 // SynchronousReplicaConfigurationMethod configures whether to use
