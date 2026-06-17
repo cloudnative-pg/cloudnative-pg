@@ -202,7 +202,17 @@ func execCommandOnce(
 		Stderr:    true,
 	}, scheme.ParameterCodec)
 
-	executor, err := remotecommand.NewWebSocketExecutor(&newConfig, "POST", req.URL().String())
+	wsExecutor, err := remotecommand.NewWebSocketExecutor(&newConfig, "POST", req.URL().String())
+	if err != nil {
+		return "", "", err
+	}
+	spdyExecutor, err := remotecommand.NewSPDYExecutor(&newConfig, "POST", req.URL())
+	if err != nil {
+		return "", "", err
+	}
+	executor, err := remotecommand.NewFallbackExecutor(wsExecutor, spdyExecutor, func(err error) bool {
+		return strings.Contains(err.Error(), "websocket: bad handshake")
+	})
 	if err != nil {
 		return "", "", err
 	}
