@@ -143,7 +143,7 @@ var _ = Describe("mapPluginEndpointSlicesToClusters", func() {
 	})
 
 	It("returns nil when the owning Service does not look like a plugin", func() {
-		// Service exists but is missing the plugin annotations.
+		// Service exists but is missing the plugin label.
 		nonPlugin := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pluginServiceName,
