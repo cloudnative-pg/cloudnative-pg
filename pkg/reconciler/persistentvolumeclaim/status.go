@@ -190,6 +190,7 @@ func EnrichStatus(
 	// First we iterate over all the PVCs building the instances map.
 	// It contains the PVCSs grouped by instance serial
 	instancesPVCs := make(map[string][]corev1.PersistentVolumeClaim)
+	maxSerial := 0
 	for _, pvc := range managedPVCs {
 		// Ignore PVCs that is in the wrong state
 		if pvc.Status.Phase != corev1.ClaimPending &&
@@ -208,8 +209,23 @@ func EnrichStatus(
 		if err != nil {
 			continue
 		}
+		if serial > maxSerial {
+			maxSerial = serial
+		}
 		instanceName := specs.GetInstanceName(cluster.Name, serial)
 		instancesPVCs[instanceName] = append(instancesPVCs[instanceName], pvc)
+	}
+
+	// Self-heal LatestGeneratedNode. The serial counter is persisted only after
+	// the Job and PVCs for a serial are committed (see recordGeneratedNodeSerial),
+	// so a crash in that window can leave the counter behind a serial that already
+	// owns a PVC. Realigning it to the highest observed serial keeps the next
+	// allocation from colliding with an existing instance. We only ever move it
+	// forward: a committed serial is one the operator generated, so this never
+	// introduces gaps, and never rolls back a counter that a stale PVC informer
+	// has not caught up with.
+	if maxSerial > cluster.Status.LatestGeneratedNode {
+		cluster.Status.LatestGeneratedNode = maxSerial
 	}
 
 	// For every instance we have we validate the list of PVCs
