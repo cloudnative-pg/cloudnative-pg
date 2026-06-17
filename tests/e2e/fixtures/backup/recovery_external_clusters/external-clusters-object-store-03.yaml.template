@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: external-cluster-minio-1
+  name: external-cluster-object-store
 spec:
   instances: 2
 
@@ -29,41 +29,17 @@ spec:
   bootstrap:
     recovery:
       # cluster name in source cluster
-      source: pg-backup-minio
+      source: source-cluster-object-store
 
-  backup:
-    target: primary
-    barmanObjectStore:
-      destinationPath: s3://cluster-backups/test/
-      endpointURL: https://minio-service.minio:9000
-      endpointCA:
-        key: ca.crt
-        name: minio-server-ca-secret
-      s3Credentials:
-        accessKeyId:
-          name: backup-storage-creds
-          key: ID
-        secretAccessKey:
-          name: backup-storage-creds
-          key: KEY
-      wal:
-        compression: gzip
-      data:
-        immediateCheckpoint: true
-      tags:
-        retention: "30days"
-      historyTags:
-        retention: "30days"
-    retentionPolicy: "30d"
 
   externalClusters:
-    - name: pg-backup-minio
+    - name: source-cluster-object-store
       barmanObjectStore:
         destinationPath: s3://cluster-backups/
-        endpointURL: https://minio-service.minio:9000
+        endpointURL: https://object-store.object-store:9000
         endpointCA:
           key: ca.crt
-          name: minio-server-ca-secret
+          name: object-store-ca-secret
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds

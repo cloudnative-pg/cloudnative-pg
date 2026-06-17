@@ -40,14 +40,14 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
-	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -367,20 +367,20 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			replicaNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the credentials for minio", func() {
+			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
 					env.Ctx,
 					env.Client,
 					replicaNamespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, replicaNamespace)
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, replicaNamespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -417,10 +417,10 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				}, 30).Should(BeEquivalentTo("always"))
 			})
 			By("verify the WALs are archived from the designated primary", func() {
-				// only replica cluster has backup configure to minio,
-				// need the server name  be replica cluster name here
-				minioasserts.AssertArchiveWalOnMinio(
-					env, testTimeouts, minioEnv, replicaNamespace, srcClusterName, replicaClusterName,
+				// only replica cluster has backup configured to the object store,
+				// need the server name to be replica cluster name here
+				objectstoreasserts.AssertArchiveWalOnObjectStore(
+					env, testTimeouts, objectStoreEnv, replicaNamespace, srcClusterName, replicaClusterName,
 				)
 			})
 		})
@@ -439,20 +439,20 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the credentials for minio", func() {
+			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
 					env.Ctx,
 					env.Client,
 					namespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -621,7 +621,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			"CREATE TABLE test_replication AS SELECT 1;",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		_ = minioasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
+		_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
 
 		Eventually(func(g Gomega) {
 			podListA, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
@@ -673,13 +673,13 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				// Since we use multiple times the same cluster names for the same minio instance, we need to clean it up
+				// Since we use multiple times the same cluster names for the same object store instance, we need to clean it up
 				// between tests
-				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterAName))
+				_, err = objectstore.CleanFiles(objectStoreEnv, path.Join("cluster-backups", clusterAName))
 				if err != nil {
 					return err
 				}
-				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterBName))
+				_, err = objectstore.CleanFiles(objectStoreEnv, path.Join("cluster-backups", clusterBName))
 				if err != nil {
 					return err
 				}
@@ -689,20 +689,20 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			stopLoad := make(chan struct{})
 			DeferCleanup(func() { close(stopLoad) })
 
-			By("creating the credentials for minio", func() {
+			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
 					env.Ctx,
 					env.Client,
 					namespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -762,7 +762,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				// Speed up backup finalization
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
-				_ = minioasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
+				_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(

@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: external-cluster-minio-replica
+  name: pg-backup-object-store-custom
 spec:
-  instances: 2
+  instances: 1
 
   postgresql:
     parameters:
@@ -13,6 +13,7 @@ spec:
       log_statement: 'ddl'
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
 
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all
@@ -25,24 +26,31 @@ spec:
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
 
   bootstrap:
-    recovery:
-      # cluster name in source cluster
-      source: source-cluster-minio
+    initdb:
+      database: app
+      owner: app
 
-  replica:
-    enabled: true
-    source: source-cluster-minio
+  monitoring:
+    customQueriesConfigMap:
+      - name: monitoring-01
+        key: additional-queries
+    customQueriesSecret:
+      - name: monitoring-01
+        key: additional-queries
 
-  externalClusters:
-    - name: source-cluster-minio
-      barmanObjectStore:
-        destinationPath: s3://cluster-backups/
-        endpointURL: https://minio-service.minio:9000
+  backup:
+    target: primary
+    barmanObjectStore:
+        destinationPath: s3://pg-backup-object-store-custom/
+        endpointURL: https://object-store.object-store:9000
         endpointCA:
           key: ca.crt
-          name: minio-server-ca-secret
+          name: object-store-ca-secret
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds
@@ -50,3 +58,13 @@ spec:
           secretAccessKey:
             name: backup-storage-creds
             key: KEY
+        wal:
+          compression: gzip
+        data:
+          immediateCheckpoint: true
+        tags:
+          retention: "30days"
+        historyTags:
+          retention: "30days"
+        serverName: pg-backup-object-store-Custom-Name
+    retentionPolicy: "30d"

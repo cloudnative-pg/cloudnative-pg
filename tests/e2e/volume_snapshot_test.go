@@ -39,13 +39,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
-	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -130,7 +130,7 @@ var _ = Describe("Verify Volume Snapshot",
 					}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 					// trigger a checkpoint as the backup may run on standby
-					minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterName)
+					objectstoreasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterName)
 					Eventually(func(g Gomega) {
 						backupList, err := backups.List(env.Ctx, env.Client, namespace)
 						g.Expect(err).ToNot(HaveOccurred())
@@ -195,8 +195,8 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
-				By("create the certificates for MinIO", func() {
-					err := minioEnv.CreateCaSecret(env, namespace)
+				By("create the certificates for the object store", func() {
+					err := objectStoreEnv.CreateCaSecret(env, namespace)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -205,8 +205,8 @@ var _ = Describe("Verify Volume Snapshot",
 					env.Client,
 					namespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -227,13 +227,13 @@ var _ = Describe("Verify Volume Snapshot",
 					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToSnapshotName, clusterToSnapshot)
 				})
 
-				By("verify connectivity of barman to minio", func() {
+				By("verify connectivity of barman to the object store", func() {
 					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
-						connectionStatus, err := minio.TestBarmanConnectivity(
+						connectionStatus, err := objectstore.TestBarmanConnectivity(
 							namespace, clusterToSnapshotName, primaryPod.Name,
-							"minio", "minio123", minioEnv.ServiceName)
+							objectstore.AccessKeyID, objectstore.SecretAccessKey, objectStoreEnv.ServiceName)
 						return connectionStatus, err
 					}, 60).Should(BeTrue())
 				})
@@ -259,7 +259,7 @@ var _ = Describe("Verify Volume Snapshot",
 					)
 					Expect(err).ToNot(HaveOccurred())
 					// trigger a checkpoint
-					minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterToSnapshotName)
+					objectstoreasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterToSnapshotName)
 					Eventually(func(g Gomega) {
 						err = env.Client.Get(env.Ctx, types.NamespacedName{
 							Namespace: namespace,
@@ -330,10 +330,10 @@ var _ = Describe("Verify Volume Snapshot",
 					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
-					minioasserts.AssertArchiveWalOnMinio(
+					objectstoreasserts.AssertArchiveWalOnObjectStore(
 						env,
 						testTimeouts,
-						minioEnv,
+						objectStoreEnv,
 						namespace,
 						clusterToSnapshotName,
 						clusterToSnapshotName,
@@ -601,7 +601,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).NotTo(HaveOccurred())
 				})
 
-				minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterToBackupName)
+				objectstoreasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterToBackupName)
 				var backup apiv1.Backup
 				By("waiting the backup to complete", func() {
 					Eventually(func(g Gomega) {
@@ -671,19 +671,19 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
-				By("create the certificates for MinIO", func() {
-					err := minioEnv.CreateCaSecret(env, namespace)
+				By("create the certificates for the object store", func() {
+					err := objectStoreEnv.CreateCaSecret(env, namespace)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				By("creating the credentials for minio", func() {
+				By("creating the credentials for the object store", func() {
 					_, err = secrets.CreateObjectStorageSecret(
 						env.Ctx,
 						env.Client,
 						namespace,
 						"backup-storage-creds",
-						"minio",
-						"minio123",
+						objectstore.AccessKeyID,
+						objectstore.SecretAccessKey,
 					)
 					Expect(err).ToNot(HaveOccurred())
 				})
@@ -692,13 +692,13 @@ var _ = Describe("Verify Volume Snapshot",
 					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToSnapshotName, clusterToSnapshot)
 				})
 
-				By("verify connectivity of barman to minio", func() {
+				By("verify connectivity of barman to the object store", func() {
 					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
-						connectionStatus, err := minio.TestBarmanConnectivity(
+						connectionStatus, err := objectstore.TestBarmanConnectivity(
 							namespace, clusterToSnapshotName, primaryPod.Name,
-							"minio", "minio123", minioEnv.ServiceName)
+							objectstore.AccessKeyID, objectstore.SecretAccessKey, objectStoreEnv.ServiceName)
 						return connectionStatus, err
 					}, 60).Should(BeTrue())
 				})
@@ -743,10 +743,10 @@ var _ = Describe("Verify Volume Snapshot",
 					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
-					minioasserts.AssertArchiveWalOnMinio(
+					objectstoreasserts.AssertArchiveWalOnObjectStore(
 						env,
 						testTimeouts,
-						minioEnv,
+						objectStoreEnv,
 						namespace,
 						clusterToSnapshotName,
 						clusterToSnapshotName,
@@ -844,10 +844,10 @@ var _ = Describe("Verify Volume Snapshot",
 					pgasserts.InsertRecordIntoTable(tableName, 6, conn)
 
 					// Close and archive the current WAL file
-					minioasserts.AssertArchiveWalOnMinio(
+					objectstoreasserts.AssertArchiveWalOnObjectStore(
 						env,
 						testTimeouts,
-						minioEnv,
+						objectStoreEnv,
 						namespace,
 						clusterToSnapshotName,
 						clusterToSnapshotName,

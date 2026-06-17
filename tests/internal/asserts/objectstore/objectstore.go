@@ -17,10 +17,10 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package minio provides Ginkgo/Gomega assertions for WAL archiving to
-// MinIO. Callers that also import tests/utils/minio should alias one of
-// the two to avoid the package name collision.
-package minio
+// Package objectstore provides Ginkgo/Gomega assertions for WAL archiving
+// to the object store. Callers that also import tests/utils/objectstore
+// should alias one of the two to avoid the package name collision.
+package objectstore
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	minioutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	objectstoreutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	pgutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -52,30 +52,31 @@ func CheckPointAndSwitchWalOnPrimary(env *environment.TestingEnvironment, namesp
 	return latestWAL
 }
 
-// AssertArchiveWalOnMinio triggers a WAL switch and verifies the resulting
-// WAL file is uploaded to the MinIO server within the WalsInMinio timeout.
-func AssertArchiveWalOnMinio(
+// AssertArchiveWalOnObjectStore triggers a WAL switch and verifies the
+// resulting WAL file is uploaded to the object store within the
+// WalsInObjectStore timeout.
+func AssertArchiveWalOnObjectStore(
 	env *environment.TestingEnvironment,
 	testTimeouts map[timeouts.Timeout]int,
-	minioEnv *minioutils.Env,
+	storeEnv *objectstoreutils.Env,
 	namespace, clusterName, serverName string,
 ) {
 	GinkgoHelper()
 	var latestWALPath string
-	// Create a WAL on the primary and check if it arrives at minio, within a short time
+	// Create a WAL on the primary and check if it arrives at the object store, within a short time
 	By("archiving WALs and verifying they exist", func() {
 		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		primary := pod.GetName()
 		latestWAL := SwitchWalAndGetLatestArchive(env, namespace, primary)
-		latestWALPath = minioutils.GetFilePath(serverName, latestWAL+".gz")
+		latestWALPath = objectstoreutils.GetFilePath(serverName, latestWAL+".gz")
 	})
 
-	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
+	By(fmt.Sprintf("verify the existence of WAL %v in the object store", latestWALPath), func() {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
-			return minioutils.CountFiles(minioEnv, latestWALPath)
-		}, testTimeouts[timeouts.WalsInMinio]).Should(BeEquivalentTo(1))
+			return objectstoreutils.CountFiles(storeEnv, latestWALPath)
+		}, testTimeouts[timeouts.WalsInObjectStore]).Should(BeEquivalentTo(1))
 	})
 }
 
