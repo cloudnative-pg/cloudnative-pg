@@ -219,8 +219,8 @@ spec:
             - message: passwordSecret and disablePassword are mutually exclusive
               rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
             - message: clientCertificate requires the role to have login enabled
-              rule: '!has(self.clientCertificate) || !has(self.clientCertificate.enabled)
-                || !self.clientCertificate.enabled || (has(self.login) && self.login)'
+              rule: '!has(self.clientCertificate) || !self.clientCertificate.enabled
+                || self.login'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up
