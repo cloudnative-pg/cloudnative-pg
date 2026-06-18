@@ -75,7 +75,7 @@ func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
 func NewClusterAdmissionGuard() *guard.Admission[*apiv1.Cluster] {
 	return &guard.Admission[*apiv1.Cluster]{
 		Defaulter: &ClusterCustomDefaulter{},
-		Validator: &ClusterCustomValidator{},
+		Validator: newBypassableValidator[*apiv1.Cluster](&ClusterCustomValidator{}),
 	}
 }
 

@@ -49,7 +49,7 @@ func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
 func NewDatabaseAdmissionGuard() *guard.Admission[*apiv1.Database] {
 	return &guard.Admission[*apiv1.Database]{
 		Defaulter: &DatabaseCustomDefaulter{},
-		Validator: &DatabaseCustomValidator{},
+		Validator: newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{}),
 	}
 }
 

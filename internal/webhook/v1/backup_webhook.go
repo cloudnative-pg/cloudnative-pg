@@ -50,7 +50,7 @@ func SetupBackupWebhookWithManager(mgr ctrl.Manager) error {
 func NewBackupAdmissionGuard() *guard.Admission[*apiv1.Backup] {
 	return &guard.Admission[*apiv1.Backup]{
 		Defaulter: &BackupCustomDefaulter{},
-		Validator: &BackupCustomValidator{},
+		Validator: newBypassableValidator[*apiv1.Backup](&BackupCustomValidator{}),
 	}
 }
 

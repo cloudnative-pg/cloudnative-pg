@@ -51,7 +51,7 @@ func SetupScheduledBackupWebhookWithManager(mgr ctrl.Manager) error {
 func NewScheduledBackupAdmissionGuard() *guard.Admission[*apiv1.ScheduledBackup] {
 	return &guard.Admission[*apiv1.ScheduledBackup]{
 		Defaulter: &ScheduledBackupCustomDefaulter{},
-		Validator: &ScheduledBackupCustomValidator{},
+		Validator: newBypassableValidator[*apiv1.ScheduledBackup](&ScheduledBackupCustomValidator{}),
 	}
 }
 

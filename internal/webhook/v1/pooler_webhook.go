@@ -109,7 +109,7 @@ func SetupPoolerWebhookWithManager(mgr ctrl.Manager) error {
 // NewPoolerAdmissionGuard creates a guard to protect a reconciliation loop.
 func NewPoolerAdmissionGuard() *guard.Admission[*apiv1.Pooler] {
 	return &guard.Admission[*apiv1.Pooler]{
-		Validator: &PoolerCustomValidator{},
+		Validator: newBypassableValidator[*apiv1.Pooler](&PoolerCustomValidator{}),
 	}
 }
 
