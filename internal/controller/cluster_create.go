@@ -53,11 +53,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-// maxInstanceSerial is the upper bound (exclusive) for instance serial numbers.
-// Serials are reused when instances are removed, so this is just a coherence cap
-// to guard against bugs — it should exceed any realistic cluster size.
-const maxInstanceSerial = 100
-
 // createPostgresClusterObjects ensures that we have the required global objects
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *apiv1.Cluster) error {
 	err := r.setupPostgresPKI(ctx, cluster)
@@ -1122,16 +1117,18 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 }
 
 // generateNodeSerial returns the first free node serial number for this cluster.
-// A serial is considered free when no instance currently listed in
-// cluster.Status.InstanceNames is using it.
+// A serial is free when no instance currently listed in
+// cluster.Status.InstanceNames is using it. Scanning from 1 over N instance
+// names always finds a free serial within N+1 steps.
 func (r *ClusterReconciler) generateNodeSerial(cluster *apiv1.Cluster) (int, error) {
-	for i := 1; i < maxInstanceSerial; i++ {
+	upperBound := len(cluster.Status.InstanceNames) + 1
+	for i := 1; i <= upperBound; i++ {
 		if !slices.Contains(cluster.Status.InstanceNames, specs.GetInstanceName(cluster.Name, i)) {
 			return i, nil
 		}
 	}
 
-	return 0, fmt.Errorf("no free instance serial found below %d", maxInstanceSerial)
+	return 0, fmt.Errorf("no free instance serial found in range [1, %d]", upperBound)
 }
 
 func (r *ClusterReconciler) createPrimaryInstance(

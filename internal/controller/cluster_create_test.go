@@ -1586,16 +1586,6 @@ var _ = Describe("generateNodeSerial", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(serial).To(Equal(1))
 	})
-
-	It("returns an error when every serial up to the cap is taken", func() {
-		taken := make([]string, 0, maxInstanceSerial-1)
-		for i := 1; i < maxInstanceSerial; i++ {
-			taken = append(taken, specs.GetInstanceName(clusterName, i))
-		}
-		serial, err := r.generateNodeSerial(newCluster(taken...))
-		Expect(err).To(HaveOccurred())
-		Expect(serial).To(Equal(0))
-	})
 })
 
 var _ = Describe("ensureJobAdoptable", func() {
