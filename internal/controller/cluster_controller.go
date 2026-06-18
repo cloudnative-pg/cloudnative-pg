@@ -1252,6 +1252,12 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	// Execute online update, if enabled and if not already executing
 	if cluster.Status.OnlineUpdateEnabled && cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
 		if err := r.upgradeInstanceManager(ctx, cluster, &instancesStatus); err != nil {
+			if remote.IsTransientAuthError(err) {
+				contextLogger.Info(
+					"Waiting for the operator certificate fingerprint to propagate " +
+						"before upgrading the instance manager")
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
 			return ctrl.Result{}, err
 		}
 		// Stop the reconciliation loop if upgradeInstanceManager initiated an upgrade

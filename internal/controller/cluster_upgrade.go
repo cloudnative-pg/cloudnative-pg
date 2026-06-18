@@ -827,6 +827,13 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				operatorHash[:6],
 				err)
 
+			// A transient rejection while the operator certificate fingerprint
+			// propagates is not a real failure: skip the event and let the caller
+			// requeue quietly.
+			if remote.IsTransientAuthError(err) {
+				return enrichedError
+			}
+
 			r.Recorder.Event(cluster, "Warning", "InstanceManagerUpgradeFailed",
 				fmt.Sprintf("Error %s", enrichedError))
 			return enrichedError
