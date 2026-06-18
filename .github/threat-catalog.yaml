@@ -6,7 +6,7 @@ metadata:
   description: >
     Threat catalog for the CloudNativePG operator, documenting threats
     specific to operating PostgreSQL clusters on Kubernetes.
-  version: v2026.03-1
+  version: v2026.06-1
   author:
     id: cnpg-maintainers
     name: CloudNativePG Maintainers
@@ -21,7 +21,7 @@ metadata:
         and threat models maintained by FINOS.
     - id: CNPG.CAPABILITIES
       title: CloudNativePG Operator Capability Catalog
-      version: v2026.03-1
+      version: v2026.06-1
       description: >
         Capabilities provided by the CloudNativePG operator for managing
         PostgreSQL clusters on Kubernetes.

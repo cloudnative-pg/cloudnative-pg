@@ -6,7 +6,7 @@ metadata:
   description: >
     Capabilities provided by the CloudNativePG operator for managing
     PostgreSQL clusters on Kubernetes.
-  version: v2026.03-1
+  version: v2026.06-1
   author:
     id: cnpg-maintainers
     name: CloudNativePG Maintainers
