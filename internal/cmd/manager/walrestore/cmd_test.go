@@ -227,7 +227,7 @@ var _ = Describe("validateTimelineHistoryFile", func() {
 			Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
 		})
 
-	It("should allow any history file when cluster timeline is not yet established (bootstrap recovery)", func(ctx SpecContext) {
+	It("should allow any history file when cluster timeline is not yet established", func(ctx SpecContext) {
 		cluster := &apiv1.Cluster{
 			Status: apiv1.ClusterStatus{
 				CurrentPrimary: "primary-pod",

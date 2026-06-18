@@ -271,6 +271,11 @@ var _ = Describe("Object storage - Backup and restore", Label(tests.LabelBackupR
 			Expect(err).ToNot(HaveOccurred())
 			metricsasserts.AssertMetricsData(env, testTimeouts, namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 
+			By("deleting the first restored cluster", func() {
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
 			previous := 0
 			latestGZ := filepath.Join("*", clusterName, "*", "*.history.gz")
 			By(fmt.Sprintf("checking the previous number of .history files in the object store, history file name is %v",
@@ -279,12 +284,53 @@ var _ = Describe("Object storage - Backup and restore", Label(tests.LabelBackupR
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
+			By("performing a switchover", func() {
+				clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
+			})
 
 			By("checking the number of .history after switchover", func() {
 				Eventually(func() (int, error) {
 					return objectstore.CountFiles(objectStoreEnv, latestGZ)
 				}, 60).Should(BeNumerically(">", previous))
+			})
+
+			const postSwitchoverTableName = "to_restore_post_switchover"
+
+			By("inserting data into source cluster after switchover", func() {
+				postSwitchoverTableLocator := pgasserts.TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: postgres.AppDBName,
+					TableName:    postSwitchoverTableName,
+				}
+				pgasserts.AssertCreateTestData(env, postSwitchoverTableLocator)
+				objectstoreasserts.AssertArchiveWalOnObjectStore(
+					env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName)
+			})
+
+			By("restoring cluster again and verifying data written after switchover is present", func() {
+				resources.CreateResourceFromFile(env, namespace, clusterRestoreSampleFile)
+				restoreClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+				clusterasserts.AssertClusterIsReady(
+					env, namespace, restoreClusterName, testTimeouts[timeouts.ClusterIsReadySlow],
+				)
+
+				origTableLocator := pgasserts.TableLocator{
+					Namespace:    namespace,
+					ClusterName:  restoreClusterName,
+					DatabaseName: postgres.AppDBName,
+					TableName:    tableName,
+				}
+				pgasserts.AssertDataExpectedCount(env, origTableLocator, 2)
+
+				postSwitchoverTableLocator := pgasserts.TableLocator{
+					Namespace:    namespace,
+					ClusterName:  restoreClusterName,
+					DatabaseName: postgres.AppDBName,
+					TableName:    postSwitchoverTableName,
+				}
+				pgasserts.AssertDataExpectedCount(env, postSwitchoverTableLocator, 2)
 			})
 
 			By("deleting the restored cluster", func() {
