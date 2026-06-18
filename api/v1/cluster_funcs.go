@@ -96,7 +96,7 @@ func GetPluginConfigurationEnabledPluginNames(pluginList []PluginConfiguration) 
 func GetExternalClustersEnabledPluginNames(externalClusters []ExternalCluster) (result []string) {
 	pluginNames := make([]string, 0, len(externalClusters))
 	for _, externalCluster := range externalClusters {
-		if externalCluster.PluginConfiguration != nil {
+		if externalCluster.PluginConfiguration != nil && externalCluster.PluginConfiguration.IsEnabled() {
 			pluginNames = append(pluginNames, externalCluster.PluginConfiguration.Name)
 		}
 	}

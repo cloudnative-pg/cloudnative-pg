@@ -577,10 +577,10 @@ var _ = Describe("getPluginsNeededForReconcile", func() {
 			To(ConsistOf("plugin-a", "plugin-ext"))
 	})
 
-	It("includes external-cluster plugins even when explicitly disabled", func() {
-		// GetExternalClustersEnabledPluginNames does not consult
-		// PluginConfiguration.Enabled — any non-nil PluginConfiguration on an
-		// external cluster contributes its name. This test locks that in.
+	It("excludes external-cluster plugins that are explicitly disabled", func() {
+		// GetExternalClustersEnabledPluginNames honours
+		// PluginConfiguration.Enabled, so a disabled plugin on an external
+		// cluster does not contribute its name.
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ExternalClusters: []apiv1.ExternalCluster{
@@ -594,8 +594,7 @@ var _ = Describe("getPluginsNeededForReconcile", func() {
 				},
 			},
 		}
-		Expect(getPluginsNeededForReconcile(cluster)).
-			To(ConsistOf("plugin-ext"))
+		Expect(getPluginsNeededForReconcile(cluster)).To(BeEmpty())
 	})
 
 	It("deduplicates plugin names that appear in both Spec.Plugins and external clusters", func() {
