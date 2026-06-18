@@ -7180,8 +7180,8 @@ spec:
               operatorCertificateFingerprint:
                 description: |-
                   OperatorCertificateFingerprint is the SHA256 fingerprint of the operator's
-                  in-memory client certificate public key. The instance manager uses this to
-                  authenticate requests from the operator via mTLS.
+                  in-memory client certificate public key. The instance manager pins this
+                  fingerprint to authenticate requests from the operator.
                 type: string
               pgDataImageInfo:
                 description: PGDataImageInfo contains the details of the latest image

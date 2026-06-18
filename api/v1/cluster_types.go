@@ -1082,8 +1082,8 @@ type ClusterStatus struct {
 	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
 
 	// OperatorCertificateFingerprint is the SHA256 fingerprint of the operator's
-	// in-memory client certificate public key. The instance manager uses this to
-	// authenticate requests from the operator via mTLS.
+	// in-memory client certificate public key. The instance manager pins this
+	// fingerprint to authenticate requests from the operator.
 	// +optional
 	OperatorCertificateFingerprint string `json:"operatorCertificateFingerprint,omitempty"`
 

@@ -62,10 +62,10 @@ func IsRetryableError(err *Error) bool {
 	return err.Code == errCodeAnotherRequestInProgress
 }
 
-// withOperatorAuth wraps a handler to enforce mTLS fingerprint authentication.
-// It reads the expected fingerprint from the instance's cached cluster (updated by
-// the reconciliation loop) and compares it against the SHA-256 public key fingerprint
-// of the peer certificate presented by the caller.
+// withOperatorAuth wraps a handler to authenticate the operator by pinning its client
+// certificate's public key. It reads the expected fingerprint from the instance's cached
+// cluster (updated by the reconciliation loop) and compares it against the SHA-256 public
+// key fingerprint of the peer certificate presented by the caller.
 //
 // Rejections use distinct status codes so callers can tell permanent from transient
 // failures: 401 means no usable client certificate was presented (for example the

@@ -60,7 +60,8 @@ func executeRequestWithError[T any](
 		return nil, fmt.Errorf("encountered an internal server error status code 500 with body: %s", string(body))
 	}
 
-	// The instance manager guards its protected endpoints with mTLS: it replies 401 when
+	// The instance manager guards its protected endpoints by pinning the operator's client
+	// certificate fingerprint: it replies 401 when
 	// no usable client certificate is presented (permanent, e.g. a status port not served
 	// over TLS) and 503 while a presented certificate is not yet recognized (transient
 	// during operator certificate fingerprint propagation). Surface both as a typed
