@@ -26,6 +26,7 @@ import (
 	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1901,6 +1902,23 @@ var _ = Describe("Cluster admission error", func() {
 		// The phase machinery, not the guard, clears the Cluster admission
 		// error, so GetAdmissionError always returns an empty string.
 		Expect(cluster.GetAdmissionError()).To(BeEmpty())
+	})
+
+	It("marks the cluster as not ready when the definition is invalid", func() {
+		cluster := &Cluster{}
+		// Simulate a previously healthy cluster reporting Ready=True.
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(ConditionClusterReady),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(ClusterReady),
+			Message: "Cluster is Ready",
+		})
+
+		cluster.SetAdmissionError("boom")
+
+		readyCondition := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionClusterReady))
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
 	})
 })
 
