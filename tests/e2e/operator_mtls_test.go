@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	remoteClient "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
@@ -82,6 +84,8 @@ var _ = Describe("Operator mTLS authentication", Label(tests.LabelSecurity), fun
 			By("confirming the authenticated pgcontroldata endpoint rejects unauthenticated access", func() {
 				_, err := proxy.RetrievePgControlDataFromInstance(env.Ctx, env.Interface, pod, tlsEnabled)
 				Expect(err).To(HaveOccurred())
+				Expect(apierrors.IsUnauthorized(err)).To(BeTrue(),
+					"expected a 401 from the operator-auth middleware, got: %v", err)
 			})
 		})
 	}, NodeTimeout(testTimeouts[timeouts.ClusterIsReady]))
