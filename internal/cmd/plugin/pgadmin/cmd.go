@@ -35,13 +35,13 @@ import (
 
 const pgadminExample = `
   # Dry-run command with default values"
-  kubectl-cnpg pgadmin <cluster-name> --dry-run
+  kubectl cnpg pgadmin4 <cluster-name> --dry-run
 
-  # Create a pgadmin job with default values.
-  kubectl-cnpg pgadmin <cluster-name>
+  # Create a pgAdmin4 deployment with default values.
+  kubectl cnpg pgadmin4 <cluster-name>
 
   # Dry-run command with given values and clusterName "cluster-example"
-  kubectl-cnpg pgadmin cluster-example -n <namespace> --dry-run
+  kubectl cnpg pgadmin4 cluster-example -n <namespace> --dry-run
 `
 
 var usageExampleTemplate = template.Must(template.New("pgadmin-example").Parse(`
