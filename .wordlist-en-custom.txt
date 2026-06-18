@@ -46,6 +46,7 @@ BarmanCredentials
 BarmanObjectStoreConfiguration
 Bartolini
 Battiato
+BlaiseAntony
 BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
@@ -1152,6 +1153,7 @@ maxParallel
 maxStandbyNamesFromCluster
 maxSyncReplicas
 maximumLag
+maxlengdell
 maxwait
 mcache
 md
@@ -1458,6 +1460,7 @@ schemaspec
 sdk
 searchAttribute
 searchFilter
+sebv
 seccompProfile
 secretAccessKey
 secretKeyRef
