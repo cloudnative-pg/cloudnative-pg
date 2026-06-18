@@ -1931,9 +1931,8 @@ func (v *ClusterCustomValidator) validateExternalCluster(
 		externalCluster.BarmanObjectStore == nil &&
 		externalCluster.PluginConfiguration == nil {
 		result = append(result,
-			field.Invalid(
+			field.Required(
 				path,
-				externalCluster,
 				"one of connectionParameters, plugin and barmanObjectStore is required"))
 	}
 
@@ -2051,17 +2050,15 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 	hasEnabled := replicaClusterConf.Enabled != nil
 	hasPrimary := len(replicaClusterConf.Primary) > 0
 	if hasPrimary && hasEnabled {
-		result = append(result, field.Invalid(
+		result = append(result, field.Forbidden(
 			field.NewPath("spec", "replicaCluster", "enabled"),
-			replicaClusterConf,
 			"replica mode enabled is not compatible with the primary field"))
 	}
 
 	if r.IsReplica() {
 		if r.Spec.Bootstrap == nil {
-			result = append(result, field.Invalid(
+			result = append(result, field.Required(
 				field.NewPath("spec", "bootstrap"),
-				replicaClusterConf,
 				"bootstrap configuration is required for replica mode"))
 		} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
 			// this is needed because we only want to validate this during cluster creation, currently if we would have
@@ -2069,7 +2066,7 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 			len(r.ResourceVersion) == 0 {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "replicaCluster"),
-				replicaClusterConf,
+				replicaClusterConf.Primary,
 				"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
 		}
 	}
