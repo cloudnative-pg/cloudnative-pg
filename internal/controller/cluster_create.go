@@ -1163,6 +1163,9 @@ func (r *ClusterReconciler) recordGeneratedNodeSerial(
 	}
 	return status.PatchWithOptimisticLock(ctx, r.Client, cluster,
 		func(c *apiv1.Cluster) {
+			// Re-checked on the server-fresh copy PatchWithOptimisticLock
+			// refetches: the outer guard only saw the stale in-memory value,
+			// so this also guards a concurrent reconcile that already advanced it.
 			if c.Status.LatestGeneratedNode < nodeSerial {
 				c.Status.LatestGeneratedNode = nodeSerial
 			}

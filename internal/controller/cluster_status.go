@@ -67,9 +67,11 @@ type managedResources struct {
 // "running" would wedge the reconciler in the 5s requeue loop.
 //
 // When the PVC is missing from cache but the serial is already covered by
-// LatestGeneratedNode, we know the PVC exists on the API server (the
-// counter persists only after both the Job and the PVC are committed);
-// the PVC informer is simply stale, so the Job still counts as running.
+// LatestGeneratedNode, the operator has already committed it (the counter
+// persists only after both the Job and the PVC are committed), so a cache
+// miss is just a stale informer and the Job still counts as running. This
+// holds only for operator-managed PVCs: one deleted out of band leaves the
+// Job counted as running.
 func (resources *managedResources) runningJobNames(cluster *apiv1.Cluster) []string {
 	pvcNames := make(map[string]struct{}, len(resources.pvcs.Items))
 	for _, pvc := range resources.pvcs.Items {
