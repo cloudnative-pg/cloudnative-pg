@@ -48,7 +48,12 @@ func GenerateSelfSignedClientCertificate(commonName string) (*KeyPair, error) {
 	}
 
 	notBefore := time.Now().Add(-5 * time.Minute)
-	notAfter := notBefore.Add(getCertificateDuration())
+	// Trust in this certificate comes from pinning its SHA-256 public-key
+	// fingerprint, not from its validity period: the private key never leaves the
+	// operator's memory and a fresh certificate is generated on every restart.
+	// Nothing verifies the expiry, so we use the RFC 5280 "no well-defined
+	// expiration date" value to avoid rejecting a long-running operator process.
+	notAfter := time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
 
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
