@@ -329,7 +329,8 @@ type PoolerStatus struct {
 	// +optional
 	Image string `json:"image,omitempty"`
 
-	// Error is the latest validation error
+	// Error is the latest admission validation error
+	// +optional
 	Error string `json:"error,omitempty"`
 }
 

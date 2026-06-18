@@ -9373,7 +9373,7 @@ spec:
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               error:
-                description: Error is the latest validation error
+                description: Error is the latest admission validation error
                 type: string
               image:
                 description: |-

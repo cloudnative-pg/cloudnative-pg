@@ -2220,7 +2220,7 @@ _Appears in:_
 | `phase` _[PoolerPhase](#poolerphase)_ | Phase summarizes the overall lifecycle state of the Pooler. |  |  | Enum: [active paused inactive failed] <br /> |
 | `phaseReason` _string_ | PhaseReason is a human-readable explanation of the current Phase. |  |  |  |
 | `image` _string_ | Image is the resolved pgbouncer container image that the operator is<br />using for this Pooler, including any override coming from spec.template.<br />While Phase is Active or Paused this field reflects what the Deployment<br />actually runs; while Phase is Inactive or Failed it may carry the last<br />successfully resolved value (or be empty if the Pooler has never reconciled<br />successfully). |  |  |  |
-| `error` _string_ | Error is the latest validation error | True |  |  |
+| `error` _string_ | Error is the latest admission validation error |  |  |  |
 
 
 #### PoolerType
