@@ -186,6 +186,12 @@ type Data struct {
 
 	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
 	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
+
+	// ManageWebhookConfigurations is true when the operator should inject the
+	// CA bundle into the mutating and validating webhook configurations. It can
+	// be disabled when the webhook configurations are managed externally (e.g.
+	// by cert-manager's CA injector or by GitOps).
+	ManageWebhookConfigurations bool `json:"manageWebhookConfigurations" env:"MANAGE_WEBHOOK_CONFIGURATIONS"`
 }
 
 // Current is the configuration used by the operator
@@ -194,17 +200,18 @@ var Current = NewConfiguration()
 // newDefaultConfig creates a configuration holding the defaults
 func newDefaultConfig() *Data {
 	return &Data{
-		OperatorPullSecretName:  DefaultOperatorPullSecretName,
-		OperatorImageName:       versions.DefaultOperatorImageName,
-		PostgresImageName:       versions.DefaultImageName,
-		PgbouncerImageName:      versions.DefaultPgbouncerImage,
-		PluginSocketDir:         DefaultPluginSocketDir,
-		CreateAnyService:        false,
-		CertificateDuration:     CertificateDuration,
-		ExpiringCheckThreshold:  ExpiringCheckThreshold,
-		StandbyTCPUserTimeout:   nil,
-		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
-		DrainTaints:             DefaultDrainTaints,
+		OperatorPullSecretName:      DefaultOperatorPullSecretName,
+		OperatorImageName:           versions.DefaultOperatorImageName,
+		PostgresImageName:           versions.DefaultImageName,
+		PgbouncerImageName:          versions.DefaultPgbouncerImage,
+		PluginSocketDir:             DefaultPluginSocketDir,
+		CreateAnyService:            false,
+		CertificateDuration:         CertificateDuration,
+		ExpiringCheckThreshold:      ExpiringCheckThreshold,
+		StandbyTCPUserTimeout:       nil,
+		KubernetesClusterDomain:     DefaultKubernetesClusterDomain,
+		DrainTaints:                 DefaultDrainTaints,
+		ManageWebhookConfigurations: true,
 	}
 }
 

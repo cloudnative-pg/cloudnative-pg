@@ -1647,3 +1647,33 @@ func (cluster *Cluster) IsInitialized() bool {
 
 	return c.Status == metav1.ConditionTrue
 }
+
+// SetAdmissionError sets the admission error status on the Cluster resource
+func (cluster *Cluster) SetAdmissionError(msg string) {
+	if len(msg) > 0 {
+		cluster.Status.Phase = PhaseDefinitionInvalid
+		cluster.Status.PhaseReason = msg
+		// The cluster definition is invalid, so it cannot be ready: mirror
+		// SetClusterReadyCondition here so an invalid cluster does not keep
+		// reporting Ready=True from a previous healthy loop. RegisterPhase
+		// would normally update the condition together with the phase, but the
+		// guard records the invalid phase directly.
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(ConditionClusterReady),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(ClusterIsNotReady),
+			Message: "Cluster Is Not Ready",
+		})
+		return
+	}
+
+	cluster.Status.PhaseReason = ""
+}
+
+// GetAdmissionError always returns an empty string: the Cluster encodes the
+// admission error in its phase, which the reconciler rewrites through the phase
+// machinery on the next healthy loop, so the guard must not persist the clear
+// itself and race that logic.
+func (cluster *Cluster) GetAdmissionError() string {
+	return ""
+}

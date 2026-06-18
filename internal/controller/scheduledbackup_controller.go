@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -58,8 +59,9 @@ const (
 // ScheduledBackupReconciler reconciles a ScheduledBackup object
 type ScheduledBackupReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
+	Admission *guard.Admission[*apiv1.ScheduledBackup]
 }
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=scheduledbackups,verbs=get;list;watch;create;update;patch;delete
@@ -85,6 +87,17 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
+	}
+
+	if result, err := r.Admission.EnsureResourceIsAdmitted(
+		ctx,
+		guard.AdmissionParams[*apiv1.ScheduledBackup]{
+			Object:       &scheduledBackup,
+			Client:       r.Client,
+			ApplyChanges: true,
+		},
+	); !result.IsZero() || err != nil {
+		return result, err
 	}
 
 	// This check is still needed for when the scheduled backup resource creation is forced through the webhook

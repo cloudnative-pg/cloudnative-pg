@@ -301,6 +301,7 @@ func setupReconcilers(
 		pluginRepository,
 		conf.DrainTaints,
 		operatorClientCert,
+		webhookv1.NewClusterAdmissionGuard(),
 	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
@@ -311,6 +312,7 @@ func setupReconcilers(
 		discoveryClient,
 		pluginRepository,
 		operatorClientCert,
+		webhookv1.NewBackupAdmissionGuard(),
 	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
@@ -323,9 +325,10 @@ func setupReconcilers(
 	}
 
 	if err := (&controller.ScheduledBackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"), //nolint:staticcheck
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Recorder:  mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"), //nolint:staticcheck
+		Admission: webhookv1.NewScheduledBackupAdmissionGuard(),
 	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
@@ -336,6 +339,7 @@ func setupReconcilers(
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"), //nolint:staticcheck
+		Admission:       webhookv1.NewPoolerAdmissionGuard(),
 	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
@@ -478,8 +482,8 @@ func ensurePKI(
 		return nil
 	}
 
-	// We need to self-manage required PKI infrastructure and install the certificates into
-	// the webhooks configuration
+	// We need to self-manage required PKI infrastructure and, unless the webhook
+	// configurations are managed externally, inject the CA bundle into them.
 	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       CaSecretName,
 		CertDir:                            mgrCertDir,
@@ -489,6 +493,7 @@ func ensurePKI(
 		MutatingWebhookConfigurationName:   conf.GetMutatingWebhookConfigurationName(),
 		ValidatingWebhookConfigurationName: conf.GetValidatingWebhookConfigurationName(),
 		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
+		ManageWebhookConfigurations:        conf.ManageWebhookConfigurations,
 	}
 	err := pkiConfig.Setup(ctx, kubeClient)
 	if err != nil {
