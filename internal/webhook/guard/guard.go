@@ -167,7 +167,12 @@ func (g *Admission[T]) ensureResourceIsValid(ctx context.Context, params Admissi
 	contextLogger.Info("Detected invalid resource, stopping reconciliation",
 		"warnings", warnings, "validationError", validationErr.Error())
 	if !params.ApplyChanges {
-		return ctrl.Result{}, reconcile.TerminalError(validationErr)
+		// We do not own writes to this object, so we can neither fix its spec
+		// nor record the error in its status: only wait for the owning
+		// reconciler to apply a correction. Requeue instead of returning a
+		// TerminalError, which would stop this controller from retrying and
+		// stall reconciliation until an unrelated event happened to wake it up.
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	params.Object.SetAdmissionError(sanitizeValidationError(validationErr))

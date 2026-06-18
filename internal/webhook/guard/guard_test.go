@@ -377,7 +377,7 @@ var _ = Describe("EnsureResourceIsAdmitted", func() {
 		Expect(result.IsZero()).To(BeTrue())
 	})
 
-	It("returns a terminal error without touching status when validation fails and ApplyChanges is false", func() {
+	It("requeues without touching status when validation fails and ApplyChanges is false", func() {
 		validationError := errors.New("validation failed")
 		statusUpdateCalled := false
 		mockCl.StatusUpdateFunc = func(
@@ -400,8 +400,10 @@ var _ = Describe("EnsureResourceIsAdmitted", func() {
 			Client:       mockCl,
 			ApplyChanges: false,
 		})
-		Expect(errors.Is(err, reconcile.TerminalError(nil))).To(BeTrue())
-		Expect(result.IsZero()).To(BeTrue())
+		// We do not own writes to this object, so we requeue and wait for the
+		// owning reconciler to fix the spec instead of terminating.
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(5 * time.Second))
 		Expect(statusUpdateCalled).To(BeFalse())
 	})
 
