@@ -23,9 +23,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -88,6 +91,27 @@ var _ = Describe("isNetworkErrorRetryable", func() {
 	It("recognizes context deadline exceeded errors", func() {
 		err := context.DeadlineExceeded
 		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("retries a transient instance manager rejection (503, certificate not recognized)", func() {
+		err := &remote.StatusError{StatusCode: http.StatusServiceUnavailable, Body: "operator certificate not recognized"}
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("retries a wrapped transient instance manager rejection (production path)", func() {
+		err := fmt.Errorf("while trying to start the backup: %w",
+			&remote.StatusError{StatusCode: http.StatusServiceUnavailable, Body: "operator certificate not recognized"})
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("does not retry a 401 (no client certificate, e.g. non-TLS status port)", func() {
+		err := &remote.StatusError{StatusCode: http.StatusUnauthorized, Body: "client certificate required"}
+		Expect(isNetworkErrorRetryable(err)).To(BeFalse())
+	})
+
+	It("does not retry on other instance manager status errors", func() {
+		err := &remote.StatusError{StatusCode: http.StatusNotFound, Body: "not found"}
+		Expect(isNetworkErrorRetryable(err)).To(BeFalse())
 	})
 
 	It("does not retry on not found errors", func() {

@@ -178,6 +178,15 @@ func reconcileDemotionToken(
 			}, nil
 		}
 
+		if remote.IsTransientAuthError(err) {
+			contextLogger.Info(
+				"Waiting for the operator certificate fingerprint to propagate " +
+					"before generating the demotion token")
+			return &ctrl.Result{
+				RequeueAfter: 10 * time.Second,
+			}, nil
+		}
+
 		return nil, err
 	}
 

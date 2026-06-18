@@ -786,8 +786,45 @@ levels, as listed in the table below:
 | operator         | 9443        | webhook server      | `webhook-server` | Yes      | Yes            |
 | operator         | 8080        | metrics             | `metrics`        | No       | No             |
 | instance manager | 9187        | metrics             | `metrics`        | Optional | No             |
-| instance manager | 8000        | status              | `status`         | Yes      | No             |
+| instance manager | 8000        | status              | `status`         | Yes      | Partial (1)    |
 | operand          | 5432        | PostgreSQL instance | `postgresql`     | Optional | Yes            |
+
+(1) Status, health, and probe endpoints are unauthenticated. Sensitive
+endpoints (backup, `pg_controldata`, partial WAL archive, and instance-manager
+upgrade) require the operator's client certificate, as described in
+[Operator-to-instance authentication](#operator-to-instance-authentication)
+below.
+
+#### Operator-to-instance authentication
+
+The operator generates a self-signed ECDSA client certificate in memory at
+startup and publishes its SHA-256 public-key fingerprint in the cluster's
+`.status.operatorCertificateFingerprint`. The instance manager pins that
+fingerprint and rejects any call to its sensitive endpoints (backup,
+`pg_controldata`, partial WAL archive, and instance-manager upgrade) that does
+not present a matching certificate. Status, health, and probe endpoints remain
+unauthenticated.
+
+The certificate is never written to disk and is regenerated on every operator
+restart, so trust derives from fingerprint pinning rather than CA validation.
+
+This protection has a hard requirement: the status port **must** be served over
+TLS, which has been the default since v1.24. A client certificate can only be
+presented over a TLS connection, so the protected endpoints are reachable by the
+operator only when the status port uses TLS.
+
+:::warning
+If the status port is not served over TLS, the instance manager cannot
+authenticate the operator and **permanently** rejects every call to its
+protected endpoints (backup, `pg_controldata`, partial WAL archive, and
+instance-manager upgrade) with `401 Unauthorized`. This is not a transient
+condition and will not resolve on its own. It can affect instances created by an
+operator older than v1.24 (whose status port serves plain HTTP) once their
+instance manager is upgraded to a version that enforces this authentication: such
+instances must be rolled out so their Pods are recreated with a TLS-enabled status
+port. Newly created instances always enable TLS on the status port and are
+unaffected.
+:::
 
 ### PostgreSQL
 

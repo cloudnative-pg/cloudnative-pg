@@ -231,7 +231,10 @@ type Instance struct {
 
 	// cluster is the cached cluster this instance belongs to.
 	// Access via GetClusterOrDefault() which returns an empty cluster if nil.
-	cluster *apiv1.Cluster
+	// It is read from HTTP handler goroutines (e.g. the remote webserver
+	// authentication middleware) while being written by the reconciliation loop,
+	// so access is synchronized through an atomic pointer.
+	cluster atomic.Pointer[apiv1.Cluster]
 }
 
 type serverCertificateHandler struct {
@@ -305,16 +308,16 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 // GetClusterOrDefault returns the cached cluster, or an empty cluster if not set.
 // The empty cluster provides safe defaults via getter methods.
 func (instance *Instance) GetClusterOrDefault() *apiv1.Cluster {
-	if instance.cluster == nil {
-		return &apiv1.Cluster{}
+	if cluster := instance.cluster.Load(); cluster != nil {
+		return cluster
 	}
-	return instance.cluster
+	return &apiv1.Cluster{}
 }
 
 // SetCluster updates the cached cluster for use outside the reconciliation
 // cycle when the API client is not available
 func (instance *Instance) SetCluster(cluster *apiv1.Cluster) {
-	instance.cluster = cluster
+	instance.cluster.Store(cluster)
 }
 
 // RequiresDesignatedPrimaryTransition checks if this instance is a primary

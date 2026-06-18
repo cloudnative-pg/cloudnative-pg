@@ -276,10 +276,16 @@ only the operator itself.
     (e.g., 1.29.2).
 :::
 
-Versions 1.30.0 and 1.29.2 introduce four changes worth reviewing before you
+Versions 1.30.0 and 1.29.2 introduce five changes worth reviewing before you
 upgrade: operator-side password encoding, `search_path` hardening, the new
-`DatabaseRole` resource for declarative role management, and safe primary
-election via a per-cluster Lease. Each is covered in its own subsection below.
+`DatabaseRole` resource for declarative role management, safe primary
+election via a per-cluster Lease, and operator-to-instance authentication on
+the instance manager's status port. Each is covered in its own subsection below.
+
+Not all of these affect both releases: operator-side password encoding and
+`search_path` hardening ship in both 1.30.0 and 1.29.2, while the `DatabaseRole`
+resource, safe primary election, and operator-to-instance authentication are
+introduced in 1.30.0 only. Each subsection states the versions it applies to.
 
 #### Operator-side password encoding
 
@@ -383,6 +389,27 @@ chart grant the required permissions automatically. If you manage the
 operator's RBAC yourself, you must add the `create`, `get`, `list`, `update`
 and `watch` verbs on `leases` in the `coordination.k8s.io` API group before
 upgrading, otherwise primaries will be unable to promote.
+:::
+
+#### Operator-to-instance authentication
+
+Starting from version 1.30.0, the operator authenticates its calls to the
+sensitive endpoints of the instance manager's status port (backup,
+`pg_controldata`, partial WAL archive, and instance-manager upgrade) by pinning
+an in-memory client certificate. This is enabled automatically and requires no
+configuration. Status, health, and probe endpoints remain unauthenticated. See
+[Operator-to-instance authentication](security.md#operator-to-instance-authentication)
+for details.
+
+:::warning
+This protection has a hard requirement: the status port **must** be served over
+TLS, which has been the default since v1.24. Instances created by an operator
+older than v1.24 serve the status port over plain HTTP; once their instance
+manager is upgraded to 1.30.0 the operator can no longer authenticate to them
+and every call to the protected endpoints is **permanently** rejected with
+`401 Unauthorized`. If you still run such instances, perform a rolling update so
+their Pods are recreated with a TLS-enabled status port. Instances created by
+v1.24 or later are unaffected.
 :::
 
 -->
