@@ -21,6 +21,7 @@ package specs
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/kballard/go-shellquote"
@@ -349,6 +350,9 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			Labels: map[string]string{
 				utils.InstanceNameLabelName: instanceName,
 				utils.ClusterLabelName:      cluster.Name,
+			},
+			Annotations: map[string]string{
+				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
 			},
 		},
 		Spec: batchv1.JobSpec{
