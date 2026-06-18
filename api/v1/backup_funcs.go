@@ -39,6 +39,7 @@ import (
 // SetAsPending marks a certain backup as pending
 func (backupStatus *BackupStatus) SetAsPending() {
 	backupStatus.Phase = BackupPhasePending
+	backupStatus.Error = ""
 }
 
 // SetAsFailed marks a certain backup as invalid
@@ -72,6 +73,7 @@ func (backupStatus *BackupStatus) SetAsCompleted() {
 // SetAsStarted marks a certain backup as started
 func (backupStatus *BackupStatus) SetAsStarted(podName, containerID, sessionID string, method BackupMethod) {
 	backupStatus.Phase = BackupPhaseStarted
+	backupStatus.Error = ""
 	backupStatus.InstanceID = &InstanceID{
 		PodName:     podName,
 		ContainerID: containerID,
@@ -328,7 +330,14 @@ func (backup *Backup) SetAdmissionError(msg string) {
 	if len(msg) > 0 {
 		backup.Status.Phase = BackupPhaseDefinitionInvalid
 		backup.Status.Error = msg
-	} else {
-		backup.Status.Error = ""
+		return
+	}
+
+	// Reset the phase from a previous validation failure so the start gates
+	// fire again once the definition is valid. The error message is cleared by
+	// the lifecycle transitions instead: clearing it here would only touch the
+	// in-memory copy used as the patch base and never reach the API server.
+	if backup.Status.Phase == BackupPhaseDefinitionInvalid {
+		backup.Status.Phase = ""
 	}
 }
