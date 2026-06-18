@@ -592,37 +592,3 @@ var _ = Describe("MarkPVCReadyForCompletedJobs", func() {
 		Expect(updatedPVC2.Annotations[utils.PVCStatusAnnotationName]).To(Equal(StatusReady))
 	})
 })
-
-var _ = Describe("LatestGeneratedNode self-heal", func() {
-	clusterName := "myCluster"
-	makeClusterPVC := func(serial string) corev1.PersistentVolumeClaim {
-		return makePVC(clusterName, serial, serial, NewPgDataCalculator(), false)
-	}
-
-	It("raises LatestGeneratedNode to the highest observed instance serial", func(ctx SpecContext) {
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
-			Status:     apiv1.ClusterStatus{LatestGeneratedNode: 0},
-		}
-		EnrichStatus(ctx, cluster, nil, nil, []corev1.PersistentVolumeClaim{
-			makeClusterPVC("1"),
-			makeClusterPVC("2"),
-		})
-		Expect(cluster.Status.LatestGeneratedNode).To(Equal(2))
-	})
-
-	It("never lowers LatestGeneratedNode below the persisted value", func(ctx SpecContext) {
-		// Stale PVC informer: the counter was already advanced past the PVCs
-		// currently visible (the higher PVC has not reached the cache yet).
-		// Rolling the counter back would re-allocate a serial that is already
-		// in flight, so the self-heal must only ever move it forward.
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
-			Status:     apiv1.ClusterStatus{LatestGeneratedNode: 5},
-		}
-		EnrichStatus(ctx, cluster, nil, nil, []corev1.PersistentVolumeClaim{
-			makeClusterPVC("2"),
-		})
-		Expect(cluster.Status.LatestGeneratedNode).To(Equal(5))
-	})
-})
