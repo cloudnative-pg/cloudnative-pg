@@ -65,7 +65,7 @@ func (f *fakeOperatorClient) ValidateClusterCreate(
 	_ *operator.OperatorValidateClusterCreateRequest,
 	_ ...grpc.CallOption,
 ) (*operator.OperatorValidateClusterCreateResult, error) {
-	panic("implement me")
+	return &operator.OperatorValidateClusterCreateResult{}, nil
 }
 
 func (f *fakeOperatorClient) ValidateClusterChange(
