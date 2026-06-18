@@ -54,8 +54,14 @@ type Admission[T AdmittableObject] struct {
 // AdmissionParams contains the parameters needed to perform admission control
 // on a resource during reconciliation.
 type AdmissionParams[T AdmittableObject] struct {
-	Object       T
-	Client       client.Client
+	Object T
+	Client client.Client
+
+	// ApplyChanges must be true only in the reconciler that owns writes to the
+	// object. When true, defaulting changes are persisted and validation
+	// failures are recorded in the status. When false (for example the instance
+	// manager reconciling a Cluster it does not own), the guard works in memory
+	// only and waits for the owning reconciler to apply the changes.
 	ApplyChanges bool
 }
 
@@ -91,7 +97,7 @@ func (g *Admission[T]) ensureResourceIsDefaulted(ctx context.Context, params Adm
 	}
 
 	if err := g.Defaulter.Default(ctx, params.Object); err != nil {
-		contextLogger.Error(err, "Unable to applying the defaulting logic to resource")
+		contextLogger.Error(err, "Unable to apply the defaulting logic to resource")
 		return ctrl.Result{}, err
 	}
 

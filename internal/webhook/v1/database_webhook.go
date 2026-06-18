@@ -67,8 +67,7 @@ type DatabaseCustomDefaulter struct{}
 func (d *DatabaseCustomDefaulter) Default(_ context.Context, database *apiv1.Database) error {
 	databaseLog.Info("Defaulting for database", "name", database.GetName(), "namespace", database.GetNamespace())
 
-	// database.Default()
-
+	// The Database kind currently has no defaults to apply.
 	return nil
 }
 
