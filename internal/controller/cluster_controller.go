@@ -850,7 +850,7 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	runningJobs := resources.runningJobNames()
+	runningJobs := resources.runningJobNames(cluster)
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 
@@ -1116,11 +1116,7 @@ func (r *ClusterReconciler) reconcilePods(
 	// Are there missing nodes? Let's create one
 	if cluster.Status.Instances < cluster.Spec.Instances &&
 		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
-		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
-		}
-		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
+		return r.joinReplicaInstance(ctx, nextNodeSerial(cluster), cluster)
 	}
 
 	// Should we scale down the cluster?
