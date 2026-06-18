@@ -477,13 +477,13 @@ func ensurePKI(
 	mgrCertDir string,
 	conf *configuration.Data,
 ) error {
-	if conf.WebhookCertDir != "" || !conf.EnableWebhookServer {
+	if conf.WebhookCertDir != "" {
 		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
 		return nil
 	}
 
-	// We need to self-manage required PKI infrastructure and install the certificates into
-	// the webhooks configuration
+	// We need to self-manage required PKI infrastructure and, unless the webhook
+	// configurations are managed externally, inject the CA bundle into them.
 	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       CaSecretName,
 		CertDir:                            mgrCertDir,
@@ -493,6 +493,7 @@ func ensurePKI(
 		MutatingWebhookConfigurationName:   conf.GetMutatingWebhookConfigurationName(),
 		ValidatingWebhookConfigurationName: conf.GetValidatingWebhookConfigurationName(),
 		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
+		ManageWebhookConfigurations:        conf.ManageWebhookConfigurations,
 	}
 	err := pkiConfig.Setup(ctx, kubeClient)
 	if err != nil {
