@@ -1866,3 +1866,28 @@ var _ = Describe("RecoveryTarget.BuildPostgresOptions", func() {
 		Expect(out).To(ContainSubstring(`recovery_target_lsn = '0/1\\6'` + "\n"))
 	})
 })
+
+var _ = Describe("GetExternalClustersEnabledPluginNames", func() {
+	falseVal := false
+
+	It("includes plugins with nil Enabled (defaults to enabled)", func() {
+		clusters := []ExternalCluster{
+			{PluginConfiguration: &PluginConfiguration{Name: "plugin-a"}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(ConsistOf("plugin-a"))
+	})
+
+	It("excludes plugins with Enabled=false", func() {
+		clusters := []ExternalCluster{
+			{PluginConfiguration: &PluginConfiguration{Name: "plugin-a", Enabled: &falseVal}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(BeEmpty())
+	})
+
+	It("excludes external clusters without a plugin configuration", func() {
+		clusters := []ExternalCluster{
+			{ConnectionParameters: map[string]string{"host": "pg.example.com"}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(BeEmpty())
+	})
+})
