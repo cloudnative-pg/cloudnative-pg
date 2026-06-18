@@ -1195,7 +1195,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
-	log.FromContext(ctx).Debug("allocated node serial", "serial", nodeSerial)
+	contextLogger.Debug("allocated node serial", "serial", nodeSerial)
 
 	// Create the PVCs from the cluster definition, and if bootstrapping from
 	// recoverySnapshot, use that as the source
