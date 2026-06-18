@@ -141,6 +141,17 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// A backup that already reached a terminal phase is immutable: never run
+	// the admission guard on it. Re-validating here is unsafe because some
+	// checks depend on the runtime environment rather than the (immutable)
+	// spec (for example the VolumeSnapshot CRD presence), so a transient
+	// environment change would otherwise clobber a Completed/Failed record
+	// with the "invalid backup definition" phase.
+	switch backup.Status.Phase {
+	case apiv1.BackupPhaseFailed, apiv1.BackupPhaseCompleted:
+		return ctrl.Result{}, nil
+	}
+
 	if result, err := r.admission.EnsureResourceIsAdmitted(
 		ctx,
 		guard.AdmissionParams[*apiv1.Backup]{
@@ -150,11 +161,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		},
 	); !result.IsZero() || err != nil {
 		return result, err
-	}
-
-	switch backup.Status.Phase {
-	case apiv1.BackupPhaseFailed, apiv1.BackupPhaseCompleted:
-		return ctrl.Result{}, nil
 	}
 
 	var cluster apiv1.Cluster
