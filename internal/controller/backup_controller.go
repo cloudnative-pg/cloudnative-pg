@@ -90,7 +90,7 @@ type BackupReconciler struct {
 // NewBackupReconciler properly initializes the BackupReconciler
 func NewBackupReconciler(
 	mgr manager.Manager,
-	discoveryClient *discovery.DiscoveryClient,
+	discoveryClient discovery.DiscoveryInterface,
 	plugins repository.Interface,
 	operatorClientCert *tls.Certificate,
 ) *BackupReconciler {

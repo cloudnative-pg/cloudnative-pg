@@ -107,7 +107,7 @@ type ClusterReconciler struct {
 // NewClusterReconciler creates a new ClusterReconciler initializing it
 func NewClusterReconciler(
 	mgr manager.Manager,
-	discoveryClient *discovery.DiscoveryClient,
+	discoveryClient discovery.DiscoveryInterface,
 	plugins repository.Interface,
 	drainTaints []string,
 	operatorClientCert *tls.Certificate,
