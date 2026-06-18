@@ -122,7 +122,7 @@ func (g *Admission[T]) ensureResourceIsValid(ctx context.Context, params Admissi
 	}
 
 	// Important: in this situation, we don't have access to the old version
-	// of the cluster. We validate is as the object was created from scratch - that's
+	// of the cluster. We validate it as if the object was created from scratch - that's
 	// the best approximation we have.
 	warnings, validationErr := g.Validator.ValidateCreate(ctx, params.Object)
 	if validationErr == nil {
