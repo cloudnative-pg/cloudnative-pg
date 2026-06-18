@@ -1555,35 +1555,30 @@ var _ = Describe("generateNodeSerial", func() {
 	r := &ClusterReconciler{}
 
 	It("returns 1 when there are no instances", func() {
-		serial, err := r.generateNodeSerial(newCluster())
-		Expect(err).ToNot(HaveOccurred())
-		Expect(serial).To(Equal(1))
+		Expect(r.generateNodeSerial(newCluster())).To(Equal(1))
 	})
 
 	It("returns the next serial when names are sequential", func() {
-		serial, err := r.generateNodeSerial(newCluster(
+		serial := r.generateNodeSerial(newCluster(
 			specs.GetInstanceName(clusterName, 1),
 			specs.GetInstanceName(clusterName, 2),
 		))
-		Expect(err).ToNot(HaveOccurred())
 		Expect(serial).To(Equal(3))
 	})
 
 	It("fills the lowest gap left by a removed instance", func() {
-		serial, err := r.generateNodeSerial(newCluster(
+		serial := r.generateNodeSerial(newCluster(
 			specs.GetInstanceName(clusterName, 1),
 			specs.GetInstanceName(clusterName, 3),
 		))
-		Expect(err).ToNot(HaveOccurred())
 		Expect(serial).To(Equal(2))
 	})
 
 	It("ignores names that don't follow the cluster prefix", func() {
-		serial, err := r.generateNodeSerial(newCluster(
+		serial := r.generateNodeSerial(newCluster(
 			specs.GetInstanceName(clusterName, 2),
 			"unrelated-pod",
 		))
-		Expect(err).ToNot(HaveOccurred())
 		Expect(serial).To(Equal(1))
 	})
 })

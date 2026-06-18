@@ -1118,17 +1118,17 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 
 // generateNodeSerial returns the first free node serial number for this cluster.
 // A serial is free when no instance currently listed in
-// cluster.Status.InstanceNames is using it. Scanning from 1 over N instance
-// names always finds a free serial within N+1 steps.
-func (r *ClusterReconciler) generateNodeSerial(cluster *apiv1.Cluster) (int, error) {
-	upperBound := len(cluster.Status.InstanceNames) + 1
-	for i := 1; i <= upperBound; i++ {
+// cluster.Status.InstanceNames is using it. With N instances, the first gap in
+// [1, N] is free; if there is no gap, all of them are taken and N+1 is free.
+func (r *ClusterReconciler) generateNodeSerial(cluster *apiv1.Cluster) int {
+	n := len(cluster.Status.InstanceNames)
+	for i := 1; i <= n; i++ {
 		if !slices.Contains(cluster.Status.InstanceNames, specs.GetInstanceName(cluster.Name, i)) {
-			return i, nil
+			return i
 		}
 	}
 
-	return 0, fmt.Errorf("no free instance serial found in range [1, %d]", upperBound)
+	return n + 1
 }
 
 func (r *ClusterReconciler) createPrimaryInstance(
@@ -1188,10 +1188,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	// Generate a new node serial
-	nodeSerial, err := r.generateNodeSerial(cluster)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
-	}
+	nodeSerial := r.generateNodeSerial(cluster)
 	contextLogger.Debug("allocated node serial", "serial", nodeSerial)
 
 	// Create the PVCs from the cluster definition, and if bootstrapping from
@@ -1244,14 +1241,13 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	podName := fmt.Sprintf("%v-%v", cluster.Name, nodeSerial)
-	if err = r.setPrimaryInstance(ctx, cluster, podName); err != nil {
+	if err := r.setPrimaryInstance(ctx, cluster, podName); err != nil {
 		contextLogger.Error(err, "Unable to set the primary instance name")
 		return ctrl.Result{}, err
 	}
 
-	err = r.RegisterPhase(ctx, cluster, apiv1.PhaseFirstPrimary,
-		fmt.Sprintf("Creating primary instance %v", podName))
-	if err != nil {
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFirstPrimary,
+		fmt.Sprintf("Creating primary instance %v", podName)); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -1268,7 +1264,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
-	if err = r.Create(ctx, job); err != nil {
+	if err := r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
