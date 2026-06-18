@@ -21,9 +21,13 @@ package guard
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -130,15 +134,42 @@ func (g *Admission[T]) ensureResourceIsValid(ctx context.Context, params Admissi
 		return ctrl.Result{}, nil
 	}
 
-	contextLogger.Info("Detected invalid resource, stopping reconciliation", "warnings", warnings)
+	// The full validation error can embed field values such as connection
+	// strings, object-store URLs or secret names; keep it in the logs only and
+	// persist just a sanitized summary to the world-readable status.
+	contextLogger.Info("Detected invalid resource, stopping reconciliation",
+		"warnings", warnings, "validationError", validationErr.Error())
 	if !params.ApplyChanges {
 		return ctrl.Result{}, reconcile.TerminalError(validationErr)
 	}
 
-	params.Object.SetAdmissionError(validationErr.Error())
+	params.Object.SetAdmissionError(sanitizeValidationError(validationErr))
 	if err := params.Client.Status().Update(ctx, params.Object); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, reconcile.TerminalError(validationErr)
+}
+
+// sanitizeValidationError returns a summary of a validation error that is safe
+// to store in the world-readable resource status. It lists only the offending
+// field paths, never their values, which may contain sensitive data such as
+// connection strings, object-store URLs or secret names.
+func sanitizeValidationError(err error) string {
+	var statusErr *apierrors.StatusError
+	if errors.As(err, &statusErr) && statusErr.ErrStatus.Details != nil {
+		var fields []string
+		for _, cause := range statusErr.ErrStatus.Details.Causes {
+			if cause.Field != "" {
+				fields = append(fields, cause.Field)
+			}
+		}
+		if len(fields) > 0 {
+			return fmt.Sprintf(
+				"the resource failed admission validation on: %s (see the operator logs for details)",
+				strings.Join(fields, ", "))
+		}
+	}
+
+	return "the resource failed admission validation (see the operator logs for details)"
 }

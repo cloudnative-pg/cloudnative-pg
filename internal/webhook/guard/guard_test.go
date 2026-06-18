@@ -25,8 +25,11 @@ import (
 	"maps"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -346,14 +349,16 @@ var _ = Describe("EnsureResourceIsAdmitted", func() {
 		Expect(statusUpdateCalled).To(BeFalse())
 	})
 
-	It("records the admission error on the status when validation fails and ApplyChanges is true", func() {
+	It("records a sanitized admission error on the status when validation fails and ApplyChanges is true", func() {
 		validationError := errors.New("validation failed")
 		statusUpdateCalled := false
 		mockCl.StatusUpdateFunc = func(
 			_ context.Context, statusObj client.Object, _ ...client.SubResourceUpdateOption,
 		) error {
 			statusUpdateCalled = true
-			Expect(statusObj.(*mockAdmittableObject).AdmissionError).To(Equal("validation failed"))
+			// The raw validation error is never written to the world-readable status
+			Expect(statusObj.(*mockAdmittableObject).AdmissionError).ToNot(BeEmpty())
+			Expect(statusObj.(*mockAdmittableObject).AdmissionError).ToNot(ContainSubstring("validation failed"))
 			return nil
 		}
 
@@ -372,8 +377,45 @@ var _ = Describe("EnsureResourceIsAdmitted", func() {
 		})
 		Expect(errors.Is(err, reconcile.TerminalError(nil))).To(BeTrue())
 		Expect(result.IsZero()).To(BeTrue())
-		Expect(obj.AdmissionError).To(Equal("validation failed"))
 		Expect(statusUpdateCalled).To(BeTrue())
+	})
+
+	It("persists the offending field paths but not their values when validation fails", func() {
+		const sensitive = "s3://secret-bucket/backups"
+		validationError := apierrors.NewInvalid(
+			schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
+			"cluster-example",
+			field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "backup", "barmanObjectStore"),
+					sensitive,
+					"missing credentials"),
+			},
+		)
+		var recorded string
+		mockCl.StatusUpdateFunc = func(
+			_ context.Context, statusObj client.Object, _ ...client.SubResourceUpdateOption,
+		) error {
+			recorded = statusObj.(*mockAdmittableObject).AdmissionError
+			return nil
+		}
+
+		guard := &Admission[*mockAdmittableObject]{
+			Validator: &mockValidator{
+				ValidateCreateFunc: func(_ context.Context, _ *mockAdmittableObject) (admission.Warnings, error) {
+					return nil, validationError
+				},
+			},
+		}
+
+		_, err := guard.EnsureResourceIsAdmitted(ctx, AdmissionParams[*mockAdmittableObject]{
+			Object:       obj,
+			Client:       mockCl,
+			ApplyChanges: true,
+		})
+		Expect(errors.Is(err, reconcile.TerminalError(nil))).To(BeTrue())
+		Expect(recorded).To(ContainSubstring("spec.backup.barmanObjectStore"))
+		Expect(recorded).ToNot(ContainSubstring(sensitive))
 	})
 
 	It("propagates an error from the status update", func() {
