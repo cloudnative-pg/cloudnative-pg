@@ -786,8 +786,29 @@ levels, as listed in the table below:
 | operator         | 9443        | webhook server      | `webhook-server` | Yes      | Yes            |
 | operator         | 8080        | metrics             | `metrics`        | No       | No             |
 | instance manager | 9187        | metrics             | `metrics`        | Optional | No             |
-| instance manager | 8000        | status              | `status`         | Yes      | No             |
+| instance manager | 8000        | status              | `status`         | Yes      | Partial (1)    |
 | operand          | 5432        | PostgreSQL instance | `postgresql`     | Optional | Yes            |
+
+(1) Status, health, and probe endpoints are unauthenticated. Sensitive
+endpoints (backup, `pg_controldata`, partial WAL archive, and instance-manager
+upgrade) require the operator's client certificate, as described in
+[Operator-to-instance authentication](#operator-to-instance-authentication)
+below.
+
+#### Operator-to-instance authentication
+
+The operator generates a self-signed ECDSA client certificate in memory at
+startup and publishes its SHA-256 public-key fingerprint in the cluster's
+`.status.operatorCertificateFingerprint`. The instance manager pins that
+fingerprint and rejects any call to its sensitive endpoints (backup,
+`pg_controldata`, partial WAL archive, and instance-manager upgrade) that does
+not present a matching certificate. Status, health, and probe endpoints remain
+unauthenticated.
+
+The certificate is never written to disk and is regenerated on every operator
+restart, so trust derives from fingerprint pinning rather than CA validation.
+This protection requires the status port to be served over TLS, which has been
+the default since v1.24.
 
 ### PostgreSQL
 
