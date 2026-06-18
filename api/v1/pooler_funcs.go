@@ -136,3 +136,8 @@ func (in *Pooler) IsMetricsTLSEnabled() bool {
 func (in *Pooler) SetAdmissionError(msg string) {
 	in.Status.Error = msg
 }
+
+// GetAdmissionError returns the admission error recorded on the Pooler status
+func (in *Pooler) GetAdmissionError() string {
+	return in.Status.Error
+}

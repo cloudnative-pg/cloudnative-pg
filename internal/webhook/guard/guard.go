@@ -41,7 +41,16 @@ import (
 type AdmittableObject interface {
 	client.Object
 
+	// SetAdmissionError records the admission validation error on the status,
+	// or clears it when msg is empty.
 	SetAdmissionError(msg string)
+
+	// GetAdmissionError returns the admission validation error currently
+	// recorded on the status, when the guard is responsible for clearing it.
+	// Types whose admission error is cleared by their own reconciler (for
+	// example through the phase machinery) return an empty string, so the
+	// guard does not race that logic by persisting the clear itself.
+	GetAdmissionError() string
 }
 
 // Admission provides admission control capabilities by wrapping defaulting
@@ -136,7 +145,19 @@ func (g *Admission[T]) ensureResourceIsValid(ctx context.Context, params Admissi
 	// the best approximation we have.
 	warnings, validationErr := g.Validator.ValidateCreate(ctx, params.Object)
 	if validationErr == nil {
+		// Clear a previously recorded admission error. The defaulting path
+		// persists its own changes, but the validation success path must
+		// persist the cleared status itself: the controllers either skip the
+		// status write when nothing else changed, or build their patch base
+		// from this already-mutated object, so an in-memory clear would never
+		// reach the API server and the stale error would stick.
+		hadError := params.ApplyChanges && params.Object.GetAdmissionError() != ""
 		params.Object.SetAdmissionError("")
+		if hadError {
+			if err := params.Client.Status().Update(ctx, params.Object); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 

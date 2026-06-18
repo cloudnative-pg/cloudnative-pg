@@ -334,10 +334,18 @@ func (backup *Backup) SetAdmissionError(msg string) {
 	}
 
 	// Reset the phase from a previous validation failure so the start gates
-	// fire again once the definition is valid. The error message is cleared by
-	// the lifecycle transitions instead: clearing it here would only touch the
-	// in-memory copy used as the patch base and never reach the API server.
+	// fire again once the definition is valid, and clear the error. The guard
+	// persists this cleared status, so the change reaches the API server.
 	if backup.Status.Phase == BackupPhaseDefinitionInvalid {
 		backup.Status.Phase = ""
+		backup.Status.Error = ""
 	}
+}
+
+// GetAdmissionError returns the admission error recorded on the Backup status
+func (backup *Backup) GetAdmissionError() string {
+	if backup.Status.Phase == BackupPhaseDefinitionInvalid {
+		return backup.Status.Error
+	}
+	return ""
 }

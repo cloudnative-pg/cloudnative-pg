@@ -1892,6 +1892,18 @@ var _ = Describe("GetExternalClustersEnabledPluginNames", func() {
 	})
 })
 
+var _ = Describe("Cluster admission error", func() {
+	It("records the error in the phase but never reports it to the guard", func() {
+		cluster := &Cluster{}
+		cluster.SetAdmissionError("boom")
+		Expect(cluster.Status.Phase).To(BeEquivalentTo(PhaseDefinitionInvalid))
+		Expect(cluster.Status.PhaseReason).To(Equal("boom"))
+		// The phase machinery, not the guard, clears the Cluster admission
+		// error, so GetAdmissionError always returns an empty string.
+		Expect(cluster.GetAdmissionError()).To(BeEmpty())
+	})
+})
+
 var _ = Describe("IsInitialized", func() {
 	It("returns false when the cluster has no conditions", func() {
 		cluster := &Cluster{}

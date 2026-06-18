@@ -59,6 +59,10 @@ func (m *mockAdmittableObject) SetAdmissionError(msg string) {
 	m.AdmissionError = msg
 }
 
+func (m *mockAdmittableObject) GetAdmissionError() string {
+	return m.AdmissionError
+}
+
 // mockDefaulter is a mock implementation of admission.Defaulter for testing
 type mockDefaulter struct {
 	DefaultFunc func(ctx context.Context, obj *mockAdmittableObject) error
@@ -216,6 +220,58 @@ var _ = Describe("EnsureResourceIsAdmitted", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.IsZero()).To(BeTrue())
 		Expect(obj.AdmissionError).To(BeEmpty())
+	})
+
+	It("persists the cleared admission error when validation passes and ApplyChanges is true", func() {
+		obj.AdmissionError = "previous error"
+
+		statusUpdated := false
+		mockCl.StatusUpdateFunc = func(
+			_ context.Context, statusObj client.Object, _ ...client.SubResourceUpdateOption,
+		) error {
+			statusUpdated = true
+			Expect(statusObj.(*mockAdmittableObject).AdmissionError).To(BeEmpty())
+			return nil
+		}
+
+		guard := &Admission[*mockAdmittableObject]{
+			Defaulter: &mockDefaulter{},
+			Validator: &mockValidator{},
+		}
+
+		result, err := guard.EnsureResourceIsAdmitted(ctx, AdmissionParams[*mockAdmittableObject]{
+			Object:       obj,
+			Client:       mockCl,
+			ApplyChanges: true,
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.IsZero()).To(BeTrue())
+		Expect(obj.AdmissionError).To(BeEmpty())
+		Expect(statusUpdated).To(BeTrue())
+	})
+
+	It("does not write the status when validation passes and there was no error", func() {
+		statusUpdated := false
+		mockCl.StatusUpdateFunc = func(
+			_ context.Context, _ client.Object, _ ...client.SubResourceUpdateOption,
+		) error {
+			statusUpdated = true
+			return nil
+		}
+
+		guard := &Admission[*mockAdmittableObject]{
+			Defaulter: &mockDefaulter{},
+			Validator: &mockValidator{},
+		}
+
+		result, err := guard.EnsureResourceIsAdmitted(ctx, AdmissionParams[*mockAdmittableObject]{
+			Object:       obj,
+			Client:       mockCl,
+			ApplyChanges: true,
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.IsZero()).To(BeTrue())
+		Expect(statusUpdated).To(BeFalse())
 	})
 
 	It("updates the object and requeues when defaulting mutates it and ApplyChanges is true", func() {

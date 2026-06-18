@@ -600,6 +600,39 @@ var _ = Describe("IsCompletedVolumeSnapshot", func() {
 	})
 })
 
+var _ = Describe("Backup admission error", func() {
+	It("records the error and the invalid phase", func() {
+		backup := &Backup{}
+		backup.SetAdmissionError("boom")
+		Expect(backup.Status.Phase).To(BeEquivalentTo(BackupPhaseDefinitionInvalid))
+		Expect(backup.Status.Error).To(Equal("boom"))
+		Expect(backup.GetAdmissionError()).To(Equal("boom"))
+	})
+
+	It("clears the error and resets the phase so the start gates fire again", func() {
+		backup := &Backup{}
+		backup.SetAdmissionError("boom")
+		backup.SetAdmissionError("")
+		Expect(backup.Status.Phase).To(BeEmpty())
+		Expect(backup.Status.Error).To(BeEmpty())
+		Expect(backup.GetAdmissionError()).To(BeEmpty())
+	})
+
+	It("does not report an error recorded by a non-admission phase", func() {
+		backup := &Backup{}
+		backup.Status.SetAsFailed(errors.New("backup failed"))
+		Expect(backup.GetAdmissionError()).To(BeEmpty())
+	})
+
+	It("leaves a non-admission failure untouched when clearing", func() {
+		backup := &Backup{}
+		backup.Status.SetAsFailed(errors.New("backup failed"))
+		backup.SetAdmissionError("")
+		Expect(backup.Status.Phase).To(BeEquivalentTo(BackupPhaseFailed))
+		Expect(backup.Status.Error).To(Equal("backup failed"))
+	})
+})
+
 var _ = Describe("GetVolumeSnapshotConfiguration", func() {
 	var (
 		backup          *Backup

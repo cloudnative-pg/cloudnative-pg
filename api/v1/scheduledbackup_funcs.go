@@ -109,3 +109,8 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 func (scheduledBackup *ScheduledBackup) SetAdmissionError(msg string) {
 	scheduledBackup.Status.Error = msg
 }
+
+// GetAdmissionError returns the admission error recorded on the ScheduledBackup status
+func (scheduledBackup *ScheduledBackup) GetAdmissionError() string {
+	return scheduledBackup.Status.Error
+}

@@ -99,3 +99,11 @@ func (db *Database) SetAdmissionError(msg string) {
 	db.Status.Message = msg
 	db.Status.Applied = ptr.To(len(msg) == 0)
 }
+
+// GetAdmissionError always returns an empty string: the Database reports the
+// admission error through Status.Message and Status.Applied, which its own
+// reconciler rewrites on every loop, so the guard must not persist the clear
+// itself and overwrite that state.
+func (db *Database) GetAdmissionError() string {
+	return ""
+}

@@ -1657,3 +1657,11 @@ func (cluster *Cluster) SetAdmissionError(msg string) {
 		cluster.Status.PhaseReason = ""
 	}
 }
+
+// GetAdmissionError always returns an empty string: the Cluster encodes the
+// admission error in its phase, which the reconciler rewrites through the phase
+// machinery on the next healthy loop, so the guard must not persist the clear
+// itself and race that logic.
+func (cluster *Cluster) GetAdmissionError() string {
+	return ""
+}
