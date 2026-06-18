@@ -156,6 +156,8 @@ EmbeddedObjectMetadata
 EnablePDB
 Endevir
 EndpointCA
+EndpointSlice
+EndpointSlices
 EnsureOption
 EnterpriseDB
 Enum
