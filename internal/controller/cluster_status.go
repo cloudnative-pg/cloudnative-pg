@@ -58,44 +58,13 @@ type managedResources struct {
 	jobs      batchv1.JobList
 }
 
-// Count the number of jobs that are still running.
-//
-// A Job whose instance PGDATA PVC is missing AND whose serial is not yet
-// covered by cluster.Status.LatestGeneratedNode is excluded: its Pod cannot
-// make progress without a volume to mount, and the instance-creation path
-// must reach the adoption branch to create the missing PVC. Treating it as
-// "running" would wedge the reconciler in the 5s requeue loop.
-//
-// When the PVC is missing from cache but the serial is already covered by
-// LatestGeneratedNode, the operator has already committed it (the counter
-// persists only after both the Job and the PVC are committed), so a cache
-// miss is just a stale informer and the Job still counts as running. This
-// holds only for operator-managed PVCs: one deleted out of band leaves the
-// Job counted as running.
-func (resources *managedResources) runningJobNames(cluster *apiv1.Cluster) []string {
-	pvcNames := make(map[string]struct{}, len(resources.pvcs.Items))
-	for _, pvc := range resources.pvcs.Items {
-		pvcNames[pvc.Name] = struct{}{}
-	}
+// Count the number of jobs that are still running
+func (resources *managedResources) runningJobNames() []string {
 	result := make([]string, 0, len(resources.jobs.Items))
 	for _, job := range resources.jobs.Items {
-		if utils.JobHasOneCompletion(job) {
-			continue
-		}
-		instanceName, hasLabel := job.Labels[utils.InstanceNameLabelName]
-		if !hasLabel {
+		if !utils.JobHasOneCompletion(job) {
 			result = append(result, job.Name)
-			continue
 		}
-		if _, hasPVC := pvcNames[instanceName]; hasPVC {
-			result = append(result, job.Name)
-			continue
-		}
-		if serial, err := specs.GetNodeSerial(job.ObjectMeta); err == nil &&
-			serial > cluster.Status.LatestGeneratedNode {
-			continue
-		}
-		result = append(result, job.Name)
 	}
 	return result
 }
@@ -367,6 +336,22 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	if !cluster.IsReplica() {
 		cluster.Status.DemotionToken = ""
+	}
+
+	if cluster.Status.Instances > 0 {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionInitialized),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.BootstrapCompleted),
+			Message: "Cluster has been bootstrapped",
+		})
+	} else if meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionInitialized)) == nil {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionInitialized),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.BootstrapPending),
+			Message: "Cluster has not been bootstrapped yet",
+		})
 	}
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {

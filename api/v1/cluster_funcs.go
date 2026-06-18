@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1632,4 +1633,17 @@ func (cluster *Cluster) GetServiceAccountName() string {
 		return cluster.Spec.ServiceAccountName
 	}
 	return cluster.Name
+}
+
+// IsInitialized is true when the cluster has been running once.
+// Falls back to LatestGeneratedNode when the condition is absent or False,
+// to handle clusters upgraded from operator versions that predate the
+// Initialized condition.
+func (cluster *Cluster) IsInitialized() bool {
+	c := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionInitialized))
+	if c == nil || c.Status == metav1.ConditionFalse {
+		return cluster.Status.LatestGeneratedNode != 0
+	}
+
+	return c.Status == metav1.ConditionTrue
 }

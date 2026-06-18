@@ -942,6 +942,8 @@ type ClusterStatus struct {
 	Topology Topology `json:"topology,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
+	//
+	// Deprecated: this field is not set anymore
 	// +optional
 	LatestGeneratedNode int `json:"latestGeneratedNode,omitempty"`
 
@@ -1173,6 +1175,10 @@ const (
 	// ConditionConsistentSystemID is true when the all the instances of the
 	// cluster report the same System ID.
 	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
+	// ConditionInitialized is False from the first reconcile until the cluster
+	// has had at least one running instance, at which point it is set to True
+	// and never cleared.
+	ConditionInitialized ClusterConditionType = "Initialized"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1221,6 +1227,14 @@ const (
 
 	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
 	DetachedVolume ConditionReason = "DetachedVolume"
+
+	// BootstrapCompleted is the reason set on ConditionInitialized=True once the
+	// cluster has completed its first bootstrap.
+	BootstrapCompleted ConditionReason = "BootstrapCompleted"
+
+	// BootstrapPending is the reason set on ConditionInitialized=False while the
+	// cluster has not yet completed its first bootstrap.
+	BootstrapPending ConditionReason = "BootstrapPending"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster

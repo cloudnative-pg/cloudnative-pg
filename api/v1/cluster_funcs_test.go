@@ -1891,3 +1891,100 @@ var _ = Describe("GetExternalClustersEnabledPluginNames", func() {
 		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(BeEmpty())
 	})
 })
+
+var _ = Describe("IsInitialized", func() {
+	It("returns false when the cluster has no conditions", func() {
+		cluster := &Cluster{}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns false when the Initialized condition is missing", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionBackup),
+						Status: metav1.ConditionTrue,
+						Reason: string(ConditionReasonLastBackupSucceeded),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns true when the Initialized condition is True", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionTrue,
+						Reason: string(BootstrapCompleted),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("returns false when the Initialized condition is False and LatestGeneratedNode is zero", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns true when the condition is absent but LatestGeneratedNode is non-zero (upgrade bridge)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				LatestGeneratedNode: 3,
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("returns true when condition is False but LatestGeneratedNode is non-zero (upgrade bridge)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				LatestGeneratedNode: 3,
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("ignores the LastBackupSucceeded condition (regression guard)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionBackup),
+						Status: metav1.ConditionTrue,
+						Reason: string(ConditionReasonLastBackupSucceeded),
+					},
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+})

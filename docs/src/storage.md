@@ -341,8 +341,8 @@ $ kubectl get pods
 NAME                           READY   STATUS      RESTARTS   AGE
 cluster-example-1              1/1     Running     0          5m58s
 cluster-example-2              1/1     Running     0          5m43s
-cluster-example-4-join-v2      0/1     Completed   0          17s
-cluster-example-4              1/1     Running     0          10s
+cluster-example-3-join-v2      0/1     Completed   0          17s
+cluster-example-3              1/1     Running     0          10s
 ```
 
 ## Volume reduction
@@ -382,8 +382,8 @@ To reduce the size of the persistent volumes:
    logs an informational `cannot decrease storage requirement` message until
    that instance is recreated. This is expected and harmless.
 3. Destroy one standby that still has a volume of the old size. The operator
-   provisions a replacement instance — created with the next available name,
-   not the one you destroyed — on the new, smaller volume:
+   provisions a replacement instance — reusing the name of the one you
+   destroyed, since instance serials are recycled — on the new, smaller volume:
 
    ```sh
    kubectl-cnpg destroy CLUSTER INSTANCE
