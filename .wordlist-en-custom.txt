@@ -159,6 +159,8 @@ EnablePDB
 EncryptionType
 Endevir
 EndpointCA
+EndpointSlice
+EndpointSlices
 EnsureOption
 EnterpriseDB
 Enum
