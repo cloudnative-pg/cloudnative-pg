@@ -89,8 +89,9 @@ func (pair KeyPair) TLSCertificate() (tls.Certificate, error) {
 }
 
 // PublicKeyFingerprint returns the hex-encoded SHA-256 digest of the certificate's
-// SubjectPublicKeyInfo, which is stable across certificate renewals that reuse the
-// same key.
+// SubjectPublicKeyInfo. It depends only on the public key, so two certificates that
+// share a key produce the same fingerprint. Note that the operator generates a fresh
+// key on every restart, so its fingerprint is not stable across restarts.
 func PublicKeyFingerprint(cert *x509.Certificate) string {
 	digest := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
 	return hex.EncodeToString(digest[:])

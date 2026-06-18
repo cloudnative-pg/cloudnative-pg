@@ -36,6 +36,12 @@ import (
 // If the fingerprint is missing or stale, it patches the status and requests an
 // immediate requeue so that the rest of the reconciliation does not run with a
 // cluster whose status the instance manager's local cache has not observed yet.
+//
+// The certificate is per-process: each operator instance generates its own at
+// startup. After a leader-election failover the new leader re-patches the
+// fingerprint of every cluster, briefly reopening the propagation window until
+// each instance manager observes the new value. This is self-healing and
+// expected, not a bug.
 func (r *ClusterReconciler) reconcileOperatorCertificateFingerprint(
 	ctx context.Context,
 	cluster *apiv1.Cluster,

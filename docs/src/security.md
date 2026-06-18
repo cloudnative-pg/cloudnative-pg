@@ -807,8 +807,24 @@ unauthenticated.
 
 The certificate is never written to disk and is regenerated on every operator
 restart, so trust derives from fingerprint pinning rather than CA validation.
-This protection requires the status port to be served over TLS, which has been
-the default since v1.24.
+
+This protection has a hard requirement: the status port **must** be served over
+TLS, which has been the default since v1.24. A client certificate can only be
+presented over a TLS connection, so the protected endpoints are reachable by the
+operator only when the status port uses TLS.
+
+:::warning
+If the status port is not served over TLS, the instance manager cannot
+authenticate the operator and **permanently** rejects every call to its
+protected endpoints (backup, `pg_controldata`, partial WAL archive, and
+instance-manager upgrade) with `401 Unauthorized`. This is not a transient
+condition and will not resolve on its own. It can affect instances created by an
+operator older than v1.24 (whose status port serves plain HTTP) once their
+instance manager is upgraded to a version that enforces this authentication: such
+instances must be rolled out so their Pods are recreated with a TLS-enabled status
+port. Newly created instances always enable TLS on the status port and are
+unaffected.
+:::
 
 ### PostgreSQL
 
