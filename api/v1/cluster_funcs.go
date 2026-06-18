@@ -140,7 +140,7 @@ func (cluster *Cluster) GetJobEnabledPluginNames() (result []string) {
 func GetExternalClustersEnabledPluginNames(externalClusters []ExternalCluster) (result []string) {
 	pluginNames := make([]string, 0, len(externalClusters))
 	for _, externalCluster := range externalClusters {
-		if externalCluster.PluginConfiguration != nil {
+		if externalCluster.PluginConfiguration != nil && externalCluster.PluginConfiguration.IsEnabled() {
 			pluginNames = append(pluginNames, externalCluster.PluginConfiguration.Name)
 		}
 	}
