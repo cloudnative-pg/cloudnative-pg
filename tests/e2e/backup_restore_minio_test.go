@@ -23,10 +23,12 @@ import (
 	"fmt"
 	"path/filepath"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
@@ -43,6 +45,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
+	storageutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -269,6 +272,31 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 			metricsasserts.AssertMetricsData(env, testTimeouts, namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 
+			By("deleting the first restored cluster and waiting for its resources to be removed", func() {
+				firstRestoreClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+
+				// The restored cluster is recreated later with the same name, so wait for
+				// the cluster and its PVCs to be fully removed first. Otherwise the
+				// recreated cluster could adopt stale PVCs instead of performing a fresh
+				// restore from the object store, masking or breaking the assertions below.
+				Eventually(func() bool {
+					_, err := clusterutils.Get(env.Ctx, env.Client, namespace, firstRestoreClusterName)
+					return apierrs.IsNotFound(err)
+				}, testTimeouts[timeouts.ClusterIsReady]).Should(BeTrue())
+
+				Eventually(func(g Gomega) {
+					pvcList, err := storageutils.GetPVCList(env.Ctx, env.Client, namespace)
+					g.Expect(err).ToNot(HaveOccurred())
+					for _, pvc := range pvcList.Items {
+						g.Expect(pvc.Labels[utils.ClusterLabelName]).ToNot(Equal(firstRestoreClusterName))
+					}
+				}, testTimeouts[timeouts.ClusterIsReady]).Should(Succeed())
+			})
+
 			previous := 0
 			latestGZ := filepath.Join("*", clusterName, "*", "*.history.gz")
 			By(fmt.Sprintf("checking the previous number of .history files in minio, history file name is %v",
@@ -277,12 +305,53 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
+			By("performing a switchover", func() {
+				clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
+			})
 
 			By("checking the number of .history after switchover", func() {
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestGZ)
 				}, 60).Should(BeNumerically(">", previous))
+			})
+
+			const postSwitchoverTableName = "to_restore_post_switchover"
+
+			By("inserting data into source cluster after switchover", func() {
+				postSwitchoverTableLocator := pgasserts.TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: postgres.AppDBName,
+					TableName:    postSwitchoverTableName,
+				}
+				pgasserts.AssertCreateTestData(env, postSwitchoverTableLocator)
+				minioasserts.AssertArchiveWalOnMinio(
+					env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
+			})
+
+			By("restoring cluster again and verifying data written after switchover is present", func() {
+				resources.CreateResourceFromFile(env, namespace, clusterRestoreSampleFile)
+				restoreClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+				clusterasserts.AssertClusterIsReady(
+					env, namespace, restoreClusterName, testTimeouts[timeouts.ClusterIsReadySlow],
+				)
+
+				origTableLocator := pgasserts.TableLocator{
+					Namespace:    namespace,
+					ClusterName:  restoreClusterName,
+					DatabaseName: postgres.AppDBName,
+					TableName:    tableName,
+				}
+				pgasserts.AssertDataExpectedCount(env, origTableLocator, 2)
+
+				postSwitchoverTableLocator := pgasserts.TableLocator{
+					Namespace:    namespace,
+					ClusterName:  restoreClusterName,
+					DatabaseName: postgres.AppDBName,
+					TableName:    postSwitchoverTableName,
+				}
+				pgasserts.AssertDataExpectedCount(env, postSwitchoverTableLocator, 2)
 			})
 
 			By("deleting the restored cluster", func() {
