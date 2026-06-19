@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 
@@ -105,6 +106,13 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			const namespacePrefix = "primary-failover-time-sync-replicas"
 			clusterName = "cluster-syncreplicas-fast-failover"
 			var err error
+			// The primary is deleted abruptly (quickDeletionPeriod), so it never
+			// releases the primary lease cleanly. Unlike the async cases, whose
+			// shutdown completes inside the grace period, the sync primary is
+			// SIGKILLed mid-shutdown: the promoting replica must therefore wait out
+			// the full lease duration before it can take over a still-held lease.
+			// Budget that take-over wait on top of the regular failover time.
+			syncMaxFailoverTime := maxFailoverTime + apiv1.DefaultPrimaryLeaseDurationSeconds
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
@@ -112,7 +120,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 				env, testTimeouts,
 				namespace, sampleFileSyncReplicas, clusterName,
 				webTestSyncReplicas, webTestJob,
-				maxReattachTime, maxFailoverTime, quickDeletionPeriod,
+				maxReattachTime, syncMaxFailoverTime, quickDeletionPeriod,
 			)
 		})
 	})
