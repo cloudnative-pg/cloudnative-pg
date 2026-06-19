@@ -43,7 +43,11 @@ const (
 	defaultRenewDeadline = 10 * time.Second
 
 	// defaultRetryPeriod is how frequently a non-holder retries acquiring the lease.
-	defaultRetryPeriod = 5 * time.Second
+	// It matches the conventional Kubernetes leader-election retry period: a non-holder
+	// polls a cleanly released lease every retry period, so a smaller value shortens the
+	// switchover hand-over without shortening the take-over wait (defaultLeaseDuration)
+	// that holds back a premature promotion.
+	defaultRetryPeriod = 2 * time.Second
 
 	// defaultReleasedLeaseDuration is the TTL written when explicitly releasing
 	// the lease. An empty HolderIdentity already marks the lease as free, but

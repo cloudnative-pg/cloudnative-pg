@@ -4789,11 +4789,11 @@ spec:
                     minimum: 1
                     type: integer
                   retryPeriodSeconds:
-                    default: 5
+                    default: 2
                     description: |-
                       How frequently, in seconds, a non-holder instance retries acquiring or
                       renewing the lease.
-                      Defaults to 5.
+                      Defaults to 2.
                     format: int32
                     minimum: 1
                     type: integer
