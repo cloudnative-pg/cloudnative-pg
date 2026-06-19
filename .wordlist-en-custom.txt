@@ -754,6 +754,7 @@ cli
 clientCA
 clientCASecret
 clientCaSecretVersion
+clientCertificate
 clientTLS
 clientTLSSecret
 clientcertificateconfiguration
