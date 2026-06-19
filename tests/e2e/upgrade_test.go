@@ -877,9 +877,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 				deployOperator(currentOperatorManifest)
 				// This spec owns its operator lifecycle, so it tears down cnpg-system
-				// itself. cleanupOperatorAndMinio is not reused: it also cleans MinIO
-				// paths that only the in-core upgrade specs create, which would fail
-				// here. The plugin is removed before cnpg-system because the operator
+				// itself. cleanupOperatorAndObjectStore is not reused: it also cleans
+				// object store paths that only the in-core upgrade specs create, which
+				// would fail here. The plugin is removed before cnpg-system because the operator
 				// puts a cnpg.io/cleanupPlugin finalizer on the plugin Service, so
 				// deleting cnpg-system wholesale would otherwise wedge the namespace
 				// on that finalizer; removing the plugin while the operator is still
@@ -887,7 +887,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				DeferCleanup(func() {
 					if CurrentSpecReport().Failed() {
 						namespaces.DumpNamespaceObjects(env.Ctx, env.Client,
-							minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
+							objectStoreEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"objectstore.log")
 						operator.Dump(env.Ctx, env.Client,
 							operatorNamespace, "out/"+CurrentSpecReport().LeafNodeText+"operator.log")
 					}
@@ -951,7 +951,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 					// Switch a WAL after the upgrade and require it to reach the
 					// object store: the archiving condition on the cluster may still
 					// reflect pre-upgrade activity, so it is not enough here.
-					minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv,
+					objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
 						upgradeNamespace, pluginClusterName, pluginClusterName)
 				})
 

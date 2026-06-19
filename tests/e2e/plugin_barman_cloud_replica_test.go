@@ -36,7 +36,7 @@ import (
 // from the source. It is added alongside the in-core variant (which shares its
 // source cluster with a volume-snapshot test), and stays until the in-core
 // Barman Cloud support is removed. Runs on kind/k3d only, where the plugin and
-// the shared MinIO are installed.
+// the shared object store are installed.
 var _ = Describe("plugin-barman-cloud replica cluster from backup",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelReplication, tests.LabelBackupRestore), func() {
 		const (
