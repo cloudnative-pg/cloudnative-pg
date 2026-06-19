@@ -26,9 +26,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
-	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -46,12 +47,12 @@ import (
 var _ = Describe("plugin-barman-cloud",
 	Label(tests.LabelSmoke, tests.LabelPluginBarmanCloud, tests.LabelBackupRestore), func() {
 		const (
-			clusterManifest = fixturesDir + "/plugin_barman_cloud/cluster-with-plugin-minio.yaml.template"
+			clusterManifest = fixturesDir + "/plugin_barman_cloud/cluster-with-plugin.yaml.template"
 			backupManifest  = fixturesDir + "/plugin_barman_cloud/backup-plugin.yaml"
-			restoreManifest = fixturesDir + "/plugin_barman_cloud/cluster-restore-plugin-minio.yaml.template"
+			restoreManifest = fixturesDir + "/plugin_barman_cloud/cluster-restore-plugin.yaml.template"
 			// Matches metadata.name of the cluster fixture and the barmanObjectName
 			// parameter it references.
-			clusterName           = "pg-backup-plugin-minio"
+			clusterName           = "pg-backup-plugin"
 			barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
 			restoreTable          = "to_restore"
 			level                 = tests.High
@@ -61,8 +62,8 @@ var _ = Describe("plugin-barman-cloud",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			// The plugin (and the shared MinIO it backs up to) is only installed on
-			// local kind/k3d engines; see hack/e2e/run-e2e.sh.
+			// The plugin (and the shared object store it backs up to) is only
+			// installed on local kind/k3d engines; see hack/e2e/run-e2e.sh.
 			if !(IsKind() || IsK3D()) {
 				Skip("This test only runs on kind or k3d clusters")
 			}
@@ -109,7 +110,8 @@ var _ = Describe("plugin-barman-cloud",
 				// would never be flushed and the standalone restore below could not
 				// reach a consistent recovery point. Switch WAL and wait for it to
 				// reach the object store.
-				minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
+				objectstoreasserts.AssertArchiveWalOnObjectStore(
+					env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName)
 			})
 
 			// Recover into a new cluster from the backup and confirm the data is
@@ -118,37 +120,38 @@ var _ = Describe("plugin-barman-cloud",
 		})
 	})
 
-// barmanCloudCredentialSecret is the Secret holding the MinIO credentials that
-// the e2e plugin ObjectStores reference; the tests create it with keys ID/KEY.
+// barmanCloudCredentialSecret is the Secret holding the object store credentials
+// that the e2e plugin ObjectStores reference; the tests create it with keys ID/KEY.
 const barmanCloudCredentialSecret = "backup-storage-creds"
 
 // setupPluginObjectStore prepares a namespace for plugin-barman-cloud
-// archiving against the shared MinIO: the CA secret, the credentials secret,
-// and an ObjectStore named after the cluster that uses them.
+// archiving against the shared object store: the CA secret, the credentials
+// secret, and an ObjectStore named after the cluster that uses them.
 func setupPluginObjectStore(namespace, name string) {
 	GinkgoHelper()
 
-	By("creating the MinIO CA secret", func() {
-		Expect(minioEnv.CreateCaSecret(env, namespace)).To(Succeed())
+	By("creating the object store CA secret", func() {
+		Expect(objectStoreEnv.CreateCaSecret(env, namespace)).To(Succeed())
 	})
 
-	By("creating the MinIO credentials secret", func() {
+	By("creating the object store credentials secret", func() {
 		_, err := secrets.CreateObjectStorageSecret(
-			env.Ctx, env.Client, namespace, barmanCloudCredentialSecret, "minio", "minio123")
+			env.Ctx, env.Client, namespace, barmanCloudCredentialSecret,
+			objectstore.AccessKeyID, objectstore.SecretAccessKey)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	By("creating the ObjectStore pointing at the shared MinIO", func() {
-		Expect(env.Client.Create(env.Ctx, newMinioObjectStore(namespace, name))).
+	By("creating the ObjectStore pointing at the shared object store", func() {
+		Expect(env.Client.Create(env.Ctx, newObjectStore(namespace, name))).
 			To(Succeed())
 	})
 }
 
-// newMinioObjectStore builds a plugin-barman-cloud ObjectStore custom resource
-// (barmancloud.cnpg.io/v1) pointing at the shared e2e MinIO. It is built as an
-// unstructured object because the CRD lives in the external plugin and is not
-// registered in the operator's scheme.
-func newMinioObjectStore(namespace, name string) *unstructured.Unstructured {
+// newObjectStore builds a plugin-barman-cloud ObjectStore custom resource
+// (barmancloud.cnpg.io/v1) pointing at the shared e2e object store. It is built
+// as an unstructured object because the CRD lives in the external plugin and is
+// not registered in the operator's scheme.
+func newObjectStore(namespace, name string) *unstructured.Unstructured {
 	objectStore := &unstructured.Unstructured{}
 	objectStore.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "barmancloud.cnpg.io",
@@ -160,9 +163,9 @@ func newMinioObjectStore(namespace, name string) *unstructured.Unstructured {
 	objectStore.Object["spec"] = map[string]interface{}{
 		"configuration": map[string]interface{}{
 			"destinationPath": "s3://" + name + "/",
-			"endpointURL":     "https://" + minioEnv.ServiceName + ":9000",
+			"endpointURL":     "https://" + objectStoreEnv.ServiceName + ":9000",
 			"endpointCA": map[string]interface{}{
-				"name": minioEnv.CaSecretName,
+				"name": objectStoreEnv.CaSecretName,
 				"key":  "ca.crt",
 			},
 			"s3Credentials": map[string]interface{}{

@@ -24,10 +24,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
-	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -86,9 +86,9 @@ var _ = Describe("plugin-barman-cloud scheduled backups, standby target and PITR
 				backupasserts.AssertScheduledBackupsImmediate(env, namespace, scheduledManifest, scheduledBackupName)
 				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 				By("verifying the base backup is on the object store", func() {
-					latestTar := minio.GetFilePath(clusterName, "data.tar")
+					latestTar := objectstore.GetFilePath(clusterName, "data.tar")
 					Eventually(func() (int, error) {
-						return minio.CountFiles(minioEnv, latestTar)
+						return objectstore.CountFiles(objectStoreEnv, latestTar)
 					}, 60).Should(BeEquivalentTo(1))
 				})
 			})
@@ -102,9 +102,9 @@ var _ = Describe("plugin-barman-cloud scheduled backups, standby target and PITR
 				})
 
 				By("verifying the base backup is on the object store", func() {
-					latestTar := minio.GetFilePath(clusterName, "data.tar")
+					latestTar := objectstore.GetFilePath(clusterName, "data.tar")
 					Eventually(func() (int, error) {
-						return minio.CountFiles(minioEnv, latestTar)
+						return objectstore.CountFiles(objectStoreEnv, latestTar)
 					}, 60).Should(BeEquivalentTo(2))
 				})
 			})
@@ -150,7 +150,8 @@ var _ = Describe("plugin-barman-cloud scheduled backups, standby target and PITR
 				})
 
 				By("archiving the WAL holding the recovery target", func() {
-					minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
+					objectstoreasserts.AssertArchiveWalOnObjectStore(
+						env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName)
 				})
 
 				By("restoring into a new cluster up to the recovery target", func() {

@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup-plugin-minio
+  name: pg-backup-plugin
 spec:
   instances: 2
 
@@ -26,4 +26,4 @@ spec:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
       parameters:
-        barmanObjectName: pg-backup-plugin-minio
+        barmanObjectName: pg-backup-plugin
