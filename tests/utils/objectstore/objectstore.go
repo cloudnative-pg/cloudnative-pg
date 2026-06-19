@@ -55,6 +55,9 @@ const (
 	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8"
 	// awsCliImage is the image used to run the AWS CLI S3 client
 	awsCliImage = "docker.io/amazon/aws-cli:2.35.4"
+	// busyboxImage is used by the init container that prepares writable
+	// working directories for the RustFS server
+	busyboxImage = "docker.io/library/busybox:1.37.0"
 
 	// AccessKeyID is the access key used to authenticate against the object store
 	AccessKeyID = "objectstore"
@@ -152,6 +155,13 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
 
+	// RustFS runs as a non-root user and writes its data and logs to these
+	// subdirectories, which the init container creates and makes writable.
+	const (
+		dataDir = "/data/rustfs"
+		logDir  = "/logs/rustfs"
+	)
+
 	deployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "object-store",
@@ -183,6 +193,35 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 							},
 						},
 					},
+					// RustFS runs as a non-root user but the PVC is root-owned, and
+					// a non-root init container cannot chown it on OpenShift.
+					// Instead the init creates a subdirectory it owns and makes it
+					// world-writable, which works as root (kind, cloud) or as the
+					// SCC-assigned UID (OpenShift).
+					InitContainers: []corev1.Container{
+						{
+							Name:  "init-permissions",
+							Image: busyboxImage,
+							Command: []string{
+								"sh", "-c",
+								fmt.Sprintf("mkdir -p %[1]s %[2]s && chmod 0777 %[1]s %[2]s", dataDir, logDir),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "data",
+									MountPath: "/data",
+								},
+								{
+									Name:      "logs",
+									MountPath: "/logs",
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(false),
+								SeccompProfile:           seccompProfile,
+							},
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:    "object-store",
@@ -200,7 +239,7 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 								},
 								{
 									Name:  "RUSTFS_VOLUMES",
-									Value: "/data",
+									Value: dataDir,
 								},
 								{
 									Name:  "RUSTFS_REGION",
@@ -220,7 +259,7 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 								},
 								{
 									Name:  "RUSTFS_OBS_LOG_DIRECTORY",
-									Value: "/logs",
+									Value: logDir,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -261,12 +300,10 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 							},
 						},
 					},
+					// No fsGroup/runAsUser: let OpenShift's restricted SCC assign
+					// the UID; elsewhere the server runs as its image default user.
 					SecurityContext: &corev1.PodSecurityContext{
 						SeccompProfile: seccompProfile,
-						// The RustFS image runs as the non-root `rustfs`
-						// user (10001): make the data volume and the
-						// projected TLS certificates group-accessible
-						FSGroup: ptr.To(int64(10001)),
 					},
 				},
 			},
@@ -334,7 +371,6 @@ func sslSetup(namespace string) (Setup, error) {
 	}
 	const tlsVolumeName = "secret-volume"
 	const tlsVolumeMountPath = "/etc/secrets/certs"
-	var secretMode int32 = 0o600
 	// RustFS enables TLS when it finds `rustfs_cert.pem` and `rustfs_key.pem`
 	// in the directory pointed to by RUSTFS_TLS_PATH
 	setup.Deployment.Spec.Template.Spec.Containers[0].Env = append(
@@ -355,6 +391,11 @@ func sslSetup(namespace string) (Setup, error) {
 			Name: tlsVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Projected: &corev1.ProjectedVolumeSource{
+					// DefaultMode is intentionally left at Kubernetes' 0644
+					// default: the non-root RustFS server must read the cert
+					// and key whatever UID it runs as, and the pod sets no
+					// fsGroup, so a tighter mode would make them unreadable on
+					// clusters that don't auto-assign one.
 					Sources: []corev1.VolumeProjection{
 						{
 							Secret: &corev1.SecretProjection{
@@ -374,7 +415,6 @@ func sslSetup(namespace string) (Setup, error) {
 							},
 						},
 					},
-					DefaultMode: &secretMode,
 				},
 			},
 		},

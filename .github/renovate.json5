@@ -103,6 +103,7 @@
       matchStrings: [
         'rustfsImage = "(?<depName>.+?):(?<currentValue>.*?)"',
         'awsCliImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'busyboxImage = "(?<depName>.+?):(?<currentValue>.*?)"',
       ],
       datasourceTemplate: 'docker',
       versioningTemplate: 'semver',
