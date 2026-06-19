@@ -1,6 +1,7 @@
 # Retrieves a list of supported image versions for the cloud providers and
 # creates a PR to update each relative JSON file:
 # - Kind (Kubernetes in Docker): kind_versions.json
+# - K3D (K3s in Docker): k3d_versions.json
 # - GKE (Google Kubernetes Engine): gke_versions.json
 # - AKS (Azure Kubernetes Service): aks_versions.json
 # - EKS (Amazon Elastic Kubernetes Service): eks_versions.json
@@ -31,64 +32,52 @@ jobs:
 
   check-public-clouds-k8s-versions:
     runs-on: ubuntu-24.04
+    env:
+      EOL_FILTER: '
+        def ver: split(".") | map(tonumber);
+        [ .[]
+          | select((.eol | type == "string") and (.eol > (now | strftime("%Y-%m-%d"))))
+          | .cycle
+        ]
+        | map(select(ver >= ($min | ver)))    # >= MINIMAL_K8S
+        | unique | sort_by(ver) | reverse'
     steps:
       -
         name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       -
-        # There is no command to get EKS k8s versions, we have to parse the documentation
         name: Get updated EKS versions
         run: |
-          DOC_URL="https://raw.githubusercontent.com/awsdocs/amazon-eks-user-guide/mainline/latest/ug/versioning/kubernetes-versions-standard.adoc"
-          curl --silent "${DOC_URL}" | sed -e 's/^== Kubernetes \([0-9].[0-9][0-9]\).*/\1/;/^[0-9]\./!d' | uniq | sort -rV | \
-            awk -vv=$MINIMAL_K8S '$0>=v {print $0}' | \
-            jq -Rn '[inputs]' | tee .github/eks_versions.json
+          curl -fsSL https://endoflife.date/api/amazon-eks.json | \
+            jq --arg min "$MINIMAL_K8S" "$EOL_FILTER" | \
+            tee .github/eks_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'eks'
-      -
-        name: Azure Login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-        if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
-      -
-        name: Get updated AKS versions
-        run: |
-          az aks get-versions --location westeurope  \
-            --query "reverse(sort(values[? isPreview != 'true' && contains(capabilities.supportPlan, 'KubernetesOfficial')].patchVersions.keys(@)[]))" -o tsv | \
-            sort -urk 1,1.5 | \
-            awk -vv=$MINIMAL_K8S '$0>=v {print $0}' | \
-            jq -Rn '[inputs]' | tee .github/aks_versions.json
-        if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
-      -
-        name: 'Auth GKE'
-        uses: 'google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093' # v3
-        with:
-          credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
-        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
-      -
-        name: Set up Cloud SDK for GKE
-        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
-      -
-        name: Install YQ
-        uses: frenck/action-setup-yq@c4b5be8b4a215c536a41d436757d9feb92836d4f # v1
-        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
       -
         name: Get updated GKE versions
         run: |
-          # Get the valid major versions from all the channels, convert them
-          # to json and write them to file.
-          YQEXPR=".validMasterVersions" #wokeignore:rule=master
-          gcloud container get-server-config --zone europe-west3-a --quiet | \
-            yq e ${YQEXPR} - | \
-            cut -d'.' -f '1-2' | \
-            uniq | \
-            sed 's/\([[:digit:]]\+\.[[:digit:]]\+\)/"\1"/' | \
-            yq '.[] | select( . >= strenv(MINIMAL_K8S) )' | \
-            jq -Rn '[inputs]' | tee .github/gke_versions.json
+          curl -fsSL https://endoflife.date/api/google-kubernetes-engine.json | \
+            jq --arg min "$MINIMAL_K8S" "$EOL_FILTER" | \
+            tee .github/gke_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
+      -
+        name: Get updated AKS versions
+        run: |
+          curl -fsSL https://releases.aks.azure.com/parsed_data.json | \
+            jq --arg min "$MINIMAL_K8S" --arg region "West Europe" '
+              def ver: split("(")[0] | split(".") | map(tonumber);    # "1.33.12" -> [1,33,12]
+              [ .Sections.KubernetesSupportedVersions.Components[].ByRegion[]
+                | select(.Regions | index($region))    # the bucket that contains West Europe
+                | .KubernetesVersionList[]
+                | select(.IsPreview == false and .IsLTS == false)    # GA, standard tier only
+                | .VersionName | split("(")[0]
+              ]
+              | unique
+              | map(select((ver)[0:2] >= ($min | split(".") | map(tonumber))))
+              | group_by(ver[0:2])      # one bucket per minor
+              | map(max_by(ver))        # latest patch per minor
+              | sort_by(ver) | reverse
+            ' | tee .github/aks_versions.json
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
       -
         name: Get updated kind node version
         run : |
@@ -133,8 +122,14 @@ jobs:
           sed -i -e 's/\(OPENSHIFT_VERSIONS ?= \)\(.*\)/\1'${OCP_VERSIONS}'/g' Makefile
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'ocp'
       -
+        name: Diff
+        run: |
+          git status
+          git diff
+      -
         name: Create Pull Request if versions have been updated
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        if: github.ref == 'refs/heads/main'
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           title: "feat: Public Cloud K8S versions update"

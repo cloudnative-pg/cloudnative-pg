@@ -51,6 +51,12 @@ const (
 	// DefaultKubernetesClusterDomain is the default value used as
 	// Kubernetes cluster domain.
 	DefaultKubernetesClusterDomain = "cluster.local"
+
+	// DefaultMutatingWebhookConfigurationName is the default name of the mutating webhook configuration
+	DefaultMutatingWebhookConfigurationName = "cnpg-mutating-webhook-configuration"
+
+	// DefaultValidatingWebhookConfigurationName is the default name of the validating webhook configuration
+	DefaultValidatingWebhookConfigurationName = "cnpg-validating-webhook-configuration"
 )
 
 // DefaultDrainTaints is the default list of taints the operator will watch and treat
@@ -181,8 +187,19 @@ type Data struct {
 	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
 	KubernetesClusterDomain string `json:"kubernetesClusterDomain" env:"KUBERNETES_CLUSTER_DOMAIN"`
 
+	// EnableWebhookNamespaceSuffix when true appends "-<OperatorNamespace>" to the default
+	// webhook configuration names, allowing multiple namespaced operator instances to coexist
+	// on the same cluster. The operator will fail to start if this is enabled without OperatorNamespace.
+	EnableWebhookNamespaceSuffix bool `json:"enableWebhookNamespaceSuffix" env:"ENABLE_WEBHOOK_NAMESPACE_SUFFIX"`
+
 	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
 	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
+
+	// ManageWebhookConfigurations is true when the operator should inject the
+	// CA bundle into the mutating and validating webhook configurations. It can
+	// be disabled when the webhook configurations are managed externally (e.g.
+	// by cert-manager's CA injector or by GitOps).
+	ManageWebhookConfigurations bool `json:"manageWebhookConfigurations" env:"MANAGE_WEBHOOK_CONFIGURATIONS"`
 }
 
 // Current is the configuration used by the operator
@@ -203,6 +220,7 @@ func newDefaultConfig() *Data {
 		StandbyTCPUserTimeout:           nil,
 		KubernetesClusterDomain:         DefaultKubernetesClusterDomain,
 		DrainTaints:                     DefaultDrainTaints,
+		ManageWebhookConfigurations:     true,
 	}
 }
 
@@ -249,6 +267,26 @@ func (config *Data) WatchedNamespaces() []string {
 	return cleanNamespaceList(config.WatchNamespace)
 }
 
+// GetMutatingWebhookConfigurationName returns the name of the MutatingWebhookConfiguration.
+// When EnableWebhookNamespaceSuffix is true and OperatorNamespace is set, it appends
+// the operator namespace to avoid collisions between multiple operator instances.
+func (config *Data) GetMutatingWebhookConfigurationName() string {
+	if config.EnableWebhookNamespaceSuffix && config.OperatorNamespace != "" {
+		return DefaultMutatingWebhookConfigurationName + "-" + config.OperatorNamespace
+	}
+	return DefaultMutatingWebhookConfigurationName
+}
+
+// GetValidatingWebhookConfigurationName returns the name of the ValidatingWebhookConfiguration.
+// When EnableWebhookNamespaceSuffix is true and OperatorNamespace is set, it appends
+// the operator namespace to avoid collisions between multiple operator instances.
+func (config *Data) GetValidatingWebhookConfigurationName() string {
+	if config.EnableWebhookNamespaceSuffix && config.OperatorNamespace != "" {
+		return DefaultValidatingWebhookConfigurationName + "-" + config.OperatorNamespace
+	}
+	return DefaultValidatingWebhookConfigurationName
+}
+
 // GetIncludePlugins gets the list of plugins to be always
 // included in the operator reconciliation
 func (config *Data) GetIncludePlugins() []string {
@@ -284,7 +322,8 @@ func evaluateGlobPatterns(patterns []string, value string) (result bool) {
 		if result, err = path.Match(pattern, value); err != nil {
 			configurationLog.Info(
 				"Skipping invalid glob pattern during labels/annotations inheritance",
-				"pattern", pattern)
+				"pattern", pattern,
+			)
 			continue
 		}
 

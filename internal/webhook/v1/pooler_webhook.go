@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 )
 
 // AllowedPgbouncerGenericConfigurationParameters is the list of allowed parameters for PgBouncer
@@ -103,6 +104,13 @@ func SetupPoolerWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Pooler{}).
 		WithValidator(newBypassableValidator[*apiv1.Pooler](&PoolerCustomValidator{})).
 		Complete()
+}
+
+// NewPoolerAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewPoolerAdmissionGuard() *guard.Admission[*apiv1.Pooler] {
+	return &guard.Admission[*apiv1.Pooler]{
+		Validator: newBypassableValidator[*apiv1.Pooler](&PoolerCustomValidator{}),
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.

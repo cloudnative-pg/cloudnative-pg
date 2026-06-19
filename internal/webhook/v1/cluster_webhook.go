@@ -48,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -68,6 +69,14 @@ func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
 		WithValidator(newBypassableValidator[*apiv1.Cluster](&ClusterCustomValidator{})).
 		WithDefaulter(&ClusterCustomDefaulter{}).
 		Complete()
+}
+
+// NewClusterAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewClusterAdmissionGuard() *guard.Admission[*apiv1.Cluster] {
+	return &guard.Admission[*apiv1.Cluster]{
+		Defaulter: &ClusterCustomDefaulter{},
+		Validator: newBypassableValidator[*apiv1.Cluster](&ClusterCustomValidator{}),
+	}
 }
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
@@ -202,6 +211,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePodSelectorRefs,
 		v.validateExtensions,
 		v.validateServiceAccountConfig,
+		v.validatePrimaryLease,
 	}
 
 	for _, validate := range validations {
@@ -1576,6 +1586,58 @@ func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field
 	return result
 }
 
+// validatePrimaryLease checks the consistency of the primary lease timings.
+// These mirror the invariants that client-go's leaderelection.NewLeaderElector
+// enforces at runtime: the lease duration must be strictly greater than the
+// renew deadline, and the renew deadline must be greater than the retry period
+// times the jitter factor. Rejecting violations here is important because a
+// combination that slips through admission would not "just" misbehave: it makes
+// NewLeaderElector return an error, which is fatal to the primary's lease
+// runnable and crash-loops the primary Pod.
+func (v *ClusterCustomValidator) validatePrimaryLease(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	lease := r.Spec.PrimaryLease
+	if lease == nil {
+		return result
+	}
+
+	basePath := field.NewPath("spec", "primaryLease")
+
+	leaseDuration := apiv1.DefaultPrimaryLeaseDurationSeconds
+	if lease.LeaseDurationSeconds != nil {
+		leaseDuration = int(*lease.LeaseDurationSeconds)
+	}
+	renewDeadline := apiv1.DefaultPrimaryLeaseRenewDeadlineSeconds
+	if lease.RenewDeadlineSeconds != nil {
+		renewDeadline = int(*lease.RenewDeadlineSeconds)
+	}
+	retryPeriod := apiv1.DefaultPrimaryLeaseRetryPeriodSeconds
+	if lease.RetryPeriodSeconds != nil {
+		retryPeriod = int(*lease.RetryPeriodSeconds)
+	}
+
+	if leaseDuration <= renewDeadline {
+		result = append(result, field.Invalid(
+			basePath.Child("leaseDurationSeconds"),
+			leaseDuration,
+			"leaseDurationSeconds must be greater than renewDeadlineSeconds"))
+	}
+
+	// client-go rejects renewDeadline <= retryPeriod*JitterFactor (JitterFactor
+	// is 1.2). We replicate the check with exact integer arithmetic, since the
+	// fields are whole seconds: renewDeadline > 1.2*retryPeriod is equivalent to
+	// 5*renewDeadline > 6*retryPeriod.
+	if 5*renewDeadline <= 6*retryPeriod {
+		result = append(result, field.Invalid(
+			basePath.Child("renewDeadlineSeconds"),
+			renewDeadline,
+			"renewDeadlineSeconds must be greater than retryPeriodSeconds multiplied by 1.2"))
+	}
+
+	return result
+}
+
 func (v *ClusterCustomValidator) validateStorageSize(r *apiv1.Cluster) field.ErrorList {
 	return validateStorageConfigurationSize(*field.NewPath("spec", "storage"), r.Spec.StorageConfiguration)
 }
@@ -1869,9 +1931,8 @@ func (v *ClusterCustomValidator) validateExternalCluster(
 		externalCluster.BarmanObjectStore == nil &&
 		externalCluster.PluginConfiguration == nil {
 		result = append(result,
-			field.Invalid(
+			field.Required(
 				path,
-				externalCluster,
 				"one of connectionParameters, plugin and barmanObjectStore is required"))
 	}
 
@@ -1989,17 +2050,15 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 	hasEnabled := replicaClusterConf.Enabled != nil
 	hasPrimary := len(replicaClusterConf.Primary) > 0
 	if hasPrimary && hasEnabled {
-		result = append(result, field.Invalid(
+		result = append(result, field.Forbidden(
 			field.NewPath("spec", "replicaCluster", "enabled"),
-			replicaClusterConf,
 			"replica mode enabled is not compatible with the primary field"))
 	}
 
 	if r.IsReplica() {
 		if r.Spec.Bootstrap == nil {
-			result = append(result, field.Invalid(
+			result = append(result, field.Required(
 				field.NewPath("spec", "bootstrap"),
-				replicaClusterConf,
 				"bootstrap configuration is required for replica mode"))
 		} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
 			// this is needed because we only want to validate this during cluster creation, currently if we would have
@@ -2007,7 +2066,7 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 			len(r.ResourceVersion) == 0 {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "replicaCluster"),
-				replicaClusterConf,
+				replicaClusterConf.Primary,
 				"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
 		}
 	}

@@ -104,3 +104,13 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 
 	return &backup
 }
+
+// SetAdmissionError sets the admission error status on the ScheduledBackup resource
+func (scheduledBackup *ScheduledBackup) SetAdmissionError(msg string) {
+	scheduledBackup.Status.Error = msg
+}
+
+// GetAdmissionError returns the admission error recorded on the ScheduledBackup status
+func (scheduledBackup *ScheduledBackup) GetAdmissionError() string {
+	return scheduledBackup.Status.Error
+}

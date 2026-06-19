@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 const (
@@ -172,6 +173,17 @@ func ExecCommand(
 	return stdout, stderr, execErr
 }
 
+// shouldFallbackToSPDY reports whether a failed WebSocket streaming attempt
+// should be retried over SPDY. This mirrors kubectl's own fallback predicate:
+// a WebSocket upgrade failure (e.g. an API server or container runtime that
+// does not support the V5 WebSocket subprotocol, as on some OpenShift
+// versions) is wrapped as an httpstream.UpgradeFailureError, and an HTTPS
+// proxy dial failure is detected separately. Both indicate the connection was
+// never established over WebSocket and is safe to retry over SPDY.
+func shouldFallbackToSPDY(err error) bool {
+	return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+}
+
 // execCommandOnce performs a single kubectl exec operation without retries
 func execCommandOnce(
 	ctx context.Context,
@@ -202,7 +214,15 @@ func execCommandOnce(
 		Stderr:    true,
 	}, scheme.ParameterCodec)
 
-	executor, err := remotecommand.NewWebSocketExecutor(&newConfig, "POST", req.URL().String())
+	wsExecutor, err := remotecommand.NewWebSocketExecutor(&newConfig, "POST", req.URL().String())
+	if err != nil {
+		return "", "", err
+	}
+	spdyExecutor, err := remotecommand.NewSPDYExecutor(&newConfig, "POST", req.URL())
+	if err != nil {
+		return "", "", err
+	}
+	executor, err := remotecommand.NewFallbackExecutor(wsExecutor, spdyExecutor, shouldFallbackToSPDY)
 	if err != nil {
 		return "", "", err
 	}

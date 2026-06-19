@@ -1,8 +1,15 @@
 # This workflow executes the following actions:
-# - Runs Golang and ShellCheck linters
+# - Runs Golang, ShellCheck and Renovate linters
+# - Runs Govulncheck
 # - Runs Unit tests
 # - Verifies API doc and CRDs are up to date
-# - Builds the operator image (no push)
+# - Verifies documentation website builds
+# - Builds and pushes the operator image (no push if the PR has been opened from a fork)
+# - Generates SLSA3+ provenance for the operator image
+# - Creates and pushes an operator's OLM bundle and catalog
+# - Runs openshift-preflight test
+# - Runs OLM scorecard test
+# - Runs community-operators OPP tests (kiwi,lemon,orange)
 name: continuous-integration
 on:
   push:
@@ -15,6 +22,10 @@ on:
     - cron:  '0 1 * * *'
 
 permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # set up environment variables to be used across all the jobs
 env:
@@ -256,16 +267,28 @@ jobs:
       - name: Get k8s versions for unit test
         id: get-k8s-versions
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          k8s_versions=$(jq -c '
-            .unit_test.max as $max |
-            .unit_test.min as $min |
-            $min | [ while(. <= $max;
-                . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
-              )
-            ] |
-            .[] |= .+".x"
-          ' < .github/k8s_versions_scope.json)
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            # On pull requests, only test against the lowest and highest supported
+            # versions to bracket the support window, keeping CI fast.
+            k8s_versions=$(jq -c '
+              [.unit_test.min + ".x", .unit_test.max + ".x"]
+            ' < .github/k8s_versions_scope.json)
+          else
+            # On pushes to main/release branches and scheduled runs, run the full
+            # matrix so cross-version regressions are caught before a release.
+            k8s_versions=$(jq -c '
+              .unit_test.max as $max |
+              .unit_test.min as $min |
+              $min | [ while(. <= $max;
+                  . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
+                )
+              ] |
+              .[] |= .+".x"
+            ' < .github/k8s_versions_scope.json)
+          fi
           echo "k8s_versions=${k8s_versions}" >> $GITHUB_OUTPUT
 
           latest_k8s_version=$(jq -r '.|last' <<< $k8s_versions)
@@ -314,6 +337,20 @@ jobs:
         if: env.ENVTEST_K8S_VERSION == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
+
+  unit-tests:
+    name: Unit tests
+    needs:
+      - tests
+    if: always() && !cancelled()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Report matrix result
+        env:
+          RESULT: ${{ needs.tests.result }}
+        run: |
+          echo "Aggregated unit tests result: ${RESULT}"
+          [[ "${RESULT}" == "success" || "${RESULT}" == "skipped" ]]
 
   apidoc:
     name: Verify API doc is up to date
@@ -408,17 +445,9 @@ jobs:
   buildx:
     name: Build containers
     needs:
-      - go-linters
-      - shellcheck
-      - tests
-      - apidoc
-      - crd
       - duplicate_runs
       - change-triage
-    # Build containers:
-    #   if there have been any code changes OR it is a scheduled execution
-    #   AND
-    #   none of the preceding jobs failed
+    # Build containers if there have been any code changes OR it is a scheduled execution
     if: |
       (always() && !cancelled()) &&
       (
@@ -429,12 +458,7 @@ jobs:
           needs.change-triage.outputs.shell-script-changed == 'true' ||
           needs.change-triage.outputs.go-code-changed == 'true'
         )
-      ) &&
-      (needs.go-linters.result == 'success' || needs.go-linters.result == 'skipped') &&
-      (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
-      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
-      (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
-      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
+      )
     runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     permissions:
       actions: read

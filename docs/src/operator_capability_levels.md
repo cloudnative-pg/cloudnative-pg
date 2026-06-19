@@ -214,7 +214,11 @@ through two declarative methods:
 
 Both methods provide automated reconciliation of role attributes (e.g.,
 `login`, `superuser`, `connectionLimit`) and secure, versioned password
-management via Kubernetes Secrets.
+management via Kubernetes Secrets. Passwords are SCRAM-SHA-256 encoded
+operator-side before they are sent to PostgreSQL, so the cleartext value never
+reaches the server log or extensions. A `DatabaseRole` can additionally request
+a TLS client certificate that the operator generates and renews automatically,
+enabling password-free `cert` authentication.
 
 ### Configuration of Postgres extensions
 
@@ -409,6 +413,10 @@ consistency and initiates a job to validate upgrade conditions and execute
 files, and tablespaces before re-creating the replicas. This structured
 workflow provides a reliable path for major version transitions and supports
 automatic rollback cleanup when the user reverts the image after a failure.
+Clusters that use Image Volume extensions are also supported: the source- and
+target-version extension images are mounted side by side during the upgrade
+job, so the old server keeps its libraries and a failed upgrade reverts
+cleanly.
 
 ### Display cluster availability status during upgrade
 
@@ -682,6 +690,9 @@ to access the database. This optimizes the query flow toward the instances
 and makes the use of the underlying PostgreSQL resources more efficient.
 Instead of connecting directly to a PostgreSQL service, applications can now
 connect to the PgBouncer service and start reusing any existing connection.
+The PgBouncer image can be managed centrally through an `ImageCatalog` or
+`ClusterImageCatalog` (via `spec.pgbouncer.imageCatalogRef`), and the `Pooler`
+metrics endpoint can optionally be served over TLS.
 
 ### Logical Replication
 
@@ -775,6 +786,11 @@ the cluster. It does this by either becoming the new primary or by following it.
 In case the former primary comes back up, the same mechanism avoids a
 split-brain by preventing applications from reaching it, running `pg_rewind` on
 the server and restarting it as a standby.
+The operator further coordinates primary promotion through a per-cluster
+Kubernetes `Lease` that acts as a mutex, ensuring at most one instance promotes
+at any given time: an instance must hold the lease before acting as primary and
+releases it on a clean shutdown, so replicas can promote without waiting for the
+full TTL.
 If synchronous failover quorum is enabled, the operator's "Auto Pilot" logic
 becomes even more sophisticated: it will actively block a promotion if a quorum
 of replicas cannot verify the transaction state. This prevents accidental data

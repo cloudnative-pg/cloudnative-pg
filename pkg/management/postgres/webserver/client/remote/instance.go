@@ -101,6 +101,23 @@ func (i StatusError) Error() string {
 	return fmt.Sprintf("error status code: %v, body: %v", i.StatusCode, i.Body)
 }
 
+// IsTransientAuthError reports whether err is a transient instance manager rejection of
+// the operator's client certificate. The instance manager replies 503 while it does not
+// (yet) recognize the presented certificate — either no operator fingerprint has been
+// registered in the cluster status, or the cached fingerprint does not match it yet. This
+// resolves as the operator certificate fingerprint propagates to the instance's cached
+// cluster (for example right after an operator restart), so the caller should retry.
+//
+// A 401 (no usable client certificate, e.g. a status port not served over TLS) is NOT
+// transient and is intentionally excluded: the caller should fail rather than retry.
+func IsTransientAuthError(err error) bool {
+	var statusErr *StatusError
+	if !errors.As(err, &statusErr) {
+		return false
+	}
+	return statusErr.StatusCode == http.StatusServiceUnavailable
+}
+
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list

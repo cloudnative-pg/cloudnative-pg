@@ -26,6 +26,7 @@ import (
 	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1864,5 +1865,156 @@ var _ = Describe("RecoveryTarget.BuildPostgresOptions", func() {
 		Expect(out).To(ContainSubstring(`recovery_target_timeline = 'l\\a''test'` + "\n"))
 		Expect(out).To(ContainSubstring(`recovery_target_xid = '1''2'` + "\n"))
 		Expect(out).To(ContainSubstring(`recovery_target_lsn = '0/1\\6'` + "\n"))
+	})
+})
+
+var _ = Describe("GetExternalClustersEnabledPluginNames", func() {
+	falseVal := false
+
+	It("includes plugins with nil Enabled (defaults to enabled)", func() {
+		clusters := []ExternalCluster{
+			{PluginConfiguration: &PluginConfiguration{Name: "plugin-a"}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(ConsistOf("plugin-a"))
+	})
+
+	It("excludes plugins with Enabled=false", func() {
+		clusters := []ExternalCluster{
+			{PluginConfiguration: &PluginConfiguration{Name: "plugin-a", Enabled: &falseVal}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(BeEmpty())
+	})
+
+	It("excludes external clusters without a plugin configuration", func() {
+		clusters := []ExternalCluster{
+			{ConnectionParameters: map[string]string{"host": "pg.example.com"}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(BeEmpty())
+	})
+})
+
+var _ = Describe("Cluster admission error", func() {
+	It("records the error in the phase but never reports it to the guard", func() {
+		cluster := &Cluster{}
+		cluster.SetAdmissionError("boom")
+		Expect(cluster.Status.Phase).To(BeEquivalentTo(PhaseDefinitionInvalid))
+		Expect(cluster.Status.PhaseReason).To(Equal("boom"))
+		// The phase machinery, not the guard, clears the Cluster admission
+		// error, so GetAdmissionError always returns an empty string.
+		Expect(cluster.GetAdmissionError()).To(BeEmpty())
+	})
+
+	It("marks the cluster as not ready when the definition is invalid", func() {
+		cluster := &Cluster{}
+		// Simulate a previously healthy cluster reporting Ready=True.
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(ConditionClusterReady),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(ClusterReady),
+			Message: "Cluster is Ready",
+		})
+
+		cluster.SetAdmissionError("boom")
+
+		readyCondition := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionClusterReady))
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+	})
+})
+
+var _ = Describe("IsInitialized", func() {
+	It("returns false when the cluster has no conditions", func() {
+		cluster := &Cluster{}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns false when the Initialized condition is missing", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionBackup),
+						Status: metav1.ConditionTrue,
+						Reason: string(ConditionReasonLastBackupSucceeded),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns true when the Initialized condition is True", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionTrue,
+						Reason: string(BootstrapCompleted),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("returns false when the Initialized condition is False and LatestGeneratedNode is zero", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns true when the condition is absent but LatestGeneratedNode is non-zero (upgrade bridge)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				LatestGeneratedNode: 3,
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("returns true when condition is False but LatestGeneratedNode is non-zero (upgrade bridge)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				LatestGeneratedNode: 3,
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("ignores the LastBackupSucceeded condition (regression guard)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionBackup),
+						Status: metav1.ConditionTrue,
+						Reason: string(ConditionReasonLastBackupSucceeded),
+					},
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
 	})
 })
