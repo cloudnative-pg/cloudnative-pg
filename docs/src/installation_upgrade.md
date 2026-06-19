@@ -281,6 +281,8 @@ password encoding and `search_path` hardening. The other three are new in
 **1.30.0** only: the `DatabaseRole` resource for declarative role management,
 and safe primary election via a per-cluster Lease, and operator-to-instance
 authentication on the instance manager's status port.
+In addition, if you are upgrading from a release **older than 1.29.1 or 1.28.3**,
+the metrics-exporter privilege separation from `CVE-2026-44477` also applies.
 Each is covered in its own subsection below.
 
 #### Operator-side password encoding
@@ -408,21 +410,22 @@ their Pods are recreated with a TLS-enabled status port. Instances created by
 v1.24 or later are unaffected.
 :::
 
-### Upgrading to 1.29.1 or 1.28.3
+#### Metrics exporter privilege separation (`CVE-2026-44477`)
 
-Version 1.29.1 and 1.28.3 ship the fix for `CVE-2026-44477` /
-`GHSA-423p-g724-fr39`. The metrics exporter now authenticates as a
-dedicated `cnpg_metrics_exporter` role with `pg_monitor` privileges
-only, instead of the `postgres` superuser.
+This applies only if you are upgrading from a release **older than 1.29.1 or
+1.28.3** (for example 1.29.0, 1.28.2, or any earlier version); installations
+already on 1.29.1, 1.28.3, or later already have this change.
+
+The fix for `CVE-2026-44477` / `GHSA-423p-g724-fr39` makes the metrics exporter
+authenticate as a dedicated `cnpg_metrics_exporter` role with `pg_monitor`
+privileges only, instead of the `postgres` superuser.
 
 Custom monitoring queries that read user-owned tables, or use
-`target_databases: '*'` against databases where `PUBLIC` `CONNECT`
-has been revoked, need explicit `GRANT` statements to
-`cnpg_metrics_exporter`. See ["Custom query privileges and
-safety"](monitoring.md#custom-query-privileges-and-safety) and ["Manually creating
-the metrics exporter
-role"](monitoring.md#manually-creating-the-metrics-exporter-role) in
-the monitoring documentation.
+`target_databases: '*'` against databases where `PUBLIC` `CONNECT` has been
+revoked, need explicit `GRANT` statements to `cnpg_metrics_exporter`.
+See ["Custom query privileges and safety"](monitoring.md#custom-query-privileges-and-safety)
+and ["Manually creating the metrics exporter role"](monitoring.md#manually-creating-the-metrics-exporter-role)
+in the monitoring documentation.
 
 ## Verifying release assets
 
