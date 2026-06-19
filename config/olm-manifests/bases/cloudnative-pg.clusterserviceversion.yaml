@@ -1105,6 +1105,12 @@ spec:
           x-descriptors:
             - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
             - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: clientCertificate.enabled
+          displayName: Client certificate
+          description: Whether the operator generates and renews a TLS client certificate for this role, signed by the cluster's client CA, enabling password-free certificate authentication
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       statusDescriptors:
       - path: applied
         displayName: Applied
@@ -1112,6 +1118,12 @@ spec:
       - path: message
         displayName: Message
         description: Message is the reconciliation output message
+      - path: clientCertificate.expiration
+        displayName: Client certificate expiration
+        description: Expiration time of the generated TLS client certificate, in RFC3339 format
+      - path: clientCertificate.message
+        displayName: Client certificate message
+        description: Human-readable explanation of the current client certificate status
     - kind: FailoverQuorum
       name: failoverquorums.postgresql.cnpg.io
       displayName: Failover Quorum
