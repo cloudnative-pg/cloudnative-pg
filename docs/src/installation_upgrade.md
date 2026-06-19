@@ -279,7 +279,7 @@ These releases introduce changes worth reviewing before you upgrade. Two are
 security changes that apply to **1.30.0, 1.29.2, and 1.28.4**: operator-side
 password encoding and `search_path` hardening. The other three are new in
 **1.30.0** only: the `DatabaseRole` resource for declarative role management,
-and safe primary election via a per-cluster Lease, and operator-to-instance
+safe primary election via a per-cluster Lease, and operator-to-instance
 authentication on the instance manager's status port.
 In addition, if you are upgrading from a release **older than 1.29.1 or 1.28.3**,
 the metrics-exporter privilege separation from `CVE-2026-44477` also applies.
