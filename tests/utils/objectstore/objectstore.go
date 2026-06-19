@@ -391,6 +391,11 @@ func sslSetup(namespace string) (Setup, error) {
 			Name: tlsVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Projected: &corev1.ProjectedVolumeSource{
+					// DefaultMode is intentionally left at Kubernetes' 0644
+					// default: the non-root RustFS server must read the cert
+					// and key whatever UID it runs as, and the pod sets no
+					// fsGroup, so a tighter mode would make them unreadable on
+					// clusters that don't auto-assign one.
 					Sources: []corev1.VolumeProjection{
 						{
 							Secret: &corev1.SecretProjection{
