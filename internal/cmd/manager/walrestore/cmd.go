@@ -466,6 +466,13 @@ func validateTimelineHistoryFile(ctx context.Context, walName string, cluster *a
 	}
 
 	clusterTimeline := cluster.Status.TimelineID
+
+	if clusterTimeline == 0 {
+		contextLog.Trace("Allowing timeline history file: cluster timeline not yet established",
+			"walName", walName,
+			"fileTimeline", fileTimeline)
+		return nil
+	}
 	if fileTimeline > clusterTimeline {
 		contextLog.Warning("Refusing to restore future timeline history file",
 			"walName", walName,

@@ -213,7 +213,21 @@ var _ = Describe("validateTimelineHistoryFile", func() {
 		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
 	})
 
-	It("should reject any timeline when cluster timeline is not yet set", func(ctx SpecContext) {
+	It("should reject a future timeline history file for an established replica",
+		func(ctx SpecContext) {
+			cluster := &apiv1.Cluster{
+				Status: apiv1.ClusterStatus{
+					CurrentPrimary: "primary-pod",
+					TargetPrimary:  "primary-pod",
+					TimelineID:     20,
+				},
+			}
+
+			err := validateTimelineHistoryFile(ctx, "00000015.history", cluster, "replica-pod")
+			Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+		})
+
+	It("should allow any history file when cluster timeline is not yet established (bootstrap recovery)", func(ctx SpecContext) {
 		cluster := &apiv1.Cluster{
 			Status: apiv1.ClusterStatus{
 				CurrentPrimary: "primary-pod",
@@ -221,7 +235,18 @@ var _ = Describe("validateTimelineHistoryFile", func() {
 			},
 		}
 
-		err := validateTimelineHistoryFile(ctx, "00000001.history", cluster, "replica-pod")
-		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+		err := validateTimelineHistoryFile(ctx, "00000014.history", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow any history file when no primary has been elected yet (empty cluster status)", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				TimelineID: 0,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "00000014.history", cluster, "restore-pod")
+		Expect(err).ToNot(HaveOccurred())
 	})
 })
