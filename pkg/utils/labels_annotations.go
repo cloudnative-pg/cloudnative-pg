@@ -323,6 +323,15 @@ const (
 	// operator if a instance is recoverable or not. Not recoverable instances will
 	// be deleted with the contents of their PVCs.
 	UnrecoverableInstanceAnnotationName = AlphaMetadataNamespace + "/unrecoverable"
+
+	// PasswordPassthroughAnnotationName is the name of the annotation that, when
+	// set to "enabled" on a basic-auth Secret consumed by the operator, instructs
+	// the role reconciler to send the password literal verbatim in
+	// CREATE/ALTER ROLE statements instead of SCRAM-SHA-256 encoding it
+	// client-side. PostgreSQL then encodes the value according to its own
+	// password_encryption setting, restoring the behavior the operator had
+	// before client-side encoding was introduced.
+	PasswordPassthroughAnnotationName = MetadataNamespace + "/passwordPassthrough"
 )
 
 type annotationStatus string
@@ -540,6 +549,13 @@ func IsWalArchivingDisabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[SkipWalArchiving] == string(annotationStatusEnabled)
 }
 
+// IsPasswordPassthroughEnabled reports whether the given Secret's metadata
+// opts the role reconciler out of client-side SCRAM-SHA-256 encoding and
+// asks the operator to forward the password value verbatim.
+func IsPasswordPassthroughEnabled(object *metav1.ObjectMeta) bool {
+	return object.Annotations[PasswordPassthroughAnnotationName] == string(annotationStatusEnabled)
+}
+
 // GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map
 func GetInstanceRole(labels map[string]string) (string, bool) {
 	if value := labels[ClusterRoleLabelName]; value != "" {
@@ -553,7 +569,7 @@ func GetInstanceRole(labels map[string]string) (string, bool) {
 }
 
 // SetInstanceRole sets both ClusterRoleLabelName and ClusterInstanceRoleLabelName on the given ObjectMeta
-func SetInstanceRole(meta metav1.ObjectMeta, role string) {
+func SetInstanceRole(meta *metav1.ObjectMeta, role string) {
 	if meta.Labels == nil {
 		meta.Labels = map[string]string{}
 	}

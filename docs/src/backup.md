@@ -243,6 +243,12 @@ The schedule `"0 0 0 * * *"` triggers a backup every day at midnight
 (00:00:00). In Kubernetes CronJobs, the equivalent expression would be `0 0 * * *`,
 since seconds are not supported.
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To schedule backups
+    for a different `Cluster`, create a new `ScheduledBackup` resource instead
+    of updating an existing one.
+:::
+
 ### Backup Frequency and RTO
 
 :::tip[Hint]

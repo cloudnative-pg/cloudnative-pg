@@ -21,16 +21,11 @@ project:
     - name: Leonardo Cecchi
       email: leonardo.cecchi@enterprisedb.com
       primary: false
-    - name: Jonathan Gonzalez V.
-      primary: false
     - name: Marco Nenciarini
       email: marco.nenciarini@enterprisedb.com
       primary: false
     - name: Armando Ruocco
       email: armando.ruocco@enterprisedb.com
-      primary: false
-    - name: Philippe Scorsolini
-      email: philippe.scorsolini@upbound.io
       primary: false
   repositories:
     - name: CloudNativePG
@@ -113,16 +108,11 @@ repository:
     - name: Leonardo Cecchi
       email: leonardo.cecchi@enterprisedb.com
       primary: false
-    - name: Jonathan Gonzalez V.
-      primary: false
     - name: Marco Nenciarini
       email: marco.nenciarini@enterprisedb.com
       primary: false
     - name: Armando Ruocco
       email: armando.ruocco@enterprisedb.com
-      primary: false
-    - name: Philippe Scorsolini
-      email: philippe.scorsolini@upbound.io
       primary: false
   documentation:
     # OSPS-DO-02.01, OSPS-GV-03.01, OSPS-DO-07.01, OSPS-GV-03.02, OSPS-DO-03.02
@@ -220,7 +210,8 @@ repository:
     assessments:
       self:
         evidence-url:
-          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-assessment.yaml
+          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-catalog.yaml
+          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/capability-catalog.yaml
         comment: >-
           Gemara-compatible threat self-assessment covering capabilities
           and threats mapped to FINOS Common Cloud Controls (CCC) Core

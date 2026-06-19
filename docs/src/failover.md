@@ -53,6 +53,133 @@ During the time the failing primary is being shut down:
     without a clean shutdown.
 :::
 
+## Safe primary election
+
+To ensure that at most one instance promotes itself to primary at any
+given time, CloudNativePG backs the election described above with a
+Kubernetes `Lease` object, named after the `Cluster` and living in
+its namespace. An instance must acquire and hold this lease before
+it promotes to primary. On a clean shutdown the former primary
+releases the lease, so an eligible replica can take over without
+waiting for the lease to expire.
+
+### What the primary lease protects against
+
+Consider a replica catching up by reading WAL files from the archive
+rather than streaming from the previous primary. PostgreSQL stops
+replaying as soon as the archive returns "file not found" for the
+next expected segment, treating it as the end of the WAL stream. If
+a replica promotes while the previous primary still has WAL it has
+not finished archiving, that signal arrives before the true end of
+the stream: the replica forks a new timeline at an LSN earlier than
+the last writes the previous primary acknowledged, and those writes
+are lost.
+
+The lease holds promotion back until the previous primary releases
+it. On a clean shutdown the release happens after PostgreSQL has
+flushed and archived its remaining WAL, so the replica that takes
+over sees the archive at its definitive end. If the previous primary
+cannot release the lease (crash, node failure, or the instance
+manager itself unreachable), the lease expires after
+`leaseDurationSeconds` elapses and the replica can promote. In that
+path the archive may not have caught up, and any writes the previous
+primary did not finish archiving are lost.
+
+### Relationship with the primary isolation check
+
+The lease does not fence a primary that has lost connectivity to the
+Kubernetes API server but is still running; that is the job of the
+[primary isolation](instance_manager.md#primary-isolation) check.
+The two mechanisms are complementary and both are enabled by default:
+
+* The lease prevents *premature* promotion: a replica cannot promote
+  while the former primary still holds the lease.
+* The isolation check stops an *isolated* primary from continuing to
+  accept writes.
+
+Keep both enabled. Disabling the isolation check leaves the lease
+alone responsible for primary safety, and the lease alone cannot
+prevent split-brain when the former primary cannot reach the API
+server but remains otherwise healthy.
+
+### Inspecting the primary lease
+
+The lease shares the cluster's name, so you can inspect it directly. For a
+cluster called `cluster-example`:
+
+```sh
+kubectl get lease cluster-example
+```
+
+The `HOLDER` column reports the pod that currently holds the lease, which is the
+current primary:
+
+```console
+NAME              HOLDER              AGE
+cluster-example   cluster-example-1   5m
+```
+
+For the full picture, including the lease duration in effect and the
+last renewal time, use:
+
+```sh
+kubectl get lease cluster-example -o yaml
+```
+
+### Tuning the primary lease
+
+The lease timings are exposed under `.spec.primaryLease` and default to values
+suitable for most clusters. They map directly onto the underlying Kubernetes
+leader-election parameters.
+
+| Field                          | Default | Description                                                                |
+| ------------------------------ | ------- | -------------------------------------------------------------------------- |
+| `leaseDurationSeconds`         | `15`    | How long the lease is valid before another instance may acquire it.        |
+| `renewDeadlineSeconds`         | `10`    | How long the primary keeps retrying to renew the lease before giving up.   |
+| `retryPeriodSeconds`           | `2`     | How frequently a non-holder retries acquiring or renewing the lease.       |
+| `releasedLeaseDurationSeconds` | `1`     | TTL written when the primary releases the lease on a clean shutdown.       |
+
+For example, to make the cluster more tolerant of a slow or briefly unreachable
+API server:
+
+```yaml
+spec:
+  primaryLease:
+    leaseDurationSeconds: 60
+    renewDeadlineSeconds: 40
+    retryPeriodSeconds: 15
+```
+
+:::warning
+Tune these values only if you understand the impact on failover timing: longer
+intervals make the cluster more tolerant of transient API server unavailability
+but slow down legitimate promotions. Two invariants are enforced by the
+admission webhook: `leaseDurationSeconds` must be greater than
+`renewDeadlineSeconds`, and `renewDeadlineSeconds` must be greater than
+`retryPeriodSeconds` multiplied by `1.2`. Both mirror the requirements of the
+underlying Kubernetes leader election.
+:::
+
+:::note
+`leaseDurationSeconds` and `retryPeriodSeconds` govern two different timings.
+After an abrupt primary loss (the previous primary did not release the lease), a
+candidate must observe the lease unchanged for a full `leaseDurationSeconds`
+before it may take over: this is what holds back a premature promotion while the
+former primary may still be alive. After a clean switchover (the previous primary
+released the lease), there is no such wait; the candidate simply notices the
+released lease on its next poll, so the hand-over latency is bounded by
+`retryPeriodSeconds`. Lowering `retryPeriodSeconds` speeds up switchover without
+shortening the take-over wait that guards against premature promotion, at the
+cost of more frequent lease renewals against the API server.
+:::
+
+:::note
+The primary instance captures these timings the first time it acquires the
+lease. Changing `.spec.primaryLease` on a running cluster therefore takes effect
+only after the affected primary Pod restarts; until then the primary keeps using
+the values it started with.
+:::
+
 ## RTO and RPO impact
 
 Failover may result in the service being impacted ([RTO](before_you_start.md#postgresql-terminology))
@@ -102,6 +229,49 @@ expected outage.
 
 Enabling a new configuration option to delay failover provides a mechanism to
 prevent premature failover for short-lived network or node instability.
+
+## Detection of node-level failures
+
+When the node hosting the primary becomes unreachable (for example, due to a
+kubelet crash or a network partition between the node and the Kubernetes API
+server), the operator relies on the pod's `Ready` condition to decide that the
+primary is no longer serviceable. While the node is healthy the kubelet keeps
+that condition up to date from the readiness probe; once the node stops
+reporting, the Kubernetes node lifecycle controller is the one that flips the
+condition to `False` as soon as it declares the node `Unknown`.
+
+With stock kube-controller-manager settings, the transition is governed by
+`--node-monitor-grace-period` (default `40s` on Kubernetes 1.29-1.31, raised
+to `50s` in 1.32 and later): after that window the controller marks the node
+`Unknown` and, in the same monitoring pass, issues a patch per pod on that
+node to flip the `Ready` condition. In practice the operator observes the
+primary as unready about **40 to 55 seconds** after the node becomes
+unreachable (the grace period plus up to one `--node-monitor-period` poll,
+default `5s`). Managed Kubernetes distributions (GKE, EKS, AKS) may tune
+these values; consult the provider's documentation if the observed timing
+does not match. After that, the failover procedure starts (further gated by
+`.spec.failoverDelay`).
+
+The `Ready` condition flip is not subject to the rate limiters that throttle
+pod *eviction* during partial-zonal or large-cluster disruptions
+(`--node-eviction-rate`, `--secondary-node-eviction-rate`,
+`--unhealthy-zone-threshold`). The operator reacts to the condition flip as
+soon as the controller emits the patch, regardless of the zone or cluster-wide
+health state.
+
+Pod *eviction* (actual deletion from the unreachable node) is a separate
+mechanism, driven by `tolerationSeconds` on the
+`node.kubernetes.io/unreachable` `NoExecute` taint (`300s` by default). That
+timer does not hold up the operator's failover decision; CloudNativePG
+promotes a new primary as soon as the `Ready` condition flips. By that point
+the kubelet on the isolated node has already stopped the old PostgreSQL
+container locally: with the default
+`.spec.probes.liveness.isolationCheck.enabled: true`, the instance manager
+fails its own liveness probe once it can reach neither the API server nor
+the rest of the cluster, and the kubelet kills the container within
+approximately three probe periods (`~30s`). Full high availability
+(recreation of the old primary on a healthy node by the operator) is still
+gated on the taint-based eviction actually deleting the pod.
 
 ## Failover Quorum (Quorum-based Failover)
 

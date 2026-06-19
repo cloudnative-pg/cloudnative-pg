@@ -39,11 +39,24 @@ export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.
 # PGBouncer Image
 export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
 
-# MINIO Image
-export MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
+# RustFS Image
+export RUSTFS_IMG=${RUSTFS_IMG:-$(grep 'rustfsImage.*=' "${ROOT_DIR}/tests/utils/objectstore/objectstore.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
+
+# AWS CLI Image (S3 client used by the e2e object storage tests)
+export AWSCLI_IMG=${AWSCLI_IMG:-$(grep 'awsCliImage.*=' "${ROOT_DIR}/tests/utils/objectstore/objectstore.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
+
+# Busybox Image (init container that prepares the object storage volumes)
+export BUSYBOX_IMG=${BUSYBOX_IMG:-$(grep 'busyboxImage.*=' "${ROOT_DIR}/tests/utils/objectstore/objectstore.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
 
 # Apache Image (Hardcoded stable default)
 export APACHE_IMG=${APACHE_IMG:-"httpd"}
+
+# Define the operator source and deployment method.
+export OPERATOR=${OPERATOR:-"local"}
+export CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD:-"manifest"}
+
+# Path to the generated operator manifest (mirrors the Makefile default).
+export OPERATOR_MANIFEST_PATH="${OPERATOR_MANIFEST_PATH:-${ROOT_DIR}/dist/operator-manifest.yaml}"
 
 # Validate that required images were successfully extracted
 if [ -z "${POSTGRES_IMG}" ]; then
@@ -54,13 +67,21 @@ if [ -z "${PGBOUNCER_IMG}" ]; then
   echo "ERROR: Failed to extract PGBOUNCER_IMG from ${ROOT_DIR}/pkg/versions/versions.go" >&2
   exit 1
 fi
-if [ -z "${MINIO_IMG}" ]; then
-  echo "ERROR: Failed to extract MINIO_IMG from ${ROOT_DIR}/tests/utils/minio/minio.go" >&2
+if [ -z "${RUSTFS_IMG}" ]; then
+  echo "ERROR: Failed to extract RUSTFS_IMG from ${ROOT_DIR}/tests/utils/objectstore/objectstore.go" >&2
+  exit 1
+fi
+if [ -z "${AWSCLI_IMG}" ]; then
+  echo "ERROR: Failed to extract AWSCLI_IMG from ${ROOT_DIR}/tests/utils/objectstore/objectstore.go" >&2
+  exit 1
+fi
+if [ -z "${BUSYBOX_IMG}" ]; then
+  echo "ERROR: Failed to extract BUSYBOX_IMG from ${ROOT_DIR}/tests/utils/objectstore/objectstore.go" >&2
   exit 1
 fi
 
 # Define the full array of helper images used by load-helper-images
-HELPER_IMGS=("$POSTGRES_IMG" "$E2E_PRE_ROLLING_UPDATE_IMG" "$PGBOUNCER_IMG" "$MINIO_IMG" "$APACHE_IMG")
+HELPER_IMGS=("$POSTGRES_IMG" "$E2E_PRE_ROLLING_UPDATE_IMG" "$PGBOUNCER_IMG" "$RUSTFS_IMG" "$AWSCLI_IMG" "$BUSYBOX_IMG" "$APACHE_IMG")
 export HELPER_IMGS
 
 # Testing the upgrade will require generating a second operator image, `-prime`

@@ -25,6 +25,8 @@ import (
 	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 
@@ -61,7 +63,8 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 		By(fmt.Sprintf(
 			"querying the %s table in the %s database defined by postInit SQL",
-			tableName, dbName), func() {
+			tableName, dbName,
+		), func() {
 			stdout, _, err := exec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
@@ -96,14 +99,14 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			CreateResourceFromFile(namespace, postInitSQLSecretRef)
-			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
-			CreateResourceFromFile(namespace, postInitApplicationSQLSecretRef)
-			CreateResourceFromFile(namespace, postInitApplicationSQLConfigMapRef)
-			CreateResourceFromFile(namespace, postInitTemplateSQLSecretRef)
-			CreateResourceFromFile(namespace, postInitTemplateSQLConfigMapRef)
+			resources.CreateResourceFromFile(env, namespace, postInitSQLSecretRef)
+			resources.CreateResourceFromFile(env, namespace, postInitSQLConfigMapRef)
+			resources.CreateResourceFromFile(env, namespace, postInitApplicationSQLSecretRef)
+			resources.CreateResourceFromFile(env, namespace, postInitApplicationSQLConfigMapRef)
+			resources.CreateResourceFromFile(env, namespace, postInitTemplateSQLSecretRef)
+			resources.CreateResourceFromFile(env, namespace, postInitTemplateSQLConfigMapRef)
 
-			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, postInitSQLCluster)
 
 			// Data defined by postInitSQL, postInitApplicationSQL and postInitTemplateSQL
 			assertPostInitData(namespace, clusterName, "sql",
@@ -148,6 +151,81 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		})
 	})
 
+	// Regression test for CWE-426 search_path operator hijack.
+	// postInitApplicationSQL plants a `=` (name, name) overload in
+	// public and flips ALTER DATABASE app SET search_path = public,
+	// pg_catalog. The operator's connection-level search_path pin
+	// must keep operator-issued queries on pg_catalog so the planted
+	// shadow is never invoked.
+	Context("search_path operator hijack regression", func() {
+		const (
+			clusterName    = "p-search-path-hijack"
+			clusterFixture = fixturesInitdbDir + "/cluster-postinit-search-path-hijack.yaml.template"
+		)
+
+		var namespace string
+
+		It("does not invoke shadow operators planted in the application database", func() {
+			const namespacePrefix = "initdb-search-path-hijack"
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterFixture)
+
+			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			// shadowCalls returns how many times the planted public.shadow_eq
+			// function has been invoked in the application database. The query
+			// is fully schema-qualified so it cannot itself trigger the shadow.
+			shadowCalls := func() string {
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.Name,
+					}, "app",
+					"SELECT pg_catalog.count(*)::text FROM public.shadow_calls")
+				Expect(err).ToNot(HaveOccurred())
+				return strings.TrimSpace(stdout)
+			}
+
+			By("verifying operator-issued queries never invoke the planted shadow operator", func() {
+				// The operator's catalog probes against `app` resolve to name
+				// equality (e.g. `... WHERE extname = $1`, extname being `name`
+				// and $1 inferred as `name`). The connection-level pin keeps
+				// pg_catalog first, so they hit pg_catalog.=(name,name) and never
+				// reach the planted public.=(name,name).
+				//
+				// To validate red/green: remove the pin in
+				// pkg/management/postgres/pool/profiles.go (fillDefaultParameters)
+				// and re-run; the probes then inherit the tenant search_path and
+				// this assertion fails with shadow_calls > 0.
+				Consistently(shadowCalls, "30s", "5s").Should(Equal("0"))
+			})
+
+			By("confirming the planted shadow operator is actually reachable (positive control)", func() {
+				// Guard against a false pass where shadow_calls stays 0 only
+				// because the shadow is unreachable. Mirror the operator's
+				// resolution path with an inferred $1 (PREPARE infers it just
+				// like the extended protocol), which under the tenant search_path
+				// (public, pg_catalog) resolves to public.=(name,name) and must
+				// increment shadow_calls. PREPARE and EXECUTE share one psql -c
+				// command so the prepared plan survives.
+				_, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.Name,
+					}, "app",
+					"PREPARE shadow_probe AS SELECT 'x'::name = $1; EXECUTE shadow_probe('y')")
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(shadowCalls, "10s", "2s").ShouldNot(Equal("0"))
+			})
+		})
+	})
+
 	Context("custom default locale", func() {
 		const (
 			clusterName        = "p-locale"
@@ -162,7 +240,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			var err error
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, postInitSQLCluster)
 
 			By("checking inside the database", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)

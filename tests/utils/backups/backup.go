@@ -25,7 +25,6 @@ import (
 	"os"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,28 +84,6 @@ func GetVolumeSnapshot(
 		return nil, err
 	}
 	return volumeSnapshot, nil
-}
-
-// AssertBackupConditionInClusterStatus check that the backup condition in the Cluster's Status
-// eventually returns true
-func AssertBackupConditionInClusterStatus(
-	ctx context.Context,
-	crudClient client.Client,
-	namespace, clusterName string,
-) {
-	ginkgo.By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
-		gomega.Eventually(func() (string, error) {
-			getBackupCondition, err := GetConditionsInClusterStatus(
-				ctx, crudClient,
-				namespace, clusterName,
-				apiv1.ConditionBackup,
-			)
-			if err != nil {
-				return "", err
-			}
-			return string(getBackupCondition.Status), nil
-		}, 300, 5).Should(gomega.BeEquivalentTo("True"))
-	})
 }
 
 // CreateOnDemandBackupViaKubectlPlugin uses the kubectl plugin to create a backup
@@ -291,9 +268,9 @@ func CreateClusterFromBackupUsingPITR(
 	return cluster, nil
 }
 
-// CreateClusterFromExternalClusterBackupWithPITROnMinio creates a cluster on Minio, starting from an external cluster
-// backup with PITR
-func CreateClusterFromExternalClusterBackupWithPITROnMinio(
+// CreateClusterFromExternalClusterBackupWithPITROnObjectStore creates a cluster on the object store,
+// starting from an external cluster backup with PITR
+func CreateClusterFromExternalClusterBackupWithPITROnObjectStore(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace,
@@ -342,10 +319,10 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 					Name: sourceClusterName,
 					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: "s3://cluster-backups/",
-						EndpointURL:     "https://minio-service.minio:9000",
+						EndpointURL:     "https://object-store.object-store:9000",
 						EndpointCA: &apiv1.SecretKeySelector{
 							LocalObjectReference: apiv1.LocalObjectReference{
-								Name: "minio-server-ca-secret",
+								Name: "object-store-ca-secret",
 							},
 							Key: "ca.crt",
 						},

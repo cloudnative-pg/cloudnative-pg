@@ -15,7 +15,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       -
         name: Get tag
         run: |
@@ -35,5 +35,5 @@ jobs:
           destination_branch: ${{ env.DEST }}
           github_token: ${{ secrets.REPO_GHA_PAT }}
           pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
-          pr_label: release
+          pr_label: "release,do not backport,no-issue"
           pr_title: "Version tag to ${{ env.TAG }}"

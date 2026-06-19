@@ -62,7 +62,8 @@ const (
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
 	initializing status = "initializing"
 
-	// List of PVCs with resizing condition. Requires a pod restart.
+	// List of PVCs with resizing condition that have a corresponding pod.
+	// Podless resizing PVCs are classified as dangling instead (see #9786).
 	//
 	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
 	resizing status = "resizing"
@@ -269,16 +270,21 @@ func classifyPVC(
 		return healthy
 	}
 
-	// PVC is resizing without a pod
+	// A resizing PVC without a pod must be classified as dangling so the
+	// reconciler recreates the pod. Two reasons:
+	//
+	//   1. Filesystem resize requires a mounted pod — kubelet performs it on mount.
+	//
+	//   2. Without a pod, the "resizing" classification is a dead end: a
+	//      simultaneous storage + resource change would leave the PVC orphaned
+	//      because the rolling-update-deleted pod is never recreated (see #9786).
+	//
+	// For online-expandable volumes reason 1 does not apply, but reason 2 still
+	// does; classifying as dangling is always safe here.
 	if isResizing(pvc) {
-		// Filesystem resize requires a pod mount to complete; classify as
-		// dangling so the reconciler creates one.
-		if isFileSystemResizePending(pvc) {
-			log.FromContext(ctx).Info("PVC filesystem resize pending without a pod, classifying as dangling",
-				"pvc", pvc.Name)
-			return dangling
-		}
-		return resizing
+		log.FromContext(ctx).Info("PVC resizing without a pod, classifying as dangling",
+			"pvc", pvc.Name)
+		return dangling
 	}
 
 	// PVC has a corresponding Job but not a corresponding Pod

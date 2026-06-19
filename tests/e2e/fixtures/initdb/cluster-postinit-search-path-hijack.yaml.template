@@ -1,0 +1,43 @@
+# Cluster used by the search_path operator hijack regression test (CWE-426).
+#
+# postInitApplicationSQL plants an attacker-controlled `=` (name, name)
+# operator in the application database's `public` schema and flips the
+# database-level search_path so that the planted operator is resolved
+# before pg_catalog. The (name, name) signature matches what the
+# operator's catalog probes resolve to (e.g. `... WHERE extname = $1`);
+# a (name, text) overload would never be reached, leaving the test unable
+# to tell a working pin from a dead trigger. With the operator's
+# connection-level search_path pin in place, every operator-issued query
+# to `app` carries search_path = pg_catalog, public, pg_temp with
+# pg_catalog first, so the built-in `=(name,name)` resolves ahead of the
+# planted one and the shadow is never invoked. The shadow body inserts
+# into public.shadow_calls; the e2e test asserts that table stays empty
+# after a reconcile window.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: p-search-path-hijack
+spec:
+  instances: 1
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      postInitApplicationSQL:
+        - CREATE TABLE public.shadow_calls (called_at timestamptz NOT NULL DEFAULT clock_timestamp());
+        - GRANT INSERT ON public.shadow_calls TO PUBLIC;
+        # Use LANGUAGE sql with a single-quoted body so the function definition
+        # does not rely on dollar-quoting. Kubernetes argv expansion treats $$
+        # as the escape for a literal $ in container command/args, which would
+        # corrupt $$ ... $$ dollar-quoted blocks before the operator even sees
+        # them. $1 / $2 parameter references survive that processing.
+        # Reference the built-in operator explicitly: a bare name=name here
+        # would re-enter the planted public.=(name,name) and recurse forever.
+        - CREATE OR REPLACE FUNCTION public.shadow_eq(a name, b name) RETURNS boolean LANGUAGE sql AS 'INSERT INTO public.shadow_calls DEFAULT VALUES; SELECT $1 OPERATOR(pg_catalog.=) $2;';
+        - CREATE OPERATOR public.= (LEFTARG=name, RIGHTARG=name, FUNCTION=public.shadow_eq);
+        - ALTER DATABASE app SET search_path = public, pg_catalog;
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

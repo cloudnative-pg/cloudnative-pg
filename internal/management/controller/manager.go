@@ -32,16 +32,23 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 )
 
+// PrimaryLeaseAcquirer is the interface the primary lease runnable exposes to the reconciler.
+type PrimaryLeaseAcquirer interface {
+	Acquire(ctx context.Context, config lease.Config) error
+}
+
 // InstanceReconciler reconciles the status of the Cluster resource with
 // the one of this PostgreSQL instance. Also, the configuration in the
-// ConfigMap is applied when needed
+// ConfigMap is applied when needed.
 type InstanceReconciler struct {
 	client        ctrl.Client
 	instance      *postgres.Instance
@@ -56,6 +63,9 @@ type InstanceReconciler struct {
 
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
+	primaryLeaseAcquirer  PrimaryLeaseAcquirer
+
+	admission *guard.Admission[*apiv1.Cluster]
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -64,6 +74,8 @@ func NewInstanceReconciler(
 	client ctrl.Client,
 	metricsExporter *metricserver.Exporter,
 	pluginRepository repository.Interface,
+	primaryLeaseAcquirer PrimaryLeaseAcquirer,
+	admission *guard.Admission[*apiv1.Cluster],
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -74,6 +86,8 @@ func NewInstanceReconciler(
 		metricsServerExporter: metricsExporter,
 		certificateReconciler: instancecertificate.NewReconciler(client, instance),
 		pluginRepository:      pluginRepository,
+		primaryLeaseAcquirer:  primaryLeaseAcquirer,
+		admission:             admission,
 	}
 }
 

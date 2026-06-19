@@ -110,6 +110,12 @@ const (
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 
+	// MetricsExporterUserName is the name of the dedicated role used by the
+	// metrics exporter to connect to PostgreSQL. This role has pg_monitor
+	// granted and is never a superuser, so session_user never escalates via
+	// RESET ROLE.
+	MetricsExporterUserName = "cnpg_metrics_exporter"
+
 	// MissingWALDiskSpaceExitCode is the exit code the instance manager
 	// will use to signal that there's no more WAL disk space
 	MissingWALDiskSpaceExitCode = 4
@@ -525,6 +531,54 @@ type ClusterSpec struct {
 	// in the PostgreSQL Pods.
 	// +optional
 	Probes *ProbesConfiguration `json:"probes,omitempty"`
+
+	// Configuration of the Kubernetes `Lease` used to coordinate safe primary
+	// election within the cluster. When omitted, the operator applies built-in
+	// defaults; tune these values only if you understand the consequences for
+	// failover timing.
+	// +optional
+	PrimaryLease *PrimaryLeaseConfiguration `json:"primaryLease,omitempty"`
+}
+
+// PrimaryLeaseConfiguration configures the timings of the Kubernetes `Lease`
+// that the primary instance holds and renews to coordinate a safe primary
+// election. These values map directly onto the underlying Kubernetes
+// leader-election parameters.
+type PrimaryLeaseConfiguration struct {
+	// How long, in seconds, the primary lease is considered valid before it
+	// expires and another instance may acquire it. It must be greater than
+	// `renewDeadlineSeconds`.
+	// Defaults to 15.
+	// +kubebuilder:default:=15
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty"`
+
+	// How long, in seconds, the current primary keeps retrying to renew the
+	// lease before giving up and stopping. It must be smaller than
+	// `leaseDurationSeconds`.
+	// Defaults to 10.
+	// +kubebuilder:default:=10
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	RenewDeadlineSeconds *int32 `json:"renewDeadlineSeconds,omitempty"`
+
+	// How frequently, in seconds, a non-holder instance retries acquiring or
+	// renewing the lease.
+	// Defaults to 2.
+	// +kubebuilder:default:=2
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	RetryPeriodSeconds *int32 `json:"retryPeriodSeconds,omitempty"`
+
+	// The TTL, in seconds, written when the primary explicitly releases the
+	// lease on a clean shutdown, allowing a replica to promote without waiting
+	// for the full lease duration to expire.
+	// Defaults to 1.
+	// +kubebuilder:default:=1
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	ReleasedLeaseDurationSeconds *int32 `json:"releasedLeaseDurationSeconds,omitempty"`
 }
 
 // ProbesConfiguration represent the configuration for the probes
@@ -712,6 +766,9 @@ const (
 
 	// PhaseCannotCreateClusterObjects is set by the operator when is unable to create cluster resources
 	PhaseCannotCreateClusterObjects = "Unable to create required cluster objects"
+
+	// PhaseDefinitionInvalid is set when the cluster definition is invalid
+	PhaseDefinitionInvalid = "Invalid cluster definition"
 )
 
 // EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral
@@ -789,8 +846,10 @@ type ManagedRoles struct {
 	// +optional
 	ByStatus map[RoleStatus][]string `json:"byStatus,omitempty"`
 
-	// CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
-	// with an explanation of the cause
+	// CannotReconcile lists roles that cannot be reconciled, with an
+	// explanation of the cause. Failures may originate in PostgreSQL
+	// (e.g. dropping a role that owns objects) or in Kubernetes (e.g.
+	// the referenced password Secret cannot be fetched).
 	// +optional
 	CannotReconcile map[string][]string `json:"cannotReconcile,omitempty"`
 
@@ -847,6 +906,13 @@ type ClusterStatus struct {
 	// +optional
 	ReadyInstances int `json:"readyInstances,omitempty"`
 
+	// Selector is the serialized form of the label selector that identifies
+	// the pods managed by this cluster. Populated by the operator and exposed
+	// through the scale sub-resource so an autoscaler (such as HPA or VPA)
+	// can discover the managed instance pods.
+	// +optional
+	Selector string `json:"selector,omitempty"`
+
 	// InstancesStatus indicates in which status the instances are
 	// +optional
 	InstancesStatus map[PodStatus][]string `json:"instancesStatus,omitempty"`
@@ -879,6 +945,8 @@ type ClusterStatus struct {
 	Topology Topology `json:"topology,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
+	//
+	// Deprecated: this field is not set anymore
 	// +optional
 	LatestGeneratedNode int `json:"latestGeneratedNode,omitempty"`
 
@@ -1016,6 +1084,12 @@ type ClusterStatus struct {
 	// +optional
 	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
 
+	// OperatorCertificateFingerprint is the SHA256 fingerprint of the operator's
+	// in-memory client certificate public key. The instance manager pins this
+	// fingerprint to authenticate requests from the operator.
+	// +optional
+	OperatorCertificateFingerprint string `json:"operatorCertificateFingerprint,omitempty"`
+
 	// AvailableArchitectures reports the available architectures of a cluster
 	// +optional
 	AvailableArchitectures []AvailableArchitecture `json:"availableArchitectures,omitempty"`
@@ -1039,6 +1113,12 @@ type ClusterStatus struct {
 	// PGDataImageInfo contains the details of the latest image that has run on the current data directory.
 	// +optional
 	PGDataImageInfo *ImageInfo `json:"pgDataImageInfo,omitempty"`
+
+	// TargetPGDataImageInfo contains the details of the target image for an
+	// in-progress major upgrade. It is set before the upgrade Job is created,
+	// and cleared on successful completion or when the upgrade is rolled back.
+	// +optional
+	TargetPGDataImageInfo *ImageInfo `json:"targetPgDataImageInfo,omitempty"`
 
 	// PluginStatus is the status of the loaded plugins
 	// +optional
@@ -1104,6 +1184,10 @@ const (
 	// ConditionConsistentSystemID is true when the all the instances of the
 	// cluster report the same System ID.
 	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
+	// ConditionInitialized is False from the first reconcile until the cluster
+	// has had at least one running instance, at which point it is set to True
+	// and never cleared.
+	ConditionInitialized ClusterConditionType = "Initialized"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1152,6 +1236,14 @@ const (
 
 	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
 	DetachedVolume ConditionReason = "DetachedVolume"
+
+	// BootstrapCompleted is the reason set on ConditionInitialized=True once the
+	// cluster has completed its first bootstrap.
+	BootstrapCompleted ConditionReason = "BootstrapCompleted"
+
+	// BootstrapPending is the reason set on ConditionInitialized=False while the
+	// cluster has not yet completed its first bootstrap.
+	BootstrapPending ConditionReason = "BootstrapPending"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
@@ -1368,6 +1460,24 @@ const (
 	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,
 	// the minimum value is 1
 	DefaultStartupDelay = 3600
+
+	// DefaultPrimaryLeaseDurationSeconds is the default validity, in seconds, of the primary lease.
+	DefaultPrimaryLeaseDurationSeconds = 15
+
+	// DefaultPrimaryLeaseRenewDeadlineSeconds is the default deadline, in seconds, for the primary
+	// to renew its lease before giving up.
+	DefaultPrimaryLeaseRenewDeadlineSeconds = 10
+
+	// DefaultPrimaryLeaseRetryPeriodSeconds is the default interval, in seconds, between lease
+	// acquisition or renewal attempts. It matches the conventional Kubernetes leader-election
+	// retry period: a smaller value lets a candidate detect a cleanly released lease sooner
+	// (faster switchover) without affecting the take-over wait that holds back a premature
+	// promotion, which is governed by the lease duration.
+	DefaultPrimaryLeaseRetryPeriodSeconds = 2
+
+	// DefaultPrimaryLeaseReleasedDurationSeconds is the default TTL, in seconds, written when the
+	// primary explicitly releases its lease on a clean shutdown.
+	DefaultPrimaryLeaseReleasedDurationSeconds = 1
 )
 
 // SynchronousReplicaConfigurationMethod configures whether to use
@@ -1534,8 +1644,11 @@ type PostgresConfiguration struct {
 // ExtensionConfiguration is the configuration used to add
 // PostgreSQL extensions to the Cluster.
 type ExtensionConfiguration struct {
-	// The name of the extension, required
+	// The name of the extension, required. The limit of 59 characters
+	// leaves room for the prefix the operator adds when deriving the
+	// extension's Kubernetes Volume name (capped at 63 characters).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=59
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`
 	Name string `json:"name"`
 
@@ -2560,6 +2673,7 @@ type PluginStatus struct {
 type RoleConfiguration struct {
 	// Name of the role
 	Name string `json:"name"`
+
 	// Description of the role
 	// +optional
 	Comment string `json:"comment,omitempty"`
@@ -2570,8 +2684,10 @@ type RoleConfiguration struct {
 	// +optional
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
-	// Secret containing the password of the role (if present)
-	// If null, the password will be ignored unless DisablePassword is set
+	// Secret containing the password of the role (if present).
+	// If null, the password will be ignored unless DisablePassword is set.
+	// When set, the secret must follow the `kubernetes.io/basic-auth` format
+	// and contain both a `username` and a `password` field.
 	// +optional
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
 
@@ -2588,11 +2704,13 @@ type RoleConfiguration struct {
 
 	// List of one or more existing roles to which this role will be
 	// immediately added as a new member. Default empty.
+	// Changes to the list are applied to an existing role through
+	// `GRANT` and `REVOKE` statements, not only at role creation.
 	// +optional
 	InRoles []string `json:"inRoles,omitempty"`
 
 	// Whether a role "inherits" the privileges of roles it is a member of.
-	// Defaults is `true`.
+	// Default is `true`.
 	// +kubebuilder:default:=true
 	// +optional
 	Inherit *bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
@@ -2647,7 +2765,7 @@ type RoleConfiguration struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
-// +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances
+// +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances,selectorpath=.status.selector
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Instances",type="integer",JSONPath=".status.instances",description="Number of instances"
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyInstances",description="Number of ready instances"
@@ -2739,8 +2857,4 @@ type ConfigMapResourceVersion struct {
 	// Map keys are the config map names, map values are the versions
 	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }

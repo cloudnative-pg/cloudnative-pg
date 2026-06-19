@@ -51,7 +51,7 @@ function create_cluster_k3d() {
   local cluster_name=$2
 
   local latest_k3s_tag
-  latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
+  latest_k3s_tag=$(k3d version list k3s -l1 -s desc --include "^${k8s_version}.*")
   if [[ -z "${latest_k3s_tag}" ]]; then
     echo "ERROR: No k3s image found for version ${k8s_version}" >&2
     exit 1
@@ -75,6 +75,13 @@ EOF
   fi
 
   options+=(--registry-config "${config_file}")
+
+  # Enable ImageVolume support from k3s v1.33.5 up to v1.34.x (defaults to true in v1.35.0+)
+  if version_gte "1.33.5" "${k8s_version#v}" && ! version_gte "1.35.0" "${k8s_version#v}"; then
+    options+=(--k3s-arg "--kube-apiserver-arg=feature-gates=ImageVolume=true@server:0")
+    options+=(--k3s-arg "--kubelet-arg=feature-gates=ImageVolume=true@server:0")
+    options+=(--k3s-arg "--kubelet-arg=feature-gates=ImageVolume=true@agent:*")
+  fi
 
   local agents=()
   if [ "$NODES" -gt 1 ]; then

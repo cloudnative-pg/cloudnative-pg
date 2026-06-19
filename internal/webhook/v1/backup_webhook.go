@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -43,6 +44,14 @@ func SetupBackupWebhookWithManager(mgr ctrl.Manager) error {
 		WithValidator(newBypassableValidator[*apiv1.Backup](&BackupCustomValidator{})).
 		WithDefaulter(&BackupCustomDefaulter{}).
 		Complete()
+}
+
+// NewBackupAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewBackupAdmissionGuard() *guard.Admission[*apiv1.Backup] {
+	return &guard.Admission[*apiv1.Backup]{
+		Defaulter: &BackupCustomDefaulter{},
+		Validator: newBypassableValidator[*apiv1.Backup](&BackupCustomValidator{}),
+	}
 }
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
@@ -81,7 +90,7 @@ func (v *BackupCustomValidator) ValidateCreate(_ context.Context, backup *apiv1.
 	}
 
 	return nil, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Backup"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Backup"},
 		backup.Name, allErrs)
 }
 
@@ -98,7 +107,7 @@ func (v *BackupCustomValidator) ValidateUpdate(
 	}
 
 	return nil, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Backup"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Backup"},
 		backup.Name, allErrs)
 }
 

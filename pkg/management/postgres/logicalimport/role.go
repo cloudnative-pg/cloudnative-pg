@@ -192,6 +192,7 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 		"postgres",
 		apiv1.StreamingReplicationUser,
 		apiv1.PGBouncerPoolerUserName,
+		apiv1.MetricsExporterUserName,
 		rs.cluster.Spec.Bootstrap.InitDB.Owner,
 	}
 

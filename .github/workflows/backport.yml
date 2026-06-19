@@ -84,20 +84,13 @@ jobs:
       -
         name: Checkout code
         if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
           ref: ${{ env.BRANCH }}
           token: ${{ secrets.REPO_GHA_PAT }}
       -
-        name: Install Go
-        if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
-        with:
-          go-version-file: go.mod
-          check-latest: true
-      -
-        name: Check commits
+        name: Check commits and detect Go version
         if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
         id: check_commits
         env:
@@ -114,13 +107,59 @@ jobs:
           author_name=$(git show -s --format='%an' "${commit}" | head -n1)
           author_email=$(git show -s --format='%ae' "${commit}" | head -n1)
 
+          # Detect the Go version to install. If the picked commit changes the
+          # `go` or `toolchain` directive, use the picked value (so Go-version
+          # bumps cherry-pick cleanly); otherwise use the release branch's
+          # current value. Install whichever of the two is set (toolchain wins
+          # because it is always >= the go directive by Go's invariants).
+          parent_go=$(git show "${commit}^:go.mod" 2>/dev/null | sed -n 's/^go //p' | head -1)
+          picked_go=$(git show "${commit}:go.mod"  2>/dev/null | sed -n 's/^go //p' | head -1)
+          branch_go=$(sed -n 's/^go //p' go.mod | head -1)
+          parent_tc=$(git show "${commit}^:go.mod" 2>/dev/null | sed -n 's/^toolchain go//p' | head -1)
+          picked_tc=$(git show "${commit}:go.mod"  2>/dev/null | sed -n 's/^toolchain go//p' | head -1)
+          branch_tc=$(sed -n 's/^toolchain go//p' go.mod | head -1)
+          if [ -n "${picked_go}" ] && [ "${picked_go}" != "${parent_go}" ]; then
+            eff_go=${picked_go}
+          else
+            eff_go=${branch_go}
+          fi
+          if [ -n "${picked_tc}" ] && [ "${picked_tc}" != "${parent_tc}" ]; then
+            eff_tc=${picked_tc}
+          else
+            eff_tc=${branch_tc}
+          fi
+          go_version=${eff_tc:-$eff_go}
+
           echo "commit=${commit}" >> $GITHUB_OUTPUT
-          echo "cherry-pick commit ${commit} to branch ${BRANCH}"
+          echo "go_version=${go_version}" >> $GITHUB_OUTPUT
+          echo "cherry-pick commit ${commit} to branch ${BRANCH} with Go ${go_version}"
 
           echo "AUTHOR_NAME=${author_name}" >> $GITHUB_ENV
           echo "AUTHOR_EMAIL=${author_email}" >> $GITHUB_ENV
       -
-        name: cherry pick
+        name: Install Go
+        if: |
+          contains( github.event.pull_request.labels.*.name, env.BRANCH ) && steps.check_commits.outputs.commit != ''
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version: ${{ steps.check_commits.outputs.go_version }}
+          check-latest: true
+          cache: false
+      -
+        name: Cache Go modules
+        if: |
+          contains( github.event.pull_request.labels.*.name, env.BRANCH ) && steps.check_commits.outputs.commit != ''
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: backport-go-${{ runner.os }}-${{ matrix.branch }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            backport-go-${{ runner.os }}-${{ matrix.branch }}-
+            backport-go-${{ runner.os }}-
+      -
+        name: cherry pick and push
         env:
           COMMIT: ${{ steps.check_commits.outputs.commit }}
         if: |
@@ -128,8 +167,47 @@ jobs:
         run: |
           git config user.email "${AUTHOR_EMAIL}"
           git config user.name "${AUTHOR_NAME}"
-          git fetch
-          git cherry-pick -x --mainline 1 "${COMMIT}"
+
+          # Register a no-op merge driver and apply it to go.mod / go.sum so
+          # the cherry-pick never duplicates singleton directives or hashes:
+          # conflicting regions keep the release branch's version unchanged
+          # (the driver is `true`, which leaves the target file untouched).
+          # The picked commit's intent is then replayed semantically below
+          # via `go mod edit`, ignoring any line context that may have
+          # diverged. `--keep-redundant-commits` lets the cherry-pick create
+          # an empty commit when the driver discards every change in the
+          # picked commit (e.g. a pure go.mod bump on a divergent branch);
+          # the replay then re-adds the intended change and the Reconcile
+          # step amends it onto that commit.
+          git config merge.keep-ours.name "Keep ours (release branch) version"
+          git config merge.keep-ours.driver "true"
+          mkdir -p .git/info
+          cat > .git/info/attributes <<'EOF'
+          go.mod merge=keep-ours
+          go.sum merge=keep-ours
+          EOF
+
+          git cherry-pick -x --mainline 1 --empty=keep "${COMMIT}"
+
+          # Replay the picked commit's go.mod intent surgically (no-op when
+          # the picked commit doesn't touch go.mod).
+          hack/replay-gomod.sh "${COMMIT}"
+
+          # If the cherry-pick commit or the semantic replay above touched
+          # go.mod/go.sum, settle go.sum with `go mod tidy`, verify hashes,
+          # and fold the result into the cherry-pick commit so it lands as
+          # a single commit. The replay leaves go.mod modified in the
+          # working tree without staging it, so we also check that.
+          if git diff-tree --no-commit-id --name-only -r HEAD | grep -qE '^go\.(mod|sum)$' \
+             || ! git diff --quiet -- go.mod go.sum; then
+            go mod tidy
+            go mod verify
+            if ! git diff --quiet go.mod go.sum; then
+              git add go.mod go.sum
+              git commit --amend --no-edit
+            fi
+          fi
+
           make fmt vet generate apidoc wordlist-ordered
           if ! git diff --exit-code --quiet
           then

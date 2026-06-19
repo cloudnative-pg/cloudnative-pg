@@ -23,16 +23,19 @@ package execute
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	cnpgiPostgres "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/env"
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
@@ -51,10 +54,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	postgresConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 // NewCmd creates the cobra command
@@ -161,6 +166,10 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 		return err
 	}
 	instance.SetCluster(&cluster)
+
+	if err := setupExtensionEnvironment(&cluster); err != nil {
+		return fmt.Errorf("error while setting up extension environment: %w", err)
+	}
 
 	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
 		return fmt.Errorf("error while downloading secrets: %w", err)
@@ -292,6 +301,26 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 
 	contextLogger.Info("Upgrade completed successfully")
 
+	return logExtensionUpdateScript(ctx, ui.pgData, instance.GetPodName())
+}
+
+func logExtensionUpdateScript(ctx context.Context, pgData, primaryPodName string) error {
+	contextLogger := log.FromContext(ctx)
+
+	scriptPath := path.Join(pgData, "update_extensions.sql")
+	exists, err := fileutils.FileExists(scriptPath)
+	if err != nil {
+		return fmt.Errorf("checking for update_extensions.sql at %q: %w", scriptPath, err)
+	}
+	if exists {
+		contextLogger.Info(
+			"pg_upgrade emitted update_extensions.sql in PGDATA on the primary. "+
+				"Once the cluster is back online, review the script and apply extension updates as needed.",
+			"scriptPath", scriptPath,
+			"primaryPodName", primaryPodName,
+		)
+	}
+
 	return nil
 }
 
@@ -419,6 +448,13 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	ctx = cluster.SetInContext(ctx)
 
 	newInstance := postgres.Instance{PgData: destDir}
+	// OperationType_TYPE_UPGRADE switches the configuration generator to the
+	// target-version extension layout: it reads the extension list from
+	// Status.TargetPGDataImageInfo and resolves mounts under
+	// UpgradeTargetExtensionsBaseDirectory, so the new pgdata's
+	// extension_control_path / dynamic_library_path GUCs reflect the new image.
+	// See pkg/management/postgres.selectAdditionalExtensions for the actual
+	// branch.
 	if _, err := newInstance.RefreshConfigurationFilesFromCluster(
 		ctx,
 		tmpCluster,
@@ -559,5 +595,68 @@ func moveDirIfExists(ctx context.Context, oldPath string, newPath string) error 
 		}
 	}
 
+	return nil
+}
+
+// setupExtensionEnvironment extends LD_LIBRARY_PATH and PATH and applies each
+// extension's custom Env entries to the process environment, so pg_upgrade's
+// old and new PostgreSQL server children inherit the right paths and values.
+//
+// Sources: Status.PGDataImageInfo for the source set; Status.TargetPGDataImageInfo
+// for the target set (populated by the reconciler before Job creation).
+//
+// Both fields are reconciler invariants for an in-progress major upgrade; either
+// one being nil means the operator violated its contract, so we surface that as
+// an error rather than silently skipping environment setup.
+func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
+	if cluster.Status.PGDataImageInfo == nil {
+		return fmt.Errorf(
+			"cannot set up extension environment: cluster status is missing PGDataImageInfo")
+	}
+
+	if cluster.Status.TargetPGDataImageInfo == nil {
+		return fmt.Errorf(
+			"cannot set up extension environment: cluster status is missing TargetPGDataImageInfo")
+	}
+
+	oldExtensions := cluster.Status.PGDataImageInfo.Extensions
+	newExtensions := cluster.Status.TargetPGDataImageInfo.Extensions
+
+	envMap, err := envmap.Parse(os.Environ())
+	if err != nil {
+		// envmap.Parse returns a partial map alongside the error; we keep going
+		// so legitimate entries still get propagated, but we surface the
+		// failure so a malformed env doesn't disappear silently.
+		log.Warning("Could not fully parse process environment; "+
+			"proceeding with the entries that did parse",
+			"error", err.Error())
+	}
+
+	libPaths := slices.Concat(
+		extensions.CollectLibraryPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
+		extensions.CollectLibraryPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
+	)
+	if len(libPaths) > 0 {
+		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], libPaths)
+	}
+
+	binPaths := slices.Concat(
+		extensions.CollectBinPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
+		extensions.CollectBinPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
+	)
+	if len(binPaths) > 0 {
+		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], binPaths)
+	}
+
+	extensions.SetEnvVars(oldExtensions, envMap, postgresConfig.ExtensionsBaseDirectory)
+	extensions.SetEnvVars(newExtensions, envMap, postgresConfig.UpgradeTargetExtensionsBaseDirectory)
+
+	// Iterate in a stable order so log output and partial-failure recovery are
+	// reproducible across runs; Go map iteration is otherwise randomized.
+	for _, name := range slices.Sorted(maps.Keys(envMap)) {
+		if err := os.Setenv(name, envMap[name]); err != nil {
+			return fmt.Errorf("while setting %s: %w", name, err)
+		}
+	}
 	return nil
 }

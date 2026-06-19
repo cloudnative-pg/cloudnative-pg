@@ -27,6 +27,8 @@ import (
 	"strings"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 )
 
 var (
@@ -44,7 +46,7 @@ var (
 // exposed by the CSI snapshotter sidecar.
 func isNetworkErrorRetryable(err error) bool {
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||
-		errors.Is(err, context.DeadlineExceeded)
+		errors.Is(err, context.DeadlineExceeded) || remote.IsTransientAuthError(err)
 }
 
 // isCSIErrorMessageRetriable detects if a certain error message

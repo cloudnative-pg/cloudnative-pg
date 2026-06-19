@@ -48,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -55,6 +56,9 @@ import (
 )
 
 const sharedBuffersParameter = "shared_buffers"
+
+// walLevelMinimal is the "minimal" wal level
+const walLevelMinimal = "minimal"
 
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
@@ -65,6 +69,14 @@ func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
 		WithValidator(newBypassableValidator[*apiv1.Cluster](&ClusterCustomValidator{})).
 		WithDefaulter(&ClusterCustomDefaulter{}).
 		Complete()
+}
+
+// NewClusterAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewClusterAdmissionGuard() *guard.Admission[*apiv1.Cluster] {
+	return &guard.Admission[*apiv1.Cluster]{
+		Defaulter: &ClusterCustomDefaulter{},
+		Validator: newBypassableValidator[*apiv1.Cluster](&ClusterCustomValidator{}),
+	}
 }
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
@@ -106,7 +118,7 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv
 	}
 
 	return allWarnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Cluster"},
 		cluster.Name, allErrs)
 }
 
@@ -199,6 +211,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePodSelectorRefs,
 		v.validateExtensions,
 		v.validateServiceAccountConfig,
+		v.validatePrimaryLease,
 	}
 
 	for _, validate := range validations {
@@ -1089,7 +1102,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 					"'.instances' field is greater than 1, or this is a replica cluster"))
 	}
 
-	if walLevel == "minimal" {
+	if walLevel == walLevelMinimal {
 		if value, ok := sanitizedParameters[postgres.ParameterMaxWalSenders]; !ok || value != "0" {
 			result = append(
 				result,
@@ -1406,6 +1419,39 @@ func (v *ClusterCustomValidator) validateRecoveryTarget(r *apiv1.Cluster) field.
 		}
 	}
 
+	// PostgreSQL casts recovery_target_xid to TransactionId (uint32); a value
+	// above 2^32-1 would be silently truncated. Use bitSize 32 so we reject
+	// rather than admit a different XID than the user wrote.
+	if recoveryTarget.TargetXID != "" {
+		if _, err := strconv.ParseUint(recoveryTarget.TargetXID, 10, 32); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetXID"),
+				recoveryTarget.TargetXID,
+				"recovery target xid must be a non-negative 32-bit integer"))
+		}
+	}
+
+	// PostgreSQL enforces MAXFNAMELEN (64) on recovery_target_name and on
+	// pg_create_restore_point; mirror it at admission for a better error.
+	if len(recoveryTarget.TargetName) >= 64 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetName"),
+			recoveryTarget.TargetName,
+			"recovery target name must be shorter than 64 bytes"))
+	}
+
+	// pg_create_restore_point accepts arbitrary text, but a name with
+	// newlines or NUL is never legitimate and is a strong signal of a
+	// malformed or hostile spec.
+	if strings.ContainsFunc(recoveryTarget.TargetName, func(r rune) bool {
+		return r < 0x20 || r == 0x7F
+	}) {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetName"),
+			recoveryTarget.TargetName,
+			"recovery target name must not contain ASCII control characters"))
+	}
+
 	// When using a backup catalog, we can identify the backup to be restored
 	// only if the PITR is time-based. If the PITR is not time-based, the user
 	// need to specify a backup ID.
@@ -1535,6 +1581,58 @@ func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field
 			field.NewPath("spec", "minSyncReplicas"),
 			r.Spec.MinSyncReplicas,
 			"minSyncReplicas cannot be greater than maxSyncReplicas"))
+	}
+
+	return result
+}
+
+// validatePrimaryLease checks the consistency of the primary lease timings.
+// These mirror the invariants that client-go's leaderelection.NewLeaderElector
+// enforces at runtime: the lease duration must be strictly greater than the
+// renew deadline, and the renew deadline must be greater than the retry period
+// times the jitter factor. Rejecting violations here is important because a
+// combination that slips through admission would not "just" misbehave: it makes
+// NewLeaderElector return an error, which is fatal to the primary's lease
+// runnable and crash-loops the primary Pod.
+func (v *ClusterCustomValidator) validatePrimaryLease(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	lease := r.Spec.PrimaryLease
+	if lease == nil {
+		return result
+	}
+
+	basePath := field.NewPath("spec", "primaryLease")
+
+	leaseDuration := apiv1.DefaultPrimaryLeaseDurationSeconds
+	if lease.LeaseDurationSeconds != nil {
+		leaseDuration = int(*lease.LeaseDurationSeconds)
+	}
+	renewDeadline := apiv1.DefaultPrimaryLeaseRenewDeadlineSeconds
+	if lease.RenewDeadlineSeconds != nil {
+		renewDeadline = int(*lease.RenewDeadlineSeconds)
+	}
+	retryPeriod := apiv1.DefaultPrimaryLeaseRetryPeriodSeconds
+	if lease.RetryPeriodSeconds != nil {
+		retryPeriod = int(*lease.RetryPeriodSeconds)
+	}
+
+	if leaseDuration <= renewDeadline {
+		result = append(result, field.Invalid(
+			basePath.Child("leaseDurationSeconds"),
+			leaseDuration,
+			"leaseDurationSeconds must be greater than renewDeadlineSeconds"))
+	}
+
+	// client-go rejects renewDeadline <= retryPeriod*JitterFactor (JitterFactor
+	// is 1.2). We replicate the check with exact integer arithmetic, since the
+	// fields are whole seconds: renewDeadline > 1.2*retryPeriod is equivalent to
+	// 5*renewDeadline > 6*retryPeriod.
+	if 5*renewDeadline <= 6*retryPeriod {
+		result = append(result, field.Invalid(
+			basePath.Child("renewDeadlineSeconds"),
+			renewDeadline,
+			"renewDeadlineSeconds must be greater than retryPeriodSeconds multiplied by 1.2"))
 	}
 
 	return result
@@ -1833,9 +1931,8 @@ func (v *ClusterCustomValidator) validateExternalCluster(
 		externalCluster.BarmanObjectStore == nil &&
 		externalCluster.PluginConfiguration == nil {
 		result = append(result,
-			field.Invalid(
+			field.Required(
 				path,
-				externalCluster,
 				"one of connectionParameters, plugin and barmanObjectStore is required"))
 	}
 
@@ -1953,17 +2050,15 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 	hasEnabled := replicaClusterConf.Enabled != nil
 	hasPrimary := len(replicaClusterConf.Primary) > 0
 	if hasPrimary && hasEnabled {
-		result = append(result, field.Invalid(
+		result = append(result, field.Forbidden(
 			field.NewPath("spec", "replicaCluster", "enabled"),
-			replicaClusterConf,
 			"replica mode enabled is not compatible with the primary field"))
 	}
 
 	if r.IsReplica() {
 		if r.Spec.Bootstrap == nil {
-			result = append(result, field.Invalid(
+			result = append(result, field.Required(
 				field.NewPath("spec", "bootstrap"),
-				replicaClusterConf,
 				"bootstrap configuration is required for replica mode"))
 		} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
 			// this is needed because we only want to validate this during cluster creation, currently if we would have
@@ -1971,7 +2066,7 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 			len(r.ResourceVersion) == 0 {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "replicaCluster"),
-				replicaClusterConf,
+				replicaClusterConf.Primary,
 				"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
 		}
 	}
@@ -2298,10 +2393,10 @@ func (v *ClusterCustomValidator) validateWALLevelChange(r, old *apiv1.Cluster) f
 	newWALLevel := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
 	oldWALLevel := old.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
 
-	if newWALLevel == "minimal" && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
+	if newWALLevel == walLevelMinimal && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
 		errs = append(errs, field.Invalid(
 			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
-			"minimal",
+			walLevelMinimal,
 			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)",
 				oldWALLevel)))
 	}
@@ -2452,10 +2547,7 @@ func (v *ClusterCustomValidator) validateManagedRoles(r *apiv1.Cluster) field.Er
 
 // validateManagedExtensions validate the managed extensions parameters set by the user
 func (v *ClusterCustomValidator) validateManagedExtensions(r *apiv1.Cluster) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	allErrors = append(allErrors, v.validatePgFailoverSlots(r)...)
-	return allErrors
+	return v.validatePgFailoverSlots(r)
 }
 
 func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field.ErrorList {

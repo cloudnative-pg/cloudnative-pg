@@ -46,7 +46,7 @@ LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 DIST_PATH := $(shell pwd)/dist
-OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
+OPERATOR_MANIFEST_PATH ?= ${DIST_PATH}/operator-manifest.yaml
 LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
@@ -55,23 +55,28 @@ PGBOUNCER_IMAGE_NAME ?= $(shell grep 'DefaultPgbouncerImage.*=' "pkg/versions/ve
 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize versioning=loose
 KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
-CONTROLLER_TOOLS_VERSION ?= v0.20.1
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
 CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.14.3
+GORELEASER_VERSION ?= v2.16.0
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.59.0
+SPELLCHECK_VERSION ?= 0.60.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
-OPERATOR_SDK_VERSION ?= v1.42.1
+OPERATOR_SDK_VERSION ?= v1.42.2
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.64.0
+OPM_VERSION ?= v1.69.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.16.0
-OPENSHIFT_VERSIONS ?= v4.16-v4.21
+PREFLIGHT_VERSION ?= 1.19.0
+# renovate: datasource=docker depName=cuelang/cue versioning=docker
+CUE_VERSION ?= 0.16.1
+# renovate: datasource=go depName=github.com/gemaraproj/gemara
+GEMARA_VERSION ?= v1.2.0
+OPENSHIFT_VERSIONS ?= v4.18-v4.22
 ARCH ?= amd64
+FUZZ_TIME ?= 30s
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -130,6 +135,23 @@ test-race: generate fmt vet manifests envtest ## Run tests enabling race detecti
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
+
+.PHONY: fuzz
+fuzz: ## Run every native fuzz target discovered in the tree.
+	trap 'exit 130' INT ;\
+	rc=0 ;\
+	pairs=$$(go test -list '^Fuzz' ./... | awk '\
+		/^ok[ \t]/ { for (i in p) print $$2, p[i]; delete p; next } \
+		/^Fuzz/    { p[NR] = $$0 }') ;\
+	if [ -z "$$pairs" ]; then \
+		echo "No fuzz targets found." ;\
+		exit 0 ;\
+	fi ;\
+	while read -r pkg name; do \
+		echo "==> $$pkg::$$name (FUZZ_TIME=$(FUZZ_TIME))" ;\
+		go test -run=^$$ "$$pkg" -fuzz="^$$name$$" -fuzztime=$(FUZZ_TIME) || rc=$$? ;\
+	done <<< "$$pairs" ;\
+	exit $$rc
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	CLUSTER_ENGINE=kind hack/e2e/run-e2e-local.sh
@@ -219,15 +241,6 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
        - cnpg-pull-secret" | envsubst > cloudnative-pg-catalog.yaml ;\
 
 ##@ Deployment
-install: manifests kustomize ## Install CRDs into a cluster.
-	$(KUSTOMIZE) build config/crd | kubectl apply --server-side -f -
-
-uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
-	$(KUSTOMIZE) build config/crd | kubectl delete -f -
-
-deploy: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
-	kubectl apply --server-side --force-conflicts -f ${OPERATOR_MANIFEST_PATH}
-
 generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
@@ -281,6 +294,16 @@ spellcheck: ## Runs the spellcheck on the project.
 woke: ## Runs the woke checks on project.
 	docker run --rm -v $(PWD):/src:Z -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
 
+validate-gemara: validate-threat-model ## Alias for validate-threat-model.
+
+validate-threat-model: ## Validate Gemara threat-model artifacts against the schema.
+	docker run --rm -v $(PWD):/src:Z -w /src cuelang/cue:$(CUE_VERSION) \
+		vet -c -d '#ThreatCatalog' \
+		github.com/gemaraproj/gemara@$(GEMARA_VERSION) .github/threat-catalog.yaml
+	docker run --rm -v $(PWD):/src:Z -w /src cuelang/cue:$(CUE_VERSION) \
+		vet -c -d '#CapabilityCatalog' \
+		github.com/gemaraproj/gemara@$(GEMARA_VERSION) .github/capability-catalog.yaml
+
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
 	mv -f .wordlist-en-custom.txt.new .wordlist-en-custom.txt
@@ -292,7 +315,7 @@ go-mod-check: ## Check if there's any dirty change after `go mod tidy`
 run-govulncheck: govulncheck ## Check if there's any known vulnerabilities with the currently installed Go modules
 	$(GOVULNCHECK) ./...
 
-checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck ## Runs all the checks on the project.
+checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck validate-threat-model ## Runs all the checks on the project.
 
 ##@ Documentation
 

@@ -60,7 +60,12 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
-	return createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, pgbouncer.NewPoolerPodMonitorManager(pooler))
+	return createOrPatchPodMonitor(
+		ctx,
+		r.Client,
+		r.DiscoveryClient,
+		pgbouncer.NewPoolerPodMonitorManager(pooler, resources.Cluster),
+	)
 }
 
 // updateDeployment update the deployment or create it when needed
@@ -70,6 +75,17 @@ func (r *PoolerReconciler) updateDeployment(
 	resources *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
+
+	// Skip deployment reconciliation while the image cannot be resolved:
+	// either Phase=Failed (catalog currently broken) or Status.Image is empty
+	// (no prior success). Unrelated spec changes wait until
+	// updatePoolerStatus resolves the image again.
+	if pooler.Status.Phase == apiv1.PoolerPhaseFailed || pooler.Status.Image == "" {
+		contextLog.Info("Skipping deployment reconciliation: pgbouncer image is not resolved",
+			"phase", pooler.Status.Phase,
+			"reason", pooler.Status.PhaseReason)
+		return nil
+	}
 
 	generatedDeployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
 	if err != nil {

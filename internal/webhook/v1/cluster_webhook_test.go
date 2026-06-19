@@ -811,7 +811,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -869,7 +869,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 2,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -933,7 +933,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -954,7 +954,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -974,7 +974,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level": "minimal",
+						"wal_level": walLevelMinimal,
 					},
 				},
 			},
@@ -1027,7 +1027,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -1047,7 +1047,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -1065,7 +1065,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 						"shared_buffers":  "512MB",
 					},
@@ -1562,7 +1562,7 @@ var _ = Describe("recovery target", func() {
 						RecoveryTarget: &apiv1.RecoveryTarget{
 							BackupID:        "",
 							TargetTLI:       "",
-							TargetXID:       "1/1",
+							TargetXID:       "1234",
 							TargetName:      "",
 							TargetLSN:       "",
 							TargetTime:      "",
@@ -1779,6 +1779,88 @@ var _ = Describe("recovery target", func() {
 			Expect(v.validateRecoveryTarget(cluster)).To(HaveLen(1))
 		})
 	})
+
+	When("TargetXID is specified", func() {
+		recoveryTargetWith := func(xid string) *apiv1.Cluster {
+			return &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							RecoveryTarget: &apiv1.RecoveryTarget{
+								BackupID:  "backup-id",
+								TargetXID: xid,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		It("accepts a non-negative integer", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("1234"))).To(BeEmpty())
+		})
+
+		It("rejects a non-numeric value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("not-a-number"))).To(HaveLen(1))
+		})
+
+		It("rejects an LSN-shaped value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("1/1"))).To(HaveLen(1))
+		})
+
+		It("rejects a negative value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("-1"))).To(HaveLen(1))
+		})
+
+		It("accepts the largest 32-bit XID", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("4294967295"))).To(BeEmpty())
+		})
+
+		It("rejects a value above 2^32-1 to avoid silent epoch truncation", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("4294967296"))).To(HaveLen(1))
+		})
+	})
+
+	When("TargetName is specified", func() {
+		recoveryTargetWith := func(name string) *apiv1.Cluster {
+			return &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							RecoveryTarget: &apiv1.RecoveryTarget{
+								BackupID:   "backup-id",
+								TargetName: name,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		It("accepts an arbitrary printable string", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("my'restore point"))).To(BeEmpty())
+		})
+
+		It("rejects an embedded newline", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("line1\nline2"))).To(HaveLen(1))
+		})
+
+		It("rejects an embedded NUL byte", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("a\x00b"))).To(HaveLen(1))
+		})
+
+		It("rejects a DEL byte", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("a\x7fb"))).To(HaveLen(1))
+		})
+
+		It("accepts a 63-byte name", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith(strings.Repeat("a", 63)))).To(BeEmpty())
+		})
+
+		It("rejects a 64-byte name", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith(strings.Repeat("a", 64)))).To(HaveLen(1))
+		})
+	})
 })
 
 var _ = Describe("primary update strategy", func() {
@@ -1912,6 +1994,121 @@ var _ = Describe("Number of synchronous replicas", func() {
 			}
 			Expect(v.validateMaxSyncReplicas(cluster)).To(BeEmpty())
 		})
+	})
+})
+
+var _ = Describe("validatePrimaryLease", func() {
+	var v *ClusterCustomValidator
+
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("is valid when the stanza is omitted", func() {
+		cluster := &apiv1.Cluster{}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("is valid with the default timings", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(apiv1.DefaultPrimaryLeaseDurationSeconds)),
+					RenewDeadlineSeconds: ptr.To(int32(apiv1.DefaultPrimaryLeaseRenewDeadlineSeconds)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("rejects a lease duration not greater than the renew deadline", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("validates a partially-specified stanza against the defaults", func() {
+		// Only renewDeadline is set; leaseDuration falls back to the default (15),
+		// which is still greater than the configured renew deadline.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					RenewDeadlineSeconds: ptr.To(int32(8)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+
+		// A renew deadline at or above the default lease duration is rejected.
+		cluster.Spec.PrimaryLease.RenewDeadlineSeconds = ptr.To(int32(20))
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("rejects a renew deadline that is not greater than retryPeriod*1.2", func() {
+		// renewDeadline == retryPeriod: leaseDuration > renewDeadline holds, so the
+		// gap this guards is the one client-go's NewLeaderElector would reject at
+		// runtime (renewDeadline must exceed retryPeriod*1.2), crash-looping the
+		// primary. The webhook must catch it before it ever reaches the instance.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("rejects a renew deadline just below the retryPeriod*1.2 boundary", func() {
+		// retryPeriod=10 => boundary is 12. renewDeadline=11 is below it and must
+		// be rejected even though leaseDuration (15) > renewDeadline (11).
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(11)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("accepts a renew deadline just above the retryPeriod*1.2 boundary", func() {
+		// retryPeriod=10 => boundary is 12. renewDeadline=13 clears it.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(13)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("accepts the documented non-default tuning example", func() {
+		// Mirrors the failover.md example (60/40/15) plus the fixture's released TTL.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds:         ptr.To(int32(60)),
+					RenewDeadlineSeconds:         ptr.To(int32(40)),
+					RetryPeriodSeconds:           ptr.To(int32(15)),
+					ReleasedLeaseDurationSeconds: ptr.To(int32(2)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
 	})
 })
 

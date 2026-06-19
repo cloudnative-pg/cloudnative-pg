@@ -30,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -128,7 +129,8 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(postgres.CountReplicas(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					primaryPod, RetryTimeout)).To(BeEquivalentTo(1))
+					primaryPod, RetryTimeout,
+				)).To(BeEquivalentTo(1))
 			}, RetryTimeout).Should(Succeed())
 		})
 
@@ -266,7 +268,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		failoverTest(namespace, clusterName, false)
 	})
@@ -283,7 +285,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		failoverTest(namespace, clusterName, true)
 	})

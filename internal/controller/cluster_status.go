@@ -247,6 +247,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
 	cluster.Status.ReadService = cluster.GetServiceReadName()
 
+	// Expose the label selector for the scale sub-resource so autoscalers
+	// (HPA, VPA) can discover the instance pods managed by this cluster.
+	cluster.Status.Selector = cluster.GetInstancesSelector()
+
 	// If we are switching, check if the target primary is still active
 	// Ignore this check if current primary is empty (it happens during the bootstrap)
 	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary &&
@@ -332,6 +336,22 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	if !cluster.IsReplica() {
 		cluster.Status.DemotionToken = ""
+	}
+
+	if cluster.Status.Instances > 0 {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionInitialized),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.BootstrapCompleted),
+			Message: "Cluster has been bootstrapped",
+		})
+	} else if meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionInitialized)) == nil {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionInitialized),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.BootstrapPending),
+			Message: "Cluster has not been bootstrapped yet",
+		})
 	}
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {

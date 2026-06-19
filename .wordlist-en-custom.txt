@@ -46,6 +46,7 @@ BarmanCredentials
 BarmanObjectStoreConfiguration
 Bartolini
 Battiato
+BlaiseAntony
 BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
@@ -54,6 +55,7 @@ Buildx
 Burstable
 ByStatus
 CAs
+CEL
 CIDR
 CIS
 CKA
@@ -64,13 +66,16 @@ CONTAINERNAME
 CR's
 CRD
 CRDs
+CRLs
 CSI
 CSV
 CSVs
 CVE
 CVEs
+CWE
 CannotReconcile
 Canovai
+CatalogComponentImage
 CatalogImage
 CatalogImages
 Cecchi
@@ -81,6 +86,9 @@ Certmanager
 CiliumNetworkPolicy
 ClassName
 ClientCASecret
+ClientCertificate
+ClientCertificateConfiguration
+ClientCertificateState
 ClientTLSSecret
 CloudNativePG
 CloudNativePG's
@@ -97,6 +105,7 @@ ClusterSpec
 ClusterStatus
 CodeQL
 ColumnName
+ComponentImages
 ConditionStatus
 ConfigMap
 ConfigMapKeySelector
@@ -127,7 +136,15 @@ DatabaseObjectStatus
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
+DatabaseRole
+DatabaseRoleList
+DatabaseRoleReclaimDelete
+DatabaseRoleReclaimPolicy
+DatabaseRoleReclaimRetain
 DatabaseRoleRef
+DatabaseRoleSpec
+DatabaseRoleStatus
+DatabaseRoles
 DatabaseSpec
 DatabaseStatus
 DefaultAzureCredential
@@ -139,6 +156,7 @@ DigitalOcean
 DisablePassword
 DisabledDefaultServices
 DoD
+DoS
 DockerHub
 Dockle
 EBS
@@ -152,6 +170,8 @@ EmbeddedObjectMetadata
 EnablePDB
 Endevir
 EndpointCA
+EndpointSlice
+EndpointSlices
 EnsureOption
 EnterpriseDB
 Enum
@@ -200,6 +220,7 @@ GoogleCredentials
 Grafana
 GrantUsageSpecType
 HH
+HPA
 HashiCorp
 HistoryTags
 Homebrew
@@ -214,12 +235,14 @@ IaC
 Ibryam
 IfNotPresent
 ImageCatalog
+ImageCatalogComponentRef
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
 ImageVolume
 ImageVolumeSource
 ImportSource
+Infinoid
 InfoSec
 InstanceID
 InstanceReportedState
@@ -314,11 +337,13 @@ OpenSSL
 OpenShift
 Openshift
 OperatorCapabilities
+OperatorCertificateFingerprint
 OperatorHub
 OptionSpec
 OwnNamespace
 PDB
 PDBs
+PEM
 PGAudit
 PGDATA
 PGDG
@@ -328,6 +353,7 @@ PGSQL
 PKI
 PODNAME
 PPROF
+PSA
 PV
 PVCs
 PascalBourdier
@@ -367,6 +393,12 @@ Pooler's
 PoolerIntegrations
 PoolerList
 PoolerMonitoringConfiguration
+PoolerMonitoringTLSConfiguration
+PoolerPhase
+PoolerPhaseActive
+PoolerPhaseFailed
+PoolerPhaseInactive
+PoolerPhasePaused
 PoolerSecrets
 PoolerSpec
 PoolerStatus
@@ -377,6 +409,7 @@ PostInitSQLRefs
 PostInitTemplateSQLRefs
 Postgres
 PostgresConfiguration
+PrimaryLeaseConfiguration
 PrimaryUpdateMethod
 PrimaryUpdateMethodRestart
 PrimaryUpdateMethodSwitchover
@@ -409,6 +442,7 @@ PushSecret
 QoS
 QuickStart
 RBAC
+RCE
 README
 RHSA
 RLS
@@ -450,6 +484,7 @@ SHA
 SLA
 SLSA
 SPDX
+SPDY
 SPoF
 SQLQuery
 SQLRefs
@@ -468,6 +503,7 @@ Seccomp
 SeccompProfile
 SecretKeySelector
 SecretRefs
+SecretResourceVersion
 SecretStore
 SecretVersion
 SecretsResourceVersion
@@ -524,6 +560,8 @@ TLS
 TLSv
 TOC
 TODO
+TTL
+TTY
 TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile
@@ -533,6 +571,7 @@ TablespaceStatus
 TablespaceStatusPendingReconciliation
 TablespaceStatusReconciled
 Tablespaces
+TargetPGDataImageInfo
 TemporaryData
 TimelineId
 TopologyKey
@@ -545,6 +584,7 @@ URIs
 UTF
 Uncomment
 Unrealizable
+Untrusted
 UpdateStrategy
 UsageSpec
 UsageSpecType
@@ -553,6 +593,7 @@ VLDBs
 VM
 VMs
 VOLNAME
+VPA
 ValidationError
 VirtualBox
 VolumeSnapshot
@@ -567,6 +608,7 @@ WALs
 WalBackupConfiguration
 WalClassName
 Wallner
+WebSocket
 XXu
 YXBw
 YY
@@ -625,6 +667,7 @@ authn
 authz
 autocompletion
 autoscaler
+autoscalers
 autovacuum
 availableArchitectures
 availablearchitecture
@@ -665,6 +708,7 @@ barmanObjectStore
 barmancloud
 barmanobjectstore
 barmanobjectstoreconfiguration
+bartscheers
 baseDN
 basebackup
 bb
@@ -696,6 +740,7 @@ cGFzc
 caSecretVersion
 cannotReconcile
 catalogName
+catalogcomponentimage
 catalogimage
 cb
 cd
@@ -716,8 +761,11 @@ cli
 clientCA
 clientCASecret
 clientCaSecretVersion
+clientCertificate
 clientTLS
 clientTLSSecret
+clientcertificateconfiguration
+clientcertificatestate
 cloudNativePGCommitHash
 cloudNativePGOperatorHash
 cloudnative
@@ -741,6 +789,7 @@ collationVersion
 columnValue
 commandError
 commandOutput
+componentImages
 conf
 config
 config's
@@ -798,10 +847,17 @@ dataChecksums
 dataDurability
 databackupconfiguration
 databaseReclaimPolicy
+databaseRoleReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
 databasereclaimpolicy
+databaserole
+databaserolelist
+databaserolereclaimpolicy
 databaseroleref
+databaseroles
+databaserolespec
+databaserolestatus
 databasespec
 databasestatus
 datacenter
@@ -818,6 +874,7 @@ de
 declaratively
 defaultMode
 demotionToken
+dennispidun
 deploymentStrategy
 dereference
 destinationPath
@@ -944,6 +1001,7 @@ historyTags
 hostPort
 hostname
 hostssl
+hpa
 href
 html
 http
@@ -961,6 +1019,7 @@ imagePullPolicy
 imagePullSecrets
 imageVolume
 imagecatalog
+imagecatalogcomponentref
 imagecatalogref
 imagecatalogs
 imagecatalogspec
@@ -993,6 +1052,7 @@ instancereportedstate
 instancesReportedState
 instancesStatus
 inuse
+invariants
 io
 ip
 ipcs
@@ -1005,6 +1065,7 @@ isolationcheckconfiguration
 isready
 issuecomment
 italy
+jaconi
 jdbc
 jmealo
 jobCount
@@ -1049,6 +1110,7 @@ le
 leonardoce
 li
 libpq
+libpq's
 lifecycle
 lifecycles
 linodeobjects
@@ -1093,6 +1155,7 @@ maxParallel
 maxStandbyNamesFromCluster
 maxSyncReplicas
 maximumLag
+maxlengdell
 maxwait
 mcache
 md
@@ -1102,6 +1165,7 @@ memstats
 metav
 metric's
 metricsQueriesTTL
+mhartmann
 microservice
 microservices
 microsoft
@@ -1170,8 +1234,10 @@ ownerReference
 parseable
 paru
 passfile
+passthrough
 passwd
 passwordSecret
+passwordState
 passwordStatus
 passwordstate
 pc
@@ -1248,6 +1314,8 @@ poolerIntegrations
 poolerName
 poolerintegrations
 poolermonitoringconfiguration
+poolermonitoringtlsconfiguration
+poolerphase
 poolers
 poolersecrets
 poolerspec
@@ -1277,8 +1345,10 @@ preferredDuringSchedulingIgnoredDuringExecution
 prefetched
 preload
 prepended
+prepends
 primaryUpdateMethod
 primaryUpdateStrategy
+primaryleaseconfiguration
 primaryupdatemethod
 primaryupdatestrategy
 priorityClassName
@@ -1363,6 +1433,9 @@ ro
 robfig
 roleRef
 roleconfiguration
+rolelist
+rolespec
+rolestate
 rolestatus
 rollout
 rollouts
@@ -1390,6 +1463,7 @@ schemaspec
 sdk
 searchAttribute
 searchFilter
+sebv
 seccompProfile
 secretAccessKey
 secretKeyRef
@@ -1567,6 +1641,7 @@ unencrypted
 unfence
 unfencing
 unix
+unmanaged
 unsatisfiable
 unschedulable
 unsetting
@@ -1587,6 +1662,7 @@ validUntil
 validatingwebhookconfigurations
 validator
 valueFrom
+verifier
 virtualized
 virtualxid
 volumeMode
@@ -1595,6 +1671,7 @@ volumeSnapshot
 volumeSnapshots
 volumesnapshot
 volumesnapshotconfiguration
+vpa
 waitForArchive
 wal
 walCapabilities
@@ -1607,6 +1684,7 @@ webhook
 webhooks
 webserver
 webtest
+whitespace
 wp
 writeService
 wsl

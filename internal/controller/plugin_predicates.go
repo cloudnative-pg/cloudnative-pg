@@ -20,10 +20,27 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
+
+// operatorNamespaceServiceEndpointSlicePredicate is a cheap pre-filter that
+// drops EndpointSlice events for slices outside the operator namespace and
+// those not backing a Service. Slices that pass still need to be matched
+// against isPluginService by resolving the owning Service: this predicate is
+// only here to keep the workqueue from being woken up by every EndpointSlice
+// in the cluster.
+func operatorNamespaceServiceEndpointSlicePredicate(operatorNamespace string) predicate.Predicate {
+	return predicate.NewPredicateFuncs(func(object client.Object) bool {
+		if object.GetNamespace() != operatorNamespace {
+			return false
+		}
+		return object.GetLabels()[discoveryv1.LabelServiceName] != ""
+	})
+}
 
 func isPluginService(object client.Object, operatorNamespace string) bool {
 	if object.GetNamespace() != operatorNamespace {

@@ -42,6 +42,7 @@ import (
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -80,6 +81,9 @@ func buildTestEnvironment() *testingEnvironment {
 		WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
 		WithIndex(&apiv1.Backup{}, ".spec.cluster.name", func(rawObj client.Object) []string {
 			return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
+		}).
+		WithIndex(&apiv1.Backup{}, backupPhase, func(rawObj client.Object) []string {
+			return []string{string(rawObj.(*apiv1.Backup).Status.Phase)}
 		}).
 		Build()
 	Expect(err).ToNot(HaveOccurred())
@@ -149,6 +153,12 @@ func newFakePooler(k8sClient client.Client, cluster *apiv1.Cluster) *apiv1.Poole
 			PgBouncer: &apiv1.PgBouncerSpec{
 				PoolMode: apiv1.PgBouncerPoolModeSession,
 			},
+		},
+		Status: apiv1.PoolerStatus{
+			// Pre-populate the resolved image so unit tests that call
+			// updateDeployment directly (bypassing updatePoolerStatus) start from
+			// the same precondition as a fully reconciled Pooler.
+			Image: configuration.Current.PgbouncerImageName,
 		},
 	}
 
@@ -333,7 +343,7 @@ func generateFakeClusterPods(
 				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
 					{
-						Type:   corev1.ContainersReady,
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					},
 				},
