@@ -35,5 +35,5 @@ jobs:
           destination_branch: ${{ env.DEST }}
           github_token: ${{ secrets.REPO_GHA_PAT }}
           pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
-          pr_label: release
+          pr_label: "release,do not backport,no-issue"
           pr_title: "Version tag to ${{ env.TAG }}"
