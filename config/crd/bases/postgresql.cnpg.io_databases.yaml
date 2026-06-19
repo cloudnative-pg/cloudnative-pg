@@ -362,6 +362,63 @@ spec:
                         It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the
                         `OWNER TO` command of `ALTER SCHEMA`.
                       type: string
+                    permissions:
+                      description: |-
+                        Permissions defines the privileges to grant or revoke on the schema,
+                        keyed by privilege. Each entry carries a role name and a type of
+                        `grant` (default) or `revoke`, mirroring the existing usage model.
+                      properties:
+                        create:
+                          description: |-
+                            List of roles for which the `CREATE` privilege on the schema is granted or revoked.
+                            Maps to `GRANT CREATE ON SCHEMA ... TO ...` / `REVOKE CREATE ON SCHEMA ... FROM ...`.
+                          items:
+                            description: UsageSpec configures a usage for a foreign
+                              data wrapper
+                            properties:
+                              name:
+                                description: Name of the usage
+                                type: string
+                                x-kubernetes-validations:
+                                - message: name is required
+                                  rule: self != ''
+                              type:
+                                default: grant
+                                description: The type of usage
+                                enum:
+                                - grant
+                                - revoke
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                        usage:
+                          description: |-
+                            List of roles for which the `USAGE` privilege on the schema is granted or revoked.
+                            Maps to `GRANT USAGE ON SCHEMA ... TO ...` / `REVOKE USAGE ON SCHEMA ... FROM ...`.
+                          items:
+                            description: UsageSpec configures a usage for a foreign
+                              data wrapper
+                            properties:
+                              name:
+                                description: Name of the usage
+                                type: string
+                                x-kubernetes-validations:
+                                - message: name is required
+                                  rule: self != ''
+                              type:
+                                default: grant
+                                description: The type of usage
+                                enum:
+                                - grant
+                                - revoke
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                      type: object
                   required:
                   - name
                   type: object

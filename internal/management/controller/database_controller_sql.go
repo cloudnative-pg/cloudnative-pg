@@ -382,12 +382,16 @@ func getDatabaseSchemaInfo(ctx context.Context, db *sql.DB, schema apiv1.SchemaS
 }
 
 // updateDatabaseSchemaGrants applies USAGE and CREATE privilege grants/revokes for a schema.
+// It is a no-op when no permissions are configured.
 func updateDatabaseSchemaGrants(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
+	if schema.Permissions == nil {
+		return nil
+	}
 	const objectTypeSchema = "SCHEMA"
-	if err := applyObjectPrivilege(ctx, db, "USAGE", objectTypeSchema, schema.Name, schema.UsagePrivileges); err != nil {
+	if err := applyObjectPrivilege(ctx, db, "USAGE", objectTypeSchema, schema.Name, schema.Permissions.Usage); err != nil {
 		return fmt.Errorf("applying USAGE grants for schema %q: %w", schema.Name, err)
 	}
-	return applyObjectPrivilege(ctx, db, "CREATE", objectTypeSchema, schema.Name, schema.CreatePrivileges)
+	return applyObjectPrivilege(ctx, db, "CREATE", objectTypeSchema, schema.Name, schema.Permissions.Create)
 }
 
 func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
@@ -406,10 +410,8 @@ func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSp
 	}
 	contextLogger.Info("created schema", "name", schema.Name)
 
-	if len(schema.UsagePrivileges) > 0 || len(schema.CreatePrivileges) > 0 {
-		if err := updateDatabaseSchemaGrants(ctx, db, schema); err != nil {
-			return err
-		}
+	if err := updateDatabaseSchemaGrants(ctx, db, schema); err != nil {
+		return err
 	}
 
 	return nil
@@ -431,10 +433,8 @@ func updateDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSp
 		contextLogger.Info("altered schema owner", "name", schema.Name, "owner", schema.Owner)
 	}
 
-	if len(schema.UsagePrivileges) > 0 || len(schema.CreatePrivileges) > 0 {
-		if err := updateDatabaseSchemaGrants(ctx, db, schema); err != nil {
-			return fmt.Errorf("updating schema grants: %w", err)
-		}
+	if err := updateDatabaseSchemaGrants(ctx, db, schema); err != nil {
+		return fmt.Errorf("updating schema grants: %w", err)
 	}
 
 	return nil
