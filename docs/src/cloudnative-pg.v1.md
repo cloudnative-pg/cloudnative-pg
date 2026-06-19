@@ -2285,7 +2285,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `leaseDurationSeconds` _integer_ | How long, in seconds, the primary lease is considered valid before it<br />expires and another instance may acquire it. It must be greater than<br />`renewDeadlineSeconds`.<br />Defaults to 15. |  | 15 | Minimum: 1 <br /> |
 | `renewDeadlineSeconds` _integer_ | How long, in seconds, the current primary keeps retrying to renew the<br />lease before giving up and stopping. It must be smaller than<br />`leaseDurationSeconds`.<br />Defaults to 10. |  | 10 | Minimum: 1 <br /> |
-| `retryPeriodSeconds` _integer_ | How frequently, in seconds, a non-holder instance retries acquiring or<br />renewing the lease.<br />Defaults to 5. |  | 5 | Minimum: 1 <br /> |
+| `retryPeriodSeconds` _integer_ | How frequently, in seconds, a non-holder instance retries acquiring or<br />renewing the lease.<br />Defaults to 2. |  | 2 | Minimum: 1 <br /> |
 | `releasedLeaseDurationSeconds` _integer_ | The TTL, in seconds, written when the primary explicitly releases the<br />lease on a clean shutdown, allowing a replica to promote without waiting<br />for the full lease duration to expire.<br />Defaults to 1. |  | 1 | Minimum: 1 <br /> |
 
 

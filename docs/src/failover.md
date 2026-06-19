@@ -136,7 +136,7 @@ leader-election parameters.
 | ------------------------------ | ------- | -------------------------------------------------------------------------- |
 | `leaseDurationSeconds`         | `15`    | How long the lease is valid before another instance may acquire it.        |
 | `renewDeadlineSeconds`         | `10`    | How long the primary keeps retrying to renew the lease before giving up.   |
-| `retryPeriodSeconds`           | `5`     | How frequently a non-holder retries acquiring or renewing the lease.       |
+| `retryPeriodSeconds`           | `2`     | How frequently a non-holder retries acquiring or renewing the lease.       |
 | `releasedLeaseDurationSeconds` | `1`     | TTL written when the primary releases the lease on a clean shutdown.       |
 
 For example, to make the cluster more tolerant of a slow or briefly unreachable
@@ -158,6 +158,19 @@ admission webhook: `leaseDurationSeconds` must be greater than
 `renewDeadlineSeconds`, and `renewDeadlineSeconds` must be greater than
 `retryPeriodSeconds` multiplied by `1.2`. Both mirror the requirements of the
 underlying Kubernetes leader election.
+:::
+
+:::note
+`leaseDurationSeconds` and `retryPeriodSeconds` govern two different timings.
+After an abrupt primary loss (the previous primary did not release the lease), a
+candidate must observe the lease unchanged for a full `leaseDurationSeconds`
+before it may take over: this is what holds back a premature promotion while the
+former primary may still be alive. After a clean switchover (the previous primary
+released the lease), there is no such wait; the candidate simply notices the
+released lease on its next poll, so the hand-over latency is bounded by
+`retryPeriodSeconds`. Lowering `retryPeriodSeconds` speeds up switchover without
+shortening the take-over wait that guards against premature promotion, at the
+cost of more frequent lease renewals against the API server.
 :::
 
 :::note
