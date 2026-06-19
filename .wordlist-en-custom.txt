@@ -874,6 +874,7 @@ de
 declaratively
 defaultMode
 demotionToken
+dennispidun
 deploymentStrategy
 dereference
 destinationPath
