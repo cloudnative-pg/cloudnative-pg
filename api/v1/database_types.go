@@ -224,15 +224,26 @@ type SchemaSpec struct {
 	// `OWNER TO` command of `ALTER SCHEMA`.
 	Owner string `json:"owner,omitempty"`
 
-	// List of roles for which the USAGE privilege on the schema is granted or revoked.
+	// Permissions defines the privileges to grant or revoke on the schema,
+	// keyed by privilege. Each entry carries a role name and a type of
+	// `grant` (default) or `revoke`, mirroring the existing usage model.
+	// +optional
+	Permissions *SchemaPermissionsSpec `json:"permissions,omitempty"`
+}
+
+// SchemaPermissionsSpec groups the privileges that can be granted or revoked
+// on a schema, keyed by privilege. Each entry reuses the `grant`/`revoke`
+// model already used for foreign data wrapper and server usage.
+type SchemaPermissionsSpec struct {
+	// List of roles for which the `USAGE` privilege on the schema is granted or revoked.
 	// Maps to `GRANT USAGE ON SCHEMA ... TO ...` / `REVOKE USAGE ON SCHEMA ... FROM ...`.
 	// +optional
-	UsagePrivileges []UsageSpec `json:"usagePrivileges,omitempty"`
+	Usage []UsageSpec `json:"usage,omitempty"`
 
-	// List of roles for which the CREATE privilege on the schema is granted or revoked.
+	// List of roles for which the `CREATE` privilege on the schema is granted or revoked.
 	// Maps to `GRANT CREATE ON SCHEMA ... TO ...` / `REVOKE CREATE ON SCHEMA ... FROM ...`.
 	// +optional
-	CreatePrivileges []UsageSpec `json:"createPrivileges,omitempty"`
+	Create []UsageSpec `json:"create,omitempty"`
 }
 
 // ExtensionSpec configures an extension in a database
