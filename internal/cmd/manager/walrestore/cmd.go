@@ -466,6 +466,19 @@ func validateTimelineHistoryFile(ctx context.Context, walName string, cluster *a
 	}
 
 	clusterTimeline := cluster.Status.TimelineID
+
+	// clusterTimeline == 0 means no primary has promoted yet and TimelineID has
+	// never been written to the cluster status, as happens during bootstrap
+	// recovery from an external archive. The split-brain scenario this guard
+	// protects against requires an active primary, which cannot exist while
+	// TimelineID is unset, so allowing all history files here is safe.
+	if clusterTimeline == 0 {
+		contextLog.Trace("Allowing timeline history file: cluster timeline not yet established",
+			"walName", walName,
+			"fileTimeline", fileTimeline)
+		return nil
+	}
+
 	if fileTimeline > clusterTimeline {
 		contextLog.Warning("Refusing to restore future timeline history file",
 			"walName", walName,
