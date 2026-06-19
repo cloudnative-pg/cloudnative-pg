@@ -45,6 +45,9 @@ export RUSTFS_IMG=${RUSTFS_IMG:-$(grep 'rustfsImage.*=' "${ROOT_DIR}/tests/utils
 # AWS CLI Image (S3 client used by the e2e object storage tests)
 export AWSCLI_IMG=${AWSCLI_IMG:-$(grep 'awsCliImage.*=' "${ROOT_DIR}/tests/utils/objectstore/objectstore.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
 
+# Busybox Image (init container that prepares the object storage volumes)
+export BUSYBOX_IMG=${BUSYBOX_IMG:-$(grep 'busyboxImage.*=' "${ROOT_DIR}/tests/utils/objectstore/objectstore.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
+
 # Apache Image (Hardcoded stable default)
 export APACHE_IMG=${APACHE_IMG:-"httpd"}
 
@@ -72,9 +75,13 @@ if [ -z "${AWSCLI_IMG}" ]; then
   echo "ERROR: Failed to extract AWSCLI_IMG from ${ROOT_DIR}/tests/utils/objectstore/objectstore.go" >&2
   exit 1
 fi
+if [ -z "${BUSYBOX_IMG}" ]; then
+  echo "ERROR: Failed to extract BUSYBOX_IMG from ${ROOT_DIR}/tests/utils/objectstore/objectstore.go" >&2
+  exit 1
+fi
 
 # Define the full array of helper images used by load-helper-images
-HELPER_IMGS=("$POSTGRES_IMG" "$E2E_PRE_ROLLING_UPDATE_IMG" "$PGBOUNCER_IMG" "$RUSTFS_IMG" "$AWSCLI_IMG" "$APACHE_IMG")
+HELPER_IMGS=("$POSTGRES_IMG" "$E2E_PRE_ROLLING_UPDATE_IMG" "$PGBOUNCER_IMG" "$RUSTFS_IMG" "$AWSCLI_IMG" "$BUSYBOX_IMG" "$APACHE_IMG")
 export HELPER_IMGS
 
 # Testing the upgrade will require generating a second operator image, `-prime`
