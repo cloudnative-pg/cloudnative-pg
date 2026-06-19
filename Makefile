@@ -74,7 +74,7 @@ PREFLIGHT_VERSION ?= 1.19.0
 CUE_VERSION ?= 0.16.1
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
 GEMARA_VERSION ?= v1.2.0
-OPENSHIFT_VERSIONS ?= v4.18-v4.21
+OPENSHIFT_VERSIONS ?= v4.18-v4.22
 ARCH ?= amd64
 FUZZ_TIME ?= 30s
 
