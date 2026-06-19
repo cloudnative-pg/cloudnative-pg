@@ -46,6 +46,7 @@ BarmanCredentials
 BarmanObjectStoreConfiguration
 Bartolini
 Battiato
+BlaiseAntony
 BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
@@ -54,6 +55,7 @@ Buildx
 Burstable
 ByStatus
 CAs
+CEL
 CIDR
 CIS
 CKA
@@ -240,6 +242,7 @@ ImageInfo
 ImageVolume
 ImageVolumeSource
 ImportSource
+Infinoid
 InfoSec
 InstanceID
 InstanceReportedState
@@ -439,6 +442,7 @@ PushSecret
 QoS
 QuickStart
 RBAC
+RCE
 README
 RHSA
 RLS
@@ -480,6 +484,7 @@ SHA
 SLA
 SLSA
 SPDX
+SPDY
 SPoF
 SQLQuery
 SQLRefs
@@ -603,6 +608,7 @@ WALs
 WalBackupConfiguration
 WalClassName
 Wallner
+WebSocket
 XXu
 YXBw
 YY
@@ -702,6 +708,7 @@ barmanObjectStore
 barmancloud
 barmanobjectstore
 barmanobjectstoreconfiguration
+bartscheers
 baseDN
 basebackup
 bb
@@ -1057,6 +1064,7 @@ isolationcheckconfiguration
 isready
 issuecomment
 italy
+jaconi
 jdbc
 jmealo
 jobCount
@@ -1146,6 +1154,7 @@ maxParallel
 maxStandbyNamesFromCluster
 maxSyncReplicas
 maximumLag
+maxlengdell
 maxwait
 mcache
 md
@@ -1155,6 +1164,7 @@ memstats
 metav
 metric's
 metricsQueriesTTL
+mhartmann
 microservice
 microservices
 microsoft
@@ -1452,6 +1462,7 @@ schemaspec
 sdk
 searchAttribute
 searchFilter
+sebv
 seccompProfile
 secretAccessKey
 secretKeyRef

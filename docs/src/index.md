@@ -112,8 +112,8 @@ For details and support, see the [`postgres-containers` project](https://github.
   eliminating the need for external tools.
 - Self-healing capabilities, including:
     - Automated failover, promoting the replica with the most up-to-date data
-      (coordinated by a per-cluster lease that serializes promotion to prevent
-      split-brain), with the option to use quorum-based failover and synchronous
+      (coordinated by a per-cluster lease that prevents premature promotion),
+      with the option to use quorum-based failover and synchronous
       replication for increased data durability and safety.
     - Automatic recreation of failed replicas.
 - Planned switchover of the primary instance by promoting a selected replica.

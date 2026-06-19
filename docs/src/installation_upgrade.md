@@ -267,29 +267,27 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
-<!--
-### Upgrading to 1.30.0 or 1.29.2
+### Upgrading to 1.30.0, 1.29.2, or 1.28.4
 
 :::info[Important]
     We strongly recommend that all CloudNativePG users upgrade to version
     1.30.0, or at least to the latest stable version of your current minor release
-    (e.g., 1.29.2).
+    (e.g., 1.29.2 or 1.28.4).
 :::
 
-Versions 1.30.0 and 1.29.2 introduce five changes worth reviewing before you
-upgrade: operator-side password encoding, `search_path` hardening, the new
-`DatabaseRole` resource for declarative role management, safe primary
-election via a per-cluster Lease, and operator-to-instance authentication on
-the instance manager's status port. Each is covered in its own subsection below.
-
-Not all of these affect both releases: operator-side password encoding and
-`search_path` hardening ship in both 1.30.0 and 1.29.2, while the `DatabaseRole`
-resource, safe primary election, and operator-to-instance authentication are
-introduced in 1.30.0 only. Each subsection states the versions it applies to.
+These releases introduce changes worth reviewing before you upgrade. Two are
+security changes that apply to **1.30.0, 1.29.2, and 1.28.4**: operator-side
+password encoding and `search_path` hardening. The other three are new in
+**1.30.0** only: the `DatabaseRole` resource for declarative role management,
+safe primary election via a per-cluster Lease, and operator-to-instance
+authentication on the instance manager's status port.
+In addition, if you are upgrading from a release **older than 1.29.1 or 1.28.3**,
+the metrics-exporter privilege separation from `CVE-2026-44477` also applies.
+Each is covered in its own subsection below.
 
 #### Operator-side password encoding
 
-Starting from versions 1.30.0 and 1.29.2, for security reasons,
+Starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons,
 CloudNativePG SCRAM-SHA-256 encodes role passwords **operator-side**
 (client-side from PostgreSQL's point of view) before issuing
 `CREATE`/`ALTER ROLE` statements. As a result, the literal that reaches
@@ -332,7 +330,7 @@ for details.
 
 #### `search_path` hardening
 
-Also starting from versions 1.30.0 and 1.29.2, for security reasons,
+Also starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons,
 CloudNativePG pins the `search_path` to a fixed `pg_catalog, public,
 pg_temp` on every connection it opens to PostgreSQL, so that a
 tenant-controlled `ALTER DATABASE`/`ALTER ROLE` setting can no longer
@@ -412,47 +410,22 @@ their Pods are recreated with a TLS-enabled status port. Instances created by
 v1.24 or later are unaffected.
 :::
 
--->
+#### Metrics exporter privilege separation (`CVE-2026-44477`)
 
-### Upgrading to 1.29.1 or 1.28.3
+This applies only if you are upgrading from a release **older than 1.29.1 or
+1.28.3** (for example 1.29.0, 1.28.2, or any earlier version); installations
+already on 1.29.1, 1.28.3, or later already have this change.
 
-:::info[Important]
-    We strongly recommend that all CloudNativePG users upgrade to version
-    1.29.1, or at least to the latest stable version of your current minor release
-    (e.g., 1.28.x).
-:::
-
-Version 1.29.1 and 1.28.3 ship the fix for `CVE-2026-44477` /
-`GHSA-423p-g724-fr39`. The metrics exporter now authenticates as a
-dedicated `cnpg_metrics_exporter` role with `pg_monitor` privileges
-only, instead of the `postgres` superuser.
+The fix for `CVE-2026-44477` / `GHSA-423p-g724-fr39` makes the metrics exporter
+authenticate as a dedicated `cnpg_metrics_exporter` role with `pg_monitor`
+privileges only, instead of the `postgres` superuser.
 
 Custom monitoring queries that read user-owned tables, or use
-`target_databases: '*'` against databases where `PUBLIC` `CONNECT`
-has been revoked, need explicit `GRANT` statements to
-`cnpg_metrics_exporter`. See ["Custom query privileges and
-safety"](monitoring.md#custom-query-privileges-and-safety) and ["Manually creating
-the metrics exporter
-role"](monitoring.md#manually-creating-the-metrics-exporter-role) in
-the monitoring documentation.
-
-### Upgrading to 1.27 from a previous minor version
-
-Version 1.27 introduces a change in the default behavior of the
-[liveness probe](instance_manager.md#liveness-probe): it now enforces the
-[shutdown of an isolated primary](instance_manager.md#primary-isolation)
-within the `livenessProbeTimeout` (30 seconds).
-
-If this behavior is not suitable for your environment, you can disable the
-*isolation check* in the liveness probe with the following configuration:
-
-```yaml
-spec:
-  probes:
-    liveness:
-      isolationCheck:
-        enabled: false
-```
+`target_databases: '*'` against databases where `PUBLIC` `CONNECT` has been
+revoked, need explicit `GRANT` statements to `cnpg_metrics_exporter`.
+See ["Custom query privileges and safety"](monitoring.md#custom-query-privileges-and-safety)
+and ["Manually creating the metrics exporter role"](monitoring.md#manually-creating-the-metrics-exporter-role)
+in the monitoring documentation.
 
 ## Verifying release assets
 
