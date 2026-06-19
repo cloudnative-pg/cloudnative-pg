@@ -512,6 +512,59 @@ var _ = Describe("Managed schema SQL", func() {
 		})
 	})
 
+	Context("schema permissions", func() {
+		BeforeEach(func() {
+			schema.Permissions = &apiv1.SchemaPermissionsSpec{
+				Usage:  []apiv1.UsageSpec{{Name: "reader", Type: apiv1.GrantUsageSpecType}},
+				Create: []apiv1.UsageSpec{{Name: "writer", Type: apiv1.RevokeUsageSpecType}},
+			}
+		})
+
+		It("applies usage and create permissions after creating the schema", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("CREATE SCHEMA \"testschema\" AUTHORIZATION \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("REVOKE CREATE ON SCHEMA \"testschema\" FROM \"writer\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(createDatabaseSchema(ctx, db, schema)).Error().NotTo(HaveOccurred())
+		})
+
+		It("applies permissions when reconciling an existing schema", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("REVOKE CREATE ON SCHEMA \"testschema\" FROM \"writer\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchema(ctx, db, schema,
+				&schemaInfo{Name: schema.Name, Owner: schema.Owner})).Error().NotTo(HaveOccurred())
+		})
+
+		It("returns an error when applying a permission fails", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("CREATE SCHEMA \"testschema\" AUTHORIZATION \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader\"").
+				WillReturnError(testError)
+
+			Expect(createDatabaseSchema(ctx, db, schema)).Error().To(MatchError(testError))
+		})
+
+		It("is a no-op when no permissions are configured", func(ctx SpecContext) {
+			schema.Permissions = nil
+
+			Expect(updateDatabaseSchema(ctx, db, schema,
+				&schemaInfo{Name: schema.Name, Owner: schema.Owner})).Error().NotTo(HaveOccurred())
+		})
+	})
+
 	Context("dropDatabaseSchema", func() {
 		dropSchemaSQL := "DROP SCHEMA IF EXISTS \"testschema\""
 
