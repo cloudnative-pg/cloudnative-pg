@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"slices"
-	"syscall"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -168,7 +167,7 @@ func (psql *Command) Exec() error {
 		return err
 	}
 
-	err = syscall.Exec(psql.kubectlPath, kubectlExec, os.Environ()) // #nosec
+	err = execKubectl(psql.kubectlPath, kubectlExec)
 	if err != nil {
 		return err
 	}
