@@ -115,6 +115,51 @@ func (r *Reconciler) RefreshSecrets(
 	return changed, nil
 }
 
+// EnsureServerCertificateLoaded makes sure the status-port web server has a
+// server certificate loaded in memory, reading it from its secret when missing.
+// It does not write the on-disk certificate files and does not signal a
+// PostgreSQL reload: those remain the responsibility of RefreshSecrets.
+//
+// The instance reconciler calls this before the admission guard so the kubelet
+// liveness/readiness/startup probes, served over TLS, keep working even when
+// the cached Cluster fails in-pod validation and the guard short-circuits the
+// rest of the reconcile loop (RefreshSecrets included). Without it
+// GetServerCertificate() stays nil, every probe handshake fails and the pod can
+// never recover.
+//
+// It short-circuits once a certificate is loaded: the probe server only needs a
+// usable certificate to be present, and ongoing rotation is handled by
+// RefreshSecrets when the cluster is valid. This avoids re-reading the secret on
+// every reconcile, since it is never cached in the instance manager.
+func (r *Reconciler) EnsureServerCertificateLoaded(ctx context.Context, cluster *apiv1.Cluster) error {
+	if r.serverCertificateHandler.GetServerCertificate() != nil {
+		return nil
+	}
+
+	secretName := cluster.Status.Certificates.ServerTLSSecret
+	if secretName == "" {
+		// The operator has not populated the certificate status yet; a later
+		// reconcile loads the certificate once the secret name is known.
+		return nil
+	}
+
+	var secret corev1.Secret
+	if err := r.cli.Get(
+		ctx,
+		client.ObjectKey{Namespace: cluster.Namespace, Name: secretName},
+		&secret,
+	); err != nil {
+		// Tolerate a missing secret as RefreshSecrets does: a later reconcile
+		// loads the certificate once the secret exists.
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	return r.refreshInstanceCertificateFromSecret(&secret)
+}
+
 // refreshServerCertificateFiles updates the latest server certificate files
 // from the secrets and updates the instance certificate if it is missing or
 // outdated.

@@ -121,6 +121,14 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
+	// Load the probe server certificate before the admission guard: the kubelet
+	// TLS probes must keep working even when the cached Cluster fails validation
+	// and the guard short-circuits the rest of the loop. See
+	// EnsureServerCertificateLoaded for the full rationale.
+	if err := r.certificateReconciler.EnsureServerCertificateLoaded(ctx, cluster); err != nil {
+		return reconcile.Result{}, fmt.Errorf("while loading the server certificate: %w", err)
+	}
+
 	if result, err := r.admission.EnsureResourceIsAdmitted(
 		ctx,
 		guard.AdmissionParams[*apiv1.Cluster]{
