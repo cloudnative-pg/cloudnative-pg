@@ -113,6 +113,7 @@ var _ = Describe("PluginReconciler", func() {
 		serverSecretName = "plugin-server-secret"
 		clientSecretName = "plugin-client-secret"
 		pluginPort       = "9090"
+		serviceFQDN      = serviceName + "." + testNamespace + ".svc"
 	)
 
 	var (
@@ -210,7 +211,7 @@ var _ = Describe("PluginReconciler", func() {
 			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
 			registration := pluginRepository.registeredPlugins[pluginName]
 			Expect(registration.tlsConfig.ServerName).To(Equal(serviceName))
-			Expect(registration.address).To(Equal(serviceName + ":" + pluginPort))
+			Expect(registration.address).To(Equal(serviceFQDN + ":" + pluginPort))
 		})
 
 		It("should use custom ServerName when annotation is provided", func() {
@@ -241,7 +242,7 @@ var _ = Describe("PluginReconciler", func() {
 			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
 			registration := pluginRepository.registeredPlugins[pluginName]
 			Expect(registration.tlsConfig.ServerName).To(Equal(customServerName))
-			Expect(registration.address).To(Equal(serviceName + ":" + pluginPort))
+			Expect(registration.address).To(Equal(serviceFQDN + ":" + pluginPort))
 		})
 
 		It("should skip reconciliation when server secret annotation is missing", func() {
