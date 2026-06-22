@@ -181,6 +181,12 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
+      - name: Run golangci-lint (tests module)
+        uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: tests
+
       - name: Check go mod tidy has no pending changes
         run: |
           make go-mod-check
@@ -210,7 +216,8 @@ jobs:
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
     runs-on: ubuntu-24.04
     steps:
@@ -224,6 +231,14 @@ jobs:
           # See https://github.com/golang/go/issues/70036
           go-version-input: ""
           check-latest: true
+
+      - name: Run govulncheck (tests module)
+        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
+        with:
+          go-version-file: tests/go.mod
+          go-version-input: ""
+          check-latest: true
+          work-dir: tests
 
   shellcheck:
     name: Run shellcheck linter
@@ -249,12 +264,14 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Generate unit tests jobs only if the operator or the Go codebase have changed
+    # Generate unit tests jobs only if the operator, the Go codebase, or the
+    # tests module have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
     runs-on: ubuntu-24.04
     outputs:
@@ -300,12 +317,14 @@ jobs:
       - duplicate_runs
       - change-triage
       - generate-unit-tests-jobs
-    # Run unit tests only if the operator or the Go codebase have changed
+    # Run unit tests only if the operator, the Go codebase, or the tests
+    # module have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
     runs-on: ubuntu-24.04
     strategy:

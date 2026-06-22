@@ -128,12 +128,16 @@ test: generate fmt vet manifests envtest ## Run tests.
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils/...
+	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/...
+	cd tests && go test -coverpkg=./... -coverprofile=cover.out ./utils/...
 
 test-race: generate fmt vet manifests envtest ## Run tests enabling race detection.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
-	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
+	go run github.com/onsi/ginkgo/v2/ginkgo -r -p \
+	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites \
+	  ./api/... ./cmd/... ./internal/... ./pkg/...
+	cd tests && go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
 .PHONY: fuzz
@@ -272,15 +276,19 @@ olm-scorecard: operator-sdk ## Run the Scorecard test from operator-sdk
 
 fmt: ## Run go fmt against code.
 	go fmt ./...
+	cd tests && go fmt ./...
 
 vet: ## Run go vet against code.
 	go vet ./...
+	cd tests && go vet ./...
 
 lint: ## Run the linter.
 	golangci-lint run
+	cd tests && golangci-lint run
 
 lint-fix: ## Run the linter with --fix.
 	golangci-lint run --fix
+	cd tests && golangci-lint run --fix
 
 shellcheck: ## Shellcheck for the hack directory.
 	@{ \
@@ -310,10 +318,12 @@ wordlist-ordered: ## Order the wordlist using sort
 
 go-mod-check: ## Check if there's any dirty change after `go mod tidy`
 	go mod tidy ;\
-	git diff --exit-code go.mod go.sum
+	go -C tests mod tidy ;\
+	git diff --exit-code go.mod go.sum tests/go.mod tests/go.sum
 
 run-govulncheck: govulncheck ## Check if there's any known vulnerabilities with the currently installed Go modules
 	$(GOVULNCHECK) ./...
+	cd tests && $(GOVULNCHECK) ./...
 
 checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck validate-threat-model ## Runs all the checks on the project.
 
@@ -340,7 +350,7 @@ apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
 ##@ Cleanup
 
 clean: ## Clean-up the work tree from build/test artifacts
-	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out
+	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out tests/cover.out
 
 distclean: clean ## Clean-up the work tree removing also cached tools binaries
 	! [ -d "$(ENVTEST_ASSETS_DIR)" ] || chmod -R u+w $(ENVTEST_ASSETS_DIR)
