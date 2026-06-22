@@ -93,6 +93,7 @@ EOF
 
   K3D_FIX_MOUNTS=1 k3d cluster create "${options[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
+    --k3s-arg "--kube-apiserver-arg=enable-admission-plugins=OwnerReferencesPermissionEnforcement@server:0" \
     "${taint_args[@]}"
 
   docker network connect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
