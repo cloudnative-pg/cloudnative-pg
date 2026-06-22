@@ -207,7 +207,7 @@ repository:
           ci: true
           release: true
       - name: OSPS Baseline Scanner
-        type: Policy-as-Code
+        type: other
         rulesets:
           - Maturity Level 2
         results:
