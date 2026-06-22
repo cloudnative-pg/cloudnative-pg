@@ -210,12 +210,8 @@ repository:
         type: other
         rulesets:
           - Maturity Level 2
-        results:
-          adhoc:
-            name: OSPS Baseline Assessment
-            location: https://github.com/cloudnative-pg/cloudnative-pg/actions/workflows/osps_security_assessment.yml
-            comment: |
-              Evaluates the repository against the Open Source Project Security Baseline
+        comment: Evaluates the repository against the Open Source Project Security Baseline
+        results: {}
         integration:
           adhoc: true
           ci: false
