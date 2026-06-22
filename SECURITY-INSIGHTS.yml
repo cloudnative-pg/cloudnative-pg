@@ -218,7 +218,7 @@ repository:
               Evaluates the repository against the Open Source Project Security Baseline
         integration:
           adhoc: true
-          ci: true
+          ci: false
           release: false
 
     assessments:
