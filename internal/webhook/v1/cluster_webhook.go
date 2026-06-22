@@ -94,7 +94,7 @@ type ClusterCustomValidator struct{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
 func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv1.Cluster) (admission.Warnings, error) {
-	clusterLog.Info("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
+	clusterLog.Debug("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
 	allErrs := v.validate(cluster)
@@ -114,7 +114,7 @@ func (v *ClusterCustomValidator) ValidateUpdate(
 	_ context.Context,
 	oldCluster *apiv1.Cluster, cluster *apiv1.Cluster,
 ) (admission.Warnings, error) {
-	clusterLog.Info("Validation for Cluster upon update", "name", cluster.GetName(), "namespace",
+	clusterLog.Debug("Validation for Cluster upon update", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
 	// applying defaults before validating updates to set any new default
