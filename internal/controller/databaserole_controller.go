@@ -58,6 +58,7 @@ const clientCertReconcileInterval = time.Hour
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/status,verbs=get;update;patch;watch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/finalizers,verbs=update
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
