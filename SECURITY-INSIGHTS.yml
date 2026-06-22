@@ -223,7 +223,7 @@ repository:
 
     assessments:
       self:
-        evidence-url:
+        evidence:
           - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-catalog.yaml
           - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/capability-catalog.yaml
         comment: >-
