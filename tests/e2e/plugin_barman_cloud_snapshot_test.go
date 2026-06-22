@@ -355,9 +355,15 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 				})
 
 				By("verifying WAL archiving through the plugin is working", func() {
-					// The online backup waits for the WAL archiver to process the last
-					// segment, so fail early if the plugin cannot archive.
-					backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 120)
+					// This source cluster is single-instance and idle here: no replica
+					// bootstrap or workload forces a WAL switch, so archive_command would
+					// only fire once archive_timeout (5m) elapses, making a wait on the
+					// ContinuousArchiving condition flaky. Force a switch and verify the
+					// WAL reaches the object store, so we fail fast and deterministically
+					// if the plugin cannot archive before the online backup (which waits
+					// for the WAL archiver) runs.
+					objectstoreasserts.AssertArchiveWalOnObjectStore(
+						env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName)
 				})
 			})
 
