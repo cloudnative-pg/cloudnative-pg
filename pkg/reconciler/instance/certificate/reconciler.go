@@ -162,7 +162,7 @@ func (r *Reconciler) EnsureServerCertificateLoaded(ctx context.Context, cluster 
 	}
 
 	log.FromContext(ctx).Info(
-		"Loaded the status-port server certificate ahead of admission validation",
+		"Preloaded TLS certificate for the health probe server",
 		"secret", secretName,
 	)
 
