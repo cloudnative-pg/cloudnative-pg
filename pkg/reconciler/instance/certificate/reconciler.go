@@ -157,7 +157,16 @@ func (r *Reconciler) EnsureServerCertificateLoaded(ctx context.Context, cluster 
 		return err
 	}
 
-	return r.refreshInstanceCertificateFromSecret(&secret)
+	if err := r.refreshInstanceCertificateFromSecret(&secret); err != nil {
+		return err
+	}
+
+	log.FromContext(ctx).Info(
+		"Loaded the status-port server certificate ahead of admission validation",
+		"secret", secretName,
+	)
+
+	return nil
 }
 
 // refreshServerCertificateFiles updates the latest server certificate files
