@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
@@ -79,11 +79,11 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 		// Require K8S 1.33 or greater
 		versionInfo, err := env.Interface.Discovery().ServerVersion()
 		Expect(err).NotTo(HaveOccurred())
-		currentVersion, err := semver.Parse(strings.TrimPrefix(versionInfo.String(), "v"))
+		currentVersion, err := semver.NewVersion(strings.TrimPrefix(versionInfo.String(), "v"))
 		Expect(err).NotTo(HaveOccurred())
-		k8s133, err := semver.Parse("1.33.0")
+		k8s133, err := semver.NewVersion("1.33.0")
 		Expect(err).NotTo(HaveOccurred())
-		if currentVersion.LT(k8s133) {
+		if currentVersion.LessThan(k8s133) {
 			Skip("This test runs only on Kubernetes 1.33 or greater")
 		}
 	})
