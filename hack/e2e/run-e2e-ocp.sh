@@ -174,8 +174,8 @@ done
 # Move OCP ingress routers off worker nodes for the duration of this test
 # job, so the drain_node e2e does not strand router-default's PDB. The
 # placement is non-production but the OCP cluster is destroyed at end-of-job.
-# OCP through 4.21 still applies the legacy control-plane taint; the key
-# is kept in a shell variable so the JSON literal does not contain a woke
+# OCP still applies the legacy control-plane taint by default; the key is
+# kept in a shell variable so the JSON literal does not contain a woke
 # trigger word.
 echo "Pinning router-default to control plane nodes"
 LEGACY_TAINT_KEY="node-role.kubernetes.io/master" # wokeignore:rule=master
