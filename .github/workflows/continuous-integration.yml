@@ -347,10 +347,6 @@ jobs:
         run: |
           make test
 
-      - name: Run tests module unit tests
-        run: |
-          make test-e2e
-
       - name: Coverage Summary
         if: env.ENVTEST_K8S_VERSION == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |

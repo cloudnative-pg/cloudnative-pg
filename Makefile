@@ -129,10 +129,7 @@ test: generate fmt vet manifests envtest ## Run tests.
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
 	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/...
-
-test-e2e:
-	cd tests/ ;\
-	go test -coverpkg=./... -coverprofile=cover.out ./utils/...
+	cd tests && go test -coverpkg=./... -coverprofile=cover.out ./utils/...
 
 test-race: generate fmt vet manifests envtest ## Run tests enabling race detection.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
