@@ -1,7 +1,7 @@
 name: Bug Report
 description: File a bug report
 title: "[Bug]: "
-labels: ["triage", "bug"]
+labels: ["triage", "bug :bug:"]
 projects: ["cloudnative-pg/cloudnative-pg"]
 assignees:
   - gbartolini
