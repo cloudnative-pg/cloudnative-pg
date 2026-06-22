@@ -111,14 +111,9 @@ func dumpSecretKeyRefToFile(
 	}
 
 	filePath := filepath.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
-	// Write the file atomically (temp file + rename), as the sibling pgpass
-	// writer in this package already does. This file lives on a stable path and
-	// is reused across reconciliations: an in-place write would leave stale
-	// trailing bytes (e.g. a removed certificate from a CA bundle) when the
-	// secret is rotated to shorter content, and would expose a window where a
-	// concurrent libpq read of sslcert/sslkey/sslrootcert observes a truncated
-	// or partially written file. WriteFileAtomic also fsyncs and skips the write
-	// when the content is unchanged.
+	// Write atomically: this file is reused across reconciliations and read
+	// concurrently by libpq, so an in-place rewrite could expose a partial file
+	// or leave stale bytes behind when the secret rotates to shorter content.
 	if _, err := fileutils.WriteFileAtomic(filePath, value, 0o600); err != nil {
 		return "", err
 	}
