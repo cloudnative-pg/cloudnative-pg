@@ -1331,6 +1331,50 @@ func (r *ClusterReconciler) ensureJobAdoptable(
 	return ctrl.Result{}, nil
 }
 
+// reconcileMissingInstance creates the next missing instance when the cluster
+// has fewer instances than desired and every reported instance is ready.
+//
+// It returns a non-zero result (or an error) when the caller should stop and
+// requeue, and a zero result with no error when there is nothing to do.
+func (r *ClusterReconciler) reconcileMissingInstance(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+	instancesStatus postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	if cluster.Status.Instances >= cluster.Spec.Instances ||
+		instancesStatus.InstancesReportingStatus() != cluster.Status.Instances {
+		return ctrl.Result{}, nil
+	}
+
+	newNodeSerial := r.generateNodeSerial(cluster)
+	instanceName := specs.GetInstanceName(cluster.Name, newNodeSerial)
+
+	// A serial stops being counted in the status while its PVCs are still
+	// terminating, so it can be picked here before the previous instance has
+	// been fully torn down. Creating the Job now would bind it to a PVC about
+	// to be garbage-collected, leaving the Pod permanently unschedulable while
+	// the running-job guard blocks any further reconciliation (see #10985).
+	// Wait for the previous PVCs to disappear before recreating the instance.
+	if pvcName := persistentvolumeclaim.GetTerminatingInstancePVCName(
+		cluster, instanceName, resources.pvcs.Items,
+	); pvcName != "" {
+		log.FromContext(ctx).Debug(
+			"Deferring instance recreation until the previous PVC finishes terminating",
+			"instance", instanceName,
+			"pvc", pvcName,
+		)
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseCreatingReplica,
+			fmt.Sprintf("Waiting for PVC %q to be removed before recreating instance %q", pvcName, instanceName),
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop
+	}
+
+	return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
+}
+
 func (r *ClusterReconciler) joinReplicaInstance(
 	ctx context.Context,
 	nodeSerial int,

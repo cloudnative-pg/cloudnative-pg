@@ -1131,10 +1131,8 @@ func (r *ClusterReconciler) reconcilePods(
 	}
 
 	// Are there missing nodes? Let's create one
-	if cluster.Status.Instances < cluster.Spec.Instances &&
-		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
-		newNodeSerial := r.generateNodeSerial(cluster)
-		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
+	if res, err := r.reconcileMissingInstance(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	// Should we scale down the cluster?

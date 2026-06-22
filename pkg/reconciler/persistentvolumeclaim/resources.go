@@ -85,6 +85,32 @@ func BelongToInstance(cluster *apiv1.Cluster, instanceName, pvcName string) bool
 	return slices.Contains(expectedPVCs, pvcName)
 }
 
+// GetTerminatingInstancePVCName returns the name of a PVC that the given
+// instance expects (and would (re)mount) which is still terminating — its
+// DeletionTimestamp is set — or "" if none is found.
+//
+// A serial stops being counted in the cluster status while its PVCs are still
+// terminating, so recreating the instance at that point binds it to a volume
+// about to be garbage-collected, leaving the Pod permanently unschedulable
+// (see #10985). Callers should wait until this returns "" before (re)creating
+// the instance. PVCs the instance no longer expects (e.g. a dropped tablespace)
+// are ignored: they will not be remounted, so they need not hold up recreation.
+func GetTerminatingInstancePVCName(
+	cluster *apiv1.Cluster,
+	instanceName string,
+	pvcs []corev1.PersistentVolumeClaim,
+) string {
+	for i := range pvcs {
+		if pvcs[i].DeletionTimestamp == nil {
+			continue
+		}
+		if BelongToInstance(cluster, instanceName, pvcs[i].Name) {
+			return pvcs[i].Name
+		}
+	}
+	return ""
+}
+
 func filterByInstanceExpectedPVCs(
 	cluster *apiv1.Cluster,
 	instanceName string,
