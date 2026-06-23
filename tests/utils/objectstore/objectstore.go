@@ -52,12 +52,12 @@ import (
 
 const (
 	// rustfsImage is the image used to run a RustFS server
-	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8"
+	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8-glibc"
 	// awsCliImage is the image used to run the AWS CLI S3 client
-	awsCliImage = "docker.io/amazon/aws-cli:2.35.4"
+	awsCliImage = "docker.io/amazon/aws-cli:2.35.11"
 	// busyboxImage is used by the init container that prepares writable
 	// working directories for the RustFS server
-	busyboxImage = "docker.io/library/busybox:1.37.0"
+	busyboxImage = "docker.io/library/busybox:1.38.0"
 
 	// AccessKeyID is the access key used to authenticate against the object store
 	AccessKeyID = "objectstore"
