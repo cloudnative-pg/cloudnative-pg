@@ -73,7 +73,7 @@ PREFLIGHT_VERSION ?= 1.19.1
 # renovate: datasource=docker depName=cuelang/cue versioning=docker
 CUE_VERSION ?= 0.16.1
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
-GEMARA_VERSION ?= v1.2.0
+GEMARA_VERSION ?= v1.3.0
 OPENSHIFT_VERSIONS ?= v4.18-v4.22
 ARCH ?= amd64
 FUZZ_TIME ?= 30s
