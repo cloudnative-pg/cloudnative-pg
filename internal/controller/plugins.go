@@ -110,12 +110,14 @@ func (r *ClusterReconciler) finalizeReconciliation(
 	contextLogger := log.FromContext(ctx)
 
 	hookResult := pluginClient.PostReconcile(ctx, cluster, cluster)
-	if hookResult.Err != nil || !hookResult.Result.IsZero() {
-		contextLogger.Info("Post-reconcile hook stopped the reconciliation loop",
+	if hookResult.Err != nil {
+		contextLogger.Info("Post-reconcile hook returned an error",
 			"hookResult", hookResult)
-		if hookResult.Err != nil {
-			return hookResult.Result, hookResult.Err
-		}
+		return hookResult.Result, hookResult.Err
+	}
+	if !hookResult.Result.IsZero() {
+		contextLogger.Info("Post-reconcile hook requested a requeue",
+			"hookResult", hookResult)
 	}
 
 	res := hookResult.Result
