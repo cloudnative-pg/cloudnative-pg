@@ -217,7 +217,7 @@ var _ = Describe("finalizeReconciliation", func() {
 
 		_, err := reconciler.finalizeReconciliation(ctx, pluginCli, cluster)
 
-		// errors.Is to ensure the wrap chain is preserved (% w, not % v):
+		// errors.Is to ensure the wrap chain is preserved (%w, not %v):
 		// downstream callers depend on Unwrap to classify plugin errors via
 		// cnpgiClient.ContainsPluginError.
 		Expect(errors.Is(err, expectedErr)).To(BeTrue())

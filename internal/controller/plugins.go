@@ -95,8 +95,8 @@ func setStatusPluginHook(
 //
 // PhaseHealthy MUST be the final status update of a successful loop. Any
 // later phase patch (e.g. an error path that registers PhaseFailurePlugin)
-// would race with the next reconciliation and oscillate Phase between
-// Healthy and the error phase. See #8582.
+// would be overwritten by the error path on the next reconciliation,
+// oscillating Phase between Healthy and the error phase. See #8582.
 //
 // The result is propagated from the underlying plugin operations so any
 // requeue they request (notably the 5s polling from setStatusPluginHook
