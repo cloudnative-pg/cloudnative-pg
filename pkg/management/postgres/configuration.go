@@ -75,7 +75,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 		return false, err
 	}
 
-	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, pgVersion.Major)
+	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, pgVersion.Major())
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		ctx,
 		instance.PgData,

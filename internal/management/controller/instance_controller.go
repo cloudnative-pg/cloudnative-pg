@@ -984,7 +984,7 @@ func (r *InstanceReconciler) reconcilePostgreSQLAutoConfFilePermissions(ctx cont
 		return
 	}
 
-	if version.Major >= 17 {
+	if version.Major() >= 17 {
 		// PostgreSQL 17 and newer versions allow preventing ALTER SYSTEM
 		// usages using a GUC. We don't need to do anything on the file
 		// system side.

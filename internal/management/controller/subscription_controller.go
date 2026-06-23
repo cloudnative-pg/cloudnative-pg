@@ -229,7 +229,7 @@ func NewSubscriptionReconciler(
 		},
 		getPostgresMajorVersion: func() (int, error) {
 			version, err := instance.GetPgVersion()
-			return int(version.Major), err //nolint:gosec
+			return int(version.Major()), err //nolint:gosec
 		},
 	}
 	sr.finalizerReconciler = newFinalizerReconciler(

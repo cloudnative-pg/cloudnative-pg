@@ -24,7 +24,7 @@ import (
 	"regexp"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -218,7 +218,7 @@ var _ = Describe("probes", func() {
 	Context("Fill basebackup stats", func() {
 		It("set the information", func() {
 			instance := (&Instance{
-				pgVersion: &semver.Version{Major: 13},
+				pgVersion: semver.New(13, 0, 0, "", ""),
 			}).WithPodName("test-1")
 			status := &postgres.PostgresqlStatus{
 				IsPrimary: false,
