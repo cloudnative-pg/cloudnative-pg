@@ -605,7 +605,7 @@ jobs:
       # Send Slack notification if the kubectl plugin build fails.
       # To avoid message overflow, we only report runs scheduled on main or release branches
       - name: Slack Notification
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         if: |
           failure() &&
           github.repository_owner == env.REPOSITORY_OWNER &&
