@@ -607,6 +607,7 @@ WALCapabilities
 WALs
 WalBackupConfiguration
 WalClassName
+WalRestoreRetryTimeout
 Wallner
 WebSocket
 XXu
