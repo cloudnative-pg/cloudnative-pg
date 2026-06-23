@@ -284,7 +284,7 @@ func (instance *Instance) fillBasebackupStats(
 	superUserDB *sql.DB,
 	result *postgres.PostgresqlStatus,
 ) error {
-	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
+	if ver, _ := instance.GetPgVersion(); ver.Major() < 13 {
 		return nil
 	}
 
@@ -390,7 +390,7 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 	if !result.IsPrimary {
 		return nil
 	}
-	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
+	if ver, _ := instance.GetPgVersion(); ver.Major() < 13 {
 		return nil
 	}
 
@@ -600,7 +600,7 @@ type PgStatWal struct {
 // TryGetPgStatWAL retrieves pg_stat_wal on pg version 14 and further
 func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	version, err := instance.GetPgVersion()
-	if err != nil || version.Major < 14 {
+	if err != nil || version.Major() < 14 {
 		return nil, err
 	}
 
@@ -613,7 +613,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	// `wal_sync_time` have been removed.
 	// See https://github.com/postgres/postgres/commit/2421e9a51d20bb83154e54a16ce628f9249fa907
 	var pgWalStat PgStatWal
-	if version.Major < 18 {
+	if version.Major() < 18 {
 		row := db.QueryRow(
 			`SELECT
 			wal_records,
@@ -641,7 +641,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 		}
 	}
 
-	if version.Major >= 18 {
+	if version.Major() >= 18 {
 		row := db.QueryRow(
 			`SELECT
         	wal_records,
