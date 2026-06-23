@@ -40,15 +40,17 @@ import (
 
 type fakePluginClient struct {
 	pluginClient.Client
-	setClusterStatus    map[string]string
-	setClusterStatusErr error
-	postReconcileResult pluginClient.ReconcilerHookResult
+	setClusterStatus         map[string]string
+	setClusterStatusErr      error
+	setStatusInClusterCalled bool
+	postReconcileResult      pluginClient.ReconcilerHookResult
 }
 
 func (f *fakePluginClient) SetStatusInCluster(
 	_ context.Context,
 	_ k8client.Object,
 ) (map[string]string, error) {
+	f.setStatusInClusterCalled = true
 	return f.setClusterStatus, f.setClusterStatusErr
 }
 
@@ -150,11 +152,11 @@ var _ = Describe("finalizeReconciliation", func() {
 	})
 
 	It("registers PhaseHealthy and propagates the requeue when plugins patch their statuses", func(ctx SpecContext) {
-		// Regression test for the original PR's `!res.IsZero()` short-circuit:
 		// setStatusPluginHook returns RequeueAfter=5s on every successful
-		// status patch, but that requeue must NOT skip the PhaseHealthy
-		// registration. Otherwise clusters with status-reporting plugins
-		// (e.g. barman-cloud) would never reach Healthy.
+		// status patch. That requeue must NOT short-circuit the PhaseHealthy
+		// registration: clusters with status-reporting plugins (e.g.
+		// barman-cloud) requeue every 5s in steady state and would otherwise
+		// never reach Healthy.
 		content, err := json.Marshal(map[string]string{"key": "value"})
 		Expect(err).ToNot(HaveOccurred())
 		pluginCli.setClusterStatus = map[string]string{pluginName: string(content)}
@@ -178,41 +180,35 @@ var _ = Describe("finalizeReconciliation", func() {
 		// cluster oscillates between Healthy and FailurePlugin.
 		expectedErr := errors.New("plugin post-reconcile failure")
 		pluginCli.postReconcileResult = pluginClient.ReconcilerHookResult{Err: expectedErr}
-		// Wired up to verify setStatusPluginHook is NOT reached when
-		// post-reconcile errored.
-		pluginCli.setClusterStatus = map[string]string{pluginName: `"unused"`}
 
 		_, err := reconciler.finalizeReconciliation(ctx, pluginCli, cluster)
 
 		Expect(err).To(MatchError(expectedErr))
+		// A post-reconcile error must short-circuit before the status sync.
+		Expect(pluginCli.setStatusInClusterCalled).To(BeFalse())
 
 		var fresh apiv1.Cluster
 		Expect(cli.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
 		Expect(fresh.Status.Phase).To(Equal(initialPhase))
-		Expect(fresh.Status.PluginStatus[0].Status).To(BeEmpty())
 	})
 
 	It("registers PhaseHealthy when post-reconcile requests a requeue without error", func(ctx SpecContext) {
-		// Behavior consistency vs pre-#10421 OLD code, which had set
-		// PhaseHealthy in reconcileResources before the post-reconcile
-		// hook ran. A plugin requesting a requeue (no error) from
-		// PostReconcile must still see the cluster transition to Healthy.
+		// A plugin requesting a requeue (no error) from PostReconcile must
+		// still transition the cluster to Healthy, and the status sync is
+		// skipped because the requeue already short-circuits the loop.
 		pluginCli.postReconcileResult = pluginClient.ReconcilerHookResult{
 			Result: ctrl.Result{RequeueAfter: 30 * time.Second},
 		}
-		// Wired up to verify setStatusPluginHook is NOT called when
-		// post-reconcile already requested a requeue.
-		pluginCli.setClusterStatus = map[string]string{pluginName: `"unused"`}
 
 		res, err := reconciler.finalizeReconciliation(ctx, pluginCli, cluster)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.RequeueAfter).To(Equal(30 * time.Second))
+		Expect(pluginCli.setStatusInClusterCalled).To(BeFalse())
 
 		var fresh apiv1.Cluster
 		Expect(cli.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
 		Expect(fresh.Status.Phase).To(Equal(apiv1.PhaseHealthy))
-		Expect(fresh.Status.PluginStatus[0].Status).To(BeEmpty())
 	})
 
 	It("does not register PhaseHealthy when SetStatusInCluster returns an error", func(ctx SpecContext) {
