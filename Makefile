@@ -74,9 +74,13 @@ PREFLIGHT_VERSION ?= 1.19.1
 CUE_VERSION ?= 0.16.1
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
 GEMARA_VERSION ?= v1.3.0
-OPENSHIFT_VERSIONS ?= v4.12-v4.21
 ARCH ?= amd64
 FUZZ_TIME ?= 30s
+
+# OPENSHIFT_VERSIONS differs per release branch, unlike the renovate-managed
+# versions above that stay identical. The blank lines around it keep it out of
+# their diff context, so backport cherry-picks of a version bump don't conflict.
+OPENSHIFT_VERSIONS ?= v4.12-v4.21
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
