@@ -341,7 +341,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
@@ -558,7 +558,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -645,7 +645,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
@@ -728,7 +728,7 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -921,7 +921,7 @@ jobs:
           df -h
           echo "-----------------------------------------------------"
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       - name: Install Go
@@ -1137,7 +1137,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -1487,7 +1487,7 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-test-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX}" | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -1875,7 +1875,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -2204,7 +2204,7 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-ocp-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_K8S_VERSION}" | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
           fetch-depth: 0
