@@ -158,7 +158,6 @@ jobs:
               - '.github/renovate.json5'
             security-insights-changed:
               - 'SECURITY-INSIGHTS.yml'
-              - '.github/workflows/continuous-integration.yml'
 
   go-linters:
     name: Run linters
@@ -224,16 +223,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - name: Install CUE
-        uses: cue-lang/setup-cue@a93fa358375740cd8b0078f76355512b9208acb1 # v1.0.1
-
       - name: Validate SECURITY-INSIGHTS.yml against its schema
-        run: |
-          version=$(yq '.header.schema-version' SECURITY-INSIGHTS.yml)
-          curl -sSfL \
-            "https://raw.githubusercontent.com/ossf/security-insights/v${version}/spec/schema.cue" \
-            -o /tmp/si-schema.cue
-          cue vet SECURITY-INSIGHTS.yml /tmp/si-schema.cue -d '#SecurityInsights'
+        run: make validate-security-insights
 
   go-vulncheck:
     name: Run govulncheck
