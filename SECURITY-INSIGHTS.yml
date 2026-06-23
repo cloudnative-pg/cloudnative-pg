@@ -194,7 +194,7 @@ repository:
           ci: true
           release: true
       - name: SLSA GitHub Generator Action
-        type: automated-tooling
+        type: other
         rulesets: ["default"]
         comment: >-
           Generates non-falsifiable SLSA Level 3 provenance attestations for
