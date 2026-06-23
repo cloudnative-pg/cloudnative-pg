@@ -1480,6 +1480,21 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{}, nil
 	}
 
+	// Reattaching an instance whose group of PVCs is incomplete because one of
+	// them is still terminating would create a Pod bound to a volume about to be
+	// garbage-collected, leaving it unschedulable. Wait for the previous PVC to
+	// disappear before reattaching (see #10985).
+	if pvcName := persistentvolumeclaim.GetTerminatingInstancePVCName(
+		cluster, instanceToCreate.Name, resources.pvcs.Items,
+	); pvcName != "" {
+		contextLogger.Debug(
+			"Deferring instance reattachment until the previous PVC finishes terminating",
+			"instance", instanceToCreate.Name,
+			"pvc", pvcName,
+		)
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&
 		instancesStatus.InstancesReportingStatus() != cluster.Status.ReadyInstances {
 		// A pod is not ready, let's retry

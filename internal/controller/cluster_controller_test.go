@@ -125,6 +125,64 @@ var _ = Describe("reconcilePods instance recreation while a PVC is terminating (
 	})
 })
 
+var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminating (#10985)", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	It("defers reattaching a Pod while one of the instance's PVCs is still terminating", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+		cluster.Status.ReadyInstances = 2
+
+		readyPod := func(serial int) *corev1.Pod {
+			pod, err := specs.NewInstance(ctx, *cluster, serial, true)
+			Expect(err).ToNot(HaveOccurred())
+			pod.Status = corev1.PodStatus{
+				Phase:      corev1.PodRunning,
+				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+			}
+			return pod
+		}
+		pod1, pod2 := readyPod(1), readyPod(2)
+
+		// Instance 3 has a podless data PVC (so it is a candidate for
+		// reattachment) while its WAL PVC is still terminating.
+		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		walName := specs.GetInstanceName(cluster.Name, 3) + apiv1.WalArchiveVolumeSuffix
+		for i := range thirdGroup {
+			if thirdGroup[i].Name == walName {
+				thirdGroup[i].DeletionTimestamp = ptr.To(metav1.Now())
+			}
+		}
+		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*pod1, *pod2}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: pod1, IsPodReady: true, IsPrimary: true},
+				{Pod: pod2, IsPodReady: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be reattached while one of its PVCs is terminating")
+	})
+})
+
 var _ = Describe("Filtering cluster", func() {
 	metrics := make(map[string]string, 1)
 	metrics["a-secret"] = "test-version"
