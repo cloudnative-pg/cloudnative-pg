@@ -312,6 +312,16 @@ validate-threat-model: ## Validate Gemara threat-model artifacts against the sch
 		vet -c -d '#CapabilityCatalog' \
 		github.com/gemaraproj/gemara@$(GEMARA_VERSION) .github/capability-catalog.yaml
 
+validate-security-insights: ## Validate SECURITY-INSIGHTS.yml against the OSSF Security Insights schema.
+	@version=$$(sed -n 's/^[[:space:]]*schema-version:[[:space:]]*//p' SECURITY-INSIGHTS.yml | head -1); \
+	tmp=$$(mktemp -d); \
+	curl -sSfL \
+		"https://raw.githubusercontent.com/ossf/security-insights/v$${version}/spec/schema.cue" \
+		-o "$$tmp/schema.cue"; \
+	docker run --rm -v $(PWD):/src:Z -v "$$tmp":/schema:Z -w /src cuelang/cue:$(CUE_VERSION) \
+		vet SECURITY-INSIGHTS.yml /schema/schema.cue -d '#SecurityInsights'; \
+	rm -rf "$$tmp"
+
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
 	mv -f .wordlist-en-custom.txt.new .wordlist-en-custom.txt
@@ -325,7 +335,7 @@ run-govulncheck: govulncheck ## Check if there's any known vulnerabilities with 
 	$(GOVULNCHECK) ./...
 	cd tests && $(GOVULNCHECK) ./...
 
-checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck validate-threat-model ## Runs all the checks on the project.
+checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck validate-threat-model validate-security-insights ## Runs all the checks on the project.
 
 ##@ Documentation
 
