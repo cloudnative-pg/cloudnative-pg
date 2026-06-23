@@ -219,9 +219,7 @@ repository:
 
     assessments:
       self:
-        evidence:
-          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-catalog.yaml
-          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/capability-catalog.yaml
+        evidence: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/security-self-assessment.md
         comment: >-
           Gemara-compatible threat self-assessment covering capabilities
           and threats mapped to FINOS Common Cloud Controls (CCC) Core
