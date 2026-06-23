@@ -82,7 +82,7 @@ if notinpath "${go_bin}"; then
 fi
 
 # renovate: datasource=github-releases depName=onsi/ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
 
 # Build kubectl-cnpg and export its path
 make build-plugin
