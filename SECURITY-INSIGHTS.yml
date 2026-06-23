@@ -79,7 +79,7 @@ project:
     quickstart-guide: https://cloudnative-pg.io/docs/current/quickstart
     release-process: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/contribute/release_procedure.md
     # OSPS-DO-03.01
-    signature-verification: https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#security
+    signature-verification: https://cloudnative-pg.io/docs/current/installation_upgrade/#verifying-release-assets
     # OSPS-DO-04.01, OSPS-DO-05.01
     support-policy: https://cloudnative-pg.io/docs/current/supported_releases
 
@@ -194,24 +194,32 @@ repository:
           ci: true
           release: true
       - name: SLSA GitHub Generator Action
-        type: automated-tooling
+        type: other
         rulesets: ["default"]
         comment: >-
           Generates non-falsifiable SLSA Level 3 provenance attestations for
           release assets. This ensures that the binary artifacts and images are traced
           back to the specific source commit and build environment without manual
           intervention.
-
+        results: {}
         integration:
           adhoc: false
           ci: true
           release: true
+      - name: OSPS Baseline Scanner
+        type: other
+        rulesets:
+          - Maturity Level 2
+        comment: Evaluates the repository against the Open Source Project Security Baseline
+        results: {}
+        integration:
+          adhoc: true
+          ci: false
+          release: false
 
     assessments:
       self:
-        evidence-url:
-          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-catalog.yaml
-          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/capability-catalog.yaml
+        evidence: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/security-self-assessment.md
         comment: >-
           Gemara-compatible threat self-assessment covering capabilities
           and threats mapped to FINOS Common Cloud Controls (CCC) Core
