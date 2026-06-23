@@ -431,13 +431,13 @@ Therefore, it's crucial to prevent users from accessing the operator's
 
 ### Restricted RBAC Mode
 
-You can restrict the operator's RBAC permissions by configuring `WATCH_NAMESPACES`
+You can restrict the operator's RBAC permissions by configuring `WATCH_NAMESPACE`
 to the same namespace as the operator deployment. This way all namespaced resource
 policies can be created in a `Role`, and the `ClusterRole` only needs to contain
 - admissionregistration.k8s.io resources (mutatingwebhookconfigurations,
 validatingwebhookconfigurations) with get, patch verbs
 - postgresql.cnpg.io/clusterimagecatalogs with get, list, watch verbs
-- nodes with get, list, watch verbs"
+- nodes with get, list, watch verbs
 
 #### Disable Node Watching
 

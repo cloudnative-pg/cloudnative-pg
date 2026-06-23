@@ -27,6 +27,10 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaced"
@@ -43,11 +47,10 @@ import (
 var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.LabelDisruptive,
 	tests.LabelReducedRbacOperator), Ordered, Serial, func() {
 	const (
-		operatorNamespace          = "cnpg-system"
-		namespacedOperatorManifest = fixturesDir + "/namespaced/manifest.yaml"
-		clusterName                = "postgresql-storage-class"
-		sampleFile                 = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		level                      = tests.Highest
+		operatorNamespace = "cnpg-system"
+		clusterName       = "postgresql-storage-class"
+		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		level             = tests.Highest
 	)
 
 	BeforeAll(func() {
@@ -75,7 +78,7 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 		}
 
 		By("deleting cluster", func() {
-			err := DeleteResourcesFromFile(operatorNamespace, sampleFile)
+			err := resources.DeleteResourcesFromFile(env, operatorNamespace, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Wait for the cluster to be deleted
 			Eventually(func() error {
@@ -87,11 +90,11 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 
 	It("can create and reconcile clusters in namespaced mode", func() {
 		By("creating a cluster in the operator namespace", func() {
-			CreateResourceFromFile(operatorNamespace, sampleFile)
+			resources.CreateResourceFromFile(env, operatorNamespace, sampleFile)
 		})
 
 		By("verifying cluster becomes ready", func() {
-			AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		By("verifying cluster can be reconciled", func() {
@@ -136,7 +139,7 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 				return len(podList.Items), nil
 			}, 300).Should(BeEquivalentTo(2))
 
-			AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 	})
 })
@@ -176,7 +179,7 @@ var _ = Describe("Namespaced Deployment - Node Drain", Label(tests.LabelNoOpensh
 		}
 
 		By("deleting cluster", func() {
-			err := DeleteResourcesFromFile(operatorNamespace, sampleFile)
+			err := resources.DeleteResourcesFromFile(env, operatorNamespace, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() error {
 				_, err := clusterutils.Get(env.Ctx, env.Client, operatorNamespace, clusterName)
@@ -215,8 +218,8 @@ var _ = Describe("Namespaced Deployment - Node Drain", Label(tests.LabelNoOpensh
 
 	It("can drain a node with cluster pods", func() {
 		By("creating a cluster in operator namespace", func() {
-			CreateResourceFromFile(operatorNamespace, sampleFile)
-			AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			resources.CreateResourceFromFile(env, operatorNamespace, sampleFile)
+			clusterasserts.AssertClusterIsReady(env, operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		By("disabling PDB", func() {
@@ -229,7 +232,7 @@ var _ = Describe("Namespaced Deployment - Node Drain", Label(tests.LabelNoOpensh
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    operatorNamespace,
 			ClusterName:  clusterName,
 			DatabaseName: postgres.AppDBName,
@@ -237,7 +240,7 @@ var _ = Describe("Namespaced Deployment - Node Drain", Label(tests.LabelNoOpensh
 		}
 
 		By("loading test data", func() {
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 		})
 
 		oldPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, operatorNamespace, clusterName)
@@ -267,9 +270,9 @@ var _ = Describe("Namespaced Deployment - Node Drain", Label(tests.LabelNoOpensh
 		})
 
 		By("verifying data and cluster health", func() {
-			AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
-			AssertDataExpectedCount(env, tableLocator, 2)
-			AssertClusterStandbysAreStreaming(operatorNamespace, clusterName, 140)
+			clusterasserts.AssertClusterIsReady(env, operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+			replicationasserts.AssertClusterStandbysAreStreaming(env, operatorNamespace, clusterName, 140)
 		})
 	})
 })

@@ -22,11 +22,11 @@ package namespaced
 import (
 	"slices"
 	"strconv"
-	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -185,10 +185,10 @@ func ConfigureOperatorWithRBACRestrictions(
 			Rules: roleRules,
 		}
 		err = env.Client.Create(env.Ctx, role)
-		if err != nil {
+		if apierrors.IsAlreadyExists(err) {
 			err = env.Client.Update(env.Ctx, role)
-			Expect(err).NotTo(HaveOccurred())
 		}
+		Expect(err).NotTo(HaveOccurred())
 
 		roleBinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
@@ -209,10 +209,10 @@ func ConfigureOperatorWithRBACRestrictions(
 			},
 		}
 		err = env.Client.Create(env.Ctx, roleBinding)
-		if err != nil {
+		if apierrors.IsAlreadyExists(err) {
 			err = env.Client.Update(env.Ctx, roleBinding)
-			Expect(err).NotTo(HaveOccurred())
 		}
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	By("waiting for namespaced operator deployment to be ready", func() {
@@ -246,7 +246,7 @@ func RevertOperatorToClusterWideMode(env *environment.TestingEnvironment, namesp
 				Namespace: namespace,
 			},
 		})
-		if err != nil && !strings.Contains(err.Error(), "not found") {
+		if err != nil && !apierrors.IsNotFound(err) {
 			Expect(err).NotTo(HaveOccurred())
 		}
 
@@ -256,7 +256,7 @@ func RevertOperatorToClusterWideMode(env *environment.TestingEnvironment, namesp
 				Namespace: namespace,
 			},
 		})
-		if err != nil && !strings.Contains(err.Error(), "not found") {
+		if err != nil && !apierrors.IsNotFound(err) {
 			Expect(err).NotTo(HaveOccurred())
 		}
 	})
