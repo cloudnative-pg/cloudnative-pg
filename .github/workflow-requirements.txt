@@ -4,13 +4,13 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=workflow-requirements.txt --strip-extras workflow-requirements.in
 #
-boto3==1.43.20 \
-    --hash=sha256:536d023d9f72dcec04254f71b216b78c6ee644be56ac61e780a6c73c1ddea445 \
-    --hash=sha256:ee878fa5cd739f38e68fbad535ff9bc3bf7c409290943a62f5e8bddad486aad4
+boto3==1.43.36 \
+    --hash=sha256:42942dde254673abcbc9e6e60017c88341a4f49d99d24e1f2e290fb38138c26f \
+    --hash=sha256:587d7ee92a12e440ad12b0e7f11f3358f0c4d65b19f64726efc94aaf194aff28
     # via -r workflow-requirements.in
-botocore==1.43.20 \
-    --hash=sha256:1ee28afba70210f726c24f4bed1bf238a33542937fa2cf1b8cf2107287b85e04 \
-    --hash=sha256:84fec90a8f25d11bb98176a3fa31c8b8e031b5be37d56f9a1a16f825b483ad4b
+botocore==1.43.36 \
+    --hash=sha256:3c65fdc39ed01d8dfde1e961b34038aed03c459f8ddf80717a12ac006475e49d \
+    --hash=sha256:4cae47d1b2d426316b85a0087d9e69e048f13bc003b5177d74639fe9dfd28205
     # via
     #   boto3
     #   s3transfer
@@ -28,9 +28,9 @@ python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \
     --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
     # via botocore
-s3transfer==0.18.0 \
-    --hash=sha256:239c13b09e65ad0346e1be7348b8a202dcad44ac7ea7c6eb858fc881dce739b6 \
-    --hash=sha256:3760b8b7ec1315da54048b2d626276732bee4300d054d492d4e1d43e20d4ecbd
+s3transfer==0.19.0 \
+    --hash=sha256:777cc2415536f1debadb5c2ef7779275d0fc0fe0e042411cdd6caebeb2685262 \
+    --hash=sha256:ce436931687addc4c1712d52d40b32f53e88315723f107ffa20ba82b05a0f685
     # via boto3
 six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
