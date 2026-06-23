@@ -192,7 +192,7 @@ You can install all the available catalogs by using the `kustomization` file
 present in the `image-catalogs` directory:
 
 ```shell
-kubectl apply -k https://github.com/cloudnative-pg/artifacts//image-catalogs?ref=main
+kubectl apply -k 'https://github.com/cloudnative-pg/artifacts//image-catalogs?ref=main'
 ```
 
 You can then view all the catalogs deployed with:
