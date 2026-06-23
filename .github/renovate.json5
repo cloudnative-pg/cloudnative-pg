@@ -228,9 +228,25 @@
       pinDigests: false,
       matchPackageNames: [
         'vmware-tanzu{/,}**',
-        'rustfs{/,}**',
-        'amazon{/,}**',
       ],
+    },
+    {
+      // All container images consumed by the e2e object-store helper live in
+      // this single file; keep their bumps in one PR.
+      //
+      // We want RustFS on its glibc build: the default image is Alpine/musl,
+      // which performs worse (rustfs/rustfs#1662). The `-glibc` suffix sorts
+      // above the plain tag under semver, so Renovate tracks it as the newest
+      // and will open the bump on its own; we do not filter candidates by tag
+      // suffix. A suffix allowlist would silently stall this file if the glibc
+      // tag ever disappeared; instead any tag-scheme change surfaces as a
+      // visible PR here for review.
+      matchFileNames: [
+        'tests/utils/objectstore/objectstore.go',
+      ],
+      groupName: 'objectstore test images',
+      separateMajorMinor: false,
+      pinDigests: false,
     },
     {
       groupName: 'operator framework',
