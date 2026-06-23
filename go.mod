@@ -4,9 +4,9 @@ go 1.26.4
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/acobaugh/osrelease v0.1.0
 	github.com/avast/retry-go/v5 v5.0.0
-	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.5.1
 	github.com/cloudnative-pg/cnpg-i v0.5.0
@@ -50,7 +50,6 @@ require (
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -122,7 +122,11 @@ func GetOpenshiftVersion(ctx context.Context, restConfig *rest.Config) (semver.V
 		return semver.Version{}, err
 	}
 
-	return semver.Make(version)
+	parsedVersion, err := semver.NewVersion(version)
+	if err != nil {
+		return semver.Version{}, err
+	}
+	return *parsedVersion, nil
 }
 
 // CreateSubscription creates a subscription object inside openshift with a fixed name
