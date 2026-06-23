@@ -79,7 +79,7 @@ project:
     quickstart-guide: https://cloudnative-pg.io/docs/current/quickstart
     release-process: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/contribute/release_procedure.md
     # OSPS-DO-03.01
-    signature-verification: https://cloudnative-pg.io/docs/devel/installation_upgrade/#verifying-release-assets
+    signature-verification: https://cloudnative-pg.io/docs/current/installation_upgrade/#verifying-release-assets
     # OSPS-DO-04.01, OSPS-DO-05.01
     support-policy: https://cloudnative-pg.io/docs/current/supported_releases
 
@@ -201,7 +201,7 @@ repository:
           release assets. This ensures that the binary artifacts and images are traced
           back to the specific source commit and build environment without manual
           intervention.
-
+        results: {}
         integration:
           adhoc: false
           ci: true
