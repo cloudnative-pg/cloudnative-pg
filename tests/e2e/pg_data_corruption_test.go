@@ -22,10 +22,12 @@ package e2e
 import (
 	"fmt"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -247,6 +249,131 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				_ = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 			})
 			testDataCorruption(namespace, sampleFile)
+		})
+	})
+
+	// This deterministically reproduces #10985: when an instance's data PVC has
+	// been removed but its WAL PVC is still terminating, the instance must not be
+	// recreated yet (a Job bound to the vanishing WAL PVC would wedge the Pod and
+	// block reconciliation). We force the race by pinning the WAL PVC with a
+	// finalizer so it lingers Terminating, and assert no recreation happens until
+	// it is released, after which the instance rejoins.
+	Context("when a previous PVC is slow to terminate", func() {
+		It("defers recreating the instance until the terminating PVC is gone, then rejoins", func() {
+			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"
+			const holdFinalizer = "cnpg.io/e2e-hold-terminating"
+
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() {
+				_ = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
+			})
+
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+
+			tableLocator := pgasserts.TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: postgres.AppDBName,
+				TableName:    "test_pg_data_corruption_race",
+			}
+			pgasserts.AssertCreateTestData(env, tableLocator)
+
+			walStorageEnabled, err := storage.IsWalStorageEnabled(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(walStorageEnabled).To(BeTrue(), "this test requires a cluster with walStorage")
+
+			var victimName string
+			By("selecting a standby instance to lose", func() {
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				for i := range podList.Items {
+					if specs.IsPodStandby(podList.Items[i]) {
+						victimName = podList.Items[i].Name
+						break
+					}
+				}
+				Expect(victimName).ToNot(BeEmpty(), "expected at least one standby")
+			})
+
+			walPVCName := fmt.Sprintf("%s-wal", victimName)
+			walPVCKey := types.NamespacedName{Namespace: namespace, Name: walPVCName}
+
+			By("pinning the standby's WAL PVC so it lingers Terminating", func() {
+				walPVC := &corev1.PersistentVolumeClaim{}
+				Expect(env.Client.Get(env.Ctx, walPVCKey, walPVC)).To(Succeed())
+				controllerutil.AddFinalizer(walPVC, holdFinalizer)
+				Expect(env.Client.Update(env.Ctx, walPVC)).To(Succeed())
+			})
+			// Always release the WAL PVC, otherwise namespace teardown would hang.
+			DeferCleanup(func() {
+				walPVC := &corev1.PersistentVolumeClaim{}
+				if err := env.Client.Get(env.Ctx, walPVCKey, walPVC); err == nil {
+					if controllerutil.RemoveFinalizer(walPVC, holdFinalizer) {
+						_ = env.Client.Update(env.Ctx, walPVC)
+					}
+				}
+			})
+
+			quickDelete := &client.DeleteOptions{GracePeriodSeconds: &quickDeletionPeriod}
+			By("deleting the standby pod, its data PVC and its WAL PVC", func() {
+				dataPVC := &corev1.PersistentVolumeClaim{}
+				Expect(env.Client.Get(env.Ctx,
+					types.NamespacedName{Namespace: namespace, Name: victimName}, dataPVC)).To(Succeed())
+				Expect(env.Client.Delete(env.Ctx, dataPVC, quickDelete)).To(Succeed())
+
+				walPVC := &corev1.PersistentVolumeClaim{}
+				Expect(env.Client.Get(env.Ctx, walPVCKey, walPVC)).To(Succeed())
+				Expect(env.Client.Delete(env.Ctx, walPVC, quickDelete)).To(Succeed())
+
+				Expect(podutils.Delete(env.Ctx, env.Client, namespace, victimName, quickDelete)).To(Succeed())
+			})
+
+			By("waiting for the data PVC to be gone while the WAL PVC stays Terminating", func() {
+				Eventually(func() bool {
+					err := env.Client.Get(env.Ctx,
+						types.NamespacedName{Namespace: namespace, Name: victimName},
+						&corev1.PersistentVolumeClaim{})
+					return apierrs.IsNotFound(err)
+				}, 120).Should(BeTrue(), "the data PVC should be garbage-collected")
+
+				walPVC := &corev1.PersistentVolumeClaim{}
+				Expect(env.Client.Get(env.Ctx, walPVCKey, walPVC)).To(Succeed())
+				Expect(walPVC.DeletionTimestamp).ToNot(BeNil(), "the WAL PVC should be terminating")
+			})
+
+			joinJobKey := types.NamespacedName{Namespace: namespace, Name: victimName + "-join"}
+			By("verifying the instance is NOT recreated while the WAL PVC is terminating", func() {
+				// Without the fix the operator creates the join Job immediately and
+				// its Pod stays Pending; with the fix no Job is created until the
+				// previous WAL PVC is gone.
+				Consistently(func() bool {
+					err := env.Client.Get(env.Ctx, joinJobKey, &batchv1.Job{})
+					return apierrs.IsNotFound(err)
+				}, 30, 3).Should(BeTrue(), "a join Job must not be created while the previous WAL PVC is terminating")
+			})
+
+			By("releasing the WAL PVC", func() {
+				walPVC := &corev1.PersistentVolumeClaim{}
+				Expect(env.Client.Get(env.Ctx, walPVCKey, walPVC)).To(Succeed())
+				controllerutil.RemoveFinalizer(walPVC, holdFinalizer)
+				Expect(env.Client.Update(env.Ctx, walPVC)).To(Succeed())
+			})
+
+			By("verifying the instance is recreated and rejoins as a ready standby", func() {
+				Eventually(func() (bool, error) {
+					pod := &corev1.Pod{}
+					if err := env.Client.Get(env.Ctx,
+						types.NamespacedName{Namespace: namespace, Name: victimName}, pod); err != nil {
+						return false, client.IgnoreNotFound(err)
+					}
+					return utils.IsPodActive(*pod) && utils.IsPodReady(*pod) && specs.IsPodStandby(*pod), nil
+				}, 300).Should(BeTrue())
+			})
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick])
+			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+			replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 		})
 	})
 })
