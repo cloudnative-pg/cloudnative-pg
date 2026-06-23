@@ -69,6 +69,12 @@ kubeadmConfigPatchesJSON6902:
         value: docker
 nodes:
 - role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+        extraArgs:
+          enable-admission-plugins: OwnerReferencesPermissionEnforcement
 EOF
 
   if [ "${ENABLE_APISERVER_AUDIT}" = "true" ]; then
@@ -77,7 +83,6 @@ EOF
     mkdir -p "${LOG_DIR}/apiserver"
     touch "${LOG_DIR}/apiserver/kube-apiserver-audit.log"
     cat >>"${config_file}" <<-EOF
-  kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
     apiServer:
