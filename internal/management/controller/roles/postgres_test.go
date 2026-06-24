@@ -32,6 +32,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -160,7 +161,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		rows := sqlmock.NewRows([]string{
 			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
 			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls", "comment",
-			"xmin", "inroles",
+			"xmin", "rolegrants",
 		}).
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
 				nil, false, []byte("This is postgres user"), 11, []byte("{}")).
@@ -169,13 +170,13 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 					Valid:            true,
 					Time:             testDate,
 					InfinityModifier: pgtype.Finite,
-				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`)).
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1|false|true|true","role2|true|false|false"}`)).
 			AddRow("future_man", false, false, true, true, false, true, 10, []byte("54321"),
 				pgtype.Timestamp{
 					Valid:            true,
 					Time:             time.Time{},
 					InfinityModifier: pgtype.Infinity,
-				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`))
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1|false|true|true","role2|true|false|false"}`))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := List(ctx, db)
@@ -204,6 +205,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			password:        password1,
 			transactionID:   11,
 			InRoles:         []string{},
+			RoleGrants:      []DatabaseRoleGrant{},
 		}, DatabaseRole{
 			Name:            "streaming_replica",
 			CreateDB:        true,
@@ -218,9 +220,20 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Comment:         "This is streaming_replica user",
 			password:        password2,
 			transactionID:   22,
-			InRoles: []string{
-				"role1",
-				"role2",
+			InRoles:         []string{},
+			RoleGrants: []DatabaseRoleGrant{
+				{
+					Name:    "role1",
+					Admin:   ptr.To(false),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(true),
+				},
+				{
+					Name:    "role2",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(false),
+					Set:     ptr.To(false),
+				},
 			},
 		}))
 	})
@@ -492,16 +505,24 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
-		rows := sqlmock.NewRows([]string{
-			"inroles",
-		}).
-			AddRow([]byte(`{"role1","role2"}`))
+		rows := sqlmock.NewRows([]string{"name", "admin", "inherit", "set"}).
+			AddRow("role1", false, false, false).AddRow("role2", false, false, false)
 		mock.ExpectQuery(expectedMembershipStmt).WithArgs("foo").WillReturnRows(rows)
 
 		roles, err := GetParentRoles(ctx, db, DatabaseRole{Name: "foo"})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(roles).To(HaveLen(2))
-		Expect(roles).To(ConsistOf("role1", "role2"))
+		Expect(roles).To(ConsistOf(DatabaseRoleGrant{
+			Name:    "role1",
+			Admin:   ptr.To(false),
+			Inherit: ptr.To(false),
+			Set:     ptr.To(false),
+		}, DatabaseRoleGrant{
+			Name:    "role2",
+			Admin:   ptr.To(false),
+			Inherit: ptr.To(false),
+			Set:     ptr.To(false),
+		}))
 	})
 
 	It("GetParentRoles will error if there is a problem querying the database", func(ctx context.Context) {
@@ -520,7 +541,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		expectedMembershipExecs := []string{
 			`GRANT "pg_monitor" TO "foo"`,
-			`GRANT "quux" TO "foo"`,
+			`GRANT "quux" TO "foo" WITH ADMIN true, INHERIT false, SET true`,
 			`REVOKE "bar" FROM "foo"`,
 		}
 
@@ -533,7 +554,15 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectCommit()
 
-		err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []string{"pg_monitor", "quux"}, []string{"bar"})
+		err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []DatabaseRoleGrant{
+			{Name: "pg_monitor"},
+			{
+				Name:    "quux",
+				Admin:   ptr.To(true),
+				Set:     ptr.To(true),
+				Inherit: ptr.To(false),
+			},
+		}, []string{"bar"})
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 
@@ -552,7 +581,10 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectRollback()
 
-		err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []string{"pg_monitor", "quux"}, []string{"bar"})
+		err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []DatabaseRoleGrant{
+			{Name: "pg_monitor"},
+			{Name: "quux"},
+		}, []string{"bar"})
 		Expect(err).Should(HaveOccurred())
 	})
 
