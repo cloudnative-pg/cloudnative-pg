@@ -556,6 +556,7 @@ var _ = Describe("configuration change validation", func() {
 		// rejected by the end anchor, which in Go matches end-of-text
 		// rather than end-of-line.
 		Entry("valid name with a trailing newline injection", "archive_command\nrestart_after = 0"),
+		Entry("trailing newline only", "archive_command\n"),
 		Entry("carriage return", "archive_command\rrestart_after = 0"),
 	)
 
