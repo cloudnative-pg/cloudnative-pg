@@ -261,7 +261,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	for _, role := range rolesByAction[roleUpdateMemberships] {
 		// NOTE: revoking / granting to a role does not alter its TransactionID
 		dbRole := role.toDatabaseRole()
-		grants, revokes, err := GetRoleMembershipDiff(ctx, db, role.InRoles, dbRole)
+		grants, revokes, err := GetRoleMembershipDiff(ctx, db, dbRole)
 		handleRoleError(err, role.Name, roleUpdateMemberships)
 
 		err = UpdateMembership(ctx, db, dbRole, grants, revokes)
@@ -280,13 +280,14 @@ func (sr *RoleSynchronizer) applyRoleActions(
 func GetRoleMembershipDiff(
 	ctx context.Context,
 	db *sql.DB,
-	desiredRoleMemberships []string,
 	dbRole DatabaseRole,
-) (toGrant []string, toRevoke []string, err error) {
+) (toGrant []DatabaseRoleGrant, toRevoke []string, err error) {
 	inRoleInDB, err := GetParentRoles(ctx, db, dbRole)
 	if err != nil {
 		return nil, nil, err
 	}
+	desiredRoleMemberships := dbRole.GetDatabaseRoleGrants()
+
 	rolesToGrant := getRolesToGrant(inRoleInDB, desiredRoleMemberships)
 	rolesToRevoke := getRolesToRevoke(inRoleInDB, desiredRoleMemberships)
 	return rolesToGrant, rolesToRevoke, nil
@@ -403,34 +404,35 @@ func getPasswordSecretResourceVersion(
 	return re
 }
 
-func getRolesToGrant(inRoleInDB, inRoleInSpec []string) []string {
-	if len(inRoleInSpec) == 0 {
+func getRolesToGrant(roleGrantsInDB, roleGrantsInSpec []DatabaseRoleGrant) []DatabaseRoleGrant {
+	if len(roleGrantsInSpec) == 0 {
 		return nil
 	}
-	if len(inRoleInDB) == 0 {
-		return inRoleInSpec
-	}
-	var roleToGrant []string
-	for _, v := range inRoleInSpec {
-		if !slices.Contains(inRoleInDB, v) {
-			roleToGrant = append(roleToGrant, v)
+
+	var rolesToGrant []DatabaseRoleGrant
+	for _, v := range roleGrantsInSpec {
+
+		if !slices.ContainsFunc(roleGrantsInDB, func(g DatabaseRoleGrant) bool {
+			return g.Matches(v)
+		}) {
+			rolesToGrant = append(rolesToGrant, v)
 		}
 	}
-	return roleToGrant
+	return rolesToGrant
 }
 
-func getRolesToRevoke(inRoleInDB, inRoleInSpec []string) []string {
-	if len(inRoleInDB) == 0 {
+func getRolesToRevoke(roleGrantsInDB, roleGrantsInSpec []DatabaseRoleGrant) []string {
+	if len(roleGrantsInDB) == 0 {
 		return nil
 	}
-	if len(inRoleInSpec) == 0 {
-		return inRoleInDB
-	}
-	var roleToRevoke []string
-	for _, v := range inRoleInDB {
-		if !slices.Contains(inRoleInSpec, v) {
-			roleToRevoke = append(roleToRevoke, v)
+
+	var rolesToRevoke []string
+	for _, v := range roleGrantsInDB {
+		if !slices.ContainsFunc(roleGrantsInSpec, func(g DatabaseRoleGrant) bool {
+			return g.Name == v.Name
+		}) {
+			rolesToRevoke = append(rolesToRevoke, v.Name)
 		}
 	}
-	return roleToRevoke
+	return rolesToRevoke
 }
