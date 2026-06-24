@@ -224,7 +224,7 @@ var _ = Describe("Role synchronizer tests", func() {
 		rowsInMockDatabase := sqlmock.NewRows([]string{
 			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
 			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls", "comment",
-			"xmin", "inroles",
+			"xmin", "rolegrants",
 		}).
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
 				nil, false, []byte("This is postgres user"), 11, []byte("{}")).
@@ -233,13 +233,13 @@ var _ = Describe("Role synchronizer tests", func() {
 					Valid:            true,
 					Time:             testDate,
 					InfinityModifier: pgtype.Finite,
-				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`)).
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1|false|true|true","role2|true|false|false"}`)).
 			AddRow("role_to_ignore", true, false, true, true, true, false, -1, []byte("12345"),
 				nil, false, []byte("This is a custom role in the DB"), 11, []byte("{}")).
 			AddRow("role_to_test1", true, true, false, false, false, false, -1, []byte("12345"),
 				nil, false, []byte("This is a role to test with"), 11, []byte("{}")).
 			AddRow("role_to_test2", true, true, false, false, false, false, -1, []byte("12345"),
-				nil, false, []byte("This is a role to test with"), 11, []byte("{inrole}")).
+				nil, false, []byte("This is a role to test with"), 11, []byte("{inrole|false|true|true}")).
 			AddRow("role_with_pass", false, true, false, false, false, false, -1, []byte(password),
 				pgtype.Timestamp{
 					Valid:            true,
@@ -619,15 +619,22 @@ var _ = Describe("Role synchronizer tests", func() {
 							"role1",
 							"role2",
 						},
+						RoleGrants: []apiv1.RoleGrant{
+							{
+								Name: "role3",
+								Set:  ptr.To(true),
+							},
+						},
 						Comment:         "This is a role to test with",
 						ConnectionLimit: -1,
 					},
 				},
 			}
-			noParents := sqlmock.NewRows([]string{"inroles"}).AddRow([]byte(`{}`))
+			noParents := sqlmock.NewRows([]string{"name", "admin", "inherit", "set"})
 			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
 			mock.ExpectBegin()
 			expectedMembershipExecs := []string{
+				`GRANT "role3" TO "role_to_test1" WITH SET true`,
 				`GRANT "role1" TO "role_to_test1"`,
 				`GRANT "role2" TO "role_to_test1"`,
 			}
@@ -661,10 +668,8 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			rows := sqlmock.NewRows([]string{
-				"inroles",
-			}).
-				AddRow([]byte(`{"foo"}`))
+			rows := sqlmock.NewRows([]string{"name", "admin", "inherit", "set"}).
+				AddRow("foo", false, false, false)
 			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test2").WillReturnRows(rows)
 			mock.ExpectBegin()
 
@@ -806,7 +811,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			}
 
-			noParents := sqlmock.NewRows([]string{"inroles"}).AddRow([]byte(`{}`))
+			noParents := sqlmock.NewRows([]string{"name", "admin", "inherit", "set"})
 			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
 			mock.ExpectBegin()
 

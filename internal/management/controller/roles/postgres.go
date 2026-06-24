@@ -44,13 +44,24 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 	rows, err := db.QueryContext(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
-       			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
-				pg_catalog.shobj_description(auth.oid, 'pg_authid') as comment, auth.xmin,
-				mem.inroles
+			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
+			pg_catalog.shobj_description(auth.oid, 'pg_authid') as comment, auth.xmin,
+			mem.rolegrants
 		FROM pg_catalog.pg_authid as auth
 		LEFT JOIN (
-			SELECT pg_catalog.array_agg(pg_catalog.pg_get_userbyid(roleid)) as inroles, member
-			FROM pg_catalog.pg_auth_members GROUP BY member
+			SELECT
+				pg_catalog.array_agg(
+						pg_catalog.pg_get_userbyid(am.roleid) ||
+						'|' ||
+						am.admin_option ||
+						'|' ||
+						am.inherit_option ||
+						'|' ||
+						am.set_option
+				) rolegrants,
+				member
+			FROM pg_catalog.pg_auth_members am
+			GROUP BY member
 		) mem ON member = oid
 		WHERE rolname not like 'pg\_%'`)
 	if err != nil {
@@ -66,7 +77,7 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 	for rows.Next() {
 		var comment sql.NullString
 		var role DatabaseRole
-		var inRoles pq.StringArray
+		var roleGrantStrings pq.StringArray
 		err := rows.Scan(
 			&role.Name,
 			&role.Superuser,
@@ -81,7 +92,7 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 			&role.BypassRLS,
 			&comment,
 			&role.transactionID,
-			&inRoles,
+			&roleGrantStrings,
 		)
 		if err != nil {
 			return nil, wrapErr(err)
@@ -90,7 +101,12 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 			role.Comment = comment.String
 		}
 
-		role.InRoles = inRoles
+		// Reading from the database, we can't make out
+		// what roles were applied with InRoles instead of
+		// RoleGrants anymore, so we treat them all as
+		// RoleGrants.
+		role.InRoles = []string{}
+		role.PopulateRoleGrantsFromStringArray(roleGrantStrings)
 
 		roles = append(roles, role)
 	}
@@ -249,7 +265,7 @@ func UpdateMembership(
 	ctx context.Context,
 	db *sql.DB,
 	role DatabaseRole,
-	rolesToGrant []string,
+	rolesToGrant []DatabaseRoleGrant,
 	rolesToRevoke []string,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
@@ -258,15 +274,16 @@ func UpdateMembership(
 		return fmt.Errorf("while updating memberships for role %s with role reconciler: %w", role.Name, err)
 	}
 	if len(rolesToRevoke)+len(rolesToGrant) == 0 {
-		contextLog.Debug("No membership change query to execute for role")
+		contextLog.Debug("No membership change query to execute for role", "role", role.Name)
 		return nil
 	}
 	queries := make([]string, 0, len(rolesToRevoke)+len(rolesToGrant))
 	for _, r := range rolesToGrant {
-		queries = append(queries, fmt.Sprintf(`GRANT %s TO %s`,
-			pgx.Identifier{r}.Sanitize(),
-			pgx.Identifier{role.Name}.Sanitize()),
-		)
+		queries = append(queries, fmt.Sprintf(`GRANT %s TO %s %s`,
+			pgx.Identifier{r.Name}.Sanitize(),
+			pgx.Identifier{role.Name}.Sanitize(),
+			r.ToWithOptionQuery(),
+		))
 	}
 	for _, r := range rolesToRevoke {
 		queries = append(queries, fmt.Sprintf(`REVOKE %s FROM %s`,
@@ -297,27 +314,40 @@ func UpdateMembership(
 }
 
 // GetParentRoles get the in roles of this role
-func GetParentRoles(ctx context.Context, db *sql.DB, role DatabaseRole) ([]string, error) {
+func GetParentRoles(ctx context.Context, db *sql.DB, role DatabaseRole) ([]DatabaseRoleGrant, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while getting parents for role %s with role reconciler: %w", role.Name, err)
 	}
-	query := `SELECT mem.inroles 
-		FROM pg_catalog.pg_authid as auth
-		LEFT JOIN (
-			SELECT pg_catalog.array_agg(pg_catalog.pg_get_userbyid(roleid)) as inroles, member
-			FROM pg_catalog.pg_auth_members GROUP BY member
-		) mem ON member = oid
-		WHERE rolname = $1`
+	query := `SELECT
+		pg_catalog.pg_get_userbyid(am.roleid) as "name",
+		am.admin_option as "admin",
+		am.inherit_option as "inherit",
+		am.set_option as "set"
+	FROM pg_auth_members am
+	JOIN pg_roles child_role ON am.member = child_role.oid
+	WHERE child_role.rolname = $1`
 	contextLog.Debug("get parent role", "query", query)
-	var parentRoles pq.StringArray
-	err := db.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, wrapErr(err)
-	}
+	rows, err := db.QueryContext(ctx, query, role.Name)
 	if err != nil {
 		return nil, wrapErr(err)
+	}
+
+	var parentRoles []DatabaseRoleGrant
+	for rows.Next() {
+		var roleGrant DatabaseRoleGrant
+
+		if err := rows.Scan(
+			&roleGrant.Name,
+			&roleGrant.Admin,
+			&roleGrant.Inherit,
+			&roleGrant.Set,
+		); err != nil {
+			return nil, wrapErr(err)
+		}
+
+		parentRoles = append(parentRoles, roleGrant)
 	}
 
 	return parentRoles, nil
