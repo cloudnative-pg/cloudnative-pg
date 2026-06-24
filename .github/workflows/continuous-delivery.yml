@@ -1240,8 +1240,9 @@ jobs:
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
             kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
             kubectl apply -f ${ROOK_BASE_URL}/common.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
+            # csi-operator.yaml defines the csi.ceph.io CRDs that operator.yaml's CRs rely on
             kubectl apply -f ${ROOK_BASE_URL}/csi-operator.yaml
+            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
             curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
               sed '/^ *#/d;/^ *$/d' | \
               yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
