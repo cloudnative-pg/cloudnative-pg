@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -100,17 +101,28 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 		})
 
-		assertInRoles := func(namespace, primaryPod, roleName string, expectedRoles []string) {
-			slices.Sort(expectedRoles)
+		assertInRoles := func(namespace, primaryPod, roleName string, expectedInRoles []string, expectedRoleGrants []apiv1.RoleGrant) {
+			var expectedRoles []apiv1.RoleGrant
+			for _, role := range expectedRoleGrants {
+				expectedRoles = append(expectedRoles, role)
+			}
+			for _, roleName := range expectedInRoles {
+				expectedRoles = append(expectedRoles, apiv1.RoleGrant{Name: roleName})
+			}
+
 			Eventually(func() []string {
 				var rolesInDB []string
-				query := `SELECT mem.inroles 
-					FROM pg_catalog.pg_authid as auth
-					LEFT JOIN (
-						SELECT string_agg(pg_catalog.pg_get_userbyid(roleid), ',') as inroles, member
-						FROM pg_catalog.pg_auth_members GROUP BY member
-					) mem ON member = oid
-					WHERE rolname =` + pq.QuoteLiteral(roleName)
+				query := `SELECT
+						pg_catalog.pg_get_userbyid(am.roleid) ||
+						'|' ||
+						am.admin_option ||
+						'|' ||
+						am.inherit_option ||
+						'|' ||
+						am.set_option
+					FROM pg_auth_members am
+					JOIN pg_roles child_role ON am.member = child_role.oid
+					WHERE child_role.rolname = ` + pq.QuoteLiteral(roleName)
 				stdout, _, err := exec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 					exec.PodLocator{
@@ -122,10 +134,10 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				if err != nil {
 					return []string{ERROR}
 				}
-				rolesInDB = strings.Split(strings.TrimSuffix(stdout, "\n"), ",")
+				rolesInDB = strings.Split(strings.TrimSuffix(stdout, "\n"), "\n")
 				slices.Sort(rolesInDB)
 				return rolesInDB
-			}, 30).Should(BeEquivalentTo(expectedRoles))
+			}, 30).Should(MatchGrants{expectedRoles})
 		}
 
 		assertRoleStatus := func(namespace, clusterName, query, expectedResult string) {
@@ -459,7 +471,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(BeEmpty())
 				}, 30).Should(Succeed())
-				assertInRoles(namespace, primaryPod.Name, newUserName, []string{"postgres", username})
+				assertInRoles(namespace, primaryPod.Name, newUserName, []string{"postgres", username}, []apiv1.RoleGrant{})
 			})
 
 			By("Remove parent role from InRole for role new_role and verify in database", func() {
@@ -481,7 +493,58 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(BeEmpty())
 				}, 30).Should(Succeed())
-				assertInRoles(namespace, primaryPod.Name, newUserName, []string{username})
+				assertInRoles(namespace, primaryPod.Name, newUserName, []string{username}, []apiv1.RoleGrant{})
+			})
+
+			By("Add role in RoleGrants for role new_role and verify in database", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				updated := cluster.DeepCopy()
+				for i, r := range updated.Spec.Managed.Roles {
+					if r.Name == newUserName {
+						updated.Spec.Managed.Roles[i].RoleGrants = []apiv1.RoleGrant{{
+							Name:    "postgres",
+							Set:     ptr.To(false),
+							Inherit: ptr.To(true),
+						},
+						}
+					}
+				}
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(func(g Gomega) {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(BeEmpty())
+				}, 30).Should(Succeed())
+				assertInRoles(namespace, primaryPod.Name, newUserName, []string{username}, []apiv1.RoleGrant{
+					{
+						Name:    "postgres",
+						Set:     ptr.To(false),
+						Inherit: ptr.To(true),
+					},
+				})
+			})
+
+			By("Remove parent role from RoleGrants for role new_role and verify in database", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				updated := cluster.DeepCopy()
+				for i, r := range updated.Spec.Managed.Roles {
+					if r.Name == newUserName {
+						updated.Spec.Managed.Roles[i].RoleGrants = []apiv1.RoleGrant{}
+					}
+				}
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(func(g Gomega) {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(BeEmpty())
+				}, 30).Should(Succeed())
+				assertInRoles(namespace, primaryPod.Name, newUserName, []string{username}, []apiv1.RoleGrant{})
 			})
 
 			By("Mock the error for unrealizable User and verify user in database", func() {

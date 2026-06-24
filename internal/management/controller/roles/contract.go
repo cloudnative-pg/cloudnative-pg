@@ -24,7 +24,8 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,24 +33,93 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
+type DatabaseRoleGrant struct {
+	Name    string `json:"name"`
+	Admin   *bool  `json:"admin,omitempty"`
+	Inherit *bool  `json:"inherit,omitempty"`
+	Set     *bool  `json:"set,omitempty"`
+}
+
+func NewDatabaseRoleGrant(name string) DatabaseRoleGrant {
+	return DatabaseRoleGrant{
+		Name:    name,
+		Admin:   nil,
+		Inherit: nil,
+		Set:     nil,
+	}
+}
+
+func NewDatabaseRoleGrantFromRoleGrant(roleGrant apiv1.RoleGrant) DatabaseRoleGrant {
+	return DatabaseRoleGrant{
+		Name:    roleGrant.Name,
+		Admin:   roleGrant.Admin,
+		Inherit: roleGrant.Inherit,
+		Set:     roleGrant.Set,
+	}
+}
+
+// `Matches` returns true if the name of this and other match and their options
+// set don't collide with each other, treating nil as not-conflicting.
+//
+// This is required because the database always returns the default values as
+// set, but we are possibly comparing it to values from the spec, which might
+// contain 'nil' where the default values are desired.
+func (g *DatabaseRoleGrant) Matches(other DatabaseRoleGrant) bool {
+	return g.Name == other.Name &&
+		(g.Admin == nil || other.Admin == nil || *g.Admin == *other.Admin) &&
+		(g.Inherit == nil || other.Inherit == nil || *g.Inherit == *other.Inherit) &&
+		(g.Set == nil || other.Set == nil || *g.Set == *other.Set)
+}
+
+func (g *DatabaseRoleGrant) hasOverriddenDefaults() bool {
+	return g.Admin != nil || g.Set != nil || g.Inherit != nil
+}
+
+func (g *DatabaseRoleGrant) ToWithOptionQuery() string {
+	if !g.hasOverriddenDefaults() {
+		return ""
+	}
+	queryParts := []string{}
+	if g.Admin != nil {
+		queryParts = append(queryParts, fmt.Sprintf(`ADMIN %v`,
+			*g.Admin,
+		))
+	}
+
+	if g.Inherit != nil {
+		queryParts = append(queryParts, fmt.Sprintf(`INHERIT %v`,
+			*g.Inherit,
+		))
+	}
+
+	if g.Set != nil {
+		queryParts = append(queryParts, fmt.Sprintf(`SET %v`,
+			*g.Set,
+		))
+	}
+
+	return fmt.Sprintf(`WITH %s`, strings.Join(queryParts, ", "))
+}
+
 // DatabaseRole represents the role information read from / written to the Database
 // The password management in the apiv1.RoleConfiguration assumes the use of Secrets,
 // so cannot cleanly be mapped to Postgres
 type DatabaseRole struct {
-	Name            string           `json:"name"`
-	Comment         string           `json:"comment,omitempty"`
-	Superuser       bool             `json:"superuser,omitempty"`
-	CreateDB        bool             `json:"createdb,omitempty"`
-	CreateRole      bool             `json:"createrole,omitempty"`
-	Inherit         bool             `json:"inherit,omitempty"` // defaults to true
-	Login           bool             `json:"login,omitempty"`
-	Replication     bool             `json:"replication,omitempty"`
-	BypassRLS       bool             `json:"bypassrls,omitempty"` // Row-Level Security
-	ignorePassword  bool             `json:"-"`
-	ConnectionLimit int64            `json:"connectionLimit,omitempty"` // default is -1
-	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
-	InRoles         []string         `json:"inRoles,omitempty"`
-	password        sql.NullString   `json:"-"`
+	Name            string              `json:"name"`
+	Comment         string              `json:"comment,omitempty"`
+	Superuser       bool                `json:"superuser,omitempty"`
+	CreateDB        bool                `json:"createdb,omitempty"`
+	CreateRole      bool                `json:"createrole,omitempty"`
+	Inherit         bool                `json:"inherit,omitempty"` // defaults to true
+	Login           bool                `json:"login,omitempty"`
+	Replication     bool                `json:"replication,omitempty"`
+	BypassRLS       bool                `json:"bypassrls,omitempty"` // Row-Level Security
+	ignorePassword  bool                `json:"-"`
+	ConnectionLimit int64               `json:"connectionLimit,omitempty"` // default is -1
+	ValidUntil      pgtype.Timestamp    `json:"validUntil"`
+	InRoles         []string            `json:"inRoles,omitempty"`
+	RoleGrants      []DatabaseRoleGrant `json:"roleGrants,omitempty"`
+	password        sql.NullString      `json:"-"`
 	// passwordPassthrough, when true, instructs the instance manager to send the
 	// password literal verbatim rather than SCRAM-SHA-256 encoding it
 	// client-side. It is populated from the cnpg.io/passwordPassthrough
@@ -73,17 +143,44 @@ func (d *DatabaseRole) hasSameCommentAs(inSpec apiv1.RoleConfiguration) bool {
 }
 
 func (d *DatabaseRole) isInSameRolesAs(inSpec apiv1.RoleConfiguration) bool {
-	if len(d.InRoles) == 0 && len(inSpec.InRoles) == 0 {
+	if len(d.InRoles)+len(d.RoleGrants) == 0 &&
+		len(inSpec.InRoles)+len(inSpec.RoleGrants) == 0 {
 		return true
 	}
 
-	if len(d.InRoles) != len(inSpec.InRoles) {
+	if len(d.InRoles)+len(d.RoleGrants) !=
+		len(inSpec.InRoles)+len(inSpec.RoleGrants) {
 		return false
 	}
 
-	sort.Strings(d.InRoles)
-	sort.Strings(inSpec.InRoles)
-	return reflect.DeepEqual(d.InRoles, inSpec.InRoles)
+	collectedInSpecRoleGrants := make(map[string]DatabaseRoleGrant)
+
+	for _, r := range inSpec.InRoles {
+		collectedInSpecRoleGrants[r] = NewDatabaseRoleGrant(r)
+	}
+
+	for _, r := range inSpec.RoleGrants {
+		collectedInSpecRoleGrants[r.Name] = NewDatabaseRoleGrantFromRoleGrant(r)
+	}
+
+	for _, r := range d.InRoles {
+		// For InRoles we are not interested in comparing Admin, Inherit and Set
+		// options; it's only relevant that the role exists anywhere in the spec
+		if _, ok := collectedInSpecRoleGrants[r]; !ok {
+			return false
+		}
+	}
+
+	for _, r := range d.RoleGrants {
+		roleGrant, ok := collectedInSpecRoleGrants[r.Name]
+		if !ok {
+			return false
+		}
+		if !roleGrant.Matches(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func (d *DatabaseRole) hasSameValidUntilAs(inSpec apiv1.RoleConfiguration) bool {
@@ -94,7 +191,8 @@ func (d *DatabaseRole) hasSameValidUntilAs(inSpec apiv1.RoleConfiguration) bool 
 }
 
 // isEquivalentTo checks a subset of the attributes of roles in DB and Spec
-// leaving passwords and role membership (InRoles) to be done separately
+// leaving passwords and role membership (InRoles,RoleGrants) to be done
+// separately
 func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	type reducedEntries struct {
 		Name            string
@@ -164,4 +262,48 @@ func (d *DatabaseRole) ApplyPassword(
 		d.passwordPassthrough = passwordSecret.passthrough
 		return passwordSecret.version, nil
 	}
+}
+
+// GetDatabaseRoleGrants helps with translating both InRoles and RoleGrants
+// to DatabaseRoleGrants.
+func (d *DatabaseRole) GetDatabaseRoleGrants() []DatabaseRoleGrant {
+	roleGrants := d.RoleGrants
+	for _, inRoleName := range d.InRoles {
+		roleGrants = append(roleGrants, NewDatabaseRoleGrant(inRoleName))
+	}
+	return roleGrants
+}
+
+func (d *DatabaseRole) PopulateRoleGrantsFromStringArray(roleGrantStrings []string) error {
+	d.RoleGrants = []DatabaseRoleGrant{}
+	for _, roleGrantString := range roleGrantStrings {
+		roleGrantParts := strings.Split(roleGrantString, "|")
+		if len(roleGrantParts) != 4 {
+			return fmt.Errorf("MatchGrants can only match against results with 4 columns, got %d (%v)", len(roleGrantParts), roleGrantParts)
+		}
+
+		adminOption, err := strconv.ParseBool(roleGrantParts[1])
+		if err != nil {
+			return fmt.Errorf("Couldn't convert %v to boolean admin option", roleGrantParts[1])
+		}
+
+		inheritOption, err := strconv.ParseBool(roleGrantParts[2])
+		if err != nil {
+			return fmt.Errorf("Couldn't convert %v to boolean inherit option", roleGrantParts[2])
+		}
+
+		setOption, err := strconv.ParseBool(roleGrantParts[3])
+		if err != nil {
+			return fmt.Errorf("Couldn't convert %v to boolean set option", roleGrantParts[3])
+		}
+
+		d.RoleGrants = append(d.RoleGrants, DatabaseRoleGrant{
+			Name:    roleGrantParts[0],
+			Admin:   &adminOption,
+			Inherit: &inheritOption,
+			Set:     &setOption,
+		})
+	}
+
+	return nil
 }
