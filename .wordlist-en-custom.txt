@@ -708,6 +708,7 @@ bootstrapconfiguration
 bootstrapinitdb
 bootstrappgbasebackup
 bootstraprecovery
+boto
 bozkayasalihx
 br
 bs
