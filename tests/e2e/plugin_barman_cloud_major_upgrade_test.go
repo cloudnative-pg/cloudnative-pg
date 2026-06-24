@@ -22,6 +22,7 @@ package e2e
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
@@ -54,7 +55,7 @@ import (
 var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelPostgresMajorUpgrade, tests.LabelBackupRestore), func() {
 		const (
-			level      = tests.High
+			level      = tests.Medium
 			pluginName = "barman-cloud.cloudnative-pg.io"
 		)
 
@@ -90,8 +91,8 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 				startMajor = targetMajor - 1
 			}
 
-			startImage := env.OfficialSystemImageName(strconv.FormatUint(startMajor, 10))
-			targetImage := env.SystemImageName(strconv.FormatUint(targetMajor, 10))
+			startImage := env.OfficialMinimalImageName(strconv.FormatUint(startMajor, 10))
+			targetImage := env.MinimalImageName(strconv.FormatUint(targetMajor, 10))
 
 			namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
@@ -107,6 +108,16 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 					Spec: apiv1.ClusterSpec{
 						Instances: 2,
 						ImageName: startImage,
+						Bootstrap: &apiv1.BootstrapConfiguration{
+							InitDB: &apiv1.BootstrapInitDB{
+								PostInitSQL: []string{
+									"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
+									"CREATE EXTENSION IF NOT EXISTS pg_trgm;",
+								},
+								DataChecksums:  ptr.To(true),
+								WalSegmentSize: 32,
+							},
+						},
 						StorageConfiguration: apiv1.StorageConfiguration{
 							StorageClass: &storageClass,
 							Size:         "1Gi",
@@ -114,6 +125,18 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 						WalStorage: &apiv1.StorageConfiguration{
 							StorageClass: &storageClass,
 							Size:         "1Gi",
+						},
+						PostgresConfiguration: apiv1.PostgresConfiguration{
+							Parameters: map[string]string{
+								"log_checkpoints":             "on",
+								"log_lock_waits":              "on",
+								"log_min_duration_statement":  "1000",
+								"log_statement":               "ddl",
+								"log_temp_files":              "1024",
+								"log_autovacuum_min_duration": "1000",
+								"log_replication_commands":    "on",
+								"pg_stat_statements.track":    "top",
+							},
 						},
 						Plugins: []apiv1.PluginConfiguration{
 							{
@@ -124,6 +147,7 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 						},
 					},
 				}
+				clusterutils.AddTopologySpreadConstraint(cluster)
 				Expect(env.Client.Create(env.Ctx, cluster)).To(Succeed())
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			})
@@ -155,7 +179,12 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 					}
 					cluster.Spec.ImageName = targetImage
 					return env.Client.Update(env.Ctx, cluster)
-				}, 60).Should(Succeed())
+				}).WithTimeout(1*time.Minute).WithPolling(10*time.Second).Should(
+					Succeed(),
+					"Failed to update cluster image from %s to %s",
+					startImage,
+					targetImage,
+				)
 			})
 
 			By("waiting for the cluster to enter the major upgrade phase", func() {
@@ -163,7 +192,7 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseMajorUpgrade))
-				}, 120).Should(Succeed())
+				}).WithTimeout(1 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 			})
 
 			By("waiting for the upgraded cluster to become ready", func() {
