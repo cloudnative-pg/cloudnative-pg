@@ -787,7 +787,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-			operator.InstallLatest(env.Client, mostRecentTag)
+			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
 			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
@@ -804,7 +804,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-			operator.InstallLatest(env.Client, mostRecentTag)
+			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
 			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
