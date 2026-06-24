@@ -159,8 +159,8 @@ func (psql *Command) getPodName() (string, error) {
 	return "", &ErrMissingPod{role: targetPodRole}
 }
 
-// Exec replaces the current process with a `kubectl Exec` invocation.
-// This function won't return
+// Exec invokes `kubectl exec` and transfers control to it.
+// This function does not return on success.
 func (psql *Command) Exec() error {
 	kubectlExec, err := psql.getKubectlInvocation()
 	if err != nil {
