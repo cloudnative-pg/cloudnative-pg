@@ -521,6 +521,7 @@ var _ = Describe("configuration change validation", func() {
 					Parameters: map[string]string{
 						"work_mem":                      "16MB",
 						"auto_explain.log_min_duration": "100ms",
+						"some$ext.param$1":              "value",
 					},
 				},
 				StorageConfiguration: apiv1.StorageConfiguration{
@@ -531,21 +532,32 @@ var _ = Describe("configuration change validation", func() {
 		Expect(v.validateConfiguration(clusterNew)).To(BeEmpty())
 	})
 
-	It("rejects a parameter name that injects a directive through a newline", func() {
-		clusterNew := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Parameters: map[string]string{
-						"#\narchive_command": "/bin/evil",
+	DescribeTable("rejects a parameter name that could inject a directive",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "/bin/evil",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
 					},
 				},
-				StorageConfiguration: apiv1.StorageConfiguration{
-					Size: "10Gi",
-				},
-			},
-		}
-		Expect(v.validateConfiguration(clusterNew)).To(HaveLen(1))
-	})
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		Entry("leading comment then newline", "#\narchive_command"),
+		// A trailing newline after an otherwise valid name must be
+		// rejected by the end anchor, which in Go matches end-of-text
+		// rather than end-of-line.
+		Entry("valid name with a trailing newline injection", "archive_command\nrestart_after = 0"),
+		Entry("carriage return", "archive_command\rrestart_after = 0"),
+	)
 
 	It("produces no error when WAL size settings are correct", func() {
 		clusterNew := &apiv1.Cluster{
