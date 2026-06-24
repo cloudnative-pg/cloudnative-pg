@@ -1130,7 +1130,7 @@ func (r *ClusterReconciler) reconcilePods(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	// Are there missing nodes? Let's create one
+	// Are there missing instances? Let's create one
 	if res, err := r.reconcileMissingInstance(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
 		return res, err
 	}

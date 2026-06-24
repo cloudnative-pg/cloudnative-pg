@@ -1364,7 +1364,11 @@ func (r *ClusterReconciler) reconcileMissingInstance(
 			"instance", instanceName,
 			"pvc", pvcName,
 		)
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseCreatingReplica,
+
+		if err := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseCreatingReplica,
 			fmt.Sprintf("Waiting for PVC %q to be removed before recreating instance %q", pvcName, instanceName),
 		); err != nil {
 			return ctrl.Result{}, err
