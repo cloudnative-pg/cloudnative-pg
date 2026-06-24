@@ -2652,6 +2652,13 @@ type PluginStatus struct {
 	Status string `json:"status,omitempty"`
 }
 
+type RoleGrant struct {
+	Name    string `json:"name"`
+	Admin   *bool  `json:"admin,omitempty"`
+	Inherit *bool  `json:"inherit,omitempty"`
+	Set     *bool  `json:"set,omitempty"`
+}
+
 // RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
 // with the additional field Ensure specifying whether to ensure the presence or
 // absence of the role in the database
@@ -2694,8 +2701,29 @@ type RoleConfiguration struct {
 	// immediately added as a new member. Default empty.
 	// Changes to the list are applied to an existing role through
 	// `GRANT` and `REVOKE` statements, not only at role creation.
+	// If you need more granular control over `ADMIN`, `INHERIT` and `SET`
+	// options use `roleGrants` instead.
+	//
+	// The difference to `roleGrants` is that `roleGrants` allows to set the
+	// `ADMIN`, `INHERIT` and `SET` options for each role granted
+	// and that `inRoles` uses the `IN ROLE` statement when creating
+	// a role, whilst `roleGrants` issues a subsequent `GRANT`
+	// statement after creation.
 	// +optional
 	InRoles []string `json:"inRoles,omitempty"`
+
+	// List of one or more existing roles to which this role will be
+	// added as a new member. Default empty.
+	// Changes to the list are applied to an existing role through
+	// `GRANT` and `REVOKE` statements, not only at role creation.
+	//
+	// The difference to `inRoles` is that `roleGrants` allows to set the
+	// `ADMIN`, `INHERIT` and `SET` options for each role granted
+	// and that `inRoles` uses the `IN ROLE` statement when creating
+	// a role, whilst `roleGrants` issues a subsequent `GRANT`
+	// statement after creation.
+	// +optional
+	RoleGrants []RoleGrant `json:"roleGrants,omitempty"`
 
 	// Whether a role "inherits" the privileges of roles it is a member of.
 	// Default is `true`.

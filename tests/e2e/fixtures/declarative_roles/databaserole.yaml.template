@@ -20,3 +20,8 @@ spec:
   inRoles:
     - pg_monitor
     - pg_signal_backend
+  roleGrants:
+    - name: postgres
+      admin: false
+      inherit: false
+      set: true

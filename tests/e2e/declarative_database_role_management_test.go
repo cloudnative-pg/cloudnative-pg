@@ -22,6 +22,7 @@ package e2e
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +54,78 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+type MatchGrants struct {
+	expectedGrants []apiv1.RoleGrant
+}
+
+func (m MatchGrants) Match(actual interface{}) (success bool, err error) {
+	roleGrantStrings, ok := actual.([]string)
+	if !ok {
+		return false, fmt.Errorf("MatchGrants expects a list of strings")
+	}
+
+	var roleGrants []apiv1.RoleGrant
+	for _, roleGrantString := range roleGrantStrings {
+		roleGrantParts := strings.Split(roleGrantString, "|")
+		if len(roleGrantParts) != 4 {
+			return false, fmt.Errorf("MatchGrants can only match against results with 4 columns, got %d (%v)", len(roleGrantParts), roleGrantParts)
+		}
+
+		adminOption, err := strconv.ParseBool(roleGrantParts[1])
+		if err != nil {
+			return false, fmt.Errorf("Couldn't convert %v to boolean admin option", roleGrantParts[1])
+		}
+
+		inheritOption, err := strconv.ParseBool(roleGrantParts[2])
+		if err != nil {
+			return false, fmt.Errorf("Couldn't convert %v to boolean inherit option", roleGrantParts[2])
+		}
+
+		setOption, err := strconv.ParseBool(roleGrantParts[3])
+		if err != nil {
+			return false, fmt.Errorf("Couldn't convert %v to boolean set option", roleGrantParts[3])
+		}
+
+		roleGrants = append(roleGrants, apiv1.RoleGrant{
+			Name:    roleGrantParts[0],
+			Admin:   &adminOption,
+			Inherit: &inheritOption,
+			Set:     &setOption,
+		})
+	}
+
+	sortByName := func(x, y apiv1.RoleGrant) int {
+		if x.Name < y.Name {
+			return -1
+		}
+		if x.Name > y.Name {
+			return 1
+		}
+		return 0
+	}
+
+	slices.SortStableFunc(roleGrants, sortByName)
+	slices.SortStableFunc(m.expectedGrants, sortByName)
+
+	if !slices.EqualFunc(roleGrants, m.expectedGrants, func(a, b apiv1.RoleGrant) bool {
+		return a.Name == b.Name &&
+			(a.Admin == nil || b.Admin == nil || *a.Admin == *b.Admin) &&
+			(a.Inherit == nil || b.Inherit == nil || *a.Inherit == *b.Inherit) &&
+			(a.Set == nil || b.Set == nil || *a.Set == *b.Set)
+	}) {
+		return false, fmt.Errorf("%v didn't match %v", roleGrants, m.expectedGrants)
+	}
+	return true, nil
+}
+
+func (m MatchGrants) FailureMessage(actual interface{}) string {
+	return fmt.Sprintf("Expected %v to match %v", actual, m.expectedGrants)
+}
+
+func (m MatchGrants) NegatedFailureMessage(actual interface{}) string {
+	return fmt.Sprintf("Expected %v not to match %v", actual, m.expectedGrants)
+}
 
 // Set of tests in which we use the DatabaseRole CRD to add new roles on an existing cluster
 var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.LabelBasic,
@@ -90,17 +163,28 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			})
 		})
 
-		assertInRoles := func(namespace, primaryPod, roleName string, expectedRoles []string) {
-			slices.Sort(expectedRoles)
+		assertInRoles := func(namespace, primaryPod, roleName string, expectedInRoles []string, expectedRoleGrants []apiv1.RoleGrant) {
+			var expectedRoles []apiv1.RoleGrant
+			for _, role := range expectedRoleGrants {
+				expectedRoles = append(expectedRoles, role)
+			}
+			for _, roleName := range expectedInRoles {
+				expectedRoles = append(expectedRoles, apiv1.RoleGrant{Name: roleName})
+			}
+
 			Eventually(func() []string {
 				var rolesInDB []string
-				query := `SELECT mem.inroles 
-					FROM pg_catalog.pg_authid as auth
-					LEFT JOIN (
-						SELECT string_agg(pg_catalog.pg_get_userbyid(roleid), ',') as inroles, member
-						FROM pg_catalog.pg_auth_members GROUP BY member
-					) mem ON member = oid
-					WHERE rolname =` + pq.QuoteLiteral(roleName)
+				query := `SELECT
+						pg_catalog.pg_get_userbyid(am.roleid) ||
+						'|' ||
+						am.admin_option ||
+						'|' ||
+						am.inherit_option ||
+						'|' ||
+						am.set_option
+					FROM pg_auth_members am
+					JOIN pg_roles child_role ON am.member = child_role.oid
+					WHERE child_role.rolname = ` + pq.QuoteLiteral(roleName)
 				stdout, _, err := exec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 					exec.PodLocator{
@@ -112,10 +196,10 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				if err != nil {
 					return []string{fmt.Sprintf("ERROR: %v", err.Error())}
 				}
-				rolesInDB = strings.Split(strings.TrimSuffix(stdout, "\n"), ",")
+				rolesInDB = strings.Split(strings.TrimSuffix(stdout, "\n"), "\n")
 				slices.Sort(rolesInDB)
 				return rolesInDB
-			}, 30).Should(BeEquivalentTo(expectedRoles))
+			}, 30).Should(MatchGrants{expectedRoles})
 		}
 
 		assertRoleHasExpectedFields := func(namespace, primaryPod string, role apiv1.DatabaseRole) {
@@ -223,7 +307,17 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
 					roleExistsQuery(role.Spec.Name), "t"), 30).Should(Succeed())
 
-				assertInRoles(namespace, primaryPodInfo.Name, role.Spec.Name, role.Spec.InRoles)
+				assertInRoles(namespace, primaryPodInfo.Name, role.Spec.Name, role.Spec.InRoles, role.Spec.RoleGrants)
+			})
+
+			By("verifying that changing the roles roleGrants works", func() {
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+					roleExistsQuery(role.Spec.Name), "t"), 30).Should(Succeed())
+
+				assertInRoles(namespace, primaryPodInfo.Name, role.Spec.Name, role.Spec.InRoles, role.Spec.RoleGrants)
 			})
 
 			By("removing the Role object", func() {
@@ -243,8 +337,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			It("can manage a declarative role and delete it in Postgres", func() {
 				roleManifest := fixturesDir +
 					"/declarative_roles/databaserole-with-delete-reclaim-policy.yaml.template"
-				assertTestDeclarativeRole(roleManifest,
-					false)
+				assertTestDeclarativeRole(roleManifest, false)
 			})
 		})
 
