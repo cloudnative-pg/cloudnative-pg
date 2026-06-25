@@ -142,7 +142,7 @@ func (d *DatabaseRole) hasSameCommentAs(inSpec apiv1.RoleConfiguration) bool {
 	return d.Comment == inSpec.Comment
 }
 
-func (d *DatabaseRole) isInSameRolesAs(inSpec apiv1.RoleConfiguration) bool {
+func (d *DatabaseRole) hasMatchingRoleGrants(inSpec apiv1.RoleConfiguration) bool {
 	if len(d.InRoles)+len(d.RoleGrants) == 0 &&
 		len(inSpec.InRoles)+len(inSpec.RoleGrants) == 0 {
 		return true
