@@ -151,9 +151,6 @@ func AssertReadWriteConnectionUsingPgBouncerService(
 	Expect(err).ToNot(HaveOccurred())
 
 	dbName := cluster.GetApplicationDatabaseName()
-	if dbName == "" {
-		dbName = apiv1.DefaultApplicationDatabaseName
-	}
 
 	if isPoolerRW {
 		replication.AssertWritesToPrimarySucceeds(env, namespace, poolerService, dbName, appUser,
