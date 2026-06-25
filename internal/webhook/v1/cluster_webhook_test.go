@@ -514,6 +514,78 @@ var _ = Describe("configuration change validation", func() {
 		v = &ClusterCustomValidator{}
 	})
 
+	It("accepts well-formed parameter names, including namespaced custom GUCs", func() {
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"work_mem":                      "16MB",
+						"auto_explain.log_min_duration": "100ms",
+						"some$ext.param$1":              "value",
+					},
+				},
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "10Gi",
+				},
+			},
+		}
+		Expect(v.validateConfiguration(clusterNew)).To(BeEmpty())
+	})
+
+	DescribeTable("rejects a parameter name that could inject a directive",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "/bin/evil",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
+					},
+				},
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		Entry("leading comment then newline", "#\narchive_command"),
+		Entry("valid name with a trailing newline injection", "archive_command\nrestart_after = 0"),
+		Entry("carriage return", "archive_command\rrestart_after = 0"),
+	)
+
+	DescribeTable("rejects a malformed parameter name",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "value",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
+					},
+				},
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		// The end anchor in the name regex matches end-of-text, not end-of-line,
+		// so a trailing newline is caught even though it carries no injected directive.
+		Entry("trailing newline", "archive_command\n"),
+		Entry("embedded NUL byte", "work_mem\x00"),
+		Entry("equals sign", "work_mem=128MB"),
+		Entry("leading whitespace", " work_mem"),
+		Entry("space in the middle", "work mem"),
+		Entry("hash character", "work#mem"),
+		Entry("empty string", ""),
+	)
+
 	It("produces no error when WAL size settings are correct", func() {
 		clusterNew := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{

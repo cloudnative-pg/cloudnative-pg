@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -1037,6 +1038,18 @@ func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.
 	return result
 }
 
+// postgresParameterNameRegex matches a valid PostgreSQL configuration
+// parameter name: a plain GUC name or a custom (namespaced) one with a
+// single dot. Keys are rendered verbatim into postgresql.conf, so a
+// newline or other unexpected character could inject an arbitrary
+// directive.
+//
+// The pattern follows PostgreSQL's configuration-file lexer (guc-file.l),
+// including the dollar sign it allows in identifiers. It is intentionally
+// restricted to ASCII: the lexer also accepts high-bit bytes, but no real
+// GUC relies on them.
+var postgresParameterNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*(\.[A-Za-z_][A-Za-z0-9_$]*)?$`)
+
 // validateConfiguration determines whether a PostgreSQL configuration is valid
 func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
@@ -1077,6 +1090,17 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
 	for key, value := range r.Spec.PostgresConfiguration.Parameters {
+		if !postgresParameterNameRegex.MatchString(key) {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", key),
+					key,
+					"must be a valid PostgreSQL configuration parameter name "+
+						"(a GUC name, optionally namespaced with a single dot)"))
+			continue
+		}
+
 		_, isFixed := postgres.FixedConfigurationParameters[key]
 		sanitizedValue, presentInSanitizedConfiguration := sanitizedParameters[key]
 		if isFixed && (!presentInSanitizedConfiguration || value != sanitizedValue) {
