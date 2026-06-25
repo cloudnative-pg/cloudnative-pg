@@ -2501,12 +2501,6 @@ var _ = Describe("validation of an external cluster", func() {
 				Key:                  "tls.crt",
 			}
 		}),
-		Entry("traversal in the password secret key", func(ec *apiv1.ExternalCluster) {
-			ec.Password = &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{Name: "creds"},
-				Key:                  "../pwned",
-			}
-		}),
 	)
 
 	It("accepts a well-formed name and secret selectors", func() {

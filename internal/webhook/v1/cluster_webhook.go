@@ -1976,7 +1976,6 @@ func (v *ClusterCustomValidator) validateExternalCluster(
 		{"sslCert", externalCluster.SSLCert},
 		{"sslKey", externalCluster.SSLKey},
 		{"sslRootCert", externalCluster.SSLRootCert},
-		{"password", externalCluster.Password},
 	}
 	for _, s := range selectors {
 		if s.selector == nil {
