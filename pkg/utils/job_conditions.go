@@ -33,10 +33,10 @@ func JobHasOneCompletion(job batchv1.Job) bool {
 	return job.Status.Succeeded == requestedCompletions
 }
 
-// JobHasFailed checks whether a job has permanently failed, i.e. it has
+// JobHasFailed checks whether a Job has permanently failed, i.e. it has
 // exhausted its backoff limit. It keys off the terminal JobFailed condition
-// rather than Status.Failed because the latter is non-zero while the job is
-// still legitimately retrying within its backoff limit.
+// rather than Status.Failed because the latter is non-zero while the Job is
+// still retrying within its backoff limit.
 func JobHasFailed(job batchv1.Job) bool {
 	// job.Status.Conditions is []batchv1.JobCondition, not []metav1.Condition,
 	// so meta.FindStatusCondition cannot be used here.
