@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -140,7 +141,7 @@ func (cluster *Cluster) GetJobEnabledPluginNames() (result []string) {
 func GetExternalClustersEnabledPluginNames(externalClusters []ExternalCluster) (result []string) {
 	pluginNames := make([]string, 0, len(externalClusters))
 	for _, externalCluster := range externalClusters {
-		if externalCluster.PluginConfiguration != nil {
+		if externalCluster.PluginConfiguration != nil && externalCluster.PluginConfiguration.IsEnabled() {
 			pluginNames = append(pluginNames, externalCluster.PluginConfiguration.Name)
 		}
 	}
@@ -755,6 +756,40 @@ func (cluster *Cluster) GetSmartShutdownTimeout() int32 {
 // a restart of a PostgreSQL instance
 func (cluster *Cluster) GetRestartTimeout() time.Duration {
 	return time.Duration(cluster.GetMaxStopDelay()+cluster.GetMaxStartDelay()) * time.Second
+}
+
+// GetPrimaryLeaseDuration returns how long the primary lease is valid before it expires
+func (cluster *Cluster) GetPrimaryLeaseDuration() time.Duration {
+	if l := cluster.Spec.PrimaryLease; l != nil && l.LeaseDurationSeconds != nil {
+		return time.Duration(*l.LeaseDurationSeconds) * time.Second
+	}
+	return DefaultPrimaryLeaseDurationSeconds * time.Second
+}
+
+// GetPrimaryLeaseRenewDeadline returns how long the primary keeps trying to renew the lease
+// before giving up
+func (cluster *Cluster) GetPrimaryLeaseRenewDeadline() time.Duration {
+	if l := cluster.Spec.PrimaryLease; l != nil && l.RenewDeadlineSeconds != nil {
+		return time.Duration(*l.RenewDeadlineSeconds) * time.Second
+	}
+	return DefaultPrimaryLeaseRenewDeadlineSeconds * time.Second
+}
+
+// GetPrimaryLeaseRetryPeriod returns how frequently a non-holder retries acquiring the lease
+func (cluster *Cluster) GetPrimaryLeaseRetryPeriod() time.Duration {
+	if l := cluster.Spec.PrimaryLease; l != nil && l.RetryPeriodSeconds != nil {
+		return time.Duration(*l.RetryPeriodSeconds) * time.Second
+	}
+	return DefaultPrimaryLeaseRetryPeriodSeconds * time.Second
+}
+
+// GetPrimaryLeaseReleasedDuration returns the TTL written when the primary explicitly releases
+// the lease on a clean shutdown
+func (cluster *Cluster) GetPrimaryLeaseReleasedDuration() time.Duration {
+	if l := cluster.Spec.PrimaryLease; l != nil && l.ReleasedLeaseDurationSeconds != nil {
+		return time.Duration(*l.ReleasedLeaseDurationSeconds) * time.Second
+	}
+	return DefaultPrimaryLeaseReleasedDurationSeconds * time.Second
 }
 
 // GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover
@@ -1598,4 +1633,47 @@ func (cluster *Cluster) GetServiceAccountName() string {
 		return cluster.Spec.ServiceAccountName
 	}
 	return cluster.Name
+}
+
+// IsInitialized is true when the cluster has been running once.
+// Falls back to LatestGeneratedNode when the condition is absent or False,
+// to handle clusters upgraded from operator versions that predate the
+// Initialized condition.
+func (cluster *Cluster) IsInitialized() bool {
+	c := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionInitialized))
+	if c == nil || c.Status == metav1.ConditionFalse {
+		return cluster.Status.LatestGeneratedNode != 0
+	}
+
+	return c.Status == metav1.ConditionTrue
+}
+
+// SetAdmissionError sets the admission error status on the Cluster resource
+func (cluster *Cluster) SetAdmissionError(msg string) {
+	if len(msg) > 0 {
+		cluster.Status.Phase = PhaseDefinitionInvalid
+		cluster.Status.PhaseReason = msg
+		// The cluster definition is invalid, so it cannot be ready: mirror
+		// SetClusterReadyCondition here so an invalid cluster does not keep
+		// reporting Ready=True from a previous healthy loop. RegisterPhase
+		// would normally update the condition together with the phase, but the
+		// guard records the invalid phase directly.
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(ConditionClusterReady),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(ClusterIsNotReady),
+			Message: "Cluster Is Not Ready",
+		})
+		return
+	}
+
+	cluster.Status.PhaseReason = ""
+}
+
+// GetAdmissionError always returns an empty string: the Cluster encodes the
+// admission error in its phase, which the reconciler rewrites through the phase
+// machinery on the next healthy loop, so the guard must not persist the clear
+// itself and race that logic.
+func (cluster *Cluster) GetAdmissionError() string {
+	return ""
 }

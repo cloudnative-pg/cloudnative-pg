@@ -73,3 +73,19 @@ func (r *DatabaseRole) GetStatusMessage() string {
 func (r *DatabaseRole) SetStatusObservedGeneration(obsGeneration int64) {
 	r.Status.ObservedGeneration = obsGeneration
 }
+
+// GetClientCertSecretName returns the name of the Secret that holds the
+// generated TLS client certificate for this role.
+func (r *DatabaseRole) GetClientCertSecretName() string {
+	return r.Name + clientCertSecretSuffix
+}
+
+// IsClientCertificateEnabled returns true if the operator should manage a TLS
+// client certificate for this role. The clientCertificate block defaults
+// enabled to true when present, so an unset enabled field means enabled.
+func (r *DatabaseRole) IsClientCertificateEnabled() bool {
+	if r.Spec.ClientCertificate == nil {
+		return false
+	}
+	return ptr.Deref(r.Spec.ClientCertificate.Enabled, true)
+}

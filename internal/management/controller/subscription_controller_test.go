@@ -236,6 +236,22 @@ var _ = Describe("Managed subscription controller tests", func() {
 		})
 	})
 
+	When("reclaim policy is delete but the object never reconciled", func() {
+		It("on deletion it removes finalizers and does NOT drop the subscription", func(ctx SpecContext) {
+			// Model the state of a conflicting duplicate: it carries the
+			// finalizer, but the exclusivity check blocked it before it could
+			// apply anything, so it has no recorded reconciliation.
+			subscription.Finalizers = []string{utils.SubscriptionFinalizerName}
+			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
+			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
+
+			// No SQL is expected: dbMock would fail on any statement.
+			err := reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
 	When("reclaim policy is retain", func() {
 		It("on deletion it removes finalizers and does NOT drop the subscription", func(ctx SpecContext) {
 			subscription.Spec.ReclaimPolicy = apiv1.SubscriptionReclaimRetain
@@ -430,6 +446,83 @@ var _ = Describe("Managed subscription controller tests", func() {
 		// The replica gate runs before the finalizer reconciler, so no
 		// finalizer is added while the cluster is a replica.
 		Expect(subscription.GetFinalizers()).Should(BeEmpty())
+	})
+
+	// The demotion behavior is identical across the three managed-object
+	// controllers, and so are its tests.
+	It("reports the replica condition when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
+		subscription.Status.Applied = ptr.To(true)
+		subscription.Status.ObservedGeneration = subscription.Generation
+		Expect(fakeClient.Status().Update(ctx, subscription)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: subscription.GetNamespace(),
+			Name:      subscription.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(subscriptionReconciliationInterval))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(subscription), subscription)).To(Succeed())
+		Expect(subscription.Status.Applied).To(BeNil())
+		Expect(subscription.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
+		// the recorded reconciliation is kept, so the subscription retains
+		// the ownership of the managed Postgres subscription
+		Expect(subscription.Status.ObservedGeneration).To(Equal(subscription.Generation))
+	})
+
+	It("keeps an applied subscription untouched on pods other than the designated primary", func(ctx SpecContext) {
+		subscription.Status.Applied = ptr.To(true)
+		subscription.Status.ObservedGeneration = subscription.Generation
+		Expect(fakeClient.Status().Update(ctx, subscription)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+		cluster.Status.CurrentPrimary = "another-pod"
+		cluster.Status.TargetPrimary = "another-pod"
+		Expect(fakeClient.Status().Update(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: subscription.GetNamespace(),
+			Name:      subscription.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		// the demotion may be racing a failover: poll until the designated
+		// primary has reported the replica condition
+		Expect(result.RequeueAfter).To(Equal(subscriptionReconciliationInterval))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(subscription), subscription)).To(Succeed())
+		Expect(subscription.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(subscription.Status.ObservedGeneration).NotTo(BeZero())
+	})
+
+	// The cluster-fetch behavior is identical across the three
+	// managed-object controllers, and so are its tests.
+	It("keeps a reconciled subscription status when the cluster cannot be fetched", func(ctx SpecContext) { //nolint:dupl
+		subscription.Status.Applied = ptr.To(true)
+		subscription.Status.ObservedGeneration = subscription.Generation
+		Expect(fakeClient.Status().Update(ctx, subscription)).To(Succeed())
+
+		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: subscription.GetNamespace(),
+			Name:      subscription.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(subscription), subscription)).To(Succeed())
+		Expect(subscription.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(subscription.Status.Message).To(BeEmpty())
 	})
 })
 

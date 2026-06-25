@@ -32,19 +32,23 @@ spec:
     - Direct integration with the Kubernetes API server for High Availability,
       eliminating the need for external tools.
     - Self-healing capabilities, including:
-        - Automated failover, promoting the replica with the most up-to-date data,
-          with the option to use quorum-based failover and synchronous replication
-          for increased data durability and safety.
+        - Automated failover, promoting the replica with the most up-to-date data
+          (coordinated by a per-cluster lease that serializes promotion to prevent
+          split-brain), with the option to use quorum-based failover and synchronous
+          replication for increased data durability and safety.
         - Automatic recreation of failed replicas.
     - Planned switchover of the primary instance by promoting a selected replica.
     - Declarative management of key PostgreSQL configurations, including:
         - PostgreSQL settings.
         - Roles, users, and groups.
-        - Databases, extensions, and schemas.
+        - Databases, extensions, schemas, foreign data wrappers (FDW), and foreign
+          servers.
         - Tablespaces (including temporary tablespaces).
     - Flexible instance definition, supporting any number of instances (minimum 1
       primary server).
-    - Scale-up/down capabilities to dynamically adjust cluster size.
+    - Scale-up/down capabilities to dynamically adjust cluster size, with a scale
+      subresource compatible with the Kubernetes Horizontal and Vertical Pod
+      Autoscalers.
     - Read-Write and Read-Only Services, ensuring applications connect correctly:
         - *Read-Write Service*: Routes connections to the primary server.
         - *Read-Only Service*: Distributes connections among replicas for read workloads.
@@ -57,20 +61,28 @@ spec:
         - Support for Local Persistent Volumes with PVC templates.
         - Reuse of Persistent Volumes storage in Pods.
         - Separate volumes for WAL files and tablespaces.
-    - Backup and recovery options, including:
-        - Integration with the [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud)
-          for continuous online backup via WAL archiving to AWS S3, S3-compatible
-          services, Azure Blob Storage, and Google Cloud Storage, with support for
-          retention policies based on a configurable recovery window.
-        - Backups using volume snapshots (where supported by storage classes).
-        - Full and Point-In-Time recovery from volume snapshots or object stores (via Barman Cloud plugin).
-        - Backup from standby replicas to reduce primary workload impact.
+    - Backup and Recovery via CNPG-I Plugins:
+        - Pluggable architecture for continuous physical backup and recovery.
+        - Hot and cold base backups.
+        - WAL archiving.
+        - Full and Point-In-Time Recovery (PITR).
+        - Scheduled and on-demand backups.
+        - Backup from standbys to reduce primary load.
+    - Community-Supported Barman Cloud Plugin:
+        - WAL archiving to object stores with support for full/PITR recovery.
+        - Retention policies based on configurable recovery windows.
+        - Supported as a CNPG-I plugin (recommended approach).
+    - Native Backup Methods:
+        - Continuous backup and full/PITR recovery via volume snapshots (if
+          supported by the storage class).
+        - Native integration with Barman Cloud for object store backups via
+          `.spec.backup.barmanObjectStore` (*deprecated since v1.26*).
+    - Offline in-place major upgrades of PostgreSQL
     - Offline and online import of PostgreSQL databases, including major upgrades:
         - *Offline Import*: Direct restore from existing databases.
         - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.
-    - Offline In-Place Major Upgrades of PostgreSQL
     - High Availability physical replication slots, including synchronization of
-      user-defined replication slots.
+      user-defined replication slots and logical decoding failover.
     - Parallel WAL archiving and restore, ensuring high-performance data
       synchronization in high-write environments.
     - TLS support, including:
@@ -119,7 +131,7 @@ spec:
   # This version should be keep as low as this one or at least satisfy the version
   # that we have here https://github.com/redhat-openshift-ecosystem/community-operators-pipeline/blob/ci/latest/ci/scripts/opp.sh#L19
   # If we change this, the kiwi test will fail
-  minKubeVersion: 1.23.0
+  minKubeVersion: 1.31.0
   links:
   - name: CloudNativePG
     url: https://cloudnative-pg.io/
@@ -1105,6 +1117,12 @@ spec:
           x-descriptors:
             - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
             - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: clientCertificate.enabled
+          displayName: Client certificate
+          description: Whether the operator generates and renews a TLS client certificate for this role, signed by the cluster's client CA, enabling password-free certificate authentication
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       statusDescriptors:
       - path: applied
         displayName: Applied
@@ -1112,6 +1130,12 @@ spec:
       - path: message
         displayName: Message
         description: Message is the reconciliation output message
+      - path: clientCertificate.expiration
+        displayName: Client certificate expiration
+        description: Expiration time of the generated TLS client certificate, in RFC3339 format
+      - path: clientCertificate.message
+        displayName: Client certificate message
+        description: Human-readable explanation of the current client certificate status
     - kind: FailoverQuorum
       name: failoverquorums.postgresql.cnpg.io
       displayName: Failover Quorum

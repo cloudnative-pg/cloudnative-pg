@@ -26,7 +26,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
-	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -397,7 +397,7 @@ func assertArchiveWalOnAzurite(namespace, clusterName string) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
 	By("archiving WALs and verifying they exist", func() {
 		primary := clusterName + "-1"
-		latestWAL := minioasserts.SwitchWalAndGetLatestArchive(env, namespace, primary)
+		latestWAL := objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary)
 		// verifying on blob storage using az
 		// Define what file we are looking for in Azurite.
 		// Escapes are required since az expects forward slashes to be escaped

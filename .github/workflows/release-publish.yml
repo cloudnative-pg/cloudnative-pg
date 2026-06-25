@@ -24,7 +24,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
@@ -62,7 +62,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       -
         name: Get tag
         run: |
@@ -97,7 +97,7 @@ jobs:
           --bundle "releases/cnpg-${VERSION}.sigstore.json" --yes
       -
         name: Release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
           body_path: release_notes.md
           draft: false
@@ -130,7 +130,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
@@ -351,7 +351,7 @@ jobs:
       )
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
 
@@ -422,7 +422,7 @@ jobs:
       VERSION: ${{ needs.release-binaries.outputs.version }}
     steps:
       - name: Checkout community-operators
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: k8s-operatorhub/community-operators
           fetch-depth: 0
@@ -505,7 +505,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}

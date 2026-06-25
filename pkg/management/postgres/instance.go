@@ -38,7 +38,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -58,6 +58,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -230,7 +231,10 @@ type Instance struct {
 
 	// cluster is the cached cluster this instance belongs to.
 	// Access via GetClusterOrDefault() which returns an empty cluster if nil.
-	cluster *apiv1.Cluster
+	// It is read from HTTP handler goroutines (e.g. the remote webserver
+	// authentication middleware) while being written by the reconciliation loop,
+	// so access is synchronized through an atomic pointer.
+	cluster atomic.Pointer[apiv1.Cluster]
 }
 
 type serverCertificateHandler struct {
@@ -304,16 +308,16 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 // GetClusterOrDefault returns the cached cluster, or an empty cluster if not set.
 // The empty cluster provides safe defaults via getter methods.
 func (instance *Instance) GetClusterOrDefault() *apiv1.Cluster {
-	if instance.cluster == nil {
-		return &apiv1.Cluster{}
+	if cluster := instance.cluster.Load(); cluster != nil {
+		return cluster
 	}
-	return instance.cluster
+	return &apiv1.Cluster{}
 }
 
 // SetCluster updates the cached cluster for use outside the reconciliation
 // cycle when the API client is not available
 func (instance *Instance) SetCluster(cluster *apiv1.Cluster) {
-	instance.cluster = cluster
+	instance.cluster.Store(cluster)
 }
 
 // RequiresDesignatedPrimaryTransition checks if this instance is a primary
@@ -796,126 +800,19 @@ func (instance *Instance) buildPostgresEnv() []string {
 		return envMap.StringSlice()
 	}
 
-	// Collect additional library paths and binary paths
-	additionalLibraryPaths := collectLibraryPaths(cluster.Status.PGDataImageInfo.Extensions)
-	additionalBinPaths := collectBinPaths(cluster.Status.PGDataImageInfo.Extensions)
-
-	// We add the additional library paths after the entries that are already
-	// available.
-	if len(additionalLibraryPaths) > 0 {
-		currentLibraryPath := envMap["LD_LIBRARY_PATH"]
-		if currentLibraryPath != "" {
-			currentLibraryPath += ":"
-		}
-		currentLibraryPath += strings.Join(additionalLibraryPaths, ":")
-		envMap["LD_LIBRARY_PATH"] = currentLibraryPath
+	// Append extension-provided paths after any existing entries, then merge
+	// custom Env from extensions. Guard against empty paths to avoid creating
+	// an empty LD_LIBRARY_PATH (glibc treats that as "search cwd").
+	exts := cluster.Status.PGDataImageInfo.Extensions
+	if paths := extensions.CollectLibraryPaths(exts, postgres.ExtensionsBaseDirectory); len(paths) > 0 {
+		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], paths)
 	}
-
-	// We add the additional binary paths after the entries that are already
-	// available.
-	if len(additionalBinPaths) > 0 {
-		currentPath := envMap["PATH"]
-		if currentPath != "" {
-			currentPath += ":"
-		}
-		currentPath += strings.Join(additionalBinPaths, ":")
-		envMap["PATH"] = currentPath
+	if paths := extensions.CollectBinPaths(exts, postgres.ExtensionsBaseDirectory); len(paths) > 0 {
+		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], paths)
 	}
-
-	// Set custom environment variables from extensions.
-	setExtensionEnvVars(cluster.Status.PGDataImageInfo.Extensions, envMap)
+	extensions.SetEnvVars(exts, envMap, postgres.ExtensionsBaseDirectory)
 
 	return envMap.StringSlice()
-}
-
-// collectLibraryPaths returns a list of paths which should be added to LD_LIBRARY_PATH
-// given a list of extensions.
-// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
-// trailing "/" are cleaned), so "/lib", "./lib", and "lib" all resolve to the
-// same directory under the extension mount point.
-func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	capacity := 0
-	for _, ext := range extensionList {
-		capacity += len(ext.LdLibraryPath)
-	}
-	result := make([]string, 0, capacity)
-
-	for _, extension := range extensionList {
-		for _, libraryPath := range extension.LdLibraryPath {
-			result = append(
-				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
-			)
-		}
-	}
-
-	return result
-}
-
-// collectBinPaths returns a list of paths which should be added to PATH
-// given a list of extensions.
-// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
-// trailing "/" are cleaned), so "/bin", "./bin", and "bin" all resolve to the
-// same directory under the extension mount point.
-func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	capacity := 0
-	for _, ext := range extensionList {
-		capacity += len(ext.BinPath)
-	}
-	result := make([]string, 0, capacity)
-
-	for _, extension := range extensionList {
-		for _, binPath := range extension.BinPath {
-			result = append(
-				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, binPath),
-			)
-		}
-	}
-
-	return result
-}
-
-// dedicatedExtensionEnvVars lists environment variables that are managed
-// via dedicated extension fields and must not be overridden by custom env vars.
-var dedicatedExtensionEnvVars = map[string]bool{
-	"PATH":            true,
-	"LD_LIBRARY_PATH": true,
-}
-
-// setExtensionEnvVars sets custom environment variables given a list of extensions,
-// expanding supported placeholders in the values.
-// As a defense-in-depth measure, env vars that are reserved for operator usage
-// or managed via dedicated fields are silently skipped.
-func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap) {
-	// Track which extension set each variable, to detect cross-extension conflicts.
-	setBy := make(map[string]string)
-
-	for _, extension := range extensionList {
-		for _, envVar := range extension.Env {
-			if postgres.IsReservedEnvironmentVariable(envVar.Name) || dedicatedExtensionEnvVars[envVar.Name] {
-				log.Warning("Skipping reserved environment variable from extension",
-					"extension", extension.Name, "variable", envVar.Name)
-				continue
-			}
-
-			if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
-				log.Warning("Extension environment variable contains unknown placeholders",
-					"extension", extension.Name, "variable", envVar.Name, "unknownPlaceholders", unknown)
-			}
-
-			if prev, ok := setBy[envVar.Name]; ok {
-				log.Warning("Extension environment variable overrides value from a previous extension",
-					"variable", envVar.Name, "extension", extension.Name, "previousExtension", prev)
-			} else if _, exists := envMap[envVar.Name]; exists {
-				log.Warning("Extension environment variable overrides a cluster-level value",
-					"variable", envVar.Name, "extension", extension.Name)
-			}
-
-			envMap[envVar.Name] = postgres.ExpandEnvPlaceholders(envVar.Value, extension.Name)
-			setBy[envVar.Name] = extension.Name
-		}
-	}
 }
 
 // WithActiveInstance execute the internal function while this

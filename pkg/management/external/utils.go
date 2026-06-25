@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -110,20 +111,14 @@ func dumpSecretKeyRefToFile(
 	}
 
 	filePath := filepath.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
-	f, err := os.OpenFile(filepath.Clean(filePath), os.O_WRONLY|os.O_CREATE, 0o600)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	_, err = f.Write(value)
-	if err != nil {
+	// Write atomically: this file is reused across reconciliations and read
+	// concurrently by libpq, so an in-place rewrite could expose a partial file
+	// or leave stale bytes behind when the secret rotates to shorter content.
+	if _, err := fileutils.WriteFileAtomic(filePath, value, 0o600); err != nil {
 		return "", err
 	}
 
-	return f.Name(), nil
+	return filePath, nil
 }
 
 // getPgPassFilePath gets the path where the pgpass file will be stored

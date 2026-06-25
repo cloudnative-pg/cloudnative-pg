@@ -28,8 +28,11 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
@@ -80,15 +83,27 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	// If everything is reconciled, we're done here
-	if subscription.Generation == subscription.Status.ObservedGeneration {
-		return ctrl.Result{}, nil
-	}
-
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
+		// A reconciled subscription keeps its status: the cluster may be
+		// gone or unreadable while it is being deleted.
+		if subscription.Generation == subscription.Status.ObservedGeneration {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
 		return ctrl.Result{}, markAsFailed(ctx, r.Client, &subscription, fmt.Errorf("while fetching the cluster: %w", err))
+	}
+
+	// If everything is reconciled, we're done here
+	if subscription.Generation == subscription.Status.ObservedGeneration {
+		// ...unless the cluster moved in or out of the replica role after
+		// the subscription was applied: report the demotion on the status,
+		// and evaluate the subscription again after the promotion.
+		result, proceed, err := handleReplicaRoleTransition(
+			ctx, r.Client, r.instance, cluster, &subscription, subscriptionReconciliationInterval)
+		if err != nil || !proceed {
+			return result, err
+		}
 	}
 
 	// Still not for me, we're waiting for a switchover
@@ -175,6 +190,7 @@ func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, s
 	if sub.Spec.ReclaimPolicy != apiv1.SubscriptionReclaimDelete {
 		return nil
 	}
+
 	// On a replica we cannot drop the subscription: return without touching
 	// PostgreSQL so the finalizer is released. Dropping it is left to the
 	// primary cluster's own Subscription object, if any.
@@ -185,6 +201,14 @@ func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, s
 	if cluster.IsReplica() {
 		return nil
 	}
+
+	// An object that never reconciled does not own the subscription: a
+	// conflicting duplicate is blocked before applying anything, and its
+	// deletion must not drop the subscription owned by the surviving object.
+	if !sub.HasReconciliations() {
+		return nil
+	}
+
 	db, err := r.getDB(sub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
@@ -205,7 +229,7 @@ func NewSubscriptionReconciler(
 		},
 		getPostgresMajorVersion: func() (int, error) {
 			version, err := instance.GetPgVersion()
-			return int(version.Major), err //nolint:gosec
+			return int(version.Major()), err //nolint:gosec
 		},
 	}
 	sr.finalizerReconciler = newFinalizerReconciler(
@@ -221,6 +245,13 @@ func NewSubscriptionReconciler(
 func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Subscription{}).
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterToManagedResources(
+				r.instance, mgr.GetClient(),
+				func() client.ObjectList { return &apiv1.SubscriptionList{} })),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		Named("instance-subscription").
 		Complete(r)
 }

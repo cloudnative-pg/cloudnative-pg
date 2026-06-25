@@ -49,9 +49,9 @@ env:
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.32.0"
   # renovate: datasource=github-releases depName=k3d-io/k3d versioning=semver
-  K3D_VERSION: "v5.8.3"
+  K3D_VERSION: "v5.9.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
-  ROOK_VERSION: "v1.19.6"
+  ROOK_VERSION: "v1.20.1"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
   EXTERNAL_SNAPSHOTTER_VERSION: "v8.6.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
@@ -341,7 +341,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
@@ -558,7 +558,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -645,7 +645,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
@@ -728,7 +728,7 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -921,7 +921,7 @@ jobs:
           df -h
           echo "-----------------------------------------------------"
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       - name: Install Go
@@ -1137,7 +1137,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -1163,7 +1163,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
@@ -1241,8 +1241,9 @@ jobs:
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
             kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
             kubectl apply -f ${ROOK_BASE_URL}/common.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
+            # csi-operator.yaml defines the csi.ceph.io CRDs that operator.yaml's CRs rely on
             kubectl apply -f ${ROOK_BASE_URL}/csi-operator.yaml
+            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
             curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
               sed '/^ *#/d;/^ *$/d' | \
               yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
@@ -1487,7 +1488,7 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-test-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX}" | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -1521,7 +1522,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6
@@ -1875,7 +1876,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -1909,7 +1910,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
       -
         name: Set cluster name
         run: |
@@ -2204,7 +2205,7 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-ocp-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_K8S_VERSION}" | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
           fetch-depth: 0
@@ -2463,7 +2464,7 @@ jobs:
       - name: Send the Ciclops view over Slack
         # Send the Ciclops thermometer on every scheduled run on `main`.
         # or when there are systematic failures in release branches
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         if: |
           github.repository_owner == env.REPOSITORY_OWNER &&
           (

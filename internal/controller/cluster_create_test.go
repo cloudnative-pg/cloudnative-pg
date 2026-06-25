@@ -24,6 +24,7 @@ import (
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -1538,5 +1539,123 @@ var _ = Describe("ServiceAccount with custom name", func() {
 		Expect(rb.Subjects[0].Kind).To(Equal("ServiceAccount"))
 		Expect(rb.Subjects[0].Name).To(Equal("shared-sa"))
 		Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
+	})
+})
+
+var _ = Describe("generateNodeSerial", func() {
+	const clusterName = "cluster-example"
+
+	newCluster := func(instanceNames ...string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+			Status:     apiv1.ClusterStatus{InstanceNames: instanceNames},
+		}
+	}
+
+	r := &ClusterReconciler{}
+
+	It("returns 1 when there are no instances", func() {
+		Expect(r.generateNodeSerial(newCluster())).To(Equal(1))
+	})
+
+	It("returns the next serial when names are sequential", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 1),
+			specs.GetInstanceName(clusterName, 2),
+		))
+		Expect(serial).To(Equal(3))
+	})
+
+	It("fills the lowest gap left by a removed instance", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 1),
+			specs.GetInstanceName(clusterName, 3),
+		))
+		Expect(serial).To(Equal(2))
+	})
+
+	It("ignores names that don't follow the cluster prefix", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 2),
+			"unrelated-pod",
+		))
+		Expect(serial).To(Equal(1))
+	})
+})
+
+var _ = Describe("ensureJobAdoptable", func() {
+	const (
+		clusterName = "cluster-example"
+		namespace   = "default"
+		jobName     = "cluster-example-2-join"
+	)
+
+	newCluster := func() *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+		}
+	}
+
+	ownedJob := func() *batchv1.Job {
+		cluster := newCluster()
+		return &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      jobName,
+				Namespace: namespace,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: apiv1.SchemeGroupVersion.String(),
+						Kind:       apiv1.ClusterKind,
+						Name:       cluster.Name,
+						Controller: ptr.To(true),
+					},
+				},
+			},
+		}
+	}
+
+	It("returns a zero result when the Job is owned by this cluster", func(ctx SpecContext) {
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(ownedJob()).
+			Build()
+		r := &ClusterReconciler{Client: cli}
+		result, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.IsZero()).To(BeTrue())
+	})
+
+	It("requeues when the Job is not yet in the cache", func(ctx SpecContext) {
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
+		r := &ClusterReconciler{Client: cli}
+		result, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+	})
+
+	It("returns an error when the Job is not owned by this cluster", func(ctx SpecContext) {
+		job := ownedJob()
+		job.OwnerReferences[0].Name = "other-cluster"
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(job).
+			Build()
+		r := &ClusterReconciler{Client: cli}
+		_, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
+		Expect(err).To(MatchError(ContainSubstring("refusing to adopt job")))
+	})
+
+	It("returns an error when the Job has no owner reference", func(ctx SpecContext) {
+		job := ownedJob()
+		job.OwnerReferences = nil
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(job).
+			Build()
+		r := &ClusterReconciler{Client: cli}
+		_, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
+		Expect(err).To(MatchError(ContainSubstring("refusing to adopt job")))
 	})
 })

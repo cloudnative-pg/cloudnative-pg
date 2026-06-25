@@ -174,7 +174,13 @@ func (se *Reconciler) Reconcile(
 
 	res, err := se.internalReconcile(ctx, cluster, backup, targetPod, pvcs)
 	if isNetworkErrorRetryable(err) {
-		contextLogger.Error(err, "detected retryable error while executing snapshot backup, retrying...")
+		if remote.IsTransientAuthError(err) {
+			contextLogger.Info(
+				"Waiting for the operator certificate fingerprint to propagate " +
+					"before executing the snapshot backup")
+		} else {
+			contextLogger.Error(err, "detected retryable error while executing snapshot backup, retrying...")
+		}
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 

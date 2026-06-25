@@ -1,8 +1,15 @@
 # This workflow executes the following actions:
-# - Runs Golang and ShellCheck linters
+# - Runs Golang, ShellCheck and Renovate linters
+# - Runs Govulncheck
 # - Runs Unit tests
 # - Verifies API doc and CRDs are up to date
-# - Builds the operator image (no push)
+# - Verifies documentation website builds
+# - Builds and pushes the operator image (no push if the PR has been opened from a fork)
+# - Generates SLSA3+ provenance for the operator image
+# - Creates and pushes an operator's OLM bundle and catalog
+# - Runs openshift-preflight test
+# - Runs OLM scorecard test
+# - Runs community-operators OPP tests (kiwi,lemon,orange)
 name: continuous-integration
 on:
   push:
@@ -15,6 +22,10 @@ on:
     - cron:  '0 1 * * *'
 
 permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # set up environment variables to be used across all the jobs
 env:
@@ -40,7 +51,7 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   SIGN_IMAGES: "true"
   # renovate: datasource=git-refs depName=https://github.com/redhat-openshift-ecosystem/community-operators-pipeline.git versioning=git currentValue=ci/latest
-  OPP_SCRIPT_VERSION: "fbac22ff0c713188bdcea36791b70fb3999e6e03"
+  OPP_SCRIPT_VERSION: "9b8066ee2d37b41acf0c9d58682141309fa53fcc"
 
 defaults:
   run:
@@ -102,9 +113,10 @@ jobs:
       shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
       go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
       renovate-changed: ${{ steps.filter.outputs.renovate-changed }}
+      security-insights-changed: ${{ steps.filter.outputs.security-insights-changed }}
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Check for changes
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
@@ -144,6 +156,8 @@ jobs:
               - '.golangci.yml'
             renovate-changed:
               - '.github/renovate.json5'
+            security-insights-changed:
+              - 'SECURITY-INSIGHTS.yml'
 
   go-linters:
     name: Run linters
@@ -155,7 +169,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Install Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -169,6 +183,12 @@ jobs:
         uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
+
+      - name: Run golangci-lint (tests module)
+        uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: tests
 
       - name: Check go mod tidy has no pending changes
         run: |
@@ -185,10 +205,26 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Validate Renovate JSON
         run: npx --yes --package renovate@latest -- renovate-config-validator
+
+  security-insights-linter:
+    name: Security Insights Linter
+    needs:
+      - duplicate_runs
+      - change-triage
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.security-insights-changed == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Validate SECURITY-INSIGHTS.yml against its schema
+        run: make validate-security-insights
 
   go-vulncheck:
     name: Run govulncheck
@@ -199,7 +235,8 @@ jobs:
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
     runs-on: ubuntu-24.04
     steps:
@@ -213,6 +250,14 @@ jobs:
           # See https://github.com/golang/go/issues/70036
           go-version-input: ""
           check-latest: true
+
+      - name: Run govulncheck (tests module)
+        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
+        with:
+          go-version-file: tests/go.mod
+          go-version-input: ""
+          check-latest: true
+          work-dir: tests
 
   shellcheck:
     name: Run shellcheck linter
@@ -228,7 +273,7 @@ jobs:
         SHELLCHECK_OPTS: -a -x -S style
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
@@ -238,12 +283,14 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Generate unit tests jobs only if the operator or the Go codebase have changed
+    # Generate unit tests jobs only if the operator, the Go codebase, or the
+    # tests module have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
     runs-on: ubuntu-24.04
     outputs:
@@ -251,21 +298,33 @@ jobs:
       latest_k8s_version: ${{ steps.get-k8s-versions.outputs.latest_k8s_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Get k8s versions for unit test
         id: get-k8s-versions
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          k8s_versions=$(jq -c '
-            .unit_test.max as $max |
-            .unit_test.min as $min |
-            $min | [ while(. <= $max;
-                . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
-              )
-            ] |
-            .[] |= .+".x"
-          ' < .github/k8s_versions_scope.json)
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            # On pull requests, only test against the lowest and highest supported
+            # versions to bracket the support window, keeping CI fast.
+            k8s_versions=$(jq -c '
+              [.unit_test.min + ".x", .unit_test.max + ".x"]
+            ' < .github/k8s_versions_scope.json)
+          else
+            # On pushes to main/release branches and scheduled runs, run the full
+            # matrix so cross-version regressions are caught before a release.
+            k8s_versions=$(jq -c '
+              .unit_test.max as $max |
+              .unit_test.min as $min |
+              $min | [ while(. <= $max;
+                  . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
+                )
+              ] |
+              .[] |= .+".x"
+            ' < .github/k8s_versions_scope.json)
+          fi
           echo "k8s_versions=${k8s_versions}" >> $GITHUB_OUTPUT
 
           latest_k8s_version=$(jq -r '.|last' <<< $k8s_versions)
@@ -277,12 +336,14 @@ jobs:
       - duplicate_runs
       - change-triage
       - generate-unit-tests-jobs
-    # Run unit tests only if the operator or the Go codebase have changed
+    # Run unit tests only if the operator, the Go codebase, or the tests
+    # module have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
     runs-on: ubuntu-24.04
     strategy:
@@ -293,7 +354,7 @@ jobs:
       ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Install Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -315,6 +376,20 @@ jobs:
         run: |
           echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
 
+  unit-tests:
+    name: Unit tests
+    needs:
+      - tests
+    if: always() && !cancelled()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Report matrix result
+        env:
+          RESULT: ${{ needs.tests.result }}
+        run: |
+          echo "Aggregated unit tests result: ${RESULT}"
+          [[ "${RESULT}" == "success" || "${RESULT}" == "skipped" ]]
+
   apidoc:
     name: Verify API doc is up to date
     needs:
@@ -330,7 +405,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Install Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -361,7 +436,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Build documentation
         run: |
@@ -385,7 +460,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Install Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -408,17 +483,9 @@ jobs:
   buildx:
     name: Build containers
     needs:
-      - go-linters
-      - shellcheck
-      - tests
-      - apidoc
-      - crd
       - duplicate_runs
       - change-triage
-    # Build containers:
-    #   if there have been any code changes OR it is a scheduled execution
-    #   AND
-    #   none of the preceding jobs failed
+    # Build containers if there have been any code changes OR it is a scheduled execution
     if: |
       (always() && !cancelled()) &&
       (
@@ -429,12 +496,7 @@ jobs:
           needs.change-triage.outputs.shell-script-changed == 'true' ||
           needs.change-triage.outputs.go-code-changed == 'true'
         )
-      ) &&
-      (needs.go-linters.result == 'success' || needs.go-linters.result == 'skipped') &&
-      (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
-      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
-      (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
-      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
+      )
     runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     permissions:
       actions: read
@@ -455,7 +517,7 @@ jobs:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
@@ -543,7 +605,7 @@ jobs:
       # Send Slack notification if the kubectl plugin build fails.
       # To avoid message overflow, we only report runs scheduled on main or release branches
       - name: Slack Notification
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         if: |
           failure() &&
           github.repository_owner == env.REPOSITORY_OWNER &&
@@ -723,7 +785,7 @@ jobs:
       needs.buildx.outputs.push == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
           ref: ${{ needs.buildx.outputs.commit }}
@@ -784,7 +846,7 @@ jobs:
       needs.olm-bundle.result == 'success'
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Install Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -841,7 +903,7 @@ jobs:
       github.repository_owner == 'cloudnative-pg'
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Setting up KinD cluster
         uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
@@ -900,7 +962,7 @@ jobs:
       TEST: ${{ matrix.test }}
     steps:
       - name: Checkout community-operators
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: k8s-operatorhub/community-operators
           persist-credentials: false

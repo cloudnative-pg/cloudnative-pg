@@ -268,9 +268,9 @@ func CreateClusterFromBackupUsingPITR(
 	return cluster, nil
 }
 
-// CreateClusterFromExternalClusterBackupWithPITROnMinio creates a cluster on Minio, starting from an external cluster
-// backup with PITR
-func CreateClusterFromExternalClusterBackupWithPITROnMinio(
+// CreateClusterFromExternalClusterBackupWithPITROnObjectStore creates a cluster on the object store,
+// starting from an external cluster backup with PITR
+func CreateClusterFromExternalClusterBackupWithPITROnObjectStore(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace,
@@ -319,10 +319,10 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 					Name: sourceClusterName,
 					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: "s3://cluster-backups/",
-						EndpointURL:     "https://minio-service.minio:9000",
+						EndpointURL:     "https://object-store.object-store:9000",
 						EndpointCA: &apiv1.SecretKeySelector{
 							LocalObjectReference: apiv1.LocalObjectReference{
-								Name: "minio-server-ca-secret",
+								Name: "object-store-ca-secret",
 							},
 							Key: "ca.crt",
 						},

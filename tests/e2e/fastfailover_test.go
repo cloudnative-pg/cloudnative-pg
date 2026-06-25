@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 
@@ -41,7 +42,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		namespace       string
 		clusterName     string
 		maxReattachTime = 60
-		maxFailoverTime = 10
+		maxFailoverTime int
 	)
 
 	BeforeEach(func() {
@@ -49,17 +50,31 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
+		// The primary is deleted abruptly (quickDeletionPeriod): usually it still
+		// releases the primary lease cleanly inside the grace period and a replica
+		// promotes within a couple of seconds, but if the SIGKILL wins the race the
+		// lease is left held, and the promoting replica must observe it unchanged
+		// for a full lease duration and then claim it on its next poll before it can
+		// promote. That take-over window is engine-independent and dominates the
+		// failover when it happens, so use it (plus a small margin for the promotion
+		// itself) as a floor on the budget rather than adding it to the per-engine
+		// base.
+		abruptTakeOver := apiv1.DefaultPrimaryLeaseDurationSeconds + apiv1.DefaultPrimaryLeaseRetryPeriodSeconds + 3
+		maxFailoverTime = 10
 		if !(IsKind() || IsK3D()) {
 			maxFailoverTime = 30
+		}
+		if maxFailoverTime < abruptTakeOver {
+			maxFailoverTime = abruptTakeOver
 		}
 	})
 
 	Context("with async replicas cluster (without HA Replication Slots)", func() {
-		// Confirm that a standby closely following the primary doesn't need more
-		// than 10 seconds to be promoted and be able to start inserting records.
-		// We test this setting up an application pointing to the rw service,
-		// forcing a failover and measuring how much time passes between the
-		// last row written on timeline 1 and the first one on timeline 2.
+		// Confirm that a standby closely following the primary is promoted and
+		// resumes inserting records within the failover budget. We test this
+		// setting up an application pointing to the rw service, forcing a
+		// failover and measuring how much time passes between the last row
+		// written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
 			const namespacePrefix = "primary-failover-time-async"
 			clusterName = "cluster-fast-failover"
@@ -77,11 +92,11 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 	})
 
 	Context("with async replicas cluster and HA Replication Slots", func() {
-		// Confirm that a standby closely following the primary doesn't need more
-		// than 10 seconds to be promoted and be able to start inserting records.
-		// We test this setting up an application pointing to the rw service,
-		// forcing a failover and measuring how much time passes between the
-		// last row written on timeline 1 and the first one on timeline 2.
+		// Confirm that a standby closely following the primary is promoted and
+		// resumes inserting records within the failover budget. We test this
+		// setting up an application pointing to the rw service, forcing a
+		// failover and measuring how much time passes between the last row
+		// written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
 			const namespacePrefix = "primary-failover-time-async-with-slots"
 			clusterName = "cluster-fast-failover"

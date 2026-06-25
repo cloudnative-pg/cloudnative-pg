@@ -512,6 +512,42 @@ _Appears in:_
 | `expirations` _object (keys:string, values:string)_ | Expiration dates for all certificates. |  |  |  |
 
 
+#### ClientCertificateConfiguration
+
+
+
+ClientCertificateConfiguration configures operator-managed issuance of a TLS
+client certificate for a DatabaseRole.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleSpec](#databaserolespec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `enabled` _boolean_ | Enabled turns on client certificate issuance for this role. When true,<br />the role must have login enabled. Defaults to true when the block is present. |  | true |  |
+
+
+#### ClientCertificateState
+
+
+
+ClientCertificateState holds the observed state of the generated TLS client certificate.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleStatus](#databaserolestatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `expiration` _string_ | Expiration is the expiration time of the generated client certificate, in RFC3339 format. |  |  |  |
+| `message` _string_ | Message contains a human-readable explanation of the current certificate status,<br />such as why issuance was skipped or why an existing Secret was left untouched. |  |  |  |
+
+
 #### Cluster
 
 
@@ -639,6 +675,7 @@ _Appears in:_
 | `enablePDB` _boolean_ | Manage the `PodDisruptionBudget` resources within the cluster. When<br />configured as `true` (default setting), the pod disruption budgets<br />will safeguard the primary node from being terminated. Conversely,<br />setting it to `false` will result in the absence of any<br />`PodDisruptionBudget` resource, permitting the shutdown of all nodes<br />hosting the PostgreSQL cluster. This latter configuration is<br />advisable for any PostgreSQL cluster employed for<br />development/staging purposes. |  | true |  |
 | `plugins` _[PluginConfiguration](#pluginconfiguration) array_ | The plugins configuration, containing<br />any plugin to be loaded with the corresponding configuration |  |  |  |
 | `probes` _[ProbesConfiguration](#probesconfiguration)_ | The configuration of the probes to be injected<br />in the PostgreSQL Pods. |  |  |  |
+| `primaryLease` _[PrimaryLeaseConfiguration](#primaryleaseconfiguration)_ | Configuration of the Kubernetes `Lease` used to coordinate safe primary<br />election within the cluster. When omitted, the operator applies built-in<br />defaults; tune these values only if you understand the consequences for<br />failover timing. |  |  |  |
 
 
 #### ClusterStatus
@@ -666,7 +703,7 @@ _Appears in:_
 | `podSelectorRefs` _[PodSelectorRefStatus](#podselectorrefstatus) array_ | PodSelectorRefs contains the resolved pod IPs for each named selector<br />defined in spec.podSelectorRefs. |  |  |  |
 | `timelineID` _integer_ | The timeline of the Postgres cluster |  |  |  |
 | `topology` _[Topology](#topology)_ | Instances topology. |  |  |  |
-| `latestGeneratedNode` _integer_ | ID of the latest generated node (used to avoid node name clashing) |  |  |  |
+| `latestGeneratedNode` _integer_ | ID of the latest generated node (used to avoid node name clashing)<br />Deprecated: this field is not set anymore |  |  |  |
 | `currentPrimary` _string_ | Current primary instance |  |  |  |
 | `targetPrimary` _string_ | Target primary instance, this is different from the previous one<br />during a switchover or a failover |  |  |  |
 | `lastPromotionToken` _string_ | LastPromotionToken is the last verified promotion token that<br />was used to promote a replica cluster |  |  |  |
@@ -695,12 +732,14 @@ _Appears in:_
 | `targetPrimaryTimestamp` _string_ | The timestamp when the last request for a new primary has occurred |  |  |  |
 | `poolerIntegrations` _[PoolerIntegrations](#poolerintegrations)_ | The integration needed by poolers referencing the cluster |  |  |  |
 | `cloudNativePGOperatorHash` _string_ | The hash of the binary of the operator |  |  |  |
+| `operatorCertificateFingerprint` _string_ | OperatorCertificateFingerprint is the SHA256 fingerprint of the operator's<br />in-memory client certificate public key. The instance manager pins this<br />fingerprint to authenticate requests from the operator. |  |  |  |
 | `availableArchitectures` _[AvailableArchitecture](#availablearchitecture) array_ | AvailableArchitectures reports the available architectures of a cluster |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for cluster object |  |  |  |
 | `instanceNames` _string array_ | List of instance names in the cluster |  |  |  |
 | `onlineUpdateEnabled` _boolean_ | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster |  |  |  |
 | `image` _string_ | Image contains the image name used by the pods |  |  |  |
 | `pgDataImageInfo` _[ImageInfo](#imageinfo)_ | PGDataImageInfo contains the details of the latest image that has run on the current data directory. |  |  |  |
+| `targetPgDataImageInfo` _[ImageInfo](#imageinfo)_ | TargetPGDataImageInfo contains the details of the target image for an<br />in-progress major upgrade. It is set before the upgrade Job is created,<br />and cleared on successful completion or when the upgrade is rolled back. |  |  |  |
 | `pluginStatus` _[PluginStatus](#pluginstatus) array_ | PluginStatus is the status of the loaded plugins |  |  |  |
 | `switchReplicaClusterStatus` _[SwitchReplicaClusterStatus](#switchreplicaclusterstatus)_ | SwitchReplicaClusterStatus is the status of the switch to replica cluster |  |  |  |
 | `demotionToken` _string_ | DemotionToken is a JSON token containing the information<br />from pg_controldata such as Database system identifier, Latest checkpoint's<br />TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO<br />WAL file, and Time of latest checkpoint |  |  |  |
@@ -957,6 +996,7 @@ _Appears in:_
 | `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
 | `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
 | `databaseRoleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
+| `clientCertificate` _[ClientCertificateConfiguration](#clientcertificateconfiguration)_ | ClientCertificate configures the operator to generate and renew a TLS client<br />certificate for this role, signed by the cluster's client CA. The certificate<br />is stored in a Secret named `<databaserole-name>-client-cert`.<br />Requires login to be true. |  |  |  |
 
 
 #### DatabaseRoleStatus
@@ -977,6 +1017,7 @@ _Appears in:_
 | `applied` _boolean_ | Applied is true if the role was reconciled correctly |  |  |  |
 | `message` _string_ | Message is the reconciliation error message |  |  |  |
 | `secretResourceVersion` _string_ | SecretResourceVersion is the resource version of the password secret<br />last applied to the role; a change to it triggers reconciliation. |  |  |  |
+| `clientCertificate` _[ClientCertificateState](#clientcertificatestate)_ | ClientCertificate holds the observed state of the generated TLS client<br />certificate, when client certificate issuance is enabled. |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for the DatabaseRole object |  |  |  |
 
 
@@ -1125,7 +1166,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | The name of the extension, required | True |  | MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$` <br /> |
+| `name` _string_ | The name of the extension, required. The limit of 59 characters<br />leaves room for the prefix the operator adds when deriving the<br />extension's Kubernetes Volume name (capped at 63 characters). | True |  | MaxLength: 59 <br />MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$` <br /> |
 | `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension. |  |  |  |
 | `extension_control_path` _string array_ | The list of directories inside the image which should be added to extension_control_path.<br />If not defined, defaults to "/share". |  |  |  |
 | `dynamic_library_path` _string array_ | The list of directories inside the image which should be added to dynamic_library_path.<br />If not defined, defaults to "/lib". |  |  |  |
@@ -2179,6 +2220,7 @@ _Appears in:_
 | `phase` _[PoolerPhase](#poolerphase)_ | Phase summarizes the overall lifecycle state of the Pooler. |  |  | Enum: [active paused inactive failed] <br /> |
 | `phaseReason` _string_ | PhaseReason is a human-readable explanation of the current Phase. |  |  |  |
 | `image` _string_ | Image is the resolved pgbouncer container image that the operator is<br />using for this Pooler, including any override coming from spec.template.<br />While Phase is Active or Paused this field reflects what the Deployment<br />actually runs; while Phase is Inactive or Failed it may carry the last<br />successfully resolved value (or be empty if the Pooler has never reconciled<br />successfully). |  |  |  |
+| `error` _string_ | Error is the latest admission validation error |  |  |  |
 
 
 #### PoolerType
@@ -2222,6 +2264,29 @@ _Appears in:_
 | `promotionTimeout` _integer_ | Specifies the maximum number of seconds to wait when promoting an instance to primary.<br />Default value is 40000000, greater than one year in seconds,<br />big enough to simulate an infinite timeout |  |  |  |
 | `enableAlterSystem` _boolean_ | If this parameter is true, the user will be able to invoke `ALTER SYSTEM`<br />on this CloudNativePG Cluster.<br />This should only be used for debugging and troubleshooting.<br />Defaults to false. |  |  |  |
 | `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | The configuration of the extensions to be added |  |  |  |
+
+
+#### PrimaryLeaseConfiguration
+
+
+
+PrimaryLeaseConfiguration configures the timings of the Kubernetes `Lease`
+that the primary instance holds and renews to coordinate a safe primary
+election. These values map directly onto the underlying Kubernetes
+leader-election parameters.
+
+
+
+_Appears in:_
+
+- [ClusterSpec](#clusterspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `leaseDurationSeconds` _integer_ | How long, in seconds, the primary lease is considered valid before it<br />expires and another instance may acquire it. It must be greater than<br />`renewDeadlineSeconds`.<br />Defaults to 15. |  | 15 | Minimum: 1 <br /> |
+| `renewDeadlineSeconds` _integer_ | How long, in seconds, the current primary keeps retrying to renew the<br />lease before giving up and stopping. It must be smaller than<br />`leaseDurationSeconds`.<br />Defaults to 10. |  | 10 | Minimum: 1 <br /> |
+| `retryPeriodSeconds` _integer_ | How frequently, in seconds, a non-holder instance retries acquiring or<br />renewing the lease.<br />Defaults to 2. |  | 2 | Minimum: 1 <br /> |
+| `releasedLeaseDurationSeconds` _integer_ | The TTL, in seconds, written when the primary explicitly releases the<br />lease on a clean shutdown, allowing a replica to promote without waiting<br />for the full lease duration to expire.<br />Defaults to 1. |  | 1 | Minimum: 1 <br /> |
 
 
 #### PrimaryUpdateMethod
@@ -2722,6 +2787,7 @@ _Appears in:_
 | `lastCheckTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | The latest time the schedule |  |  |  |
 | `lastScheduleTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Information when was the last time that backup was successfully scheduled. |  |  |  |
 | `nextScheduleTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Next time we will run a backup |  |  |  |
+| `error` _string_ | Error is the latest admission validation error |  |  |  |
 
 
 #### SchemaSpec

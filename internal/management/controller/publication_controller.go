@@ -28,8 +28,11 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -86,15 +89,27 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// If everything is reconciled, we're done here
-	if publication.Generation == publication.Status.ObservedGeneration {
-		return ctrl.Result{}, nil
-	}
-
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
+		// A reconciled publication keeps its status: the cluster may be
+		// gone or unreadable while it is being deleted.
+		if publication.Generation == publication.Status.ObservedGeneration {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
 		return ctrl.Result{}, markAsFailed(ctx, r.Client, &publication, fmt.Errorf("while fetching the cluster: %w", err))
+	}
+
+	// If everything is reconciled, we're done here
+	if publication.Generation == publication.Status.ObservedGeneration {
+		// ...unless the cluster moved in or out of the replica role after
+		// the publication was applied: report the demotion on the status,
+		// and evaluate the publication again after the promotion.
+		result, proceed, err := handleReplicaRoleTransition(
+			ctx, r.Client, r.instance, cluster, &publication, publicationReconciliationInterval)
+		if err != nil || !proceed {
+			return result, err
+		}
 	}
 
 	// Still not for me, we're waiting for a switchover
@@ -167,6 +182,7 @@ func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub
 	if pub.Spec.ReclaimPolicy != apiv1.PublicationReclaimDelete {
 		return nil
 	}
+
 	// On a replica we cannot drop the publication: return without touching
 	// PostgreSQL so the finalizer is released. Dropping it is left to the
 	// primary cluster's own Publication object, if any.
@@ -177,6 +193,14 @@ func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub
 	if cluster.IsReplica() {
 		return nil
 	}
+
+	// An object that never reconciled does not own the publication: a
+	// conflicting duplicate is blocked before applying anything, and its
+	// deletion must not drop the publication owned by the surviving object.
+	if !pub.HasReconciliations() {
+		return nil
+	}
+
 	db, err := r.getDB(pub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
@@ -211,6 +235,13 @@ func NewPublicationReconciler(
 func (r *PublicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Publication{}).
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterToManagedResources(
+				r.instance, mgr.GetClient(),
+				func() client.ObjectList { return &apiv1.PublicationList{} })),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		Named("instance-publication").
 		Complete(r)
 }
