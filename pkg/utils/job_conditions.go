@@ -38,6 +38,8 @@ func JobHasOneCompletion(job batchv1.Job) bool {
 // rather than Status.Failed because the latter is non-zero while the job is
 // still legitimately retrying within its backoff limit.
 func JobHasFailed(job batchv1.Job) bool {
+	// job.Status.Conditions is []batchv1.JobCondition, not []metav1.Condition,
+	// so meta.FindStatusCondition cannot be used here.
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
 			return true
