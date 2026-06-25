@@ -22,6 +22,7 @@ package external
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,5 +115,44 @@ var _ = Describe("dumpSecretKeyRefToFile", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(content).To(Equal(shortValue))
 		Expect(content).ToNot(ContainSubstring("BBBB"))
+	})
+
+	DescribeTable("rejects path components that would escape the secrets directory",
+		func(serverNameValue, selectorName, selectorKey string) {
+			base := GinkgoT().TempDir()
+			customExternalSecretsPath = base
+			DeferCleanup(func() { customExternalSecretsPath = "" })
+
+			selector := &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: selectorName},
+				Key:                  selectorKey,
+			}
+			fakeClient = buildClient([]byte("payload"))
+
+			_, err := dumpSecretKeyRefToFile(ctx, fakeClient, namespace, serverNameValue, selector)
+			Expect(err).To(MatchError(ErrInvalidPathComponent))
+
+			// nothing must have been written outside the base directory
+			outside := filepath.Join(filepath.Dir(base), "pwned")
+			Expect(outside).ToNot(BeAnExistingFile())
+		},
+		Entry("traversal in the server name", "../pwned", secretName, secretKey),
+		Entry("separator in the server name", "nested/pwned", secretName, secretKey),
+		Entry("traversal in the secret name", serverName, "../pwned", secretKey),
+		Entry("traversal in the secret key", serverName, secretName, "../pwned"),
+	)
+})
+
+var _ = Describe("createPgPassFile", func() {
+	It("rejects a server name that would escape the secrets directory", func() {
+		base := GinkgoT().TempDir()
+		customExternalSecretsPath = base
+		DeferCleanup(func() { customExternalSecretsPath = "" })
+
+		_, err := createPgPassFile("../pwned", map[string]string{"host": "example"}, "secret")
+		Expect(err).To(MatchError(ErrInvalidPathComponent))
+
+		outside := filepath.Join(filepath.Dir(base), "pwned")
+		Expect(outside).ToNot(BeAnExistingFile())
 	})
 })

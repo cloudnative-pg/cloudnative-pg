@@ -21,9 +21,11 @@ package external
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	corev1 "k8s.io/api/core/v1"
@@ -49,6 +51,22 @@ func getExternalSecretsPath() string {
 	}
 
 	return defaultExternalSecretsPath
+}
+
+// ErrInvalidPathComponent is returned when a value that is used as a filesystem
+// path component contains a path separator or a parent-directory reference, both
+// of which could be used to escape the external secrets directory.
+var ErrInvalidPathComponent = errors.New("value cannot be used as a filesystem path component")
+
+// validatePathComponent ensures that a spec-provided value can be safely joined
+// into the external secrets path without escaping it. The admission webhook
+// rejects these values too, but the instance manager reads the spec directly, so
+// the check is repeated here as a defense-in-depth guard.
+func validatePathComponent(value string) error {
+	if value == "." || value == ".." || strings.ContainsAny(value, `/\`) {
+		return fmt.Errorf("%w: %q", ErrInvalidPathComponent, value)
+	}
+	return nil
 }
 
 // readSecretKeyRef reads the passed secret selector into a string.
@@ -93,6 +111,12 @@ func dumpSecretKeyRefToFile(
 	ctx context.Context, client ctrl.Client,
 	namespace string, serverName string, selector *corev1.SecretKeySelector,
 ) (string, error) {
+	for _, component := range []string{serverName, selector.Name, selector.Key} {
+		if err := validatePathComponent(component); err != nil {
+			return "", err
+		}
+	}
+
 	var secret corev1.Secret
 
 	err := client.Get(ctx, ctrl.ObjectKey{Namespace: namespace, Name: selector.Name}, &secret)
@@ -135,6 +159,10 @@ func createPgPassFile(
 	password string,
 ) (string, error) {
 	pgpassLine := pgpass.NewConnectionInfo(connectionParameters, password)
+
+	if err := validatePathComponent(serverName); err != nil {
+		return "", err
+	}
 
 	directory := filepath.Join(getExternalSecretsPath(), serverName)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
