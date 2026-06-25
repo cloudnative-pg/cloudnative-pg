@@ -719,6 +719,7 @@ beginLSN
 beginWal
 benchmarked
 benchmarking
+binak
 bindAsAuth
 bindDN
 bindPassword
