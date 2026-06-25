@@ -36,37 +36,29 @@ func GetServerConnectionString(
 	server *apiv1.ExternalCluster,
 	databaseName string,
 ) (string, error) {
+	if err := validateExternalClusterPaths(server); err != nil {
+		return "", err
+	}
+
 	connectionParameters := maps.Clone(server.ConnectionParameters)
 
 	if server.SSLCert != nil {
-		name, err := getSecretKeyRefFileName(server.Name, server.SSLCert)
-		if err != nil {
-			return "", err
-		}
+		name := getSecretKeyRefFileName(server.Name, server.SSLCert)
 		connectionParameters["sslcert"] = name
 	}
 
 	if server.SSLKey != nil {
-		name, err := getSecretKeyRefFileName(server.Name, server.SSLKey)
-		if err != nil {
-			return "", err
-		}
+		name := getSecretKeyRefFileName(server.Name, server.SSLKey)
 		connectionParameters["sslkey"] = name
 	}
 
 	if server.SSLRootCert != nil {
-		name, err := getSecretKeyRefFileName(server.Name, server.SSLRootCert)
-		if err != nil {
-			return "", err
-		}
+		name := getSecretKeyRefFileName(server.Name, server.SSLRootCert)
 		connectionParameters["sslrootcert"] = name
 	}
 
 	if server.Password != nil {
-		pgpassfile, err := getPgPassFilePath(server.Name)
-		if err != nil {
-			return "", err
-		}
+		pgpassfile := getPgPassFilePath(server.Name)
 		connectionParameters["passfile"] = pgpassfile
 	}
 
@@ -87,6 +79,10 @@ func ConfigureConnectionToServer(
 	namespace string,
 	server *apiv1.ExternalCluster,
 ) (string, error) {
+	if err := validateExternalClusterPaths(server); err != nil {
+		return "", err
+	}
+
 	connectionParameters := maps.Clone(server.ConnectionParameters)
 
 	if server.SSLCert != nil {

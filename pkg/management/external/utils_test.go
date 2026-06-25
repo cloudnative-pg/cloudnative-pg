@@ -22,13 +22,13 @@ package external
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -116,63 +116,67 @@ var _ = Describe("dumpSecretKeyRefToFile", func() {
 		Expect(content).To(Equal(shortValue))
 		Expect(content).ToNot(ContainSubstring("BBBB"))
 	})
+})
+
+var _ = Describe("validateExternalClusterPaths", func() {
+	sslSelector := func(name, key string) *corev1.SecretKeySelector {
+		return &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: name},
+			Key:                  key,
+		}
+	}
+
+	It("accepts a valid cluster with all SSL selectors set", func() {
+		cluster := &apiv1.ExternalCluster{
+			Name:        "my-server",
+			SSLCert:     sslSelector("cert-secret", "tls.crt"),
+			SSLKey:      sslSelector("cert-secret", "tls.key"),
+			SSLRootCert: sslSelector("ca-secret", "ca.crt"),
+			Password:    sslSelector("pass-secret", "password"),
+		}
+		Expect(validateExternalClusterPaths(cluster)).To(Succeed())
+	})
+
+	It("accepts a valid cluster with no SSL selectors set", func() {
+		cluster := &apiv1.ExternalCluster{Name: "my-server"}
+		Expect(validateExternalClusterPaths(cluster)).To(Succeed())
+	})
+
+	It("does not validate the password selector (not used as a path component)", func() {
+		cluster := &apiv1.ExternalCluster{
+			Name:     "my-server",
+			Password: sslSelector("../pwned", "../pwned"),
+		}
+		Expect(validateExternalClusterPaths(cluster)).To(Succeed())
+	})
 
 	DescribeTable("rejects path components that would escape the secrets directory",
-		func(serverNameValue, selectorName, selectorKey string) {
-			base := GinkgoT().TempDir()
-			customExternalSecretsPath = base
-			DeferCleanup(func() { customExternalSecretsPath = "" })
-
-			selector := &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{Name: selectorName},
-				Key:                  selectorKey,
-			}
-			fakeClient = buildClient([]byte("payload"))
-
-			_, err := dumpSecretKeyRefToFile(ctx, fakeClient, namespace, serverNameValue, selector)
-			Expect(err).To(MatchError(ErrInvalidPathComponent))
-
-			// validation fires before any filesystem operation, so nothing must
-			// have been created either inside the base directory or alongside it
-			expectNothingWritten(base)
+		func(cluster *apiv1.ExternalCluster) {
+			Expect(validateExternalClusterPaths(cluster)).To(MatchError(ErrInvalidPathComponent))
 		},
-		Entry("traversal in the server name", "../pwned", secretName, secretKey),
-		Entry("separator in the server name", "nested/pwned", secretName, secretKey),
-		Entry("backslash in the server name", `nested\pwned`, secretName, secretKey),
-		Entry("absolute path as the server name", "/etc/pwned", secretName, secretKey),
-		Entry("dot component as the server name", ".", secretName, secretKey),
-		Entry("parent-dir component as the server name", "..", secretName, secretKey),
-		Entry("traversal in the secret name", serverName, "../pwned", secretKey),
-		Entry("traversal in the secret key", serverName, secretName, "../pwned"),
+		Entry("traversal in server name",
+			&apiv1.ExternalCluster{Name: "../pwned"}),
+		Entry("separator in server name",
+			&apiv1.ExternalCluster{Name: "nested/pwned"}),
+		Entry("backslash in server name",
+			&apiv1.ExternalCluster{Name: `nested\pwned`}),
+		Entry("absolute path as server name",
+			&apiv1.ExternalCluster{Name: "/etc/pwned"}),
+		Entry("dot as server name",
+			&apiv1.ExternalCluster{Name: "."}),
+		Entry("parent-dir as server name",
+			&apiv1.ExternalCluster{Name: ".."}),
+		Entry("traversal in SSLCert secret name",
+			&apiv1.ExternalCluster{Name: "ok", SSLCert: sslSelector("../pwned", "tls.crt")}),
+		Entry("traversal in SSLCert key",
+			&apiv1.ExternalCluster{Name: "ok", SSLCert: sslSelector("cert-secret", "../pwned")}),
+		Entry("traversal in SSLKey secret name",
+			&apiv1.ExternalCluster{Name: "ok", SSLKey: sslSelector("../pwned", "tls.key")}),
+		Entry("traversal in SSLKey key",
+			&apiv1.ExternalCluster{Name: "ok", SSLKey: sslSelector("cert-secret", "../pwned")}),
+		Entry("traversal in SSLRootCert secret name",
+			&apiv1.ExternalCluster{Name: "ok", SSLRootCert: sslSelector("../pwned", "ca.crt")}),
+		Entry("traversal in SSLRootCert key",
+			&apiv1.ExternalCluster{Name: "ok", SSLRootCert: sslSelector("ca-secret", "../pwned")}),
 	)
 })
-
-var _ = Describe("createPgPassFile", func() {
-	DescribeTable("rejects a server name that would escape the secrets directory",
-		func(serverNameValue string) {
-			base := GinkgoT().TempDir()
-			customExternalSecretsPath = base
-			DeferCleanup(func() { customExternalSecretsPath = "" })
-
-			_, err := createPgPassFile(serverNameValue, map[string]string{"host": "example"}, "secret")
-			Expect(err).To(MatchError(ErrInvalidPathComponent))
-
-			expectNothingWritten(base)
-		},
-		Entry("traversal", "../pwned"),
-		Entry("separator", "nested/pwned"),
-		Entry("absolute path", "/etc/pwned"),
-		Entry("dot component", "."),
-	)
-})
-
-// expectNothingWritten asserts that the dump validation prevented any directory
-// or file from being created, both inside the base directory and as a sibling
-// reachable through a traversal sequence.
-func expectNothingWritten(base string) {
-	GinkgoHelper()
-	entries, err := os.ReadDir(base)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(entries).To(BeEmpty(), "the base secrets directory must stay empty")
-	Expect(filepath.Join(filepath.Dir(base), "pwned")).ToNot(BeAnExistingFile())
-}

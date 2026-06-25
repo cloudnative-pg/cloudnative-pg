@@ -57,5 +57,9 @@ func GetConnectionString(
 		return "", fmt.Errorf("external cluster not existent in the cluster definition")
 	}
 
-	return external.GetServerConnectionString(&externalCluster, databaseName)
+	connString, err := external.GetServerConnectionString(&externalCluster, databaseName)
+	if err != nil {
+		return "", fmt.Errorf("while building connection string for external cluster %q: %w", externalClusterName, err)
+	}
+	return connString, nil
 }
