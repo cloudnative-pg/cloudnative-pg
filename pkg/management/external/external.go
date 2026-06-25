@@ -35,26 +35,38 @@ import (
 func GetServerConnectionString(
 	server *apiv1.ExternalCluster,
 	databaseName string,
-) string {
+) (string, error) {
 	connectionParameters := maps.Clone(server.ConnectionParameters)
 
 	if server.SSLCert != nil {
-		name := getSecretKeyRefFileName(server.Name, server.SSLCert)
+		name, err := getSecretKeyRefFileName(server.Name, server.SSLCert)
+		if err != nil {
+			return "", err
+		}
 		connectionParameters["sslcert"] = name
 	}
 
 	if server.SSLKey != nil {
-		name := getSecretKeyRefFileName(server.Name, server.SSLKey)
+		name, err := getSecretKeyRefFileName(server.Name, server.SSLKey)
+		if err != nil {
+			return "", err
+		}
 		connectionParameters["sslkey"] = name
 	}
 
 	if server.SSLRootCert != nil {
-		name := getSecretKeyRefFileName(server.Name, server.SSLRootCert)
+		name, err := getSecretKeyRefFileName(server.Name, server.SSLRootCert)
+		if err != nil {
+			return "", err
+		}
 		connectionParameters["sslrootcert"] = name
 	}
 
 	if server.Password != nil {
-		pgpassfile := getPgPassFilePath(server.Name)
+		pgpassfile, err := getPgPassFilePath(server.Name)
+		if err != nil {
+			return "", err
+		}
 		connectionParameters["passfile"] = pgpassfile
 	}
 
@@ -62,7 +74,7 @@ func GetServerConnectionString(
 		connectionParameters["dbname"] = databaseName
 	}
 
-	return configfile.CreateConnectionString(connectionParameters)
+	return configfile.CreateConnectionString(connectionParameters), nil
 }
 
 // ConfigureConnectionToServer creates a connection string to the external

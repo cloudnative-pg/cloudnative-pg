@@ -91,14 +91,22 @@ func readSecretKeyRef(
 }
 
 // getSecretKeyRefFileName get the name of the file where the content of the
-// connection secret will be dumped
+// connection secret will be dumped. The server name and the secret selector are
+// joined into the path, so they are validated to make sure they cannot escape
+// the external secrets directory.
 func getSecretKeyRefFileName(
 	serverName string,
 	selector *corev1.SecretKeySelector,
-) string {
+) (string, error) {
+	for _, component := range []string{serverName, selector.Name, selector.Key} {
+		if err := validatePathComponent(component); err != nil {
+			return "", err
+		}
+	}
+
 	directory := filepath.Join(getExternalSecretsPath(), serverName)
 	filePath := filepath.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
-	return filePath
+	return filePath, nil
 }
 
 // dumpSecretKeyRefToFile dumps a certain secret to a file inside a temporary folder
@@ -111,16 +119,13 @@ func dumpSecretKeyRefToFile(
 	ctx context.Context, client ctrl.Client,
 	namespace string, serverName string, selector *corev1.SecretKeySelector,
 ) (string, error) {
-	for _, component := range []string{serverName, selector.Name, selector.Key} {
-		if err := validatePathComponent(component); err != nil {
-			return "", err
-		}
+	filePath, err := getSecretKeyRefFileName(serverName, selector)
+	if err != nil {
+		return "", err
 	}
 
 	var secret corev1.Secret
-
-	err := client.Get(ctx, ctrl.ObjectKey{Namespace: namespace, Name: selector.Name}, &secret)
-	if err != nil {
+	if err := client.Get(ctx, ctrl.ObjectKey{Namespace: namespace, Name: selector.Name}, &secret); err != nil {
 		return "", err
 	}
 
@@ -129,12 +134,10 @@ func dumpSecretKeyRefToFile(
 		return "", fmt.Errorf("missing key %v in secret %v", selector.Key, selector.Name)
 	}
 
-	directory := filepath.Join(getExternalSecretsPath(), serverName)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o700); err != nil {
 		return "", err
 	}
 
-	filePath := filepath.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
 	// Write atomically: this file is reused across reconciliations and read
 	// concurrently by libpq, so an in-place rewrite could expose a partial file
 	// or leave stale bytes behind when the secret rotates to shorter content.
@@ -145,11 +148,17 @@ func dumpSecretKeyRefToFile(
 	return filePath, nil
 }
 
-// getPgPassFilePath gets the path where the pgpass file will be stored
-func getPgPassFilePath(serverName string) string {
+// getPgPassFilePath gets the path where the pgpass file will be stored. The
+// server name is joined into the path, so it is validated to make sure it cannot
+// escape the external secrets directory.
+func getPgPassFilePath(serverName string) (string, error) {
+	if err := validatePathComponent(serverName); err != nil {
+		return "", err
+	}
+
 	directory := filepath.Join(getExternalSecretsPath(), serverName)
 	filePath := filepath.Join(directory, "pgpass")
-	return filePath
+	return filePath, nil
 }
 
 // createPgPassFile creates a pgpass file inside the user home directory
@@ -158,17 +167,16 @@ func createPgPassFile(
 	connectionParameters map[string]string,
 	password string,
 ) (string, error) {
+	filePath, err := getPgPassFilePath(serverName)
+	if err != nil {
+		return "", err
+	}
+
 	pgpassLine := pgpass.NewConnectionInfo(connectionParameters, password)
 
-	if err := validatePathComponent(serverName); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o700); err != nil {
 		return "", err
 	}
-
-	directory := filepath.Join(getExternalSecretsPath(), serverName)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
-		return "", err
-	}
-	filePath := filepath.Join(directory, "pgpass")
 
 	return filePath, pgpass.From(pgpassLine).Write(filePath)
 }

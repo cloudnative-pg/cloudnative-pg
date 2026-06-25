@@ -132,27 +132,47 @@ var _ = Describe("dumpSecretKeyRefToFile", func() {
 			_, err := dumpSecretKeyRefToFile(ctx, fakeClient, namespace, serverNameValue, selector)
 			Expect(err).To(MatchError(ErrInvalidPathComponent))
 
-			// nothing must have been written outside the base directory
-			outside := filepath.Join(filepath.Dir(base), "pwned")
-			Expect(outside).ToNot(BeAnExistingFile())
+			// validation fires before any filesystem operation, so nothing must
+			// have been created either inside the base directory or alongside it
+			expectNothingWritten(base)
 		},
 		Entry("traversal in the server name", "../pwned", secretName, secretKey),
 		Entry("separator in the server name", "nested/pwned", secretName, secretKey),
+		Entry("backslash in the server name", `nested\pwned`, secretName, secretKey),
+		Entry("absolute path as the server name", "/etc/pwned", secretName, secretKey),
+		Entry("dot component as the server name", ".", secretName, secretKey),
+		Entry("parent-dir component as the server name", "..", secretName, secretKey),
 		Entry("traversal in the secret name", serverName, "../pwned", secretKey),
 		Entry("traversal in the secret key", serverName, secretName, "../pwned"),
 	)
 })
 
 var _ = Describe("createPgPassFile", func() {
-	It("rejects a server name that would escape the secrets directory", func() {
-		base := GinkgoT().TempDir()
-		customExternalSecretsPath = base
-		DeferCleanup(func() { customExternalSecretsPath = "" })
+	DescribeTable("rejects a server name that would escape the secrets directory",
+		func(serverNameValue string) {
+			base := GinkgoT().TempDir()
+			customExternalSecretsPath = base
+			DeferCleanup(func() { customExternalSecretsPath = "" })
 
-		_, err := createPgPassFile("../pwned", map[string]string{"host": "example"}, "secret")
-		Expect(err).To(MatchError(ErrInvalidPathComponent))
+			_, err := createPgPassFile(serverNameValue, map[string]string{"host": "example"}, "secret")
+			Expect(err).To(MatchError(ErrInvalidPathComponent))
 
-		outside := filepath.Join(filepath.Dir(base), "pwned")
-		Expect(outside).ToNot(BeAnExistingFile())
-	})
+			expectNothingWritten(base)
+		},
+		Entry("traversal", "../pwned"),
+		Entry("separator", "nested/pwned"),
+		Entry("absolute path", "/etc/pwned"),
+		Entry("dot component", "."),
+	)
 })
+
+// expectNothingWritten asserts that the dump validation prevented any directory
+// or file from being created, both inside the base directory and as a sibling
+// reachable through a traversal sequence.
+func expectNothingWritten(base string) {
+	GinkgoHelper()
+	entries, err := os.ReadDir(base)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(entries).To(BeEmpty(), "the base secrets directory must stay empty")
+	Expect(filepath.Join(filepath.Dir(base), "pwned")).ToNot(BeAnExistingFile())
+}

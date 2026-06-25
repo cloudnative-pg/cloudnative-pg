@@ -273,5 +273,5 @@ func getSubscriptionConnectionString(
 		return "", fmt.Errorf("externalCluster '%s' not declared in cluster %s", externalClusterName, cluster.Name)
 	}
 
-	return external.GetServerConnectionString(&externalCluster, databaseName), nil
+	return external.GetServerConnectionString(&externalCluster, databaseName)
 }
