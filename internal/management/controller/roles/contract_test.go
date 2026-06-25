@@ -130,7 +130,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				},
 			},
 		}
-		res := role.isInSameRolesAs(config)
+		res := role.hasMatchingRoleGrants(config)
 		Expect(res).To(BeTrue())
 	})
 
@@ -186,7 +186,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				},
 			},
 		}
-		res := role.isInSameRolesAs(config)
+		res := role.hasMatchingRoleGrants(config)
 		Expect(res).To(BeTrue())
 	})
 
@@ -234,10 +234,10 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				},
 			},
 		}
-		resInRoles := role.isInSameRolesAs(configInRolesWrong)
+		resInRoles := role.hasMatchingRoleGrants(configInRolesWrong)
 		Expect(resInRoles).To(BeFalse())
 
-		resRoleGrants := role.isInSameRolesAs(configRoleGrantsWrong)
+		resRoleGrants := role.hasMatchingRoleGrants(configRoleGrantsWrong)
 		Expect(resRoleGrants).To(BeFalse())
 	})
 
