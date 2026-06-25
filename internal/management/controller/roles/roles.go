@@ -187,7 +187,7 @@ func evaluateNextRoleActions(
 				RoleConfiguration: inSpec,
 			}
 			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], internalRole)
-		case isInSpec && !role.isInSameRolesAs(inSpec):
+		case isInSpec && !role.hasMatchingRoleGrants(inSpec):
 			internalRole := roleConfigurationAdapter{
 				RoleConfiguration: inSpec,
 			}
