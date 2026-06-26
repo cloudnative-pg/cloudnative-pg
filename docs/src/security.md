@@ -241,6 +241,38 @@ Pod is created. Installing a plugin is therefore an explicit trust decision
 made by the cluster administrator, on par with granting write access to a
 Cluster resource.
 
+The same authority extends into the database itself: because the operator
+reconciles PostgreSQL as the superuser, a Cluster writer gains superuser-level
+influence over the resulting cluster through documented, intended fields,
+including:
+
+- the bootstrap SQL hooks `postInitSQL`, `postInitApplicationSQL`, and
+  `postInitTemplateSQL`, executed as the `postgres` superuser at initialization
+  (see [Executing Queries After Initialization](bootstrap.md#executing-queries-after-initialization));
+- [inline managed roles](declarative_role_management.md#inline-managed-roles)
+  (`spec.managed.roles`), which may set `superuser: true` or grant membership of
+  existing roles, and can use PostgreSQL features such as `COPY ... FROM PROGRAM`
+  to run commands inside the operand Pod;
+- custom PostgreSQL configuration, including
+  [`pg_hba`](postgresql_conf.md#the-pg_hba-section) rules (for example `trust`
+  authentication) and parameters that shape the cluster's security posture and
+  durability, such as `password_encryption`, `fsync`, and memory-related
+  settings.
+
+This is the intended trust model, not a privilege escalation.
+
+Code running in the operand Pod also runs under its mounted `ServiceAccount`,
+which can read the Secrets associated with its own cluster (see
+[Calls to the API server made by the instance manager](#calls-to-the-api-server-made-by-the-instance-manager)
+and ["Secrets"](applications.md#secrets)). A Cluster writer can therefore read
+those Secrets, confined by [Namespace Isolation](#namespace-isolation) to the
+Cluster's own namespace.
+
+:::note
+These trust boundaries are also covered in the project's
+[self security assessment](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-catalog.yaml).
+:::
+
 #### Kubernetes Admission Control
 
 The operator creates Pods through the standard Kubernetes API, meaning every
@@ -290,6 +322,11 @@ allows `superuser: true` and membership of any existing role through
 `DatabaseRole` objects in a namespace is therefore equivalent to superuser
 access on the PostgreSQL clusters in that namespace, and deserves the same
 care as write access to the `Cluster` resource.
+
+Treat write access to these resources as a high-privilege grant: for
+multi-tenant deployments, isolate tenants in separate namespaces and scope it
+per namespace with Kubernetes RBAC, relying on
+[Namespace Isolation](#namespace-isolation) to bound the impact.
 
 The RBAC discussed here governs access to CloudNativePG's own custom resources.
 The next section covers the complementary side: the RBAC that the operator
