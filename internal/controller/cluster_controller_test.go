@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -180,6 +181,94 @@ var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminat
 		var pods corev1.PodList
 		Expect(env.client.List(ctx, &pods)).To(Succeed())
 		Expect(pods.Items).To(BeEmpty(), "no Pod should be reattached while one of its PVCs is terminating")
+	})
+})
+
+var _ = Describe("ensureInstancesAreCreated recovers a lost first-primary bootstrap Job (#11036)", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	It("recreates the initdb Job reusing serial 1 when the primary PVC is stuck initializing", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+		})
+
+		// The first-primary bootstrap created the data PVC for serial 1 and patched
+		// the cluster status (TargetPrimary set, Instances flipped to 1) but lost the
+		// optimistic lock before creating the initdb Job: no Pod and no Job exist.
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		pvcGroup := newFakePVC(env.client, cluster, 1, persistentvolumeclaim.StatusInitializing)
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: pvcGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(HaveLen(1), "the bootstrap Job for serial 1 should have been recreated")
+		Expect(jobs.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(primaryName))
+
+		// No serial-2 instance or PVC must be created: the existing serial must be reused.
+		var pvcs corev1.PersistentVolumeClaimList
+		Expect(env.client.List(ctx, &pvcs)).To(Succeed())
+		for _, pvc := range pvcs.Items {
+			serial, serr := specs.GetNodeSerial(pvc.ObjectMeta)
+			Expect(serr).ToNot(HaveOccurred())
+			Expect(serial).To(Equal(1), "no PVC for a different serial should have been created")
+		}
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be created while the PVC is still initializing")
+	})
+
+	It("waits instead of recreating the init Job when one already exists", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		// The initializing PVC already has its bootstrap Job: the recovery path
+		// must defer to the regular wait, not create a second Job.
+		pvcGroup := newFakePVC(env.client, cluster, 1, persistentvolumeclaim.StatusInitializing)
+		existingJob := specs.CreatePrimaryJobViaInitdb(*cluster, 1)
+		cluster.SetInheritedDataAndOwnership(&existingJob.ObjectMeta)
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: pvcGroup},
+			jobs: batchv1.JobList{Items: []batchv1.Job{*existingJob}},
+		}
+		statusList := postgres.PostgresqlStatusList{}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(BeEmpty(), "the pre-existing Job lives only in resources, none should be created")
 	})
 })
 
