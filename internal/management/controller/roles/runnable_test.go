@@ -227,25 +227,25 @@ var _ = Describe("Role synchronizer tests", func() {
 			"xmin", "rolegrants",
 		}).
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
-				nil, false, []byte("This is postgres user"), 11, []byte("{}")).
+				nil, false, []byte("This is postgres user"), 11, []byte("[]")).
 			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
 				pgtype.Timestamp{
 					Valid:            true,
 					Time:             testDate,
 					InfinityModifier: pgtype.Finite,
-				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1|false|true|true","role2|true|false|false"}`)).
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`[{"name":"role1","admin":false,"inherit":true,"set":true},{"name":"role2","admin":true,"inherit":false,"set":false}]`)).
 			AddRow("role_to_ignore", true, false, true, true, true, false, -1, []byte("12345"),
-				nil, false, []byte("This is a custom role in the DB"), 11, []byte("{}")).
+				nil, false, []byte("This is a custom role in the DB"), 11, []byte("[]")).
 			AddRow("role_to_test1", true, true, false, false, false, false, -1, []byte("12345"),
-				nil, false, []byte("This is a role to test with"), 11, []byte("{}")).
+				nil, false, []byte("This is a role to test with"), 11, []byte("[]")).
 			AddRow("role_to_test2", true, true, false, false, false, false, -1, []byte("12345"),
-				nil, false, []byte("This is a role to test with"), 11, []byte("{inrole|false|true|true}")).
+				nil, false, []byte("This is a role to test with"), 11, []byte(`[{"name":"inrole","admin":false,"inherit":true,"set":true}]`)).
 			AddRow("role_with_pass", false, true, false, false, false, false, -1, []byte(password),
 				pgtype.Timestamp{
 					Valid:            true,
 					Time:             testDate,
 					InfinityModifier: pgtype.Finite,
-				}, false, []byte(""), 11, []byte("{}"))
+				}, false, []byte(""), 11, []byte("[]"))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rowsInMockDatabase)
 
 		// define various secrets as test cases to show failure modes
