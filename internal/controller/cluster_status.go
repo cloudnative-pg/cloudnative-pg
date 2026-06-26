@@ -100,6 +100,18 @@ func (resources *managedResources) runningJobNames(cluster *apiv1.Cluster) []str
 	return result
 }
 
+// failedJobNames returns the names of the jobs that have permanently failed,
+// i.e. they have exhausted their backoff limit
+func (resources *managedResources) failedJobNames() []string {
+	result := make([]string, 0, len(resources.jobs.Items))
+	for _, job := range resources.jobs.Items {
+		if utils.JobHasFailed(job) {
+			result = append(result, job.Name)
+		}
+	}
+	return result
+}
+
 // Check if every managed Pod is active and will be schedules
 func (resources *managedResources) inactiveInstanceNames() []string {
 	result := make([]string, 0, len(resources.instances.Items))
