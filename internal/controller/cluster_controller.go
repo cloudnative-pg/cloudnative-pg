@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -836,6 +837,24 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
 	} else if result != nil {
 		return *result, err
+	}
+
+	// A Job that creates an instance (bootstrap, recovery or replica creation)
+	// is counted as "running" until it succeeds, so a Job that has exhausted its
+	// backoff limit would otherwise keep the cluster waiting forever. Surface the
+	// failure in the phase instead. The cause is in the job logs and has to be
+	// investigated: there is no predefined recipe.
+	if failedJobs := resources.failedJobNames(); len(failedJobs) > 0 {
+		contextLogger.Warning("An instance creation job has failed", "failedJobs", failedJobs)
+
+		reason := fmt.Sprintf("Instance creation failed for the following jobs: %s. "+
+			"Check the job logs to investigate the cause of the failure.",
+			strings.Join(failedJobs, ", "))
+
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	runningJobs := resources.runningJobNames(cluster)
