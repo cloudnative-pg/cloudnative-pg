@@ -22,12 +22,14 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -1059,5 +1061,89 @@ var _ = Describe("Supervised primary update strategy and rollout slots", func() 
 		result := rm.CoordinateRollout(secondCluster, "other-pod")
 		Expect(result.RolloutAllowed).To(BeFalse(),
 			"unsupervised strategy should consume the rollout slot")
+	})
+})
+
+var _ = Describe("archiverSidecarMissingOnPrimary", func() {
+	const sidecarName = "plugin-barman-cloud"
+
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec:       apiv1.ClusterSpec{ImageName: "postgres:17.0"},
+		}
+	})
+
+	// withArchiverSidecar returns a copy of pod with an extra container,
+	// mimicking the sidecar a WAL-archiver plugin injects at evaluation time.
+	withArchiverSidecar := func(pod *corev1.Pod) *corev1.Pod {
+		out := pod.DeepCopy()
+		out.Spec.Containers = append(out.Spec.Containers, corev1.Container{
+			Name:  sidecarName,
+			Image: "plugin-barman-cloud:latest",
+		})
+		return out
+	}
+
+	enableArchiverPlugin := func() {
+		cluster.Spec.Plugins = []apiv1.PluginConfiguration{
+			{
+				Name:          "barman-cloud.cloudnative-pg.io",
+				Enabled:       ptr.To(true),
+				IsWALArchiver: ptr.To(true),
+			},
+		}
+	}
+
+	It("returns false when no WAL-archiver plugin is enabled", func() {
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(archiverSidecarMissingOnPrimary(context.TODO(), pod, &cluster)).To(BeFalse())
+	})
+
+	It("returns true when the primary is missing the injected sidecar", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		// The freshly evaluated spec carries the sidecar, the running primary does not.
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: withArchiverSidecar(pod)})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, pod, &cluster)).To(BeTrue())
+	})
+
+	It("returns false when the primary already has the injected sidecar", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		podWithSidecar := withArchiverSidecar(pod)
+
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: podWithSidecar})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, podWithSidecar, &cluster)).To(BeFalse())
+	})
+
+	It("propagates evaluation errors instead of degrading to a switchover decision", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		evalErr := errors.New("plugin evaluation failed")
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedError: evalErr})
+
+		missing, err := archiverSidecarMissingOnPrimary(ctx, pod, &cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, evalErr)).To(BeTrue(),
+			"the evaluation error must surface so the caller requeues instead of switching over")
+		Expect(missing).To(BeFalse())
 	})
 })

@@ -211,6 +211,21 @@ func (r *ClusterReconciler) updatePrimaryPod(
 
 	// if the cluster has more than one instance, we should trigger a switchover before upgrading
 	if cluster.Status.Instances > 1 && len(podList.Items) > 1 {
+		// A WAL-archiver plugin was enabled on a cluster whose primary Pod predates
+		// it, so the primary lacks the injected sidecar and cannot archive WAL. A
+		// switchover cannot roll it out: demoting the primary runs ArchiveAllReadyWALs
+		// before pg_rewind (see instance_startup.go), and that archiving needs the
+		// sidecar that is still missing, so the demotion would never complete.
+		// Recreate the Pod in place instead: it comes back as primary with the
+		// sidecar, archiving resumes, and no demotion or rewind is involved.
+		sidecarMissing, err := archiverSidecarMissingOnPrimary(ctx, &primaryPod, cluster)
+		if err != nil {
+			return false, err
+		}
+		if sidecarMissing {
+			return r.recreatePrimaryInPlace(ctx, cluster, &primaryPod, reason)
+		}
+
 		// If this is not a replica cluster, podList.Items[1] is the first replica,
 		// as the pod list is sorted in the same order we use for switchover / failover.
 		// This may not be true for replica clusters, where every instance is a replica
@@ -631,6 +646,30 @@ func checkPodEnvironmentIsOutdated(_ context.Context, pod *corev1.Pod, cluster *
 	return rollout{}, nil
 }
 
+// newInstanceForRunningPod evaluates the instance specification that the given
+// running Pod should currently match. It derives the node serial and status
+// scheme from the Pod, then calls specs.NewInstance, which runs the plugins'
+// OperationVerbEvaluate lifecycle hook so the returned spec already includes any
+// sidecars they inject.
+func newInstanceForRunningPod(
+	ctx context.Context,
+	pod *corev1.Pod,
+	cluster *apiv1.Cluster,
+) (*corev1.Pod, error) {
+	serial, err := utils.GetClusterSerialValue(pod.Annotations)
+	if err != nil {
+		return nil, fmt.Errorf("while getting the pod serial value: %w", err)
+	}
+
+	tlsEnabled := remote.GetStatusSchemeFromPod(pod).IsHTTPS()
+	targetPod, err := specs.NewInstance(ctx, *cluster, serial, tlsEnabled)
+	if err != nil {
+		return nil, fmt.Errorf("while creating a new instance pod: %w", err)
+	}
+
+	return targetPod, nil
+}
+
 func checkPodSpecIsOutdated(
 	ctx context.Context,
 	pod *corev1.Pod,
@@ -647,16 +686,9 @@ func checkPodSpecIsOutdated(
 		return rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
 	}
 
-	tlsEnabled := remote.GetStatusSchemeFromPod(pod).IsHTTPS()
-
-	serial, err := utils.GetClusterSerialValue(pod.Annotations)
+	targetPod, err := newInstanceForRunningPod(ctx, pod, cluster)
 	if err != nil {
-		return rollout{}, fmt.Errorf("while getting the pod serial value: %w", err)
-	}
-
-	targetPod, err := specs.NewInstance(ctx, *cluster, serial, tlsEnabled)
-	if err != nil {
-		return rollout{}, fmt.Errorf("while creating a new pod to check podSpec: %w", err)
+		return rollout{}, fmt.Errorf("while building the target instance to check podSpec: %w", err)
 	}
 
 	// the bootstrap init-container could change image after an operator upgrade.
@@ -684,6 +716,74 @@ func checkPodSpecIsOutdated(
 	}
 
 	return rollout{}, nil
+}
+
+// recreatePrimaryInPlace deletes the primary Pod so the operator recreates it
+// with the up-to-date spec, without a switchover. Used when a switchover would
+// dead-lock because the primary lacks the WAL-archiver sidecar it needs to
+// demote (see updatePrimaryPod and issue #10981).
+func (r *ClusterReconciler) recreatePrimaryInPlace(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	primaryPod *corev1.Pod,
+	reason rolloutReason,
+) (bool, error) {
+	log.FromContext(ctx).Info(
+		"Primary is missing the WAL-archiver sidecar; recreating it in place instead of switching over",
+		"reason", reason,
+		"primaryPod", primaryPod.Name)
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseInplaceDeletePrimaryRestart, reason); err != nil {
+		return false, err
+	}
+	err := r.upgradePod(ctx, cluster, primaryPod, reason)
+	return err == nil, err
+}
+
+// archiverSidecarMissingOnPrimary reports whether the cluster has an enabled
+// WAL-archiver plugin while the given primary Pod is missing one or more of the
+// containers that the enabled plugins inject. Such a primary cannot archive WAL,
+// so it must be recreated to gain the sidecar rather than demoted via a
+// switchover, which would dead-lock on archiving (see issue #10981).
+//
+// Detection diffs the Pod's containers against a freshly evaluated instance
+// spec: NewInstance runs the plugins' OperationVerbEvaluate lifecycle hook, so
+// its containers already include any injected sidecars. The check is a
+// deliberate over-approximation. We cannot map a sidecar back to the specific
+// plugin that injected it, so when several sidecar-injecting plugins are enabled
+// this may recreate the primary even if only a non-archiver sidecar is missing.
+// Likewise any container the evaluated spec adds but the running primary lacks
+// (for example one introduced by a newer operator version) triggers the same
+// in-place restart. Both cases are safe: they trade a switchover for an in-place
+// restart, never the other way around.
+//
+// An error stops the caller rather than degrading to a decision: evaluating the
+// instance spec to false would route the primary into the very switchover that
+// dead-locks here, so a transient failure must requeue and retry instead.
+func archiverSidecarMissingOnPrimary(
+	ctx context.Context,
+	pod *corev1.Pod,
+	cluster *apiv1.Cluster,
+) (bool, error) {
+	if cluster.GetEnabledWALArchivePluginName() == "" {
+		return false, nil
+	}
+
+	targetPod, err := newInstanceForRunningPod(ctx, pod, cluster)
+	if err != nil {
+		return false, err
+	}
+
+	current := make(map[string]struct{}, len(pod.Spec.Containers))
+	for _, container := range pod.Spec.Containers {
+		current[container.Name] = struct{}{}
+	}
+	for _, container := range targetPod.Spec.Containers {
+		if _, found := current[container.Name]; !found {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // upgradePod deletes a Pod to let the operator recreate it using an
