@@ -24,7 +24,6 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -272,38 +271,4 @@ func (d *DatabaseRole) GetDatabaseRoleGrants() []DatabaseRoleGrant {
 		roleGrants = append(roleGrants, NewDatabaseRoleGrant(inRoleName))
 	}
 	return roleGrants
-}
-
-func (d *DatabaseRole) PopulateRoleGrantsFromStringArray(roleGrantStrings []string) error {
-	d.RoleGrants = []DatabaseRoleGrant{}
-	for _, roleGrantString := range roleGrantStrings {
-		roleGrantParts := strings.Split(roleGrantString, "|")
-		if len(roleGrantParts) != 4 {
-			return fmt.Errorf("MatchGrants can only match against results with 4 columns, got %d (%v)", len(roleGrantParts), roleGrantParts)
-		}
-
-		adminOption, err := strconv.ParseBool(roleGrantParts[1])
-		if err != nil {
-			return fmt.Errorf("Couldn't convert %v to boolean admin option", roleGrantParts[1])
-		}
-
-		inheritOption, err := strconv.ParseBool(roleGrantParts[2])
-		if err != nil {
-			return fmt.Errorf("Couldn't convert %v to boolean inherit option", roleGrantParts[2])
-		}
-
-		setOption, err := strconv.ParseBool(roleGrantParts[3])
-		if err != nil {
-			return fmt.Errorf("Couldn't convert %v to boolean set option", roleGrantParts[3])
-		}
-
-		d.RoleGrants = append(d.RoleGrants, DatabaseRoleGrant{
-			Name:    roleGrantParts[0],
-			Admin:   &adminOption,
-			Inherit: &inheritOption,
-			Set:     &setOption,
-		})
-	}
-
-	return nil
 }
