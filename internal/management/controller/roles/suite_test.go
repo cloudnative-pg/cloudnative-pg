@@ -35,18 +35,17 @@ const (
 	expectedSelStmt = `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
 		rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
 		pg_catalog.shobj_description(auth.oid, 'pg_authid') as comment, auth.xmin,
-		mem.rolegrants
+		COALESCE(mem.rolegrants,'[]'::jsonb)
 	FROM pg_catalog.pg_authid as auth
 	LEFT JOIN (
 		SELECT
-			pg_catalog.array_agg(
-					pg_catalog.pg_get_userbyid(am.roleid) ||
-					'|' ||
-					am.admin_option ||
-					'|' ||
-					am.inherit_option ||
-					'|' ||
-					am.set_option
+			jsonb_agg(
+				jsonb_build_object(
+					'name', pg_catalog.pg_get_userbyid(am.roleid),
+					'admin', am.admin_option,
+					'inherit', am.inherit_option,
+					'set', am.set_option
+				)
 			) rolegrants,
 			member
 		FROM pg_catalog.pg_auth_members am
