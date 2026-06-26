@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -1247,5 +1248,22 @@ var _ = Describe("archiverSidecarMissingOnPrimary", func() {
 			fakePluginClientRollout{returnedPod: podWithSidecar})
 
 		Expect(archiverSidecarMissingOnPrimary(ctx, podWithSidecar, &cluster)).To(BeFalse())
+	})
+
+	It("propagates evaluation errors instead of degrading to a switchover decision", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		evalErr := errors.New("plugin evaluation failed")
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedError: evalErr})
+
+		missing, err := archiverSidecarMissingOnPrimary(ctx, pod, &cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, evalErr)).To(BeTrue(),
+			"the evaluation error must surface so the caller requeues instead of switching over")
+		Expect(missing).To(BeFalse())
 	})
 })
