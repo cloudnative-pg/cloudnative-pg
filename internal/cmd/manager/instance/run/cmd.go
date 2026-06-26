@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
@@ -65,13 +64,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-var (
-	scheme = runtime.NewScheme()
-
-	// errWALArchivePluginNotAvailable is returned when the configured
-	// WAL archiving plugin is not available or cannot be found.
-	errWALArchivePluginNotAvailable = fmt.Errorf("WAL archive plugin not available")
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -125,9 +118,6 @@ func NewCmd() *cobra.Command {
 
 			if errors.Is(err, postgres.ErrNoFreeWALSpace) {
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
-			}
-			if errors.Is(err, errWALArchivePluginNotAvailable) {
-				os.Exit(apiv1.MissingWALArchivePlugin)
 			}
 
 			return err
@@ -238,9 +228,8 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	postgresStartConditions := concurrency.MultipleExecuted{}
 	exitedConditions := concurrency.MultipleExecuted{}
 
-	var loadedPluginNames []string
 	pluginRepository := repository.New()
-	if loadedPluginNames, err = pluginRepository.RegisterUnixSocketPluginsInPath(
+	if _, err = pluginRepository.RegisterUnixSocketPluginsInPath(
 		configuration.Current.PluginSocketDir,
 	); err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
@@ -413,17 +402,6 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	} else if !hasDiskSpaceForWals {
 		contextLogger.Info("Detected low-disk space condition")
 		return makeUnretryableError(postgres.ErrNoFreeWALSpace)
-	}
-
-	if instance.Cluster != nil {
-		enabledArchiverPluginName := instance.Cluster.GetEnabledWALArchivePluginName()
-		if enabledArchiverPluginName != "" && !slices.Contains(loadedPluginNames, enabledArchiverPluginName) {
-			contextLogger.Info(
-				"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",
-				"enabledArchiverPluginName", enabledArchiverPluginName,
-				"loadedPluginNames", loadedPluginNames)
-			return makeUnretryableError(errWALArchivePluginNotAvailable)
-		}
 	}
 
 	return nil

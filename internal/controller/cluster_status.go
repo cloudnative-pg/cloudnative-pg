@@ -876,16 +876,6 @@ func isWALSpaceAvailableOnPod(pod *corev1.Pod) bool {
 	return !hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
 }
 
-// isTerminatedBecauseOfMissingWALArchivePlugin check if a Pod terminated because the
-// WAL archiving plugin was missing when the Pod started
-func isTerminatedBecauseOfMissingWALArchivePlugin(pod *corev1.Pod) bool {
-	isTerminatedForMissingWALArchivePlugin := func(state *corev1.ContainerState) bool {
-		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALArchivePlugin
-	}
-	// Return true if the pod IS terminated because of missing WAL archive plugin
-	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALArchivePlugin)
-}
-
 func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *corev1.ContainerState) bool) bool {
 	var pgContainerStatus *corev1.ContainerStatus
 	for i := range pod.Status.ContainerStatuses {
