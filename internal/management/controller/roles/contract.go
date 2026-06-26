@@ -32,6 +32,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
+// DatabaseRoleGrants represents a role being granted another role and the
+// options for this membership.
 type DatabaseRoleGrant struct {
 	Name    string `json:"name"`
 	Admin   *bool  `json:"admin,omitempty"`
