@@ -141,6 +141,14 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	if backup.Status.Phase == "" {
+		origBackup := backup.DeepCopy()
+		backup.Status.SetAsPending()
+
+		return ctrl.Result{},
+			r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
+	}
+
 	// A backup that already reached a terminal phase is immutable: never run
 	// the admission guard on it. Re-validating here is unsafe because some
 	// checks depend on the runtime environment rather than the (immutable)
@@ -290,8 +298,6 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 ) (*ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
-	origBackup := backup.DeepCopy()
-
 	// If no good running backups are found we elect a pod for the backup
 	podStatus, err := r.getBackupTargetPod(ctx, &cluster, backup)
 	if apierrs.IsNotFound(err) ||
@@ -301,10 +307,6 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
 			cluster.Status.TargetPrimary)
-		backup.Status.SetAsPending()
-		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
-			return nil, err
-		}
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -320,12 +322,8 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	if !utils.IsPodReady(*pod) {
 		contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
-		backup.Status.SetAsPending()
 		r.Recorder.Eventf(backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 			cluster.Status.TargetPrimary)
-		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
-			return nil, err
-		}
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -463,12 +461,7 @@ func (r *BackupReconciler) getCluster(
 	if apierrs.IsNotFound(err) {
 		r.Recorder.Eventf(backup, "Warning", "FindingCluster",
 			"Unknown cluster %v, will retry in 30 seconds", clusterName)
-		origBackup := backup.DeepCopy()
-		backup.Status.SetAsPending()
-		if patchErr := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); patchErr != nil {
-			contextLogger.Error(patchErr, "while setting backup as pending")
-			return nil, patchErr
-		}
+
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -666,11 +659,6 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 			cluster.Status.TargetPrimary,
 		)
 		// TODO: shouldn't this be a failed backup?
-		origBackup := backup.DeepCopy()
-		backup.Status.SetAsPending()
-		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
-			return nil, err
-		}
 
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -1122,12 +1110,7 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 			"A backup is already in progress or waiting to be started, retrying",
 			"targetBackup", backup.Name,
 		)
-		origBackup := backup.DeepCopy()
-		backup.Status.SetAsPending()
-		if patchErr := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); patchErr != nil {
-			contextLogger.Error(patchErr, "while setting backup as pending")
-			return ctrl.Result{}, patchErr
-		}
+
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
