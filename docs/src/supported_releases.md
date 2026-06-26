@@ -129,7 +129,7 @@ version of PostgreSQL, we might not be able to help you.
 |---------|--------------|-------------|
 | 1.31.0  | ~ Sep, 2026  | ~ Mar, 2027 |
 | 1.32.0  | ~ Dec, 2026  | ~ Jun, 2027 |
-| 1.33.0  | ~ Mar, 2027  | ~ Sep, 2026 |
+| 1.33.0  | ~ Mar, 2027  | ~ Sep, 2027 |
 
 :::note
     Feature freeze occurs 1-2 weeks before the release, at which point a
