@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -115,4 +116,67 @@ var _ = Describe("dumpSecretKeyRefToFile", func() {
 		Expect(content).To(Equal(shortValue))
 		Expect(content).ToNot(ContainSubstring("BBBB"))
 	})
+})
+
+var _ = Describe("validateExternalClusterPaths", func() {
+	sslSelector := func(name, key string) *corev1.SecretKeySelector {
+		return &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: name},
+			Key:                  key,
+		}
+	}
+
+	It("accepts a valid cluster with all SSL selectors set", func() {
+		cluster := &apiv1.ExternalCluster{
+			Name:        "my-server",
+			SSLCert:     sslSelector("cert-secret", "tls.crt"),
+			SSLKey:      sslSelector("cert-secret", "tls.key"),
+			SSLRootCert: sslSelector("ca-secret", "ca.crt"),
+			Password:    sslSelector("pass-secret", "password"),
+		}
+		Expect(validateExternalClusterPaths(cluster)).To(Succeed())
+	})
+
+	It("accepts a valid cluster with no SSL selectors set", func() {
+		cluster := &apiv1.ExternalCluster{Name: "my-server"}
+		Expect(validateExternalClusterPaths(cluster)).To(Succeed())
+	})
+
+	It("does not validate the password selector (not used as a path component)", func() {
+		cluster := &apiv1.ExternalCluster{
+			Name:     "my-server",
+			Password: sslSelector("../pwned", "../pwned"),
+		}
+		Expect(validateExternalClusterPaths(cluster)).To(Succeed())
+	})
+
+	DescribeTable("rejects path components that would escape the secrets directory",
+		func(cluster *apiv1.ExternalCluster) {
+			Expect(validateExternalClusterPaths(cluster)).To(MatchError(ErrInvalidPathComponent))
+		},
+		Entry("traversal in server name",
+			&apiv1.ExternalCluster{Name: "../pwned"}),
+		Entry("separator in server name",
+			&apiv1.ExternalCluster{Name: "nested/pwned"}),
+		Entry("backslash in server name",
+			&apiv1.ExternalCluster{Name: `nested\pwned`}),
+		Entry("absolute path as server name",
+			&apiv1.ExternalCluster{Name: "/etc/pwned"}),
+		Entry("dot as server name",
+			&apiv1.ExternalCluster{Name: "."}),
+		Entry("parent-dir as server name",
+			&apiv1.ExternalCluster{Name: ".."}),
+		Entry("traversal in SSLCert secret name",
+			&apiv1.ExternalCluster{Name: "ok", SSLCert: sslSelector("../pwned", "tls.crt")}),
+		Entry("traversal in SSLCert key",
+			&apiv1.ExternalCluster{Name: "ok", SSLCert: sslSelector("cert-secret", "../pwned")}),
+		Entry("traversal in SSLKey secret name",
+			&apiv1.ExternalCluster{Name: "ok", SSLKey: sslSelector("../pwned", "tls.key")}),
+		Entry("traversal in SSLKey key",
+			&apiv1.ExternalCluster{Name: "ok", SSLKey: sslSelector("cert-secret", "../pwned")}),
+		Entry("traversal in SSLRootCert secret name",
+			&apiv1.ExternalCluster{Name: "ok", SSLRootCert: sslSelector("../pwned", "ca.crt")}),
+		Entry("traversal in SSLRootCert key",
+			&apiv1.ExternalCluster{Name: "ok", SSLRootCert: sslSelector("ca-secret", "../pwned")}),
+	)
 })

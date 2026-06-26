@@ -21,14 +21,17 @@ package external
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external/internal/pgpass"
 )
 
@@ -49,6 +52,41 @@ func getExternalSecretsPath() string {
 	}
 
 	return defaultExternalSecretsPath
+}
+
+// ErrInvalidPathComponent is returned when a value that is used as a filesystem
+// path component contains a path separator or a parent-directory reference, both
+// of which could be used to escape the external secrets directory.
+var ErrInvalidPathComponent = errors.New("value cannot be used as a filesystem path component")
+
+// validatePathComponent ensures that a spec-provided value can be safely joined
+// into the external secrets path without escaping it. The admission webhook
+// rejects these values too, but the instance manager reads the spec directly, so
+// the check is repeated here as a defense-in-depth guard.
+func validatePathComponent(value string) error {
+	if value == "." || value == ".." || strings.ContainsAny(value, `/\`) {
+		return fmt.Errorf("%w: %q", ErrInvalidPathComponent, value)
+	}
+	return nil
+}
+
+// validateExternalClusterPaths ensures that all ExternalCluster fields used as
+// filesystem path components are safe to join into the external secrets directory.
+func validateExternalClusterPaths(server *apiv1.ExternalCluster) error {
+	if err := validatePathComponent(server.Name); err != nil {
+		return err
+	}
+	for _, selector := range []*corev1.SecretKeySelector{server.SSLCert, server.SSLKey, server.SSLRootCert} {
+		if selector == nil {
+			continue
+		}
+		for _, component := range []string{selector.Name, selector.Key} {
+			if err := validatePathComponent(component); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // readSecretKeyRef reads the passed secret selector into a string.
@@ -73,7 +111,7 @@ func readSecretKeyRef(
 }
 
 // getSecretKeyRefFileName get the name of the file where the content of the
-// connection secret will be dumped
+// connection secret will be dumped.
 func getSecretKeyRefFileName(
 	serverName string,
 	selector *corev1.SecretKeySelector,
@@ -105,12 +143,11 @@ func dumpSecretKeyRefToFile(
 		return "", fmt.Errorf("missing key %v in secret %v", selector.Key, selector.Name)
 	}
 
-	directory := filepath.Join(getExternalSecretsPath(), serverName)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	filePath := getSecretKeyRefFileName(serverName, selector)
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o700); err != nil {
 		return "", err
 	}
 
-	filePath := filepath.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
 	// Write atomically: this file is reused across reconciliations and read
 	// concurrently by libpq, so an in-place rewrite could expose a partial file
 	// or leave stale bytes behind when the secret rotates to shorter content.
@@ -121,7 +158,7 @@ func dumpSecretKeyRefToFile(
 	return filePath, nil
 }
 
-// getPgPassFilePath gets the path where the pgpass file will be stored
+// getPgPassFilePath gets the path where the pgpass file will be stored.
 func getPgPassFilePath(serverName string) string {
 	directory := filepath.Join(getExternalSecretsPath(), serverName)
 	filePath := filepath.Join(directory, "pgpass")
@@ -136,11 +173,10 @@ func createPgPassFile(
 ) (string, error) {
 	pgpassLine := pgpass.NewConnectionInfo(connectionParameters, password)
 
-	directory := filepath.Join(getExternalSecretsPath(), serverName)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	filePath := getPgPassFilePath(serverName)
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o700); err != nil {
 		return "", err
 	}
-	filePath := filepath.Join(directory, "pgpass")
 
 	return filePath, pgpass.From(pgpassLine).Write(filePath)
 }
