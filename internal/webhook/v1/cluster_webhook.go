@@ -1920,7 +1920,46 @@ func (v *ClusterCustomValidator) validateExternalCluster(
 				"one of connectionParameters, plugin and barmanObjectStore is required"))
 	}
 
+	// The external cluster name and the referenced secret selectors are joined
+	// into filesystem paths under the external secrets directory when the
+	// instance manager dumps the connection material, so they cannot contain a
+	// path separator or a parent-directory reference.
+	const pathComponentMsg = "cannot contain a path separator or a '..' component"
+	if isUnsafePathComponent(externalCluster.Name) {
+		result = append(result, field.Invalid(path.Child("name"), externalCluster.Name, pathComponentMsg))
+	}
+
+	selectors := []struct {
+		name     string
+		selector *corev1.SecretKeySelector
+	}{
+		{"sslCert", externalCluster.SSLCert},
+		{"sslKey", externalCluster.SSLKey},
+		{"sslRootCert", externalCluster.SSLRootCert},
+	}
+	for _, s := range selectors {
+		if s.selector == nil {
+			continue
+		}
+		if isUnsafePathComponent(s.selector.Name) {
+			result = append(result,
+				field.Invalid(path.Child(s.name, "name"), s.selector.Name, pathComponentMsg))
+		}
+		if isUnsafePathComponent(s.selector.Key) {
+			result = append(result,
+				field.Invalid(path.Child(s.name, "key"), s.selector.Key, pathComponentMsg))
+		}
+	}
+
 	return result
+}
+
+// isUnsafePathComponent reports whether a spec-provided value would escape the
+// directory it is meant to be joined into, either through a path separator or a
+// parent-directory reference. The instance manager enforces the same rule at the
+// write site, since it reads the spec directly and can bypass admission.
+func isUnsafePathComponent(value string) bool {
+	return value == "." || value == ".." || strings.ContainsAny(value, `/\`)
 }
 
 func (v *ClusterCustomValidator) validateReplicaClusterChange(r, old *apiv1.Cluster) field.ErrorList {
