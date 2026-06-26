@@ -1144,27 +1144,11 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, nil
 	}
 
-	var (
-		backup           *apiv1.Backup
-		recoverySnapshot *persistentvolumeclaim.StorageSource
-	)
-	// If the cluster is bootstrapping from recovery, it may do so from:
-	//  1 - a backup object, which may be done with volume snapshots or object storage
-	//  2 - volume snapshots
-	// We need to check that whichever alternative is used, the backup/snapshot is completed.
-	if cluster.Spec.Bootstrap != nil &&
-		cluster.Spec.Bootstrap.Recovery != nil {
-		var err error
-		backup, err = r.getOriginBackup(ctx, cluster)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
-			return res, err
-		}
-
-		recoverySnapshot = persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
+	// If the cluster is bootstrapping from recovery, resolve the source backup
+	// or volume snapshot and make sure it is ready before proceeding.
+	backup, recoverySnapshot, res, err := r.resolvePrimaryRecoverySource(ctx, cluster)
+	if !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	nodeSerial := nextNodeSerial(cluster)
@@ -1232,14 +1216,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+	inheritJobMetadata(cluster, job)
 
 	switch err := r.Create(ctx, job); {
 	case err == nil:
@@ -1263,6 +1240,90 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
+}
+
+// resolvePrimaryRecoverySource resolves the backup or volume snapshot used to
+// bootstrap the first primary, when the cluster bootstraps from recovery. It
+// returns a non-zero result (to be propagated to the caller) when the source is
+// not ready yet.
+func (r *ClusterReconciler) resolvePrimaryRecoverySource(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (*apiv1.Backup, *persistentvolumeclaim.StorageSource, ctrl.Result, error) {
+	// If the cluster is bootstrapping from recovery, it may do so from:
+	//  1 - a backup object, which may be done with volume snapshots or object storage
+	//  2 - volume snapshots
+	// We need to check that whichever alternative is used, the backup/snapshot is completed.
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.Recovery == nil {
+		return nil, nil, ctrl.Result{}, nil
+	}
+
+	backup, err := r.getOriginBackup(ctx, cluster)
+	if err != nil {
+		return nil, nil, ctrl.Result{}, err
+	}
+
+	if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
+		return nil, nil, res, err
+	}
+
+	recoverySnapshot := persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
+	return backup, recoverySnapshot, ctrl.Result{}, nil
+}
+
+// buildPrimaryInstanceJob builds the bootstrap Job for the first primary
+// instance, selecting the variant (initdb, recovery, pgBaseBackup or volume
+// snapshot restore) according to the cluster bootstrap configuration.
+func (r *ClusterReconciler) buildPrimaryInstanceJob(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	nodeSerial int,
+	backup *apiv1.Backup,
+	recoverySnapshot *persistentvolumeclaim.StorageSource,
+) (*batchv1.Job, error) {
+	isBootstrappingFromRecovery := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil
+	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
+
+	switch {
+	case isBootstrappingFromRecovery && recoverySnapshot != nil:
+		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx,
+			r.Client,
+			cluster.Namespace,
+			recoverySnapshot.DataSource,
+		)
+		if err != nil {
+			return nil, err
+		}
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
+		return specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup), nil
+
+	case isBootstrappingFromRecovery:
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
+		return specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup), nil
+
+	case isBootstrappingFromBaseBackup:
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
+		return specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial), nil
+
+	default:
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
+		return specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial), nil
+	}
+}
+
+// inheritJobMetadata propagates the cluster's inherited annotations and labels
+// onto an instance Job and its pod template.
+func inheritJobMetadata(cluster *apiv1.Cluster, job *batchv1.Job) {
+	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
 }
 
 // getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
@@ -1329,14 +1390,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+	inheritJobMetadata(cluster, job)
 
 	switch err := r.Create(ctx, job); {
 	case err == nil:
@@ -1416,6 +1470,21 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		// as an assertion to catch unexpected events.
 		pvcStatus := instancePVC.Annotations[utils.PVCStatusAnnotationName]
 		if pvcStatus != persistentvolumeclaim.StatusReady {
+			// A PVC only becomes ready once the Job that initializes it completes,
+			// or once a Pod attaches to it. When the bootstrap of the first primary
+			// loses a status-patch optimistic-lock race after the data PVC has been
+			// created but before the initialization Job is created, the orphan PVC
+			// is counted as an instance and the cluster never re-enters the
+			// bootstrap gate, so no Job is ever created and this branch would wait
+			// forever (see #11036). If the instance owning this PVC is the intended
+			// primary and no initialization Job exists for it, (re)create it reusing
+			// the serial already assigned to the PVC.
+			if res, handled, err := r.ensurePrimaryBootstrapJob(
+				ctx, cluster, instanceToCreate, &instancePVC, resources.jobs.Items,
+			); err != nil || handled {
+				return res, err
+			}
+
 			contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
 				"pvc", instancePVC.Name,
 				"status", pvcStatus,
@@ -1513,6 +1582,98 @@ func findInstancePodToCreate(
 	}
 
 	return nil, nil
+}
+
+// ensurePrimaryBootstrapJob recovers the first-primary bootstrap when the data
+// PVC has been created but the initialization Job was never created (for
+// instance because a status-patch optimistic-lock conflict aborted
+// createPrimaryInstance after the PVC creation, see #11036). When the instance
+// owning the not-ready PVC is the intended primary and no Job exists for it, it
+// (re)creates the bootstrap Job reusing the serial already assigned to the PVC.
+//
+// It returns handled=true when it took over the reconciliation (the returned
+// result must be propagated), and handled=false to let the caller fall back to
+// the regular wait-and-requeue behavior.
+func (r *ClusterReconciler) ensurePrimaryBootstrapJob(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instanceToCreate *corev1.Pod,
+	instancePVC *corev1.PersistentVolumeClaim,
+	jobs []batchv1.Job,
+) (ctrl.Result, bool, error) {
+	contextLogger := log.FromContext(ctx)
+
+	// Only the primary instance bootstraps a brand-new data directory through a
+	// Job; standby instances are joined via their own path. We treat the
+	// instance as the intended primary when it matches the TargetPrimary or when
+	// its PVC still carries the primary role label.
+	isPrimary := instanceToCreate.Name == cluster.Status.TargetPrimary ||
+		specs.IsPrimary(instancePVC.ObjectMeta)
+	if !isPrimary {
+		return ctrl.Result{}, false, nil
+	}
+
+	// If an initialization Job already exists for this instance, the regular
+	// wait path is correct: the PVC will turn ready once the Job completes.
+	for i := range jobs {
+		if jobs[i].Labels[utils.InstanceNameLabelName] == instanceToCreate.Name {
+			return ctrl.Result{}, false, nil
+		}
+	}
+
+	// Reuse the serial already assigned to the PVC: allocating a new one would
+	// orphan this PVC and create a second instance.
+	nodeSerial, err := specs.GetNodeSerial(instancePVC.ObjectMeta)
+	if err != nil {
+		return ctrl.Result{}, false, err
+	}
+
+	contextLogger.Info(
+		"Recreating the missing bootstrap Job for the primary instance",
+		"instance", instanceToCreate.Name,
+		"serial", nodeSerial,
+	)
+
+	// Set TargetPrimary defensively: if it is not set the instance manager would
+	// shut the primary down as soon as it starts (see reconcileOldPrimary).
+	if cluster.Status.TargetPrimary != instanceToCreate.Name {
+		if err := r.setPrimaryInstance(ctx, cluster, instanceToCreate.Name); err != nil {
+			return ctrl.Result{}, false, fmt.Errorf("unable to set the primary instance name: %w", err)
+		}
+	}
+
+	backup, recoverySnapshot, res, err := r.resolvePrimaryRecoverySource(ctx, cluster)
+	if !res.IsZero() || err != nil {
+		return res, true, err
+	}
+
+	job, err := r.buildPrimaryInstanceJob(ctx, cluster, nodeSerial, backup, recoverySnapshot)
+	if err != nil {
+		return ctrl.Result{}, true, err
+	}
+
+	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
+		return ctrl.Result{}, true, fmt.Errorf("unable to set the owner reference for the bootstrap Job: %w", err)
+	}
+
+	inheritJobMetadata(cluster, job)
+
+	if err := r.Create(ctx, job); err != nil {
+		if apierrs.IsAlreadyExists(err) {
+			// This Job was already created, maybe the cache is stale.
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, true, nil
+		}
+		contextLogger.Error(err, "Unable to create the bootstrap Job", "job", job)
+		return ctrl.Result{}, true, err
+	}
+
+	// Persist the reused serial so the generated-node counter stays consistent:
+	// without this a later instance would be assigned the same serial again.
+	if err := r.recordGeneratedNodeSerial(ctx, cluster, nodeSerial); err != nil {
+		return ctrl.Result{}, true, fmt.Errorf("cannot persist generated node serial: %w", err)
+	}
+
+	return ctrl.Result{RequeueAfter: 1 * time.Second}, true, ErrNextLoop
 }
 
 // checkReadyForRecovery checks if the backup or volumeSnapshots are ready, and
