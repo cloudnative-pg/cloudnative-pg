@@ -59,7 +59,7 @@ type MatchGrants struct {
 	expectedGrants []apiv1.RoleGrant
 }
 
-func (m MatchGrants) Match(actual interface{}) (success bool, err error) {
+func (m MatchGrants) Match(actual any) (success bool, err error) {
 	roleGrantStrings, ok := actual.([]string)
 	if !ok {
 		return false, fmt.Errorf("MatchGrants expects a list of strings")
