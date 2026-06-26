@@ -2652,6 +2652,19 @@ type PluginStatus struct {
 	Status string `json:"status,omitempty"`
 }
 
+// RoleGrant is the representation, in Kubernetes, of a PostgreSQL role
+// membership including its membership options.
+//
+// If a membership option is set, it's managed and CNPG will try to achieve the
+// desired state.
+// If a membership option is omitted, PostgreSQL applies its default values
+// during initial creation.
+//
+// NOTE: CNPG ignores omitted membership options. If you remove a previously
+// configured field, CNPG will NOT reset it to its default value - it will just
+// stop managing it.
+//
+// Reference: https://www.postgresql.org/docs/current/sql-grant.html#:~:text=GRANT%20on%20Roles
 type RoleGrant struct {
 	Name    string `json:"name"`
 	Admin   *bool  `json:"admin,omitempty"`
