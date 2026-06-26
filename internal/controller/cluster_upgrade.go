@@ -671,6 +671,30 @@ func checkPodEnvironmentIsOutdated(_ context.Context, pod *corev1.Pod, cluster *
 	return rollout{}, nil
 }
 
+// newInstanceForRunningPod evaluates the instance specification that the given
+// running Pod should currently match. It derives the node serial and status
+// scheme from the Pod, then calls specs.NewInstance, which runs the plugins'
+// OperationVerbEvaluate lifecycle hook so the returned spec already includes any
+// sidecars they inject.
+func newInstanceForRunningPod(
+	ctx context.Context,
+	pod *corev1.Pod,
+	cluster *apiv1.Cluster,
+) (*corev1.Pod, error) {
+	serial, err := utils.GetClusterSerialValue(pod.Annotations)
+	if err != nil {
+		return nil, fmt.Errorf("while getting the pod serial value: %w", err)
+	}
+
+	tlsEnabled := remote.GetStatusSchemeFromPod(pod).IsHTTPS()
+	targetPod, err := specs.NewInstance(ctx, *cluster, serial, tlsEnabled)
+	if err != nil {
+		return nil, fmt.Errorf("while creating a new instance pod: %w", err)
+	}
+
+	return targetPod, nil
+}
+
 func checkPodSpecIsOutdated(
 	ctx context.Context,
 	pod *corev1.Pod,
@@ -687,16 +711,9 @@ func checkPodSpecIsOutdated(
 		return rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
 	}
 
-	tlsEnabled := remote.GetStatusSchemeFromPod(pod).IsHTTPS()
-
-	serial, err := utils.GetClusterSerialValue(pod.Annotations)
+	targetPod, err := newInstanceForRunningPod(ctx, pod, cluster)
 	if err != nil {
-		return rollout{}, fmt.Errorf("while getting the pod serial value: %w", err)
-	}
-
-	targetPod, err := specs.NewInstance(ctx, *cluster, serial, tlsEnabled)
-	if err != nil {
-		return rollout{}, fmt.Errorf("while creating a new pod to check podSpec: %w", err)
+		return rollout{}, fmt.Errorf("while building the target instance to check podSpec: %w", err)
 	}
 
 	// the bootstrap init-container could change image after an operator upgrade.
@@ -773,13 +790,7 @@ func archiverSidecarMissingOnPrimary(
 		return false, nil
 	}
 
-	serial, err := utils.GetClusterSerialValue(pod.Annotations)
-	if err != nil {
-		return false, err
-	}
-
-	tlsEnabled := remote.GetStatusSchemeFromPod(pod).IsHTTPS()
-	targetPod, err := specs.NewInstance(ctx, *cluster, serial, tlsEnabled)
+	targetPod, err := newInstanceForRunningPod(ctx, pod, cluster)
 	if err != nil {
 		return false, err
 	}
