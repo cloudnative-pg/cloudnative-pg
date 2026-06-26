@@ -772,11 +772,14 @@ func (r *ClusterReconciler) recreatePrimaryInPlace(
 //
 // Detection diffs the Pod's containers against a freshly evaluated instance
 // spec: NewInstance runs the plugins' OperationVerbEvaluate lifecycle hook, so
-// its containers already include any injected sidecars. We cannot map a sidecar
-// back to the specific plugin that injected it, so when several sidecar-injecting
-// plugins are enabled this may recreate the primary even if only a non-archiver
-// sidecar is missing. That is a safe over-approximation: it trades a switchover
-// for an in-place restart, never the other way around.
+// its containers already include any injected sidecars. The check is a
+// deliberate over-approximation. We cannot map a sidecar back to the specific
+// plugin that injected it, so when several sidecar-injecting plugins are enabled
+// this may recreate the primary even if only a non-archiver sidecar is missing.
+// Likewise any container the evaluated spec adds but the running primary lacks
+// (for example one introduced by a newer operator version) triggers the same
+// in-place restart. Both cases are safe: they trade a switchover for an in-place
+// restart, never the other way around.
 //
 // An error stops the caller rather than degrading to a decision: evaluating the
 // instance spec to false would route the primary into the very switchover that
