@@ -1,7 +1,7 @@
 {
   "image": "mcr.microsoft.com/devcontainers/go:2-1.25-trixie",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:3": {
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {
       "moby": false
     },
     "ghcr.io/mpriscella/features/kind:1": {},
