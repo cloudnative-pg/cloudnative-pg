@@ -1213,14 +1213,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		"jobName", job.Name,
 		"primary", true)
 
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+	inheritJobMetadata(cluster, job)
 
 	if err := r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
@@ -1304,6 +1297,19 @@ func (r *ClusterReconciler) buildPrimaryInstanceJob(
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
 		return specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial), nil
 	}
+}
+
+// inheritJobMetadata propagates the cluster's inherited annotations and labels
+// onto an instance Job and its pod template.
+func inheritJobMetadata(cluster *apiv1.Cluster, job *batchv1.Job) {
+	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
 }
 
 // getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
@@ -1453,14 +1459,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+	inheritJobMetadata(cluster, job)
 
 	if err := r.Create(ctx, job); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -1728,14 +1727,7 @@ func (r *ClusterReconciler) ensurePrimaryBootstrapJob(
 		return ctrl.Result{}, true, fmt.Errorf("unable to set the owner reference for the bootstrap Job: %w", err)
 	}
 
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+	inheritJobMetadata(cluster, job)
 
 	if err := r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
