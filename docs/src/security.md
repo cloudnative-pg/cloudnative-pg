@@ -253,7 +253,11 @@ including:
   (`spec.managed.roles`), which may set `superuser: true` or grant membership of
   existing roles, and can use PostgreSQL features such as `COPY ... FROM PROGRAM`
   to run commands inside the operand Pod;
-- custom PostgreSQL configuration parameters.
+- custom PostgreSQL configuration, including
+  [`pg_hba`](postgresql_conf.md#the-pg_hba-section) rules (for example `trust`
+  authentication) and parameters that shape the cluster's security posture and
+  durability, such as `password_encryption`, `fsync`, and memory-related
+  settings.
 
 This is the intended trust model, not a privilege escalation.
 
