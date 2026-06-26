@@ -294,6 +294,7 @@
         'getwoke{/,}**',
         'jonasbn/github-action-spellcheck',
         'registry',
+        'cuelang/cue',
       ],
       pinDigests: false,
       separateMajorMinor: false,
