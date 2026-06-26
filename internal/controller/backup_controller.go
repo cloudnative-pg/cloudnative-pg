@@ -117,7 +117,11 @@ func NewBackupReconciler(
 // Reconcile is the main reconciliation loop
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:gocognit
 	contextLogger, ctx := log.SetupLogger(ctx)
-	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
+
+	contextLogger.Debug("Reconciliation loop start")
+	defer func() {
+		contextLogger.Debug("Reconciliation loop end")
+	}()
 
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
@@ -223,9 +227,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	default:
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
 	}
-
-	// plugin post hooks
-	contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
 
 	hookResult := postReconcilePluginHooks(ctx, &cluster, &backup)
 	if hookResult.Err != nil || !hookResult.Result.IsZero() {
