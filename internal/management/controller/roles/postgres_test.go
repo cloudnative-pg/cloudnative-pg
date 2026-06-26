@@ -164,19 +164,19 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			"xmin", "rolegrants",
 		}).
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
-				nil, false, []byte("This is postgres user"), 11, []byte("{}")).
+				nil, false, []byte("This is postgres user"), 11, []byte("[]")).
 			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
 				pgtype.Timestamp{
 					Valid:            true,
 					Time:             testDate,
 					InfinityModifier: pgtype.Finite,
-				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1|false|true|true","role2|true|false|false"}`)).
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`[{"name":"role1","admin":false,"inherit":true,"set":true},{"name":"role2","admin":true,"inherit":false,"set":false}]`)).
 			AddRow("future_man", false, false, true, true, false, true, 10, []byte("54321"),
 				pgtype.Timestamp{
 					Valid:            true,
 					Time:             time.Time{},
 					InfinityModifier: pgtype.Infinity,
-				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1|false|true|true","role2|true|false|false"}`))
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`[{"name":"role1","admin":false,"inherit":true,"set":true},{"name":"role2","admin":true,"inheri":false,"set":false}]`))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := List(ctx, db)
