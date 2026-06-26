@@ -656,3 +656,48 @@ var _ = Describe("getPluginsNeededForReconcile", func() {
 			To(Equal([]string{"plugin-shared"}))
 	})
 })
+
+var _ = Describe("reconcileResources surfaces a permanently failed instance creation job", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// recoveryJob returns a recovery Job for the cluster with the given status,
+	// mimicking the bootstrap/recovery Job the operator creates.
+	recoveryJob := func(cluster *apiv1.Cluster, status batchv1.JobStatus) batchv1.Job {
+		return batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Name + "-1-full-recovery",
+				Namespace: namespace,
+			},
+			Status: status,
+		}
+	}
+
+	It("reports the unrecoverable phase when a job reaches its backoff limit",
+		func(ctx SpecContext) {
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			failedJob := recoveryJob(cluster, batchv1.JobStatus{
+				Failed: 7,
+				Conditions: []batchv1.JobCondition{
+					{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "BackoffLimitExceeded"},
+				},
+			})
+
+			resources := &managedResources{jobs: batchv1.JobList{Items: []batchv1.Job{failedJob}}}
+
+			res, err := env.clusterReconciler.reconcileResources(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.RequeueAfter).To(BeNumerically(">", 0))
+
+			var updated apiv1.Cluster
+			Expect(env.client.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: namespace}, &updated)).
+				To(Succeed())
+			Expect(updated.Status.Phase).To(Equal(apiv1.PhaseUnrecoverable))
+			Expect(updated.Status.PhaseReason).To(ContainSubstring(failedJob.Name))
+		})
+})
