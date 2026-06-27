@@ -11,6 +11,7 @@ AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
 AllNamespaces
+Anand
 AntiAffinity
 AppArmor
 AppArmorProfile
@@ -588,6 +589,7 @@ Untrusted
 UpdateStrategy
 UsageSpec
 UsageSpecType
+Utkarsh
 VLDB
 VLDBs
 VM
@@ -717,6 +719,7 @@ beginLSN
 beginWal
 benchmarked
 benchmarking
+binak
 bindAsAuth
 bindDN
 bindPassword
@@ -1076,6 +1079,7 @@ jsonpath
 juliamertz
 kb
 kbytes
+kdautrey
 keepalive
 kms
 kube
@@ -1498,6 +1502,7 @@ serviceupdatestrategy
 sessionToken
 sha
 sharifmshaker
+sharma
 shm
 shmall
 shmmax
