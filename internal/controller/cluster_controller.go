@@ -1218,13 +1218,13 @@ func (r *ClusterReconciler) handleRollingUpdate(
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	case errors.Is(err, errRolloutDelayed):
 		contextLogger.Warning(
-			"A Pod need to be rolled out, but the rollout is being delayed",
+			"A Pod needs to be rolled out, but the rollout is being delayed",
 		)
 		if err := r.RegisterPhase(
 			ctx,
 			cluster,
 			apiv1.PhaseUpgradeDelayed,
-			"The cluster need to be update, but the operator is configured to delay "+
+			"The cluster needs to be updated, but the operator is configured to delay "+
 				"the operation",
 		); err != nil {
 			return ctrl.Result{}, err
