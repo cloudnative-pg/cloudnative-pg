@@ -391,6 +391,53 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.MajorVersionLabelName, "18"))
 		}
 	})
+
+	It("reuses a pre-existing VolumeSnapshot that belongs to the backup", func(ctx SpecContext) {
+		// Simulate the cached-list-lag race: a VolumeSnapshot we created in a
+		// previous reconciliation cycle already exists, carrying this backup's
+		// label, but the Create call collides with it.
+		existing := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name),
+				Labels: map[string]string{
+					utils.BackupNameLabelName: backup.Name,
+				},
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod, existing).
+			Build()
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
+
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("fails when a foreign VolumeSnapshot collides with the backup name", func(ctx SpecContext) {
+		// A VolumeSnapshot with the same name exists but does not belong to
+		// this backup: the collision must surface as an error instead of
+		// looping forever.
+		existing := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name),
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod, existing).
+			Build()
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
+
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		Expect(err).To(HaveOccurred())
+	})
 })
 
 var _ = Describe("transferLabelsToAnnotations", func() {

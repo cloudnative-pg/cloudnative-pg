@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -508,7 +509,30 @@ func (se *Reconciler) createSnapshot(
 	}
 
 	if err := se.cli.Create(ctx, &snapshot); err != nil {
-		return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
+		if !apierrs.IsAlreadyExists(err) {
+			return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
+		}
+
+		// A VolumeSnapshot with this name already exists. This can happen when
+		// the cached VolumeSnapshot list used to decide whether to create the
+		// snapshots lags behind a snapshot we created in a previous
+		// reconciliation cycle. If the existing object is the one we manage for
+		// this backup, the error is harmless: the reconciliation loop will
+		// requeue and pick it up through the backup label selector. Otherwise
+		// the name collides with a foreign object and we must surface the error
+		// instead of silently looping.
+		var existing volumesnapshotv1.VolumeSnapshot
+		if err := se.cli.Get(ctx, client.ObjectKeyFromObject(&snapshot), &existing); err != nil {
+			return fmt.Errorf("while verifying pre-existing VolumeSnapshot %s: %w", snapshot.Name, err)
+		}
+		if existing.Labels[utils.BackupNameLabelName] != backup.Name {
+			return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
+		}
+
+		log.FromContext(ctx).Info(
+			"VolumeSnapshot for this backup already exists, reusing it",
+			"snapshotName", snapshot.Name,
+			"backupName", backup.Name)
 	}
 
 	return nil
