@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -107,7 +108,7 @@ type ClusterCustomValidator struct{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
 func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv1.Cluster) (admission.Warnings, error) {
-	clusterLog.Info("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
+	clusterLog.Debug("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
 	allErrs := v.validate(cluster)
@@ -127,7 +128,7 @@ func (v *ClusterCustomValidator) ValidateUpdate(
 	_ context.Context,
 	oldCluster *apiv1.Cluster, cluster *apiv1.Cluster,
 ) (admission.Warnings, error) {
-	clusterLog.Info("Validation for Cluster upon update", "name", cluster.GetName(), "namespace",
+	clusterLog.Debug("Validation for Cluster upon update", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
 	// applying defaults before validating updates to set any new default
@@ -1026,6 +1027,18 @@ func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.
 	return result
 }
 
+// postgresParameterNameRegex matches a valid PostgreSQL configuration
+// parameter name: a plain GUC name or a custom (namespaced) one with a
+// single dot. Keys are rendered verbatim into postgresql.conf, so a
+// newline or other unexpected character could inject an arbitrary
+// directive.
+//
+// The pattern follows PostgreSQL's configuration-file lexer (guc-file.l),
+// including the dollar sign it allows in identifiers. It is intentionally
+// restricted to ASCII: the lexer also accepts high-bit bytes, but no real
+// GUC relies on them.
+var postgresParameterNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*(\.[A-Za-z_][A-Za-z0-9_$]*)?$`)
+
 // validateConfiguration determines whether a PostgreSQL configuration is valid
 func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
@@ -1066,6 +1079,17 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
 	for key, value := range r.Spec.PostgresConfiguration.Parameters {
+		if !postgresParameterNameRegex.MatchString(key) {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", key),
+					key,
+					"must be a valid PostgreSQL configuration parameter name "+
+						"(a GUC name, optionally namespaced with a single dot)"))
+			continue
+		}
+
 		_, isFixed := postgres.FixedConfigurationParameters[key]
 		sanitizedValue, presentInSanitizedConfiguration := sanitizedParameters[key]
 		if isFixed && (!presentInSanitizedConfiguration || value != sanitizedValue) {
@@ -1936,7 +1960,46 @@ func (v *ClusterCustomValidator) validateExternalCluster(
 				"one of connectionParameters, plugin and barmanObjectStore is required"))
 	}
 
+	// The external cluster name and the referenced secret selectors are joined
+	// into filesystem paths under the external secrets directory when the
+	// instance manager dumps the connection material, so they cannot contain a
+	// path separator or a parent-directory reference.
+	const pathComponentMsg = "cannot contain a path separator or a '..' component"
+	if isUnsafePathComponent(externalCluster.Name) {
+		result = append(result, field.Invalid(path.Child("name"), externalCluster.Name, pathComponentMsg))
+	}
+
+	selectors := []struct {
+		name     string
+		selector *corev1.SecretKeySelector
+	}{
+		{"sslCert", externalCluster.SSLCert},
+		{"sslKey", externalCluster.SSLKey},
+		{"sslRootCert", externalCluster.SSLRootCert},
+	}
+	for _, s := range selectors {
+		if s.selector == nil {
+			continue
+		}
+		if isUnsafePathComponent(s.selector.Name) {
+			result = append(result,
+				field.Invalid(path.Child(s.name, "name"), s.selector.Name, pathComponentMsg))
+		}
+		if isUnsafePathComponent(s.selector.Key) {
+			result = append(result,
+				field.Invalid(path.Child(s.name, "key"), s.selector.Key, pathComponentMsg))
+		}
+	}
+
 	return result
+}
+
+// isUnsafePathComponent reports whether a spec-provided value would escape the
+// directory it is meant to be joined into, either through a path separator or a
+// parent-directory reference. The instance manager enforces the same rule at the
+// write site, since it reads the spec directly and can bypass admission.
+func isUnsafePathComponent(value string) bool {
+	return value == "." || value == ".." || strings.ContainsAny(value, `/\`)
 }
 
 func (v *ClusterCustomValidator) validateReplicaClusterChange(r, old *apiv1.Cluster) field.ErrorList {

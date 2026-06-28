@@ -69,6 +69,18 @@ func (resources *managedResources) runningJobNames() []string {
 	return result
 }
 
+// failedJobNames returns the names of the jobs that have permanently failed,
+// i.e. they have exhausted their backoff limit
+func (resources *managedResources) failedJobNames() []string {
+	result := make([]string, 0, len(resources.jobs.Items))
+	for _, job := range resources.jobs.Items {
+		if utils.JobHasFailed(job) {
+			result = append(result, job.Name)
+		}
+	}
+	return result
+}
+
 // Check if every managed Pod is active and will be schedules
 func (resources *managedResources) inactiveInstanceNames() []string {
 	result := make([]string, 0, len(resources.instances.Items))
@@ -847,16 +859,6 @@ func isWALSpaceAvailableOnPod(pod *corev1.Pod) bool {
 	}
 	// Return true if WAL space IS available (i.e., NOT terminated for missing disk space)
 	return !hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
-}
-
-// isTerminatedBecauseOfMissingWALArchivePlugin check if a Pod terminated because the
-// WAL archiving plugin was missing when the Pod started
-func isTerminatedBecauseOfMissingWALArchivePlugin(pod *corev1.Pod) bool {
-	isTerminatedForMissingWALArchivePlugin := func(state *corev1.ContainerState) bool {
-		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALArchivePlugin
-	}
-	// Return true if the pod IS terminated because of missing WAL archive plugin
-	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALArchivePlugin)
 }
 
 func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *corev1.ContainerState) bool) bool {

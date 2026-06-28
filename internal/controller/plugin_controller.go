@@ -244,7 +244,9 @@ func (r *PluginReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
-	pluginAddress := fmt.Sprintf("%s:%d", service.Name, pluginPort)
+	// Use the in-cluster service FQDN to match common NO_PROXY patterns
+	// in managed environments where proxy env vars are injected.
+	pluginAddress := fmt.Sprintf("%s.%s.svc:%d", service.Name, service.Namespace, pluginPort)
 
 	// Use custom server name if provided, otherwise default to service name
 	serverName := service.Annotations[utils.PluginServerNameAnnotationName]

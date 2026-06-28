@@ -84,7 +84,7 @@ jobs:
       -
         name: Checkout code
         if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
           ref: ${{ env.BRANCH }}
@@ -140,7 +140,7 @@ jobs:
         name: Install Go
         if: |
           contains( github.event.pull_request.labels.*.name, env.BRANCH ) && steps.check_commits.outputs.commit != ''
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ steps.check_commits.outputs.go_version }}
           check-latest: true
@@ -149,7 +149,7 @@ jobs:
         name: Cache Go modules
         if: |
           contains( github.event.pull_request.labels.*.name, env.BRANCH ) && steps.check_commits.outputs.commit != ''
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6
         with:
           path: |
             ~/go/pkg/mod

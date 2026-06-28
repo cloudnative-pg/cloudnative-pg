@@ -84,13 +84,17 @@ EOF
   fi
 
   local agents=()
+  local taint_args=()
   if [ "$NODES" -gt 1 ]; then
     agents=(-a "${NODES}")
+    # Only taint the server when agent nodes exist to schedule workloads
+    taint_args=(--k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0") #wokeignore:rule=master
   fi
 
   K3D_FIX_MOUNTS=1 k3d cluster create "${options[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
-    --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
+    --k3s-arg "--kube-apiserver-arg=enable-admission-plugins=OwnerReferencesPermissionEnforcement@server:0" \
+    "${taint_args[@]}"
 
   docker network connect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
 }

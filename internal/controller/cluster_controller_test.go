@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -37,10 +38,239 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("reconcilePods instance recreation while a PVC is terminating (#10985)", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// Builds a 3-instance cluster with WAL storage where instance serial 1 is
+	// missing while instances 2 and 3 are up and reporting ready. This is the
+	// state in which reconcilePods decides to recreate serial 1.
+	newRecreatingCluster := func(ctx SpecContext) (*apiv1.Cluster, *managedResources, postgres.PostgresqlStatusList) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+		cluster.Status.Instances = 2
+		cluster.Status.ReadyInstances = 2
+		cluster.Status.InstanceNames = []string{
+			specs.GetInstanceName(cluster.Name, 2),
+			specs.GetInstanceName(cluster.Name, 3),
+		}
+
+		readyPod := func(serial int) *corev1.Pod {
+			pod, err := specs.NewInstance(ctx, *cluster, serial, true)
+			Expect(err).ToNot(HaveOccurred())
+			pod.Status = corev1.PodStatus{
+				Phase:      corev1.PodRunning,
+				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+			}
+			return pod
+		}
+		pod2 := readyPod(2)
+		pod3 := readyPod(3)
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*pod2, *pod3}},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: pod2, IsPodReady: true},
+				{Pod: pod3, IsPodReady: true, IsPrimary: true},
+			},
+		}
+		return cluster, resources, statusList
+	}
+
+	It("creates the join Job when no previous PVC is terminating", func(ctx SpecContext) {
+		cluster, resources, statusList := newRecreatingCluster(ctx)
+
+		res, err := env.clusterReconciler.reconcilePods(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(30 * time.Second))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(HaveLen(1), "the join Job for the recreated instance should have been created")
+	})
+
+	It("defers recreation while a previous PVC for the same serial is still terminating", func(ctx SpecContext) {
+		cluster, resources, statusList := newRecreatingCluster(ctx)
+		// The WAL PVC of serial 1 has not finished terminating yet.
+		resources.pvcs = corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              specs.GetInstanceName(cluster.Name, 1) + apiv1.WalArchiveVolumeSuffix,
+					Namespace:         namespace,
+					DeletionTimestamp: ptr.To(metav1.Now()),
+				},
+			},
+		}}
+
+		res, err := env.clusterReconciler.reconcilePods(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(BeEmpty(), "no join Job should be created while the previous PVC is terminating")
+	})
+})
+
+var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminating (#10985)", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	It("defers reattaching a Pod while one of the instance's PVCs is still terminating", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+		cluster.Status.ReadyInstances = 2
+
+		readyPod := func(serial int) *corev1.Pod {
+			pod, err := specs.NewInstance(ctx, *cluster, serial, true)
+			Expect(err).ToNot(HaveOccurred())
+			pod.Status = corev1.PodStatus{
+				Phase:      corev1.PodRunning,
+				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+			}
+			return pod
+		}
+		pod1, pod2 := readyPod(1), readyPod(2)
+
+		// Instance 3 has a podless data PVC (so it is a candidate for
+		// reattachment) while its WAL PVC is still terminating.
+		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		walName := specs.GetInstanceName(cluster.Name, 3) + apiv1.WalArchiveVolumeSuffix
+		for i := range thirdGroup {
+			if thirdGroup[i].Name == walName {
+				thirdGroup[i].DeletionTimestamp = ptr.To(metav1.Now())
+			}
+		}
+		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*pod1, *pod2}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: pod1, IsPodReady: true, IsPrimary: true},
+				{Pod: pod2, IsPodReady: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be reattached while one of its PVCs is terminating")
+	})
+})
+
+var _ = Describe("ensureInstancesAreCreated recovers a lost first-primary bootstrap Job (#11036)", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	It("recreates the initdb Job reusing serial 1 when the primary PVC is stuck initializing", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+		})
+
+		// The first-primary bootstrap created the data PVC for serial 1 and patched
+		// the cluster status (TargetPrimary set, Instances flipped to 1) but lost the
+		// optimistic lock before creating the initdb Job: no Pod and no Job exist.
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		pvcGroup := newFakePVC(env.client, cluster, 1, persistentvolumeclaim.StatusInitializing)
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: pvcGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(HaveLen(1), "the bootstrap Job for serial 1 should have been recreated")
+		Expect(jobs.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(primaryName))
+
+		// No serial-2 instance or PVC must be created: the existing serial must be reused.
+		var pvcs corev1.PersistentVolumeClaimList
+		Expect(env.client.List(ctx, &pvcs)).To(Succeed())
+		for _, pvc := range pvcs.Items {
+			serial, serr := specs.GetNodeSerial(pvc.ObjectMeta)
+			Expect(serr).ToNot(HaveOccurred())
+			Expect(serial).To(Equal(1), "no PVC for a different serial should have been created")
+		}
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be created while the PVC is still initializing")
+	})
+
+	It("waits instead of recreating the init Job when one already exists", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		// The initializing PVC already has its bootstrap Job: the recovery path
+		// must defer to the regular wait, not create a second Job.
+		pvcGroup := newFakePVC(env.client, cluster, 1, persistentvolumeclaim.StatusInitializing)
+		existingJob := specs.CreatePrimaryJobViaInitdb(*cluster, 1)
+		cluster.SetInheritedDataAndOwnership(&existingJob.ObjectMeta)
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: pvcGroup},
+			jobs: batchv1.JobList{Items: []batchv1.Job{*existingJob}},
+		}
+		statusList := postgres.PostgresqlStatusList{}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(BeEmpty(), "the pre-existing Job lives only in resources, none should be created")
+	})
+})
 
 var _ = Describe("Filtering cluster", func() {
 	metrics := make(map[string]string, 1)
@@ -653,4 +883,49 @@ var _ = Describe("getPluginsNeededForReconcile", func() {
 		Expect(getPluginsNeededForReconcile(cluster)).
 			To(Equal([]string{"plugin-shared"}))
 	})
+})
+
+var _ = Describe("reconcileResources surfaces a permanently failed instance creation job", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// recoveryJob returns a recovery Job for the cluster with the given status,
+	// mimicking the bootstrap/recovery Job the operator creates.
+	recoveryJob := func(cluster *apiv1.Cluster, status batchv1.JobStatus) batchv1.Job {
+		return batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Name + "-1-full-recovery",
+				Namespace: namespace,
+			},
+			Status: status,
+		}
+	}
+
+	It("reports the unrecoverable phase when a job reaches its backoff limit",
+		func(ctx SpecContext) {
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			failedJob := recoveryJob(cluster, batchv1.JobStatus{
+				Failed: 7,
+				Conditions: []batchv1.JobCondition{
+					{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "BackoffLimitExceeded"},
+				},
+			})
+
+			resources := &managedResources{jobs: batchv1.JobList{Items: []batchv1.Job{failedJob}}}
+
+			res, err := env.clusterReconciler.reconcileResources(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.RequeueAfter).To(BeNumerically(">", 0))
+
+			var updated apiv1.Cluster
+			Expect(env.client.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: namespace}, &updated)).
+				To(Succeed())
+			Expect(updated.Status.Phase).To(Equal(apiv1.PhaseUnrecoverable))
+			Expect(updated.Status.PhaseReason).To(ContainSubstring(failedJob.Name))
+		})
 })

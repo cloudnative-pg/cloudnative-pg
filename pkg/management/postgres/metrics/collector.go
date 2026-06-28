@@ -31,7 +31,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/cnpg-i/pkg/metrics"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
@@ -237,14 +237,14 @@ func (q *QueriesCollector) checkRunOnServerMatches(runOnServer string, name stri
 		return false, err
 	}
 
-	isVersionInRange, err := semver.ParseRange(runOnServer)
+	versionRange, err := semver.NewConstraint(runOnServer)
 	if err != nil {
 		log.Error(err, "while parsing runOnServer version range",
 			"runOnServer", runOnServer, "query", name)
 		return false, err
 	}
 
-	return isVersionInRange(pgVersion), nil
+	return versionRange.Check(&pgVersion), nil
 }
 
 func (q *QueriesCollector) expandTargetDatabases(

@@ -188,6 +188,7 @@ rules:
   - postgresql.cnpg.io
   resources:
   - clusters/finalizers
+  - databaseroles/finalizers
   - poolers/finalizers
   verbs:
   - update

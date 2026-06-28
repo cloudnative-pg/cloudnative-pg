@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -534,10 +535,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
-	if res, err := r.requireWALArchivingPluginOrDelete(ctx, instancesStatus); err != nil || !res.IsZero() {
-		return res, err
-	}
-
 	if res, err := replicaclusterswitch.Reconcile(
 		ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
@@ -599,15 +596,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
-	// Calls post-reconcile hooks
-	if hookResult := postReconcilePluginHooks(ctx, cluster, cluster); hookResult.Err != nil ||
-		!hookResult.Result.IsZero() {
-		contextLogger.Info("Post-reconcile hook stopped the reconciliation loop",
-			"hookResult", hookResult)
-		return hookResult.Result, hookResult.Err
-	}
-
-	return setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+	// Run plugin post-reconcile hooks, sync per-plugin statuses, and
+	// register PhaseHealthy as the LAST status mutation. See #8582.
+	return r.finalizeReconciliation(ctx, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
 }
 
 // evaluatePodReadinessGuards short-circuits the reconciliation loop with a
@@ -728,30 +719,6 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-}
-
-func (r *ClusterReconciler) requireWALArchivingPluginOrDelete(
-	ctx context.Context,
-	instances postgres.PostgresqlStatusList,
-) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx).WithName("require_wal_archiving_plugin_delete")
-
-	for _, state := range instances.Items {
-		if isTerminatedBecauseOfMissingWALArchivePlugin(state.Pod) {
-			contextLogger.Warning(
-				"Detected instance manager initialization procedure that failed "+
-					"because the required WAL archive plugin is missing. Deleting it to trigger rollout",
-				"targetPod", state.Pod.Name)
-			if err := r.Delete(ctx, state.Pod); err != nil {
-				contextLogger.Error(err, "Cannot delete the pod", "pod", state.Pod.Name)
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-	}
-
-	return ctrl.Result{}, nil
 }
 
 func (r *ClusterReconciler) handleSwitchover(
@@ -878,6 +845,24 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
+	// A Job that creates an instance (bootstrap, recovery or replica creation)
+	// is counted as "running" until it succeeds, so a Job that has exhausted its
+	// backoff limit would otherwise keep the cluster waiting forever. Surface the
+	// failure in the phase instead. The cause is in the job logs and has to be
+	// investigated: there is no predefined recipe.
+	if failedJobs := resources.failedJobNames(); len(failedJobs) > 0 {
+		contextLogger.Warning("An instance creation job has failed", "failedJobs", failedJobs)
+
+		reason := fmt.Sprintf("Instance creation failed for the following jobs: %s. "+
+			"Check the job logs to investigate the cause of the failure.",
+			strings.Join(failedJobs, ", "))
+
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
 	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
@@ -964,11 +949,6 @@ func (r *ClusterReconciler) reconcileResources(
 	// PhaseInplacePrimaryRestart will be patched to healthy in instance manager
 	if cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
-	// When everything is reconciled, update the status
-	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	r.cleanupCompletedJobs(ctx, resources.jobs)
@@ -1141,11 +1121,9 @@ func (r *ClusterReconciler) reconcilePods(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	// Are there missing nodes? Let's create one
-	if cluster.Status.Instances < cluster.Spec.Instances &&
-		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
-		newNodeSerial := r.generateNodeSerial(cluster)
-		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
+	// Are there missing instances? Let's create one
+	if res, err := r.reconcileMissingInstance(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	// Should we scale down the cluster?

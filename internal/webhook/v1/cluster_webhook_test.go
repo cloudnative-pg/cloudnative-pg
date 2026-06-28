@@ -514,6 +514,78 @@ var _ = Describe("configuration change validation", func() {
 		v = &ClusterCustomValidator{}
 	})
 
+	It("accepts well-formed parameter names, including namespaced custom GUCs", func() {
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"work_mem":                      "16MB",
+						"auto_explain.log_min_duration": "100ms",
+						"some$ext.param$1":              "value",
+					},
+				},
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "10Gi",
+				},
+			},
+		}
+		Expect(v.validateConfiguration(clusterNew)).To(BeEmpty())
+	})
+
+	DescribeTable("rejects a parameter name that could inject a directive",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "/bin/evil",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
+					},
+				},
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		Entry("leading comment then newline", "#\narchive_command"),
+		Entry("valid name with a trailing newline injection", "archive_command\nrestart_after = 0"),
+		Entry("carriage return", "archive_command\rrestart_after = 0"),
+	)
+
+	DescribeTable("rejects a malformed parameter name",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "value",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
+					},
+				},
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		// The end anchor in the name regex matches end-of-text, not end-of-line,
+		// so a trailing newline is caught even though it carries no injected directive.
+		Entry("trailing newline", "archive_command\n"),
+		Entry("embedded NUL byte", "work_mem\x00"),
+		Entry("equals sign", "work_mem=128MB"),
+		Entry("leading whitespace", " work_mem"),
+		Entry("space in the middle", "work mem"),
+		Entry("hash character", "work#mem"),
+		Entry("empty string", ""),
+	)
+
 	It("produces no error when WAL size settings are correct", func() {
 		clusterNew := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -2402,6 +2474,80 @@ var _ = Describe("validation of an external cluster", func() {
 
 		cluster.Spec.ExternalClusters[0].ConnectionParameters = nil
 		cluster.Spec.ExternalClusters[0].BarmanObjectStore = &apiv1.BarmanObjectStoreConfiguration{}
+		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
+	})
+
+	DescribeTable("rejects names and secret selectors that would escape the secrets directory",
+		func(mutate func(*apiv1.ExternalCluster)) {
+			ec := apiv1.ExternalCluster{
+				Name:                 "one",
+				ConnectionParameters: map[string]string{"dbname": "postgres"},
+			}
+			mutate(&ec)
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{ExternalClusters: []apiv1.ExternalCluster{ec}},
+			}
+			Expect(v.validateExternalClusters(cluster)).ToNot(BeEmpty())
+		},
+		Entry("traversal in the name", func(ec *apiv1.ExternalCluster) {
+			ec.Name = "../pwned"
+		}),
+		Entry("separator in the name", func(ec *apiv1.ExternalCluster) {
+			ec.Name = "nested/pwned"
+		}),
+		Entry("traversal in the sslCert secret name", func(ec *apiv1.ExternalCluster) {
+			ec.SSLCert = &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "../pwned"},
+				Key:                  "tls.crt",
+			}
+		}),
+		Entry("traversal in the sslCert secret key", func(ec *apiv1.ExternalCluster) {
+			ec.SSLCert = &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "cert"},
+				Key:                  "../pwned",
+			}
+		}),
+	)
+
+	It("does not reject a password selector whose value would be unsafe as a path", func() {
+		// The password selector name and key are never joined into a
+		// filesystem path, so the webhook must leave them untouched.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                 "one",
+						ConnectionParameters: map[string]string{"dbname": "postgres"},
+						Password: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "../pwned"},
+							Key:                  "../pwned",
+						},
+					},
+				},
+			},
+		}
+		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
+	})
+
+	It("accepts a well-formed name and secret selectors", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                 "one",
+						ConnectionParameters: map[string]string{"dbname": "postgres"},
+						SSLCert: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "cert"},
+							Key:                  "tls.crt",
+						},
+						Password: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "creds"},
+							Key:                  "password",
+						},
+					},
+				},
+			},
+		}
 		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
 	})
 })
