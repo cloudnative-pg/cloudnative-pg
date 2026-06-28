@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -101,6 +102,21 @@ var _ = Describe("isNetworkErrorRetryable", func() {
 	It("retries a wrapped transient instance manager rejection (production path)", func() {
 		err := fmt.Errorf("while trying to start the backup: %w",
 			&remote.StatusError{StatusCode: http.StatusServiceUnavailable, Body: "operator certificate not recognized"})
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("retries a transport-level dial timeout to the instance manager (production path)", func() {
+		// Mirrors the error chain produced when the finalize status read cannot reach
+		// the instance manager: a *net.OpError wrapped by the HTTP client and the
+		// reconciler.
+		err := fmt.Errorf("while getting status while finalizing: %w",
+			fmt.Errorf("while executing http request: %w",
+				&net.OpError{Op: "dial", Net: "tcp", Err: errors.New("i/o timeout")}))
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("retries a transport-level connection error", func() {
+		err := &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}
 		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
 	})
 

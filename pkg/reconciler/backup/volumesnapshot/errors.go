@@ -22,6 +22,7 @@ package volumesnapshot
 import (
 	"context"
 	"errors"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -45,8 +46,17 @@ var (
 // It is not designed to check errors raised by the CSI driver and
 // exposed by the CSI snapshotter sidecar.
 func isNetworkErrorRetryable(err error) bool {
+	// A transport-level failure to reach the instance manager (dial timeout,
+	// connection refused or reset, DNS error) surfaces as a net.Error. It means a
+	// brief network disruption rather than a response the instance manager
+	// produced, so the backup should be retried rather than failed. This matters in
+	// the finalize step, where the snapshots are already provisioned and a single
+	// blip would otherwise discard an otherwise complete backup.
+	var netErr net.Error
+
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||
-		errors.Is(err, context.DeadlineExceeded) || remote.IsTransientAuthError(err)
+		errors.Is(err, context.DeadlineExceeded) || remote.IsTransientAuthError(err) ||
+		errors.As(err, &netErr)
 }
 
 // isCSIErrorMessageRetriable detects if a certain error message
