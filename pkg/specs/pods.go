@@ -208,6 +208,8 @@ func createClusterPodSpec(
 		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 		TerminationGracePeriodSeconds: &gracePeriod,
 		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
+		DNSPolicy:                     cluster.Spec.DNSPolicy,
+		DNSConfig:                     cluster.Spec.DNSConfig,
 	}
 }
 
