@@ -2662,7 +2662,38 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getStorageWarnings(r)...)
 	list = append(list, getSharedBuffersWarnings(r)...)
 	list = append(list, getMonitoringFieldsWarnings(r)...)
-	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+	return append(list, getReservedLabelsWarnings(r)...)
+}
+
+// getReservedLabelsWarnings warns when spec.inheritedMetadata.labels overrides a
+// label that CloudNativePG relies on internally for Service selectors, resource
+// discovery, and reconciliation. Overriding these can disrupt operator behavior.
+func getReservedLabelsWarnings(r *apiv1.Cluster) admission.Warnings {
+	if r.Spec.InheritedMetadata == nil || len(r.Spec.InheritedMetadata.Labels) == 0 {
+		return nil
+	}
+
+	reservedLabels := []string{
+		utils.ClusterLabelName,
+		utils.PodRoleLabelName,
+		utils.ClusterInstanceRoleLabelName,
+		utils.InstanceNameLabelName,
+		utils.PvcRoleLabelName,
+	}
+
+	var result admission.Warnings
+	for _, label := range reservedLabels {
+		if _, ok := r.Spec.InheritedMetadata.Labels[label]; ok {
+			result = append(result, fmt.Sprintf(
+				"label `%s` in spec.inheritedMetadata.labels is used internally by CloudNativePG and "+
+					"may cause unexpected behavior when overridden. Remove it from spec.inheritedMetadata.labels.",
+				label,
+			))
+		}
+	}
+
+	return result
 }
 
 func getMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {

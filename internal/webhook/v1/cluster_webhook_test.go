@@ -6565,6 +6565,54 @@ var _ = Describe("getRetentionPolicyWarnings", func() {
 	})
 })
 
+var _ = Describe("getReservedLabelsWarnings", func() {
+	It("returns no warnings when inheritedMetadata is not set", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{},
+		}
+		Expect(getReservedLabelsWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warnings for non-reserved labels", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
+					Labels: map[string]string{"team": "platform"},
+				},
+			},
+		}
+		Expect(getReservedLabelsWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns one warning for a single reserved label", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
+					Labels: map[string]string{utils.ClusterLabelName: "value"},
+				},
+			},
+		}
+		warnings := getReservedLabelsWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring(utils.ClusterLabelName))
+	})
+
+	It("returns a warning for each reserved label", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
+					Labels: map[string]string{
+						utils.ClusterLabelName: "value",
+						utils.PodRoleLabelName: "value",
+					},
+				},
+			},
+		}
+		warnings := getReservedLabelsWarnings(cluster)
+		Expect(warnings).To(HaveLen(2))
+	})
+})
+
 var _ = Describe("getStorageWarnings", func() {
 	It("returns no warnings when storage is properly configured", func() {
 		cluster := &apiv1.Cluster{
