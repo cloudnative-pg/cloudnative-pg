@@ -46,12 +46,19 @@ var (
 // It is not designed to check errors raised by the CSI driver and
 // exposed by the CSI snapshotter sidecar.
 func isNetworkErrorRetryable(err error) bool {
-	// A transport-level failure to reach the instance manager (dial timeout,
-	// connection refused or reset, DNS error) surfaces as a net.Error: the
-	// connection never produced an authenticated response, so it is safe to
-	// requeue. In the common case this is a transient blip, and it matters most
-	// in the finalize step, where the snapshots are already provisioned and a
-	// single failure would otherwise discard an otherwise complete backup.
+	// A transport-level failure to reach the instance manager surfaces as a
+	// net.Error. The HTTP client wraps every such failure in a *net/url.Error,
+	// which itself satisfies net.Error, so this matches all of them: dial
+	// timeout, connection refused or reset, DNS failure, and TLS or certificate
+	// errors. In each case the connection never produced an authenticated
+	// response, so requeuing is safe. It matters most in the finalize step,
+	// where the snapshots are already provisioned and a single failure would
+	// otherwise discard an otherwise complete backup.
+	//
+	// This is intentionally the opposite of the in-request retry in
+	// remote.getReplicaStatusFromPodViaHTTP, which treats a net.Error timeout as
+	// non-retryable: that path retries within a single reconcile, whereas here we
+	// requeue the whole reconcile.
 	var netErr net.Error
 
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||
