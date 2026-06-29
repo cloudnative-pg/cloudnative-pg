@@ -222,3 +222,14 @@ You can also access pprof using the browser at [http://localhost:6060/debug/ppro
     Treat pprof as a sensitive debugging interface and never expose it publicly.
     If you must access it remotely, secure it with proper network policies and access controls.
 :::
+
+
+## Multiple Namespaced Deployments
+
+!!! Warning
+    CloudNativePG does NOT currently support running multiple operators on
+    the same cluster. While this can be achieved through the use of namespaced
+    deployments using `ENABLE_WEBHOOK_NAMESPACE_SUFFIX` and `WATCH_NAMESPACE`,
+    multiple operators still use the same set of shared CRDs. We cannot
+    guarantee a backwards compatible upgrade across multiple concurrently
+    running operators.
