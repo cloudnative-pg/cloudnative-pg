@@ -37,7 +37,7 @@ var (
 	httpStatusCodeRegex  = regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
 )
 
-// isErrorRetryable detects is an error is retryable or not.
+// isNetworkErrorRetryable detects if an error is retryable or not.
 //
 // Important: this function is intended for detecting errors that
 // occur during communication between the operator and the Kubernetes
@@ -47,11 +47,11 @@ var (
 // exposed by the CSI snapshotter sidecar.
 func isNetworkErrorRetryable(err error) bool {
 	// A transport-level failure to reach the instance manager (dial timeout,
-	// connection refused or reset, DNS error) surfaces as a net.Error. It means a
-	// brief network disruption rather than a response the instance manager
-	// produced, so the backup should be retried rather than failed. This matters in
-	// the finalize step, where the snapshots are already provisioned and a single
-	// blip would otherwise discard an otherwise complete backup.
+	// connection refused or reset, DNS error) surfaces as a net.Error: the
+	// connection never produced an authenticated response, so it is safe to
+	// requeue. In the common case this is a transient blip, and it matters most
+	// in the finalize step, where the snapshots are already provisioned and a
+	// single failure would otherwise discard an otherwise complete backup.
 	var netErr net.Error
 
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||

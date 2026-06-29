@@ -116,6 +116,9 @@ var _ = Describe("isNetworkErrorRetryable", func() {
 	})
 
 	It("retries a transport-level connection error", func() {
+		// The bare, unwrapped net.OpError, and a connection refused rather than a
+		// timeout: errors.As must match the type directly, without relying on a
+		// Timeout()/Temporary() check.
 		err := &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}
 		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
 	})
