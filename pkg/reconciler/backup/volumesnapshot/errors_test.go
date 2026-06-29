@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -87,6 +88,24 @@ var _ = Describe("isNetworkErrorRetryable", func() {
 
 	It("recognizes context deadline exceeded errors", func() {
 		err := context.DeadlineExceeded
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("retries a transport-level dial timeout to the instance manager (production path)", func() {
+		// Mirrors the error chain produced when the finalize status read cannot reach
+		// the instance manager: a *net.OpError wrapped by the HTTP client and the
+		// reconciler.
+		err := fmt.Errorf("while getting status while finalizing: %w",
+			fmt.Errorf("while executing http request: %w",
+				&net.OpError{Op: "dial", Net: "tcp", Err: errors.New("i/o timeout")}))
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("retries a transport-level connection error", func() {
+		// The bare, unwrapped net.OpError, and a connection refused rather than a
+		// timeout: errors.As must match the type directly, without relying on a
+		// Timeout()/Temporary() check.
+		err := &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}
 		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
 	})
 
