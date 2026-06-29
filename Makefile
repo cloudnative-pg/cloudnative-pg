@@ -65,7 +65,7 @@ SPELLCHECK_VERSION ?= 0.62.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
-OPERATOR_SDK_VERSION ?= v1.42.2
+OPERATOR_SDK_VERSION ?= v1.42.3
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
 OPM_VERSION ?= v1.72.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
