@@ -226,3 +226,33 @@ the `logger` field indicating the process that produced them. The possible
 With the exception of `postgres`, which follows a specific structure, all other
 `logger` values contain the `msg` field with the escaped message that is
 logged.
+
+## OpenTelemetry Log Export
+
+CloudNativePG supports pushing logs directly to an
+[OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) via OTLP
+gRPC, without requiring a DaemonSet or sidecar for log collection.
+
+When enabled, all logs — operator, instance manager, and PostgreSQL — are
+exported to the configured collector in addition to the standard JSON stdout
+output. Structured PostgreSQL log fields (severity, SQL state, query text,
+session ID, etc.) are preserved as log record attributes.
+
+### Configuration
+
+Set the `CNPG_LOG_OTEL_ENDPOINT` environment variable on the operator
+deployment, or pass the `--log-otel-endpoint` flag. The operator automatically
+propagates this endpoint to all instance manager pods. Both IPv4 and IPv6
+endpoints are supported.
+
+When the endpoint is not configured, behavior is identical to the default —
+no OTel connections are made and no additional resources are consumed.
+
+### What is exported
+
+| Log source | Description |
+|---|---|
+| Operator | Controller reconciliation, cluster management, webhook logs |
+| Instance manager | Lifecycle events, health probes, fencing, WAL management |
+| PostgreSQL | All CSV log records (errors, statements, checkpoints, autovacuum) |
+| PGAudit | Audit records (same path as PostgreSQL logs) |
