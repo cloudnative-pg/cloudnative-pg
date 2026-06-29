@@ -123,7 +123,7 @@ jobs:
         id: filter
         # Remember to add new folders in the operator-changed filter if needed
         with:
-          base: ${{ (github.event_name == 'schedule') && 'main' || '' }}
+          base: ${{ (github.event_name == 'schedule' && 'main') || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name) || '' }}
           filters: |
             docs-changed:
               - '**/*.md'
