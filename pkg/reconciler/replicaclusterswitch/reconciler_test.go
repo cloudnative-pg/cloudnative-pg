@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -50,19 +51,15 @@ Latest checkpoint's REDO WAL file:         000000010000000000000003
 const archivedWALName = "000000010000000000000003"
 
 // instanceClientMock is a minimal remote.InstanceClient implementation that
-// returns canned pg_controldata and partial-WAL-archive responses.
+// returns canned pg_controldata and partial-WAL-archive responses. The other
+// InstanceClient methods are inherited from the embedded nil interface and
+// panic if called.
 type instanceClientMock struct {
+	remote.InstanceClient
 	controlData  string
 	archivedWAL  string
 	archiveCalls int
 	controlErr   error
-}
-
-func (m *instanceClientMock) GetStatusFromInstances(
-	_ context.Context,
-	_ corev1.PodList,
-) postgres.PostgresqlStatusList {
-	return postgres.PostgresqlStatusList{}
 }
 
 func (m *instanceClientMock) GetPgControlDataFromInstance(
@@ -70,14 +67,6 @@ func (m *instanceClientMock) GetPgControlDataFromInstance(
 	_ *corev1.Pod,
 ) (string, error) {
 	return m.controlData, m.controlErr
-}
-
-func (m *instanceClientMock) UpgradeInstanceManager(
-	_ context.Context,
-	_ *corev1.Pod,
-	_ *utils.AvailableArchitecture,
-) error {
-	return nil
 }
 
 func (m *instanceClientMock) ArchivePartialWAL(_ context.Context, _ *corev1.Pod) (string, error) {
@@ -134,6 +123,8 @@ var _ = Describe("reconcileDemotionToken", func() {
 		_, err := reconcileDemotionToken(ctx, cli, cluster, instanceClient, instancesStatus)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(cluster.Status.DemotionToken).To(Equal(expectedToken))
+		// A fresh token triggers exactly one partial WAL archive.
+		Expect(instanceClient.archiveCalls).To(Equal(1))
 	})
 
 	// Regression for #11074: when generateDemotionToken short-circuits with an
