@@ -79,6 +79,14 @@ The namespace where the operator looks for the `PULL_SECRET_NAME` secret is wher
 you installed the operator. If the operator is not able to find that secret, it
 will ignore the configuration parameter.
 
+!!! Warning
+    CloudNativePG does NOT currently support running multiple operators on
+    the same cluster. While this can be achieved through the use of namespaced
+    deployments using `ENABLE_WEBHOOK_NAMESPACE_SUFFIX` and `WATCH_NAMESPACE`,
+    multiple operators still use the same set of shared CRDs. We cannot
+    guarantee a backwards compatible upgrade across multiple concurrently
+    running operators.
+
 ## Defining an operator config map
 
 The example below customizes the behavior of the operator, by defining
@@ -222,14 +230,3 @@ You can also access pprof using the browser at [http://localhost:6060/debug/ppro
     Treat pprof as a sensitive debugging interface and never expose it publicly.
     If you must access it remotely, secure it with proper network policies and access controls.
 :::
-
-
-## Multiple Namespaced Deployments
-
-!!! Warning
-    CloudNativePG does NOT currently support running multiple operators on
-    the same cluster. While this can be achieved through the use of namespaced
-    deployments using `ENABLE_WEBHOOK_NAMESPACE_SUFFIX` and `WATCH_NAMESPACE`,
-    multiple operators still use the same set of shared CRDs. We cannot
-    guarantee a backwards compatible upgrade across multiple concurrently
-    running operators.
