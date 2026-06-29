@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"path"
 	"reflect"
 	"slices"
@@ -171,6 +172,17 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 			corev1.EnvVar{
 				Name:  "CNPG_STANDBY_TCP_USER_TIMEOUT",
 				Value: strconv.Itoa(*configuration.Current.StandbyTCPUserTimeout),
+			},
+		)
+	}
+
+	// Propagate OTel log endpoint to instance pods
+	if otelEndpoint := os.Getenv("CNPG_LOG_OTEL_ENDPOINT"); otelEndpoint != "" {
+		config.EnvVars = append(
+			config.EnvVars,
+			corev1.EnvVar{
+				Name:  "CNPG_LOG_OTEL_ENDPOINT",
+				Value: otelEndpoint,
 			},
 		)
 	}
