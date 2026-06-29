@@ -1078,6 +1078,15 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
+	// Only gate a backup that is still waiting to start. Once it has begun,
+	// the contention check is a no-op for it, but the SetAsPending below would
+	// regress a phase that may have advanced concurrently: the instance manager
+	// writes the terminal phase asynchronously, so a stale read here could flip
+	// an already-completed plugin backup back to pending.
+	if len(backup.Status.Phase) != 0 && backup.Status.Phase != apiv1.BackupPhasePending {
+		return ctrl.Result{}, nil
+	}
+
 	// Validate we don't have other running backups
 	var clusterBackups apiv1.BackupList
 	if err := r.List(
