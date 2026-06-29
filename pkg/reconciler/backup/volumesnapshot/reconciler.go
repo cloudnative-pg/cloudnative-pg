@@ -538,6 +538,10 @@ func (se *Reconciler) handleSnapshotCreateError(
 		// so treat the collision as harmless and let a later cycle re-evaluate
 		// ownership once the cache catches up.
 		if apierrs.IsNotFound(getErr) {
+			log.FromContext(ctx).Trace(
+				"VolumeSnapshot creation collided but the cache still hides it, requeuing",
+				"snapshotName", snapshot.Name,
+				"backupName", backup.Name)
 			return nil
 		}
 		return fmt.Errorf("while verifying pre-existing VolumeSnapshot %s: %w", snapshot.Name, getErr)
