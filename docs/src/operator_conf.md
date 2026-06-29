@@ -68,6 +68,15 @@ Name | Description
 `STANDBY_TCP_USER_TIMEOUT` | Defines the [`TCP_USER_TIMEOUT` socket option](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-TCP-USER-TIMEOUT) in milliseconds for replication connections from standby instances to the primary. Default is 5000 (5 seconds). Set to `0` to use the system's default.
 `WATCH_NAMESPACE` | Specifies the namespace(s) where the operator should watch for resources. Multiple namespaces can be specified separated by commas. If not set, the operator watches all namespaces (cluster-wide mode).
 
+:::warning
+    CloudNativePG does NOT currently support running multiple operators on
+    the same cluster. While this can be achieved through the use of namespaced
+    deployments using `ENABLE_WEBHOOK_NAMESPACE_SUFFIX` and `WATCH_NAMESPACE`,
+    multiple operators still use the same set of shared CRDs. We cannot
+    guarantee a backwards compatible upgrade across multiple concurrently
+    running operators.
+:::
+
 Values in `INHERITED_ANNOTATIONS` and `INHERITED_LABELS` support path-like wildcards. For example, the value `example.com/*` will match
 both the value `example.com/one` and `example.com/two`.
 
@@ -78,14 +87,6 @@ cluster. That secret will be named `<cluster-name>-pull`.
 The namespace where the operator looks for the `PULL_SECRET_NAME` secret is where
 you installed the operator. If the operator is not able to find that secret, it
 will ignore the configuration parameter.
-
-!!! Warning
-    CloudNativePG does NOT currently support running multiple operators on
-    the same cluster. While this can be achieved through the use of namespaced
-    deployments using `ENABLE_WEBHOOK_NAMESPACE_SUFFIX` and `WATCH_NAMESPACE`,
-    multiple operators still use the same set of shared CRDs. We cannot
-    guarantee a backwards compatible upgrade across multiple concurrently
-    running operators.
 
 ## Defining an operator config map
 
