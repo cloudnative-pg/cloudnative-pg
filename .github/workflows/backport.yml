@@ -32,9 +32,9 @@ jobs:
           number:  ${{ github.event.pull_request.number }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.25
             release-1.28
             release-1.29
+            release-1.30
       -
         name: Create comment
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
@@ -56,9 +56,9 @@ jobs:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.25
             release-1.28
             release-1.29
+            release-1.30
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
@@ -74,7 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.28, release-1.29]
+        branch: [release-1.28, release-1.29, release-1.30]
     env:
       PR: ${{ github.event.pull_request.number }}
       BRANCH: ${{ matrix.branch }}
