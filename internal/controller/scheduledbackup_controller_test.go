@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -47,6 +48,19 @@ func newScheduledBackupTestClient() client.Client {
 	return fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithStatusSubresource(&apiv1.ScheduledBackup{}, &apiv1.Backup{}).
+		// Reconcile lists child backups through this field index
+		// (see GetChildBackups); the fake client errors on an unregistered index,
+		// so we register the same extractor SetupWithManager installs.
+		WithIndex(&apiv1.Backup{}, backupParentScheduledBackupIndex, func(rawObj client.Object) []string {
+			backup := rawObj.(*apiv1.Backup)
+			if backup.Labels == nil {
+				return nil
+			}
+			if parent, ok := backup.Labels[ParentScheduledBackupLabelName]; ok {
+				return []string{parent}
+			}
+			return nil
+		}).
 		Build()
 }
 
@@ -335,6 +349,60 @@ var _ = Describe("scheduledbackup reconcileScheduledBackup immediate", func() {
 		Expect(stored.Status.LastCheckTime).ToNot(BeNil())
 		Expect(stored.Status.LastScheduleTime).ToNot(BeNil())
 		Expect(stored.Status.LastScheduleTime.Time).To(BeTemporally("==", existing.CreationTimestamp.Time))
+	})
+})
+
+var _ = Describe("scheduledbackup Reconcile suspend", func() {
+	// Assert that a suspended ScheduledBackup creates no child Backup, and that
+	// flipping spec.suspend back to false resumes Backup creation.
+	// Admission is left nil: the guard short-circuits when the receiver is nil.
+	It("creates no Backup while suspended and resumes when unsuspended", func(ctx context.Context) {
+		cli := newScheduledBackupTestClient()
+		ns := newFakeNamespace(cli)
+
+		// Pre-populate LastCheckTime in the past so that, once resumed, the
+		// daily schedule's next fire is already due and the reconciler creates
+		// a Backup right away (same setup as the reconcileScheduledBackup tests).
+		sb := &apiv1.ScheduledBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "sb-test", Namespace: ns},
+			Spec: apiv1.ScheduledBackupSpec{
+				Schedule: "0 0 0 * * *",
+				Cluster:  apiv1.LocalObjectReference{Name: "cluster-x"},
+				Suspend:  ptr.To(true),
+			},
+			Status: apiv1.ScheduledBackupStatus{
+				LastCheckTime: &metav1.Time{Time: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+			},
+		}
+		Expect(cli.Create(ctx, sb)).To(Succeed())
+		Expect(cli.Status().Update(ctx, sb)).To(Succeed())
+
+		r := &ScheduledBackupReconciler{Client: cli, Recorder: record.NewFakeRecorder(10)}
+		sbNamespacedName := types.NamespacedName{Name: sb.Name, Namespace: ns}
+
+		By("not creating any Backup while suspended", func() {
+			result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: sbNamespacedName})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+
+			var backups apiv1.BackupList
+			Expect(cli.List(ctx, &backups, client.InNamespace(ns))).To(Succeed())
+			Expect(backups.Items).To(BeEmpty())
+		})
+
+		By("resuming Backup creation once unsuspended", func() {
+			Expect(cli.Get(ctx, sbNamespacedName, sb)).To(Succeed())
+			sb.Spec.Suspend = ptr.To(false)
+			Expect(cli.Update(ctx, sb)).To(Succeed())
+
+			result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: sbNamespacedName})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
+
+			var backups apiv1.BackupList
+			Expect(cli.List(ctx, &backups, client.InNamespace(ns))).To(Succeed())
+			Expect(backups.Items).To(HaveLen(1))
+		})
 	})
 })
 
