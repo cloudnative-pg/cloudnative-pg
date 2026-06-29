@@ -11,6 +11,7 @@ AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
 AllNamespaces
+Anand
 AntiAffinity
 AppArmor
 AppArmorProfile
@@ -46,6 +47,7 @@ BarmanCredentials
 BarmanObjectStoreConfiguration
 Bartolini
 Battiato
+BlaiseAntony
 BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
@@ -54,6 +56,7 @@ Buildx
 Burstable
 ByStatus
 CAs
+CEL
 CIDR
 CIS
 CKA
@@ -228,6 +231,7 @@ ImageInfo
 ImageVolume
 ImageVolumeSource
 ImportSource
+Infinoid
 InfoSec
 InstanceID
 InstanceReportedState
@@ -424,6 +428,7 @@ PushSecret
 QoS
 QuickStart
 RBAC
+RCE
 README
 RHSA
 RLS
@@ -564,6 +569,7 @@ Untrusted
 UpdateStrategy
 UsageSpec
 UsageSpecType
+Utkarsh
 VLDB
 VLDBs
 VM
@@ -691,6 +697,7 @@ beginLSN
 beginWal
 benchmarked
 benchmarking
+binak
 bindAsAuth
 bindDN
 bindPassword
@@ -839,6 +846,7 @@ de
 declaratively
 defaultMode
 demotionToken
+dennispidun
 deploymentStrategy
 dereference
 destinationPath
@@ -1028,6 +1036,7 @@ isolationcheckconfiguration
 isready
 issuecomment
 italy
+jaconi
 jdbc
 jmealo
 jobCount
@@ -1037,6 +1046,7 @@ jsonpath
 juliamertz
 kb
 kbytes
+kdautrey
 keepalive
 kms
 kube
@@ -1126,6 +1136,7 @@ memstats
 metav
 metric's
 metricsQueriesTTL
+mhartmann
 microservice
 microservices
 microsoft
@@ -1374,6 +1385,7 @@ reportNonRedacted
 reportRedacted
 req
 requestTimeout
+requeued
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
@@ -1417,6 +1429,7 @@ schemaspec
 sdk
 searchAttribute
 searchFilter
+sebv
 seccompProfile
 secretAccessKey
 secretKeyRef
@@ -1450,6 +1463,7 @@ serviceupdatestrategy
 sessionToken
 sha
 sharifmshaker
+sharma
 shm
 shmall
 shmmax
