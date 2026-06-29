@@ -190,7 +190,11 @@ func reconcileDemotionToken(
 		return nil, err
 	}
 
-	if cluster.Status.DemotionToken != demotionToken {
+	// generateDemotionToken returns an empty token to signal that the stored
+	// one is already up to date. Skip the patch in that case: writing the empty
+	// value back would wipe a previously generated token if this reconcile is
+	// requeued before the transition metadata is cleaned up.
+	if demotionToken != "" && cluster.Status.DemotionToken != demotionToken {
 		origCluster := cluster.DeepCopy()
 		contextLogger.Info(
 			"patching the demotionToken in the  cluster status",
