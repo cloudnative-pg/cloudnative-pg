@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -446,8 +447,7 @@ func (se *Reconciler) waitSnapshotToBeReadyStep(
 	return nil, nil
 }
 
-// createSnapshot creates a VolumeSnapshot resource for the given PVC and
-// add it to the command status
+// createSnapshot creates a VolumeSnapshot resource for the given PVC
 func (se *Reconciler) createSnapshot(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -502,8 +502,53 @@ func (se *Reconciler) createSnapshot(
 	}
 
 	if err := se.cli.Create(ctx, &snapshot); err != nil {
+		return se.handleSnapshotCreateError(ctx, err, &snapshot, backup)
+	}
+
+	return nil
+}
+
+// handleSnapshotCreateError decides whether a failed VolumeSnapshot creation can
+// be tolerated. An AlreadyExists collision against a snapshot we manage for this
+// backup is harmless, because the cached VolumeSnapshot list used to decide
+// whether to create the snapshots can lag behind a snapshot we created in a
+// previous reconciliation cycle. In that case this reconciliation requeues and a
+// later cycle picks the snapshot up through the backup label selector. Any other
+// error, or a collision with a foreign object, is returned to the caller.
+func (se *Reconciler) handleSnapshotCreateError(
+	ctx context.Context,
+	err error,
+	snapshot *volumesnapshotv1.VolumeSnapshot,
+	backup *apiv1.Backup,
+) error {
+	if !apierrs.IsAlreadyExists(err) {
 		return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
 	}
+
+	var existing volumesnapshotv1.VolumeSnapshot
+	if getErr := se.cli.Get(ctx, client.ObjectKeyFromObject(snapshot), &existing); getErr != nil {
+		// The same cache lag that triggered the spurious Create can also hide
+		// the object from this Get. The API server already confirmed it exists,
+		// so treat the collision as harmless and let a later cycle re-evaluate
+		// ownership once the cache catches up.
+		if apierrs.IsNotFound(getErr) {
+			log.FromContext(ctx).Trace(
+				"VolumeSnapshot creation collided but the cache still hides it, requeuing",
+				"snapshotName", snapshot.Name,
+				"backupName", backup.Name)
+			return nil
+		}
+		return fmt.Errorf("while verifying pre-existing VolumeSnapshot %s: %w", snapshot.Name, getErr)
+	}
+	if existing.Labels[utils.BackupNameLabelName] != backup.Name {
+		return fmt.Errorf("VolumeSnapshot %s already exists and is not owned by backup %s: %w",
+			snapshot.Name, backup.Name, err)
+	}
+
+	log.FromContext(ctx).Info(
+		"VolumeSnapshot for this backup already exists, reusing it",
+		"snapshotName", snapshot.Name,
+		"backupName", backup.Name)
 
 	return nil
 }
