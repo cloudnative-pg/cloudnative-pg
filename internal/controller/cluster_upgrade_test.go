@@ -1198,11 +1198,14 @@ var _ = Describe("archiverSidecarMissingOnPrimary", func() {
 
 	// withArchiverSidecar returns a copy of pod with an extra container,
 	// mimicking the sidecar a WAL-archiver plugin injects at evaluation time.
+	// Real plugins (e.g. plugin-barman-cloud) inject it as a native sidecar: an
+	// init container with RestartPolicy=Always.
 	withArchiverSidecar := func(pod *corev1.Pod) *corev1.Pod {
 		out := pod.DeepCopy()
-		out.Spec.Containers = append(out.Spec.Containers, corev1.Container{
-			Name:  sidecarName,
-			Image: "plugin-barman-cloud:latest",
+		out.Spec.InitContainers = append(out.Spec.InitContainers, corev1.Container{
+			Name:          sidecarName,
+			Image:         "plugin-barman-cloud:latest",
+			RestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
 		})
 		return out
 	}
@@ -1248,6 +1251,26 @@ var _ = Describe("archiverSidecarMissingOnPrimary", func() {
 			fakePluginClientRollout{returnedPod: podWithSidecar})
 
 		Expect(archiverSidecarMissingOnPrimary(ctx, podWithSidecar, &cluster)).To(BeFalse())
+	})
+
+	It("ignores a missing run-once init container, only native sidecars matter", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		// The evaluated target adds a plain run-once init container (no
+		// RestartPolicy=Always). A missing one of those is not an archiver
+		// sidecar and must not force an in-place recreate.
+		target := pod.DeepCopy()
+		target.Spec.InitContainers = append(target.Spec.InitContainers, corev1.Container{
+			Name:  "some-run-once-init",
+			Image: "init:latest",
+		})
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: target})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, pod, &cluster)).To(BeFalse())
 	})
 
 	It("propagates evaluation errors instead of degrading to a switchover decision", func() {
