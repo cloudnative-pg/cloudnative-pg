@@ -277,18 +277,20 @@ only the operator itself.
 
 These releases introduce changes worth reviewing before you upgrade. Two are
 security changes that apply to **1.30.0, 1.29.2, and 1.28.4**: operator-side
-password encoding and `search_path` hardening. The other three are new in
+password encoding (`CVE-2026-55765`) and `search_path` hardening
+(`CVE-2026-55769`). The other three are new in
 **1.30.0** only: the `DatabaseRole` resource for declarative role management,
 safe primary election via a per-cluster Lease, and operator-to-instance
-authentication on the instance manager's status port.
+authentication on the instance manager's status port (`GHSA-7qwx-x8ff-3px9`).
 In addition, if you are upgrading from a release **older than 1.29.1 or 1.28.3**,
 the metrics-exporter privilege separation from `CVE-2026-44477` also applies.
 Each is covered in its own subsection below.
 
-#### Operator-side password encoding
+#### Operator-side password encoding (`CVE-2026-55765`)
 
-Starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons,
-CloudNativePG SCRAM-SHA-256 encodes role passwords **operator-side**
+Starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons
+(`CVE-2026-55765` / `GHSA-w3gf-xc94-wvmj`), CloudNativePG SCRAM-SHA-256 encodes
+role passwords **operator-side**
 (client-side from PostgreSQL's point of view) before issuing
 `CREATE`/`ALTER ROLE` statements. As a result, the literal that reaches
 the PostgreSQL parser (and that extensions such as `pg_stat_statements`
@@ -328,10 +330,11 @@ according to its own `password_encryption` GUC.
 See ["Opting out of operator-side encoding"](declarative_role_management.md#opting-out-of-operator-side-encoding)
 for details.
 
-#### `search_path` hardening
+#### `search_path` hardening (`CVE-2026-55769`)
 
-Also starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons,
-CloudNativePG pins the `search_path` to a fixed `pg_catalog, public,
+Also starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons
+(`CVE-2026-55769` / `GHSA-x8c2-3p4r-v9r6`), CloudNativePG pins the `search_path`
+to a fixed `pg_catalog, public,
 pg_temp` on every connection it opens to PostgreSQL, so that a
 tenant-controlled `ALTER DATABASE`/`ALTER ROLE` setting can no longer
 influence how operator-issued queries resolve unqualified object names.
@@ -389,13 +392,16 @@ and `watch` verbs on `leases` in the `coordination.k8s.io` API group before
 upgrading, otherwise primaries will be unable to promote.
 :::
 
-#### Operator-to-instance authentication
+#### Operator-to-instance authentication (`GHSA-7qwx-x8ff-3px9`)
 
 Starting from version 1.30.0, the operator authenticates its calls to the
 sensitive endpoints of the instance manager's status port (backup,
 `pg_controldata`, partial WAL archive, and instance-manager upgrade) by pinning
 an in-memory client certificate. This is enabled automatically and requires no
-configuration. Status, health, and probe endpoints remain unauthenticated. See
+configuration. Status, health, and probe endpoints remain unauthenticated.
+This hardening is not backported; on releases earlier than 1.30.0, continue to
+restrict the status port (TCP 8000) with a `NetworkPolicy`, which remains its
+security boundary there. See
 [Operator-to-instance authentication](security.md#operator-to-instance-authentication)
 for details.
 
