@@ -353,6 +353,14 @@ func setupReconcilers(
 		return err
 	}
 
+	if err := (&controller.DatabaseSecretReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DatabaseSecret")
+		return err
+	}
+
 	return nil
 }
 
