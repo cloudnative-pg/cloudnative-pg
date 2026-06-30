@@ -28,6 +28,7 @@ import (
 	"github.com/thoas/go-funk"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -209,69 +210,97 @@ var _ = Describe("testing restore InitInfo methods", func() {
 })
 
 var _ = Describe("getRestoreWalConfig", func() {
-	It("escapes quotes and backslashes across both shell and config layers",
+	It("delegates WAL recovery to the instance manager wal-restore command", func() {
+		out := getRestoreWalConfig()
+
+		// restore_command must invoke the in-tree controller rather than
+		// barman-cloud directly: the recovery source store and credentials are
+		// provided through the local webserver cache instead of being embedded
+		// in (and shell-quoted into) the command line.
+		Expect(out).To(ContainSubstring("/controller/manager wal-restore"))
+		Expect(out).To(ContainSubstring("%f"))
+		Expect(out).To(ContainSubstring("%p"))
+		Expect(out).To(ContainSubstring("recovery_target_action"))
+		Expect(out).To(ContainSubstring("promote"))
+		Expect(out).ToNot(ContainSubstring("barman-cloud-wal-restore"))
+	})
+})
+
+var _ = Describe("setupBootstrapWALRestoreCache", func() {
+	AfterEach(func() {
+		cache.Delete(cache.WALRestoreKey)
+		cache.Delete(cache.WALRestoreOptionsKey)
+	})
+
+	backup := func() *apiv1.Backup {
+		return &apiv1.Backup{
+			Status: apiv1.BackupStatus{
+				BarmanCredentials: apiv1.BarmanCredentials{AWS: &apiv1.S3Credentials{}},
+				EndpointURL:       "https://source-endpoint",
+				DestinationPath:   "s3://source/path",
+				ServerName:        "source-server",
+			},
+		}
+	}
+
+	It("caches the recovery source store options and credentials for a recovery.backup reference",
 		func(ctx SpecContext) {
-			backup := &apiv1.Backup{
-				Status: apiv1.BackupStatus{
-					DestinationPath: "s3://bucket/has'quote",
-					ServerName:      `server\name`,
+			// recovery.backup: no Source, so no Wal config is available.
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							Backup: &apiv1.BackupSource{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "a-backup"},
+							},
+						},
+					},
 				},
 			}
-			out, err := getRestoreWalConfig(ctx, backup)
+			env := []string{"AWS_ACCESS_KEY_ID=source-key"}
+
+			Expect(setupBootstrapWALRestoreCache(ctx, cluster, backup(), env)).To(Succeed())
+
+			cachedEnv, err := cache.LoadEnv(cache.WALRestoreKey)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(cachedEnv).To(Equal(env))
 
-			// shellQuote wraps the value as has\'quote (escape).
-			// configfile.EscapePostgresConfLiteral then doubles every ' and \,
-			// yielding the exact form below at the config-file layer.
-			Expect(out).To(ContainSubstring(`s3://bucket/has\\''quote`))
-			// shellQuote quotes `\` to `\\` — config layer doubles the
-			// backslash.
-			Expect(out).To(ContainSubstring(`server\\\\name`))
-
-			// Raw unescaped forms must not appear — either would let the user
-			// break out of the config-file string literal.
-			Expect(out).NotTo(ContainSubstring("has'quote"))
-			Expect(out).NotTo(MatchRegexp(`server\\[^\\]name`),
-				"backslash in server name must be doubled")
+			options, err := cache.LoadEnv(cache.WALRestoreOptionsKey)
+			Expect(err).ToNot(HaveOccurred())
+			// Options must target the recovery SOURCE store, not the cluster's
+			// own backup store.
+			Expect(options).To(ContainElement("s3://source/path"))
+			Expect(options).To(ContainElement("source-server"))
+			Expect(options).To(ContainElement("https://source-endpoint"))
+			Expect(options).To(ContainElement("aws-s3"))
 		})
 
-	It("shell-quotes cmd args so whitespace in user-controlled fields does not word-split",
+	It("carries the source store's additional command args for a recovery.source",
 		func(ctx SpecContext) {
-			backup := &apiv1.Backup{
-				Status: apiv1.BackupStatus{
-					DestinationPath: "s3://my bucket/wal",
-					ServerName:      "server-a",
+			// recovery.source: the source store's Wal config lives in the external
+			// cluster definition and must be applied, just like the plugin does.
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{Source: "origin"},
+					},
+					ExternalClusters: []apiv1.ExternalCluster{
+						{
+							Name: "origin",
+							BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+								Wal: &apiv1.WalBackupConfiguration{
+									RestoreAdditionalCommandArgs: []string{"--read-timeout=60"},
+								},
+							},
+						},
+					},
 				},
 			}
-			out, err := getRestoreWalConfig(ctx, backup)
+
+			Expect(setupBootstrapWALRestoreCache(ctx, cluster, backup(), []string{"X=y"})).To(Succeed())
+
+			options, err := cache.LoadEnv(cache.WALRestoreOptionsKey)
 			Expect(err).ToNot(HaveOccurred())
-			// After shell-quoting, the DestinationPath is wrapped in single quotes.
-			// The outer configfile.EscapePostgresConfLiteral layer then doubles
-			// each of those single quotes, so the value appears as ''...'' in
-			// the config file.
-			Expect(out).To(ContainSubstring("''s3://my bucket/wal''"))
-
-			// PostgreSQL will replace %f %p with proper quoting when needed.
-			Expect(out).To(ContainSubstring("%f"))
-			Expect(out).To(ContainSubstring("%p"))
-		})
-
-	It("nests an obvious shell-injection payload inside both quoting layers",
-		func(ctx SpecContext) {
-			backup := &apiv1.Backup{
-				Status: apiv1.BackupStatus{
-					DestinationPath: `s3://bucket"; rm -rf /; "`,
-					ServerName:      "server-a",
-				},
-			}
-			out, err := getRestoreWalConfig(ctx, backup)
-			Expect(err).ToNot(HaveOccurred())
-
-			// shellquote.Join wraps the whole arg in single quotes (because
-			// of the embedded `;` and spaces); EscapePostgresConfLiteral
-			// then doubles each of those quotes. The payload must arrive at
-			// the shell as one argument, not as a `;`-separated command.
-			Expect(out).To(ContainSubstring(
-				`''s3://bucket"; rm -rf /; "''`))
+			Expect(options).To(ContainElement("--read-timeout=60"))
 		})
 })

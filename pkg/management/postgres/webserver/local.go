@@ -100,7 +100,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-	case cache.WALRestoreKey, cache.WALArchiveKey:
+	case cache.WALRestoreKey, cache.WALArchiveKey, cache.WALRestoreOptionsKey:
 		response, err := cache.LoadEnv(requestedObject)
 		if errors.Is(err, cache.ErrCacheMiss) {
 			w.WriteHeader(http.StatusNotFound)
