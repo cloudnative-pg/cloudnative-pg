@@ -122,7 +122,7 @@ retrying, the latter is not. CloudNativePG inspects the exit code of
 `barman-cloud-wal-restore` (or the gRPC status returned by the configured
 CNPG-i plugin) on every attempt and retries transient failures within a
 bounded budget. Only when the budget is exhausted does `restore_command`
-exit with code `255`, which tells PostgreSQL to stop log-shipping
+exit with code `143`, which tells PostgreSQL to stop log-shipping
 replication rather than promote on a partial archive. This behavior is
 especially important during a replica promotion: without it, a brief
 network glitch while draining the archive could cause the new primary to

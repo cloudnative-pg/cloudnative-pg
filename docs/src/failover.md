@@ -83,7 +83,7 @@ and/or data being lost ([RPO](before_you_start.md#postgresql-terminology)):
     restore (for example a network blip) is retried for up to
     `.spec.walRestoreRetryTimeout` (default 5 minutes) to avoid promoting on
     a partial archive and losing already-archived transactions. If the
-    budget is exhausted, `restore_command` exits with code `255` and
+    budget is exhausted, `restore_command` exits with code `143` and
     PostgreSQL stops log-shipping replication rather than promoting. See
     ["Continuous backup integration"](replication.md#continuous-backup-integration)
     for details.
