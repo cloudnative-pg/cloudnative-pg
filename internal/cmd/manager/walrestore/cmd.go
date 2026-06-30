@@ -125,10 +125,11 @@ func NewCmd() *cobra.Command {
 // resolveMaxRetryTimeout returns the retry budget for transient wal-restore
 // failures, honoring spec.walRestoreRetryTimeout on the cluster when set.
 //
-// The webhook rejects zero and negative values, so any valid cluster that
-// reaches this code carries either nil (unset) or a strictly positive
-// duration. As a defense in depth, non-positive values here still fall back
-// to the default rather than disabling retries.
+// The CRD validation rule (a CEL XValidation on the field) rejects zero and
+// negative values at admission, so any valid cluster that reaches this code
+// carries either nil (unset) or a strictly positive duration. As a defense in
+// depth, non-positive values here still fall back to the default rather than
+// disabling retries.
 func resolveMaxRetryTimeout(cluster *apiv1.Cluster) time.Duration {
 	if cluster == nil || cluster.Spec.WalRestoreRetryTimeout == nil {
 		return DefaultMaxRetryTimeout
@@ -163,34 +164,8 @@ func runWalRestore(
 ) error {
 	cluster := loadClusterFromCache(ctx)
 
-	// We opt into the retry budget only when a failed WAL restore could lead
-	// to this pod being promoted to primary — that is the only situation in
-	// which surfacing a transient failure to PostgreSQL is dangerous, because
-	// PG would otherwise open the database with unapplied WAL. Replica
-	// clusters are excluded from both cases below: their pods never
-	// auto-promote (the designated primary stays in standby; the first-pod
-	// bootstrap stays in standby too, falling back to streaming from the
-	// external source if the archive fails). Two cases qualify:
-	//
-	//   - Bootstrapping a standard cluster: we are replaying a physical base
-	//     backup and there is no live primary yet
-	//     (cluster.Status.CurrentPrimary == ""). Giving up on a transient
-	//     archive failure here would promote a pod whose WAL chain is
-	//     incomplete.
-	//   - New primary of a standard cluster being promoted: this pod is the
-	//     cluster's TargetPrimary and is draining the WAL archive in
-	//     preparation for promotion. Same hazard as bootstrap.
-	//
-	// A genuine replica (live primary exists and it isn't us) keeps the
-	// legacy behavior: streaming replication from the primary is the natural
-	// fallback, so there is no need to block PG on retries.
-	isStandard := cluster != nil && !cluster.IsReplica()
-	isBootstrapping := isStandard && cluster.Status.CurrentPrimary == ""
-	isTargetPrimary := isStandard && cluster.Status.TargetPrimary == podName
-
-	if cluster == nil || (!isBootstrapping && !isTargetPrimary) {
-		err := run(ctx, pgData, podName, args)
-		return err
+	if !shouldRetryRestore(cluster, podName) {
+		return run(ctx, pgData, podName, args)
 	}
 
 	timeout := resolveMaxRetryTimeout(cluster)
@@ -200,6 +175,43 @@ func runWalRestore(
 		},
 		time.Now().Add(timeout),
 	)
+}
+
+// shouldRetryRestore reports whether transient WAL-restore failures for this
+// pod must be retried within the budget instead of being surfaced immediately
+// to PostgreSQL.
+//
+// We opt into the retry budget only when a failed WAL restore could lead to
+// this pod being promoted to primary, which is the only situation in which
+// surfacing a transient failure to PostgreSQL is dangerous (PG would otherwise
+// open the database with unapplied WAL). Two cases qualify, both on standard
+// (non-replica) clusters:
+//
+//   - Bootstrapping a standard cluster (cluster.Status.CurrentPrimary == ""):
+//     we are replaying a physical base backup and there is no live primary
+//     yet. Giving up on a transient archive failure here would promote a pod
+//     whose WAL chain is incomplete.
+//   - New primary of a standard cluster being promoted
+//     (cluster.Status.TargetPrimary == podName): this pod is draining the WAL
+//     archive in preparation for promotion. Same hazard as bootstrap.
+//
+// Replica clusters are excluded from both cases: their pods never auto-promote
+// (the designated primary stays in standby, and the first-pod bootstrap stays
+// in standby too, writing standby.signal before PostgreSQL starts), so a
+// transient archive failure falls back to streaming from the external source.
+// A nil cluster (cache unavailable) and a genuine replica (a live primary
+// exists and it isn't us) both keep the legacy single-attempt behavior: run()
+// will surface the real error, and streaming replication is the natural
+// fallback.
+func shouldRetryRestore(cluster *apiv1.Cluster, podName string) bool {
+	if cluster == nil || cluster.IsReplica() {
+		return false
+	}
+
+	isBootstrapping := cluster.Status.CurrentPrimary == ""
+	isTargetPrimary := cluster.Status.TargetPrimary == podName
+
+	return isBootstrapping || isTargetPrimary
 }
 
 // isTransientRestoreError reports whether the caller should retry.

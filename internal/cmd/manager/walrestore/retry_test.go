@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -138,10 +139,59 @@ var _ = Describe("resolveMaxRetryTimeout", func() {
 			clusterWith(&metav1.Duration{Duration: 42 * time.Second}), 42*time.Second),
 		// Zero and negative both hit the defense-in-depth branch; one
 		// entry per polarity is enough to catch regressions in that guard.
-		Entry("zero → default (defense in depth — webhook rejects this)",
+		Entry("zero → default (defense in depth; CRD rule rejects this)",
 			clusterWith(&metav1.Duration{Duration: 0}), DefaultMaxRetryTimeout),
 		Entry("negative → default (defense in depth)",
 			clusterWith(&metav1.Duration{Duration: -5 * time.Minute}), DefaultMaxRetryTimeout),
+	)
+})
+
+var _ = Describe("shouldRetryRestore", func() {
+	const podName = "cluster-1"
+
+	standard := func(currentPrimary, targetPrimary string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: currentPrimary,
+				TargetPrimary:  targetPrimary,
+			},
+		}
+	}
+	replica := func(currentPrimary, targetPrimary string) *apiv1.Cluster {
+		c := standard(currentPrimary, targetPrimary)
+		c.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{Enabled: ptr.To(true)}
+		return c
+	}
+
+	DescribeTable("retries only when a transient failure could promote this pod on a partial archive",
+		func(cluster *apiv1.Cluster, expected bool) {
+			Expect(shouldRetryRestore(cluster, podName)).To(Equal(expected))
+		},
+		// Cache unavailable: fall back to the legacy single-attempt path.
+		Entry("nil cluster → no retry", (*apiv1.Cluster)(nil), false),
+
+		// Standard cluster — the two protected cases.
+		Entry("standard cluster bootstrapping (no current primary) → retry",
+			standard("", ""), true),
+		Entry("standard cluster, this pod is the target primary being promoted → retry",
+			standard("other-pod", podName), true),
+		Entry("standard cluster, bootstrapping and target primary at once → retry",
+			standard("", podName), true),
+
+		// Standard cluster, a healthy non-target replica keeps legacy behavior:
+		// streaming from the primary is the natural fallback.
+		Entry("standard cluster, a healthy non-target replica → no retry",
+			standard("other-pod", "other-pod"), false),
+
+		// Replica clusters are excluded from BOTH cases: standby.signal makes
+		// restore_command failures harmless. This is the regression guard for
+		// the e1a96abac fix — the earlier gating retried replica bootstrap.
+		Entry("replica cluster bootstrapping (no current primary) → no retry",
+			replica("", ""), false),
+		Entry("replica cluster designated primary (this pod) → no retry",
+			replica(podName, podName), false),
+		Entry("replica cluster, this pod is the target primary → no retry",
+			replica("other-pod", podName), false),
 	)
 })
 
