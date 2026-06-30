@@ -272,7 +272,7 @@ The following artifacts are produced **once** per release cycle, regardless of
 how many supported versions are released together:
 
 - The release announcement (blog post) on the
-  [CloudNativePG website](https://cloudnative-pg.io/blog/).
+  [CloudNativePG website](https://cloudnative-pg.io/releases/).
 - The Helm chart for the newest released version — only one chart is
   published per release cycle, even when multiple versions are released —
   from the [`cloudnative-pg/charts`](https://github.com/cloudnative-pg/charts)
