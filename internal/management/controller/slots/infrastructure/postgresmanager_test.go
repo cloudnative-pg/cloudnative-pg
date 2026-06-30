@@ -236,6 +236,35 @@ var _ = Describe("PostgresManager", func() {
 		})
 	})
 
+	Context("IsInRecovery", func() {
+		const expectedSQL = "SELECT pg_catalog.pg_is_in_recovery"
+
+		It("returns true when PostgreSQL is in recovery (standby)", func(ctx SpecContext) {
+			rows := sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true)
+			mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
+
+			inRecovery, err := IsInRecovery(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(inRecovery).To(BeTrue())
+		})
+
+		It("returns false when PostgreSQL is a primary", func(ctx SpecContext) {
+			rows := sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(false)
+			mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
+
+			inRecovery, err := IsInRecovery(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(inRecovery).To(BeFalse())
+		})
+
+		It("returns error when the query fails", func(ctx SpecContext) {
+			mock.ExpectQuery(expectedSQL).WillReturnError(errors.New("mock error"))
+
+			_, err := IsInRecovery(ctx, db)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	Context("DeleteLogicalSlot", func() {
 		const expectedSQL = "SELECT pg_catalog.pg_drop_replication_slot"
 
