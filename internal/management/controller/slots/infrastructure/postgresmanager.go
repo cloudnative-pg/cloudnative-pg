@@ -159,6 +159,17 @@ func ListLogicalSlotsWithSyncStatus(ctx context.Context, db *sql.DB) ([]LogicalR
 	return slots, nil
 }
 
+// IsInRecovery reports whether PostgreSQL considers this instance to be in
+// recovery (i.e. running as a standby). pg_is_in_recovery() returns false on a
+// primary and true on a standby.
+func IsInRecovery(ctx context.Context, db *sql.DB) (bool, error) {
+	var inRecovery bool
+	if err := db.QueryRowContext(ctx, "SELECT pg_catalog.pg_is_in_recovery()").Scan(&inRecovery); err != nil {
+		return false, fmt.Errorf("querying pg_is_in_recovery: %w", err)
+	}
+	return inRecovery, nil
+}
+
 // DeleteLogicalSlot drops a logical replication slot by name.
 // Note: Active slots cannot be dropped - this will return an error from PostgreSQL.
 func DeleteLogicalSlot(ctx context.Context, db *sql.DB, slotName string) error {

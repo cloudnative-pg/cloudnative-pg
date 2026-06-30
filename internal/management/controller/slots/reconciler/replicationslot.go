@@ -73,8 +73,12 @@ func ReconcileReplicationSlots(
 				"imageName", cluster.Spec.ImageName,
 				"err", err)
 		} else if pgMajor >= 17 {
-			if err := cleanupOrphanedLogicalSlots(ctx, db); err != nil {
+			res, err := cleanupOrphanedLogicalSlots(ctx, db)
+			if err != nil {
 				return reconcile.Result{}, fmt.Errorf("cleaning up orphaned logical slots: %w", err)
+			}
+			if !res.IsZero() {
+				return res, nil
 			}
 		}
 	}
@@ -225,14 +229,30 @@ func dropReplicationSlots(
 // We specifically require failover=true to avoid dropping legitimate external
 // subscription slots (like those created by pg_createsubscription), which have
 // failover=false and should not be touched.
-func cleanupOrphanedLogicalSlots(ctx context.Context, db *sql.DB) error {
+func cleanupOrphanedLogicalSlots(ctx context.Context, db *sql.DB) (reconcile.Result, error) {
 	contextLog := log.FromContext(ctx).WithName("cleanupOrphanedLogicalSlots")
+
+	// Belt-and-suspenders: gate this destructive drop on PostgreSQL's own view of
+	// its role rather than relying solely on the caller's cluster-status check.
+	// During a demotion the cluster status can already name the new primary while
+	// this node's PostgreSQL has not yet been restarted into recovery; dropping a
+	// still-live failover slot in that window would lose a slot the sync worker
+	// (which only runs on standbys) will not recreate.
+	inRecovery, err := infrastructure.IsInRecovery(ctx, db)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("checking recovery status before logical slot cleanup: %w", err)
+	}
+	if !inRecovery {
+		contextLog.Warning("Skipping orphaned logical slot cleanup: PostgreSQL reports this node is not in recovery")
+		return reconcile.Result{}, nil
+	}
 
 	slots, err := infrastructure.ListLogicalSlotsWithSyncStatus(ctx, db)
 	if err != nil {
-		return fmt.Errorf("listing logical slots: %w", err)
+		return reconcile.Result{}, fmt.Errorf("listing logical slots: %w", err)
 	}
 
+	needToReschedule := false
 	for _, slot := range slots {
 		// Skip synced slots - they are properly managed by the sync worker
 		if slot.Synced {
@@ -247,10 +267,11 @@ func cleanupOrphanedLogicalSlots(ctx context.Context, db *sql.DB) error {
 			continue
 		}
 
-		// Skip active slots - they cannot be dropped and we'll retry on next reconciliation
+		// Skip active slots - they cannot be dropped, so retry on a later reconciliation
 		if slot.Active {
 			contextLog.Trace("Skipping active orphaned logical slot (cannot be dropped)",
 				"slotName", slot.SlotName)
+			needToReschedule = true
 			continue
 		}
 
@@ -258,9 +279,19 @@ func cleanupOrphanedLogicalSlots(ctx context.Context, db *sql.DB) error {
 		contextLog.Info("Dropping orphaned logical slot", "slotName", slot.SlotName)
 
 		if err := infrastructure.DeleteLogicalSlot(ctx, db, slot.SlotName); err != nil {
-			return fmt.Errorf("deleting orphaned logical slot %q: %w", slot.SlotName, err)
+			// A slot can become active between listing and dropping. Mirror the
+			// physical-slot path: treat the failure as transient and retry on a
+			// later reconciliation rather than aborting the whole instance reconcile.
+			contextLog.Warning("Failed to drop orphaned logical slot, will retry",
+				"slotName", slot.SlotName, "err", err)
+			needToReschedule = true
+			continue
 		}
 	}
 
-	return nil
+	if needToReschedule {
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
+	return reconcile.Result{}, nil
 }

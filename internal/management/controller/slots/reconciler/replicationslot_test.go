@@ -261,6 +261,10 @@ var _ = Describe("ReconcileReplicationSlots logical slot cleanup integration", f
 				true,
 			)
 
+			// The cleanup first confirms the node is in recovery (a standby).
+			mock.ExpectQuery("SELECT pg_catalog.pg_is_in_recovery").
+				WillReturnRows(sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
+
 			// Expect logical slot cleanup query
 			// Only the orphan_slot (synced=false, failover=true) should be dropped
 			// external_sub_slot (synced=false, failover=false) should NOT be dropped
@@ -346,8 +350,26 @@ var _ = Describe("cleanupOrphanedLogicalSlots", func() {
 		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 
+	expectInRecovery := func(inRecovery bool) {
+		mock.ExpectQuery("SELECT pg_catalog.pg_is_in_recovery").
+			WillReturnRows(sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(inRecovery))
+	}
+
+	It("does not drop any slot when PostgreSQL reports the node is not in recovery",
+		func(ctx SpecContext) {
+			// Belt-and-suspenders: even if the caller's cluster-status gate let us
+			// through, a node PostgreSQL still considers a primary must not have its
+			// slots dropped. No list or drop query should be issued.
+			expectInRecovery(false)
+
+			res, err := cleanupOrphanedLogicalSlots(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.IsZero()).To(BeTrue())
+		})
+
 	It("should drop only orphaned failover slots (synced=false, failover=true, active=false)",
 		func(ctx SpecContext) {
+			expectInRecovery(true)
 			rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
 				AddRow("synced_slot", "pgoutput", false, "0/1234", true, true).   // synced=true, skip
 				AddRow("orphan_slot", "pgoutput", false, "0/5678", false, true).  // orphaned failover slot, DROP
@@ -362,11 +384,12 @@ var _ = Describe("cleanupOrphanedLogicalSlots", func() {
 				WithArgs("orphan_slot").
 				WillReturnResult(sqlmock.NewResult(1, 1))
 
-			err := cleanupOrphanedLogicalSlots(ctx, db)
+			_, err := cleanupOrphanedLogicalSlots(ctx, db)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 	It("should NOT drop external subscription slots (failover=false)", func(ctx SpecContext) {
+		expectInRecovery(true)
 		// This test ensures we don't accidentally break external logical replication
 		rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
 			AddRow("test_sub", "pgoutput", false, "0/5678", false, false) // external subscription slot
@@ -375,42 +398,62 @@ var _ = Describe("cleanupOrphanedLogicalSlots", func() {
 			WillReturnRows(rows)
 
 		// No deletion should occur - test_sub has failover=false
-		err := cleanupOrphanedLogicalSlots(ctx, db)
+		_, err := cleanupOrphanedLogicalSlots(ctx, db)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should do nothing when no orphaned failover slots exist", func(ctx SpecContext) {
+		expectInRecovery(true)
 		rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
 			AddRow("synced_slot", "pgoutput", false, "0/1234", true, true)
 
 		mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
 			WillReturnRows(rows)
 
-		err := cleanupOrphanedLogicalSlots(ctx, db)
+		_, err := cleanupOrphanedLogicalSlots(ctx, db)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should return error when listing slots fails", func(ctx SpecContext) {
+		expectInRecovery(true)
 		mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
 			WillReturnError(errors.New("mock error"))
 
-		err := cleanupOrphanedLogicalSlots(ctx, db)
+		_, err := cleanupOrphanedLogicalSlots(ctx, db)
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("should return error when deleting a slot fails", func(ctx SpecContext) {
-		rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
-			AddRow("orphan_slot", "pgoutput", false, "0/5678", false, true)
+	It("reschedules instead of failing when dropping a slot errors (e.g. it became active)",
+		func(ctx SpecContext) {
+			expectInRecovery(true)
+			rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
+				AddRow("orphan_slot", "pgoutput", false, "0/5678", false, true)
 
-		mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
-			WillReturnRows(rows)
+			mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
+				WillReturnRows(rows)
 
-		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").
-			WithArgs("orphan_slot").
-			WillReturnError(errors.New("delete error"))
+			// A consumer can connect between listing and dropping, making the drop fail.
+			// This must not abort the whole instance reconcile; it should requeue.
+			mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").
+				WithArgs("orphan_slot").
+				WillReturnError(errors.New("replication slot \"orphan_slot\" is active"))
 
-		err := cleanupOrphanedLogicalSlots(ctx, db)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("delete error"))
-	})
+			res, err := cleanupOrphanedLogicalSlots(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.RequeueAfter).To(Equal(time.Second))
+		})
+
+	It("reschedules when an orphaned failover slot is active and cannot be dropped",
+		func(ctx SpecContext) {
+			expectInRecovery(true)
+			rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
+				AddRow("active_orphan", "pgoutput", true, "0/5678", false, true) // active, must be retried later
+
+			mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
+				WillReturnRows(rows)
+
+			res, err := cleanupOrphanedLogicalSlots(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.RequeueAfter).To(Equal(time.Second))
+		})
 })

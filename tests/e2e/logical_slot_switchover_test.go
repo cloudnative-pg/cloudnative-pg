@@ -138,10 +138,13 @@ var _ = Describe("Logical Slot Switchover", Label(tests.LabelPublicationSubscrip
 					)
 					g.Expect(err).ToNot(HaveOccurred())
 					GinkgoWriter.Printf("Slot on primary:\n%s\n", out)
-					// On primary: synced should be false (locally created), failover should be true
-					g.Expect(out).To(ContainSubstring(slotName))
-					g.Expect(out).To(ContainSubstring("f")) // synced=false
-					g.Expect(out).To(ContainSubstring("t")) // failover=true
+					// psql -tA emits one pipe-separated row: slot_name|slot_type|synced|failover.
+					// On the primary the slot is locally created: synced=false (f), failover=true (t).
+					fields := strings.Split(strings.TrimSpace(out), "|")
+					g.Expect(fields).To(HaveLen(4))
+					g.Expect(fields[0]).To(Equal(slotName))
+					g.Expect(fields[2]).To(Equal("f"), "expected synced=false on primary")
+					g.Expect(fields[3]).To(Equal("t"), "expected failover=true on primary")
 				}, 60).WithPolling(5 * time.Second).Should(Succeed())
 			})
 
@@ -171,8 +174,12 @@ var _ = Describe("Logical Slot Switchover", Label(tests.LabelPublicationSubscrip
 					)
 					g.Expect(err).ToNot(HaveOccurred())
 					GinkgoWriter.Printf("Slot on replica %s:\n%s\n", replicaPod, out)
-					// On replica: slot should exist with synced=true (synced from primary)
-					g.Expect(out).To(ContainSubstring(slotName))
+					// Row layout: slot_name|synced|failover. On the replica the slot must be
+					// present and synced from the primary (synced=true), not just exist.
+					fields := strings.Split(strings.TrimSpace(out), "|")
+					g.Expect(fields).To(HaveLen(3))
+					g.Expect(fields[0]).To(Equal(slotName))
+					g.Expect(fields[1]).To(Equal("t"), "expected synced=true on replica")
 				}, 120).WithPolling(10 * time.Second).Should(Succeed())
 			})
 
@@ -205,6 +212,28 @@ var _ = Describe("Logical Slot Switchover", Label(tests.LabelPublicationSubscrip
 					GinkgoWriter.Printf("Orphaned failover slots on demoted primary:\n%s\n", out)
 					// Empty result means the orphaned slot was cleaned up
 					g.Expect(strings.TrimSpace(out)).To(BeEmpty(), "Expected orphaned failover slot to be cleaned up")
+				}, 180).WithPolling(10 * time.Second).Should(Succeed())
+			})
+
+			By("verifying the slot is re-synced from the new primary on the demoted primary", func() {
+				// Dropping the orphaned synced=false slot is only the means to an end:
+				// the slot-sync worker on the demoted primary (now a standby) must
+				// recreate it from the new primary with synced=true. Assert the recovery,
+				// not just the deletion.
+				query := "SELECT slot_name, synced FROM pg_replication_slots WHERE slot_name = '" + slotName + "'"
+				Eventually(func(g Gomega) {
+					out, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{Namespace: namespace, PodName: oldPrimary},
+						postgres.PostgresDBName, query,
+					)
+					g.Expect(err).ToNot(HaveOccurred())
+					GinkgoWriter.Printf("Re-synced slot on demoted primary:\n%s\n", out)
+					// Row layout: slot_name|synced. The slot must exist again with synced=true.
+					fields := strings.Split(strings.TrimSpace(out), "|")
+					g.Expect(fields).To(HaveLen(2))
+					g.Expect(fields[0]).To(Equal(slotName))
+					g.Expect(fields[1]).To(Equal("t"), "expected slot re-synced with synced=true")
 				}, 180).WithPolling(10 * time.Second).Should(Succeed())
 			})
 		})
