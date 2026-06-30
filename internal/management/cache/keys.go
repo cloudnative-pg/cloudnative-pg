@@ -26,4 +26,10 @@ const (
 	WALArchiveKey = "wal-archive"
 	// WALRestoreKey is the key to be used to access the cached envs for wal-restore
 	WALRestoreKey = "wal-restore"
+	// WALRestoreOptionsKey is the key to be used to access the cached
+	// barman-cloud-wal-restore command-line options. It is populated only by the
+	// bootstrap recovery Job, which resolves the recovery source object store
+	// (not derivable from the cluster spec for a recovery.backup reference) and
+	// hands the options to the wal-restore command via the local webserver cache.
+	WALRestoreOptionsKey = "wal-restore-options"
 )

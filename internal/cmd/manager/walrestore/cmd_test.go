@@ -20,14 +20,33 @@ SPDX-License-Identifier: Apache-2.0
 package walrestore
 
 import (
+	"errors"
+
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// fakeCacheClient is an in-memory implementation of local.CacheClient for tests.
+type fakeCacheClient struct {
+	envs map[string][]string
+}
+
+func (f fakeCacheClient) GetCluster() (*apiv1.Cluster, error) {
+	return nil, errors.New("GetCluster not implemented in fakeCacheClient")
+}
+
+func (f fakeCacheClient) GetEnv(key string) ([]string, error) {
+	if v, ok := f.envs[key]; ok {
+		return v, nil
+	}
+	return nil, cache.ErrCacheMiss
+}
 
 var _ = Describe("Function isStreamingAvailable", func() {
 	It("returns false if cluster is nil", func() {
@@ -112,6 +131,120 @@ var _ = Describe("Function isStreamingAvailable", func() {
 			},
 		}
 		Expect(isStreamingAvailable(&cluster, "primaryPod")).To(BeTrue())
+	})
+})
+
+var _ = Describe("getWALRestoreSettings", func() {
+	const podName = "cluster-1"
+
+	clusterWithOwnBackup := func(currentPrimary string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{CurrentPrimary: currentPrimary},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						BarmanCredentials: apiv1.BarmanCredentials{AWS: &apiv1.S3Credentials{}},
+						DestinationPath:   "s3://own-backup/path",
+						ServerName:        "own-server",
+						Wal:               &apiv1.WalBackupConfiguration{MaxParallel: 3},
+					},
+				},
+			},
+		}
+	}
+
+	It("uses the cached bootstrap options and credentials during a recovery Job", func(ctx SpecContext) {
+		// recovery.backup reference: no primary elected yet, and the source store
+		// carries no parallelism setting, so prefetch defaults to a single segment.
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{CurrentPrimary: ""},
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						Backup: &apiv1.BackupSource{
+							LocalObjectReference: apiv1.LocalObjectReference{Name: "a-backup"},
+						},
+					},
+				},
+			},
+		}
+		bootstrapOptions := []string{"--endpoint-url", "https://source", "s3://source/path", "source-server"}
+		creds := []string{"AWS_ACCESS_KEY_ID=source-key"}
+		cacheClient := fakeCacheClient{envs: map[string][]string{
+			cache.WALRestoreOptionsKey: bootstrapOptions,
+			cache.WALRestoreKey:        creds,
+		}}
+
+		options, env, maxParallel, err := getWALRestoreSettings(ctx, cacheClient, cluster, podName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(options).To(Equal(bootstrapOptions))
+		Expect(env).To(Equal(creds))
+		Expect(maxParallel).To(Equal(1))
+	})
+
+	It("honors the recovery source store maxParallel during a recovery Job", func(ctx SpecContext) {
+		// recovery.source: prefetch parallelism comes from the source external
+		// cluster's object store, just like a replica restoring from that store.
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{CurrentPrimary: ""},
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{Source: "origin"},
+				},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name: "origin",
+						BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+							Wal: &apiv1.WalBackupConfiguration{MaxParallel: 2},
+						},
+					},
+				},
+			},
+		}
+		cacheClient := fakeCacheClient{envs: map[string][]string{
+			cache.WALRestoreOptionsKey: {"s3://source/path", "origin"},
+			cache.WALRestoreKey:        {"AWS_ACCESS_KEY_ID=source-key"},
+		}}
+
+		_, _, maxParallel, err := getWALRestoreSettings(ctx, cacheClient, cluster, podName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(maxParallel).To(Equal(2))
+	})
+
+	It("ignores cached bootstrap options once a primary has been elected", func(ctx SpecContext) {
+		cluster := clusterWithOwnBackup(podName)
+		cacheClient := fakeCacheClient{envs: map[string][]string{
+			// This must never be used: a running instance resolves the store from
+			// the cluster spec, not from the bootstrap options cache.
+			cache.WALRestoreOptionsKey: {"POISON-MUST-NOT-BE-USED"},
+			cache.WALRestoreKey:        {"AWS_ACCESS_KEY_ID=own-key"},
+		}}
+
+		options, _, maxParallel, err := getWALRestoreSettings(ctx, cacheClient, cluster, podName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(options).ToNot(ContainElement("POISON-MUST-NOT-BE-USED"))
+		Expect(options).To(ContainElement("s3://own-backup/path"))
+		Expect(maxParallel).To(Equal(3))
+	})
+
+	It("falls back to the cluster store during bootstrap when no options are cached", func(ctx SpecContext) {
+		cluster := clusterWithOwnBackup("")
+		cacheClient := fakeCacheClient{envs: map[string][]string{
+			cache.WALRestoreKey: {"AWS_ACCESS_KEY_ID=own-key"},
+		}}
+
+		options, _, maxParallel, err := getWALRestoreSettings(ctx, cacheClient, cluster, podName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(options).To(ContainElement("s3://own-backup/path"))
+		Expect(maxParallel).To(Equal(3))
+	})
+
+	It("returns ErrNoBackupConfigured when nothing is available", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{Status: apiv1.ClusterStatus{CurrentPrimary: podName}}
+		cacheClient := fakeCacheClient{envs: map[string][]string{}}
+
+		_, _, _, err := getWALRestoreSettings(ctx, cacheClient, cluster, podName)
+		Expect(err).To(MatchError(ErrNoBackupConfigured))
 	})
 })
 

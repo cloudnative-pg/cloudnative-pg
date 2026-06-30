@@ -146,7 +146,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return nil
 	}
 
-	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
+	options, env, maxParallel, err := getWALRestoreSettings(ctx, cacheClient, cluster, podName)
 	if errors.Is(err, ErrNoBackupConfigured) {
 		// Backup not configured, skipping WAL
 		contextLog.Trace("Skipping WAL restore, there is no backup configuration",
@@ -157,20 +157,8 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return err
 	}
 	if err != nil {
-		return fmt.Errorf("while getting recover configuration: %w", err)
+		return err
 	}
-
-	options, err := barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, recoverClusterName)
-	if err != nil {
-		return fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
-	}
-
-	env, err := cacheClient.GetEnv(cache.WALRestoreKey)
-	if err != nil {
-		return fmt.Errorf("failed to get envs: %w", err)
-	}
-
-	mergeEnv(env, recoverEnv)
 
 	// Create the restorer
 	var walRestorer *barmanRestorer.WALRestorer
@@ -201,10 +189,6 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	// Step 3: gather the WAL files names to restore. If the required file isn't a regular WAL, we download it directly.
 	var walFilesList []string
-	maxParallel := 1
-	if barmanConfiguration.Wal != nil && barmanConfiguration.Wal.MaxParallel > 1 {
-		maxParallel = barmanConfiguration.Wal.MaxParallel
-	}
 	if postgres.IsWALFile(walName) {
 		// If this is a regular WAL file, we try to prefetch
 		if walFilesList, err = gatherWALFilesToRestore(walName, maxParallel); err != nil {
@@ -334,6 +318,89 @@ func mergeEnv(env []string, incomingEnv []string) {
 			}
 		}
 	}
+}
+
+// getWALRestoreSettings resolves the barman-cloud-wal-restore command-line
+// options, the environment carrying the object store credentials, and the
+// prefetch parallelism to use for a WAL restore.
+//
+// During the bootstrap recovery Job no primary has been elected yet
+// (cluster.Status.CurrentPrimary is empty) and there is no instance-manager
+// cache. The Job, which is the only component able to resolve the recovery
+// source object store (for a recovery.backup reference the store lives only in
+// the referenced Backup CR and is not derivable from the cluster spec),
+// pre-populates the local webserver cache with the wal-restore options and
+// credentials. We honor those here so the recovery replay restores WALs from
+// the source store, just like a replica does.
+func getWALRestoreSettings(
+	ctx context.Context,
+	cacheClient local.CacheClient,
+	cluster *apiv1.Cluster,
+	podName string,
+) (options []string, env []string, maxParallel int, err error) {
+	// Only the bootstrap recovery Job pre-populates these options, and only while
+	// no primary has been elected yet. Gating on CurrentPrimary keeps this lookup
+	// off the hot path of a running instance, where the key is never set and the
+	// webserver cache miss would otherwise retry on every WAL.
+	if cluster.Status.CurrentPrimary == "" {
+		bootstrapOptions, optionsErr := cacheClient.GetEnv(cache.WALRestoreOptionsKey)
+		if optionsErr == nil {
+			env, err = cacheClient.GetEnv(cache.WALRestoreKey)
+			if err != nil {
+				return nil, nil, 0, fmt.Errorf("failed to get envs: %w", err)
+			}
+			return bootstrapOptions, env, bootstrapMaxParallel(cluster), nil
+		}
+	}
+
+	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
+	if err != nil {
+		if errors.Is(err, ErrNoBackupConfigured) {
+			// returned unwrapped so the caller can detect it and skip the WAL
+			return nil, nil, 0, err
+		}
+		return nil, nil, 0, fmt.Errorf("while getting recover configuration: %w", err)
+	}
+
+	options, err = barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, recoverClusterName)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
+	}
+
+	env, err = cacheClient.GetEnv(cache.WALRestoreKey)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("failed to get envs: %w", err)
+	}
+	mergeEnv(env, recoverEnv)
+
+	maxParallel = 1
+	if barmanConfiguration.Wal != nil && barmanConfiguration.Wal.MaxParallel > 1 {
+		maxParallel = barmanConfiguration.Wal.MaxParallel
+	}
+
+	return options, env, maxParallel, nil
+}
+
+// bootstrapMaxParallel returns the WAL prefetch parallelism to use during a
+// bootstrap recovery. It mirrors the regular path, which reads it from the
+// object store being restored from: here that is the recovery source store.
+// Parallelism is only configurable for an external-cluster recovery source; a
+// recovery.backup reference carries no such setting, so it falls back to 1.
+func bootstrapMaxParallel(cluster *apiv1.Cluster) int {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return 1
+	}
+
+	externalCluster, found := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
+	if !found || externalCluster.BarmanObjectStore == nil || externalCluster.BarmanObjectStore.Wal == nil {
+		return 1
+	}
+
+	if maxParallel := externalCluster.BarmanObjectStore.Wal.MaxParallel; maxParallel > 1 {
+		return maxParallel
+	}
+
+	return 1
 }
 
 // GetRecoverConfiguration get the appropriate recover Configuration for a given cluster
