@@ -83,6 +83,9 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection", Label(tes
 		})
 
 		By("verifying WAL archiving through the plugin is working on the first Cluster", func() {
+			objectstoreasserts.AssertArchiveWalOnObjectStore(
+				env, testTimeouts, objectStoreEnv, namespace, firstClusterName, sharedArchiveName,
+			)
 			backupasserts.AssertArchiveConditionMet(env, namespace, firstClusterName, 120)
 		})
 
@@ -93,10 +96,6 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection", Label(tes
 
 		By("creating second cluster from backup", func() {
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, secondClusterName, secondClusterFile)
-		})
-
-		By("verifying WAL archiving through the plugin is working on the second Cluster", func() {
-			backupasserts.AssertArchiveConditionMet(env, namespace, secondClusterName, 120)
 		})
 
 		By("verifying second cluster is on timeline 2", func() {
@@ -110,6 +109,7 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection", Label(tes
 			objectstoreasserts.AssertArchiveWalOnObjectStore(
 				env, testTimeouts, objectStoreEnv, namespace, secondClusterName, sharedArchiveName,
 			)
+			backupasserts.AssertArchiveConditionMet(env, namespace, secondClusterName, 120)
 			Eventually(func() (int, error) {
 				return objectstore.CountFiles(objectStoreEnv, objectstore.GetFilePath(sharedArchiveName, "00000002.history*"))
 			}, 60).Should(BeNumerically(">", 0))
