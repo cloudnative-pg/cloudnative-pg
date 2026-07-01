@@ -338,18 +338,16 @@ func getWALRestoreSettings(
 	cluster *apiv1.Cluster,
 	podName string,
 ) (options []string, env []string, maxParallel int, err error) {
-	// Only the bootstrap recovery Job pre-populates these options, and only while
-	// no primary has been elected yet. Gating on CurrentPrimary keeps this lookup
-	// off the hot path of a running instance, where the key is never set and the
-	// webserver cache miss would otherwise retry on every WAL.
+	// During a bootstrap recovery no primary has been elected yet and there is no
+	// instance-manager cache. The Job resolves the recovery source object store
+	// (for a recovery.backup reference it lives only in the referenced Backup CR,
+	// so it is not derivable from the cluster spec here) and caches it for us.
+	// Gating on CurrentPrimary keeps this lookup off a running instance's hot
+	// path, where the key is never set.
 	if cluster.Status.CurrentPrimary == "" {
-		bootstrapOptions, optionsErr := cacheClient.GetEnv(cache.WALRestoreOptionsKey)
-		if optionsErr == nil {
-			env, err = cacheClient.GetEnv(cache.WALRestoreKey)
-			if err != nil {
-				return nil, nil, 0, fmt.Errorf("failed to get envs: %w", err)
-			}
-			return bootstrapOptions, env, bootstrapMaxParallel(cluster), nil
+		barmanConfiguration, configErr := cacheClient.GetBarmanObjectStore(cache.WALRestoreConfigKey)
+		if configErr == nil {
+			return walRestoreSettingsFromStore(ctx, cacheClient, barmanConfiguration, barmanConfiguration.ServerName, nil)
 		}
 	}
 
@@ -362,7 +360,23 @@ func getWALRestoreSettings(
 		return nil, nil, 0, fmt.Errorf("while getting recover configuration: %w", err)
 	}
 
-	options, err = barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, recoverClusterName)
+	return walRestoreSettingsFromStore(ctx, cacheClient, barmanConfiguration, recoverClusterName, recoverEnv)
+}
+
+// walRestoreSettingsFromStore builds the barman-cloud-wal-restore options, loads
+// the credentials environment, and computes the prefetch parallelism from a
+// resolved object store configuration. recoverEnv carries extra environment
+// (e.g. the endpoint CA bundle location) to merge on top of the cached
+// credentials; it is nil for a bootstrap recovery, whose cached credentials
+// already include it.
+func walRestoreSettingsFromStore(
+	ctx context.Context,
+	cacheClient local.CacheClient,
+	barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
+	serverName string,
+	recoverEnv []string,
+) (options []string, env []string, maxParallel int, err error) {
+	options, err = barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, serverName)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
 	}
@@ -379,28 +393,6 @@ func getWALRestoreSettings(
 	}
 
 	return options, env, maxParallel, nil
-}
-
-// bootstrapMaxParallel returns the WAL prefetch parallelism to use during a
-// bootstrap recovery. It mirrors the regular path, which reads it from the
-// object store being restored from: here that is the recovery source store.
-// Parallelism is only configurable for an external-cluster recovery source; a
-// recovery.backup reference carries no such setting, so it falls back to 1.
-func bootstrapMaxParallel(cluster *apiv1.Cluster) int {
-	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
-		return 1
-	}
-
-	externalCluster, found := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
-	if !found || externalCluster.BarmanObjectStore == nil || externalCluster.BarmanObjectStore.Wal == nil {
-		return 1
-	}
-
-	if maxParallel := externalCluster.BarmanObjectStore.Wal.MaxParallel; maxParallel > 1 {
-		return maxParallel
-	}
-
-	return 1
 }
 
 // GetRecoverConfiguration get the appropriate recover Configuration for a given cluster

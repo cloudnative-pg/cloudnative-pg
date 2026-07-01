@@ -252,9 +252,7 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 		},
 	}
 
-	if err := setupBootstrapWALRestoreCache(ctx, cluster, backup, env); err != nil {
-		return nil, "", err
-	}
+	setupBootstrapWALRestoreCache(cluster, backup, env)
 
 	return env, getRestoreWalConfig(), nil
 }
@@ -330,9 +328,7 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 			return err
 		}
 
-		if err := setupBootstrapWALRestoreCache(ctx, cluster, backup, env); err != nil {
-			return err
-		}
+		setupBootstrapWALRestoreCache(cluster, backup, env)
 		config = getRestoreWalConfig()
 		envs = env
 	}
@@ -638,48 +634,36 @@ func getRestoreWalConfig() string {
 }
 
 // setupBootstrapWALRestoreCache populates the local webserver cache with the
-// recovery source object store options and credentials. During the bootstrap
-// recovery Job the instance-manager reconciler that normally fills this cache is
-// not running, so PostgreSQL's restore_command (`/controller/manager
+// recovery source object store configuration and credentials. During the
+// bootstrap recovery Job the instance-manager reconciler that normally fills
+// this cache is not running, so PostgreSQL's restore_command (`/controller/manager
 // wal-restore`) would otherwise be unable to resolve the recovery source. The
 // source store is not always derivable from the cluster spec (for a
 // recovery.backup reference it lives only in the referenced Backup CR), so we
-// resolve it here, where it is already available, and cache it for wal-restore.
-func setupBootstrapWALRestoreCache(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	backup *apiv1.Backup,
-	env []string,
-) error {
+// resolve it here, where it is already available, and cache the whole store so
+// the wal-restore command can derive its options and prefetch parallelism from
+// it, exactly as it does for a running instance.
+func setupBootstrapWALRestoreCache(cluster *apiv1.Cluster, backup *apiv1.Backup, env []string) {
 	// A replica cluster configures streaming replication and does not replay WAL
 	// in this Job: concludeRestore returns before starting PostgreSQL, so the
 	// wal-restore command is never invoked here and this cache would never be
 	// read. Its WALs are restored later by the running instance, using the cache
 	// the reconciler populates in that pod.
 	if cluster.IsReplica() {
-		return nil
-	}
-
-	sourceStore := recoverySourceObjectStore(cluster, backup)
-
-	options, err := barmanCommand.CloudWalRestoreOptions(ctx, sourceStore, backup.Status.ServerName)
-	if err != nil {
-		return fmt.Errorf("while building the wal-restore options for the recovery source: %w", err)
+		return
 	}
 
 	cache.Store(cache.WALRestoreKey, env)
-	cache.Store(cache.WALRestoreOptionsKey, options)
-
-	return nil
+	cache.Store(cache.WALRestoreConfigKey, recoverySourceObjectStore(cluster, backup))
 }
 
 // recoverySourceObjectStore returns the object store to restore WALs from during
 // a bootstrap recovery. The endpoint, destination, server name and credentials
 // come from the resolved Backup. For a recovery.source the source store's Wal
-// configuration (the additional barman-cloud-wal-restore command-line arguments,
-// and the prefetch parallelism honored separately by the wal-restore command) is
-// recorded only in the external cluster definition, so it is carried over here
-// to mirror what the Barman Cloud plugin does with its own ObjectStore resource.
+// configuration (the prefetch parallelism and the additional
+// barman-cloud-wal-restore command-line arguments) is recorded only in the
+// external cluster definition, so it is carried over here to mirror what the
+// Barman Cloud plugin does with its own ObjectStore resource.
 func recoverySourceObjectStore(cluster *apiv1.Cluster, backup *apiv1.Backup) *apiv1.BarmanObjectStoreConfiguration {
 	store := &apiv1.BarmanObjectStoreConfiguration{
 		BarmanCredentials: backup.Status.BarmanCredentials,
