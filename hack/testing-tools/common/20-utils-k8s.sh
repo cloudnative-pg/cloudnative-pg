@@ -20,6 +20,14 @@
 
 # This file contains functions for interacting with the Kubernetes API using $K8S_CLI.
 
+# _github_auth_header: returns curl auth flags when running from GitHub Actions.
+# Avoids 403 rate-limiting on unauthenticated downloads from GitHub Actions.
+function _github_auth_header() {
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    echo "Authorization: Bearer ${GITHUB_TOKEN}"
+  fi
+}
+
 # wait_for(type, namespace, name, interval, retries)
 # Waits until a specified Kubernetes object exists.
 function wait_for() {
@@ -171,6 +179,13 @@ function reset_operator_namespace() {
     fi
 
     if ${K8S_CLI} get ns cnpg-system >/dev/null 2>&1; then
+        # Delete plugin services while the operator is still running: the
+        # reconciler handles the cnpg.io/cleanupPlugin finalizer on deletion.
+        # If we skip this, deleting the namespace kills the operator pod before
+        # it can clear the finalizer, wedging the namespace.
+        ${K8S_CLI} delete services -n cnpg-system -l cnpg.io/pluginName \
+            --ignore-not-found --wait=true --timeout=60s 2>/dev/null || true
+
         ${K8S_CLI} delete ns cnpg-system --ignore-not-found --wait=false
         ${K8S_CLI} wait --for=delete ns/cnpg-system --timeout=60s
     fi
@@ -229,7 +244,7 @@ function deploy_operator_from_manifest() {
     fi
 
     local manifest_file="${TEMP_DIR}/cnpg-operator-manifest.yaml"
-    if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+    if ! curl -fsSL --retry 5 --retry-delay 2 -H "$(_github_auth_header)" -o "${manifest_file}" "${manifest_url}"; then
         printf '%bError: Manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         printf '%bInterpreted %s as a %s.%b\n' "${bright}" "${operator}" "${mode}" "${reset}" >&2
         exit 1
@@ -279,7 +294,7 @@ function deploy_csi_host_path() {
 
   ## Create a temporary file for the modified plugin deployment. This updates the image tag.
   local plugin_file="${TEMP_DIR}/csi-hostpath-plugin.yaml"
-  curl -sSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
+  curl -fsSL --retry 5 --retry-delay 2 -H "$(_github_auth_header)" "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
     sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
 
   # Apply driver info and plugin deployment
@@ -426,4 +441,88 @@ function deploy_operator_with_helm() {
     # cnpg-controller-manager. See:
     # https://cloudnative-pg.io/docs/current/installation_upgrade#using-the-helm-chart
     wait_operator_ready "cnpg-cloudnative-pg"
+}
+
+# ensure_cert_manager: installs cert-manager (idempotently) and waits for it to
+# become ready. plugin-barman-cloud requires cert-manager because its manifest
+# creates the Issuer/Certificate resources used for the operator<->plugin mTLS.
+function ensure_cert_manager() {
+    # renovate: datasource=github-releases depName=cert-manager/cert-manager
+    local cert_manager_version="${CERT_MANAGER_VERSION:-v1.20.2}"
+
+    # shellcheck disable=SC2154
+    if ${K8S_CLI} get namespace cert-manager >/dev/null 2>&1; then
+        echo -e "${bright}cert-manager already present, skipping install.${reset}"
+    else
+        echo -e "${bright}Installing cert-manager ${cert_manager_version}...${reset}"
+        # Download once, then retry only the apply, as deploy_operator_from_manifest does.
+        local manifest_file="${TEMP_DIR:-/tmp}/cert-manager-manifest.yaml"
+        if ! curl -fsSL --retry 5 --retry-delay 2 -H "$(_github_auth_header)" -o "${manifest_file}" \
+            "https://github.com/cert-manager/cert-manager/releases/download/${cert_manager_version}/cert-manager.yaml"; then
+            printf '%bError: could not download the cert-manager %s manifest%b\n' \
+                "${bright}" "${cert_manager_version}" "${reset}" >&2
+            return 1
+        fi
+        retry 5 "${K8S_CLI}" apply --server-side --force-conflicts -f "${manifest_file}"
+    fi
+    ${K8S_CLI} wait --for=condition=Available --timeout=300s -n cert-manager \
+        deployment/cert-manager deployment/cert-manager-webhook deployment/cert-manager-cainjector
+}
+
+# install_barman_cloud_plugin: installs plugin-barman-cloud into cnpg-system.
+# The version is selected via the BARMAN_PLUGIN_VERSION environment variable:
+#   - "release" (default): the latest published release
+#   - "main":              the current snapshot from the main branch
+#   - "vX.Y.Z" / "X.Y.Z":  a specific pinned release
+# Requires the operator to be installed first. Exports
+# BARMAN_PLUGIN_VERSION_RESOLVED with the concrete version that was deployed
+# (read back from the running deployment image) so the test suite can log it.
+function install_barman_cloud_plugin() {
+    # shellcheck disable=SC2154
+    local selector="${BARMAN_PLUGIN_VERSION:-release}"
+    local repo="cloudnative-pg/plugin-barman-cloud"
+    local manifest_url
+
+    case "${selector}" in
+        release)
+            manifest_url="https://github.com/${repo}/releases/latest/download/manifest.yaml"
+            ;;
+        main)
+            manifest_url="https://raw.githubusercontent.com/${repo}/refs/heads/main/manifest.yaml"
+            ;;
+        *)
+            # A pinned version, validated with the same anchored pattern used by
+            # deploy_operator_from_manifest so a malformed value fails fast with a
+            # clear message instead of a confusing 404.
+            if [[ "${selector}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+                manifest_url="https://github.com/${repo}/releases/download/v${selector#v}/manifest.yaml"
+            else
+                printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main" or a version like v0.12.0)%b\n' \
+                    "${bright}" "${selector}" "${reset}" >&2
+                return 1
+            fi
+            ;;
+    esac
+
+    ensure_cert_manager
+
+    echo -e "${bright}Installing plugin-barman-cloud (${selector}) from ${manifest_url}${reset}"
+    # Download once, then retry only the apply, as deploy_operator_from_manifest
+    # does. The retry absorbs the cert-manager webhook readiness race: the
+    # plugin manifest creates cert-manager Issuer/Certificate resources.
+    local manifest_file="${TEMP_DIR:-/tmp}/plugin-barman-cloud-manifest.yaml"
+    if ! curl -fsSL --retry 5 --retry-delay 2 -H "$(_github_auth_header)" -o "${manifest_file}" "${manifest_url}"; then
+        printf '%bError: manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
+        return 1
+    fi
+    retry 5 "${K8S_CLI}" apply --server-side --force-conflicts -f "${manifest_file}"
+
+    ${K8S_CLI} -n cnpg-system rollout status deploy/barman-cloud --timeout=5m
+
+    local image
+    image=$(${K8S_CLI} get deployment barman-cloud -n cnpg-system \
+        -o jsonpath='{.spec.template.spec.containers[0].image}')
+    export BARMAN_PLUGIN_VERSION_RESOLVED="${image##*:}"
+    printf '%bplugin-barman-cloud installed: selector=%s resolved=%s (image %s)%b\n' \
+        "${bright}" "${selector}" "${BARMAN_PLUGIN_VERSION_RESOLVED}" "${image}" "${reset}"
 }

@@ -41,7 +41,7 @@
 # Usage:
 #   manage.sh <action>
 #   where <action> can be: create, deploy, load-helper-images,
-#   print-image, export-logs, teardown, pyroscope, env
+#   plugin-barman-cloud, print-image, export-logs, teardown, pyroscope, env
 #
 # Environment Variables:
 #   CLUSTER_ENGINE - Determines the target vendor (default: 'kind')
@@ -74,7 +74,7 @@ source "${COMMON_DIR}/50-utils-images-load.sh"
 ACTION="${1:-}"
 
 if [ -z "$ACTION" ]; then
-    echo "Usage: $0 <create|deploy|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
+    echo "Usage: $0 <create|deploy|load-helper-images|plugin-barman-cloud|print-image|export-logs|teardown|pyroscope|env>"
     exit 1
 fi
 
@@ -182,6 +182,11 @@ case "$ACTION" in
             echo "ERROR: Log export script not found for vendor '$VENDOR' at: ${EXPORT_SCRIPT}" >&2
             exit 1
         fi
+        ;;
+
+    plugin-barman-cloud)
+        source "${COMMON_DIR}/20-utils-k8s.sh"
+        install_barman_cloud_plugin
         ;;
 
     pyroscope)
