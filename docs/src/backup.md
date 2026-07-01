@@ -117,6 +117,8 @@ the need of a WAL archive, even though they can take advantage of it, if
 available (with all the benefits on the recovery side highlighted in the
 previous section).
 
+See the [Recovery section](recovery.md#recovery-from-volumesnapshot-objects) for more details on when a WAL archive is required for restoring from a snapshot.
+
 In those situations with a higher RPO (for example, 1 hour or 24 hours), and
 shorter retention periods, cold backups represent a viable option to be considered
 for your disaster recovery plans.

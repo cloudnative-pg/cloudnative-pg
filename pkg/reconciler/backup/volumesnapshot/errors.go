@@ -77,6 +77,7 @@ func isCSIErrorMessageRetriable(msg string) bool {
 	isRetryableFuncs := []func(string) bool{
 		isExplicitlyRetriableError,
 		isRetryableHTTPError,
+		isRetryableGRPCOrRateLimitError, // new check for gRPC/rate-limit
 		isConflictError,
 		isContextDeadlineExceededError,
 	}
@@ -87,6 +88,26 @@ func isCSIErrorMessageRetriable(msg string) bool {
 		}
 	}
 
+	return false
+}
+
+// isRetryableGRPCOrRateLimitError detects retryable errors from gRPC status or rate-limit messages
+func isRetryableGRPCOrRateLimitError(msg string) bool {
+	// gRPC status codes for transient errors
+	if strings.Contains(msg, "code = ResourceExhausted") ||
+		strings.Contains(msg, "code = Unavailable") {
+		return true
+	}
+	// Common rate-limit messages
+	if strings.Contains(msg, "Too Many Requests") ||
+		strings.Contains(msg, "rate limit") {
+		return true
+	}
+	// Also match DigitalOcean's 429 format
+	// e.g. ": 429 (request \"...\") per-volume snapshot limit exceeded"
+	if strings.Contains(msg, ": 429 ") {
+		return true
+	}
 	return false
 }
 
