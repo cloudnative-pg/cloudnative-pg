@@ -141,9 +141,8 @@ This procedure must happen immediately before starting the release.
 Once the new release branch is created, go back to `main` and submit a pull
 request to update the
 [backport](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/workflows/backport.yml),
-[continuous delivery](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/workflows/continuous-delivery.yml),
-[continuous integration](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/workflows/continuous-integration.yml)
-and [Renovate](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/renovate.json5)
+[continuous delivery](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/workflows/continuous-delivery.yml)
+and [continuous integration](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/workflows/continuous-integration.yml)
 workflows to support the new release branch.
 And also remember to update the [github issue template](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/ISSUE_TEMPLATE/bug.yml).
 
@@ -273,7 +272,7 @@ The following artifacts are produced **once** per release cycle, regardless of
 how many supported versions are released together:
 
 - The release announcement (blog post) on the
-  [CloudNativePG website](https://cloudnative-pg.io/blog/).
+  [CloudNativePG website](https://cloudnative-pg.io/releases/).
 - The Helm chart for the newest released version — only one chart is
   published per release cycle, even when multiple versions are released —
   from the [`cloudnative-pg/charts`](https://github.com/cloudnative-pg/charts)
