@@ -1064,4 +1064,42 @@ var _ = Describe("NewInstance", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
 	})
+
+	It("propagates the configured DNS policy and configuration", func(ctx SpecContext) {
+		dnsConfig := &corev1.PodDNSConfig{
+			Nameservers: []string{"1.1.1.1"},
+			Searches:    []string{"example.com"},
+		}
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				DNSPolicy: corev1.DNSNone,
+				DNSConfig: dnsConfig,
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+		Expect(pod.Spec.DNSPolicy).To(Equal(corev1.DNSNone))
+		Expect(pod.Spec.DNSConfig).To(Equal(dnsConfig))
+	})
+
+	It("leaves DNS settings empty when not configured", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+		Expect(pod.Spec.DNSPolicy).To(BeEmpty())
+		Expect(pod.Spec.DNSConfig).To(BeNil())
+	})
 })
