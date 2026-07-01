@@ -651,6 +651,15 @@ func setupBootstrapWALRestoreCache(
 	backup *apiv1.Backup,
 	env []string,
 ) error {
+	// A replica cluster configures streaming replication and does not replay WAL
+	// in this Job: concludeRestore returns before starting PostgreSQL, so the
+	// wal-restore command is never invoked here and this cache would never be
+	// read. Its WALs are restored later by the running instance, using the cache
+	// the reconciler populates in that pod.
+	if cluster.IsReplica() {
+		return nil
+	}
+
 	sourceStore := recoverySourceObjectStore(cluster, backup)
 
 	options, err := barmanCommand.CloudWalRestoreOptions(ctx, sourceStore, backup.Status.ServerName)

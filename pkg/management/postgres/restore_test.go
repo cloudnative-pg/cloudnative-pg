@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/thoas/go-funk"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
@@ -302,5 +303,32 @@ var _ = Describe("setupBootstrapWALRestoreCache", func() {
 			options, err := cache.LoadEnv(cache.WALRestoreOptionsKey)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(options).To(ContainElement("--read-timeout=60"))
+		})
+
+	It("does not populate the cache for a replica cluster",
+		func(ctx SpecContext) {
+			// A replica cluster does not replay WAL in the recovery Job, so this
+			// cache would never be read; populating it is pointless.
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{Source: "origin"},
+					},
+					ExternalClusters: []apiv1.ExternalCluster{
+						{Name: "origin", BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{}},
+					},
+					ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+						Enabled: ptr.To(true),
+						Source:  "origin",
+					},
+				},
+			}
+
+			Expect(setupBootstrapWALRestoreCache(ctx, cluster, backup(), []string{"X=y"})).To(Succeed())
+
+			_, err := cache.LoadEnv(cache.WALRestoreOptionsKey)
+			Expect(err).To(MatchError(cache.ErrCacheMiss))
+			_, err = cache.LoadEnv(cache.WALRestoreKey)
+			Expect(err).To(MatchError(cache.ErrCacheMiss))
 		})
 })
