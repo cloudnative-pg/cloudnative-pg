@@ -245,4 +245,18 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 	})
+  
+	It("disables service links to prevent argument list too long errors", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+		job := CreatePrimaryJobViaInitdb(cluster, 0)
+
+		Expect(job.Spec.Template.Spec.EnableServiceLinks).NotTo(BeNil())
+		Expect(*job.Spec.Template.Spec.EnableServiceLinks).To(BeFalse())
+	})
 })
