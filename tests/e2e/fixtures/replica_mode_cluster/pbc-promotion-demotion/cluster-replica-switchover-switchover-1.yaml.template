@@ -1,0 +1,36 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: replica-switchover-switchover-a
+spec:
+  instances: 3
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: replica-cluster-backups
+
+  replica:
+    primary: replica-switchover-switchover-a
+    source: replica-switchover-switchover-b
+
+  externalClusters:
+  - name: replica-switchover-switchover-a
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: replica-cluster-backups
+        serverName: replica-switchover-switchover-a
+  - name: replica-switchover-switchover-b
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: replica-cluster-backups
+        serverName: replica-switchover-switchover-b
