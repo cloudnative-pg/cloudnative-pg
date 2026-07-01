@@ -258,6 +258,9 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
 	cluster.Status.ReadService = cluster.GetServiceReadName()
+	if cluster.IsReadOnlyServiceEnabled() && cluster.Spec.Instances > 1 {
+		cluster.Status.ReadOnlyService = cluster.GetServiceReadOnlyName()
+	}
 
 	// Expose the label selector for the scale sub-resource so autoscalers
 	// (HPA, VPA) can discover the instance pods managed by this cluster.
