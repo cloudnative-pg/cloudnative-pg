@@ -161,7 +161,8 @@ func RunController(
 		namespaces := conf.WatchedNamespaces()
 		managerOptions.NewCache = multicache.DelegatingMultiNamespacedCacheBuilder(
 			namespaces,
-			conf.OperatorNamespace)
+			conf.OperatorNamespace,
+		)
 		setupLog.Info("Listening for changes", "watchNamespaces", namespaces)
 	} else {
 		setupLog.Info("Listening for changes on all namespaces")
@@ -234,7 +235,8 @@ func RunController(
 		return err
 	}
 
-	setupLog.Info("Kubernetes system metadata",
+	setupLog.Info(
+		"Kubernetes system metadata",
 		"haveSCC", utils.HaveSecurityContextConstraints(),
 		"haveVolumeSnapshot", utils.HaveVolumeSnapshot(),
 		"availableArchitectures", utils.GetAvailableArchitectures(),
@@ -492,7 +494,7 @@ func ensurePKI(
 		OperatorNamespace:                  conf.OperatorNamespace,
 		MutatingWebhookConfigurationName:   conf.GetMutatingWebhookConfigurationName(),
 		ValidatingWebhookConfigurationName: conf.GetValidatingWebhookConfigurationName(),
-		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
+		OperatorDeploymentLabelSelector:    conf.OperatorDeploymentLabelSelector,
 		ManageWebhookConfigurations:        conf.ManageWebhookConfigurations,
 	}
 	err := pkiConfig.Setup(ctx, kubeClient)
