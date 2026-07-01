@@ -2325,16 +2325,39 @@ func (v *ClusterCustomValidator) validateReplicationSlots(r *apiv1.Cluster) fiel
 		return nil
 	}
 
-	if err := r.Spec.ReplicationSlots.SynchronizeReplicas.ValidateRegex(); err != nil {
-		return field.ErrorList{
-			field.Invalid(
-				field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
-				err,
-				"Cannot configure synchronizeReplicas. Invalid regexes were found"),
-		}
+	var result field.ErrorList
+
+	if err := replicationSlots.SynchronizeReplicas.ValidateRegex(); err != nil {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
+			err,
+			"Cannot configure synchronizeReplicas. Invalid regexes were found"))
 	}
 
-	return nil
+	// When HA replication slots are enabled the operator derives a slot name for
+	// every instance as "<slotPrefix><instanceName>". PostgreSQL rejects
+	// replication slot names longer than NAMEDATALEN-1 (63) characters, so reject
+	// at admission a slotPrefix that would push the longest possible slot name
+	// past that limit. The highest node serial a cluster can assign equals its
+	// number of instances: serials are kept contiguous because new instances
+	// fill the lowest free serial (generateNodeSerial) and scale-down always
+	// removes the highest serial (findDeletableInstance). The instance with the
+	// highest serial therefore has the longest instance name, and so the longest
+	// slot name, the cluster can produce. GetSlotNameFromInstanceName returns an
+	// empty string when HA slots are disabled, so this is a no-op in that case.
+	longestInstanceName := specs.GetInstanceName(r.Name, r.Spec.Instances)
+	if slotName := r.GetSlotNameFromInstanceName(longestInstanceName); len(slotName) > postgres.PostgresIdentifierMaxLen {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "replicationSlots", "highAvailability", "slotPrefix"),
+			replicationSlots.HighAvailability.SlotPrefix,
+			fmt.Sprintf(
+				"the generated replication slot name %q is %d characters long, which exceeds the "+
+					"PostgreSQL limit of %d: use a shorter slotPrefix",
+				slotName, len(slotName), postgres.PostgresIdentifierMaxLen),
+		))
+	}
+
+	return result
 }
 
 func (v *ClusterCustomValidator) validateSynchronizeLogicalDecoding(r *apiv1.Cluster) field.ErrorList {
