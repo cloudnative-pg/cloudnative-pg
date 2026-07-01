@@ -24,6 +24,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -44,18 +45,35 @@ var _ = Describe("DatabaseRole implementation test", func() {
 		Expect(res).To(BeTrue())
 	})
 
-	It("should return true when the objects are equal except inRoles", func() {
+	It("should return true when the objects are equal except inRoles and roleGrants", func() {
 		role := DatabaseRole{
 			Name:    "abc",
 			Inherit: true,
 			InRoles: []string{
-				"role1", "Userrole2", "Testxxx",
+				"Userrole2", "Testxxx",
+			},
+			RoleGrants: []DatabaseRoleGrant{
+				{
+					Name:    "role1",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
 			},
 		}
 		config := apiv1.RoleConfiguration{
 			Name: "abc",
 			InRoles: []string{
-				"Userrole2", "role1", "TestroleABC",
+				"Userrole2", "TestroleABC",
+			},
+			RoleGrants: []apiv1.RoleGrant{
+				{
+					Name:    "role1",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+				{Name: "role2"},
 			},
 		}
 		res := role.isEquivalentTo(config)
@@ -69,40 +87,158 @@ var _ = Describe("DatabaseRole implementation test", func() {
 		Expect(res).To(BeFalse())
 	})
 
-	It("should return true when the inRole are same but not same order", func() {
+	It("should return true when the inRoles and roleGrants are same but not same order", func() {
 		role := DatabaseRole{
 			Name:    "abc",
 			Inherit: true,
 			InRoles: []string{
-				"role1", "Userrole2", "TestroleABC",
+				"TestroleABC",
+				"Userrole2",
+			},
+			RoleGrants: []DatabaseRoleGrant{
+				{
+					Name:    "role1",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+				{
+					Name:    "role3",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
 			},
 		}
 		config := apiv1.RoleConfiguration{
 			Name: "abc",
 			InRoles: []string{
-				"Userrole2", "role1", "TestroleABC",
+				"Userrole2", "TestroleABC",
+			},
+			RoleGrants: []apiv1.RoleGrant{
+				{
+					Name:    "role3",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+				{
+					Name:    "role1",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
 			},
 		}
-		res := role.isInSameRolesAs(config)
+		res := role.hasMatchingRoleGrants(config)
 		Expect(res).To(BeTrue())
 	})
 
-	It("should return false when the in roles are not equal", func() {
+	It("should return true when all inRoles are present in roleGrants, ignoring specific options", func() {
 		role := DatabaseRole{
 			Name:    "abc",
 			Inherit: true,
-			InRoles: []string{
-				"role1", "Userrole2", "TestroleABC",
+			InRoles: []string{},
+			RoleGrants: []DatabaseRoleGrant{
+				{
+					Name:    "role1",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+				{
+					Name:    "role3",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+				{
+					Name:    "TestroleABC",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+				{
+					Name:    "Userrole2",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
 			},
 		}
 		config := apiv1.RoleConfiguration{
 			Name: "abc",
 			InRoles: []string{
-				"Userrole2", "role1x", "TestroleABC",
+				"Userrole2", "TestroleABC",
+			},
+			RoleGrants: []apiv1.RoleGrant{
+				{
+					Name:    "role3",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+				{
+					Name:    "role1",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
 			},
 		}
-		res := role.isInSameRolesAs(config)
-		Expect(res).To(BeFalse())
+		res := role.hasMatchingRoleGrants(config)
+		Expect(res).To(BeTrue())
+	})
+
+	It("should return false when the inRoles and roleGrants are not equal", func() {
+		role := DatabaseRole{
+			Name:    "abc",
+			Inherit: true,
+			InRoles: []string{
+				"Userrole2", "TestroleABC",
+			},
+			RoleGrants: []DatabaseRoleGrant{
+				{
+					Name:    "role1",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+			},
+		}
+		configInRolesWrong := apiv1.RoleConfiguration{
+			Name: "abc",
+			InRoles: []string{
+				"Userrole2", "TestroleABCx",
+			},
+			RoleGrants: []apiv1.RoleGrant{
+				{
+					Name:    "role1",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+			},
+		}
+		configRoleGrantsWrong := apiv1.RoleConfiguration{
+			Name: "abc",
+			InRoles: []string{
+				"Userrole2", "TestroleABC",
+			},
+			RoleGrants: []apiv1.RoleGrant{
+				{
+					Name:    "role1x",
+					Admin:   ptr.To(true),
+					Inherit: ptr.To(true),
+					Set:     ptr.To(false),
+				},
+			},
+		}
+		resInRoles := role.hasMatchingRoleGrants(configInRolesWrong)
+		Expect(resInRoles).To(BeFalse())
+
+		resRoleGrants := role.hasMatchingRoleGrants(configRoleGrantsWrong)
+		Expect(resRoleGrants).To(BeFalse())
 	})
 
 	It("Detects that spec and db role have the same ValidUntil", func() {
@@ -214,11 +350,45 @@ var _ = Describe("DatabaseRole implementation test", func() {
 	})
 
 	It("should return Correct Role to grant/revoke", func() {
-		rolesInDB := []string{"role1", "DBRole1", "DBRoleABC"}
-		rolesInSpec := []string{"role1", "role2", "roleabc"}
+		rolesInDB := []DatabaseRoleGrant{
+			{
+				Name:    "role1",
+				Admin:   ptr.To(true),
+				Inherit: ptr.To(true),
+				Set:     ptr.To(false),
+			}, {
+				Name:    "DBRole1",
+				Admin:   ptr.To(true),
+				Inherit: ptr.To(true),
+				Set:     ptr.To(false),
+			}, {
+				Name:    "DBRoleABC",
+				Admin:   ptr.To(true),
+				Inherit: ptr.To(true),
+				Set:     ptr.To(false),
+			}, {
+				Name:    "role_with_explicit_set_option",
+				Admin:   ptr.To(true),
+				Inherit: ptr.To(true),
+				Set:     ptr.To(false),
+			}}
+		rolesInSpec := []DatabaseRoleGrant{
+			{
+				Name: "role1",
+			}, {
+				Name: "role2",
+			}, {
+				Name: "roleabc",
+			}, {
+				Name: "role_with_explicit_set_option",
+				Set:  ptr.To(true),
+			}}
 		rolesToRevoke := getRolesToRevoke(rolesInDB, rolesInSpec)
 		rolesToGrant := getRolesToGrant(rolesInDB, rolesInSpec)
 		Expect(rolesToRevoke).To(BeEquivalentTo([]string{"DBRole1", "DBRoleABC"}))
-		Expect(rolesToGrant).To(BeEquivalentTo([]string{"role2", "roleabc"}))
+		Expect(rolesToGrant).To(BeEquivalentTo([]DatabaseRoleGrant{{Name: "role2"}, {Name: "roleabc"}, {
+			Name: "role_with_explicit_set_option",
+			Set:  ptr.To(true),
+		}}))
 	})
 })

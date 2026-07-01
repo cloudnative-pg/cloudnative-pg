@@ -3302,6 +3302,14 @@ spec:
                             immediately added as a new member. Default empty.
                             Changes to the list are applied to an existing role through
                             `GRANT` and `REVOKE` statements, not only at role creation.
+                            If you need more granular control over `ADMIN`, `INHERIT` and `SET`
+                            options use `roleGrants` instead.
+
+                            The difference to `roleGrants` is that `roleGrants` allows to set the
+                            `ADMIN`, `INHERIT` and `SET` options for each role granted
+                            and that `inRoles` uses the `IN ROLE` statement when creating
+                            a role, whilst `roleGrants` issues a subsequent `GRANT`
+                            statement after creation.
                           items:
                             type: string
                           type: array
@@ -3344,6 +3352,32 @@ spec:
                             should only be used on roles actually used for replication. Default
                             is `false`.
                           type: boolean
+                        roleGrants:
+                          description: |-
+                            List of one or more existing roles to which this role will be
+                            added as a new member. Default empty.
+                            Changes to the list are applied to an existing role through
+                            `GRANT` and `REVOKE` statements, not only at role creation.
+
+                            The difference to `inRoles` is that `roleGrants` allows to set the
+                            `ADMIN`, `INHERIT` and `SET` options for each role granted
+                            and that `inRoles` uses the `IN ROLE` statement when creating
+                            a role, whilst `roleGrants` issues a subsequent `GRANT`
+                            statement after creation.
+                          items:
+                            properties:
+                              admin:
+                                type: boolean
+                              inherit:
+                                type: boolean
+                              name:
+                                type: string
+                              set:
+                                type: boolean
+                            required:
+                            - name
+                            type: object
+                          type: array
                         superuser:
                           description: |-
                             Whether the role is a `superuser` who can override all access
