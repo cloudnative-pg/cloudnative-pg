@@ -230,7 +230,7 @@ var _ = Describe("getRestoreWalConfig", func() {
 var _ = Describe("setupBootstrapWALRestoreCache", func() {
 	AfterEach(func() {
 		cache.Delete(cache.WALRestoreKey)
-		cache.Delete(cache.WALRestoreOptionsKey)
+		cache.Delete(cache.WALRestoreConfigKey)
 	})
 
 	backup := func() *apiv1.Backup {
@@ -244,91 +244,97 @@ var _ = Describe("setupBootstrapWALRestoreCache", func() {
 		}
 	}
 
-	It("caches the recovery source store options and credentials for a recovery.backup reference",
-		func(ctx SpecContext) {
-			// recovery.backup: no Source, so no Wal config is available.
-			cluster := &apiv1.Cluster{
-				Spec: apiv1.ClusterSpec{
-					Bootstrap: &apiv1.BootstrapConfiguration{
-						Recovery: &apiv1.BootstrapRecovery{
-							Backup: &apiv1.BackupSource{
-								LocalObjectReference: apiv1.LocalObjectReference{Name: "a-backup"},
+	loadCachedStore := func() *apiv1.BarmanObjectStoreConfiguration {
+		cached, err := cache.Load(cache.WALRestoreConfigKey)
+		Expect(err).ToNot(HaveOccurred())
+		store, ok := cached.(*apiv1.BarmanObjectStoreConfiguration)
+		Expect(ok).To(BeTrue())
+		return store
+	}
+
+	It("caches the recovery source store and credentials for a recovery.backup reference", func() {
+		// recovery.backup: no Source, so no Wal config is available.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						Backup: &apiv1.BackupSource{
+							LocalObjectReference: apiv1.LocalObjectReference{Name: "a-backup"},
+						},
+					},
+				},
+			},
+		}
+		env := []string{"AWS_ACCESS_KEY_ID=source-key"}
+
+		setupBootstrapWALRestoreCache(cluster, backup(), env)
+
+		cachedEnv, err := cache.LoadEnv(cache.WALRestoreKey)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cachedEnv).To(Equal(env))
+
+		// The cached store must target the recovery SOURCE, not the cluster's own
+		// backup store, and carries no Wal config for a recovery.backup reference.
+		store := loadCachedStore()
+		Expect(store.DestinationPath).To(Equal("s3://source/path"))
+		Expect(store.ServerName).To(Equal("source-server"))
+		Expect(store.EndpointURL).To(Equal("https://source-endpoint"))
+		Expect(store.Wal).To(BeNil())
+	})
+
+	It("carries the source store's Wal config for a recovery.source", func() {
+		// recovery.source: the source store's Wal config lives in the external
+		// cluster definition and must be carried over, just like the plugin does.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{Source: "origin"},
+				},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name: "origin",
+						BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+							Wal: &apiv1.WalBackupConfiguration{
+								MaxParallel:                  2,
+								RestoreAdditionalCommandArgs: []string{"--read-timeout=60"},
 							},
 						},
 					},
 				},
-			}
-			env := []string{"AWS_ACCESS_KEY_ID=source-key"}
+			},
+		}
 
-			Expect(setupBootstrapWALRestoreCache(ctx, cluster, backup(), env)).To(Succeed())
+		setupBootstrapWALRestoreCache(cluster, backup(), []string{"X=y"})
 
-			cachedEnv, err := cache.LoadEnv(cache.WALRestoreKey)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(cachedEnv).To(Equal(env))
+		store := loadCachedStore()
+		Expect(store.Wal).ToNot(BeNil())
+		Expect(store.Wal.MaxParallel).To(Equal(2))
+		Expect(store.Wal.RestoreAdditionalCommandArgs).To(ContainElement("--read-timeout=60"))
+	})
 
-			options, err := cache.LoadEnv(cache.WALRestoreOptionsKey)
-			Expect(err).ToNot(HaveOccurred())
-			// Options must target the recovery SOURCE store, not the cluster's
-			// own backup store.
-			Expect(options).To(ContainElement("s3://source/path"))
-			Expect(options).To(ContainElement("source-server"))
-			Expect(options).To(ContainElement("https://source-endpoint"))
-			Expect(options).To(ContainElement("aws-s3"))
-		})
-
-	It("carries the source store's additional command args for a recovery.source",
-		func(ctx SpecContext) {
-			// recovery.source: the source store's Wal config lives in the external
-			// cluster definition and must be applied, just like the plugin does.
-			cluster := &apiv1.Cluster{
-				Spec: apiv1.ClusterSpec{
-					Bootstrap: &apiv1.BootstrapConfiguration{
-						Recovery: &apiv1.BootstrapRecovery{Source: "origin"},
-					},
-					ExternalClusters: []apiv1.ExternalCluster{
-						{
-							Name: "origin",
-							BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-								Wal: &apiv1.WalBackupConfiguration{
-									RestoreAdditionalCommandArgs: []string{"--read-timeout=60"},
-								},
-							},
-						},
-					},
+	It("does not populate the cache for a replica cluster", func() {
+		// A replica cluster does not replay WAL in the recovery Job, so this
+		// cache would never be read; populating it is pointless.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{Source: "origin"},
 				},
-			}
-
-			Expect(setupBootstrapWALRestoreCache(ctx, cluster, backup(), []string{"X=y"})).To(Succeed())
-
-			options, err := cache.LoadEnv(cache.WALRestoreOptionsKey)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(options).To(ContainElement("--read-timeout=60"))
-		})
-
-	It("does not populate the cache for a replica cluster",
-		func(ctx SpecContext) {
-			// A replica cluster does not replay WAL in the recovery Job, so this
-			// cache would never be read; populating it is pointless.
-			cluster := &apiv1.Cluster{
-				Spec: apiv1.ClusterSpec{
-					Bootstrap: &apiv1.BootstrapConfiguration{
-						Recovery: &apiv1.BootstrapRecovery{Source: "origin"},
-					},
-					ExternalClusters: []apiv1.ExternalCluster{
-						{Name: "origin", BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{}},
-					},
-					ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-						Enabled: ptr.To(true),
-						Source:  "origin",
-					},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{Name: "origin", BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{}},
 				},
-			}
+				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "origin",
+				},
+			},
+		}
 
-			Expect(setupBootstrapWALRestoreCache(ctx, cluster, backup(), []string{"X=y"})).To(Succeed())
+		setupBootstrapWALRestoreCache(cluster, backup(), []string{"X=y"})
 
-			_, err := cache.LoadEnv(cache.WALRestoreOptionsKey)
-			Expect(err).To(MatchError(cache.ErrCacheMiss))
-			_, err = cache.LoadEnv(cache.WALRestoreKey)
-			Expect(err).To(MatchError(cache.ErrCacheMiss))
-		})
+		_, err := cache.Load(cache.WALRestoreConfigKey)
+		Expect(err).To(MatchError(cache.ErrCacheMiss))
+		_, err = cache.LoadEnv(cache.WALRestoreKey)
+		Expect(err).To(MatchError(cache.ErrCacheMiss))
+	})
 })

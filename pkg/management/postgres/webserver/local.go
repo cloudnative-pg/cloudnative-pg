@@ -100,7 +100,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-	case cache.WALRestoreKey, cache.WALArchiveKey, cache.WALRestoreOptionsKey:
+	case cache.WALRestoreKey, cache.WALArchiveKey:
 		response, err := cache.LoadEnv(requestedObject)
 		if errors.Is(err, cache.ErrCacheMiss) {
 			w.WriteHeader(http.StatusNotFound)
@@ -114,6 +114,23 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 		js, err = json.Marshal(response)
 		if err != nil {
 			log.Error(err, "while marshalling cached env")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	case cache.WALRestoreConfigKey:
+		response, err := cache.Load(requestedObject)
+		if errors.Is(err, cache.ErrCacheMiss) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Error(err, "while loading cached barman object store configuration")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		js, err = json.Marshal(response)
+		if err != nil {
+			log.Error(err, "while marshalling cached barman object store configuration")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
