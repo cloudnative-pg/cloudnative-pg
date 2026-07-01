@@ -41,7 +41,24 @@ func ReconcileReplicationSlots(
 ) (reconcile.Result, error) {
 	if cluster.Spec.ReplicationSlots == nil ||
 		cluster.Spec.ReplicationSlots.HighAvailability == nil {
-		return reconcile.Result{}, nil
+		   // Logical slot orphan cleanup for PG17+ replicas
+		   if !isPrimary && cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding {
+			   // Only attempt cleanup if Postgres version is 17+
+			   pgMajor, err := cluster.GetPostgresqlMajorVersion()
+			   if err == nil && pgMajor >= 17 {
+				   // List logical slots with sync status
+				   slots, err := infrastructure.ListLogicalSlotsWithSyncStatus(ctx, db)
+				   if err == nil {
+					   for _, slot := range slots.Items {
+						   // Drop only slots with synced=false, failover=true, active=false
+						   if slot.Synced != nil && !*slot.Synced && slot.Failover != nil && *slot.Failover && !slot.Active {
+							   _ = infrastructure.DeleteLogicalSlot(ctx, db, slot.SlotName)
+						   }
+					   }
+				   }
+			   }
+		   }
+		   return reconcile.Result{}, nil
 	}
 
 	isPrimary := cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName
