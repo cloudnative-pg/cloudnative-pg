@@ -641,16 +641,10 @@ func getRestoreWalConfig() string {
 // resolve it here, where it is already available, and cache the whole store so
 // the wal-restore command can derive its options and prefetch parallelism from
 // it, exactly as it does for a running instance.
+//
+// For a replica cluster the Job configures streaming replication instead of
+// replaying WAL, so the cached values are simply never read there.
 func setupBootstrapWALRestoreCache(cluster *apiv1.Cluster, backup *apiv1.Backup, env []string) {
-	// A replica cluster configures streaming replication and does not replay WAL
-	// in this Job: concludeRestore returns before starting PostgreSQL, so the
-	// wal-restore command is never invoked here and this cache would never be
-	// read. Its WALs are restored later by the running instance, using the cache
-	// the reconciler populates in that pod.
-	if cluster.IsReplica() {
-		return
-	}
-
 	cache.Store(cache.WALRestoreKey, env)
 	cache.Store(cache.WALRestoreConfigKey, recoverySourceObjectStore(cluster, backup))
 }
