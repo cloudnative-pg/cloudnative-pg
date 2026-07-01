@@ -359,13 +359,7 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	opts, err := barmanCommand.CloudWalRestoreOptions(ctx, &apiv1.BarmanObjectStoreConfiguration{
-		BarmanCredentials: backup.Status.BarmanCredentials,
-		EndpointCA:        backup.Status.EndpointCA,
-		EndpointURL:       backup.Status.EndpointURL,
-		DestinationPath:   backup.Status.DestinationPath,
-		ServerName:        backup.Status.ServerName,
-	}, cluster.Name)
+	opts, err := barmanCommand.CloudWalRestoreOptions(ctx, barmanObjectStoreFromBackup(backup), cluster.Name)
 	if err != nil {
 		return err
 	}
@@ -585,13 +579,7 @@ func (info InitInfo) loadBackupFromReference(
 		ctx,
 		typedClient,
 		cluster.Namespace,
-		&apiv1.BarmanObjectStoreConfiguration{
-			BarmanCredentials: backup.Status.BarmanCredentials,
-			EndpointCA:        backup.Status.EndpointCA,
-			EndpointURL:       backup.Status.EndpointURL,
-			DestinationPath:   backup.Status.DestinationPath,
-			ServerName:        backup.Status.ServerName,
-		},
+		barmanObjectStoreFromBackup(&backup),
 		os.Environ())
 	if err != nil {
 		return nil, nil, err
@@ -649,6 +637,18 @@ func setupBootstrapWALRestoreCache(cluster *apiv1.Cluster, backup *apiv1.Backup,
 	cache.Store(cache.WALRestoreConfigKey, recoverySourceObjectStore(cluster, backup))
 }
 
+// barmanObjectStoreFromBackup maps the object store coordinates recorded in
+// the status of a Backup back to a barman object store configuration.
+func barmanObjectStoreFromBackup(backup *apiv1.Backup) *apiv1.BarmanObjectStoreConfiguration {
+	return &apiv1.BarmanObjectStoreConfiguration{
+		BarmanCredentials: backup.Status.BarmanCredentials,
+		EndpointCA:        backup.Status.EndpointCA,
+		EndpointURL:       backup.Status.EndpointURL,
+		DestinationPath:   backup.Status.DestinationPath,
+		ServerName:        backup.Status.ServerName,
+	}
+}
+
 // recoverySourceObjectStore returns the object store to restore WALs from during
 // a bootstrap recovery. The endpoint, destination, server name and credentials
 // come from the resolved Backup. For a recovery.source the source store's Wal
@@ -657,13 +657,7 @@ func setupBootstrapWALRestoreCache(cluster *apiv1.Cluster, backup *apiv1.Backup,
 // external cluster definition, so it is carried over here to mirror what the
 // Barman Cloud plugin does with its own ObjectStore resource.
 func recoverySourceObjectStore(cluster *apiv1.Cluster, backup *apiv1.Backup) *apiv1.BarmanObjectStoreConfiguration {
-	store := &apiv1.BarmanObjectStoreConfiguration{
-		BarmanCredentials: backup.Status.BarmanCredentials,
-		EndpointCA:        backup.Status.EndpointCA,
-		EndpointURL:       backup.Status.EndpointURL,
-		DestinationPath:   backup.Status.DestinationPath,
-		ServerName:        backup.Status.ServerName,
-	}
+	store := barmanObjectStoreFromBackup(backup)
 
 	source := cluster.Spec.Bootstrap.Recovery.Source
 	if source == "" {
