@@ -376,6 +376,7 @@ var _ = Describe("scheduledbackup Reconcile suspend", func() {
 		}
 		Expect(cli.Create(ctx, sb)).To(Succeed())
 		Expect(cli.Status().Update(ctx, sb)).To(Succeed())
+		originalLastCheck := sb.Status.LastCheckTime.Time
 
 		r := &ScheduledBackupReconciler{Client: cli, Recorder: record.NewFakeRecorder(10)}
 		sbNamespacedName := types.NamespacedName{Name: sb.Name, Namespace: ns}
@@ -388,6 +389,15 @@ var _ = Describe("scheduledbackup Reconcile suspend", func() {
 			var backups apiv1.BackupList
 			Expect(cli.List(ctx, &backups, client.InNamespace(ns))).To(Succeed())
 			Expect(backups.Items).To(BeEmpty())
+
+			// The suspend branch returns before any status patch, so LastCheckTime
+			// must be untouched. This pins the assertion to the IsSuspended
+			// short-circuit rather than an incidental "no Backup" outcome from
+			// falling through to the scheduling logic.
+			var stored apiv1.ScheduledBackup
+			Expect(cli.Get(ctx, sbNamespacedName, &stored)).To(Succeed())
+			Expect(stored.Status.LastCheckTime).ToNot(BeNil())
+			Expect(stored.Status.LastCheckTime.Time).To(BeTemporally("==", originalLastCheck))
 		})
 
 		By("resuming Backup creation once unsuspended", func() {
