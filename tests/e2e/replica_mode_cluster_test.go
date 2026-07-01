@@ -588,6 +588,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
+//
+//nolint:dupl
 var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.LabelBackupRestore), Ordered, func() {
 	const (
 		replicaSwitchoverClusterDir = "/replica_mode_cluster/"

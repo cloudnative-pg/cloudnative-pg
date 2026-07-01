@@ -103,6 +103,8 @@ var _ = Describe("plugin-barman-cloud replica cluster from backup",
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
 // Runs on kind/k3d only, where the plugin and the shared object store are installed.
+//
+//nolint:dupl // TODO: remove once in-tree counterpart is removed
 var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelReplication, tests.LabelBackupRestore), Ordered, func() {
 		const (
