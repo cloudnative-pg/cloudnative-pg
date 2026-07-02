@@ -27,12 +27,19 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // UpdateServiceAccount sets the needed values in the ServiceAccount that will be used in every Pod
-func UpdateServiceAccount(imagePullSecretsNames []string, serviceAccount *corev1.ServiceAccount) error {
+func UpdateServiceAccount(
+	imagePullSecretsNames []string,
+	serviceAccount *corev1.ServiceAccount,
+	automountServiceAccountToken *bool,
+) error {
+	serviceAccount.AutomountServiceAccountToken = automountServiceAccountToken
+
 	if serviceAccount.ImagePullSecrets == nil {
 		serviceAccount.ImagePullSecrets = []corev1.LocalObjectReference{}
 	}
@@ -84,8 +91,14 @@ func IsServiceAccountAligned(
 	sa *corev1.ServiceAccount,
 	imagePullSecretsNames []string,
 	updatedMetadata metav1.ObjectMeta,
+	automountServiceAccountToken *bool,
 ) bool {
 	contextLogger := log.FromContext(ctx)
+
+	if !ptr.Equal(sa.AutomountServiceAccountToken, automountServiceAccountToken) {
+		return false
+	}
+
 	// This is an old version of the ServiceAccount, that need to be refreshed to
 	// store the annotation value
 	if sa.Annotations == nil {
