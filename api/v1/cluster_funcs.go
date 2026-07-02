@@ -822,6 +822,17 @@ func (cluster *Cluster) GetPrimaryUpdateMethod() PrimaryUpdateMethod {
 	return strategy
 }
 
+// GetResourcesUpdateStrategy get the strategy used to apply changes to
+// the resources of the instance containers, defaulting to recreate
+func (cluster *Cluster) GetResourcesUpdateStrategy() ResourcesUpdateStrategy {
+	strategy := cluster.Spec.ResourcesUpdateStrategy
+	if strategy == "" {
+		return ResourcesUpdateStrategyRecreate
+	}
+
+	return strategy
+}
+
 // GetEnablePDB get the cluster EnablePDB value, defaults to true
 func (cluster *Cluster) GetEnablePDB() bool {
 	if cluster.Spec.EnablePDB == nil {
