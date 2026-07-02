@@ -88,21 +88,34 @@ func GetContainerResourceDrifts(current, target *corev1.PodSpec) []ContainerReso
 	return drifts
 }
 
+// GetResizableContainerResourceDrifts returns the resource drifts of the
+// containers that Kubernetes can resize in place: regular containers and
+// native sidecars. Run-once init containers are excluded: they have already
+// terminated, cannot be resized, and their resources only matter when the
+// pod is created, so their drift is left to the next pod recreation.
+func GetResizableContainerResourceDrifts(current, target *corev1.PodSpec) []ContainerResourceDrift {
+	drifts := GetContainerResourceDrifts(current, target)
+	resizable := make([]ContainerResourceDrift, 0, len(drifts))
+	for _, drift := range drifts {
+		if drift.InitContainer && !isNativeSidecar(current.InitContainers, drift.Name) {
+			continue
+		}
+		resizable = append(resizable, drift)
+	}
+	return resizable
+}
+
 // CanResizeInPlace verifies that the resource drifts between the current and
 // the target pod spec can be applied through the resize subresource without
 // disrupting the pod: only cpu and memory values may change, no entry may be
-// added or removed, memory limits may not be decreased (PostgreSQL never
+// added or removed, and memory limits may not be decreased (PostgreSQL never
 // releases its shared memory, so the kubelet would keep the resize pending
-// forever), and init containers must be native sidecars. The QoS class
-// invariant is not checked here: the API server enforces it and a rejected
-// patch makes the operator fall back to recreating the pod.
+// forever). Run-once init container drifts are ignored, being deferred to
+// the next pod recreation. The QoS class invariant is not checked here: the
+// API server enforces it and a rejected patch makes the operator fall back
+// to recreating the pod.
 func CanResizeInPlace(current, target *corev1.PodSpec) (bool, string) {
-	for _, drift := range GetContainerResourceDrifts(current, target) {
-		if drift.InitContainer && !isNativeSidecar(current.InitContainers, drift.Name) {
-			return false, fmt.Sprintf(
-				"container %s is a run-once init container and cannot be resized in place", drift.Name)
-		}
-
+	for _, drift := range GetResizableContainerResourceDrifts(current, target) {
 		currentResources := getContainerResources(current, drift.Name, drift.InitContainer)
 		if ok, reason := canResizeResources(drift.Name, currentResources, drift.Target); !ok {
 			return false, reason
