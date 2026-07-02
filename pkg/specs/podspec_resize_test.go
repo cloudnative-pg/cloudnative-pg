@@ -288,7 +288,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		Expect(reason).To(ContainSubstring("hugepages-2Mi"))
 	})
 
-	It("refuses run-once init container changes", func() {
+	It("ignores run-once init container changes, deferring them to the next recreation", func() {
 		current := corev1.PodSpec{
 			InitContainers: []corev1.Container{
 				{Name: "init", Resources: makeResources("100m", "", "", "")},
@@ -299,9 +299,13 @@ var _ = Describe("CanResizeInPlace", func() {
 				{Name: "init", Resources: makeResources("200m", "", "", "")},
 			},
 		}
-		ok, reason := CanResizeInPlace(&current, &target)
-		Expect(ok).To(BeFalse())
-		Expect(reason).To(ContainSubstring("init"))
+
+		Expect(GetResizableContainerResourceDrifts(&current, &target)).To(BeEmpty())
+		// the drift is still visible to the full detection
+		Expect(GetContainerResourceDrifts(&current, &target)).To(HaveLen(1))
+
+		ok, _ := CanResizeInPlace(&current, &target)
+		Expect(ok).To(BeTrue())
 	})
 
 	It("accepts native sidecar changes", func() {
