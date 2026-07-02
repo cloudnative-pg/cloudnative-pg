@@ -26,6 +26,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -211,7 +212,12 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				stopLoad := make(chan struct{})
 				DeferCleanup(func() { close(stopLoad) })
 
-				setupPluginObjectStore(namespace, objectStoreName)
+				setupPluginObjectStore(namespace, objectStoreName, func(objectStore *unstructured.Unstructured) {
+					Expect(unstructured.SetNestedField(objectStore.Object, true,
+						"spec", "configuration", "data", "immediateCheckpoint")).To(Succeed())
+					Expect(unstructured.SetNestedField(objectStore.Object, int64(6),
+						"spec", "configuration", "wal", "maxParallel")).To(Succeed())
+				})
 
 				By("creating the A cluster", func() {
 					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterAName, clusterAFile)
