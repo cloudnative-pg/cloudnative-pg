@@ -25,6 +25,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -244,5 +245,43 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
+	})
+})
+
+var _ = Describe("Job automountServiceAccountToken", func() {
+	const tokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+	cluster := apiv1.Cluster{
+		Spec: apiv1.ClusterSpec{
+			AutomountServiceAccountToken: ptr.To(false),
+			Bootstrap: &apiv1.BootstrapConfiguration{
+				InitDB: &apiv1.BootstrapInitDB{},
+			},
+		},
+	}
+
+	It("disables the automount and mounts the token in every container when false", func() {
+		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		podSpec := job.Spec.Template.Spec
+		Expect(podSpec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
+		Expect(podSpec.Volumes).To(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
+		containers := append(podSpec.InitContainers, podSpec.Containers...)
+		Expect(containers).ToNot(BeEmpty())
+		for _, container := range containers {
+			Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+				Name:      kubeAPIAccessVolumeName,
+				MountPath: tokenMountPath,
+				ReadOnly:  true,
+			}), "container %s should mount the projected token", container.Name)
+		}
+	})
+
+	It("leaves the automount behavior untouched when unset", func() {
+		plainCluster := cluster.DeepCopy()
+		plainCluster.Spec.AutomountServiceAccountToken = nil
+		job := CreatePrimaryJobViaInitdb(*plainCluster, 0)
+		podSpec := job.Spec.Template.Spec
+		Expect(podSpec.AutomountServiceAccountToken).To(BeNil())
+		Expect(podSpec.Volumes).ToNot(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
 	})
 })

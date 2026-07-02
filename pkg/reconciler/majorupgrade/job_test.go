@@ -21,6 +21,7 @@ package majorupgrade
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -72,4 +73,21 @@ var _ = Describe("Major upgrade Job generation", func() {
 		Entry("initdb jobs are not major upgrades", specs.CreatePrimaryJobViaInitdb(cluster, 1), false),
 		Entry("major-upgrade jobs are major upgrades", createMajorUpgradeJobDefinition(&cluster, 1, nil), true),
 	)
+
+	It("mounts the projected token in every container when the automount is disabled", func() {
+		clusterWithoutAutomount := cluster.DeepCopy()
+		clusterWithoutAutomount.Spec.AutomountServiceAccountToken = ptr.To(false)
+
+		majorUpgradeJob := createMajorUpgradeJobDefinition(clusterWithoutAutomount, 1, nil)
+		podSpec := majorUpgradeJob.Spec.Template.Spec
+		Expect(podSpec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
+
+		containers := append(podSpec.InitContainers, podSpec.Containers...)
+		Expect(containers).To(HaveLen(3))
+		for _, container := range containers {
+			Expect(container.VolumeMounts).To(ContainElement(
+				HaveField("MountPath", "/var/run/secrets/kubernetes.io/serviceaccount"),
+			), "container %s should mount the projected token", container.Name)
+		}
+	})
 })
