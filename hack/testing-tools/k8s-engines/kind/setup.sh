@@ -69,6 +69,12 @@ kubeadmConfigPatchesJSON6902:
         value: docker
 nodes:
 - role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+        extraArgs:
+          enable-admission-plugins: OwnerReferencesPermissionEnforcement
 EOF
 
   if [ "${ENABLE_APISERVER_AUDIT}" = "true" ]; then
@@ -77,7 +83,6 @@ EOF
     mkdir -p "${LOG_DIR}/apiserver"
     touch "${LOG_DIR}/apiserver/kube-apiserver-audit.log"
     cat >>"${config_file}" <<-EOF
-  kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
     apiServer:
@@ -113,8 +118,8 @@ EOF
     done
   fi
 
-  # Enable ImageVolume support from kindest/node v1.33.1
-  if [[ "$(printf '%s\n' "1.33.1" "${k8s_version#v}" | sort -V | head -n1)" == "1.33.1" ]]; then
+  # Enable ImageVolume support from kindest/node v1.33.1 up to v1.34.x (defaults to true in v1.35.0+)
+  if version_gte "1.33.1" "${k8s_version#v}" && ! version_gte "1.35.0" "${k8s_version#v}"; then
     cat >>"${config_file}" <<-EOF
 
 featureGates:

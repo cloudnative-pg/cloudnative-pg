@@ -714,4 +714,49 @@ var _ = Describe("extensionsEqual", func() {
 		}
 		Expect(extensionsEqual(a, b)).To(BeFalse())
 	})
+
+	It("returns false when bin paths differ", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{
+				Name:              "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:1"},
+				BinPath:           []string{"/bin"},
+			},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{
+				Name:              "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:1"},
+			},
+		}
+		Expect(extensionsEqual(a, b)).To(BeFalse())
+	})
+
+	It("returns false when envs differ", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{
+				Name:              "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:1"},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO",
+						Value: "bar",
+					},
+				},
+			},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{
+				Name:              "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:1"},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO",
+						Value: "baz",
+					},
+				},
+			},
+		}
+		Expect(extensionsEqual(a, b)).To(BeFalse())
+	})
 })

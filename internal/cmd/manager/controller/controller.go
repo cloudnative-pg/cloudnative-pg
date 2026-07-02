@@ -22,15 +22,20 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -60,12 +65,6 @@ const (
 	// is reachable
 	WebhookServiceName = "cnpg-webhook-service" // #nosec
 
-	// MutatingWebhookConfigurationName is the name of the mutating webhook configuration
-	MutatingWebhookConfigurationName = "cnpg-mutating-webhook-configuration"
-
-	// ValidatingWebhookConfigurationName is the name of the validating webhook configuration
-	ValidatingWebhookConfigurationName = "cnpg-validating-webhook-configuration"
-
 	// The name of the directory containing the TLS certificates for webhooks
 	defaultWebhookCertDir = "/run/secrets/cnpg.io/webhook"
 
@@ -75,6 +74,9 @@ const (
 	// CaSecretName is the name of the secret which is hosting the Operator CA
 	CaSecretName = "cnpg-ca-secret" // #nosec
 
+	// operatorClientCertCommonName is the fallback CN for the operator's in-memory
+	// client certificate when the Pod hostname cannot be determined.
+	operatorClientCertCommonName = "cloudnative-pg-operator"
 )
 
 // leaderElectionConfiguration contains the leader parameters that will be passed to controllerruntime.Options.
@@ -130,6 +132,31 @@ func RunController(
 		LeaderElectionReleaseOnCancel: true,
 	}
 
+	// EndpointSlices are watched only to detect CNPG-i plugin rollouts, and
+	// plugins are deployed in the operator namespace. Restricting the informer
+	// to that namespace avoids listing and watching every EndpointSlice in the
+	// cluster (one or more per Service in every namespace), which would
+	// otherwise be cached just to be dropped by the controller predicate.
+	//
+	// The restriction is only applied when the operator namespace is known: an
+	// empty namespace key is interpreted by controller-runtime as "all
+	// namespaces", which would silently widen the cache instead of narrowing
+	// it. When the namespace is unknown (e.g. local development without
+	// OPERATOR_NAMESPACE set) we simply fall back to the default caching.
+	if conf.OperatorNamespace != "" {
+		managerOptions.Cache = cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&discoveryv1.EndpointSlice{}: {
+					Namespaces: map[string]cache.Config{
+						conf.OperatorNamespace: {},
+					},
+				},
+			},
+		}
+	} else {
+		setupLog.Info("Plugin EndpointSlice watch disabled: OPERATOR_NAMESPACE not set")
+	}
+
 	if conf.WatchNamespace != "" {
 		namespaces := conf.WatchedNamespaces()
 		managerOptions.NewCache = multicache.DelegatingMultiNamespacedCacheBuilder(
@@ -179,6 +206,11 @@ func RunController(
 
 	setupLog.Info("Operator configuration loaded", "configuration", conf)
 
+	if conf.EnableWebhookNamespaceSuffix && conf.OperatorNamespace == "" {
+		return fmt.Errorf("ENABLE_WEBHOOK_NAMESPACE_SUFFIX requires OPERATOR_NAMESPACE to be set " +
+			"as a pod environment variable (typically via the Downward API fieldRef.fieldPath = metadata.namespace)")
+	}
+
 	discoveryClient, err := utils.GetDiscoveryClient()
 	if err != nil {
 		return err
@@ -212,6 +244,12 @@ func RunController(
 		return err
 	}
 
+	operatorClientCert, err := generateOperatorClientCertificate()
+	if err != nil {
+		setupLog.Error(err, "unable to generate operator client certificate")
+		return err
+	}
+
 	pluginRepository := repository.New()
 	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(
 		conf.PluginSocketDir,
@@ -220,71 +258,127 @@ func RunController(
 	}
 	defer pluginRepository.Close()
 
-	if err = controller.NewClusterReconciler(
+	if err = setupReconcilers(
+		ctx,
+		mgr,
+		discoveryClient,
+		pluginRepository,
+		operatorClientCert,
+		conf,
+		maxConcurrentReconciles,
+	); err != nil {
+		return err
+	}
+
+	if err = setupWebhooks(mgr); err != nil {
+		return err
+	}
+
+	// +kubebuilder:scaffold:builder
+
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		return err
+	}
+
+	return nil
+}
+
+// setupReconcilers registers every operator reconciler with the manager.
+func setupReconcilers(
+	ctx context.Context,
+	mgr ctrl.Manager,
+	discoveryClient discovery.DiscoveryInterface,
+	pluginRepository repository.Interface,
+	operatorClientCert *tls.Certificate,
+	conf *configuration.Data,
+	maxConcurrentReconciles int,
+) error {
+	if err := controller.NewClusterReconciler(
 		mgr,
 		discoveryClient,
 		pluginRepository,
 		conf.DrainTaints,
+		operatorClientCert,
+		webhookv1.NewClusterAdmissionGuard(),
 	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
 	}
 
-	if err = controller.NewBackupReconciler(
+	if err := controller.NewBackupReconciler(
 		mgr,
 		discoveryClient,
 		pluginRepository,
+		operatorClientCert,
+		webhookv1.NewBackupAdmissionGuard(),
 	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}
 
-	if err = controller.NewPluginReconciler(mgr, conf.OperatorNamespace, pluginRepository).
+	if err := controller.NewPluginReconciler(mgr, conf.OperatorNamespace, pluginRepository).
 		SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Plugin")
 		return err
 	}
 
-	if err = (&controller.ScheduledBackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"), //nolint:staticcheck
+	if err := (&controller.ScheduledBackupReconciler{
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Recorder:  mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"), //nolint:staticcheck
+		Admission: webhookv1.NewScheduledBackupAdmissionGuard(),
 	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
 	}
 
-	if err = (&controller.PoolerReconciler{
+	if err := (&controller.PoolerReconciler{
 		Client:          mgr.GetClient(),
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"), //nolint:staticcheck
-	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+		Admission:       webhookv1.NewPoolerAdmissionGuard(),
+	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
 	}
 
-	if err = webhookv1.SetupClusterWebhookWithManager(mgr); err != nil {
+	if err := (&controller.DatabaseRoleReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DatabaseRole")
+		return err
+	}
+
+	return nil
+}
+
+// setupWebhooks registers every admission webhook with the manager.
+func setupWebhooks(mgr ctrl.Manager) error {
+	if err := webhookv1.SetupClusterWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1")
 		return err
 	}
 
-	if err = webhookv1.SetupBackupWebhookWithManager(mgr); err != nil {
+	if err := webhookv1.SetupBackupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1")
 		return err
 	}
 
-	if err = webhookv1.SetupScheduledBackupWebhookWithManager(mgr); err != nil {
+	if err := webhookv1.SetupScheduledBackupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1")
 		return err
 	}
 
-	if err = webhookv1.SetupPoolerWebhookWithManager(mgr); err != nil {
+	if err := webhookv1.SetupPoolerWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Pooler", "version", "v1")
 		return err
 	}
 
-	if err = webhookv1.SetupDatabaseWebhookWithManager(mgr); err != nil {
+	if err := webhookv1.SetupDatabaseWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Database", "version", "v1")
 		return err
 	}
@@ -300,15 +394,7 @@ func RunController(
 	//
 	// 2. the webhook service and/or the CNI are being updated, e.g. when a POD is
 	//    deleted. In that case we could get a "Connection refused" error message.
-	webhookServer.WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
-
-	// +kubebuilder:scaffold:builder
-
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		return err
-	}
+	mgr.GetWebhookServer().WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
 
 	return nil
 }
@@ -396,17 +482,18 @@ func ensurePKI(
 		return nil
 	}
 
-	// We need to self-manage required PKI infrastructure and install the certificates into
-	// the webhooks configuration
+	// We need to self-manage required PKI infrastructure and, unless the webhook
+	// configurations are managed externally, inject the CA bundle into them.
 	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       CaSecretName,
 		CertDir:                            mgrCertDir,
 		SecretName:                         WebhookSecretName,
 		ServiceName:                        WebhookServiceName,
 		OperatorNamespace:                  conf.OperatorNamespace,
-		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
-		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
+		MutatingWebhookConfigurationName:   conf.GetMutatingWebhookConfigurationName(),
+		ValidatingWebhookConfigurationName: conf.GetValidatingWebhookConfigurationName(),
 		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
+		ManageWebhookConfigurations:        conf.ManageWebhookConfigurations,
 	}
 	err := pkiConfig.Setup(ctx, kubeClient)
 	if err != nil {
@@ -480,6 +567,27 @@ func readSecret(
 	}
 
 	return data, nil
+}
+
+func generateOperatorClientCertificate() (*tls.Certificate, error) {
+	commonName, err := os.Hostname()
+	if err != nil {
+		setupLog.Info(
+			"Unable to determine hostname for operator client certificate, falling back to default common name",
+			"fallback", operatorClientCertCommonName,
+			"error", err.Error(),
+		)
+		commonName = operatorClientCertCommonName
+	}
+	pair, err := certs.GenerateSelfSignedClientCertificate(commonName)
+	if err != nil {
+		return nil, err
+	}
+	cert, err := pair.TLSCertificate()
+	if err != nil {
+		return nil, err
+	}
+	return &cert, nil
 }
 
 func getPprofServerAddress(enabled bool) string {

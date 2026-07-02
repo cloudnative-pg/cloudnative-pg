@@ -79,14 +79,34 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return hasPVCCondition(pvc, corev1.PersistentVolumeClaimResizing)
 }
 
-func isFileSystemResizePending(pvc corev1.PersistentVolumeClaim) bool {
-	return hasPVCCondition(pvc, corev1.PersistentVolumeClaimFileSystemResizePending)
-}
-
 // BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
 func BelongToInstance(cluster *apiv1.Cluster, instanceName, pvcName string) bool {
 	expectedPVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
 	return slices.Contains(expectedPVCs, pvcName)
+}
+
+// GetTerminatingInstancePVCName returns the name of a PVC that the given
+// instance expects (and would (re)mount) which is still terminating (its
+// DeletionTimestamp is set), or "" if none is found.
+//
+// Callers should wait until this returns "" before (re)creating the instance,
+// to avoid binding it to a volume about to be garbage-collected (see #10985).
+// PVCs the instance no longer expects (e.g. a dropped tablespace) are ignored:
+// they will not be remounted, so they need not hold up recreation.
+func GetTerminatingInstancePVCName(
+	cluster *apiv1.Cluster,
+	instanceName string,
+	pvcs []corev1.PersistentVolumeClaim,
+) string {
+	for i := range pvcs {
+		if pvcs[i].DeletionTimestamp == nil {
+			continue
+		}
+		if BelongToInstance(cluster, instanceName, pvcs[i].Name) {
+			return pvcs[i].Name
+		}
+	}
+	return ""
 }
 
 func filterByInstanceExpectedPVCs(

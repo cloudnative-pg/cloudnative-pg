@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -102,6 +103,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	}
 
 	err = r.reconcileFailoverQuorumObject(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
+	err = r.reconcilePrimaryLease(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -400,6 +406,7 @@ func (r *ClusterReconciler) serviceReconciler(
 			return nil
 		}
 		contextLogger.Info("creating service")
+		servicespec.SetLastApplied(&proposed.ObjectMeta, &proposed.Spec)
 		return r.Create(ctx, proposed)
 	}
 	if err != nil {
@@ -421,12 +428,6 @@ func (r *ClusterReconciler) serviceReconciler(
 	}
 	var shouldUpdate bool
 
-	// we ensure that the selector perfectly match
-	if !reflect.DeepEqual(proposed.Spec.Selector, livingService.Spec.Selector) {
-		livingService.Spec.Selector = proposed.Spec.Selector
-		shouldUpdate = true
-	}
-
 	// we ensure we've some space to store the labels and the annotations
 	if livingService.Labels == nil {
 		livingService.Labels = make(map[string]string)
@@ -446,13 +447,25 @@ func (r *ClusterReconciler) serviceReconciler(
 		shouldUpdate = true
 	}
 
+	// Three-way merge: start from living spec, overlay proposed changes,
+	// and use last-applied annotation to detect intentional field removals
+	patchedSpec := livingService.Spec.DeepCopy()
+	if err := servicespec.ApplyProposedChanges(patchedSpec, &proposed.Spec, livingService.Annotations); err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(*patchedSpec, livingService.Spec) {
+		livingService.Spec = *patchedSpec
+		shouldUpdate = true
+	}
+
 	if !shouldUpdate {
 		return nil
 	}
 
 	if strategy == apiv1.ServiceUpdateStrategyPatch {
+		// Store the proposed spec for future three-way merges
+		servicespec.SetLastApplied(&livingService.ObjectMeta, &proposed.Spec)
 		contextLogger.Info("reconciling service")
-		// we update to ensure that we substitute the selectors
 		return r.Update(ctx, &livingService)
 	}
 
@@ -738,6 +751,23 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		return err
 	}
 
+	// List all the PG roles that will be reconciled by the primary
+	// instance of the cluster. CreateRole will create a corev1.Role
+	// resource allowing access to all the secrets that are referred
+	// by them.
+	var roleList apiv1.DatabaseRoleList
+
+	if err := r.List(
+		ctx,
+		&roleList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{
+			databaseRoleClusterKey: cluster.Name,
+		},
+	); err != nil {
+		return fmt.Errorf("while listing database roles: %w", err)
+	}
+
 	var role rbacv1.Role
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &role); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -745,10 +775,16 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		}
 
 		r.Recorder.Event(cluster, "Normal", "CreatingRole", "Creating Cluster Role")
-		return r.createRole(ctx, cluster, originBackup)
+		return r.createRole(ctx, cluster, originBackup, roleList.Items)
 	}
 
-	generatedRole := specs.CreateRole(*cluster, originBackup)
+	generatedRole := specs.CreateRole(
+		specs.RoleOptions{
+			Cluster:      cluster,
+			BackupOrigin: originBackup,
+			Roles:        roleList.Items,
+		},
+	)
 	if equality.Semantic.DeepEqual(generatedRole.Rules, role.Rules) {
 		// Everything fine, the two rules have the same content
 		return nil
@@ -1042,8 +1078,19 @@ func createOrPatchPodMonitor(
 }
 
 // createRole creates the role
-func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
-	role := specs.CreateRole(*cluster, backupOrigin)
+func (r *ClusterReconciler) createRole(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backupOrigin *apiv1.Backup,
+	roles []apiv1.DatabaseRole,
+) error {
+	role := specs.CreateRole(
+		specs.RoleOptions{
+			Cluster:      cluster,
+			BackupOrigin: backupOrigin,
+			Roles:        roles,
+		},
+	)
 	cluster.SetInheritedDataAndOwnership(&role.ObjectMeta)
 
 	err := r.Create(ctx, &role)
@@ -1069,14 +1116,19 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 	return nil
 }
 
-// generateNodeSerial extracts the first free node serial in this pods
-func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *apiv1.Cluster) (int, error) {
-	cluster.Status.LatestGeneratedNode++
-	if err := r.Status().Update(ctx, cluster); err != nil {
-		return 0, err
+// generateNodeSerial returns the first free node serial number for this cluster.
+// A serial is free when no instance currently listed in
+// cluster.Status.InstanceNames is using it. With N instances, the first gap in
+// [1, N] is free; if there is no gap, all of them are taken and N+1 is free.
+func (r *ClusterReconciler) generateNodeSerial(cluster *apiv1.Cluster) int {
+	n := len(cluster.Status.InstanceNames)
+	for i := 1; i <= n; i++ {
+		if !slices.Contains(cluster.Status.InstanceNames, specs.GetInstanceName(cluster.Name, i)) {
+			return i
+		}
 	}
 
-	return cluster.Status.LatestGeneratedNode, nil
+	return n + 1
 }
 
 func (r *ClusterReconciler) createPrimaryInstance(
@@ -1085,23 +1137,22 @@ func (r *ClusterReconciler) createPrimaryInstance(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if cluster.Status.LatestGeneratedNode != 0 {
+	if cluster.IsInitialized() {
 		// We are we creating a new blank primary when we had previously generated
 		// other nodes, and we don't have any PVC to reuse?
 		// This can happen when:
 		//
 		// 1 - the user deletes all the PVCs and all the Pods in a cluster
 		//    (and why would a user do that?)
-		// 2 - the cache isn't ready for Pods and ready for the Cluster,
-		//     so we actually haven't the first pod in our managed list
+		// 2 - the cache isn't ready for Pods but is ready for the Cluster,
+		//     so we actually don't have the first pod in our managed list,
 		//     but it's still in the API Server
 		//
 		// As far as the first option is concerned, we can just stop
 		// healing this cluster as we have nothing to do.
-		// For the second option we can just retry when the next
+		// For the second option, we can just retry when the next
 		// reconciliation loop is started by the informers.
-		contextLogger.Info("refusing to create the primary instance while the latest generated serial is not zero",
-			"latestGeneratedNode", cluster.Status.LatestGeneratedNode)
+		contextLogger.Info("refusing to create the primary instance because the cluster already initialized")
 
 		if err := r.RegisterPhase(ctx, cluster,
 			apiv1.PhaseUnrecoverable,
@@ -1113,34 +1164,16 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, nil
 	}
 
-	var (
-		backup           *apiv1.Backup
-		recoverySnapshot *persistentvolumeclaim.StorageSource
-	)
-	// If the cluster is bootstrapping from recovery, it may do so from:
-	//  1 - a backup object, which may be done with volume snapshots or object storage
-	//  2 - volume snapshots
-	// We need to check that whichever alternative is used, the backup/snapshot is completed.
-	if cluster.Spec.Bootstrap != nil &&
-		cluster.Spec.Bootstrap.Recovery != nil {
-		var err error
-		backup, err = r.getOriginBackup(ctx, cluster)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
-			return res, err
-		}
-
-		recoverySnapshot = persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
+	// If the cluster is bootstrapping from recovery, resolve the source backup
+	// or volume snapshot and make sure it is ready before proceeding.
+	backup, recoverySnapshot, res, err := r.resolvePrimaryRecoverySource(ctx, cluster)
+	if !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	// Generate a new node serial
-	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
-	}
+	nodeSerial := r.generateNodeSerial(cluster)
+	contextLogger.Debug("allocated node serial", "serial", nodeSerial)
 
 	// Create the PVCs from the cluster definition, and if bootstrapping from
 	// recoverySnapshot, use that as the source
@@ -1155,35 +1188,9 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
-	var job *batchv1.Job
-
-	isBootstrappingFromRecovery := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil
-	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
-	switch {
-	case isBootstrappingFromRecovery && recoverySnapshot != nil:
-		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
-			ctx,
-			r.Client,
-			cluster.Namespace,
-			recoverySnapshot.DataSource,
-		)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup)
-
-	case isBootstrappingFromRecovery:
-		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
-
-	case isBootstrappingFromBaseBackup:
-		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
-		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
-
-	default:
-		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
-		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
+	job, err := r.buildPrimaryInstanceJob(ctx, cluster, nodeSerial, backup, recoverySnapshot)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
@@ -1192,14 +1199,13 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	podName := fmt.Sprintf("%v-%v", cluster.Name, nodeSerial)
-	if err = r.setPrimaryInstance(ctx, cluster, podName); err != nil {
+	if err := r.setPrimaryInstance(ctx, cluster, podName); err != nil {
 		contextLogger.Error(err, "Unable to set the primary instance name")
 		return ctrl.Result{}, err
 	}
 
-	err = r.RegisterPhase(ctx, cluster, apiv1.PhaseFirstPrimary,
-		fmt.Sprintf("Creating primary instance %v", podName))
-	if err != nil {
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFirstPrimary,
+		fmt.Sprintf("Creating primary instance %v", podName)); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -1207,16 +1213,9 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		"jobName", job.Name,
 		"primary", true)
 
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+	inheritJobMetadata(cluster, job)
 
-	if err = r.Create(ctx, job); err != nil {
+	if err := r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
@@ -1227,6 +1226,90 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
+}
+
+// resolvePrimaryRecoverySource resolves the backup or volume snapshot used to
+// bootstrap the first primary, when the cluster bootstraps from recovery. It
+// returns a non-zero result (to be propagated to the caller) when the source is
+// not ready yet.
+func (r *ClusterReconciler) resolvePrimaryRecoverySource(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (*apiv1.Backup, *persistentvolumeclaim.StorageSource, ctrl.Result, error) {
+	// If the cluster is bootstrapping from recovery, it may do so from:
+	//  1 - a backup object, which may be done with volume snapshots or object storage
+	//  2 - volume snapshots
+	// We need to check that whichever alternative is used, the backup/snapshot is completed.
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.Recovery == nil {
+		return nil, nil, ctrl.Result{}, nil
+	}
+
+	backup, err := r.getOriginBackup(ctx, cluster)
+	if err != nil {
+		return nil, nil, ctrl.Result{}, err
+	}
+
+	if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
+		return nil, nil, res, err
+	}
+
+	recoverySnapshot := persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
+	return backup, recoverySnapshot, ctrl.Result{}, nil
+}
+
+// buildPrimaryInstanceJob builds the bootstrap Job for the first primary
+// instance, selecting the variant (initdb, recovery, pgBaseBackup or volume
+// snapshot restore) according to the cluster bootstrap configuration.
+func (r *ClusterReconciler) buildPrimaryInstanceJob(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	nodeSerial int,
+	backup *apiv1.Backup,
+	recoverySnapshot *persistentvolumeclaim.StorageSource,
+) (*batchv1.Job, error) {
+	isBootstrappingFromRecovery := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil
+	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
+
+	switch {
+	case isBootstrappingFromRecovery && recoverySnapshot != nil:
+		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx,
+			r.Client,
+			cluster.Namespace,
+			recoverySnapshot.DataSource,
+		)
+		if err != nil {
+			return nil, err
+		}
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
+		return specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup), nil
+
+	case isBootstrappingFromRecovery:
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
+		return specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup), nil
+
+	case isBootstrappingFromBaseBackup:
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
+		return specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial), nil
+
+	default:
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
+		return specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial), nil
+	}
+}
+
+// inheritJobMetadata propagates the cluster's inherited annotations and labels
+// onto an instance Job and its pod template.
+func inheritJobMetadata(cluster *apiv1.Cluster, job *batchv1.Job) {
+	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
 }
 
 // getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
@@ -1256,6 +1339,79 @@ func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.
 	}
 
 	return &backup, nil
+}
+
+// ensureJobAdoptable verifies that an existing bootstrap Job is owned by this
+// cluster. A NotFound result means the cache lags behind the AlreadyExists
+// error just returned by Create; requeue briefly rather than proceed with
+// unverified adoption.
+func (r *ClusterReconciler) ensureJobAdoptable(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	jobName string,
+) (ctrl.Result, error) {
+	var existing batchv1.Job
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      jobName,
+	}, &existing); err != nil {
+		if apierrs.IsNotFound(err) {
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("cannot get existing job %q for adoption: %w", jobName, err)
+	}
+	if owner, ok := IsOwnedByCluster(&existing); !ok || owner != cluster.Name {
+		return ctrl.Result{}, fmt.Errorf("refusing to adopt job %q: not owned by cluster %q", jobName, cluster.Name)
+	}
+	return ctrl.Result{}, nil
+}
+
+// reconcileMissingInstance creates the next missing instance when the cluster
+// has fewer instances than desired and every reported instance is ready.
+//
+// It returns a non-zero result (or an error) when the caller should stop and
+// requeue, and a zero result with no error when there is nothing to do.
+func (r *ClusterReconciler) reconcileMissingInstance(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+	instancesStatus postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	if cluster.Status.Instances >= cluster.Spec.Instances ||
+		instancesStatus.InstancesReportingStatus() != cluster.Status.Instances {
+		return ctrl.Result{}, nil
+	}
+
+	newNodeSerial := r.generateNodeSerial(cluster)
+	instanceName := specs.GetInstanceName(cluster.Name, newNodeSerial)
+
+	// A serial stops being counted in the status while its PVCs are still
+	// terminating, so it can be picked here before the previous instance has
+	// been fully torn down. Creating the Job now would bind it to a PVC about
+	// to be garbage-collected, leaving the Pod permanently unschedulable while
+	// the running-job guard blocks any further reconciliation (see #10985).
+	// Wait for the previous PVCs to disappear before recreating the instance.
+	if pvcName := persistentvolumeclaim.GetTerminatingInstancePVCName(
+		cluster, instanceName, resources.pvcs.Items,
+	); pvcName != "" {
+		log.FromContext(ctx).Debug(
+			"Deferring instance recreation until the previous PVC finishes terminating",
+			"instance", instanceName,
+			"pvc", pvcName,
+		)
+
+		if err := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseCreatingReplica,
+			fmt.Sprintf("Waiting for PVC %q to be removed before recreating instance %q", pvcName, instanceName),
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop
+	}
+
+	return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
 }
 
 func (r *ClusterReconciler) joinReplicaInstance(
@@ -1303,24 +1459,21 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+	inheritJobMetadata(cluster, job)
 
 	if err := r.Create(ctx, job); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			// This Job was already created, maybe the cache is stale.
-			contextLogger.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
+		if !apierrs.IsAlreadyExists(err) {
+			contextLogger.Error(err, "Unable to create Job", "job", job)
+			return ctrl.Result{}, err
 		}
-
-		contextLogger.Error(err, "Unable to create Job", "job", job)
-		return ctrl.Result{}, err
+		// A previous reconcile created the Job but may not have finished
+		// creating the PVCs. Adopt it if owned by this cluster, then fall
+		// through to CreateInstancePVCs so any missing PVCs are created on
+		// this pass.
+		if result, adoptErr := r.ensureJobAdoptable(ctx, cluster, job.Name); adoptErr != nil || !result.IsZero() {
+			return result, adoptErr
+		}
+		contextLogger.Info("Job already exists, adopting it", "job", job.Name)
 	}
 
 	if err := persistentvolumeclaim.CreateInstancePVCs(
@@ -1359,6 +1512,21 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{}, nil
 	}
 
+	// Reattaching an instance whose group of PVCs is incomplete because one of
+	// them is still terminating would create a Pod bound to a volume about to be
+	// garbage-collected, leaving it unschedulable. Wait for the previous PVC to
+	// disappear before reattaching (see #10985).
+	if pvcName := persistentvolumeclaim.GetTerminatingInstancePVCName(
+		cluster, instanceToCreate.Name, resources.pvcs.Items,
+	); pvcName != "" {
+		contextLogger.Debug(
+			"Deferring instance reattachment until the previous PVC finishes terminating",
+			"instance", instanceToCreate.Name,
+			"pvc", pvcName,
+		)
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&
 		instancesStatus.InstancesReportingStatus() != cluster.Status.ReadyInstances {
 		// A pod is not ready, let's retry
@@ -1373,6 +1541,21 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		// as an assertion to catch unexpected events.
 		pvcStatus := instancePVC.Annotations[utils.PVCStatusAnnotationName]
 		if pvcStatus != persistentvolumeclaim.StatusReady {
+			// A PVC only becomes ready once the Job that initializes it completes,
+			// or once a Pod attaches to it. When the bootstrap of the first primary
+			// loses a status-patch optimistic-lock race after the data PVC has been
+			// created but before the initialization Job is created, the orphan PVC
+			// is counted as an instance and the cluster never re-enters the
+			// bootstrap gate, so no Job is ever created and this branch would wait
+			// forever (see #11036). If the instance owning this PVC is the intended
+			// primary and no initialization Job exists for it, (re)create it reusing
+			// the serial already assigned to the PVC.
+			if res, handled, err := r.ensurePrimaryBootstrapJob(
+				ctx, cluster, instanceToCreate, &instancePVC, resources.jobs.Items,
+			); err != nil || handled {
+				return res, err
+			}
+
 			contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
 				"pvc", instancePVC.Name,
 				"status", pvcStatus,
@@ -1470,6 +1653,92 @@ func findInstancePodToCreate(
 	}
 
 	return nil, nil
+}
+
+// ensurePrimaryBootstrapJob recovers the first-primary bootstrap when the data
+// PVC has been created but the initialization Job was never created (for
+// instance because a status-patch optimistic-lock conflict aborted
+// createPrimaryInstance after the PVC creation, see #11036). When the instance
+// owning the not-ready PVC is the intended primary and no Job exists for it, it
+// (re)creates the bootstrap Job reusing the serial already assigned to the PVC.
+//
+// It returns handled=true when it took over the reconciliation (the returned
+// result must be propagated), and handled=false to let the caller fall back to
+// the regular wait-and-requeue behavior.
+func (r *ClusterReconciler) ensurePrimaryBootstrapJob(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instanceToCreate *corev1.Pod,
+	instancePVC *corev1.PersistentVolumeClaim,
+	jobs []batchv1.Job,
+) (ctrl.Result, bool, error) {
+	contextLogger := log.FromContext(ctx)
+
+	// Only the primary instance bootstraps a brand-new data directory through a
+	// Job; standby instances are joined via their own path. We treat the
+	// instance as the intended primary when it matches the TargetPrimary or when
+	// its PVC still carries the primary role label.
+	isPrimary := instanceToCreate.Name == cluster.Status.TargetPrimary ||
+		specs.IsPrimary(instancePVC.ObjectMeta)
+	if !isPrimary {
+		return ctrl.Result{}, false, nil
+	}
+
+	// If an initialization Job already exists for this instance, the regular
+	// wait path is correct: the PVC will turn ready once the Job completes.
+	for i := range jobs {
+		if jobs[i].Labels[utils.InstanceNameLabelName] == instanceToCreate.Name {
+			return ctrl.Result{}, false, nil
+		}
+	}
+
+	// Reuse the serial already assigned to the PVC: allocating a new one would
+	// orphan this PVC and create a second instance.
+	nodeSerial, err := specs.GetNodeSerial(instancePVC.ObjectMeta)
+	if err != nil {
+		return ctrl.Result{}, false, err
+	}
+
+	contextLogger.Info(
+		"Recreating the missing bootstrap Job for the primary instance",
+		"instance", instanceToCreate.Name,
+		"serial", nodeSerial,
+	)
+
+	// Set TargetPrimary defensively: if it is not set the instance manager would
+	// shut the primary down as soon as it starts (see reconcileOldPrimary).
+	if cluster.Status.TargetPrimary != instanceToCreate.Name {
+		if err := r.setPrimaryInstance(ctx, cluster, instanceToCreate.Name); err != nil {
+			return ctrl.Result{}, false, fmt.Errorf("unable to set the primary instance name: %w", err)
+		}
+	}
+
+	backup, recoverySnapshot, res, err := r.resolvePrimaryRecoverySource(ctx, cluster)
+	if !res.IsZero() || err != nil {
+		return res, true, err
+	}
+
+	job, err := r.buildPrimaryInstanceJob(ctx, cluster, nodeSerial, backup, recoverySnapshot)
+	if err != nil {
+		return ctrl.Result{}, true, err
+	}
+
+	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
+		return ctrl.Result{}, true, fmt.Errorf("unable to set the owner reference for the bootstrap Job: %w", err)
+	}
+
+	inheritJobMetadata(cluster, job)
+
+	if err := r.Create(ctx, job); err != nil {
+		if apierrs.IsAlreadyExists(err) {
+			// This Job was already created, maybe the cache is stale.
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, true, nil
+		}
+		contextLogger.Error(err, "Unable to create the bootstrap Job", "job", job)
+		return ctrl.Result{}, true, err
+	}
+
+	return ctrl.Result{RequeueAfter: 1 * time.Second}, true, ErrNextLoop
 }
 
 // checkReadyForRecovery checks if the backup or volumeSnapshots are ready, and

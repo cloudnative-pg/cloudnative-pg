@@ -34,6 +34,9 @@ Both resources share a common schema:
 - **Uniqueness**: The `major` field must be unique within a single catalog.
 - **Extensions**: Support for certified extension container images (available for
   PostgreSQL 18+ via `extension_control_path`).
+- **Component images**: An optional list of named images for non-PostgreSQL
+  components such as PgBouncer (see
+  [Component images](#component-images)).
 
 :::warning
 While the operator trusts the user-defined `major` version without performing
@@ -42,6 +45,45 @@ community to ensure that every extension and operand image entry correctly
 matches the declared major version. If you are creating a custom catalog, you
 must ensure the declared major version matches the actual PostgreSQL images to
 maintain compatibility.
+:::
+
+## Component images
+
+In addition to PostgreSQL images, a catalog can store images for other
+components via the `componentImages` field. Each entry is identified by a string
+**key** — a lowercase alphanumeric identifier (hyphens allowed, 1–63
+characters) that must be unique within the catalog.
+
+Currently, the only consumer of component images is the `Pooler` resource,
+which can reference a component image entry to centrally manage the PgBouncer
+container image (see
+[Using an image catalog](connection_pooling.md#using-an-image-catalog)).
+
+The following example defines a namespaced `ImageCatalog` with a PgBouncer
+component image:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: my-catalog
+  namespace: default
+spec:
+  images:
+    - major: 18
+      image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+  componentImages:
+    - key: pgbouncer
+      image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
+```
+
+For a cluster-wide catalog, use `kind: ClusterImageCatalog` and drop the
+`metadata.namespace` field (the `spec` is otherwise identical).
+
+:::info
+A catalog may contain up to 32 component image entries. Keys are lowercase
+alphanumeric characters or hyphens, starting and ending with an alphanumeric
+character, up to 63 characters long.
 :::
 
 ## Configuration examples
@@ -67,7 +109,7 @@ spec:
     - major: 17
       image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
     - major: 18
-      image: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+      image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
 ```
 
 The following example defines a cluster-wide `ClusterImageCatalog`:
@@ -86,7 +128,7 @@ spec:
     - major: 17
       image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
     - major: 18
-      image: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+      image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
 ```
 
 ### Referencing a Catalog in a Cluster
@@ -122,7 +164,7 @@ metadata:
 spec:
   images:
     - major: 18
-      image: ghcr.io/cloudnative-pg/postgresql:18.3-minimal-trixie
+      image: ghcr.io/cloudnative-pg/postgresql:18.4-minimal-trixie
       extensions:
         - name: foo
           image:
@@ -142,15 +184,23 @@ instructions on how to select or override catalog extensions within a cluster.
 
 ## CloudNativePG Catalogs
 
+
 The CloudNativePG project maintains `ClusterImageCatalog` manifests for all
 supported images.
 
-These catalogs are regularly updated and published in the
-[artifacts repository](https://github.com/cloudnative-pg/artifacts/tree/main/image-catalogs).
+These catalogs are regularly updated and published in two distinct locations
+within the [artifacts repository](https://github.com/cloudnative-pg/artifacts/tree/main):
 
-Each catalog corresponds to a specific combination of image type (e.g.
-`minimal`) and Debian release (e.g. `trixie`). It lists the most up-to-date
-container images for every supported PostgreSQL major version.
+- **[`image-catalogs`](https://github.com/cloudnative-pg/artifacts/tree/main/image-catalogs):**
+  core catalog definitions for base image types.
+
+- **[`image-catalogs-extensions`](https://github.com/cloudnative-pg/artifacts/tree/main/image-catalogs-extensions):**
+  identical to the above catalogs, with the key difference that the `minimal`
+  image type includes extension definitions.
+
+Each catalog corresponds to a specific combination of image type and Debian
+release (e.g., `trixie`). It lists the most up-to-date container images for
+every supported PostgreSQL major version.
 
 :::important
 To ensure maximum security and immutability, all images within official
@@ -160,7 +210,7 @@ just tags.
 
 ### Version Compatibility
 
-While standard catalogs work with older versions of the operator, **catalogs
+While core catalogs work with older versions of the operator, **catalogs
 containing an `extensions` section are only compatible with CloudNativePG 1.29
 or later**. Using a catalog with extension definitions on an older operator
 will result in those definitions being rejected.
@@ -184,7 +234,7 @@ You can install all the available catalogs by using the `kustomization` file
 present in the `image-catalogs` directory:
 
 ```shell
-kubectl apply -k https://github.com/cloudnative-pg/artifacts//image-catalogs?ref=main
+kubectl apply -k 'https://github.com/cloudnative-pg/artifacts//image-catalogs?ref=main'
 ```
 
 You can then view all the catalogs deployed with:

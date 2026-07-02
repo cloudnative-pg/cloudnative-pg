@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -314,7 +316,7 @@ var _ = DescribeTable("test creation of volume mounts",
 		},
 		[]corev1.VolumeMount{
 			{
-				Name:             "pgdata",
+				Name:             pgdataVolumeName,
 				ReadOnly:         false,
 				MountPath:        "/var/lib/postgresql/data",
 				SubPath:          "",
@@ -333,7 +335,7 @@ var _ = DescribeTable("test creation of volume mounts",
 		},
 		[]corev1.VolumeMount{
 			{
-				Name:             "pgdata",
+				Name:             pgdataVolumeName,
 				ReadOnly:         false,
 				MountPath:        "/var/lib/postgresql/data",
 				SubPath:          "",
@@ -405,7 +407,7 @@ var _ = DescribeTable("test creation of volumes",
 		},
 		[]corev1.Volume{
 			{
-				Name: "pgdata",
+				Name: pgdataVolumeName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "pod-1",
@@ -424,7 +426,7 @@ var _ = DescribeTable("test creation of volumes",
 		},
 		[]corev1.Volume{
 			{
-				Name: "pgdata",
+				Name: pgdataVolumeName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "pod-1",
@@ -566,13 +568,13 @@ var _ = Describe("ImageVolume Extensions", func() {
 			It("shouldn't create Volumes", func() {
 				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
 				cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
-				extensionVolumes := createExtensionVolumes(getExtensions(&cluster))
+				extensionVolumes := CreateExtensionVolumes(getExtensions(&cluster))
 				Expect(extensionVolumes).To(BeEmpty())
 			})
 		})
 		When("Extensions are enabled", func() {
 			It("should create a Volume for each Extension", func() {
-				extensionVolumes := createExtensionVolumes(getExtensions(&cluster))
+				extensionVolumes := CreateExtensionVolumes(getExtensions(&cluster))
 				Expect(len(extensionVolumes)).To(BeEquivalentTo(2))
 				Expect(extensionVolumes[0].Name).To(Equal("ext-foo"))
 				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("foo:dev"))
@@ -591,7 +593,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 				cluster.Spec.PostgresConfiguration.Extensions = extensionsConfig
 				cluster.Status.PGDataImageInfo.Extensions = extensionsConfig
 
-				extensionVolumes := createExtensionVolumes(getExtensions(&cluster))
+				extensionVolumes := CreateExtensionVolumes(getExtensions(&cluster))
 				Expect(len(extensionVolumes)).To(BeEquivalentTo(1))
 				Expect(extensionVolumes[0].Name).To(Equal("ext-pg-ivm"))
 				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("pg_ivm:latest"))
@@ -604,7 +606,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 			It("shouldn't create VolumeMounts", func() {
 				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
 				cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
-				extensionVolumeMounts := createExtensionVolumeMounts(getExtensions(&cluster))
+				extensionVolumeMounts := CreateExtensionVolumeMounts(getExtensions(&cluster))
 				Expect(extensionVolumeMounts).To(BeEmpty())
 			})
 		})
@@ -614,7 +616,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 					fooMountPath = postgres.ExtensionsBaseDirectory + "/foo"
 					barMountPath = postgres.ExtensionsBaseDirectory + "/bar"
 				)
-				extensionVolumeMounts := createExtensionVolumeMounts(getExtensions(&cluster))
+				extensionVolumeMounts := CreateExtensionVolumeMounts(getExtensions(&cluster))
 				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(2))
 				Expect(extensionVolumeMounts[0].Name).To(Equal("ext-foo"))
 				Expect(extensionVolumeMounts[0].MountPath).To(Equal(fooMountPath))
@@ -633,7 +635,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 				cluster.Spec.PostgresConfiguration.Extensions = extensionsConfig
 				cluster.Status.PGDataImageInfo.Extensions = extensionsConfig
 
-				extensionVolumeMounts := createExtensionVolumeMounts(getExtensions(&cluster))
+				extensionVolumeMounts := CreateExtensionVolumeMounts(getExtensions(&cluster))
 				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(1))
 				Expect(extensionVolumeMounts[0].Name).To(Equal("ext-pg-ivm"))
 				Expect(extensionVolumeMounts[0].MountPath).To(Equal(postgres.ExtensionsBaseDirectory + "/pg_ivm"))
@@ -661,6 +663,38 @@ var _ = Describe("ImageVolume Extensions", func() {
 
 		It("should handle consecutive underscores", func() {
 			Expect(SanitizeExtensionNameForVolume("pg__stat")).To(Equal("ext-pg--stat"))
+		})
+	})
+
+	Context("SanitizeExtensionNameForUpgradeTargetVolume", func() {
+		It("prefixes with new- instead of ext- and sanitizes underscores", func() {
+			Expect(SanitizeExtensionNameForUpgradeTargetVolume("pg_ivm")).To(Equal("new-pg-ivm"))
+			Expect(SanitizeExtensionNameForUpgradeTargetVolume("foo")).To(Equal("new-foo"))
+		})
+
+		It("cannot collide with a steady-state volume name", func() {
+			// Disjointness rests on the prefixes, not on any particular name:
+			// steady-state volumes always start with "ext-" and upgrade-target
+			// volumes always start with "new-". Even a name that itself looks
+			// like the other prefix (e.g. "new-foo") still gets "ext-" prepended.
+			Expect(SanitizeExtensionNameForVolume("new-foo")).To(HavePrefix("ext-"))
+			Expect(SanitizeExtensionNameForUpgradeTargetVolume("ext-foo")).To(HavePrefix("new-"))
+		})
+
+		It("keeps volume names within the RFC 1123 limit for a max-length name", func() {
+			// ExtensionConfiguration.Name is bounded by MaxLength=59 precisely so
+			// that the 4-character volume-name prefix keeps the result within the
+			// RFC 1123 label limit of 63. Both sanitizers must share that budget,
+			// so their prefixes must be the same length; if either prefix changes
+			// length, the API MaxLength must change with it.
+			const rfc1123LabelMaxLength = 63
+			const maxExtensionNameLength = 59
+			maxName := strings.Repeat("a", maxExtensionNameLength)
+
+			Expect(SanitizeExtensionNameForVolume(maxName)).
+				To(HaveLen(rfc1123LabelMaxLength))
+			Expect(SanitizeExtensionNameForUpgradeTargetVolume(maxName)).
+				To(HaveLen(rfc1123LabelMaxLength))
 		})
 	})
 })

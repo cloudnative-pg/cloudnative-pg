@@ -28,6 +28,11 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -56,23 +61,31 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		Expect(err).ToNot(HaveOccurred())
 
 		By("creating a cluster for pooler", func() {
-			AssertCreateCluster(namespace, clusterName, clusterFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterFile)
 		})
 
-		By("creating a shared ServiceAccount", func() {
-			CreateResourceFromFile(namespace, sharedSAFile)
+		By("creating a shared ServiceAccount with operator pull secrets", func() {
+			resources.CreateResourceFromFile(env, namespace, sharedSAFile)
+			operatorDeployment, err := operator.GetDeployment(env.Ctx, env.Client)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secrets.CopyOperatorPullSecretToServiceAccount(
+				env.Ctx, env.Client, operatorDeployment, namespace, sharedSAName,
+			)).To(Succeed())
 		})
 
 		By("creating pooler using shared ServiceAccount", func() {
-			CreateResourceFromFile(namespace, pooler1File)
+			resources.CreateResourceFromFile(env, namespace, pooler1File)
 		})
 
 		By("waiting for pooler deployment to be ready", func() {
-			Eventually(func() error {
+			Eventually(func(g Gomega) {
 				var deployment appsv1.Deployment
-				return env.Client.Get(env.Ctx,
-					client.ObjectKey{Namespace: namespace, Name: pooler1Name},
-					&deployment)
+				err := env.Client.Get(env.Ctx, client.ObjectKey{Namespace: namespace, Name: pooler1Name}, &deployment)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(deployments.IsReady(deployment)).To(
+					BeTrue(),
+					"Pooler deployment %s/%s is not ready", namespace, pooler1Name,
+				)
 			}, 300).Should(Succeed())
 		})
 

@@ -66,6 +66,9 @@ var _ = Describe("Deployment", func() {
 					EnablePodMonitor: true,
 				},
 			},
+			Status: apiv1.PoolerStatus{
+				Image: config.Current.PgbouncerImageName,
+			},
 		}
 
 		cluster = &apiv1.Cluster{

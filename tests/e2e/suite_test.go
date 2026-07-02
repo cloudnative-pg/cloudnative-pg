@@ -42,9 +42,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/cloudvendors"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -68,11 +68,11 @@ var (
 	operatorWasRestarted    bool
 	quickDeletionPeriod     = int64(1)
 	testTimeouts            map[timeouts.Timeout]int
-	minioEnv                = &minio.Env{
-		Namespace:    "minio",
-		ServiceName:  "minio-service.minio",
-		CaSecretName: "minio-server-ca-secret",
-		TLSSecret:    "minio-server-tls-secret",
+	objectStoreEnv          = &objectstore.Env{
+		Namespace:    "object-store",
+		ServiceName:  "object-store.object-store",
+		CaSecretName: "object-store-ca-secret",
+		TLSSecret:    "object-store-tls-secret",
 	}
 )
 
@@ -87,7 +87,8 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		}
 		return s
 	}
-	_, _ = fmt.Fprintf(GinkgoWriter, `
+	_, _ = fmt.Fprintf(
+		GinkgoWriter, `
 E2E test configuration:
   Postgres image:                %s:%s
   Postgres version:              %d
@@ -98,6 +99,7 @@ E2E test configuration:
   Default storage class:         %s
   CSI storage class:             %s
   Default volume snapshot class: %s
+  CNPG deployment method:        %s
 `,
 		env.PostgresImageName, env.PostgresImageTag,
 		env.PostgresVersion,
@@ -108,10 +110,11 @@ E2E test configuration:
 		display(env.DefaultStorageClass),
 		display(env.CSIStorageClass),
 		display(env.DefaultVolumeSnapshotClass),
+		display(os.Getenv("CNPG_DEPLOYMENT_METHOD")),
 	)
 
 	// Export detected storage class values as environment variables for
-	// code that uses os.Getenv (e.g. MinIO PVC setup).
+	// code that uses os.Getenv (e.g. the object storage PVC setup).
 	for k, v := range map[string]string{
 		"E2E_DEFAULT_STORAGE_CLASS":        env.DefaultStorageClass,
 		"E2E_CSI_STORAGE_CLASS":            env.CSIStorageClass,
@@ -142,21 +145,21 @@ E2E test configuration:
 	_ = corev1.AddToScheme(env.Scheme)
 	_ = appsv1.AddToScheme(env.Scheme)
 
-	// Set up a global MinIO service on his own namespace
-	err = namespaces.CreateNamespace(env.Ctx, env.Client, minioEnv.Namespace)
+	// Set up a global object storage service in its own namespace
+	err = namespaces.CreateNamespace(env.Ctx, env.Client, objectStoreEnv.Namespace)
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(func() {
-		err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, minioEnv.Namespace, 300)
+		err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, objectStoreEnv.Namespace, 300)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	minioEnv.Timeout = uint(testTimeouts[timeouts.MinioInstallation])
-	minioClient, err := minio.Deploy(minioEnv, env)
+	objectStoreEnv.Timeout = uint(testTimeouts[timeouts.ObjectStoreInstallation])
+	objectStoreClient, err := objectstore.Deploy(objectStoreEnv, env)
 	Expect(err).ToNot(HaveOccurred())
 
-	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	minioEnv.CaSecretObj = *caSecret
-	objs := map[string]corev1.Pod{
-		"minio": *minioClient,
+	caSecret := objectStoreEnv.CaPair.GenerateCASecret(objectStoreEnv.Namespace, objectStoreEnv.CaSecretName)
+	objectStoreEnv.CaSecretObj = *caSecret
+	objs := map[string]appsv1.Deployment{
+		"object-store": *objectStoreClient,
 	}
 
 	jsonObjs, err := json.Marshal(objs)
@@ -201,12 +204,12 @@ E2E test configuration:
 		panic(err)
 	}
 
-	var objs map[string]*corev1.Pod
+	var objs map[string]*appsv1.Deployment
 	if err := json.Unmarshal(jsonObjs, &objs); err != nil {
 		panic(err)
 	}
 
-	minioEnv.Client = objs["minio"]
+	objectStoreEnv.Client = objs["object-store"]
 })
 
 var _ = BeforeEach(func() {

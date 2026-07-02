@@ -28,13 +28,13 @@ import (
 	"math"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 )
 
@@ -101,6 +101,7 @@ const (
 #
 
 # Grant local access ('local' user map)
+local all cnpg_metrics_exporter peer map=cnpg_metrics_exporter
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
@@ -144,6 +145,9 @@ cnpg_streaming_replica streaming_replica streaming_replica
 
 # Grant cnpg_pooler_pgbouncer access ('cnpg_pooler_pgbouncer' user map)
 cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
+
+# Grant cnpg_metrics_exporter access via peer authentication on the Unix socket
+cnpg_metrics_exporter {{.Username}} cnpg_metrics_exporter
 
 #
 # USER-DEFINED RULES
@@ -274,6 +278,11 @@ cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 
 	// ExtensionsBaseDirectory is the base directory to store ImageVolume Extensions
 	ExtensionsBaseDirectory = "/extensions"
+
+	// UpgradeTargetExtensionsBaseDirectory is where target-version ImageVolume
+	// extensions are mounted during a major upgrade so they can coexist with the
+	// source-version ones at their original location.
+	UpgradeTargetExtensionsBaseDirectory = "/new-extensions"
 )
 
 // hbaTemplate is the template used to create the HBA configuration.
@@ -693,18 +702,6 @@ func (p *PgConfiguration) GetConfig(key string) string {
 	return p.configs[key]
 }
 
-// GetSortedList returns a sorted list of configurations
-func (p *PgConfiguration) GetSortedList() []string {
-	parameters := make([]string, len(p.configs))
-	i := 0
-	for key := range p.configs {
-		parameters[i] = key
-		i++
-	}
-	sort.Strings(parameters)
-	return parameters
-}
-
 // CreatePostgresqlConfiguration creates the configuration from the settings
 // and the default values
 func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
@@ -872,43 +869,40 @@ func (p *PgConfiguration) setUserSharedPreloadLibraries(info ConfigurationInfo) 
 
 // CreatePostgresqlConfFile creates the contents of the postgresql.conf file
 func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
-	// We need to be able to compare two configurations generated
-	// by operator to know if they are different or not. To do
-	// that we sort the configuration by parameter name as order
-	// is really irrelevant for our purposes
-	parameters := configuration.GetSortedList()
-	var postgresConf strings.Builder
-	var cnpgConf strings.Builder
-	for _, parameter := range parameters {
-		line := fmt.Sprintf(
-			"%v = %v\n",
-			parameter,
-			escapePostgresConfValue(configuration.configs[parameter]))
-		if strings.HasPrefix(parameter, "cnpg.") {
-			cnpgConf.WriteString(line)
+	// Split the parameters into the regular PostgreSQL section (whose hash
+	// defines the identity of the configuration) and the cnpg.* section (which
+	// carries operator-internal state and must not contribute to the hash).
+	pgOptions := map[string]string{}
+	cnpgOptions := map[string]string{}
+	for name, value := range configuration.configs {
+		if strings.HasPrefix(name, "cnpg.") {
+			cnpgOptions[name] = value
 		} else {
-			postgresConf.WriteString(line)
+			pgOptions[name] = value
 		}
 	}
 
-	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf.String())))
-	postgresConf.WriteString(cnpgConf.String())
-	fmt.Fprintf(&postgresConf, "%v = %v\n", CNPGConfigSha256,
-		escapePostgresConfValue(sha256sum))
+	pgPart := configfile.RenderPostgresConfiguration(pgOptions)
+	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(pgPart)))
 
-	return postgresConf.String(), sha256sum
-}
+	// Emit the cnpg.* keys (sorted), then always emit the sha256 line LAST.
+	// The sha256-last layout is legacy behaviour; preserving it prevents a
+	// byte-level diff in postgresql.conf (and an avoidable pg_reload_conf())
+	// on operator upgrade for clusters that already have other cnpg.* keys
+	// such as cnpg.synchronous_standby_names_metadata.
+	cnpgPart := configfile.RenderPostgresConfiguration(cnpgOptions)
+	sha256Line := configfile.RenderPostgresConfiguration(map[string]string{
+		CNPGConfigSha256: sha256sum,
+	})
 
-// escapePostgresConfValue escapes a value to make its representation
-// directly embeddable in the PostgreSQL configuration file
-func escapePostgresConfValue(value string) string {
-	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+	return pgPart + cnpgPart + sha256Line, sha256sum
 }
 
 // AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
 type AdditionalExtensionConfiguration struct {
-	// The name of the Extension
-	Name string
+	// MountPath is the directory where the extension's ImageVolume is mounted
+	// (e.g. /extensions/postgis or /new-extensions/postgis during a major upgrade).
+	MountPath string
 
 	// The list of directories that should be added to ExtensionControlPath.
 	ExtensionControlPath []string
@@ -917,12 +911,11 @@ type AdditionalExtensionConfiguration struct {
 	DynamicLibraryPath []string
 }
 
-// absolutizePaths returns an iterator over the passed paths, absolutized
-// using the name of the extension
+// absolutizePaths returns an iterator over paths joined to the extension's MountPath.
 func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for _, path := range paths {
-			if !yield(filepath.Join(ExtensionsBaseDirectory, ext.Name, path)) {
+			if !yield(filepath.Join(ext.MountPath, path)) {
 				break
 			}
 		}

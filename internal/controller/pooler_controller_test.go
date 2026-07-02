@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -193,6 +194,31 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 	})
 
+	It("should requeue without panicking when the referenced cluster is missing", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		// cluster is intentionally not persisted: the Pooler references
+		// a Cluster that does not exist (e.g., it has been deleted while
+		// the Pooler still existed).
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "missing-cluster",
+				Namespace: namespace,
+			},
+		}
+		pooler := newFakePooler(env.client, cluster)
+
+		result, err := env.poolerReconciler.Reconcile(ctx, ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      pooler.Name,
+				Namespace: pooler.Namespace,
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+	})
+
 	It("should make sure that isOwnedByPoolerKind works correctly", func() {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
@@ -216,6 +242,132 @@ var _ = Describe("pooler_controller unit tests", func() {
 			Expect(name).To(Equal(""))
 		})
 	})
+
+	It("setPoolerPhase skips the API update when phase and reason already match", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		pooler.Status.Phase = apiv1.PoolerPhaseInactive
+		pooler.Status.PhaseReason = "stable reason"
+		Expect(env.client.Status().Update(ctx, pooler)).To(Succeed())
+
+		var before apiv1.Pooler
+		Expect(env.client.Get(ctx,
+			types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+			&before)).To(Succeed())
+
+		Expect(env.poolerReconciler.setPoolerPhase(ctx, pooler,
+			apiv1.PoolerPhaseInactive, "stable reason")).To(Succeed())
+
+		var after apiv1.Pooler
+		Expect(env.client.Get(ctx,
+			types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+			&after)).To(Succeed())
+		Expect(after.ResourceVersion).To(Equal(before.ResourceVersion))
+	})
+})
+
+var _ = Describe("waitForPrerequisites function tests", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("waitForPrerequisites returns nil when all prerequisites are present", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+
+		res := &poolerManagedResources{
+			AuthUserSecret:  &corev1.Secret{},
+			ClientTLSSecret: &corev1.Secret{},
+			ClientCASecret:  &corev1.Secret{},
+			ServerCASecret:  &corev1.Secret{},
+			Cluster:         cluster,
+		}
+		ctrlRes := env.poolerReconciler.waitForPrerequisites(ctx, pooler, res)
+		Expect(ctrlRes).To(BeNil())
+	})
+
+	DescribeTable("waitForPrerequisites marks the pooler Inactive when a resource is missing",
+		func(
+			setupPooler func(*apiv1.Pooler),
+			buildResources func(*apiv1.Cluster) *poolerManagedResources,
+			expectedSubstring string,
+		) {
+			ctx := context.Background()
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			pooler := newFakePooler(env.client, cluster)
+			if setupPooler != nil {
+				setupPooler(pooler)
+				Expect(env.client.Update(ctx, pooler)).To(Succeed())
+			}
+
+			res := buildResources(cluster)
+			ctrlRes := env.poolerReconciler.waitForPrerequisites(ctx, pooler, res)
+			Expect(ctrlRes).ToNot(BeNil())
+
+			var fetched apiv1.Pooler
+			Expect(env.client.Get(ctx,
+				types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+				&fetched)).To(Succeed())
+			Expect(fetched.Status.Phase).To(Equal(apiv1.PoolerPhaseInactive))
+			Expect(fetched.Status.PhaseReason).To(ContainSubstring(expectedSubstring))
+			Expect(fetched.Status.PhaseReason).To(ContainSubstring("not found"))
+		},
+		Entry("AuthUserSecret missing (automated integration)",
+			nil,
+			func(_ *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{}
+			},
+			"AuthUserSecret",
+		),
+		Entry("ServerTLSSecret missing (manual TLS)",
+			func(p *apiv1.Pooler) {
+				p.Spec.PgBouncer.ServerTLSSecret = &apiv1.LocalObjectReference{Name: "custom-server-tls"}
+			},
+			func(_ *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{}
+			},
+			"ServerTLSSecret",
+		),
+		Entry("ClientTLSSecret missing",
+			nil,
+			func(cluster *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{
+					AuthUserSecret: &corev1.Secret{},
+					Cluster:        cluster,
+				}
+			},
+			"ClientTLSSecret",
+		),
+		Entry("ClientCASecret missing",
+			nil,
+			func(cluster *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{
+					AuthUserSecret:  &corev1.Secret{},
+					ClientTLSSecret: &corev1.Secret{},
+					Cluster:         cluster,
+				}
+			},
+			"ClientCASecret",
+		),
+		Entry("ServerCASecret missing",
+			nil,
+			func(cluster *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{
+					AuthUserSecret:  &corev1.Secret{},
+					ClientTLSSecret: &corev1.Secret{},
+					ClientCASecret:  &corev1.Secret{},
+					Cluster:         cluster,
+				}
+			},
+			"ServerCASecret",
+		),
+	)
 })
 
 var _ = Describe("isOwnedByPooler function tests", func() {
@@ -267,5 +419,73 @@ var _ = Describe("isOwnedByPooler function tests", func() {
 
 		result := isOwnedByPooler(pooler.Name, &ownedResource)
 		Expect(result).To(BeFalse())
+	})
+})
+
+var _ = Describe("poolerImageCatalogIndexer", func() {
+	newPooler := func() *apiv1.Pooler {
+		return &apiv1.Pooler{
+			ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns"},
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{},
+			},
+		}
+	}
+
+	It("returns nil when no imageCatalogRef is set", func() {
+		Expect(poolerImageCatalogIndexer(newPooler())).To(BeNil())
+	})
+
+	It("returns nil when PgBouncer is nil", func() {
+		pooler := newPooler()
+		pooler.Spec.PgBouncer = nil
+		Expect(poolerImageCatalogIndexer(pooler)).To(BeNil())
+	})
+
+	It("returns Kind/Name for namespaced catalog references", func() {
+		pooler := newPooler()
+		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ImageCatalogKind,
+				Name: "foo",
+			},
+			Key: "pgbouncer",
+		}
+		Expect(poolerImageCatalogIndexer(pooler)).To(ConsistOf("ImageCatalog/foo"))
+	})
+
+	It("returns Kind/Name for cluster-scoped catalog references", func() {
+		pooler := newPooler()
+		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ClusterImageCatalogKind,
+				Name: "foo",
+			},
+			Key: "pgbouncer",
+		}
+		Expect(poolerImageCatalogIndexer(pooler)).To(ConsistOf("ClusterImageCatalog/foo"))
+	})
+
+	It("uses different index values for same-named catalogs of different kinds", func() {
+		namespaced := newPooler()
+		namespaced.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ImageCatalogKind,
+				Name: "shared-name",
+			},
+			Key: "pgbouncer",
+		}
+
+		clusterScoped := newPooler()
+		clusterScoped.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ClusterImageCatalogKind,
+				Name: "shared-name",
+			},
+			Key: "pgbouncer",
+		}
+
+		Expect(poolerImageCatalogIndexer(namespaced)).
+			ToNot(Equal(poolerImageCatalogIndexer(clusterScoped)))
 	})
 })

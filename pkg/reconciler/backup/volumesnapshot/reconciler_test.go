@@ -28,12 +28,15 @@ import (
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -390,6 +393,88 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupYearLabelName, strconv.Itoa(time.Now().Year())))
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.MajorVersionLabelName, "18"))
 		}
+	})
+
+	It("reuses a pre-existing VolumeSnapshot that belongs to the backup", func(ctx SpecContext) {
+		// Simulate the cached-list-lag race: a VolumeSnapshot we created in a
+		// previous reconciliation cycle already exists, carrying this backup's
+		// label, but the Create call collides with it.
+		existing := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name),
+				Labels: map[string]string{
+					utils.BackupNameLabelName: backup.Name,
+				},
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod, existing).
+			Build()
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
+
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("fails when a foreign VolumeSnapshot collides with the backup name", func(ctx SpecContext) {
+		// A VolumeSnapshot with the same name exists but does not belong to
+		// this backup: the collision must surface as an error instead of
+		// looping forever.
+		existing := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name),
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod, existing).
+			Build()
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
+
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		Expect(apierrs.IsAlreadyExists(err)).To(BeTrue())
+		Expect(err.Error()).To(ContainSubstring("is not owned by backup"))
+	})
+
+	It("tolerates an AlreadyExists collision the cache still hides on Get", func(ctx SpecContext) {
+		// The cache lag that made the reconciler attempt the Create can also
+		// keep the object hidden from the follow-up Get. The API server already
+		// confirmed it exists via AlreadyExists, so the collision must be
+		// tolerated instead of failing the backup.
+		mockClient := interceptor.NewClient(
+			fake.NewClientBuilder().
+				WithScheme(scheme.BuildWithAllKnownScheme()).
+				WithObjects(backup, cluster, targetPod).
+				Build(),
+			interceptor.Funcs{
+				Create: func(
+					_ context.Context, _ k8client.WithWatch, obj k8client.Object, _ ...k8client.CreateOption,
+				) error {
+					return apierrs.NewAlreadyExists(
+						schema.GroupResource{Group: volumesnapshotv1.GroupName, Resource: "volumesnapshots"},
+						obj.GetName())
+				},
+				Get: func(
+					_ context.Context, _ k8client.WithWatch, key k8client.ObjectKey,
+					_ k8client.Object, _ ...k8client.GetOption,
+				) error {
+					return apierrs.NewNotFound(
+						schema.GroupResource{Group: volumesnapshotv1.GroupName, Resource: "volumesnapshots"},
+						key.Name)
+				},
+			})
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
+
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		Expect(err).ToNot(HaveOccurred())
 	})
 })
 

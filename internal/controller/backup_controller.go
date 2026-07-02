@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"reflect"
@@ -47,6 +48,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
@@ -77,19 +79,24 @@ type BackupReconciler struct {
 	client.Client
 	DiscoveryClient discovery.DiscoveryInterface
 
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	Plugins  repository.Interface
+	Scheme             *runtime.Scheme
+	Recorder           record.EventRecorder
+	Plugins            repository.Interface
+	OperatorClientCert *tls.Certificate
 
 	instanceStatusClient remote.InstanceClient
 	vsr                  *volumesnapshot.Reconciler
+
+	admission *guard.Admission[*apiv1.Backup]
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler
 func NewBackupReconciler(
 	mgr manager.Manager,
-	discoveryClient *discovery.DiscoveryClient,
+	discoveryClient discovery.DiscoveryInterface,
 	plugins repository.Interface,
+	operatorClientCert *tls.Certificate,
+	admission *guard.Admission[*apiv1.Backup],
 ) *BackupReconciler {
 	cli := mgr.GetClient()
 	recorder := mgr.GetEventRecorderFor("cloudnative-pg-backup") //nolint:staticcheck
@@ -98,9 +105,11 @@ func NewBackupReconciler(
 		DiscoveryClient:      discoveryClient,
 		Scheme:               mgr.GetScheme(),
 		Recorder:             recorder,
+		OperatorClientCert:   operatorClientCert,
 		instanceStatusClient: remote.NewClient().Instance(),
 		Plugins:              plugins,
 		vsr:                  volumesnapshot.NewReconcilerBuilder(cli, recorder).Build(),
+		admission:            admission,
 	}
 }
 
@@ -113,9 +122,15 @@ func NewBackupReconciler(
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
 // Reconcile is the main reconciliation loop
-func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:gocognit
+//
+//nolint:gocognit,gocyclo
+func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
-	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
+
+	contextLogger.Debug("Reconciliation loop start")
+	defer func() {
+		contextLogger.Debug("Reconciliation loop end")
+	}()
 
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
@@ -130,9 +145,26 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// A backup that already reached a terminal phase is immutable: never run
+	// the admission guard on it. Re-validating here is unsafe because some
+	// checks depend on the runtime environment rather than the (immutable)
+	// spec (for example the VolumeSnapshot CRD presence), so a transient
+	// environment change would otherwise clobber a Completed/Failed record
+	// with the "invalid backup definition" phase.
 	switch backup.Status.Phase {
 	case apiv1.BackupPhaseFailed, apiv1.BackupPhaseCompleted:
 		return ctrl.Result{}, nil
+	}
+
+	if result, err := r.admission.EnsureResourceIsAdmitted(
+		ctx,
+		guard.AdmissionParams[*apiv1.Backup]{
+			Object:       &backup,
+			Client:       r.Client,
+			ApplyChanges: true,
+		},
+	); !result.IsZero() || err != nil {
+		return result, err
 	}
 
 	var cluster apiv1.Cluster
@@ -170,12 +202,13 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	contextLogger.Debug("Found cluster for backup", "cluster", cluster.Name)
 
-	// Store in the context the TLS configuration required communicating with the Pods
-	ctx, err = certs.NewTLSConfigForContext(
-		ctx,
-		r.Client,
-		cluster.GetServerCASecretObjectKey(),
-	)
+	// Store in the context the TLS configuration required communicating with the Pods.
+	// The operator client certificate is presented to authenticate with the instance manager.
+	ctx, err = certs.NewTLSConfigForContext(ctx, certs.TLSConfigOptions{
+		Client:     r.Client,
+		CASecret:   cluster.GetServerCASecretObjectKey(),
+		ClientCert: r.OperatorClientCert,
+	})
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -208,7 +241,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	switch {
 	case backup.Spec.Method.IsManagedByInstance():
-		res, err := r.startBackupManagedByInstance(ctx, cluster, backup)
+		res, err := r.startBackupManagedByInstance(ctx, cluster, &backup)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -227,41 +260,58 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
 	}
 
-	// plugin post hooks
-	contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
-
 	hookResult := postReconcilePluginHooks(ctx, &cluster, &backup)
-	return hookResult.Result, hookResult.Err
+	if hookResult.Err != nil || !hookResult.Result.IsZero() {
+		return hookResult.Result, hookResult.Err
+	}
+
+	// A backup in the "started" phase advances only through the instance
+	// manager's progress updates. If the instance manager is restarted before
+	// the backup moves forward, for example during an operator in-place
+	// upgrade, no update arrives, so requeue to re-enter Reconcile. The
+	// isCurrentBackupRunning check above then re-validates the session and
+	// fails the backup if the instance manager is gone; otherwise the
+	// running-backup branch above takes over the requeuing. This relies on that
+	// check running before the start switch, and it is the only re-check for
+	// plugin backups, which never transition to the "running" phase.
+	if backup.Status.Phase == apiv1.BackupPhaseStarted {
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	return ctrl.Result{}, nil
 }
 
+// startBackupManagedByInstance receives the backup by pointer: it updates the
+// backup status as the start progresses, and the caller relies on seeing the
+// "started" phase to schedule the safety requeue at the end of Reconcile.
 func (r *BackupReconciler) startBackupManagedByInstance(
 	ctx context.Context,
 	cluster apiv1.Cluster,
-	backup apiv1.Backup,
+	backup *apiv1.Backup,
 ) (*ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
 	origBackup := backup.DeepCopy()
 
 	// If no good running backups are found we elect a pod for the backup
-	podStatus, err := r.getBackupTargetPod(ctx, &cluster, &backup)
+	podStatus, err := r.getBackupTargetPod(ctx, &cluster, backup)
 	if apierrs.IsNotFound(err) ||
 		errors.Is(err, ErrPrimaryImageNeedsUpdate) ||
 		errors.Is(err, ErrInstanceStatusUnavailable) {
-		r.Recorder.Eventf(&backup, "Warning", "FindingPod",
+		r.Recorder.Eventf(backup, "Warning", "FindingPod",
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
 			cluster.Status.TargetPrimary)
 		backup.Status.SetAsPending()
-		if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
+		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
 			return nil, err
 		}
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if err != nil {
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, fmt.Errorf("while getting pod: %w", err))
-		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, &cluster, fmt.Errorf("while getting pod: %w", err))
+		r.Recorder.Eventf(backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
 		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
@@ -272,9 +322,9 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 	if !utils.IsPodReady(*pod) {
 		contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
 		backup.Status.SetAsPending()
-		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
+		r.Recorder.Eventf(backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 			cluster.Status.TargetPrimary)
-		if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
+		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
 			return nil, err
 		}
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
@@ -284,14 +334,14 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 		"cluster", cluster.Name,
 		"pod", pod.Name)
 
-	r.Recorder.Eventf(&backup, "Normal", "Starting",
+	r.Recorder.Eventf(backup, "Normal", "Starting",
 		"Starting backup for cluster %v", cluster.Name)
 
 	// This backup can be started. The SessionID from podStatus is used to detect
 	// if the instance manager was restarted during the backup.
-	if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster, podStatus.SessionID); err != nil {
-		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
+	if err := startInstanceManagerBackup(ctx, r.Client, backup, pod, &cluster, podStatus.SessionID); err != nil {
+		r.Recorder.Eventf(backup, "Warning", "Error", "Backup exit with error %v", err)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, &cluster,
 			fmt.Errorf("encountered an error while taking the backup: %w", err))
 		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
@@ -1056,6 +1106,15 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	// Only gate a backup that is still waiting to start. Once it has begun,
+	// the contention check is a no-op for it, but the SetAsPending below would
+	// regress a phase that may have advanced concurrently: the instance manager
+	// writes the terminal phase asynchronously, so a stale read here could flip
+	// an already-completed plugin backup back to pending.
+	if len(backup.Status.Phase) != 0 && backup.Status.Phase != apiv1.BackupPhasePending {
+		return ctrl.Result{}, nil
+	}
 
 	// Validate we don't have other running backups
 	var clusterBackups apiv1.BackupList

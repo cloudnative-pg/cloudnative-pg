@@ -21,12 +21,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/jackc/pgx/v5/pgconn"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -315,8 +317,8 @@ var _ = Describe("buildPostgresEnv", func() {
 
 	Context("Extensions enabled, LD_LIBRARY_PATH undefined", func() {
 		It("should be empty by default", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEmpty())
+			env := instance.buildPostgresEnv()
+			Expect(env).ToNot(ContainElement(HavePrefix("LD_LIBRARY_PATH=")))
 		})
 	})
 
@@ -339,14 +341,55 @@ var _ = Describe("buildPostgresEnv", func() {
 		})
 
 		It("should be defined", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(Equal(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
 		})
 		It("should retain existing values", func() {
 			GinkgoT().Setenv("LD_LIBRARY_PATH", "/my/library/path")
 
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
+		})
+	})
+
+	Context("Extensions enabled, no bin_path configured", func() {
+		It("should not be modified", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement("PATH=/my/default/path"))
+		})
+	})
+
+	Context("Extensions enabled, PATH defined", func() {
+		const (
+			path1 = postgres.ExtensionsBaseDirectory + "/foo/bindir"
+			path2 = postgres.ExtensionsBaseDirectory + "/foo/sample"
+			path3 = postgres.ExtensionsBaseDirectory + "/bar/bindir"
+			path4 = postgres.ExtensionsBaseDirectory + "/bar/sample"
+		)
+		finalPaths := strings.Join([]string{path1, path2, path3, path4}, ":")
+
+		BeforeEach(func() {
+			// Update the spec
+			cluster.Spec.PostgresConfiguration.Extensions[0].BinPath = []string{"/bindir", "sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[1].BinPath = []string{"./bindir", "./sample/"}
+			// Update the status
+			cluster.Status.PGDataImageInfo.Extensions[0].BinPath = []string{"/bindir", "sample/"}
+			cluster.Status.PGDataImageInfo.Extensions[1].BinPath = []string{"./bindir", "./sample/"}
+		})
+
+		It("should be defined", func() {
+			GinkgoT().Setenv("PATH", "")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("PATH=%s", finalPaths)))
+		})
+		It("should retain existing values", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("PATH=/my/default/path:%s", finalPaths)))
 		})
 	})
 
@@ -356,24 +399,17 @@ var _ = Describe("buildPostgresEnv", func() {
 			cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
 		})
 		It("LD_LIBRARY_PATH should be empty", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEmpty())
+			env := instance.buildPostgresEnv()
+			Expect(env).ToNot(ContainElement(HavePrefix("LD_LIBRARY_PATH=")))
+		})
+		It("PATH should not be modified", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement("PATH=/my/default/path"))
 		})
 	})
 })
-
-func getLibraryPathFromEnv(envs []string) string {
-	var ldLibraryPath string
-
-	for i := len(envs) - 1; i >= 0; i-- {
-		if strings.HasPrefix(envs[i], "LD_LIBRARY_PATH=") {
-			ldLibraryPath = envs[i]
-			break
-		}
-	}
-
-	return ldLibraryPath
-}
 
 var _ = Describe("GetPrimaryConnInfo", func() {
 	var instance *Instance
@@ -581,5 +617,52 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 
 		result := instance.RequiresDesignatedPrimaryTransition()
 		Expect(result).To(BeFalse())
+	})
+})
+
+var _ = Describe("EnrichMetricsConnError", func() {
+	const recoveryHint = "see the troubleshooting documentation for recovery steps"
+
+	It("returns nil unchanged", func() {
+		Expect(EnrichMetricsConnError(nil)).To(Succeed())
+	})
+
+	It("wraps a 28000 error that names the metrics exporter role", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `role "cnpg_metrics_exporter" does not exist`,
+		}
+		err := EnrichMetricsConnError(original)
+		Expect(err).To(MatchError(ContainSubstring(recoveryHint)))
+		Expect(errors.Is(err, original)).To(BeTrue())
+	})
+
+	It("leaves a 28000 error that does not name the role unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `peer authentication failed for user "someone_else"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves a 28000 ident-misconfig error that names the role unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `no pg_ident.conf entry for host "...", user "cnpg_metrics_exporter", database "postgres"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves errors with a different SQLSTATE unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28P01",
+			Message: `password authentication failed for user "cnpg_metrics_exporter"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves non-pgconn errors unchanged", func() {
+		original := errors.New("plain network error")
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
 	})
 })

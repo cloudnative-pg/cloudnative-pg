@@ -20,8 +20,8 @@ on:
         default: '4'
       feature_type:
         description: >
-          Feature Type (backup-restore, basic, cluster-metadata, declarative-databases, disruptive,
-          image-volume-extensions, importing-databases, maintenance, no-openshift, observability, operator,
+          Feature Type (backup-restore, basic, cluster-metadata, declarative-database-roles, declarative-databases,
+          disruptive, image-volume-extensions, importing-databases, maintenance, no-openshift, observability, operator,
           performance, plugin, pod-scheduling, postgres-configuration, postgres-major-upgrade, publication-subscription,
           recovery, replication, security, self-healing, service-connectivity, smoke, snapshot, storage, tablespaces,
           upgrade)
@@ -30,6 +30,14 @@ on:
         description: 'Log level for operator (error, warning, info, debug(default), trace)'
         required: false
         default: 'debug'
+      cnpg_deployment_method:
+        description: 'Deployment method for CNPG operator. Only relevant for Kind and K3D engines.'
+        required: false
+        default: 'manifest'
+        type: choice
+        options:
+          - manifest
+          - helm
   schedule:
     - cron:  '0 1 * * *'
 
@@ -39,13 +47,13 @@ permissions: read-all
 env:
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
-  KIND_VERSION: "v0.31.0"
+  KIND_VERSION: "v0.32.0"
   # renovate: datasource=github-releases depName=k3d-io/k3d versioning=semver
-  K3D_VERSION: "v5.8.3"
+  K3D_VERSION: "v5.9.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
-  ROOK_VERSION: "v1.19.2"
+  ROOK_VERSION: "v1.20.1"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
-  EXTERNAL_SNAPSHOTTER_VERSION: "v8.5.0"
+  EXTERNAL_SNAPSHOTTER_VERSION: "v8.6.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
@@ -79,12 +87,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.27, release-1.28]
+        branch: [release-1.28, release-1.29, release-1.30]
     env:
       BRANCH: ${{ matrix.branch }}
     steps:
       - name: Invoke workflow with inputs
-        uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
+        uses: benc-uk/workflow-dispatch@31e2b3319479a63f0ab15bf800eff9e913504e26 # v1
         with:
           workflow: continuous-delivery
           ref: ${{ env.BRANCH }}
@@ -109,6 +117,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
     steps:
       - name: Check for Command
         id: command
@@ -132,6 +141,7 @@ jobs:
           TEST_LEVEL="4"
           FEATURE_TYPE=""
           LOG_LEVEL="debug"
+          CNPG_DEPLOYMENT_METHOD="manifest"
 
           for ARG in $ARGS; do
             IFS='=' read name value <<< $ARG
@@ -151,6 +161,9 @@ jobs:
               "log_level"|"ll")
               LOG_LEVEL="${value}"
               ;;
+              "cnpg_deployment_method"|"deployment-method"|"dm")
+              CNPG_DEPLOYMENT_METHOD="${value}"
+              ;;
               *)
               ;;
             esac
@@ -161,6 +174,7 @@ jobs:
           echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
+          echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
         uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3
@@ -187,6 +201,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
     steps:
       - name: Parse input to env
         env:
@@ -196,6 +211,7 @@ jobs:
           INPUT_TEST_LEVEL: ${{ github.event.inputs.test_level }}
           INPUT_FEATURE_TYPE: ${{ github.event.inputs.feature_type }}
           INPUT_LOG_LEVEL: ${{ github.event.inputs.log_level }}
+          INPUT_CNPG_DEPLOYMENT_METHOD: ${{ github.event.inputs.cnpg_deployment_method }}
         run: |
           # Set the defaults for workflow dispatch
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]]; then
@@ -204,6 +220,7 @@ jobs:
             TEST_LEVEL="${INPUT_TEST_LEVEL}"
             FEATURE_TYPE="${INPUT_FEATURE_TYPE}"
             LOG_LEVEL="${INPUT_LOG_LEVEL}"
+            CNPG_DEPLOYMENT_METHOD="${INPUT_CNPG_DEPLOYMENT_METHOD}"
           fi
           # Set the defaults for schedule dispatch
           if [[ "${EVENT_NAME}" == 'schedule' ]]; then
@@ -212,12 +229,14 @@ jobs:
             TEST_LEVEL="4"
             FEATURE_TYPE=""
             LOG_LEVEL="debug"
+            CNPG_DEPLOYMENT_METHOD="manifest"
           fi
           echo "DEPTH=${DEPTH}" >> $GITHUB_ENV
           echo "LIMIT=${LIMIT}" >> $GITHUB_ENV
           echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
+          echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
 
   evaluate_options:
     name: Evaluate workflow options
@@ -238,6 +257,8 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
+      runs_on: ${{ steps.set-runner.outputs.runs_on }}
     steps:
       - name: From command
         env:
@@ -248,12 +269,14 @@ jobs:
           WD_TEST_LEVEL: ${{ needs.test_arguments.outputs.test_level }}
           WD_FEATURE_TYPE: ${{ needs.test_arguments.outputs.feature_type }}
           WD_LOG_LEVEL: ${{ needs.test_arguments.outputs.log_level }}
+          WD_CNPG_DEPLOYMENT_METHOD: ${{ needs.test_arguments.outputs.cnpg_deployment_method }}
           IC_GITHUB_REF: ${{ needs.check_commenter.outputs.github_ref }}
           IC_DEPTH: ${{ needs.check_commenter.outputs.depth }}
           IC_LIMIT: ${{ needs.check_commenter.outputs.limit }}
           IC_TEST_LEVEL: ${{ needs.check_commenter.outputs.test_level }}
           IC_FEATURE_TYPE: ${{ needs.check_commenter.outputs.feature_type }}
           IC_LOG_LEVEL: ${{ needs.check_commenter.outputs.log_level }}
+          IC_CNPG_DEPLOYMENT_METHOD: ${{ needs.check_commenter.outputs.cnpg_deployment_method }}
         run: |
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]; then
             echo "GITHUB_REF=${WD_GITHUB_REF}" >> $GITHUB_ENV
@@ -262,6 +285,7 @@ jobs:
             echo "TEST_LEVEL=${WD_TEST_LEVEL}" >> $GITHUB_ENV
             echo "FEATURE_TYPE=${WD_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${WD_LOG_LEVEL}" >> $GITHUB_ENV
+            echo "CNPG_DEPLOYMENT_METHOD=${WD_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
           fi
           if [[ "${EVENT_NAME}" == 'issue_comment' ]]; then
             echo "GITHUB_REF=${IC_GITHUB_REF}" >> $GITHUB_ENV
@@ -270,6 +294,18 @@ jobs:
             echo "TEST_LEVEL=${IC_TEST_LEVEL}" >> $GITHUB_ENV
             echo "FEATURE_TYPE=${IC_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${IC_LOG_LEVEL}" >> $GITHUB_ENV
+            echo "CNPG_DEPLOYMENT_METHOD=${IC_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
+          fi
+
+      - name: Set runner based on organization
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+        id: set-runner
+        run: |
+          if [[ "${REPO_OWNER}" == "cloudnative-pg" ]]; then
+            echo "runs_on=ubuntu-latest-16-cores" >> $GITHUB_OUTPUT
+          else
+            echo "runs_on=ubuntu-24.04" >> $GITHUB_OUTPUT
           fi
 
   buildx:
@@ -281,7 +317,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       needs.evaluate_options.result == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     permissions:
       contents: read
       packages: write
@@ -305,14 +341,14 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           check-latest: true
@@ -379,7 +415,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7
         with:
           distribution: goreleaser
           version: v2
@@ -390,22 +426,22 @@ jobs:
           VERSION: ${{ env.VERSION }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
       -
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@82490499d2e5613fcead7e128237ef0b0ea210f7 # v7
+        uses: docker/bake-action@6614cfa25eff9a0b2b2697efb0b6159e7680d584 # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -422,7 +458,7 @@ jobs:
       -
         name: Install cosign
         if: env.SIGN_IMAGES == 'true'
-        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
         # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
         # how to use cosign.
@@ -457,7 +493,7 @@ jobs:
           make generate-manifest
       -
         name: Upload the operator manifest as artifact in workflow
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
@@ -471,10 +507,8 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build binary for upgrade test
-        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
-        if: |
-          always() && !cancelled() &&
-          needs.evaluate_options.outputs.test_level == '4'
+        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7
+        if: needs.evaluate_options.outputs.test_level == '4'
         with:
           distribution: goreleaser
           version: v2
@@ -493,11 +527,9 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build and push image for upgrade test
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
         id: build-prime
-        if: |
-          always() && !cancelled() &&
-          needs.evaluate_options.outputs.test_level == '4'
+        if: needs.evaluate_options.outputs.test_level == '4'
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -526,7 +558,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -550,7 +582,7 @@ jobs:
           rm -fr manifests/operator-manifest.yaml
       -
         name: Prepare the operator manifest
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: operator-manifest.yaml
           path: manifests
@@ -569,7 +601,7 @@ jobs:
           git commit -m "${COMMIT_MESSAGE}"
       -
         name: Push changes
-        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
+        uses: ad-m/github-push-action@881a6320fdb16eb5318c5054f31c218aec2b324c # v1.3.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts
@@ -613,7 +645,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
@@ -643,7 +675,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.kindMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -672,6 +704,7 @@ jobs:
       LOG_DIR: ${{ github.workspace }}/kind-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "kind"
+      CNPG_DEPLOYMENT_METHOD: ${{ needs.evaluate_options.outputs.cnpg_deployment_method }}
     steps:
       -
         name: Cleanup Disk
@@ -695,19 +728,19 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -771,7 +804,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -797,7 +830,7 @@ jobs:
         # Archive logs for failed test cases if there are any
         name: Archive Kind logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: kind-logs-${{ env.MATRIX }}
           path: kind-logs/
@@ -805,7 +838,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -816,7 +849,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -828,7 +861,7 @@ jobs:
     name: Run E2E on K3D
     if: |
       (always() && !cancelled()) &&
-      github.event_name == 'workflow_dispatch' &&
+      vars.K3D_ENABLED == 'true' &&
       needs.generate-jobs.outputs.k3dEnabled == 'true' &&
       needs.generate-jobs.result == 'success'
     needs:
@@ -838,7 +871,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.k3dMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -867,6 +900,7 @@ jobs:
       LOG_DIR: ${{ github.workspace }}/k3d-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "k3d"
+      CNPG_DEPLOYMENT_METHOD: ${{ github.event_name == 'schedule' && 'helm' || needs.evaluate_options.outputs.cnpg_deployment_method }}
     steps:
       - name: Cleanup Disk
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
@@ -887,17 +921,17 @@ jobs:
           df -h
           echo "-----------------------------------------------------"
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       - name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           check-latest: true
       - ## In case hack/setup-cluster.sh needs to pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -911,7 +945,7 @@ jobs:
           install /tmp/k3d /usr/local/bin/k3d
           k3d version
       - name: Install kubectl
-        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4.0.1
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
         with:
           version: ${{ env.K8S_VERSION }}
       - name: Prepare patch for customization
@@ -960,7 +994,7 @@ jobs:
           fi
       - name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -981,14 +1015,14 @@ jobs:
       - # Archive logs for failed test cases if there are any
         name: Archive K3D logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: k3d-logs-${{ env.MATRIX }}
           path: k3d-logs/
           retention-days: 7
       - name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -997,7 +1031,7 @@ jobs:
           if-no-files-found: ignore
       - name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1029,12 +1063,12 @@ jobs:
     steps:
       -
         name: Azure Login
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Create AKS shared resources
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         id: setup
         with:
           timeout_minutes: 10
@@ -1103,18 +1137,18 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           check-latest: true
       -
         name: Prepare the environment
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -1123,34 +1157,34 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_minutes: 1
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Azure Login
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Install kubectl
-        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
         with:
           version: v${{ env.K8S_VERSION }}
       -
         name: Create AKS cluster
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1175,7 +1209,7 @@ jobs:
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_AKS} \
               --tier standard \
-              --node-count 3 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
+              --node-count 3 --node-vm-size Standard_D4s_v5 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
               --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
               --aks-custom-headers EnableAzureDiskFileCSIDriver=true
             az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
@@ -1196,7 +1230,7 @@ jobs:
         # use rook to get the small PV we use in the tests.
         # It can still take a while to deploy rook.
         name: Set up Rook
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_minutes: 27
           max_attempts: 1
@@ -1207,8 +1241,9 @@ jobs:
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
             kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
             kubectl apply -f ${ROOK_BASE_URL}/common.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
+            # csi-operator.yaml defines the csi.ceph.io CRDs that operator.yaml's CRs rely on
             kubectl apply -f ${ROOK_BASE_URL}/csi-operator.yaml
+            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
             curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
               sed '/^ *#/d;/^ *$/d' | \
               yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
@@ -1275,7 +1310,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1300,7 +1335,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1310,7 +1345,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1381,13 +1416,13 @@ jobs:
       -
         name: Azure Login
         if: always()
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Teardown AKS shared resources
         if: always()
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -1453,26 +1488,26 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-test-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX}" | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -1481,23 +1516,23 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_minutes: 1
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
       -
         name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       -
         name: Install eksctl
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -1549,12 +1584,12 @@ jobs:
           kubectl get storageclass
       -
         name: Setup Velero
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         env:
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
-          VELERO_VERSION: "v1.18.0"
+          VELERO_VERSION: "v1.18.2"
           # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
-          VELERO_AWS_PLUGIN_VERSION: "v1.14.0"
+          VELERO_AWS_PLUGIN_VERSION: "v1.14.2"
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1649,7 +1684,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1674,7 +1709,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1684,7 +1719,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1841,26 +1876,26 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -1869,13 +1904,13 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           timeout_seconds: 120
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
       -
         name: Set cluster name
         run: |
@@ -1911,8 +1946,8 @@ jobs:
               --num-nodes=1 \
               --cluster-version=${{ env.K8S_VERSION }} \
               --region=${{ env.REGION }} \
-              --disk-size=20 \
-              --machine-type=e2-standard-2 \
+              --disk-size=80 \
+              --machine-type=e2-standard-4 \
               --labels=cluster=${{ env.CLUSTER_NAME }}
             then
               exit 0
@@ -1997,7 +2032,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2022,7 +2057,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -2032,7 +2067,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -2170,28 +2205,28 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-ocp-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_K8S_VERSION}" | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ env.GIT_REF }}
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           check-latest: true
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -2204,6 +2239,11 @@ jobs:
           INDEX_IMG: ${{ needs.buildx.outputs.index_img }}
           CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
+          # opm requires registries.conf in v2 format; the runner default may be v1.
+          # Override with a v2 file matching the runner's search registries.
+          REGCONF="${RUNNER_TEMP}/registries.conf"
+          printf 'unqualified-search-registries = ["docker.io", "quay.io"]\n' > "${REGCONF}"
+          export CONTAINERS_REGISTRIES_CONF="${REGCONF}"
           make olm-catalog
       -
         name: Install OC Installer and client
@@ -2300,7 +2340,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2325,7 +2365,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -2335,7 +2375,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -2391,7 +2431,7 @@ jobs:
         run: mkdir test-artifacts
 
       - name: Download all artifacts to the directory
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: test-artifacts
           pattern: testartifacts-*
@@ -2415,7 +2455,7 @@ jobs:
 
       - name: If there is an overflow summary, archive it
         if: steps.generate-summary.outputs.Overflow
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.generate-summary.outputs.Overflow }}
           path: ${{ steps.generate-summary.outputs.Overflow }}
@@ -2424,7 +2464,7 @@ jobs:
       - name: Send the Ciclops view over Slack
         # Send the Ciclops thermometer on every scheduled run on `main`.
         # or when there are systematic failures in release branches
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         if: |
           github.repository_owner == env.REPOSITORY_OWNER &&
           (

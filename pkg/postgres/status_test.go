@@ -239,6 +239,54 @@ var _ = Describe("PostgreSQL status real", func() {
 	})
 })
 
+var _ = Describe("IsPodReadyAndNotReporting", func() {
+	errStatusEndpointFailing := fmt.Errorf("status endpoint failing")
+
+	podList := PostgresqlStatusList{
+		Items: []PostgresqlStatus{
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "primary"}},
+				IsPodReady: true,
+				Error:      errStatusEndpointFailing,
+			},
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-reporting"}},
+				IsPodReady: true,
+				Error:      nil,
+			},
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-not-ready"}},
+				IsPodReady: false,
+				Error:      errStatusEndpointFailing,
+			},
+		},
+	}
+
+	It("returns true and the underlying error when the pod is ready but the status endpoint is failing", func() {
+		ok, err := podList.IsPodReadyAndNotReporting("primary")
+		Expect(ok).To(BeTrue())
+		Expect(err).To(MatchError(errStatusEndpointFailing))
+	})
+
+	It("returns false and a nil error when the pod is ready and reporting", func() {
+		ok, err := podList.IsPodReadyAndNotReporting("replica-reporting")
+		Expect(ok).To(BeFalse())
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("returns false and a nil error when the pod is not ready and not reporting", func() {
+		ok, err := podList.IsPodReadyAndNotReporting("replica-not-ready")
+		Expect(ok).To(BeFalse())
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("returns false and a nil error when the pod is not in the list", func() {
+		ok, err := podList.IsPodReadyAndNotReporting("unknown")
+		Expect(ok).To(BeFalse())
+		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
 var _ = Describe("Configuration report", func() {
 	DescribeTable(
 		"Configuration report",

@@ -384,6 +384,16 @@ Objects in each list will be processed sequentially.
     leaving the cluster incomplete and requiring manual intervention.
 :::
 
+:::note
+These queries run with the standard `"$user", public` `search_path`, even
+though operator-issued connections otherwise pin a fixed `search_path` for
+security reasons.
+See [Schema resolution and `search_path` hardening](security.md#schema-resolution-and-search_path-hardening)
+for details.
+Schema-qualify object references if you need them to be independent of the
+`search_path`.
+:::
+
 :::info[Important]
     Ensure the existence of entries inside the ConfigMaps or Secrets specified
     in `postInitSQLRefs`, `postInitTemplateSQLRefs`, and
@@ -614,7 +624,7 @@ file on the source PostgreSQL instance:
 host replication streaming_replica all md5
 ```
 
-The following manifest creates a new PostgreSQL 18.3 cluster,
+The following manifest creates a new PostgreSQL 18.4 cluster,
 called `target-db`, using the `pg_basebackup` bootstrap method
 to clone an external PostgreSQL cluster defined as `source-db`
 (in the `externalClusters` array). As you can see, the `source-db`
@@ -629,7 +639,7 @@ metadata:
   name: target-db
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
 
   bootstrap:
     pg_basebackup:
@@ -649,7 +659,7 @@ spec:
 ```
 
 All the requirements must be met for the clone operation to work, including
-the same PostgreSQL version (in our case 18.3).
+the same PostgreSQL version (in our case 18.4).
 
 #### TLS certificate authentication
 
@@ -665,7 +675,7 @@ in the same Kubernetes cluster.
     outside the Kubernetes cluster.
 :::
 
-The manifest defines a new PostgreSQL 18.3 cluster called `cluster-clone-tls`,
+The manifest defines a new PostgreSQL 18.4 cluster called `cluster-clone-tls`,
 which is bootstrapped using the `pg_basebackup` method from the `cluster-example`
 external cluster. The host is identified by the read/write service
 in the same cluster, while the `streaming_replica` user is authenticated
@@ -680,7 +690,7 @@ metadata:
   name: cluster-clone-tls
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
 
   bootstrap:
     pg_basebackup:

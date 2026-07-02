@@ -42,8 +42,8 @@ def env_to_json():
     """Convert a set of environment variables into a valid JSON with the following format:
     {
         "runner": , # e.g. local, aks, eks, gke
-        "id": , # the matrix ID e.g. local-v1.22.2-PostgreSQL-13.5
-        "postgres": , # version of PostgreSQL e.g. 13.5
+        "id": , # the matrix ID e.g. local-v1.22.2-PostgreSQL-18.4
+        "postgres": , # version of PostgreSQL e.g. 18.4
         "postgres_kind": , # flavor of PostgreSQL
         "kubernetes": , # version of K8s e.g. v1.22.2
         "runid": , # the GH Action run-id -> ${{ github.run_id }}
@@ -102,8 +102,8 @@ def convert_ginkgo_test(test, matrix):
     a JSON of the form:
     {
         "runner": , # e.g. local, aks, eks, gke
-        "id": , # the matrix ID e.g. local-v1.22.2-PostgreSQL-13.5
-        "postgres": , # version of PostgreSQL e.g. 13.5
+        "id": , # the matrix ID e.g. local-v1.22.2-PostgreSQL-18.4
+        "postgres": , # version of PostgreSQL e.g. 18.4
         "postgres_kind": , # flavor of PostgreSQL
         "kubernetes": , # version of K8s e.g. v1.22.2
         "runid": , # the GH Action run-id -> ${{ github.run_id }}

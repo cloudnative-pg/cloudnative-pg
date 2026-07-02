@@ -33,6 +33,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -59,7 +60,12 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
-	return createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, pgbouncer.NewPoolerPodMonitorManager(pooler))
+	return createOrPatchPodMonitor(
+		ctx,
+		r.Client,
+		r.DiscoveryClient,
+		pgbouncer.NewPoolerPodMonitorManager(pooler, resources.Cluster),
+	)
 }
 
 // updateDeployment update the deployment or create it when needed
@@ -69,6 +75,17 @@ func (r *PoolerReconciler) updateDeployment(
 	resources *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
+
+	// Skip deployment reconciliation while the image cannot be resolved:
+	// either Phase=Failed (catalog currently broken) or Status.Image is empty
+	// (no prior success). Unrelated spec changes wait until
+	// updatePoolerStatus resolves the image again.
+	if pooler.Status.Phase == apiv1.PoolerPhaseFailed || pooler.Status.Image == "" {
+		contextLog.Info("Skipping deployment reconciliation: pgbouncer image is not resolved",
+			"phase", pooler.Status.Phase,
+			"reason", pooler.Status.PhaseReason)
+		return nil
+	}
 
 	generatedDeployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
 	if err != nil {
@@ -139,6 +156,7 @@ func (r *PoolerReconciler) reconcileService(
 
 	if resources.Service == nil {
 		contextLog.Info("Creating the service")
+		servicespec.SetLastApplied(&expectedService.ObjectMeta, &expectedService.Spec)
 		err := r.Create(ctx, expectedService)
 		if err != nil && !apierrs.IsAlreadyExists(err) {
 			return err
@@ -148,13 +166,22 @@ func (r *PoolerReconciler) reconcileService(
 	}
 
 	patchedService := resources.Service.DeepCopy()
-	patchedService.Spec = expectedService.Spec
+	if err := servicespec.ApplyProposedChanges(
+		&patchedService.Spec,
+		&expectedService.Spec,
+		resources.Service.Annotations,
+	); err != nil {
+		return err
+	}
 	utils.MergeObjectsMetadata(patchedService, expectedService)
 
 	if reflect.DeepEqual(patchedService.ObjectMeta, resources.Service.ObjectMeta) &&
 		reflect.DeepEqual(patchedService.Spec, resources.Service.Spec) {
 		return nil
 	}
+
+	// Store the proposed spec for future three-way merges
+	servicespec.SetLastApplied(&patchedService.ObjectMeta, &expectedService.Spec)
 
 	contextLog.Info("Updating the service metadata")
 

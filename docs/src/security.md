@@ -207,9 +207,137 @@ container-level security:
 
 Security at the cluster level takes into account all Kubernetes components that
 form both the control plane and the nodes, as well as the applications that run in
-the cluster (PostgreSQL included).
+the cluster (PostgreSQL included). We start by defining the trust model and the
+security boundaries that frame the rest of this section.
+
+### Trust Model and Security Boundaries
+
+CloudNativePG follows a clear separation of responsibilities between the
+operator and the Kubernetes platform for enforcing security policies. The
+subsections below describe who is trusted to influence the PostgreSQL Pods,
+where the enforcement boundary actually lies, how the operator confines the
+resources it manages, and how access to all of this is governed by RBAC.
+
+#### Trusted Cluster Resource Writers
+
+Any user with create or update permissions on the `Cluster` custom resource is
+trusted to define the full specification of the PostgreSQL Pods that the
+operator manages. This includes security-sensitive fields such as
+`spec.securityContext`, `spec.podSecurityContext`, and
+`spec.serviceAccountName`. The operator applies these settings as instructed.
+When a Cluster writer does not override them, the operator applies a hardened
+default Pod and container security context (see
+[Pod and Container Security Contexts](#pod-and-container-security-contexts)).
+
+This is consistent with how all Kubernetes operators work: the operator acts as
+a privileged agent that translates high-level intent into low-level Kubernetes
+resources. Granting someone write access to a Cluster resource is equivalent
+to granting them control over the resulting Pods, Services, PVCs, and other
+managed resources.
+
+The same principle applies to [CNPG-I plugins](cnpg_i.md). A plugin hooks into
+the Pod lifecycle and can modify any field of the Pod specification before the
+Pod is created. Installing a plugin is therefore an explicit trust decision
+made by the cluster administrator, on par with granting write access to a
+Cluster resource.
+
+The same authority extends into the database itself: because the operator
+reconciles PostgreSQL as the superuser, a Cluster writer gains superuser-level
+influence over the resulting cluster through documented, intended fields,
+including:
+
+- the bootstrap SQL hooks `postInitSQL`, `postInitApplicationSQL`, and
+  `postInitTemplateSQL`, executed as the `postgres` superuser at initialization
+  (see [Executing Queries After Initialization](bootstrap.md#executing-queries-after-initialization));
+- [inline managed roles](declarative_role_management.md#inline-managed-roles)
+  (`spec.managed.roles`), which may set `superuser: true` or grant membership of
+  existing roles, and can use PostgreSQL features such as `COPY ... FROM PROGRAM`
+  to run commands inside the operand Pod;
+- custom PostgreSQL configuration, including
+  [`pg_hba`](postgresql_conf.md#the-pg_hba-section) rules (for example `trust`
+  authentication) and parameters that shape the cluster's security posture and
+  durability, such as `password_encryption`, `fsync`, and memory-related
+  settings.
+
+This is the intended trust model, not a privilege escalation.
+
+Code running in the operand Pod also runs under its mounted `ServiceAccount`,
+which can read the Secrets associated with its own cluster (see
+[Calls to the API server made by the instance manager](#calls-to-the-api-server-made-by-the-instance-manager)
+and ["Secrets"](applications.md#secrets)). A Cluster writer can therefore read
+those Secrets, confined by [Namespace Isolation](#namespace-isolation) to the
+Cluster's own namespace.
+
+:::note
+These trust boundaries are also covered in the project's
+[self security assessment](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-catalog.yaml).
+:::
+
+#### Kubernetes Admission Control
+
+The operator creates Pods through the standard Kubernetes API, meaning every
+Pod goes through the full admission control chain configured on the cluster.
+This includes
+[Pod Security Admission](https://kubernetes.io/docs/concepts/security/pod-security-admission/)
+(PSA), the built-in Kubernetes mechanism that enforces
+[Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
+at the namespace level, as well as any third-party policy engine in use. If a
+namespace enforces the PSA `restricted` or `baseline` profile, the Kubernetes
+API server rejects any Pod that violates the policy, including Pods created by
+the operator.
+
+Because the trusted Cluster writers described above can set any Pod field, this
+admission control chain (not the operator) is the boundary that enforces Pod
+security policies in your environment.
+
+#### Namespace Isolation
+
+The operator confines all managed resources to the namespace of their parent
+Cluster. Instance Pods are always created in the same namespace as their
+Cluster, set explicitly and deterministically rather than inferred from any
+other relationship. Because Kubernetes owner references are confined to a
+single namespace, the operator also cannot establish ownership of resources in
+any other namespace.
+
+#### RBAC on Custom Resources
+
+Access to CloudNativePG custom resources is governed by standard Kubernetes
+RBAC. Since write access to a Cluster resource implies control over the
+resulting Pods, annotations like `cnpg.io/podPatch` (which applies a
+user-supplied patch to the managed Pods), `cnpg.io/validation`, and
+`cnpg.io/reconciliationLoop` are subject to the same RBAC rules as the
+Cluster resource itself.
+
+In particular, setting `cnpg.io/validation` to `disabled` bypasses the
+operator's own validating admission webhook for that Cluster, including the
+syntactic and applicability checks performed on `cnpg.io/podPatch`.
+CloudNativePG's webhook validation is therefore advisory: it can be turned off
+by the same actor who can write the Cluster, so it is not a security boundary.
+Kubernetes admission control still applies to the resulting Pods regardless of
+this annotation.
+
+The same reasoning applies to the `DatabaseRole` resource: its specification
+allows `superuser: true` and membership of any existing role through
+`inRoles`, including the `postgres` role itself. Write access to
+`DatabaseRole` objects in a namespace is therefore equivalent to superuser
+access on the PostgreSQL clusters in that namespace, and deserves the same
+care as write access to the `Cluster` resource.
+
+Treat write access to these resources as a high-privilege grant: for
+multi-tenant deployments, isolate tenants in separate namespaces and scope it
+per namespace with Kubernetes RBAC, relying on
+[Namespace Isolation](#namespace-isolation) to bound the impact.
+
+The RBAC discussed here governs access to CloudNativePG's own custom resources.
+The next section covers the complementary side: the RBAC that the operator
+itself relies on to manage Kubernetes resources on your behalf.
 
 ### Role Based Access Control (RBAC)
+
+This section covers the operator's *own* RBAC (the service account and roles it
+uses to manage Kubernetes resources on your behalf), as opposed to the user
+access to custom resources discussed in
+[RBAC on Custom Resources](#rbac-on-custom-resources) above.
 
 The operator interacts with the Kubernetes API server using a dedicated service
 account named `cnpg-manager`. This service account is typically installed in
@@ -367,10 +495,11 @@ specifying the `serviceAccountName` field in the cluster specification. This
 enables one-time IAM configuration that works across all clusters using that
 `ServiceAccount`.
 
-!!! Important
-    When using a shared `ServiceAccount`, you are responsible for creating and
-    managing the `ServiceAccount` yourself. The operator will validate that the
-    specified `ServiceAccount` exists but will not create or modify it.
+:::important
+When using a shared `ServiceAccount`, you are responsible for creating and
+managing the `ServiceAccount` yourself. The operator will validate that the
+specified `ServiceAccount` exists but will not create or modify it.
+:::
 
 Here's an example of using a shared `ServiceAccount`:
 
@@ -396,22 +525,25 @@ spec:
     size: 100Gi
 ```
 
-!!! Note
-    The `serviceAccountName` field is mutually exclusive with
-    `serviceAccountTemplate`. You can either let the operator manage the
-    `ServiceAccount` (optionally customizing it with `serviceAccountTemplate`)
-    or reference an existing one with `serviceAccountName`, but not both.
+:::note
+The `serviceAccountName` field is mutually exclusive with
+`serviceAccountTemplate`. You can either let the operator manage the
+`ServiceAccount` (optionally customizing it with `serviceAccountTemplate`)
+or reference an existing one with `serviceAccountName`, but not both.
+:::
 
-!!! Warning
-    The `serviceAccountName` field is immutable once set. If you need to change
-    the `ServiceAccount`, you must recreate the cluster.
+:::warning
+The `serviceAccountName` field is immutable once set. If you need to change
+the `ServiceAccount`, you must recreate the cluster.
+:::
 
-!!! Note
-    When multiple clusters share a `ServiceAccount`, the operator creates
-    a separate `Role` and `RoleBinding` for each cluster. The shared
-    `ServiceAccount` accumulates the Kubernetes RBAC permissions of all
-    clusters using it. Each `Role` is narrowly scoped to the specific
-    cluster's resources, so this does not constitute a privilege escalation.
+:::note
+When multiple clusters share a `ServiceAccount`, the operator creates
+a separate `Role` and `RoleBinding` for each cluster. The shared
+`ServiceAccount` accumulates the Kubernetes RBAC permissions of all
+clusters using it. Each `Role` is narrowly scoped to the specific
+cluster's resources, so this does not constitute a privilege escalation.
+:::
 
 #### Using a shared ServiceAccount with Poolers
 
@@ -434,10 +566,11 @@ spec:
     poolMode: session
 ```
 
-!!! Warning
-    As with clusters, the `serviceAccountName` field on poolers is immutable
-    once set. If you need to change the `ServiceAccount`, you must recreate
-    the pooler.
+:::warning
+As with clusters, the `serviceAccountName` field on poolers is immutable
+once set. If you need to change the `ServiceAccount`, you must recreate
+the pooler.
+:::
 
 For transparency, the permissions associated with the service account are defined in the
 [roles.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/pkg/specs/roles.go)
@@ -608,13 +741,16 @@ spec:
     These fields are particularly useful when working with the
     [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
     `restricted` profile, which has strict requirements for pod and container
-    security contexts.
+    security contexts. As described in
+    [Kubernetes Admission Control](#kubernetes-admission-control), it is this
+    admission chain (not the operator) that enforces such profiles on the
+    resulting Pods.
 :::
 
 #### Security Context Constraints
 
 When running in an environment that is utilizing
-[Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/4.17/authentication/managing-security-context-constraints.html)
+[Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/latest/authentication/managing-security-context-constraints.html)
 the operator does not explicitly set the security context of the PostgreSQL
 cluster pods, but rather allows the pods to inherit the restricted Security
 Context Constraints that are already defined.
@@ -687,8 +823,45 @@ levels, as listed in the table below:
 | operator         | 9443        | webhook server      | `webhook-server` | Yes      | Yes            |
 | operator         | 8080        | metrics             | `metrics`        | No       | No             |
 | instance manager | 9187        | metrics             | `metrics`        | Optional | No             |
-| instance manager | 8000        | status              | `status`         | Yes      | No             |
+| instance manager | 8000        | status              | `status`         | Yes      | Partial (1)    |
 | operand          | 5432        | PostgreSQL instance | `postgresql`     | Optional | Yes            |
+
+(1) Status, health, and probe endpoints are unauthenticated. Sensitive
+endpoints (backup, `pg_controldata`, partial WAL archive, and instance-manager
+upgrade) require the operator's client certificate, as described in
+[Operator-to-instance authentication](#operator-to-instance-authentication)
+below.
+
+#### Operator-to-instance authentication
+
+The operator generates a self-signed ECDSA client certificate in memory at
+startup and publishes its SHA-256 public-key fingerprint in the cluster's
+`.status.operatorCertificateFingerprint`. The instance manager pins that
+fingerprint and rejects any call to its sensitive endpoints (backup,
+`pg_controldata`, partial WAL archive, and instance-manager upgrade) that does
+not present a matching certificate. Status, health, and probe endpoints remain
+unauthenticated.
+
+The certificate is never written to disk and is regenerated on every operator
+restart, so trust derives from fingerprint pinning rather than CA validation.
+
+This protection has a hard requirement: the status port **must** be served over
+TLS, which has been the default since v1.24. A client certificate can only be
+presented over a TLS connection, so the protected endpoints are reachable by the
+operator only when the status port uses TLS.
+
+:::warning
+If the status port is not served over TLS, the instance manager cannot
+authenticate the operator and **permanently** rejects every call to its
+protected endpoints (backup, `pg_controldata`, partial WAL archive, and
+instance-manager upgrade) with `401 Unauthorized`. This is not a transient
+condition and will not resolve on its own. It can affect instances created by an
+operator older than v1.24 (whose status port serves plain HTTP) once their
+instance manager is upgraded to a version that enforces this authentication: such
+instances must be rolled out so their Pods are recreated with a TLS-enabled status
+port. Newly created instances always enable TLS on the status port and are
+unaffected.
+:::
 
 ### PostgreSQL
 
@@ -756,6 +929,45 @@ For further detail on how `pg_ident.conf` is managed by the operator, see the
 
 :::info[Important]
     Examples assume that the Kubernetes cluster runs in a private and secure network.
+:::
+
+#### Schema resolution and `search_path` hardening
+
+A user with privileges on a database can plant objects (functions,
+operators, tables, or types) in a writable schema such as `public` and
+change the database- or role-level `search_path` (for example with
+`ALTER DATABASE ... SET search_path` or `ALTER ROLE ... SET
+search_path`). A privileged session that later connects to that database
+inherits the tenant-controlled `search_path`, so an unqualified
+reference in one of its queries could resolve to the planted object
+instead of the intended one. This is a privilege-escalation vector
+analogous to
+[CWE-426 (Untrusted Search Path)](https://cwe.mitre.org/data/definitions/426.html),
+and the same class of issue as the well-known
+[CVE-2018-1058](https://www.postgresql.org/support/security/CVE-2018-1058/).
+
+To prevent this, CloudNativePG pins the `search_path` on every
+connection it opens to PostgreSQL to a fixed value of
+`pg_catalog, public, pg_temp`, regardless of any `search_path`
+configured on the database or the connecting role:
+
+- `pg_catalog` is searched first, so a built-in object always takes
+  precedence over a same-named object planted in another schema;
+- `pg_temp` (the session-private temporary schema) is searched last
+  rather than first, so it cannot shadow relations or data types.
+
+In addition, the `SECURITY DEFINER` lookup function used by the
+PgBouncer integration is created with its own pinned `search_path`, and
+the monitoring queries run inside a transaction whose `search_path` is
+pinned as described in the ["Monitoring" page](monitoring.md).
+
+:::note
+User-authored SQL — `postInitSQL`/`postInitApplicationSQL`/`postInitTemplateSQL`
+during bootstrap, and the post-import queries of a logical import — runs
+with the standard `"$user", public` resolution so that it keeps behaving
+as it would in a plain PostgreSQL session. Schema-qualify object
+references in those scripts if you need them to be independent of the
+`search_path`.
 :::
 
 ### Storage

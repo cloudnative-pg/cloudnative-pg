@@ -38,12 +38,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -57,6 +58,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -134,6 +136,10 @@ var (
 
 	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
+
+	// ErrNoFreeWALSpace is returned when there isn't enough disk space
+	// available to store at least two WAL files.
+	ErrNoFreeWALSpace = errors.New("no free disk space for WALs")
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -155,8 +161,13 @@ type Instance struct {
 	// Pool of DB connections pointing to every used database
 	pool *pool.ConnectionPool
 
+	// Pool of DB connections for the metrics exporter (connects as cnpg_metrics_exporter)
+	initializeMetricsPool sync.Once
+	metricsPool           *pool.ConnectionPool
+
 	// Pool of DB connections pointing to primary instance
-	primaryPool *pool.ConnectionPool
+	initializePrimaryPool sync.Once
+	primaryPool           *pool.ConnectionPool
 
 	// The namespace of the k8s object representing this cluster
 	namespace string
@@ -220,7 +231,10 @@ type Instance struct {
 
 	// cluster is the cached cluster this instance belongs to.
 	// Access via GetClusterOrDefault() which returns an empty cluster if nil.
-	cluster *apiv1.Cluster
+	// It is read from HTTP handler goroutines (e.g. the remote webserver
+	// authentication middleware) while being written by the reconciliation loop,
+	// so access is synchronized through an atomic pointer.
+	cluster atomic.Pointer[apiv1.Cluster]
 }
 
 type serverCertificateHandler struct {
@@ -294,16 +308,16 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 // GetClusterOrDefault returns the cached cluster, or an empty cluster if not set.
 // The empty cluster provides safe defaults via getter methods.
 func (instance *Instance) GetClusterOrDefault() *apiv1.Cluster {
-	if instance.cluster == nil {
-		return &apiv1.Cluster{}
+	if cluster := instance.cluster.Load(); cluster != nil {
+		return cluster
 	}
-	return instance.cluster
+	return &apiv1.Cluster{}
 }
 
 // SetCluster updates the cached cluster for use outside the reconciliation
 // cycle when the API client is not available
 func (instance *Instance) SetCluster(cluster *apiv1.Cluster) {
-	instance.cluster = cluster
+	instance.cluster.Store(cluster)
 }
 
 // RequiresDesignatedPrimaryTransition checks if this instance is a primary
@@ -541,6 +555,9 @@ func (instance *Instance) ShutdownConnections() {
 	if instance.pool != nil {
 		instance.pool.ShutdownConnections()
 	}
+	if instance.metricsPool != nil {
+		instance.metricsPool.ShutdownConnections()
+	}
 	if instance.primaryPool != nil {
 		instance.primaryPool.ShutdownConnections()
 	}
@@ -768,8 +785,7 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 }
 
 // buildPostgresEnv builds the environment variables that should be used by PostgreSQL
-// to run the main process, taking care of adding any library path that is needed for
-// extensions.
+// to run the main process, taking care of adding any path that is needed for extensions.
 func (instance *Instance) buildPostgresEnv() []string {
 	env := instance.Env
 	if env == nil {
@@ -784,58 +800,61 @@ func (instance *Instance) buildPostgresEnv() []string {
 		return envMap.StringSlice()
 	}
 
-	// If there are no additional library paths, we use the environment variables
-	// of the current process
-	additionalLibraryPaths := collectLibraryPaths(cluster.Status.PGDataImageInfo.Extensions)
-	if len(additionalLibraryPaths) == 0 {
-		return envMap.StringSlice()
+	// Append extension-provided paths after any existing entries, then merge
+	// custom Env from extensions. Guard against empty paths to avoid creating
+	// an empty LD_LIBRARY_PATH (glibc treats that as "search cwd").
+	exts := cluster.Status.PGDataImageInfo.Extensions
+	if paths := extensions.CollectLibraryPaths(exts, postgres.ExtensionsBaseDirectory); len(paths) > 0 {
+		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], paths)
 	}
-
-	// We add the additional library paths after the entries that are already
-	// available.
-	currentLibraryPath := envMap["LD_LIBRARY_PATH"]
-	if currentLibraryPath != "" {
-		currentLibraryPath += ":"
+	if paths := extensions.CollectBinPaths(exts, postgres.ExtensionsBaseDirectory); len(paths) > 0 {
+		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], paths)
 	}
-	currentLibraryPath += strings.Join(additionalLibraryPaths, ":")
-	envMap["LD_LIBRARY_PATH"] = currentLibraryPath
+	extensions.SetEnvVars(exts, envMap, postgres.ExtensionsBaseDirectory)
 
 	return envMap.StringSlice()
-}
-
-// collectLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
-// given an extension
-func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	result := make([]string, 0, len(extensionList))
-
-	for _, extension := range extensionList {
-		for _, libraryPath := range extension.LdLibraryPath {
-			result = append(
-				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
-			)
-		}
-	}
-
-	return result
 }
 
 // WithActiveInstance execute the internal function while this
 // PostgreSQL instance is running
 func (instance *Instance) WithActiveInstance(inner func() error) error {
-	// Start the CSV logpipe to redirect log to stdout
+	// Start all log pipe readers so the FIFOs are created before postgres or other
+	// components (e.g. the archive/restore command implementation) try to write logs.
+	// Without these readers nothing calls Mkfifo on the log paths, the writers fall
+	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	csvPipe := logpipe.NewLogPipe()
 
+	csvPipe := logpipe.NewLogPipe()
 	go func() {
 		if err := csvPipe.Start(ctx); err != nil {
-			log.Info("csv pipeline encountered an error", "err", err)
+			log.Info("csv log pipe encountered an error", "err", err)
+		}
+	}()
+
+	rawPipe := logpipe.NewRawLineLogPipe(
+		filepath.Join(postgres.LogPath, postgres.LogFileName),
+		logpipe.LoggingCollectorRecordName,
+	)
+	go func() {
+		if err := rawPipe.Start(ctx); err != nil {
+			log.Info("raw log pipe encountered an error", "err", err)
+		}
+	}()
+
+	jsonPipe := logpipe.NewJSONLineLogPipe(
+		filepath.Join(postgres.LogPath, postgres.LogFileName+".json"),
+	)
+	go func() {
+		if err := jsonPipe.Start(ctx); err != nil {
+			log.Info("json log pipe encountered an error", "err", err)
 		}
 	}()
 
 	defer func() {
 		ctxCancel()
 		csvPipe.GetExitedCondition().Wait()
+		rawPipe.GetExitedCondition().Wait()
+		jsonPipe.GetExitedCondition().Wait()
 	}()
 
 	err := instance.Startup()
@@ -855,6 +874,39 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 // GetSuperUserDB gets a connection to the "postgres" database on this instance
 func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("postgres")
+}
+
+// GetMetricsDB gets a connection to the named database authenticated as cnpg_metrics_exporter.
+func (instance *Instance) GetMetricsDB(dbname string) (*sql.DB, error) {
+	return instance.metricsConnectionPool().Connection(dbname)
+}
+
+// PostgreSQL SQLSTATE for "invalid authorization specification" (Class 28).
+// See https://www.postgresql.org/docs/current/errcodes-appendix.html
+const sqlstateInvalidAuth = "28000"
+
+// EnrichMetricsConnError wraps a database error with a recovery hint when
+// it indicates the cnpg_metrics_exporter role is missing. It deliberately
+// matches the role-not-found case only (SQLSTATE 28000 with the canonical
+// "role <name> does not exist" message) to avoid misleading users when
+// SQLSTATE 28000 surfaces from other auth-time failures (peer ident
+// misconfiguration, password mismatch, etc.).
+func EnrichMetricsConnError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) &&
+		pgErr.Code == sqlstateInvalidAuth &&
+		strings.Contains(pgErr.Message, apiv1.MetricsExporterUserName) &&
+		strings.Contains(pgErr.Message, "does not exist") {
+		return fmt.Errorf(
+			"metrics exporter cannot connect: PostgreSQL role %q not found in the database; "+
+				"see the troubleshooting documentation for recovery steps: %w",
+			apiv1.MetricsExporterUserName, err,
+		)
+	}
+	return err
 }
 
 // GetTemplateDB gets a connection to the "template1" database on this instance
@@ -901,11 +953,27 @@ func (instance *Instance) ConnectionPool() pool.Pooler {
 	return instance.pool
 }
 
+// metricsConnectionPool gets or initializes the connection pool used by the metrics exporter.
+func (instance *Instance) metricsConnectionPool() pool.Pooler {
+	instance.initializeMetricsPool.Do(func() {
+		socketDir := GetSocketDir()
+		dsn := fmt.Sprintf(
+			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			socketDir,
+			GetServerPort(),
+			apiv1.MetricsExporterUserName,
+			apiv1.MetricsExporterUserName,
+		)
+		instance.metricsPool = pool.NewPostgresqlConnectionPool(dsn)
+	})
+	return instance.metricsPool
+}
+
 // PrimaryConnectionPool gets or initializes the primary connection pool for this instance
 func (instance *Instance) PrimaryConnectionPool() *pool.ConnectionPool {
-	if instance.primaryPool == nil {
+	instance.initializePrimaryPool.Do(func() {
 		instance.primaryPool = pool.NewPostgresqlConnectionPool(instance.GetPrimaryConnInfo())
-	}
+	})
 
 	return instance.primaryPool
 }
@@ -951,7 +1019,7 @@ func (instance *Instance) WaitForPrimaryAvailable(ctx context.Context) error {
 	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
 
-	db, err := sql.Open("pgx", primaryConnInfo)
+	db, err := pool.NewDBConnection(primaryConnInfo, pool.ConnectionProfilePostgresql)
 	if err != nil {
 		return err
 	}

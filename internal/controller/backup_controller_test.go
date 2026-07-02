@@ -35,6 +35,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -209,8 +211,59 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(res).To(BeFalse())
 		})
+
+		It("failing the backup when the instance manager was restarted during it", func(ctx context.Context) {
+			backup.Spec.Method = apiv1.BackupMethodPlugin
+			backup.Status.Phase = apiv1.BackupPhaseStarted
+			backup.Status.InstanceID.SessionID = "session-before-restart"
+			env.backupReconciler.instanceStatusClient = &fakeInstanceStatusClient{
+				sessionID: "session-after-restart",
+			}
+
+			res, err := env.backupReconciler.isValidBackupRunning(ctx, backup, cluster)
+			Expect(err).To(HaveOccurred())
+			Expect(res).To(BeFalse())
+
+			var stored apiv1.Backup
+			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(backup), &stored)).To(Succeed())
+			Expect(stored.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
+		})
+
+		It("considering the backup running when the instance manager session is unchanged", func(ctx context.Context) {
+			backup.Spec.Method = apiv1.BackupMethodPlugin
+			backup.Status.InstanceID.SessionID = "session-stable"
+			env.backupReconciler.instanceStatusClient = &fakeInstanceStatusClient{
+				sessionID: "session-stable",
+			}
+
+			res, err := env.backupReconciler.isValidBackupRunning(ctx, backup, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res).To(BeTrue())
+		})
 	})
 })
+
+// fakeInstanceStatusClient reports a fixed instance manager session ID for
+// every queried pod. The other InstanceClient methods are inherited from the
+// embedded nil interface and panic if called.
+type fakeInstanceStatusClient struct {
+	remote.InstanceClient
+	sessionID string
+}
+
+func (f *fakeInstanceStatusClient) GetStatusFromInstances(
+	_ context.Context,
+	pods corev1.PodList,
+) postgres.PostgresqlStatusList {
+	items := make([]postgres.PostgresqlStatus, 0, len(pods.Items))
+	for i := range pods.Items {
+		items = append(items, postgres.PostgresqlStatus{
+			Pod:       &pods.Items[i],
+			SessionID: f.sessionID,
+		})
+	}
+	return postgres.PostgresqlStatusList{Items: items}
+}
 
 var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 	When("there's a running backup", func() {
@@ -715,6 +768,66 @@ var _ = Describe("backup pending state", func() {
 			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(backup), &stored)).To(Succeed())
 			// Phase should still be empty since we didn't need to set it as pending
 			Expect(stored.Status.Phase).To(BeEmpty())
+		})
+
+		It("does not regress a backup that already moved past pending", func(ctx context.Context) {
+			ns := newFakeNamespace(env.client)
+
+			cluster := newFakeCNPGCluster(env.client, ns, func(c *apiv1.Cluster) {
+				c.Spec.Backup = &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						BarmanCredentials: apiv1.BarmanCredentials{
+							AWS: &apiv1.S3Credentials{
+								AccessKeyIDReference: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{Name: "aws-creds"},
+									Key:                  "ACCESS_KEY_ID",
+								},
+								SecretAccessKeyReference: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{Name: "aws-creds"},
+									Key:                  "SECRET_ACCESS_KEY",
+								},
+							},
+						},
+						DestinationPath: "s3://bucket/path",
+					},
+				}
+			})
+
+			// Another backup is running, so CanExecuteBackup would return false
+			// for any other backup and the pre-guard code would set it as pending.
+			runningBackup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{Name: "backup-1-running", Namespace: ns},
+				Spec: apiv1.BackupSpec{
+					Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+					Method:  apiv1.BackupMethodBarmanObjectStore,
+				},
+				Status: apiv1.BackupStatus{
+					Phase: apiv1.BackupPhaseRunning,
+				},
+			}
+			Expect(env.client.Create(ctx, runningBackup)).To(Succeed())
+
+			// A backup whose phase the instance manager has already advanced to
+			// completed. Reconciling it must not flip it back to pending.
+			completedBackup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{Name: "backup-2-completed", Namespace: ns},
+				Spec: apiv1.BackupSpec{
+					Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+					Method:  apiv1.BackupMethodBarmanObjectStore,
+				},
+				Status: apiv1.BackupStatus{
+					Phase: apiv1.BackupPhaseCompleted,
+				},
+			}
+			Expect(env.client.Create(ctx, completedBackup)).To(Succeed())
+
+			res, err := env.backupReconciler.waitIfOtherBackupsRunning(ctx, completedBackup, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.IsZero()).To(BeTrue())
+
+			var stored apiv1.Backup
+			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(completedBackup), &stored)).To(Succeed())
+			Expect(stored.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 		})
 	})
 })

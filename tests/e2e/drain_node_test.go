@@ -30,6 +30,9 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -97,7 +100,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				var err error
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 			})
 
 			By("waiting for the jobs to be removed", func() {
@@ -111,7 +114,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}, timeout).Should(BeEquivalentTo(3))
 			})
 
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
@@ -119,7 +122,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			}
 
 			By("loading test data", func() {
-				AssertCreateTestData(env, tableLocator)
+				pgasserts.AssertCreateTestData(env, tableLocator)
 			})
 
 			oldPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -152,8 +155,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			By("data is present and standbys are streaming", func() {
-				AssertDataExpectedCount(env, tableLocator, 2)
-				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+				replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 			})
 		})
 	})
@@ -187,7 +190,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			By("waiting for the jobs to be removed", func() {
 				// Wait for jobs to be removed
@@ -203,13 +206,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			// Load test data
 			oldPrimary := clusterName + "-1"
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			// We create a mapping between the pod names and the UIDs of
 			// their volumes. We do not expect the UIDs to change.
@@ -275,8 +278,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}
 			})
 
-			AssertDataExpectedCount(env, tableLocator, 2)
-			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+			replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 		})
 
 		// Scenario: all the pods of a cluster are on a single node and another schedulable node exists.
@@ -311,7 +314,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				// Create a cluster in a namespace we'll delete after the test
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 				By("waiting for the jobs to be removed", func() {
 					// Wait for jobs to be removed
@@ -327,13 +330,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 				// Load test data
 				oldPrimary := clusterName + "-1"
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    "test",
 				}
-				AssertCreateTestData(env, tableLocator)
+				pgasserts.AssertCreateTestData(env, tableLocator)
 
 				// We create a mapping between the pod names and the UIDs of
 				// their volumes. We do not expect the UIDs to change.
@@ -405,8 +408,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					}
 				})
 
-				AssertDataExpectedCount(env, tableLocator, 2)
-				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+				replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 			})
 		})
 	})
@@ -444,7 +447,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			// Avoid pod from init jobs interfering with the tests
 			By("waiting for the jobs to be removed", func() {
@@ -459,8 +462,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}, timeout).Should(BeEquivalentTo(3))
 			})
 
-			// Retrieve the names of the current pods. All of them should
-			// not exist anymore after the drain
+			// Retrieve the names of the current pods. After the drain
+			// they must come back with the exact same names: instance
+			// serials are reused, so pod identity (name) is stable.
 			var podsBeforeDrain []string
 			By("retrieving the current pods' names", func() {
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
@@ -471,13 +475,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			// Load test data
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			// We uncordon a cordoned node. New pods can go there.
 			By("uncordon node for pod failover", func() {
@@ -494,30 +498,23 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			)
 
 			// Expect pods to be recreated and to be ready
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady])
 
-			// Expect pods to be running on the uncordoned node and to have new names
-			By("verifying cluster pods changed names", func() {
+			By("verifying cluster pods kept their names", func() {
 				timeout := 600
 				Eventually(func(g Gomega) {
-					matchingNames := 0
 					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
+					currentNames := make([]string, 0, len(podList.Items))
 					for _, pod := range podList.Items {
-						// compare the old pod list with the current pod names
-						for _, oldName := range podsBeforeDrain {
-							if pod.GetName() == oldName {
-								matchingNames++
-							}
-						}
+						currentNames = append(currentNames, pod.GetName())
 					}
-					g.Expect(len(podList.Items)).To(BeEquivalentTo(3))
-					g.Expect(matchingNames).To(BeEquivalentTo(0))
+					g.Expect(currentNames).To(ConsistOf(podsBeforeDrain))
 				}, timeout).Should(Succeed())
 			})
 
-			AssertDataExpectedCount(env, tableLocator, 2)
-			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+			replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 			err = nodes.UncordonAll(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -538,7 +535,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 		When("the PDB is disabled", func() {
 			It("can drain the primary node and recover the cluster when uncordoned", func() {
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 				var drainedNodeName string
 				By("waiting for the jobs to be removed", func() {
@@ -557,13 +554,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 
 				// Load test data
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    "test",
 				}
-				AssertCreateTestData(env, tableLocator)
+				pgasserts.AssertCreateTestData(env, tableLocator)
 
 				// Drain the node containing the primary pod and store the list of running pods
 				_ = nodes.DrainPrimary(
@@ -588,8 +585,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
-				AssertDataExpectedCount(env, tableLocator, 2)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady])
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 

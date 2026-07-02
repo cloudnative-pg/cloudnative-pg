@@ -77,7 +77,3 @@ type FailoverQuorumStatus struct {
 	// +optional
 	Primary string `json:"primary,omitempty"`
 }
-
-func init() {
-	SchemeBuilder.Register(&FailoverQuorum{}, &FailoverQuorumList{})
-}
