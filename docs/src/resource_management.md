@@ -169,11 +169,17 @@ This happens when:
 
 - The Kubernetes cluster does not expose the resize subresource of the pods
   (the feature requires Kubernetes 1.33 or later, and became stable in 1.35).
-- A **memory limit is decreased**. The kubelet applies memory limit decreases
-  only when the current usage is below the new limit, and PostgreSQL never
-  releases its shared memory, so such a resize would remain pending
-  indefinitely. A fresh pod starting under the new limit is the deterministic
-  option.
+- A **memory limit is decreased**. The kubelet applies a memory limit
+  decrease only when the current usage of the container is below the new
+  limit, and PostgreSQL keeps its shared memory (`shared_buffers` above all)
+  allocated for the whole life of the instance, so on a warmed-up instance
+  such a resize would remain pending indefinitely, without any error being
+  reported. Even if the usage momentarily dropped below the target and the
+  decrease were applied, the instance would then be running with a memory
+  configuration sized for the old limit inside a smaller cgroup, exposed to
+  an out-of-memory termination at the next spike of activity. A fresh pod
+  starting under the new limit, with memory parameters reviewed accordingly,
+  is the deterministic option.
 - Resource entries are added or removed, rather than changed: Kubernetes does
   not allow a resize to add or remove `requests` and `limits` entries.
 - Resources other than `cpu` and `memory` (for example, hugepages) are
