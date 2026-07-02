@@ -133,6 +133,17 @@ func canResizeResources(containerName string, current, target corev1.ResourceReq
 		return false, reason
 	}
 
+	// A memory limit decrease is never applied in place. The kubelet lowers
+	// the cgroup limit only when the current usage of the container is
+	// already below the new value, and PostgreSQL keeps its shared memory
+	// (shared_buffers above all) allocated for the whole life of the
+	// postmaster, so on a warmed-up instance the resize would stay pending
+	// indefinitely without reporting any error. Should the usage momentarily
+	// dip below the target and the decrease land, the instance would then
+	// run with a memory configuration sized for the old limit inside a
+	// smaller cgroup, one allocation spike away from an OOM kill. A
+	// recreated pod starts under the new limit from the beginning, making
+	// the outcome deterministic.
 	currentMemoryLimit, hasCurrentMemoryLimit := current.Limits[corev1.ResourceMemory]
 	targetMemoryLimit, hasTargetMemoryLimit := target.Limits[corev1.ResourceMemory]
 	if hasCurrentMemoryLimit && hasTargetMemoryLimit && targetMemoryLimit.Cmp(currentMemoryLimit) < 0 {
