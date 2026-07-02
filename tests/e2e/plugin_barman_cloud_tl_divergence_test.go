@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"k8s.io/client-go/util/retry"
-
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
@@ -117,14 +115,7 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection",
 			})
 
 			By("scaling first cluster to 2 instances", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, firstClusterName)
-					if err != nil {
-						return err
-					}
-					cluster.Spec.Instances = 2
-					return env.Client.Update(env.Ctx, cluster)
-				})
+				err := clusterutils.ScaleSize(env.Ctx, env.Client, namespace, firstClusterName, 2)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
