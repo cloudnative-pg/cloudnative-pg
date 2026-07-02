@@ -176,7 +176,7 @@ This happens when:
   option.
 - Resource entries are added or removed, rather than changed: Kubernetes does
   not allow a resize to add or remove `requests` and `limits` entries.
-- Resources other than `cpu` and `memory` (for example, HugePages) are
+- Resources other than `cpu` and `memory` (for example, hugepages) are
   changed.
 - The change would alter the pod QoS class, which Kubernetes forbids: the API
   server rejects the resize and the operator recreates the pod.
