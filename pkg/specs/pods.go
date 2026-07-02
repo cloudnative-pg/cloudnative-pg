@@ -200,6 +200,7 @@ func createClusterPodSpec(
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
 		ServiceAccountName:            cluster.GetServiceAccountName(),
+		AutomountServiceAccountToken:  cluster.Spec.AutomountServiceAccountToken,
 		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 		TerminationGracePeriodSeconds: &gracePeriod,
 		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,

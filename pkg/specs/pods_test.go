@@ -1065,3 +1065,62 @@ var _ = Describe("NewInstance", func() {
 		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
 	})
 })
+
+var _ = Describe("automountServiceAccountToken", func() {
+	const tokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+	allContainers := func(spec corev1.PodSpec) []corev1.Container {
+		return append(spec.InitContainers, spec.Containers...)
+	}
+
+	mountsAtTokenPath := func(container corev1.Container) bool {
+		for _, mount := range container.VolumeMounts {
+			if mount.MountPath == tokenMountPath {
+				return true
+			}
+		}
+		return false
+	}
+
+	It("leaves the automount behavior untouched when unset", func() {
+		pod, err := buildInstance(apiv1.Cluster{}, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pod.Spec.AutomountServiceAccountToken).To(BeNil())
+		for _, container := range allContainers(pod.Spec) {
+			Expect(mountsAtTokenPath(container)).To(BeFalse(),
+				"container %s should not mount the token explicitly", container.Name)
+		}
+	})
+
+	It("disables the automount and mounts the token in every container when false", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				AutomountServiceAccountToken: ptr.To(false),
+			},
+		}
+		pod, err := buildInstance(cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pod.Spec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
+		Expect(pod.Spec.Volumes).To(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
+		Expect(allContainers(pod.Spec)).ToNot(BeEmpty())
+		for _, container := range allContainers(pod.Spec) {
+			Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+				Name:      kubeAPIAccessVolumeName,
+				MountPath: tokenMountPath,
+				ReadOnly:  true,
+			}), "container %s should mount the projected token", container.Name)
+		}
+	})
+
+	It("propagates an explicit true without projecting the token volume", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				AutomountServiceAccountToken: ptr.To(true),
+			},
+		}
+		pod, err := buildInstance(cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pod.Spec.AutomountServiceAccountToken).To(HaveValue(BeTrue()))
+		Expect(pod.Spec.Volumes).ToNot(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
+	})
+})

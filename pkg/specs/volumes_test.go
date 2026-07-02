@@ -698,3 +698,102 @@ var _ = Describe("ImageVolume Extensions", func() {
 		})
 	})
 })
+
+var _ = Describe("kube-api-access volume", func() {
+	expectedVolume := corev1.Volume{
+		Name: "kube-api-access",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+				Sources: []corev1.VolumeProjection{
+					{
+						ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+							Path:              "token",
+							ExpirationSeconds: ptr.To[int64](3607),
+						},
+					},
+					{
+						ConfigMap: &corev1.ConfigMapProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "kube-root-ca.crt",
+							},
+							Items: []corev1.KeyToPath{
+								{
+									Key:  "ca.crt",
+									Path: "ca.crt",
+								},
+							},
+						},
+					},
+					{
+						DownwardAPI: &corev1.DownwardAPIProjection{
+							Items: []corev1.DownwardAPIVolumeFile{
+								{
+									Path: "namespace",
+									FieldRef: &corev1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.namespace",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expectedMount := corev1.VolumeMount{
+		Name:      "kube-api-access",
+		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+		ReadOnly:  true,
+	}
+
+	It("is not created when automountServiceAccountToken is unset", func() {
+		cluster := apiv1.Cluster{}
+		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).NotTo(ContainElement(expectedVolume))
+		Expect(CreatePostgresVolumeMounts(cluster, nil)).NotTo(ContainElement(expectedMount))
+	})
+
+	It("is not created when automountServiceAccountToken is true", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				AutomountServiceAccountToken: ptr.To(true),
+			},
+		}
+		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).NotTo(ContainElement(expectedVolume))
+		Expect(CreatePostgresVolumeMounts(cluster, nil)).NotTo(ContainElement(expectedMount))
+	})
+
+	It("replicates the volume injected by the ServiceAccount admission controller when false", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				AutomountServiceAccountToken: ptr.To(false),
+			},
+		}
+		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).To(ContainElement(expectedVolume))
+		Expect(CreatePostgresVolumeMounts(cluster, nil)).To(ContainElement(expectedMount))
+	})
+
+	It("coexists with the user defined projected volume", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				AutomountServiceAccountToken: ptr.To(false),
+				ProjectedVolumeTemplate: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							ConfigMap: &corev1.ConfigMapProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "user-provided",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		volumes := createPostgresVolumes(&cluster, "pod-1", nil)
+		Expect(volumes).To(ContainElement(expectedVolume))
+		Expect(volumes).To(ContainElement(createProjectedVolume(&cluster)))
+	})
+})
