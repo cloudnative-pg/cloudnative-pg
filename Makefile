@@ -61,9 +61,9 @@ CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.16.0
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.62.0
+SPELLCHECK_VERSION ?= 0.62.0@sha256:ca8f6ef6da2dd0a23ef4abe51ae36cdc8e551a0feb1cbc849e6342af6d8c4da7
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
-WOKE_VERSION ?= 0.19.0
+WOKE_VERSION ?= 0.19.0@sha256:5cdd550a166c9e11f2f53c3f6c23dfafdf879e9bcaffd07c2f8bfef095c1b579
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
 OPERATOR_SDK_VERSION ?= v1.42.3
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
@@ -71,7 +71,7 @@ OPM_VERSION ?= v1.72.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.19.1
 # renovate: datasource=docker depName=cuelang/cue versioning=docker
-CUE_VERSION ?= 0.16.1
+CUE_VERSION ?= 0.16.1@sha256:02a15644a421cbbb91a6137d980b061b1f93ccf3504c8efcd091ec8060e6a406
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
 GEMARA_VERSION ?= v1.3.0
 ARCH ?= amd64
