@@ -812,6 +812,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(ServiceAccountTemplate)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AutomountServiceAccountToken != nil {
+		in, out := &in.AutomountServiceAccountToken, &out.AutomountServiceAccountToken
+		*out = new(bool)
+		**out = **in
+	}
 	if in.WalStorage != nil {
 		in, out := &in.WalStorage, &out.WalStorage
 		*out = new(StorageConfiguration)
