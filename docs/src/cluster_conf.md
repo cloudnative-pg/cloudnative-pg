@@ -89,6 +89,17 @@ the `.spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec.
 Use this field only in case of
 [PostgreSQL running with `posix` shared memory dynamic allocation](postgresql_conf.md#dynamic-shared-memory-settings).
 
+## ServiceAccount token mount
+
+The `automountServiceAccountToken` field of the cluster specification
+controls the automatic mount of the `ServiceAccount` token in the instance
+Pods and in the Jobs that create them. Setting it to `false` helps comply
+with admission policies enforced in hardened environments; the operator then
+mounts an equivalent projected volume so that the instance manager can keep
+working. See
+["Disabling the automatic mount of the ServiceAccount token"](security.md#disabling-the-automatic-mount-of-the-serviceaccount-token)
+for the details.
+
 ## Environment variables
 
 :::important
