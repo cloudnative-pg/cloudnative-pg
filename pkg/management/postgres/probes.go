@@ -134,6 +134,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 	}
 
 	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading.Load()
+	result.SessionID = instance.SessionID
 
 	return result, nil
 }
@@ -160,8 +161,19 @@ func updateResultForDecrease(
 	// mark the pending restart as due to a decrease
 	result.PendingRestartForDecrease = true
 	if !result.IsPrimary {
-		// in case of hot standby parameters being decreased,
-		// followers need to wait for the new value to be present in the PGDATA before being restarted.
+		// In a replica cluster, pg_controldata values are received from the external
+		// source primary through the WAL stream, not from this cluster's designated
+		// primary. Comparing decreased parameter values against pg_controldata is
+		// incorrect for replica clusters because those values reflect the source
+		// primary's configuration, not the local cluster's. We skip this check and
+		// keep PendingRestart as-is, allowing the restart to proceed.
+		cluster := instance.GetClusterOrDefault()
+		if cluster.IsReplica() {
+			return nil
+		}
+
+		// In non-replica clusters, followers need to wait for the new value to be
+		// present in the PGDATA before being restarted.
 		pgControldataParams, err := LoadEnforcedParametersFromPgControldata(instance.PgData)
 		if err != nil {
 			return err
@@ -284,7 +296,7 @@ func (instance *Instance) fillBasebackupStats(
 	superUserDB *sql.DB,
 	result *postgres.PostgresqlStatus,
 ) error {
-	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
+	if ver, _ := instance.GetPgVersion(); ver.Major() < 13 {
 		return nil
 	}
 
@@ -390,7 +402,7 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 	if !result.IsPrimary {
 		return nil
 	}
-	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
+	if ver, _ := instance.GetPgVersion(); ver.Major() < 13 {
 		return nil
 	}
 
@@ -600,11 +612,11 @@ type PgStatWal struct {
 // TryGetPgStatWAL retrieves pg_stat_wal on pg version 14 and further
 func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	version, err := instance.GetPgVersion()
-	if err != nil || version.Major < 14 {
+	if err != nil || version.Major() < 14 {
 		return nil, err
 	}
 
-	superUserDB, err := instance.GetSuperUserDB()
+	db, err := instance.GetMetricsDB("postgres")
 	if err != nil {
 		return nil, err
 	}
@@ -613,8 +625,8 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	// `wal_sync_time` have been removed.
 	// See https://github.com/postgres/postgres/commit/2421e9a51d20bb83154e54a16ce628f9249fa907
 	var pgWalStat PgStatWal
-	if version.Major < 18 {
-		row := superUserDB.QueryRow(
+	if version.Major() < 18 {
+		row := db.QueryRow(
 			`SELECT
 			wal_records,
 			wal_fpi,
@@ -637,12 +649,12 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 			&pgWalStat.WalSyncTime,
 			&pgWalStat.StatsReset,
 		); err != nil {
-			return nil, err
+			return nil, EnrichMetricsConnError(err)
 		}
 	}
 
-	if version.Major >= 18 {
-		row := superUserDB.QueryRow(
+	if version.Major() >= 18 {
+		row := db.QueryRow(
 			`SELECT
         	wal_records,
 		wal_fpi,
@@ -657,7 +669,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 			&pgWalStat.WALBuffersFull,
 			&pgWalStat.StatsReset,
 		); err != nil {
-			return nil, err
+			return nil, EnrichMetricsConnError(err)
 		}
 	}
 

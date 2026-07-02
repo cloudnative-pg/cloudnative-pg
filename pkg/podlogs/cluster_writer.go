@@ -220,7 +220,7 @@ func (csr *ClusterWriter) SingleStream(ctx context.Context, writer io.Writer) er
 				}
 			}
 		}
-		if streamSet.isZero() {
+		if !csr.Options.Follow && streamSet.isZero() {
 			return nil
 		}
 

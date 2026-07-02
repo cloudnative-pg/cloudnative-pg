@@ -21,18 +21,17 @@ package v1
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 )
 
 // databaseLog is for logging in this package.
@@ -40,10 +39,18 @@ var databaseLog = log.WithName("database-resource").WithValues("version", "v1")
 
 // SetupDatabaseWebhookWithManager registers the webhook for Database in the manager.
 func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Database{}).
-		WithValidator(newBypassableValidator(&DatabaseCustomValidator{})).
+	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Database{}).
+		WithValidator(newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{})).
 		WithDefaulter(&DatabaseCustomDefaulter{}).
 		Complete()
+}
+
+// NewDatabaseAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewDatabaseAdmissionGuard() *guard.Admission[*apiv1.Database] {
+	return &guard.Admission[*apiv1.Database]{
+		Defaulter: &DatabaseCustomDefaulter{},
+		Validator: newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{}),
+	}
 }
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
@@ -57,15 +64,10 @@ func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
 type DatabaseCustomDefaulter struct{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Database.
-func (d *DatabaseCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	database, ok := obj.(*apiv1.Database)
-	if !ok {
-		return fmt.Errorf("expected a database object but got %T", obj)
-	}
+func (d *DatabaseCustomDefaulter) Default(_ context.Context, database *apiv1.Database) error {
 	databaseLog.Info("Defaulting for database", "name", database.GetName(), "namespace", database.GetNamespace())
 
-	// database.Default()
-
+	// The Database kind currently has no defaults to apply.
 	return nil
 }
 
@@ -74,11 +76,9 @@ func (d *DatabaseCustomDefaulter) Default(_ context.Context, obj runtime.Object)
 type DatabaseCustomValidator struct{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Database .
-func (v *DatabaseCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	database, ok := obj.(*apiv1.Database)
-	if !ok {
-		return nil, fmt.Errorf("expected a Database object but got %T", obj)
-	}
+func (v *DatabaseCustomValidator) ValidateCreate(
+	_ context.Context, database *apiv1.Database,
+) (admission.Warnings, error) {
 	databaseLog.Info(
 		"Validation for Database upon creation",
 		"name", database.GetName(), "namespace", database.GetNamespace())
@@ -91,25 +91,15 @@ func (v *DatabaseCustomValidator) ValidateCreate(_ context.Context, obj runtime.
 	}
 
 	return allWarnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Database "},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Database "},
 		database.Name, allErrs)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Database .
 func (v *DatabaseCustomValidator) ValidateUpdate(
 	_ context.Context,
-	oldObj, newObj runtime.Object,
+	oldDatabase *apiv1.Database, database *apiv1.Database,
 ) (admission.Warnings, error) {
-	database, ok := newObj.(*apiv1.Database)
-	if !ok {
-		return nil, fmt.Errorf("expected a Database object for the newObj but got %T", newObj)
-	}
-
-	oldDatabase, ok := oldObj.(*apiv1.Database)
-	if !ok {
-		return nil, fmt.Errorf("expected a Database object for the oldObj but got %T", oldObj)
-	}
-
 	databaseLog.Info(
 		"Validation for Database upon update",
 		"name", database.GetName(), "namespace", database.GetNamespace())
@@ -134,11 +124,9 @@ func (v *DatabaseCustomValidator) validateDatabaseChanges(_ *apiv1.Database, _ *
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Database .
-func (v *DatabaseCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	database, ok := obj.(*apiv1.Database)
-	if !ok {
-		return nil, fmt.Errorf("expected a Database object but got %T", obj)
-	}
+func (v *DatabaseCustomValidator) ValidateDelete(
+	_ context.Context, database *apiv1.Database,
+) (admission.Warnings, error) {
 	databaseLog.Info(
 		"Validation for Database upon deletion",
 		"name", database.GetName(), "namespace", database.GetNamespace())
@@ -240,7 +228,7 @@ func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) fiel
 	}
 
 	nameSet := stringset.New()
-	var allErrs field.ErrorList
+	allErrs := make(field.ErrorList, 0, len(d.Spec.Servers))
 	for i, server := range d.Spec.Servers {
 		itemPath := basePath.Index(i)
 

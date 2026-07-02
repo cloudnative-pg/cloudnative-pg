@@ -111,6 +111,42 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 				ToNot(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
 			Expect(*afterDep.Spec.Replicas).To(Equal(instancesNumber))
 		})
+
+		By("leaving the existing deployment untouched when the image becomes unresolved", func() {
+			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
+
+			brokenPooler := pooler.DeepCopy()
+			brokenPooler.Status.Image = ""
+			brokenPooler.Spec.Instances = ptr.To(int32(7))
+
+			err := env.poolerReconciler.updateDeployment(ctx, brokenPooler, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			afterDep := getPoolerDeployment(ctx, env.client, pooler)
+			Expect(afterDep.ResourceVersion).To(Equal(beforeDep.ResourceVersion))
+			Expect(*afterDep.Spec.Replicas).To(Equal(*beforeDep.Spec.Replicas))
+		})
+	})
+
+	It("does not create a deployment when the image cannot be resolved", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		pooler.Status.Image = ""
+		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
+
+		err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Deployment).To(BeNil())
+
+		deployment := &appsv1.Deployment{}
+		getErr := env.client.Get(
+			ctx,
+			types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+			deployment,
+		)
+		Expect(apierrors.IsNotFound(getErr)).To(BeTrue())
 	})
 
 	It("should test the ServiceAccount and RBAC update logic", func() {
@@ -217,13 +253,86 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 			Expect(expectedRole.Rules).To(Equal(role.Rules))
 
-			expectedRb := pgbouncer.RoleBinding(pooler)
+			expectedRb := pgbouncer.RoleBinding(pooler, pooler.GetServiceAccountName())
 			roleBinding := &rbacv1.RoleBinding{}
 			err = env.client.Get(ctx, types.NamespacedName{Name: expectedRb.Name, Namespace: expectedRb.Namespace}, roleBinding)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(expectedRb.Subjects).To(Equal(roleBinding.Subjects))
 			Expect(expectedRb.RoleRef).To(Equal(roleBinding.RoleRef))
+		})
+	})
+
+	It("should validate and use custom ServiceAccount", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		pooler := &apiv1.Pooler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pooler-custom-sa",
+				Namespace: namespace,
+			},
+			Spec: apiv1.PoolerSpec{
+				Cluster: apiv1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Type:               "rw",
+				Instances:          ptr.To(int32(1)),
+				ServiceAccountName: "shared-sa",
+				PgBouncer: &apiv1.PgBouncerSpec{
+					PoolMode: apiv1.PgBouncerPoolModeSession,
+				},
+			},
+		}
+		Expect(env.client.Create(ctx, pooler)).To(Succeed())
+		pooler.TypeMeta = metav1.TypeMeta{
+			Kind:       apiv1.PoolerKind,
+			APIVersion: apiv1.SchemeGroupVersion.String(),
+		}
+
+		By("failing when specified ServiceAccount doesn't exist", func() {
+			res := &poolerManagedResources{Cluster: cluster, ServiceAccount: nil}
+			err := env.poolerReconciler.updateServiceAccount(ctx, pooler, res)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not found"))
+		})
+
+		By("succeeding when specified ServiceAccount exists", func() {
+			sharedSA := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "shared-sa",
+					Namespace: namespace,
+				},
+			}
+			Expect(env.client.Create(ctx, sharedSA)).To(Succeed())
+
+			res := &poolerManagedResources{Cluster: cluster, ServiceAccount: nil}
+			err := env.poolerReconciler.updateServiceAccount(ctx, pooler, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify no SA was created with the pooler name
+			sa := &corev1.ServiceAccount{}
+			err = env.client.Get(ctx, types.NamespacedName{
+				Name: pooler.Name, Namespace: namespace,
+			}, sa)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+
+		By("creating RoleBinding referencing the custom ServiceAccount", func() {
+			res := &poolerManagedResources{Cluster: cluster, RoleBinding: nil}
+			err := env.poolerReconciler.updateRBAC(ctx, pooler, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			rb := &rbacv1.RoleBinding{}
+			err = env.client.Get(ctx, types.NamespacedName{
+				Name: pooler.Name, Namespace: namespace,
+			}, rb)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rb.Subjects).To(HaveLen(1))
+			Expect(rb.Subjects[0].Kind).To(Equal("ServiceAccount"))
+			Expect(rb.Subjects[0].Name).To(Equal("shared-sa"))
+			Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
 		})
 	})
 

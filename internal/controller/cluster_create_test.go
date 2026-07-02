@@ -24,8 +24,10 @@ import (
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -197,10 +199,16 @@ var _ = Describe("cluster_create unit tests", func() {
 				}, &afterChangesService)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(afterChangesService.Spec.Selector).ToNot(Equal(before.Spec.Selector))
-				Expect(afterChangesService.Spec.Selector).To(Equal(expectedLabels))
+				for k, v := range expectedLabels {
+					Expect(afterChangesService.Spec.Selector).To(HaveKeyWithValue(k, v))
+				}
 				Expect(afterChangesService.Labels).To(Equal(before.Labels))
-				Expect(afterChangesService.Annotations).To(Equal(before.Annotations))
+				// The reconciler now stores a lastAppliedServiceSpec annotation
+				// for three-way merge, so we check that original annotations are preserved
+				for k, v := range before.Annotations {
+					Expect(afterChangesService.Annotations).To(HaveKeyWithValue(k, v))
+				}
+				Expect(afterChangesService.Annotations).To(HaveKey(utils.LastAppliedSpecAnnotationName))
 			}
 
 			var readOnlyService, readWriteService, readService, anyService *corev1.Service
@@ -574,7 +582,7 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 		Expect(res).To(Or(BeNil(), Equal(reconcile.Result{})))
 	})
 
-	// nolint: dupl
+	//nolint: dupl
 	It("should requeue if bootstrapping from an invalid volume snapshot", func(ctx SpecContext) {
 		snapshots := volumesnapshotv1.VolumeSnapshotList{
 			Items: []volumesnapshotv1.VolumeSnapshot{
@@ -611,7 +619,7 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 		Expect(res).ToNot(Equal(reconcile.Result{}))
 	})
 
-	// nolint: dupl
+	//nolint: dupl
 	It("should requeue if bootstrapping from a snapshot that isn't there", func(ctx SpecContext) {
 		snapshots := volumesnapshotv1.VolumeSnapshotList{
 			Items: []volumesnapshotv1.VolumeSnapshot{
@@ -762,7 +770,19 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("should remove the PodMonitor if it is disabled when the PodMonitor exists", func() {
+	It("should remove the PodMonitor if it is disabled and is owned by a cluster", func() {
+		cluster := apiv1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       apiv1.ClusterKind,
+				APIVersion: apiSGVString,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+		cluster.SetInheritedDataAndOwnership(&manager.podMonitor.ObjectMeta)
+
 		// Create the PodMonitor with the fake client
 		err := fakeCli.Create(ctx, manager.podMonitor)
 		Expect(err).ToNot(HaveOccurred())
@@ -783,6 +803,33 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		)
 		Expect(err).To(HaveOccurred())
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("should NOT remove the PodMonitor if it is not owned by a cluster", func() {
+		unownedPodMonitor := &monitoringv1.PodMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+			},
+		}
+		err := fakeCli.Create(ctx, unownedPodMonitor)
+		Expect(err).ToNot(HaveOccurred())
+
+		manager.isEnabled = false
+		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
+		Expect(err).ToNot(HaveOccurred())
+
+		podMonitor := &monitoringv1.PodMonitor{}
+		err = fakeCli.Get(
+			ctx,
+			types.NamespacedName{
+				Name:      manager.podMonitor.Name,
+				Namespace: manager.podMonitor.Namespace,
+			},
+			podMonitor,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(podMonitor.Name).To(Equal("test"))
 	})
 
 	It("should patch the PodMonitor with updated labels and annotations", func() {
@@ -1266,6 +1313,80 @@ var _ = Describe("Service Reconciling", func() {
 				Expect(updatedService.Spec.Selector).To(Equal(proposedService.Spec.Selector))
 			})
 
+			It("should update the service spec when using patch strategy and spec fields change", func() {
+				existingService := proposedService.DeepCopy()
+				existingService.Annotations = map[string]string{
+					utils.UpdateStrategyAnnotation: string(apiv1.ServiceUpdateStrategyPatch),
+				}
+				existingService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				existingService.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+				err := serviceClient.Update(ctx, existingService)
+				Expect(err).NotTo(HaveOccurred())
+
+				proposedService.Annotations = map[string]string{
+					utils.UpdateStrategyAnnotation: string(apiv1.ServiceUpdateStrategyPatch),
+				}
+				proposedService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				proposedService.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8", "172.16.0.0/12"}
+
+				err = reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				var updatedService corev1.Service
+				err = serviceClient.Get(ctx, types.NamespacedName{
+					Name:      proposedService.Name,
+					Namespace: proposedService.Namespace,
+				}, &updatedService)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedService.Spec.LoadBalancerSourceRanges).To(Equal([]string{"10.0.0.0/8", "172.16.0.0/12"}))
+			})
+
+			It("should not trigger unnecessary updates when only Kubernetes-managed fields differ", func() {
+				singleStack := corev1.IPFamilyPolicySingleStack
+				clusterPolicy := corev1.ServiceInternalTrafficPolicyCluster
+				existingService := proposedService.DeepCopy()
+				existingService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				existingService.Spec.ClusterIP = "10.96.0.1"
+				existingService.Spec.ClusterIPs = []string{"10.96.0.1"}
+				existingService.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+				existingService.Spec.IPFamilyPolicy = &singleStack
+				existingService.Spec.InternalTrafficPolicy = &clusterPolicy
+				existingService.Spec.SessionAffinity = corev1.ServiceAffinityNone
+				existingService.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+				existingService.Spec.Ports = []corev1.ServicePort{
+					{
+						Port: 80, Protocol: corev1.ProtocolTCP,
+						TargetPort: intstr.FromInt32(80), NodePort: 31234,
+					},
+				}
+				existingService.Spec.HealthCheckNodePort = 30000
+				err := serviceClient.Update(ctx, existingService)
+				Expect(err).NotTo(HaveOccurred())
+
+				proposedService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				proposedService.Spec.Ports = []corev1.ServicePort{{Port: 80}}
+				proposedService.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+
+				err = reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				var updatedService corev1.Service
+				err = serviceClient.Get(ctx, types.NamespacedName{
+					Name:      proposedService.Name,
+					Namespace: proposedService.Namespace,
+				}, &updatedService)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedService.Spec.ClusterIP).To(Equal("10.96.0.1"))
+				Expect(updatedService.Spec.Ports[0].NodePort).To(Equal(int32(31234)))
+				Expect(updatedService.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+				Expect(updatedService.Spec.Ports[0].TargetPort).To(Equal(intstr.FromInt32(80)))
+				Expect(updatedService.Spec.HealthCheckNodePort).To(Equal(int32(30000)))
+				Expect(updatedService.Spec.IPFamilies).To(Equal([]corev1.IPFamily{corev1.IPv4Protocol}))
+				Expect(updatedService.Spec.IPFamilyPolicy).To(Equal(&singleStack))
+				Expect(updatedService.Spec.InternalTrafficPolicy).To(Equal(&clusterPolicy))
+				Expect(updatedService.Spec.SessionAffinity).To(Equal(corev1.ServiceAffinityNone))
+			})
+
 			It("should preserve existing labels and annotations added by third parties", func() {
 				existingService := proposedService.DeepCopy()
 				existingService.Labels = map[string]string{"custom-label": "value"}
@@ -1342,5 +1463,199 @@ var _ = Describe("Service Reconciling", func() {
 			)
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
+	})
+})
+
+var _ = Describe("ServiceAccount with custom name", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("should use existing ServiceAccount when specified", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+
+		existingSA := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "shared-sa",
+				Namespace: namespace,
+			},
+		}
+		Expect(env.client.Create(ctx, existingSA)).To(Succeed())
+
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.ServiceAccountName = "shared-sa"
+
+		By("executing createOrPatchServiceAccount", func() {
+			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("verifying no new ServiceAccount was created", func() {
+			var sa corev1.ServiceAccount
+			err := env.client.Get(ctx, types.NamespacedName{
+				Name:      cluster.Name,
+				Namespace: namespace,
+			}, &sa)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		})
+
+		By("verifying existing ServiceAccount still exists", func() {
+			var sa corev1.ServiceAccount
+			err := env.client.Get(ctx, types.NamespacedName{
+				Name:      "shared-sa",
+				Namespace: namespace,
+			}, &sa)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	It("should fail when specified ServiceAccount doesn't exist", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.ServiceAccountName = "non-existent-sa"
+
+		err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("not found"))
+	})
+
+	It("should create RoleBinding referencing the custom ServiceAccount", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.ServiceAccountName = "shared-sa"
+
+		err := env.clusterReconciler.createRoleBinding(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		var rb rbacv1.RoleBinding
+		err = env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: namespace,
+		}, &rb)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rb.Subjects).To(HaveLen(1))
+		Expect(rb.Subjects[0].Kind).To(Equal("ServiceAccount"))
+		Expect(rb.Subjects[0].Name).To(Equal("shared-sa"))
+		Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
+	})
+})
+
+var _ = Describe("generateNodeSerial", func() {
+	const clusterName = "cluster-example"
+
+	newCluster := func(instanceNames ...string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+			Status:     apiv1.ClusterStatus{InstanceNames: instanceNames},
+		}
+	}
+
+	r := &ClusterReconciler{}
+
+	It("returns 1 when there are no instances", func() {
+		Expect(r.generateNodeSerial(newCluster())).To(Equal(1))
+	})
+
+	It("returns the next serial when names are sequential", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 1),
+			specs.GetInstanceName(clusterName, 2),
+		))
+		Expect(serial).To(Equal(3))
+	})
+
+	It("fills the lowest gap left by a removed instance", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 1),
+			specs.GetInstanceName(clusterName, 3),
+		))
+		Expect(serial).To(Equal(2))
+	})
+
+	It("ignores names that don't follow the cluster prefix", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 2),
+			"unrelated-pod",
+		))
+		Expect(serial).To(Equal(1))
+	})
+})
+
+var _ = Describe("ensureJobAdoptable", func() {
+	const (
+		clusterName = "cluster-example"
+		namespace   = "default"
+		jobName     = "cluster-example-2-join"
+	)
+
+	newCluster := func() *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+		}
+	}
+
+	ownedJob := func() *batchv1.Job {
+		cluster := newCluster()
+		return &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      jobName,
+				Namespace: namespace,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: apiv1.SchemeGroupVersion.String(),
+						Kind:       apiv1.ClusterKind,
+						Name:       cluster.Name,
+						Controller: ptr.To(true),
+					},
+				},
+			},
+		}
+	}
+
+	It("returns a zero result when the Job is owned by this cluster", func(ctx SpecContext) {
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(ownedJob()).
+			Build()
+		r := &ClusterReconciler{Client: cli}
+		result, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.IsZero()).To(BeTrue())
+	})
+
+	It("requeues when the Job is not yet in the cache", func(ctx SpecContext) {
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
+		r := &ClusterReconciler{Client: cli}
+		result, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+	})
+
+	It("returns an error when the Job is not owned by this cluster", func(ctx SpecContext) {
+		job := ownedJob()
+		job.OwnerReferences[0].Name = "other-cluster"
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(job).
+			Build()
+		r := &ClusterReconciler{Client: cli}
+		_, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
+		Expect(err).To(MatchError(ContainSubstring("refusing to adopt job")))
+	})
+
+	It("returns an error when the Job has no owner reference", func(ctx SpecContext) {
+		job := ownedJob()
+		job.OwnerReferences = nil
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(job).
+			Build()
+		r := &ClusterReconciler{Client: cli}
+		_, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
+		Expect(err).To(MatchError(ContainSubstring("refusing to adopt job")))
 	})
 })

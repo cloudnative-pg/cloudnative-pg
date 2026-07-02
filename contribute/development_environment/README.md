@@ -20,7 +20,7 @@ following the next three steps:
 ## Installation
 
 Currently, we provide installation instructions for [GNU/Linux](#gnulinux-systems),
-[MacOS X](#mac-os-x), and [Windows Subsystem for Linux](microsoft-wsl2)
+[MacOS X](#mac-os-x), and [Windows Subsystem for Linux](#microsoft-wsl2)
 (feel free to submit a PR for any improvement you might think of).
 
 Once you have followed the instructions for your system, run the following
@@ -155,7 +155,7 @@ export GPG_TTY=$(tty)
 If you are using Docker Desktop, please make sure you follow the instructions in the
 ["Settings for Docker Desktop" section of the `kind` documentation](https://kind.sigs.k8s.io/docs/user/quick-start/#settings-for-docker-desktop).
 
-MacOS Airplay uses port 5000 and can interfere with docker repository port. Make sure Airplay is off (System Preferences -> Share -> uncheck the Airplay checkbox).
+MacOS Airplay uses port 5000 and can interfere with the docker repository port. Make sure Airplay is off (System Preferences -> General -> Airdrop & Continuity -> uncheck the Airplay Receiver checkbox).
 
 ## Forking the repository
 
@@ -188,7 +188,25 @@ This will build the operator based on the `main` branch content, create a
 `kind` cluster in your workstation with a container registry that provides the
 operator image that you just built.
 
-*Note:* For a list of options, run `./hack/setup-cluster.sh`.
+Alternatively, you can deploy a published release or development snapshot
+instead of building from sources by using the `-o` flag:
+
+```shell
+# Deploy a specific published release
+./hack/setup-cluster.sh -o 1.28.1 create deploy
+
+# Deploy the latest snapshot from the main branch
+./hack/setup-cluster.sh -o main create deploy
+
+# Deploy the latest snapshot for a release branch
+./hack/setup-cluster.sh -o release-1.28 create deploy
+```
+
+Branch snapshots are pulled from the
+[`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts)
+repository.
+
+> **Note:** For a list of options, run `./hack/setup-cluster.sh`.
 
 > **NOTE:** In case of errors, make sure that you have the latest versions of the Go
 > binaries in your system. For this reason, from time to time, we recommend
@@ -205,7 +223,7 @@ kubectl get deploy -n cnpg-system cnpg-controller-manager
 Now that your system has been validated, you can tear down the local cluster with:
 
 ```shell
-./hack/setup-cluster.sh destroy
+./hack/setup-cluster.sh teardown
 ```
 
 Congratulations, you have a suitable development environment. You are now able

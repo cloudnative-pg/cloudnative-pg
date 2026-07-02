@@ -95,9 +95,6 @@ oc apply -f cloudnative-pg-catalog.yaml
 # create the secret for the index to be pulled in the marketplace
 oc create secret docker-registry -n openshift-marketplace --docker-server="${REGISTRY}" --docker-username="${REGISTRY_USER}" --docker-password="${REGISTRY_PASSWORD}" cnpg-pull-secret || true
 
-# Create the default configmap to set global keepalives on all the tests
-oc create configmap -n openshift-operators --from-literal=STANDBY_TCP_USER_TIMEOUT=5000 cnpg-controller-manager-config
-
 # Install the operator
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -110,6 +107,14 @@ spec:
   name: cloudnative-pg
   source: cloudnative-pg-catalog
   sourceNamespace: openshift-marketplace
+  config:
+    env:
+    - name: POSTGRES_IMAGE_NAME
+      value: ${POSTGRES_IMG}
+    - name: PGBOUNCER_IMAGE_NAME
+      value: ${PGBOUNCER_IMG}
+    - name: STANDBY_TCP_USER_TIMEOUT
+      value: "5000"
 EOF
 
 # The subscription will install the operator, but the service account used
@@ -127,20 +132,13 @@ CSV_NAME=$(oc get csv -n openshift-operators -l 'operators.coreos.com/cloudnativ
 DEPLOYMENT_NAME=$(oc get csv -n openshift-operators "$CSV_NAME" -o jsonpath='{.spec.install.spec.deployments[0].name}')
 wait_for deployment openshift-operators "$DEPLOYMENT_NAME" 5 60
 
-# Force a default postgresql and pgbouncer image in the running operator
-oc patch -n openshift-operators csv "$CSV_NAME" --type='json' -p \
-"[
-  {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/0\", \"value\": { \"name\": \"POSTGRES_IMAGE_NAME\", \"value\": \"${POSTGRES_IMG}\"}},
-  {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/1\", \"value\": { \"name\": \"PGBOUNCER_IMAGE_NAME\", \"value\": \"${PGBOUNCER_IMG}\"}}
-]"
-
-# After patching, we need some time to propagate the change to the deployment and the pod.
+# After creating Subscription, OLM needs time to create and start the operator pod with the configured environment
 ITER=0
 while true; do
   ITER=$((ITER + 1))
   sleep 5
   if [[ $ITER -gt 60 ]]; then
-    echo "Patch not propagated to pod, exiting"
+    echo "OLM did not create operator pod with correct environment, exiting"
     oc get -n openshift-operators "$(oc get -n openshift-operators deployments -o name)" -o yaml || true
     oc get -n openshift-operators "$(oc get -n openshift-operators pods -o name)" -o yaml || true
     oc logs -n openshift-operators "$(oc get -n openshift-operators pods -o name)" || true
@@ -172,6 +170,40 @@ while true; do
   echo "[$ITER] Everything ready to run e2e tests."
   break
 done
+
+# Move OCP ingress routers off worker nodes for the duration of this test
+# job, so the drain_node e2e does not strand router-default's PDB. The
+# placement is non-production but the OCP cluster is destroyed at end-of-job.
+# OCP still applies the legacy control-plane taint by default; the key is
+# kept in a shell variable so the JSON literal does not contain a woke
+# trigger word.
+echo "Pinning router-default to control plane nodes"
+LEGACY_TAINT_KEY="node-role.kubernetes.io/master" # wokeignore:rule=master
+CTRL_PLANE_KEY="node-role.kubernetes.io/control-plane"
+PATCH=$(cat <<EOF
+{
+  "spec": {
+    "nodePlacement": {
+      "nodeSelector": { "matchLabels": { "${CTRL_PLANE_KEY}": "" } },
+      "tolerations": [
+        { "key": "${LEGACY_TAINT_KEY}", "operator": "Exists", "effect": "NoSchedule" },
+        { "key": "${CTRL_PLANE_KEY}",   "operator": "Exists", "effect": "NoSchedule" }
+      ]
+    }
+  }
+}
+EOF
+)
+NEW_GEN=$(oc patch ingresscontroller.operator.openshift.io/default \
+  -n openshift-ingress-operator --type merge -p "$PATCH" \
+  -o jsonpath='{.metadata.generation}')
+oc wait ingresscontroller.operator.openshift.io/default \
+  -n openshift-ingress-operator \
+  --for=jsonpath="{.status.observedGeneration}=${NEW_GEN}" --timeout=2m
+oc rollout status -n openshift-ingress deployment/router-default --timeout=5m
+oc wait ingresscontroller.operator.openshift.io/default \
+  -n openshift-ingress-operator \
+  --for=condition=Available=True --timeout=2m
 
 echo "Running the e2e tests"
 "${ROOT_DIR}/hack/e2e/run-e2e.sh"

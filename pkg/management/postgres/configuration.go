@@ -120,8 +120,11 @@ func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBind
 
 	return postgres.CreateHBARules(
 		cluster.Spec.PostgresConfiguration.PgHBA,
-		defaultAuthenticationMethod,
-		buildLDAPConfigString(cluster, ldapBindPassword))
+		postgres.HBAOptions{
+			DefaultAuthenticationMethod: defaultAuthenticationMethod,
+			LDAPConfigString:            buildLDAPConfigString(cluster, ldapBindPassword),
+			SelectorIPs:                 cluster.GetPodSelectorIPs(),
+		})
 }
 
 // RefreshPGHBA generates and writes down the pg_hba.conf file
@@ -303,88 +306,6 @@ func createStandbySignal(pgData string) error {
 	return err
 }
 
-var migrateAutoConfOptions = []string{
-	"archive_mode",
-	"primary_conninfo",
-	"primary_slot_name",
-	"recovery_target_timeline",
-	"restore_command",
-}
-
-var cleanupAutoConfOptions = []string{
-	"archive_mode",
-	"primary_conninfo",
-	"primary_slot_name",
-	"recovery_target",
-	"recovery_target_inclusive",
-	"recovery_target_lsn",
-	"recovery_target_name",
-	"recovery_target_time",
-	"recovery_target_timeline",
-	"recovery_target_xid",
-	"restore_command",
-}
-
-// migratePostgresAutoConfFile migrates options managed by the operator from `postgresql.auto.conf` file,
-// to `override.conf` file for an upgrade case.
-// Returns a boolean indicating if any changes were done and any errors encountered
-func (instance *Instance) migratePostgresAutoConfFile(ctx context.Context) (changed bool, err error) {
-	contextLogger := log.FromContext(ctx).WithName("migratePostgresAutoConfFile")
-
-	// this is an idempotent operation. Ensures that we always include the override import.
-	// See: #5747
-	if changed, err = configfile.EnsureIncludes(path.Join(instance.PgData, "postgresql.conf"),
-		constants.PostgresqlOverrideConfigurationFile); err != nil {
-		return false, fmt.Errorf("migrating replication settings: %w",
-			err)
-	}
-
-	overrideConfPath := filepath.Join(instance.PgData, constants.PostgresqlOverrideConfigurationFile)
-	autoConfFile := filepath.Join(instance.PgData, "postgresql.auto.conf")
-	autoConfContent, readLinesErr := fileutils.ReadFileLines(autoConfFile)
-	if readLinesErr != nil {
-		return changed, fmt.Errorf("error while reading postgresql.auto.conf file: %w", readLinesErr)
-	}
-
-	overrideConfExists, _ := fileutils.FileExists(overrideConfPath)
-	options := configfile.ReadLinesFromConfigurationContents(autoConfContent, migrateAutoConfOptions...)
-	if len(options) == 0 && overrideConfExists {
-		contextLogger.Trace("no action taken, options slice is empty")
-		return changed, nil
-	}
-
-	contextLogger.Info("Start to migrate replication settings",
-		"filename", constants.PostgresqlOverrideConfigurationFile,
-		"targetFileExists", overrideConfExists,
-		"options", options,
-	)
-
-	// We create the override.conf file only if it doesn't exist (first-time migration).
-	// The instance manager manages the content of this file, and it will be overwritten
-	// later during the configuration update. We create it here just as a precaution.
-	if !overrideConfExists {
-		if _, err := fileutils.WriteLinesToFile(overrideConfPath, options); err != nil {
-			return changed, fmt.Errorf("migrating replication settings: %w",
-				err)
-		}
-	}
-
-	if _, err := fileutils.WriteLinesToFile(autoConfFile,
-		configfile.RemoveOptionsFromConfigurationContents(
-			autoConfContent, cleanupAutoConfOptions...),
-	); err != nil {
-		return true, fmt.Errorf("cleaning up postgresql.auto.conf file: %w", err)
-	}
-
-	contextLogger.Info("Migrated replication settings",
-		"filename", constants.PostgresqlOverrideConfigurationFile,
-		"overrideConfCreated", !overrideConfExists,
-		"options", options,
-	)
-
-	return true, nil
-}
-
 // createPostgresqlConfiguration creates the PostgreSQL configuration to be
 // used for this cluster and return it and its sha256 checksum
 func createPostgresqlConfiguration(
@@ -423,12 +344,19 @@ func createPostgresqlConfiguration(
 	}
 	sort.Strings(info.TemporaryTablespaces)
 
-	// Set additional extensions
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+	// Set additional extensions. During a major upgrade we configure the
+	// target-version cluster, so we read from TargetPGDataImageInfo and resolve
+	// mounts under UpgradeTargetExtensionsBaseDirectory; otherwise we read from
+	// PGDataImageInfo at the steady-state mount path.
+	exts, baseDir, err := selectAdditionalExtensions(cluster, operationType)
+	if err != nil {
+		return "", "", err
+	}
+	for _, extension := range exts {
 		info.AdditionalExtensions = append(
 			info.AdditionalExtensions,
 			postgres.AdditionalExtensionConfiguration{
-				Name:                 extension.Name,
+				MountPath:            filepath.Join(baseDir, extension.Name),
 				ExtensionControlPath: extension.ExtensionControlPath,
 				DynamicLibraryPath:   extension.DynamicLibraryPath,
 			},
@@ -465,6 +393,47 @@ func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
 		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
 		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
 		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
+}
+
+// selectAdditionalExtensions returns the extension list and mount base
+// directory the configuration generator should use, picking between the
+// source-version (steady-state) and target-version (major upgrade) layouts
+// according to operationType.
+//
+// Caller invariant for OperationType_TYPE_UPGRADE: cluster.Status.TargetPGDataImageInfo
+// MUST be populated. The configuration being written in upgrade mode belongs
+// to the new pgdata, so the target set is authoritative; falling back to the
+// source set on a missing target would silently produce a config pointing at
+// the wrong mount tree. Today only the major-upgrade reconciler -> upgrade-Job
+// path passes TYPE_UPGRADE, and it always patches TargetPGDataImageInfo
+// atomically with the phase transition before scheduling the Job. New callers
+// adding TYPE_UPGRADE paths (e.g. plugin hooks, restoration jobs) must
+// preserve this invariant.
+//
+// In all other operation types the source set is read from
+// cluster.Status.PGDataImageInfo; a nil there returns an empty list (no
+// error), since a freshly-bootstrapped cluster legitimately has no extensions
+// yet.
+func selectAdditionalExtensions(
+	cluster *apiv1.Cluster,
+	operationType postgresClient.OperationType_Type,
+) ([]apiv1.ExtensionConfiguration, string, error) {
+	if operationType == postgresClient.OperationType_TYPE_UPGRADE {
+		if cluster.Status.TargetPGDataImageInfo == nil {
+			return nil, "", fmt.Errorf(
+				"cannot configure target-version extensions: cluster status is missing TargetPGDataImageInfo")
+		}
+		return cluster.Status.TargetPGDataImageInfo.Extensions,
+			postgres.UpgradeTargetExtensionsBaseDirectory,
+			nil
+	}
+
+	if cluster.Status.PGDataImageInfo == nil {
+		return nil, postgres.ExtensionsBaseDirectory, nil
+	}
+	return cluster.Status.PGDataImageInfo.Extensions,
+		postgres.ExtensionsBaseDirectory,
+		nil
 }
 
 // configurePostgresForImport configures Postgres to be optimized for the firt import

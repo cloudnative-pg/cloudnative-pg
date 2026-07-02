@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -59,6 +60,49 @@ func IsRetryableError(err *Error) bool {
 		return false
 	}
 	return err.Code == errCodeAnotherRequestInProgress
+}
+
+// withOperatorAuth wraps a handler to authenticate the operator by pinning its client
+// certificate's public key. It reads the expected fingerprint from the instance's cached
+// cluster (updated by the reconciliation loop) and compares it against the SHA-256 public
+// key fingerprint of the peer certificate presented by the caller.
+//
+// Rejections use distinct status codes so callers can tell permanent from transient
+// failures: 401 means no usable client certificate was presented (for example the
+// status port is not served over TLS) and is permanent; 503 means a certificate was
+// presented but is not (yet) recognized, which is transient while the operator
+// certificate fingerprint propagates to the instance's cached cluster.
+func (ws *remoteWebserverEndpoints) withOperatorAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		contextLogger := log.FromContext(r.Context())
+
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			contextLogger.Debug("Rejecting unauthenticated request to protected endpoint",
+				"path", r.URL.Path)
+			http.Error(w, "client certificate required", http.StatusUnauthorized)
+			return
+		}
+
+		expectedFingerprint := ws.instance.GetClusterOrDefault().Status.OperatorCertificateFingerprint
+		if expectedFingerprint == "" {
+			contextLogger.Debug("No operator certificate fingerprint in cluster status; rejecting request",
+				"path", r.URL.Path)
+			http.Error(w, "operator certificate not registered", http.StatusServiceUnavailable)
+			return
+		}
+
+		peerCert := r.TLS.PeerCertificates[0]
+		actualFingerprint := certs.PublicKeyFingerprint(peerCert)
+		if actualFingerprint != expectedFingerprint {
+			contextLogger.Debug("Rejecting request with unknown operator certificate",
+				"path", r.URL.Path,
+				"fingerprint", actualFingerprint)
+			http.Error(w, "operator certificate not recognized", http.StatusServiceUnavailable)
+			return
+		}
+
+		next(w, r)
+	}
 }
 
 type remoteWebserverEndpoints struct {
@@ -115,15 +159,29 @@ func NewRemoteWebServer(
 	}
 
 	serveMux := http.NewServeMux()
-	serveMux.HandleFunc(url.PathFailSafe, endpoints.failSafe)
-	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.backup)
-	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
-	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
-	serveMux.HandleFunc(url.PathStartup, endpoints.isServerStartedUp)
+
+	// Unauthenticated: used by the Kubernetes API server ProxyGet (kubectl cnpg status).
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
-	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.pgArchivePartial)
-	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
-	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
+	// Unauthenticated: kubelet liveness probe; must be reachable without client cert.
+	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
+	// Unauthenticated: kubelet readiness probe; must be reachable without client cert.
+	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
+	// Unauthenticated: kubelet startup probe; must be reachable without client cert.
+	serveMux.HandleFunc(url.PathStartup, endpoints.isServerStartedUp)
+	// Unauthenticated: failsafe is a lightweight no-op called only by the operator.
+	// It does not perform any sensitive operation and needs no authentication.
+	serveMux.HandleFunc(url.PathFailSafe, endpoints.failSafe)
+
+	// Authenticated: backup drives a PostgreSQL pg_start/stop_backup session.
+	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.withOperatorAuth(endpoints.backup))
+	// Authenticated: spawns a pg_controldata process per call; only the operator should invoke it.
+	serveMux.HandleFunc(url.PathPGControlData, endpoints.withOperatorAuth(endpoints.pgControlData))
+	// Authenticated: pgarchivepartial triggers WAL archival and must not be callable by arbitrary clients.
+	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.withOperatorAuth(endpoints.pgArchivePartial))
+	// Authenticated: update replaces the running instance manager binary.
+	serveMux.HandleFunc(
+		url.PathUpdate,
+		endpoints.withOperatorAuth(endpoints.updateInstanceManager(cancelFunc, exitedConditions)))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
@@ -138,6 +196,9 @@ func NewRemoteWebServer(
 			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				return instance.GetServerCertificate(), nil
 			},
+			// RequestClientCert asks the client to send a certificate but does not require it.
+			// Authentication is enforced per-endpoint by withOperatorAuth.
+			ClientAuth: tls.RequestClientCert,
 		}
 	}
 
@@ -344,7 +405,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 	}
 }
 
-// nolint: gocognit
+//nolint:gocognit
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
 	log.Trace("request method", "method", req.Method)
 	if !ws.ongoingBackupRequest.TryLock() {
@@ -406,6 +467,9 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
+
+		// The backup start request continues when the request already terminated.
+		//nolint:gosec
 		go ws.currentBackup.startBackup(context.Background(), &ws.ongoingBackupRequest)
 
 		res := Response[BackupResultData]{
@@ -465,6 +529,8 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 
 		ws.currentBackup.data.Phase = Closing
 
+		// The backup stop request continues when the request already terminated.
+		//nolint:gosec
 		go ws.currentBackup.stopBackup(context.Background(), &ws.ongoingBackupRequest)
 		sendJSONResponseWithData(w, 200, res)
 		return
@@ -527,7 +593,7 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 	}()
 
 	options := []string{constants.WalArchiveCommand, partialWalFileRelativePath}
-	walArchiveCmd := exec.Command("/controller/manager", options...) // nolint: gosec
+	walArchiveCmd := exec.Command("/controller/manager", options...) //nolint: gosec
 	walArchiveCmd.Dir = pgData
 	if err := execlog.RunBuffering(walArchiveCmd, "wal-archive-partial"); err != nil {
 		sendBadRequestJSONResponse(w, "ERROR_WHILE_EXECUTING_WAL_ARCHIVE", err.Error())

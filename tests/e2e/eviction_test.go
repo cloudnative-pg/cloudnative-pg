@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -86,26 +87,28 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		}
 
 		// Checking the Pod is actually evicted and resource version changed
-		err = retry.Do(
-			func() error {
-				err = env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: podName},
-					&pod)
-				if err != nil {
-					return err
-				}
-				// Sometimes the eviction status is too short, we can not see if has been changed.
-				// We checked the resource version here
-				if oldPodRV != pod.GetResourceVersion() {
-					GinkgoWriter.Printf("New resource version for %v pod: %v \n",
-						pod.GetName(), pod.GetResourceVersion())
-					return nil
-				}
-				return fmt.Errorf("pod %v has not been evicted", pod.Name)
-			},
+		err = retry.New(
 			retry.Delay(2*time.Second),
 			retry.Attempts(timeoutSeconds),
-		)
+		).
+			Do(
+				func() error {
+					err = env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: podName},
+						&pod)
+					if err != nil {
+						return err
+					}
+					// Sometimes the eviction status is too short, we can not see if has been changed.
+					// We checked the resource version here
+					if oldPodRV != pod.GetResourceVersion() {
+						GinkgoWriter.Printf("New resource version for %v pod: %v \n",
+							pod.GetName(), pod.GetResourceVersion())
+						return nil
+					}
+					return fmt.Errorf("pod %v has not been evicted", pod.Name)
+				},
+			)
 		return err
 	}
 
@@ -119,10 +122,10 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		})
 
 		BeforeAll(func() {
-			// limit the case running on local kind env as we are using taint to simulate the eviction
+			// limit the case running on kind as we are using taint to simulate the eviction
 			// we do not know if other cloud vendor crd controller is running on the node been evicted
-			if !IsLocal() {
-				Skip("This test is only run on local cluster")
+			if !IsKind() {
+				Skip("This test only runs on kind clusters")
 			}
 			const namespacePrefix = "single-instance-pod-eviction"
 			var err error
@@ -132,7 +135,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				// Create a cluster in a namespace we'll delete after the test
 				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, singleInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, singleInstanceSampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, singleInstanceSampleFile)
 			})
 		})
 
@@ -159,7 +162,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 			})
 		})
 	})
@@ -175,8 +178,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if !IsLocal() {
-				Skip("This test is only run on local cluster")
+			if !IsKind() {
+				Skip("This test only runs on kind clusters")
 			}
 		})
 
@@ -189,7 +192,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				// Create a cluster in a namespace and shared in containers, we'll delete after the test
 				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, multiInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, multiInstanceSampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, multiInstanceSampleFile)
 			})
 
 			By("retrieving the nodeName for primary pod", func() {
@@ -251,7 +254,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 			})
 		})
 
@@ -297,7 +300,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 
 			// Pod need rejoin, need more time
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 			})
 		})
 	})

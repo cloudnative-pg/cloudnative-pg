@@ -54,7 +54,7 @@ func collectPGStatWAL(e *Exporter) error {
 	walMetrics.WalFpi.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalFpi))
 	walMetrics.WalBytes.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalBytes))
 	walMetrics.WALBuffersFull.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WALBuffersFull))
-	if version, _ := e.instance.GetPgVersion(); version.Major < 18 {
+	if version, _ := e.instance.GetPgVersion(); version.Major() < 18 {
 		walMetrics.WalWrite.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWrite))
 		walMetrics.WalSync.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSync))
 		walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(walStat.WalWriteTime)
@@ -85,7 +85,7 @@ func (s *walSettings) synchronize(db *sql.DB, configSha256 string) error {
 	rows, err := db.Query(`
 SELECT name, setting FROM pg_catalog.pg_settings
 WHERE pg_settings.name
-IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_keep_segments', 'max_slot_wal_keep_size')`) // nolint: lll
+IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_keep_segments', 'max_slot_wal_keep_size')`) //nolint: lll
 	if err != nil {
 		log.Error(err, "while fetching rows")
 		return err

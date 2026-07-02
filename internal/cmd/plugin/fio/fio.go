@@ -45,7 +45,7 @@ type fioCommand struct {
 
 const (
 	fioKeyWord = "fio"
-	fioImage   = "wallnerryan/fiotools-aio:v2"
+	fioImage   = "docker.io/wallnerryan/fiotools-aio:v2"
 )
 
 var jobExample = `

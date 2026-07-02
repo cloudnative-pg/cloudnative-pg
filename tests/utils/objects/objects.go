@@ -24,7 +24,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -44,15 +44,16 @@ func Create(
 	object client.Object,
 	opts ...client.CreateOption,
 ) (client.Object, error) {
-	err := retry.Do(
-		func() error {
-			return crudClient.Create(ctx, object, opts...)
-		},
+	err := retry.New(
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),
 		retry.DelayType(retry.FixedDelay),
-		retry.RetryIf(func(err error) bool { return !errors.IsAlreadyExists(err) }),
-	)
+		retry.RetryIf(func(err error) bool { return !errors.IsAlreadyExists(err) })).
+		Do(
+			func() error {
+				return crudClient.Create(ctx, object, opts...)
+			},
+		)
 	return object, err
 }
 
@@ -63,15 +64,15 @@ func Delete(
 	object client.Object,
 	opts ...client.DeleteOption,
 ) error {
-	err := retry.Do(
-		func() error {
-			return crudClient.Delete(ctx, object, opts...)
-		},
-		retry.Delay(PollingTime*time.Second),
+	err := retry.New(retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),
 		retry.DelayType(retry.FixedDelay),
-		retry.RetryIf(func(err error) bool { return !errors.IsNotFound(err) }),
-	)
+		retry.RetryIf(func(err error) bool { return !errors.IsNotFound(err) })).
+		Do(
+			func() error {
+				return crudClient.Delete(ctx, object, opts...)
+			},
+		)
 	return err
 }
 
@@ -82,18 +83,19 @@ func List(
 	objectList client.ObjectList,
 	opts ...client.ListOption,
 ) error {
-	err := retry.Do(
-		func() error {
-			err := crudClient.List(ctx, objectList, opts...)
-			if err != nil {
-				return err
-			}
-			return nil
-		},
+	err := retry.New(
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),
-		retry.DelayType(retry.FixedDelay),
-	)
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				err := crudClient.List(ctx, objectList, opts...)
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		)
 	return err
 }
 
@@ -104,17 +106,18 @@ func Get(
 	objectKey client.ObjectKey,
 	object client.Object,
 ) error {
-	err := retry.Do(
-		func() error {
-			err := crudClient.Get(ctx, objectKey, object)
-			if err != nil {
-				return err
-			}
-			return nil
-		},
+	err := retry.New(
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),
-		retry.DelayType(retry.FixedDelay),
-	)
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				err := crudClient.Get(ctx, objectKey, object)
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		)
 	return err
 }

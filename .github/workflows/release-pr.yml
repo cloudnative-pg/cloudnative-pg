@@ -12,13 +12,10 @@ on:
 jobs:
   pull-request:
     runs-on: ubuntu-24.04
-    permissions:
-      pull-requests: write
-      contents: write
     steps:
       -
         name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       -
         name: Get tag
         run: |
@@ -36,7 +33,7 @@ jobs:
         uses: repo-sync/pull-request@572331753c3787dee4a6c0b6719c889af9646b81 # v2.12
         with:
           destination_branch: ${{ env.DEST }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.REPO_GHA_PAT }}
           pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
-          pr_label: release
+          pr_label: "release,do not backport,no-issue"
           pr_title: "Version tag to ${{ env.TAG }}"

@@ -102,7 +102,6 @@ func (columnMapping ColumnMapping) ToMetricMap(
 		columnFQName = fmt.Sprintf("%s_%s", namespace, columnMapping.Name)
 	}
 	// Determine how to convert the column based on its usage.
-	// nolint: dupl
 	switch columnMapping.Usage {
 	case DISCARD:
 		result[columnName] = MetricMap{

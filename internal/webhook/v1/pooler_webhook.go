@@ -26,14 +26,13 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 )
 
 // AllowedPgbouncerGenericConfigurationParameters is the list of allowed parameters for PgBouncer
@@ -44,7 +43,9 @@ var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"cancel_wait_timeout",
 	"client_idle_timeout",
 	"client_login_timeout",
+	"client_tls_ciphers",
 	"client_tls_sslmode",
+	"client_tls13_ciphers",
 	"default_pool_size",
 	"disable_pqexec",
 	"dns_max_ttl",
@@ -79,6 +80,7 @@ var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"server_reset_query_always",
 	"server_round_robin",
 	"server_tls_ciphers",
+	"server_tls13_ciphers",
 	"server_tls_protocols",
 	"server_tls_sslmode",
 	"stats_period",
@@ -99,9 +101,16 @@ var poolerLog = log.WithName("pooler-resource").WithValues("version", "v1")
 
 // SetupPoolerWebhookWithManager registers the webhook for Pooler in the manager.
 func SetupPoolerWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Pooler{}).
-		WithValidator(newBypassableValidator(&PoolerCustomValidator{})).
+	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Pooler{}).
+		WithValidator(newBypassableValidator[*apiv1.Pooler](&PoolerCustomValidator{})).
 		Complete()
+}
+
+// NewPoolerAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewPoolerAdmissionGuard() *guard.Admission[*apiv1.Pooler] {
+	return &guard.Admission[*apiv1.Pooler]{
+		Validator: newBypassableValidator[*apiv1.Pooler](&PoolerCustomValidator{}),
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -113,14 +122,8 @@ func SetupPoolerWebhookWithManager(mgr ctrl.Manager) error {
 // when it is created, updated, or deleted.
 type PoolerCustomValidator struct{}
 
-var _ webhook.CustomValidator = &PoolerCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Pooler.
-func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	pooler, ok := obj.(*apiv1.Pooler)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pooler object but got %T", obj)
-	}
+func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, pooler *apiv1.Pooler) (admission.Warnings, error) {
 	poolerLog.Info("Validation for Pooler upon creation", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
 	warns := v.getAdmissionWarnings(pooler)
@@ -133,7 +136,7 @@ func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Ob
 	}
 
 	return nil, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Pooler"},
 		pooler.Name, allErrs)
 }
 
@@ -149,7 +152,7 @@ func (v *PoolerCustomValidator) getAdmissionWarnings(r *apiv1.Pooler) admission.
 	}
 
 	if r.Spec.PgBouncer != nil &&
-		r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" { //nolint:staticcheck
+		r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" {
 		warns = append(
 			warns,
 			"The .spec.pgbouncer.authQuerySecret field has been deprecated")
@@ -161,18 +164,8 @@ func (v *PoolerCustomValidator) getAdmissionWarnings(r *apiv1.Pooler) admission.
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Pooler.
 func (v *PoolerCustomValidator) ValidateUpdate(
 	_ context.Context,
-	oldObj, newObj runtime.Object,
+	_ *apiv1.Pooler, pooler *apiv1.Pooler,
 ) (admission.Warnings, error) {
-	pooler, ok := newObj.(*apiv1.Pooler)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pooler object for the newObj but got %T", newObj)
-	}
-
-	_, ok = oldObj.(*apiv1.Pooler)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pooler object for the oldObj but got %T", oldObj)
-	}
-
 	poolerLog.Info("Validation for Pooler upon update", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
 	warns := v.getAdmissionWarnings(pooler)
@@ -185,16 +178,12 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 	}
 
 	return warns, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Pooler"},
 		pooler.Name, allErrs)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Pooler.
-func (v *PoolerCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	pooler, ok := obj.(*apiv1.Pooler)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pooler object but got %T", obj)
-	}
+func (v *PoolerCustomValidator) ValidateDelete(_ context.Context, pooler *apiv1.Pooler) (admission.Warnings, error) {
 	poolerLog.Info("Validation for Pooler upon deletion", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
 	// TODO(user): fill in your validation logic upon object deletion.
@@ -259,7 +248,56 @@ func (v *PoolerCustomValidator) validateCluster(r *apiv1.Pooler) field.ErrorList
 func (v *PoolerCustomValidator) validate(r *apiv1.Pooler) (allErrs field.ErrorList) {
 	allErrs = append(allErrs, v.validatePgBouncer(r)...)
 	allErrs = append(allErrs, v.validateCluster(r)...)
+	allErrs = append(allErrs, v.validateMonitoring(r)...)
 	return allErrs
+}
+
+// validateMonitoring enforces a configuration hygiene rule: when the metrics
+// endpoint is switched to TLS *and* the operator is asked to generate the
+// PodMonitor, the user must supply a clientTLSSecret so the pooler presents
+// a certificate that semantically belongs to the pooler.
+//
+// Without a user-supplied clientTLSSecret the metrics server falls back to
+// the cluster's server TLS certificate, whose SANs cover the cluster's
+// services rather than the pooler. The operator-generated PodMonitor already
+// scrapes with insecureSkipVerify=true (Prometheus scrapes pods by IP), so
+// the scrape itself does not break, but serving a cluster-identity
+// certificate from a pooler endpoint is a configuration mistake the operator
+// should surface at admission time rather than ship silently when the user
+// has explicitly opted into TLS.
+//
+// When enablePodMonitor is false (or omitted, its default), the operator does
+// not emit a PodMonitor at all: the user is wiring up their own scraper and
+// chooses the TLS expectations on that side. In that case clientTLSSecret is
+// not required and the rule does not fire.
+func (v *PoolerCustomValidator) validateMonitoring(r *apiv1.Pooler) field.ErrorList {
+	if !r.IsMetricsTLSEnabled() {
+		return nil
+	}
+
+	// No operator-generated PodMonitor → no misleading operator-side TLS
+	// config to prevent. Let the user manage their own scrape config.
+	//nolint:staticcheck // EnablePodMonitor is a deprecated sub-field but still honoured during the deprecation window
+	if r.Spec.Monitoring == nil || !r.Spec.Monitoring.EnablePodMonitor {
+		return nil
+	}
+
+	if r.Spec.PgBouncer != nil &&
+		r.Spec.PgBouncer.ClientTLSSecret != nil &&
+		r.Spec.PgBouncer.ClientTLSSecret.Name != "" {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Required(
+			field.NewPath("spec", "pgbouncer", "clientTLSSecret"),
+			"clientTLSSecret is required when spec.monitoring.tls.enabled is true and "+
+				"the operator-generated PodMonitor is enabled. Without it the metrics endpoint "+
+				"serves the cluster's server certificate, whose SANs cover the cluster's "+
+				"services rather than the pooler. Supply a clientTLSSecret whose certificate "+
+				"represents the pooler, or set spec.monitoring.enablePodMonitor=false and "+
+				"manage your own PodMonitor."),
+	}
 }
 
 // validatePgbouncerGenericParameters validates pgbouncer parameters

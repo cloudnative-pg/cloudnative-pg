@@ -46,7 +46,7 @@ LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 DIST_PATH := $(shell pwd)/dist
-OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
+OPERATOR_MANIFEST_PATH ?= ${DIST_PATH}/operator-manifest.yaml
 LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
@@ -55,22 +55,32 @@ PGBOUNCER_IMAGE_NAME ?= $(shell grep 'DefaultPgbouncerImage.*=' "pkg/versions/ve
 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize versioning=loose
 KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
-CONTROLLER_TOOLS_VERSION ?= v0.20.0
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
-CRDREFDOCS_VERSION ?= v0.2.0
+CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.13.1
+GORELEASER_VERSION ?= v2.16.0
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.55.0
+SPELLCHECK_VERSION ?= 0.62.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
-OPERATOR_SDK_VERSION ?= v1.42.0
+OPERATOR_SDK_VERSION ?= v1.42.3
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.61.0
+OPM_VERSION ?= v1.72.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.15.2
+PREFLIGHT_VERSION ?= 1.19.1
+# renovate: datasource=docker depName=cuelang/cue versioning=docker
+CUE_VERSION ?= 0.16.1
+# renovate: datasource=go depName=github.com/gemaraproj/gemara
+GEMARA_VERSION ?= v1.3.0
 ARCH ?= amd64
+FUZZ_TIME ?= 30s
+
+# OPENSHIFT_VERSIONS differs per release branch, unlike the renovate-managed
+# versions above that stay identical. The blank lines around it keep it out of
+# their diff context, so backport cherry-picks of a version bump don't conflict.
+OPENSHIFT_VERSIONS ?= v4.18-v4.22
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -122,19 +132,43 @@ test: generate fmt vet manifests envtest ## Run tests.
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils/...
+	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/...
+	cd tests && go test -coverpkg=./... -coverprofile=cover.out ./utils/...
 
 test-race: generate fmt vet manifests envtest ## Run tests enabling race detection.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
-	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
+	go run github.com/onsi/ginkgo/v2/ginkgo -r -p \
+	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites \
+	  ./api/... ./cmd/... ./internal/... ./pkg/...
+	cd tests && go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
-e2e-test-kind: ## Run e2e tests locally using kind.
-	hack/e2e/run-e2e-kind.sh
+.PHONY: fuzz
+fuzz: ## Run every native fuzz target discovered in the tree.
+	trap 'exit 130' INT ;\
+	rc=0 ;\
+	pairs=$$(go test -list '^Fuzz' ./... | awk '\
+		/^ok[ \t]/ { for (i in p) print $$2, p[i]; delete p; next } \
+		/^Fuzz/    { p[NR] = $$0 }') ;\
+	if [ -z "$$pairs" ]; then \
+		echo "No fuzz targets found." ;\
+		exit 0 ;\
+	fi ;\
+	while read -r pkg name; do \
+		echo "==> $$pkg::$$name (FUZZ_TIME=$(FUZZ_TIME))" ;\
+		go test -run=^$$ "$$pkg" -fuzz="^$$name$$" -fuzztime=$(FUZZ_TIME) || rc=$$? ;\
+	done <<< "$$pairs" ;\
+	exit $$rc
 
-e2e-test-local: ## Run e2e tests locally using the default kubernetes context.
-	hack/e2e/run-e2e-local.sh
+e2e-test-kind: ## Run e2e tests locally using kind.
+	CLUSTER_ENGINE=kind hack/e2e/run-e2e-local.sh
+
+e2e-test-k3d: ## Run e2e tests locally using k3d.
+	CLUSTER_ENGINE=k3d hack/e2e/run-e2e-local.sh
+
+e2e-test-existing-cluster: ## Run e2e tests using the default kubernetes context.
+	hack/e2e/run-e2e-suite.sh
 
 ##@ Build
 build: generate fmt vet build-manager build-plugin ## Build binaries.
@@ -182,6 +216,8 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	sed -i -e "s/ClusterRole/Role/" "$${CONFIG_TMP_DIR}/config/rbac/role.yaml" "$${CONFIG_TMP_DIR}/config/rbac/role_binding.yaml"  ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
+	echo -e "\n  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
+	echo -e "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
 	DOCKER_BUILDKIT=1 docker build --push --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMG} . ;\
 	export BUNDLE_IMG="${BUNDLE_IMG}"
 
@@ -213,15 +249,6 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
        - cnpg-pull-secret" | envsubst > cloudnative-pg-catalog.yaml ;\
 
 ##@ Deployment
-install: manifests kustomize ## Install CRDs into a cluster.
-	$(KUSTOMIZE) build config/crd | kubectl apply --server-side -f -
-
-uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
-	$(KUSTOMIZE) build config/crd | kubectl delete -f -
-
-deploy: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
-	kubectl apply --server-side --force-conflicts -f ${OPERATOR_MANIFEST_PATH}
-
 generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
@@ -253,20 +280,24 @@ olm-scorecard: operator-sdk ## Run the Scorecard test from operator-sdk
 
 fmt: ## Run go fmt against code.
 	go fmt ./...
+	cd tests && go fmt ./...
 
 vet: ## Run go vet against code.
 	go vet ./...
+	cd tests && go vet ./...
 
 lint: ## Run the linter.
 	golangci-lint run
+	cd tests && golangci-lint run
 
 lint-fix: ## Run the linter with --fix.
 	golangci-lint run --fix
+	cd tests && golangci-lint run --fix
 
 shellcheck: ## Shellcheck for the hack directory.
 	@{ \
 	set -e ;\
-	find -name '*.sh' -exec shellcheck -a -S style {} + ;\
+	find -name '*.sh' -exec shellcheck -x -a -S style {} + ;\
 	}
 
 spellcheck: ## Runs the spellcheck on the project.
@@ -275,18 +306,40 @@ spellcheck: ## Runs the spellcheck on the project.
 woke: ## Runs the woke checks on project.
 	docker run --rm -v $(PWD):/src:Z -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
 
+validate-gemara: validate-threat-model ## Alias for validate-threat-model.
+
+validate-threat-model: ## Validate Gemara threat-model artifacts against the schema.
+	docker run --rm -v $(PWD):/src:Z -w /src cuelang/cue:$(CUE_VERSION) \
+		vet -c -d '#ThreatCatalog' \
+		github.com/gemaraproj/gemara@$(GEMARA_VERSION) .github/threat-catalog.yaml
+	docker run --rm -v $(PWD):/src:Z -w /src cuelang/cue:$(CUE_VERSION) \
+		vet -c -d '#CapabilityCatalog' \
+		github.com/gemaraproj/gemara@$(GEMARA_VERSION) .github/capability-catalog.yaml
+
+validate-security-insights: ## Validate SECURITY-INSIGHTS.yml against the OSSF Security Insights schema.
+	@version=$$(sed -n 's/^[[:space:]]*schema-version:[[:space:]]*//p' SECURITY-INSIGHTS.yml | head -1); \
+	tmp=$$(mktemp -d); \
+	curl -sSfL \
+		"https://raw.githubusercontent.com/ossf/security-insights/v$${version}/spec/schema.cue" \
+		-o "$$tmp/schema.cue"; \
+	docker run --rm -v $(PWD):/src:Z -v "$$tmp":/schema:Z -w /src cuelang/cue:$(CUE_VERSION) \
+		vet SECURITY-INSIGHTS.yml /schema/schema.cue -d '#SecurityInsights'; \
+	rm -rf "$$tmp"
+
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
 	mv -f .wordlist-en-custom.txt.new .wordlist-en-custom.txt
 
 go-mod-check: ## Check if there's any dirty change after `go mod tidy`
 	go mod tidy ;\
-	git diff --exit-code go.mod go.sum
+	go -C tests mod tidy ;\
+	git diff --exit-code go.mod go.sum tests/go.mod tests/go.sum
 
 run-govulncheck: govulncheck ## Check if there's any known vulnerabilities with the currently installed Go modules
 	$(GOVULNCHECK) ./...
+	cd tests && $(GOVULNCHECK) ./...
 
-checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck ## Runs all the checks on the project.
+checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck validate-threat-model validate-security-insights ## Runs all the checks on the project.
 
 ##@ Documentation
 
@@ -305,11 +358,13 @@ apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
 		--max-depth 15 \
 		--templates-dir docs/crd-gen-refs/markdown \
 		--output-path docs/src/cloudnative-pg.v1.md
+	@echo "Escaping Markdown directives in generated API documentation..."
+	sed -i 's/:map\[\([^]]*\)\]/\\: \\{ \1 \\}/g' docs/src/cloudnative-pg.v1.md
 
 ##@ Cleanup
 
 clean: ## Clean-up the work tree from build/test artifacts
-	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out
+	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out tests/cover.out
 
 distclean: clean ## Clean-up the work tree removing also cached tools binaries
 	! [ -d "$(ENVTEST_ASSETS_DIR)" ] || chmod -R u+w $(ENVTEST_ASSETS_DIR)

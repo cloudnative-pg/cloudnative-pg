@@ -31,10 +31,12 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -176,14 +178,16 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		})
 		By("writing some WAL", func() {
 			query := "CHECKPOINT; SELECT pg_catalog.pg_switch_wal(); CHECKPOINT"
-			_, _, err := exec.QueryInInstancePod(
+			checkpointGracePeriod := time.Duration(testTimeouts[timeouts.ClusterIsReadyQuick]) * time.Second
+			_, _, err := exec.QueryInInstancePodWithTimeout(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
 				postgres.PostgresDBName,
-				query)
+				query,
+				checkpointGracePeriod)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	}
@@ -198,7 +202,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		}
 	})
 
-	DescribeTable("WAL volume space unavailable",
+	DescribeTable(
+		"WAL volume space unavailable",
 		func(sampleFile string) {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
@@ -208,7 +213,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			By("leaving a full disk pod fenced", func() {
 				diskSpaceDetectionTest(namespace, clusterName)

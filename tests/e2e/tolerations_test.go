@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
@@ -30,8 +31,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Set of tests in which we check that the operator is able to failover primary and brings back
-// replicas when we drain node
+// Set of tests in which we verify that Cluster's pods can be scheduled on tainted nodes
+// when proper tolerations are configured
 var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, tests.LabelPodScheduling), func() {
 	var taintedNodes []string
 	var namespace string
@@ -76,6 +77,6 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 				}
 			}
 		})
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 	})
 })

@@ -21,6 +21,10 @@ package pgbench
 
 import (
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -97,5 +101,58 @@ var _ = Describe("NewCmd", func() {
 		Expect(testRun.nodeSelector).To(Equal([]string{"label=value"}))
 		Expect(testRun.ttlSecondsAfterFinished).To(Equal(int32(86400)))
 		Expect(testRun.pgBenchCommandArgs).To(Equal([]string{"arg1", "arg2"}))
+	})
+})
+
+var _ = Describe("buildJob", func() {
+	It("should propagate ImagePullSecrets from the Cluster spec to the Job pod template", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImagePullSecrets: []apiv1.LocalObjectReference{
+					{Name: "my-registry-secret"},
+					{Name: "another-secret"},
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				Image: "my-registry.io/cloudnative-pg:16",
+			},
+		}
+
+		cmd := &pgBenchRun{
+			clusterName: "test-cluster",
+			dbName:      "app",
+		}
+
+		job := cmd.buildJob(cluster)
+
+		Expect(job.Spec.Template.Spec.ImagePullSecrets).To(ConsistOf(
+			corev1.LocalObjectReference{Name: "my-registry-secret"},
+			corev1.LocalObjectReference{Name: "another-secret"},
+		))
+	})
+
+	It("should leave ImagePullSecrets empty when the Cluster has none", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Status: apiv1.ClusterStatus{
+				Image: "ghcr.io/cloudnative-pg/postgresql:16",
+			},
+		}
+
+		cmd := &pgBenchRun{
+			clusterName: "test-cluster",
+			dbName:      "app",
+		}
+
+		job := cmd.buildJob(cluster)
+
+		Expect(job.Spec.Template.Spec.ImagePullSecrets).To(BeEmpty())
 	})
 })

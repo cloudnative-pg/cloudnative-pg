@@ -27,7 +27,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/google/shlex"
 	"github.com/onsi/ginkgo/v2"
 
@@ -64,16 +64,17 @@ func UncheckedRetry(command string) (stdout string, stderr string, err error) {
 	}
 
 	var outBuffer, errBuffer bytes.Buffer
-	err = retry.Do(
-		func() error {
-			cmd := exec.Command(tokens[0], tokens[1:]...) // #nosec G204
-			cmd.Stdout, cmd.Stderr = &outBuffer, &errBuffer
-			return cmd.Run()
-		},
+	err = retry.New(
 		retry.Delay(objects.PollingTime*time.Second),
 		retry.Attempts(objects.RetryAttempts),
-		retry.DelayType(retry.FixedDelay),
-	)
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				cmd := exec.Command(tokens[0], tokens[1:]...) // #nosec G204
+				cmd.Stdout, cmd.Stderr = &outBuffer, &errBuffer
+				return cmd.Run()
+			},
+		)
 	stdout = outBuffer.String()
 	stderr = errBuffer.String()
 	if err != nil {

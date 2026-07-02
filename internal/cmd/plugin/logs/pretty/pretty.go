@@ -121,7 +121,7 @@ func (bf *prettyCmd) decode(ctx context.Context, reader io.Reader, recordChannel
 
 		record, err := newLogRecordFromBytes(scanner.Bytes())
 		if err != nil {
-			_, _ = fmt.Fprintln(
+			_, _ = fmt.Fprintln( //nolint:gosec // output to local stderr
 				os.Stderr,
 				aurora.Red(fmt.Sprintf("JSON syntax error (%s)", err.Error())),
 				scanner.Text())
@@ -159,10 +159,17 @@ func (bf *prettyCmd) group(ctx context.Context, logChannel <-chan logRecord, gro
 		buffer = bufferArray[0:0]
 	}
 
+	// A single timer is reused across iterations and reset at the top of each
+	// one. This preserves the original "flush the buffer after one second of
+	// inactivity" behaviour while avoiding the allocation of a new timer (and a
+	// piled-up deferred Stop) on every received log record, which previously
+	// grew unbounded for the lifetime of the stream.
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
+
 logLoop:
 	for {
-		timer := time.NewTimer(1 * time.Second)
-		defer timer.Stop()
+		timer.Reset(1 * time.Second)
 
 		select {
 		case <-ctx.Done():

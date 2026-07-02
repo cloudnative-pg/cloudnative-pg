@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -34,6 +36,20 @@ var _ = Describe("image catalog", func() {
 			{
 				Image: "test:16",
 				Major: 16,
+				Extensions: []ExtensionConfiguration{
+					{
+						Name: "postgis",
+						ImageVolumeSource: corev1.ImageVolumeSource{
+							Reference: "postgis:latest",
+						},
+					},
+					{
+						Name: "pgvector",
+						ImageVolumeSource: corev1.ImageVolumeSource{
+							Reference: "pgvector:0.8.0",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -48,5 +64,66 @@ var _ = Describe("image catalog", func() {
 		image, ok := catalogSpec.FindImageForMajor(13)
 		Expect(image).To(BeEmpty())
 		Expect(ok).To(BeFalse())
+	})
+
+	It("looks up extensions given the major version", func() {
+		extensions, ok := catalogSpec.FindExtensionsForMajor(16)
+		Expect(ok).To(BeTrue())
+		Expect(extensions).To(HaveLen(2))
+		Expect(extensions[0].Name).To(Equal("postgis"))
+		Expect(extensions[0].ImageVolumeSource.Reference).To(Equal("postgis:latest"))
+		Expect(extensions[1].Name).To(Equal("pgvector"))
+		Expect(extensions[1].ImageVolumeSource.Reference).To(Equal("pgvector:0.8.0"))
+	})
+
+	It("returns empty extensions when major version has no extensions", func() {
+		extensions, ok := catalogSpec.FindExtensionsForMajor(15)
+		Expect(ok).To(BeTrue())
+		Expect(extensions).To(BeEmpty())
+	})
+
+	It("returns false when major version is not found", func() {
+		extensions, ok := catalogSpec.FindExtensionsForMajor(13)
+		Expect(ok).To(BeFalse())
+		Expect(extensions).To(BeNil())
+	})
+})
+
+var _ = Describe("image catalog component images", func() {
+	catalogSpec := ImageCatalogSpec{
+		Images: []CatalogImage{
+			{Image: "test:16", Major: 16},
+		},
+		ComponentImages: []CatalogComponentImage{
+			{Key: "pgbouncer", Image: "pgbouncer:1.24.0"},
+			{Key: "other-tool", Image: "other-tool:1.0.0"},
+		},
+	}
+
+	It("looks up a component image by key", func() {
+		image, ok := catalogSpec.FindComponentImageForKey("pgbouncer")
+		Expect(ok).To(BeTrue())
+		Expect(image).To(Equal("pgbouncer:1.24.0"))
+	})
+
+	It("looks up a second component image by key", func() {
+		image, ok := catalogSpec.FindComponentImageForKey("other-tool")
+		Expect(ok).To(BeTrue())
+		Expect(image).To(Equal("other-tool:1.0.0"))
+	})
+
+	It("returns false when the key is not present", func() {
+		image, ok := catalogSpec.FindComponentImageForKey("nonexistent")
+		Expect(ok).To(BeFalse())
+		Expect(image).To(BeEmpty())
+	})
+
+	It("returns false when componentImages is empty", func() {
+		emptySpec := ImageCatalogSpec{
+			Images: []CatalogImage{{Image: "test:16", Major: 16}},
+		}
+		image, ok := emptySpec.FindComponentImageForKey("pgbouncer")
+		Expect(ok).To(BeFalse())
+		Expect(image).To(BeEmpty())
 	})
 })

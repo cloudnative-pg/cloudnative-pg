@@ -23,18 +23,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	cnpgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // roleAction encodes the action necessary for a role, i.e. ignore, or CRUD
@@ -83,13 +83,7 @@ func NewRoleSynchronizer(instance *postgres.Instance, client client.Client) *Rol
 func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Info("starting up the runnable")
-	isPrimary, err := sr.instance.IsPrimary()
-	if err != nil {
-		return err
-	}
-	if !isPrimary {
-		contextLog.Info("skipping the RoleSynchronizer in replicas")
-	}
+
 	go func() {
 		var config *apiv1.ManagedConfiguration
 		contextLog.Info("setting up RoleSynchronizer loop")
@@ -112,7 +106,18 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 				continue
 			}
 
-			err := sr.reconcile(ctx, config)
+			// Skip replicas and designated primaries: only true primaries write roles.
+			isPrimary, err := sr.instance.IsPrimary()
+			if err != nil {
+				contextLog.Error(err, "checking primary status")
+				continue
+			}
+			if !isPrimary {
+				contextLog.Debug("skipping role reconciliation on a non-primary instance")
+				continue
+			}
+
+			err = sr.reconcile(ctx, config)
 			if err != nil {
 				contextLog.Error(err, "synchronizing roles", "config", config)
 				continue
@@ -127,13 +132,6 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 // with the spec. It also updates the cluster Status with the latest applied changes
 func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.ManagedConfiguration) error {
 	var err error
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("recovered from a panic: %s", r)
-		}
-	}()
-
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("reconciling managed roles")
 
@@ -158,7 +156,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	if err != nil {
 		return fmt.Errorf("while getting superuser connection: %w", err)
 	}
-	appliedState, irreconcilableRoles, err := sr.synchronizeRoles(ctx, superUserDB, config, rolePasswords)
+	appliedState, unreconciledRoles, err := sr.synchronizeRoles(ctx, superUserDB, config, rolePasswords)
 	if err != nil {
 		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
@@ -171,7 +169,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 	updatedCluster := remoteCluster.DeepCopy()
 	updatedCluster.Status.ManagedRolesStatus.PasswordStatus = appliedState
-	updatedCluster.Status.ManagedRolesStatus.CannotReconcile = irreconcilableRoles
+	updatedCluster.Status.ManagedRolesStatus.CannotReconcile = unreconciledRoles
 	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(&remoteCluster))
 }
 
@@ -186,19 +184,18 @@ func getRoleNames(roles []roleConfigurationAdapter) []string {
 // synchronizeRoles aligns roles in the database to the spec
 // It returns
 //   - the PasswordState for any updated roles
-//   - any roles that had expectable postgres errors
-//   - any unexpected error
+//   - the per-role errors encountered while applying role actions (e.g.
+//     unrealizable postgres operations, missing password secret)
+//   - any error that prevents the whole synchronization from running
+//     (e.g. listing the roles in the database failed)
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
 	db *sql.DB,
 	config *apiv1.ManagedConfiguration,
 	storedPasswordState map[string]apiv1.PasswordState,
 ) (map[string]apiv1.PasswordState, map[string][]string, error) {
-	latestSecretResourceVersion, err := getPasswordSecretResourceVersion(
+	latestSecretResourceVersion := getPasswordSecretResourceVersion(
 		ctx, sr.client, config.Roles, sr.instance.GetNamespaceName())
-	if err != nil {
-		return nil, nil, err
-	}
 	rolesInDB, err := List(ctx, db)
 	if err != nil {
 		return nil, nil, err
@@ -206,50 +203,42 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	rolesByAction := evaluateNextRoleActions(
 		ctx, config, rolesInDB, storedPasswordState, latestSecretResourceVersion)
 
-	passwordStates, irreconcilableRoles, err := sr.applyRoleActions(ctx, db, rolesByAction)
-	if err != nil {
-		return nil, nil, err
-	}
+	passwordStates, unreconciledRoles := sr.applyRoleActions(ctx, db, rolesByAction)
 
 	// Merge the status from database into spec. We should keep all the status
 	// otherwise in the next loop the user without status will be marked as need update
 	for role, stateInDatabase := range passwordStates {
 		storedPasswordState[role] = stateInDatabase
 	}
-	return storedPasswordState, irreconcilableRoles, nil
+	return storedPasswordState, unreconciledRoles, nil
 }
 
-// applyRoleActions applies the actions to reconcile roles in the DB with the Spec
-// It returns the apiv1.PasswordState for each role, as well as a map of roles that
-// cannot be reconciled for expectable errors, e.g. dropping a role owning content
-//
-// NOTE: applyRoleActions will carry on after an expectable error, i.e. an error
-// due to an invalid request for postgres. This is so that other actions will not
-// be blocked by a user error.
-// It will, however, error out on unexpected errors.
+// applyRoleActions applies the actions to reconcile roles in the DB with the Spec.
+// It returns the apiv1.PasswordState for each successfully applied role, and a
+// map collecting the errors encountered per role. Both expectable errors
+// (e.g. dropping a role that owns content) and unexpected errors are recorded
+// in the map, so that an error on one role does not block the reconciliation
+// of the others.
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	db *sql.DB,
 	rolesByAction rolesByAction,
-) (map[string]apiv1.PasswordState, map[string][]string, error) {
+) (map[string]apiv1.PasswordState, map[string][]string) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("applying role actions")
 
-	irreconcilableRoles := make(map[string][]string)
+	unreconciledRoles := make(map[string][]string)
 	appliedChanges := make(map[string]apiv1.PasswordState)
-	handleRoleError := func(errToEvaluate error, roleName string, action roleAction) error {
-		// log unexpected errors, collect expectable PostgreSQL errors
+	handleRoleError := func(errToEvaluate error, roleName string, action roleAction) {
 		if errToEvaluate == nil {
-			return nil
+			return
 		}
 		roleError, err := parseRoleError(errToEvaluate, roleName, action)
-		if err != nil {
-			contextLog.Error(err, "while performing "+string(action), "role", roleName)
-			return err
+		if err == nil {
+			unreconciledRoles[roleName] = append(unreconciledRoles[roleName], roleError.Error())
+		} else {
+			unreconciledRoles[roleName] = append(unreconciledRoles[roleName], errToEvaluate.Error())
 		}
-
-		irreconcilableRoles[roleName] = append(irreconcilableRoles[roleName], roleError.Error())
-		return nil
 	}
 
 	actionsCreateUpdate := []roleAction{roleCreate, roleUpdate}
@@ -259,56 +248,47 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			if err == nil {
 				appliedChanges[role.Name] = appliedState
 			}
-			if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
-				return nil, nil, unhandledErr
-			}
+			handleRoleError(err, role.Name, action)
 		}
 	}
 
 	for _, role := range rolesByAction[roleSetComment] {
 		// NOTE: adding/updating a comment on a role does not alter its TransactionID
 		err := UpdateComment(ctx, db, role.toDatabaseRole())
-		if unhandledErr := handleRoleError(err, role.Name, roleSetComment); unhandledErr != nil {
-			return nil, nil, unhandledErr
-		}
+		handleRoleError(err, role.Name, roleSetComment)
 	}
 
 	for _, role := range rolesByAction[roleUpdateMemberships] {
 		// NOTE: revoking / granting to a role does not alter its TransactionID
 		dbRole := role.toDatabaseRole()
-		grants, revokes, err := getRoleMembershipDiff(ctx, db, role, dbRole)
-		if unhandledErr := handleRoleError(err, role.Name, roleUpdateMemberships); unhandledErr != nil {
-			return nil, nil, unhandledErr
-		}
+		grants, revokes, err := GetRoleMembershipDiff(ctx, db, role.InRoles, dbRole)
+		handleRoleError(err, role.Name, roleUpdateMemberships)
 
 		err = UpdateMembership(ctx, db, dbRole, grants, revokes)
-		if unhandledErr := handleRoleError(err, role.Name, roleUpdateMemberships); unhandledErr != nil {
-			return nil, nil, unhandledErr
-		}
+		handleRoleError(err, role.Name, roleUpdateMemberships)
 	}
 
 	for _, role := range rolesByAction[roleDelete] {
 		err := Delete(ctx, db, role.toDatabaseRole())
-		if unhandledErr := handleRoleError(err, role.Name, roleDelete); unhandledErr != nil {
-			return nil, nil, unhandledErr
-		}
+		handleRoleError(err, role.Name, roleDelete)
 	}
 
-	return appliedChanges, irreconcilableRoles, nil
+	return appliedChanges, unreconciledRoles
 }
 
-func getRoleMembershipDiff(
+// GetRoleMembershipDiff returns two lists of roles: those to be granted, and revoked
+func GetRoleMembershipDiff(
 	ctx context.Context,
 	db *sql.DB,
-	role roleConfigurationAdapter,
+	desiredRoleMemberships []string,
 	dbRole DatabaseRole,
-) ([]string, []string, error) {
+) (toGrant []string, toRevoke []string, err error) {
 	inRoleInDB, err := GetParentRoles(ctx, db, dbRole)
 	if err != nil {
 		return nil, nil, err
 	}
-	rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
-	rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
+	rolesToGrant := getRolesToGrant(inRoleInDB, desiredRoleMemberships)
+	rolesToRevoke := getRolesToRevoke(inRoleInDB, desiredRoleMemberships)
 	return rolesToGrant, rolesToRevoke, nil
 }
 
@@ -321,30 +301,13 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	role roleConfigurationAdapter,
 	action roleAction,
 ) (apiv1.PasswordState, error) {
-	var passVersion string
 	databaseRole := role.toDatabaseRole()
-	switch {
-	case role.PasswordSecret == nil && !role.DisablePassword:
-		databaseRole.ignorePassword = true
-	case role.PasswordSecret == nil && role.DisablePassword:
-		databaseRole.password = sql.NullString{}
-	case role.PasswordSecret != nil && role.DisablePassword:
-		// this case should be prevented by the validation webhook,
-		// and is an error
-		return apiv1.PasswordState{},
-			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
-				role.PasswordSecret.Name)
-	case role.PasswordSecret != nil && !role.DisablePassword:
-		passwordSecret, err := getPassword(ctx, sr.client, role, sr.instance.GetNamespaceName())
-		if err != nil {
-			return apiv1.PasswordState{}, err
-		}
-
-		databaseRole.password = sql.NullString{Valid: true, String: passwordSecret.password}
-		passVersion = passwordSecret.version
+	passVersion, err := databaseRole.ApplyPassword(ctx, sr.client,
+		&role.RoleConfiguration, sr.instance.GetNamespaceName())
+	if err != nil {
+		return apiv1.PasswordState{}, err
 	}
 
-	var err error
 	switch action {
 	case roleCreate:
 		err = Create(ctx, db, databaseRole)
@@ -368,9 +331,10 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 
 // passwordSecret contains the decoded credentials from a Secret
 type passwordSecret struct {
-	username string
-	password string
-	version  string
+	username    string
+	password    string
+	version     string
+	passthrough bool
 }
 
 // getPassword retrieves the password stored in the Kubernetes secret for the
@@ -378,11 +342,11 @@ type passwordSecret struct {
 func getPassword(
 	ctx context.Context,
 	cl client.Client,
-	roleInSpec roleConfigurationAdapter,
+	config *apiv1.RoleConfiguration,
 	namespace string,
 ) (passwordSecret, error) {
-	secretName := roleInSpec.GetRoleSecretsName()
-	// no secrets defined, will keep roleInSpec.Password nil
+	secretName := config.GetRoleSecretName()
+	// no secrets defined, will keep the role password nil
 	if secretName == "" {
 		return passwordSecret{}, nil
 	}
@@ -392,47 +356,51 @@ func getPassword(
 		client.ObjectKey{Namespace: namespace, Name: secretName},
 		&secret)
 	if err != nil {
-		if apierrs.IsNotFound(err) {
-			return passwordSecret{}, nil
-		}
-		return passwordSecret{}, err
+		return passwordSecret{},
+			fmt.Errorf("failed to get password secret %s: %w", secretName, err)
 	}
 	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
 	if err != nil {
 		return passwordSecret{}, err
 	}
-	if strings.TrimSpace(roleInSpec.Name) != strings.TrimSpace(usernameFromSecret) {
-		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
-		return passwordSecret{}, err
+	if strings.TrimSpace(config.Name) != strings.TrimSpace(usernameFromSecret) {
+		return passwordSecret{},
+			fmt.Errorf("the username in secret %q does not match role %q", secretName, config.Name)
 	}
 	return passwordSecret{
-			strings.TrimSpace(usernameFromSecret),
-			strings.TrimSpace(passwordFromSecret),
-			secret.GetResourceVersion(),
+			username:    strings.TrimSpace(usernameFromSecret),
+			password:    strings.TrimSpace(passwordFromSecret),
+			version:     secret.GetResourceVersion(),
+			passthrough: cnpgutils.IsPasswordPassthroughEnabled(&secret.ObjectMeta),
 		},
 		nil
 }
 
-// getPasswordSecretResourceVersion returns a list of resource version of the passwords secrets for managed roles
-// stored as Kubernetes secrets
+// getPasswordSecretResourceVersion returns a list of resource version of the password secrets for managed roles
+// stored as Kubernetes secrets. Roles whose secret cannot be fetched are
+// omitted from the result; the action evaluator will route them through the
+// update path so the failure surfaces in CannotReconcile.
 func getPasswordSecretResourceVersion(
 	ctx context.Context,
-	client client.Client,
+	cl client.Client,
 	rolesInSpec []apiv1.RoleConfiguration,
 	namespace string,
-) (map[string]string, error) {
+) map[string]string {
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	re := make(map[string]string)
 	for _, role := range rolesInSpec {
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
-		passwordSecret, err := getPassword(ctx, client, roleConfigurationAdapter{RoleConfiguration: role}, namespace)
+		passwordSecret, err := getPassword(ctx, cl, &role, namespace)
 		if err != nil {
-			return nil, err
+			contextLog.Debug("could not fetch password secret for role; will be flagged for reconciliation",
+				"role", role.Name, "secret", role.PasswordSecret.Name, "err", err.Error())
+			continue
 		}
 		re[role.Name] = passwordSecret.version
 	}
-	return re, nil
+	return re
 }
 
 func getRolesToGrant(inRoleInDB, inRoleInSpec []string) []string {

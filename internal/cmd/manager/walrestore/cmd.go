@@ -122,6 +122,12 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
+	// Validate timeline history files before any restore attempt (plugin or in-tree)
+	// to ensure replicas don't download future timeline history files
+	if err := validateTimelineHistoryFile(ctx, walName, cluster, podName); err != nil {
+		return err
+	}
+
 	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath)
 	if err != nil {
 		// With the current implementation, this happens when both of the following conditions are met:
@@ -432,4 +438,60 @@ func isStreamingAvailable(cluster *apiv1.Cluster, podName string) bool {
 
 	// Primary, we do not replicate from nobody
 	return false
+}
+
+// validateTimelineHistoryFile prevents replicas from downloading timeline history files
+// for timelines ahead of the cluster's current timeline. Primaries can download any timeline.
+func validateTimelineHistoryFile(ctx context.Context, walName string, cluster *apiv1.Cluster, podName string) error {
+	contextLog := log.FromContext(ctx)
+
+	if !strings.HasSuffix(walName, ".history") {
+		return nil
+	}
+
+	fileTimeline, err := postgres.ParseTimelineFromHistoryFilename(walName)
+	if err != nil {
+		contextLog.Warning("Could not parse timeline from history filename",
+			"walName", walName,
+			"error", err)
+		return nil
+	}
+
+	if cluster.Status.CurrentPrimary == podName || cluster.Status.TargetPrimary == podName {
+		contextLog.Trace("Allowing timeline history file download for primary",
+			"walName", walName,
+			"fileTimeline", fileTimeline,
+			"isPrimary", true)
+		return nil
+	}
+
+	clusterTimeline := cluster.Status.TimelineID
+
+	// clusterTimeline == 0 means no primary has promoted yet and TimelineID has
+	// never been written to the cluster status, as happens during bootstrap
+	// recovery from an external archive. The split-brain scenario this guard
+	// protects against requires an active primary, which cannot exist while
+	// TimelineID is unset, so allowing all history files here is safe.
+	if clusterTimeline == 0 {
+		contextLog.Trace("Allowing timeline history file: cluster timeline not yet established",
+			"walName", walName,
+			"fileTimeline", fileTimeline)
+		return nil
+	}
+
+	if fileTimeline > clusterTimeline {
+		contextLog.Warning("Refusing to restore future timeline history file",
+			"walName", walName,
+			"fileTimeline", fileTimeline,
+			"clusterTimeline", clusterTimeline)
+
+		return barmanRestorer.ErrWALNotFound
+	}
+
+	contextLog.Trace("Allowing timeline history file download for replica",
+		"walName", walName,
+		"fileTimeline", fileTimeline,
+		"clusterTimeline", clusterTimeline)
+
+	return nil
 }

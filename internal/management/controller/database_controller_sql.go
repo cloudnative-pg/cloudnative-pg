@@ -87,54 +87,54 @@ func createDatabase(
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateDatabase strings.Builder
-	sqlCreateDatabase.WriteString(fmt.Sprintf("CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize()))
+	fmt.Fprintf(&sqlCreateDatabase, "CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize())
 	if len(obj.Spec.Owner) > 0 {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" OWNER %s", pgx.Identifier{obj.Spec.Owner}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " OWNER %s", pgx.Identifier{obj.Spec.Owner}.Sanitize())
 	}
 	if len(obj.Spec.Template) > 0 {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" TEMPLATE %s", pgx.Identifier{obj.Spec.Template}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " TEMPLATE %s", pgx.Identifier{obj.Spec.Template}.Sanitize())
 	}
 	if len(obj.Spec.Tablespace) > 0 {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" TABLESPACE %s", pgx.Identifier{obj.Spec.Tablespace}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " TABLESPACE %s", pgx.Identifier{obj.Spec.Tablespace}.Sanitize())
 	}
 	if obj.Spec.AllowConnections != nil {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" ALLOW_CONNECTIONS %v", *obj.Spec.AllowConnections))
+		fmt.Fprintf(&sqlCreateDatabase, " ALLOW_CONNECTIONS %v", *obj.Spec.AllowConnections)
 	}
 	if obj.Spec.ConnectionLimit != nil {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" CONNECTION LIMIT %v", *obj.Spec.ConnectionLimit))
+		fmt.Fprintf(&sqlCreateDatabase, " CONNECTION LIMIT %v", *obj.Spec.ConnectionLimit)
 	}
 	if obj.Spec.IsTemplate != nil {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" IS_TEMPLATE %v", *obj.Spec.IsTemplate))
+		fmt.Fprintf(&sqlCreateDatabase, " IS_TEMPLATE %v", *obj.Spec.IsTemplate)
 	}
 	if obj.Spec.Encoding != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" ENCODING %s", pgx.Identifier{obj.Spec.Encoding}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " ENCODING %s", pgx.Identifier{obj.Spec.Encoding}.Sanitize())
 	}
 	if obj.Spec.Locale != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE %s", pgx.Identifier{obj.Spec.Locale}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " LOCALE %s", pgx.Identifier{obj.Spec.Locale}.Sanitize())
 	}
 	if obj.Spec.LocaleProvider != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE_PROVIDER %s",
-			pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " LOCALE_PROVIDER %s",
+			pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize())
 	}
 	if obj.Spec.LcCollate != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LC_COLLATE %s", pgx.Identifier{obj.Spec.LcCollate}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " LC_COLLATE %s", pgx.Identifier{obj.Spec.LcCollate}.Sanitize())
 	}
 	if obj.Spec.LcCtype != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LC_CTYPE %s", pgx.Identifier{obj.Spec.LcCtype}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " LC_CTYPE %s", pgx.Identifier{obj.Spec.LcCtype}.Sanitize())
 	}
 	if obj.Spec.IcuLocale != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_LOCALE %s", pgx.Identifier{obj.Spec.IcuLocale}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " ICU_LOCALE %s", pgx.Identifier{obj.Spec.IcuLocale}.Sanitize())
 	}
 	if obj.Spec.IcuRules != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize())
 	}
 	if obj.Spec.BuiltinLocale != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" BUILTIN_LOCALE %s",
-			pgx.Identifier{obj.Spec.BuiltinLocale}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " BUILTIN_LOCALE %s",
+			pgx.Identifier{obj.Spec.BuiltinLocale}.Sanitize())
 	}
 	if obj.Spec.CollationVersion != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" COLLATION_VERSION %s",
-			pgx.Identifier{obj.Spec.CollationVersion}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " COLLATION_VERSION %s",
+			pgx.Identifier{obj.Spec.CollationVersion}.Sanitize())
 	}
 
 	_, err := db.ExecContext(ctx, sqlCreateDatabase.String())
@@ -268,16 +268,41 @@ func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.Extensio
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateExtension strings.Builder
-	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE EXTENSION %s ", pgx.Identifier{ext.Name}.Sanitize()))
+	fmt.Fprintf(&sqlCreateExtension, "CREATE EXTENSION %s ", pgx.Identifier{ext.Name}.Sanitize())
 	if len(ext.Version) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" VERSION %s", pgx.Identifier{ext.Version}.Sanitize()))
+		fmt.Fprintf(&sqlCreateExtension, " VERSION %s", pgx.Identifier{ext.Version}.Sanitize())
 	}
 	if len(ext.Schema) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" SCHEMA %s", pgx.Identifier{ext.Schema}.Sanitize()))
+		fmt.Fprintf(&sqlCreateExtension, " SCHEMA %s", pgx.Identifier{ext.Schema}.Sanitize())
 	}
 
-	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
+	// The pool pins search_path with pg_catalog first; under that pin a
+	// relocatable extension without an explicit SCHEMA would target
+	// pg_catalog, where object creation is denied, so CREATE EXTENSION
+	// would fail. Acquire a dedicated *sql.Conn and SET search_path to
+	// "$user", public so extensions land in the standard user-data
+	// schema, matching the pre-pin default behavior.
+	conn, err := db.Conn(ctx)
 	if err != nil {
+		return fmt.Errorf("acquiring dedicated connection for CREATE EXTENSION: %w", err)
+	}
+	defer func() {
+		// Restore the pinned search_path before the connection returns
+		// to the pool. The pgx stdlib driver does not reset session GUCs
+		// on release, so without this RESET a subsequent operator query
+		// reusing this connection would run with the "$user", public
+		// search_path and could resolve objects planted by a tenant.
+		if _, resetErr := conn.ExecContext(ctx, `RESET search_path`); resetErr != nil {
+			contextLogger.Error(resetErr, "while resetting search_path after CREATE EXTENSION")
+		}
+		_ = conn.Close()
+	}()
+
+	if _, err := conn.ExecContext(ctx, `SET search_path TO "$user", public`); err != nil {
+		return fmt.Errorf("setting search_path before CREATE EXTENSION: %w", err)
+	}
+
+	if _, err := conn.ExecContext(ctx, sqlCreateExtension.String()); err != nil {
 		contextLogger.Error(err, "while creating extension", "query", sqlCreateExtension.String())
 		return err
 	}
@@ -360,9 +385,9 @@ func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSp
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateExtension strings.Builder
-	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE SCHEMA %s ", pgx.Identifier{schema.Name}.Sanitize()))
+	fmt.Fprintf(&sqlCreateExtension, "CREATE SCHEMA %s ", pgx.Identifier{schema.Name}.Sanitize())
 	if len(schema.Owner) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" AUTHORIZATION %s", pgx.Identifier{schema.Owner}.Sanitize()))
+		fmt.Fprintf(&sqlCreateExtension, " AUTHORIZATION %s", pgx.Identifier{schema.Owner}.Sanitize())
 	}
 
 	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
@@ -501,6 +526,71 @@ func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *a
 	return applyUsagePermissions(ctx, db, objectTypeForeignServer, server.Name, server.Usages)
 }
 
+// publicRole is the special PostgreSQL grantee `PUBLIC`, which grants or
+// revokes a privilege for all roles at once. It must be emitted verbatim as a
+// keyword and never quoted as an identifier: quoting it would target a role
+// literally named "public", which does not (and cannot) exist.
+const publicRole = "PUBLIC"
+
+// sanitizeGrantee renders a grantee for use in a GRANT/REVOKE statement,
+// special-casing the PUBLIC pseudo-role.
+func sanitizeGrantee(name string) string {
+	if strings.EqualFold(name, publicRole) {
+		return publicRole
+	}
+	return pgx.Identifier{name}.Sanitize()
+}
+
+// applyObjectPrivilege grants or revokes a single privilege keyword (e.g. USAGE,
+// CREATE, CONNECT, TEMPORARY) on the given object for the listed grantees. It is
+// the shared primitive behind object-level privilege management; callers wrap it
+// with the privilege and object type relevant to their resource.
+//
+// The privilege and objectType arguments are interpolated into the SQL verbatim
+// (they are not escapable identifiers), so callers MUST pass trusted, in-code
+// constants for them and never user-controlled input.
+func applyObjectPrivilege(
+	ctx context.Context,
+	db *sql.DB,
+	privilege string,
+	objectType string,
+	objectName string,
+	grantees []apiv1.UsageSpec,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	for _, grantee := range grantees {
+		sanitizedObject := pgx.Identifier{objectName}.Sanitize()
+		sanitizedGrantee := sanitizeGrantee(grantee.Name)
+
+		switch grantee.Type {
+		case apiv1.GrantUsageSpecType:
+			mutation := fmt.Sprintf("GRANT %s ON %s %s TO %s", //nolint:gosec
+				privilege, objectType, sanitizedObject, sanitizedGrantee)
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("granting %s on %s: %w", privilege, objectType, err)
+			}
+			contextLogger.Info("granted privilege",
+				"privilege", privilege, "type", objectType, "name", objectName, "grantee", grantee.Name)
+
+		case apiv1.RevokeUsageSpecType:
+			mutation := fmt.Sprintf("REVOKE %s ON %s %s FROM %s", //nolint:gosec
+				privilege, objectType, sanitizedObject, sanitizedGrantee)
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("revoking %s on %s: %w", privilege, objectType, err)
+			}
+			contextLogger.Info("revoked privilege",
+				"privilege", privilege, "type", objectType, "name", objectName, "grantee", grantee.Name)
+
+		default:
+			contextLogger.Warning("unknown privilege type",
+				"type", grantee.Type, "privilege", privilege, "objectType", objectType, "name", objectName)
+		}
+	}
+
+	return nil
+}
+
 // applyUsagePermissions is a generic helper to grant or revoke USAGE permissions
 // for FOREIGN DATA WRAPPER / FOREIGN SERVER objects, avoiding duplicated logic.
 func applyUsagePermissions(
@@ -510,45 +600,14 @@ func applyUsagePermissions(
 	objectName string,
 	usages []apiv1.UsageSpec,
 ) error {
-	contextLogger := log.FromContext(ctx)
-
-	if len(usages) == 0 {
-		return nil
-	}
-
-	for _, usageSpec := range usages {
-		sanitizedObject := pgx.Identifier{objectName}.Sanitize()
-		sanitizedUser := pgx.Identifier{usageSpec.Name}.Sanitize()
-
-		switch usageSpec.Type {
-		case apiv1.GrantUsageSpecType:
-			mutation := fmt.Sprintf("GRANT USAGE ON %s %s TO %s", objectType, sanitizedObject, sanitizedUser)
-			if _, err := db.ExecContext(ctx, mutation); err != nil {
-				return fmt.Errorf("granting usage of %s: %w", objectType, err)
-			}
-			contextLogger.Info("granted usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
-
-		case apiv1.RevokeUsageSpecType:
-			mutation := fmt.Sprintf("REVOKE USAGE ON %s %s FROM %s", objectType, sanitizedObject, sanitizedUser) // nolint:gosec
-			if _, err := db.ExecContext(ctx, mutation); err != nil {
-				return fmt.Errorf("revoking usage of %s: %w", objectType, err)
-			}
-			contextLogger.Info("revoked usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
-
-		default:
-			contextLogger.Warning(
-				"unknown usage type", "type", usageSpec.Type, "objectType", objectType, "name", objectName)
-		}
-	}
-
-	return nil
+	return applyObjectPrivilege(ctx, db, "USAGE", objectType, objectName, usages)
 }
 
 func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateFDW strings.Builder
-	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
+	fmt.Fprintf(&sqlCreateFDW, "CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize())
 
 	// Create Handler
 	if len(fdw.Handler) > 0 {
@@ -556,7 +615,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		case "-":
 			sqlCreateFDW.WriteString("NO HANDLER ")
 		default:
-			sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
+			fmt.Fprintf(&sqlCreateFDW, "HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize())
 		}
 	}
 
@@ -566,7 +625,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		case "-":
 			sqlCreateFDW.WriteString("NO VALIDATOR ")
 		default:
-			sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
+			fmt.Fprintf(&sqlCreateFDW, "VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize())
 		}
 	}
 
@@ -737,9 +796,9 @@ func createDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.S
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateServer strings.Builder
-	sqlCreateServer.WriteString(fmt.Sprintf("CREATE SERVER %s FOREIGN DATA WRAPPER %s ",
+	fmt.Fprintf(&sqlCreateServer, "CREATE SERVER %s FOREIGN DATA WRAPPER %s ",
 		pgx.Identifier{server.Name}.Sanitize(),
-		pgx.Identifier{server.FdwName}.Sanitize()))
+		pgx.Identifier{server.FdwName}.Sanitize())
 
 	if opts := extractOptionsClauses(server.Options); len(opts) > 0 {
 		sqlCreateServer.WriteString("OPTIONS (" + strings.Join(opts, ", ") + ")")

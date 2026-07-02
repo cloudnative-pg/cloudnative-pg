@@ -22,6 +22,7 @@ package majorupgrade
 import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -52,8 +53,19 @@ func getTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
 	return "", false
 }
 
-// createMajorUpgradeJobDefinition creates a job to upgrade the primary node to a new Postgres major version
-func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *batchv1.Job {
+// createMajorUpgradeJobDefinition creates the Job that runs pg_upgrade.
+// newExtensions is the target-major extension set; the source-major set
+// is taken from Status.PGDataImageInfo.
+func createMajorUpgradeJobDefinition(
+	cluster *apiv1.Cluster,
+	nodeSerial int,
+	newExtensions []apiv1.ExtensionConfiguration,
+) *batchv1.Job {
+	var oldExtensions []apiv1.ExtensionConfiguration
+	if cluster.Status.PGDataImageInfo != nil {
+		oldExtensions = cluster.Status.PGDataImageInfo.Extensions
+	}
+
 	prepareCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -66,7 +78,7 @@ func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *ba
 		Image:           cluster.Status.PGDataImageInfo.Image,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Command:         prepareCommand,
-		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster),
+		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, oldExtensions),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: specs.GetSecurityContext(cluster),
 	}
@@ -78,8 +90,22 @@ func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *ba
 		"execute",
 		"/controller/old/bindir.txt",
 	}
-	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand)
+	// Build the Job without any extension-managed volumes/mounts; both sets
+	// (source-version and target-version) are appended explicitly below so
+	// they can coexist under distinct mount trees.
+	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, nil)
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
+	// A failed pg_upgrade will not succeed on retry.
+	job.Spec.BackoffLimit = ptr.To(int32(0))
+
+	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
+		specs.CreateExtensionVolumes(oldExtensions)...)
+	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
+		specs.CreateUpgradeTargetExtensionVolumes(newExtensions)...)
+
+	mounts := &job.Spec.Template.Spec.Containers[0].VolumeMounts
+	*mounts = append(*mounts, specs.CreateExtensionVolumeMounts(oldExtensions)...)
+	*mounts = append(*mounts, specs.CreateUpgradeTargetExtensionVolumeMounts(newExtensions)...)
 
 	return job
 }

@@ -116,7 +116,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		contextLogger.Error(err, "Error while getting cluster")
 		return err
 	}
-	instance.Cluster = &cluster
+	instance.SetCluster(&cluster)
 
 	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
 		contextLogger.Error(err, "Error while refreshing secrets")

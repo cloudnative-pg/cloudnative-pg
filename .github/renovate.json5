@@ -10,12 +10,11 @@
   prConcurrentLimit: 5,
   baseBranchPatterns: [
     'main',
-    'release-1.25',
-    'release-1.27',
-    'release-1.28',
   ],
   ignorePaths: [
-    'docs/**',
+    // Keep the example manifests pinned, but allow custom managers below to
+    // update specific tool images referenced elsewhere in the docs.
+    'docs/src/samples/**',
     'releases/**',
     'contribute/**',
     'licenses/**',
@@ -27,7 +26,6 @@
   semanticCommits: 'enabled',
   labels: [
     'automated',
-    'do not backport',
     'no-issue',
   ],
   'pip-compile': {
@@ -47,7 +45,8 @@
       managerFilePatterns: [
         '/^Makefile$/',
         '/^hack/setup-cluster.sh$/',
-        '/^hack/e2e/run-e2e-kind.sh$/',
+        '/^hack/testing-tools/k8s-engines/[^/]+/settings\\.sh$/',
+        '/^hack/testing-tools/common/40-utils-registry\\.sh$/'
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*["\']?(?<currentValue>.+?)["\']?\\s',
@@ -60,6 +59,7 @@
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))? currentValue=(?<currentValue>[^\\s]+?)\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentDigest>.+?)["\']?\\s',
       ],
     },
     {
@@ -100,20 +100,32 @@
     {
       customType: 'regex',
       managerFilePatterns: [
-        '/^tests\\/utils\\/minio\\/minio\\.go$/',
+        '/^tests\\/utils\\/objectstore\\/objectstore\\.go$/',
       ],
       matchStrings: [
-        'minioImage = "(?<depName>.+?):(?<currentValue>.*?)"',
-        'minioClientImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'rustfsImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'awsCliImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'busyboxImage = "(?<depName>.+?):(?<currentValue>.*?)"',
       ],
       datasourceTemplate: 'docker',
-      versioningTemplate: 'regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T\\d{2}-\\d{2}-\\d{2}Z$',
+      versioningTemplate: 'semver',
+    },
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^docs\\/src\\/monitoring\\.md$/',
+      ],
+      matchStrings: [
+        'image: (?<depName>curlimages/curl):(?<currentValue>\\S+)',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'docker',
     },
     {
       customType: 'regex',
       managerFilePatterns:  [
         '/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/',
-        '/^hack/e2e/run-e2e-local.sh$/',
+        '/^hack/e2e/run-e2e-suite.sh$/',
         '/^hack/e2e/run-e2e\\.sh$/',
       ],
       matchStrings: [
@@ -178,7 +190,6 @@
         'major',
       ],
       matchPackageNames: [
-        '*',
         '!k8s.io{/,}**',
         '!sigs.k8s.io{/,}**',
         '!github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
@@ -195,7 +206,6 @@
       ],
       groupName: 'all non-major go dependencies',
       matchPackageNames: [
-        '*',
         '!k8s.io{/,}**',
         '!sigs.k8s.io{/,}**',
         '!github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
@@ -209,10 +219,11 @@
       matchUpdateTypes: [
         'digest',
         'pinDigest',
+        'major',
         'minor',
         'patch',
       ],
-      groupName: 'all non-major github action',
+      groupName: 'all github action',
       pinDigests: true,
     },
     {
@@ -230,8 +241,25 @@
       pinDigests: false,
       matchPackageNames: [
         'vmware-tanzu{/,}**',
-        'minio{/,}**',
       ],
+    },
+    {
+      // All container images consumed by the e2e object-store helper live in
+      // this single file; keep their bumps in one PR.
+      //
+      // We want RustFS on its glibc build: the default image is Alpine/musl,
+      // which performs worse (rustfs/rustfs#1662). The `-glibc` suffix sorts
+      // above the plain tag under semver, so Renovate tracks it as the newest
+      // and will open the bump on its own; we do not filter candidates by tag
+      // suffix. A suffix allowlist would silently stall this file if the glibc
+      // tag ever disappeared; instead any tag-scheme change surfaces as a
+      // visible PR here for review.
+      matchFileNames: [
+        'tests/utils/objectstore/objectstore.go',
+      ],
+      groupName: 'objectstore test images',
+      separateMajorMinor: false,
+      pinDigests: false,
     },
     {
       groupName: 'operator framework',
@@ -264,7 +292,29 @@
       matchPackageNames: [
         'kindest{/,}**',
         'getwoke{/,}**',
-        'jonasbn/github-action-spellcheck'
+        'jonasbn/github-action-spellcheck',
+        'registry',
+        'cuelang/cue',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
+      // The curl image is only used in a documentation example, so keep it as a
+      // readable tag without a pinned digest.
+      matchPackageNames: [
+        'curlimages/curl',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
+      groupName: 'SLSA actions no-digest',
+      matchDatasources: [
+        'github-tags',
+      ],
+      matchPackageNames: [
+        'slsa-framework{/,}**',
       ],
       pinDigests: false,
       separateMajorMinor: false,

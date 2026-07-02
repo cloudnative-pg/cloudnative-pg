@@ -38,13 +38,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/atomic"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
@@ -53,8 +55,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -132,6 +136,10 @@ var (
 
 	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
+
+	// ErrNoFreeWALSpace is returned when there isn't enough disk space
+	// available to store at least two WAL files.
+	ErrNoFreeWALSpace = errors.New("no free disk space for WALs")
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -153,8 +161,13 @@ type Instance struct {
 	// Pool of DB connections pointing to every used database
 	pool *pool.ConnectionPool
 
+	// Pool of DB connections for the metrics exporter (connects as cnpg_metrics_exporter)
+	initializeMetricsPool sync.Once
+	metricsPool           *pool.ConnectionPool
+
 	// Pool of DB connections pointing to primary instance
-	primaryPool *pool.ConnectionPool
+	initializePrimaryPool sync.Once
+	primaryPool           *pool.ConnectionPool
 
 	// The namespace of the k8s object representing this cluster
 	namespace string
@@ -169,33 +182,23 @@ type Instance struct {
 	// adding the PostgreSQL CNPGConfigSha256 parameter
 	ConfigSha256 string
 
-	// PgCtlTimeoutForPromotion specifies the maximum number of seconds to wait when waiting for promotion to complete
-	PgCtlTimeoutForPromotion int32
-
-	// specifies the maximum number of seconds to wait when shutting down for a switchover
-	MaxSwitchoverDelay int32
-
 	// pgVersion is the PostgreSQL version
 	pgVersion *semver.Version
 
 	// instanceCommandChan is a channel for requesting actions on the instance
 	instanceCommandChan chan InstanceCommand
 
+	// SessionID is a unique identifier generated at instance manager startup.
+	// This ID changes on every instance manager restart, including reboots that don't
+	// change the container ID. Used to detect if the instance manager was restarted
+	// during long-running operations like backups.
+	SessionID string
+
 	// InstanceManagerIsUpgrading tells if there is an instance manager upgrade in process
 	InstanceManagerIsUpgrading atomic.Bool
 
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool
-
-	// MaxStopDelay is the current MaxStopDelay of the cluster
-	MaxStopDelay int32
-
-	// SmartStopDelay is used to control PostgreSQL smart shutdown timeout
-	SmartStopDelay int32
-
-	// RequiresDesignatedPrimaryTransition indicates if this instance is a primary that needs to become
-	// a designatedPrimary
-	RequiresDesignatedPrimaryTransition bool
 
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
@@ -226,8 +229,12 @@ type Instance struct {
 
 	serverCertificateHandler serverCertificateHandler
 
-	// Cluster is the cluster this instance belongs to
-	Cluster *apiv1.Cluster
+	// cluster is the cached cluster this instance belongs to.
+	// Access via GetClusterOrDefault() which returns an empty cluster if nil.
+	// It is read from HTTP handler goroutines (e.g. the remote webserver
+	// authentication middleware) while being written by the reconciliation loop,
+	// so access is synchronized through an atomic pointer.
+	cluster atomic.Pointer[apiv1.Cluster]
 }
 
 type serverCertificateHandler struct {
@@ -296,6 +303,47 @@ func (instance *Instance) SetFencing(enabled bool) {
 // SetCanCheckReadiness marks whether the instance should be checked for readiness
 func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
+}
+
+// GetClusterOrDefault returns the cached cluster, or an empty cluster if not set.
+// The empty cluster provides safe defaults via getter methods.
+func (instance *Instance) GetClusterOrDefault() *apiv1.Cluster {
+	if cluster := instance.cluster.Load(); cluster != nil {
+		return cluster
+	}
+	return &apiv1.Cluster{}
+}
+
+// SetCluster updates the cached cluster for use outside the reconciliation
+// cycle when the API client is not available
+func (instance *Instance) SetCluster(cluster *apiv1.Cluster) {
+	instance.cluster.Store(cluster)
+}
+
+// RequiresDesignatedPrimaryTransition checks if this instance is a primary
+// that needs to become a designated primary in a replica cluster
+func (instance *Instance) RequiresDesignatedPrimaryTransition() bool {
+	cluster := instance.GetClusterOrDefault()
+
+	if !cluster.IsReplica() {
+		return false
+	}
+
+	if !conditions.IsDesignatedPrimaryTransitionRequested(cluster) {
+		return false
+	}
+
+	if !instance.IsFenced() && !instance.MightBeUnavailable() {
+		return false
+	}
+
+	// Check if this pod was the primary before the transition started.
+	// We use CurrentPrimary instead of IsPrimary() because IsPrimary()
+	// checks for the absence of standby.signal, which gets created during
+	// the transition by RefreshReplicaConfiguration(). Using CurrentPrimary
+	// keeps the sentinel true throughout the transition, allowing retries
+	// if the status update fails due to optimistic locking conflicts.
+	return cluster.Status.CurrentPrimary == instance.GetPodName()
 }
 
 // CheckHasDiskSpaceForWAL checks if we have enough disk space to store two WAL files,
@@ -402,6 +450,7 @@ func NewInstance() *Instance {
 		slotsReplicatorChan:        make(chan *apiv1.ReplicationSlotsConfiguration),
 		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
 		tablespaceSynchronizerChan: make(chan map[string]apiv1.TablespaceConfiguration),
+		SessionID:                  string(uuid.NewUUID()),
 	}
 }
 
@@ -506,6 +555,9 @@ func (instance *Instance) ShutdownConnections() {
 	if instance.pool != nil {
 		instance.pool.ShutdownConnections()
 	}
+	if instance.metricsPool != nil {
+		instance.metricsPool.ShutdownConnections()
+	}
 	if instance.primaryPool != nil {
 		instance.primaryPool.ShutdownConnections()
 	}
@@ -567,11 +619,13 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	var err error
 
-	smartTimeout := instance.SmartStopDelay
-	if instance.MaxStopDelay <= instance.SmartStopDelay {
+	cluster := instance.GetClusterOrDefault()
+	smartTimeout := cluster.GetSmartShutdownTimeout()
+	maxStopDelay := cluster.GetMaxStopDelay()
+	if maxStopDelay <= smartTimeout {
 		contextLogger.Warning("Ignoring maxStopDelay <= smartShutdownTimeout",
-			"smartShutdownTimeout", instance.SmartStopDelay,
-			"maxStopDelay", instance.MaxStopDelay,
+			"smartShutdownTimeout", smartTimeout,
+			"maxStopDelay", maxStopDelay,
 		)
 		smartTimeout = 0
 	}
@@ -617,12 +671,13 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
+	maxSwitchoverDelay := instance.GetClusterOrDefault().GetMaxSwitchoverDelay()
 	err := instance.Shutdown(
 		ctx,
 		shutdownOptions{
 			Mode:    shutdownModeFast,
 			Wait:    true,
-			Timeout: &instance.MaxSwitchoverDelay,
+			Timeout: &maxSwitchoverDelay,
 		},
 	)
 	var exitError *exec.ExitError
@@ -730,8 +785,7 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 }
 
 // buildPostgresEnv builds the environment variables that should be used by PostgreSQL
-// to run the main process, taking care of adding any library path that is needed for
-// extensions.
+// to run the main process, taking care of adding any path that is needed for extensions.
 func (instance *Instance) buildPostgresEnv() []string {
 	env := instance.Env
 	if env == nil {
@@ -741,62 +795,66 @@ func (instance *Instance) buildPostgresEnv() []string {
 	envMap["PG_OOM_ADJUST_FILE"] = "/proc/self/oom_score_adj"
 	envMap["PG_OOM_ADJUST_VALUE"] = "0"
 
-	if instance.Cluster == nil {
+	cluster := instance.GetClusterOrDefault()
+	if cluster.Status.PGDataImageInfo == nil {
 		return envMap.StringSlice()
 	}
 
-	// If there are no additional library paths, we use the environment variables
-	// of the current process
-	additionalLibraryPaths := collectLibraryPaths(instance.Cluster.Spec.PostgresConfiguration.Extensions)
-	if len(additionalLibraryPaths) == 0 {
-		return envMap.StringSlice()
+	// Append extension-provided paths after any existing entries, then merge
+	// custom Env from extensions. Guard against empty paths to avoid creating
+	// an empty LD_LIBRARY_PATH (glibc treats that as "search cwd").
+	exts := cluster.Status.PGDataImageInfo.Extensions
+	if paths := extensions.CollectLibraryPaths(exts, postgres.ExtensionsBaseDirectory); len(paths) > 0 {
+		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], paths)
 	}
-
-	// We add the additional library paths after the entries that are already
-	// available.
-	currentLibraryPath := envMap["LD_LIBRARY_PATH"]
-	if currentLibraryPath != "" {
-		currentLibraryPath += ":"
+	if paths := extensions.CollectBinPaths(exts, postgres.ExtensionsBaseDirectory); len(paths) > 0 {
+		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], paths)
 	}
-	currentLibraryPath += strings.Join(additionalLibraryPaths, ":")
-	envMap["LD_LIBRARY_PATH"] = currentLibraryPath
+	extensions.SetEnvVars(exts, envMap, postgres.ExtensionsBaseDirectory)
 
 	return envMap.StringSlice()
-}
-
-// collectLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
-// given an extension
-func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	result := make([]string, 0, len(extensionList))
-
-	for _, extension := range extensionList {
-		for _, libraryPath := range extension.LdLibraryPath {
-			result = append(
-				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
-			)
-		}
-	}
-
-	return result
 }
 
 // WithActiveInstance execute the internal function while this
 // PostgreSQL instance is running
 func (instance *Instance) WithActiveInstance(inner func() error) error {
-	// Start the CSV logpipe to redirect log to stdout
+	// Start all log pipe readers so the FIFOs are created before postgres or other
+	// components (e.g. the archive/restore command implementation) try to write logs.
+	// Without these readers nothing calls Mkfifo on the log paths, the writers fall
+	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	csvPipe := logpipe.NewLogPipe()
 
+	csvPipe := logpipe.NewLogPipe()
 	go func() {
 		if err := csvPipe.Start(ctx); err != nil {
-			log.Info("csv pipeline encountered an error", "err", err)
+			log.Info("csv log pipe encountered an error", "err", err)
+		}
+	}()
+
+	rawPipe := logpipe.NewRawLineLogPipe(
+		filepath.Join(postgres.LogPath, postgres.LogFileName),
+		logpipe.LoggingCollectorRecordName,
+	)
+	go func() {
+		if err := rawPipe.Start(ctx); err != nil {
+			log.Info("raw log pipe encountered an error", "err", err)
+		}
+	}()
+
+	jsonPipe := logpipe.NewJSONLineLogPipe(
+		filepath.Join(postgres.LogPath, postgres.LogFileName+".json"),
+	)
+	go func() {
+		if err := jsonPipe.Start(ctx); err != nil {
+			log.Info("json log pipe encountered an error", "err", err)
 		}
 	}()
 
 	defer func() {
 		ctxCancel()
 		csvPipe.GetExitedCondition().Wait()
+		rawPipe.GetExitedCondition().Wait()
+		jsonPipe.GetExitedCondition().Wait()
 	}()
 
 	err := instance.Startup()
@@ -816,6 +874,39 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 // GetSuperUserDB gets a connection to the "postgres" database on this instance
 func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("postgres")
+}
+
+// GetMetricsDB gets a connection to the named database authenticated as cnpg_metrics_exporter.
+func (instance *Instance) GetMetricsDB(dbname string) (*sql.DB, error) {
+	return instance.metricsConnectionPool().Connection(dbname)
+}
+
+// PostgreSQL SQLSTATE for "invalid authorization specification" (Class 28).
+// See https://www.postgresql.org/docs/current/errcodes-appendix.html
+const sqlstateInvalidAuth = "28000"
+
+// EnrichMetricsConnError wraps a database error with a recovery hint when
+// it indicates the cnpg_metrics_exporter role is missing. It deliberately
+// matches the role-not-found case only (SQLSTATE 28000 with the canonical
+// "role <name> does not exist" message) to avoid misleading users when
+// SQLSTATE 28000 surfaces from other auth-time failures (peer ident
+// misconfiguration, password mismatch, etc.).
+func EnrichMetricsConnError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) &&
+		pgErr.Code == sqlstateInvalidAuth &&
+		strings.Contains(pgErr.Message, apiv1.MetricsExporterUserName) &&
+		strings.Contains(pgErr.Message, "does not exist") {
+		return fmt.Errorf(
+			"metrics exporter cannot connect: PostgreSQL role %q not found in the database; "+
+				"see the troubleshooting documentation for recovery steps: %w",
+			apiv1.MetricsExporterUserName, err,
+		)
+	}
+	return err
 }
 
 // GetTemplateDB gets a connection to the "template1" database on this instance
@@ -862,11 +953,27 @@ func (instance *Instance) ConnectionPool() pool.Pooler {
 	return instance.pool
 }
 
+// metricsConnectionPool gets or initializes the connection pool used by the metrics exporter.
+func (instance *Instance) metricsConnectionPool() pool.Pooler {
+	instance.initializeMetricsPool.Do(func() {
+		socketDir := GetSocketDir()
+		dsn := fmt.Sprintf(
+			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			socketDir,
+			GetServerPort(),
+			apiv1.MetricsExporterUserName,
+			apiv1.MetricsExporterUserName,
+		)
+		instance.metricsPool = pool.NewPostgresqlConnectionPool(dsn)
+	})
+	return instance.metricsPool
+}
+
 // PrimaryConnectionPool gets or initializes the primary connection pool for this instance
 func (instance *Instance) PrimaryConnectionPool() *pool.ConnectionPool {
-	if instance.primaryPool == nil {
+	instance.initializePrimaryPool.Do(func() {
 		instance.primaryPool = pool.NewPostgresqlConnectionPool(instance.GetPrimaryConnInfo())
-	}
+	})
 
 	return instance.primaryPool
 }
@@ -912,7 +1019,7 @@ func (instance *Instance) WaitForPrimaryAvailable(ctx context.Context) error {
 	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
 
-	db, err := sql.Open("pgx", primaryConnInfo)
+	db, err := pool.NewDBConnection(primaryConnInfo, pool.ConnectionProfilePostgresql)
 	if err != nil {
 		return err
 	}
@@ -1136,11 +1243,12 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	instance.LogPgControldata(ctx, "before pg_rewind")
 
 	primaryConnInfo := instance.GetPrimaryConnInfo()
-	options := []string{
+	options := make([]string, 0, 6)
+	options = append(options,
 		"-P",
 		"--source-server", primaryConnInfo,
 		"--target-pgdata", instance.PgData,
-	}
+	)
 
 	// make sure restore_command is set in override.conf
 	if _, err := configurePostgresOverrideConfFile(instance.PgData, primaryConnInfo, ""); err != nil {

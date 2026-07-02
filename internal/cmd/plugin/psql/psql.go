@@ -24,10 +24,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"syscall"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -160,15 +159,15 @@ func (psql *Command) getPodName() (string, error) {
 	return "", &ErrMissingPod{role: targetPodRole}
 }
 
-// Exec replaces the current process with a `kubectl Exec` invocation.
-// This function won't return
+// Exec invokes `kubectl exec` and transfers control to it.
+// This function does not return on success.
 func (psql *Command) Exec() error {
 	kubectlExec, err := psql.getKubectlInvocation()
 	if err != nil {
 		return err
 	}
 
-	err = syscall.Exec(psql.kubectlPath, kubectlExec, os.Environ()) // #nosec
+	err = execKubectl(psql.kubectlPath, kubectlExec)
 	if err != nil {
 		return err
 	}
@@ -183,7 +182,7 @@ func (psql *Command) Run() error {
 		return err
 	}
 
-	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) // nolint:gosec
+	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) //nolint:gosec
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -197,7 +196,7 @@ func (psql *Command) Output() ([]byte, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) // nolint:gosec
+	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) //nolint:gosec
 	cmd.Stderr = os.Stderr
 	return cmd.Output()
 }

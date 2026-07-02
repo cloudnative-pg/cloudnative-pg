@@ -26,6 +26,7 @@ import (
 	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1033,7 +1034,7 @@ var _ = Describe("Managed Roles", func() {
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeTrue())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets1")).To(BeFalse())
 		Expect(cluster.Spec.Managed.Roles[0].GetRoleInherit()).To(BeTrue())
-		Expect(cluster.Spec.Managed.Roles[0].GetRoleSecretsName()).To(Equal("test_user_secrets"))
+		Expect(cluster.Spec.Managed.Roles[0].GetRoleSecretName()).To(Equal("test_user_secrets"))
 	})
 
 	It("Verifies default values when there are no managed roles", func() {
@@ -1787,4 +1788,233 @@ var _ = Describe("Failover quorum", func() {
 		Entry("with failover quorum enabled", clusterWithFailoverQuorumEnabled, true),
 		Entry("with failover quorum disabled", clusterWithFailoverQuorumDisabled, false),
 	)
+})
+
+var _ = Describe("GetServiceAccountName", func() {
+	It("returns cluster name when serviceAccountName is not specified", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-cluster",
+			},
+			Spec: ClusterSpec{},
+		}
+		Expect(cluster.GetServiceAccountName()).To(Equal("my-cluster"))
+	})
+
+	It("returns custom serviceAccountName when specified", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-cluster",
+			},
+			Spec: ClusterSpec{
+				ServiceAccountName: "shared-service-account",
+			},
+		}
+		Expect(cluster.GetServiceAccountName()).To(Equal("shared-service-account"))
+	})
+
+	It("returns cluster name when serviceAccountName is empty string", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-cluster",
+			},
+			Spec: ClusterSpec{
+				ServiceAccountName: "",
+			},
+		}
+		Expect(cluster.GetServiceAccountName()).To(Equal("my-cluster"))
+	})
+})
+
+var _ = Describe("RecoveryTarget.BuildPostgresOptions", func() {
+	It("returns an empty string for a nil receiver", func() {
+		var target *RecoveryTarget
+		Expect(target.BuildPostgresOptions()).To(Equal(""))
+	})
+
+	It("escapes single quotes in the target name", func() {
+		target := &RecoveryTarget{TargetName: "my'restore'point"}
+		Expect(target.BuildPostgresOptions()).To(ContainSubstring(
+			"recovery_target_name = 'my''restore''point'\n",
+		))
+	})
+
+	It("escapes backslashes in the target name", func() {
+		target := &RecoveryTarget{TargetName: `path\to\restore`}
+		Expect(target.BuildPostgresOptions()).To(ContainSubstring(
+			`recovery_target_name = 'path\\to\\restore'` + "\n",
+		))
+	})
+
+	It("escapes literal newlines in the target name", func() {
+		// pg_create_restore_point accepts any string, including one with a
+		// literal newline. The config file must stay line-oriented.
+		target := &RecoveryTarget{TargetName: "line1\nline2"}
+		Expect(target.BuildPostgresOptions()).To(ContainSubstring(
+			`recovery_target_name = 'line1\nline2'` + "\n",
+		))
+	})
+
+	It("escapes every other target field", func() {
+		target := &RecoveryTarget{
+			TargetTLI: `l\a'test`,
+			TargetXID: "1'2",
+			TargetLSN: `0/1\6`,
+		}
+		out := target.BuildPostgresOptions()
+		Expect(out).To(ContainSubstring(`recovery_target_timeline = 'l\\a''test'` + "\n"))
+		Expect(out).To(ContainSubstring(`recovery_target_xid = '1''2'` + "\n"))
+		Expect(out).To(ContainSubstring(`recovery_target_lsn = '0/1\\6'` + "\n"))
+	})
+})
+
+var _ = Describe("GetExternalClustersEnabledPluginNames", func() {
+	falseVal := false
+
+	It("includes plugins with nil Enabled (defaults to enabled)", func() {
+		clusters := []ExternalCluster{
+			{PluginConfiguration: &PluginConfiguration{Name: "plugin-a"}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(ConsistOf("plugin-a"))
+	})
+
+	It("excludes plugins with Enabled=false", func() {
+		clusters := []ExternalCluster{
+			{PluginConfiguration: &PluginConfiguration{Name: "plugin-a", Enabled: &falseVal}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(BeEmpty())
+	})
+
+	It("excludes external clusters without a plugin configuration", func() {
+		clusters := []ExternalCluster{
+			{ConnectionParameters: map[string]string{"host": "pg.example.com"}},
+		}
+		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(BeEmpty())
+	})
+})
+
+var _ = Describe("Cluster admission error", func() {
+	It("records the error in the phase but never reports it to the guard", func() {
+		cluster := &Cluster{}
+		cluster.SetAdmissionError("boom")
+		Expect(cluster.Status.Phase).To(BeEquivalentTo(PhaseDefinitionInvalid))
+		Expect(cluster.Status.PhaseReason).To(Equal("boom"))
+		// The phase machinery, not the guard, clears the Cluster admission
+		// error, so GetAdmissionError always returns an empty string.
+		Expect(cluster.GetAdmissionError()).To(BeEmpty())
+	})
+
+	It("marks the cluster as not ready when the definition is invalid", func() {
+		cluster := &Cluster{}
+		// Simulate a previously healthy cluster reporting Ready=True.
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(ConditionClusterReady),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(ClusterReady),
+			Message: "Cluster is Ready",
+		})
+
+		cluster.SetAdmissionError("boom")
+
+		readyCondition := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionClusterReady))
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+	})
+})
+
+var _ = Describe("IsInitialized", func() {
+	It("returns false when the cluster has no conditions", func() {
+		cluster := &Cluster{}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns false when the Initialized condition is missing", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionBackup),
+						Status: metav1.ConditionTrue,
+						Reason: string(ConditionReasonLastBackupSucceeded),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns true when the Initialized condition is True", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionTrue,
+						Reason: string(BootstrapCompleted),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("returns false when the Initialized condition is False and LatestGeneratedNode is zero", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns true when the condition is absent but LatestGeneratedNode is non-zero (upgrade bridge)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				LatestGeneratedNode: 3,
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("returns true when condition is False but LatestGeneratedNode is non-zero (upgrade bridge)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				LatestGeneratedNode: 3,
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("ignores the LastBackupSucceeded condition (regression guard)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionBackup),
+						Status: metav1.ConditionTrue,
+						Reason: string(ConditionReasonLastBackupSucceeded),
+					},
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(BootstrapPending),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
 })

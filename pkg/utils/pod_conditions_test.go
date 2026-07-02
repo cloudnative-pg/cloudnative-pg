@@ -43,7 +43,7 @@ var _ = Describe("Pod conditions test suite", func() {
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{
 						{
-							Type:   corev1.ContainersReady,
+							Type:   corev1.PodReady,
 							Status: corev1.ConditionTrue,
 						},
 					},
@@ -57,7 +57,25 @@ var _ = Describe("Pod conditions test suite", func() {
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{
 						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionFalse,
+						},
+					},
+				},
+			}
+			Expect(IsPodReady(pod)).To(BeFalse())
+		})
+
+		It("Returns false when ContainersReady is True but PodReady is False", func() {
+			pod := corev1.Pod{
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
 							Type:   corev1.ContainersReady,
+							Status: corev1.ConditionTrue,
+						},
+						{
+							Type:   corev1.PodReady,
 							Status: corev1.ConditionFalse,
 						},
 					},
@@ -80,7 +98,7 @@ var _ = Describe("Pod conditions test suite", func() {
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{
 						{
-							Type:   corev1.ContainersReady,
+							Type:   corev1.PodReady,
 							Status: corev1.ConditionTrue,
 						},
 					},
@@ -95,7 +113,7 @@ var _ = Describe("Pod conditions test suite", func() {
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{
 						{
-							Type:   corev1.ContainersReady,
+							Type:   corev1.PodReady,
 							Status: corev1.ConditionTrue,
 						},
 					},
@@ -110,7 +128,7 @@ var _ = Describe("Pod conditions test suite", func() {
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{
 						{
-							Type:   corev1.ContainersReady,
+							Type:   corev1.PodReady,
 							Status: corev1.ConditionFalse,
 						},
 					},
@@ -125,7 +143,7 @@ var _ = Describe("Pod conditions test suite", func() {
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{
 						{
-							Type:   corev1.ContainersReady,
+							Type:   corev1.PodReady,
 							Status: corev1.ConditionFalse,
 						},
 					},
@@ -157,7 +175,7 @@ var _ = Describe("Pod conditions test suite", func() {
 				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
 					{
-						Type:   corev1.ContainersReady,
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					},
 				},

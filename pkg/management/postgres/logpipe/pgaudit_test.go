@@ -55,7 +55,7 @@ var _ = Describe("pgAudit CSV log record", func() {
 
 var _ = Describe("PgAudit CVS logging decorator", func() {
 	Context("Given a CSV record embedding pgAudit without rows", func() {
-		It("fills the fields for PostgreSQL 13", func() { // nolint:dupl
+		It("fills the fields for PostgreSQL 13", func() { //nolint:dupl
 			values := make([]string, FieldsPerRecord12)
 			for i := range values {
 				values[i] = fmt.Sprintf("%d", i)
@@ -108,7 +108,7 @@ var _ = Describe("PgAudit CVS logging decorator", func() {
 			}))
 		})
 
-		It("fills the fields for PostgreSQL 13", func() { // nolint:dupl
+		It("fills the fields for PostgreSQL 13", func() { //nolint:dupl
 			values := make([]string, FieldsPerRecord13)
 			for i := range values {
 				values[i] = fmt.Sprintf("%d", i)
@@ -163,7 +163,7 @@ var _ = Describe("PgAudit CVS logging decorator", func() {
 	})
 
 	Context("Given a CSV record embedding pgAudit with rows", func() {
-		It("fills the fields for PostgreSQL 13", func() { // nolint:dupl
+		It("fills the fields for PostgreSQL 13", func() { //nolint:dupl
 			values := make([]string, FieldsPerRecord12)
 			for i := range values {
 				values[i] = fmt.Sprintf("%d", i)
@@ -217,7 +217,7 @@ var _ = Describe("PgAudit CVS logging decorator", func() {
 			}))
 		})
 
-		It("fills the fields for PostgreSQL 13", func() { // nolint:dupl
+		It("fills the fields for PostgreSQL 13", func() { //nolint:dupl
 			values := make([]string, FieldsPerRecord13)
 			for i := range values {
 				values[i] = fmt.Sprintf("%d", i)

@@ -25,6 +25,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -207,6 +208,42 @@ func GetReplicas(
 	}
 	err = fmt.Errorf("no replicas found")
 	return podList, err
+}
+
+// GetFirstReplica gets the first replica pod from a cluster
+func GetFirstReplica(
+	ctx context.Context,
+	crudClient client.Client,
+	namespace, clusterName string,
+) (*corev1.Pod, error) {
+	podList, err := GetReplicas(ctx, crudClient, namespace, clusterName)
+	if err != nil {
+		return nil, err
+	}
+	if len(podList.Items) == 0 {
+		return nil, fmt.Errorf("no replicas found")
+	}
+	return &podList.Items[0], nil
+}
+
+// AddTopologySpreadConstraint appends a soft topology spread constraint
+// that distributes all CNPG-managed pods (instances and jobs) across
+// nodes. Call this on E2E clusters to prevent co-location of concurrent
+// test workloads.
+func AddTopologySpreadConstraint(cluster *apiv1.Cluster) {
+	cluster.Spec.TopologySpreadConstraints = append(
+		cluster.Spec.TopologySpreadConstraints,
+		corev1.TopologySpreadConstraint{
+			MaxSkew:           1,
+			TopologyKey:       "kubernetes.io/hostname",
+			WhenUnsatisfiable: corev1.ScheduleAnyway,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+				},
+			},
+		},
+	)
 }
 
 // ScaleSize scales a cluster to the requested size

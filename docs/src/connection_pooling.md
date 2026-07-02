@@ -59,6 +59,12 @@ spec:
     The pooler name can't be the same as any cluster name in the same namespace.
 :::
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To point a pooler at
+    a different `Cluster`, create a new `Pooler` resource instead of updating
+    an existing one.
+:::
+
 This example creates a `Pooler` resource called `pooler-example-rw`
 that's strictly associated with the Postgres `Cluster` resource called
 `cluster-example`. It points to the primary, identified by the read/write
@@ -192,14 +198,25 @@ GRANT CONNECT ON DATABASE postgres TO cnpg_pooler_pgbouncer;
 
 Create the lookup function for password verification. This function is created
 in the `postgres` database with `SECURITY DEFINER` privileges and is used by
-PgBouncer’s `auth_query` option:
+PgBouncer’s `auth_query` option. Because it runs as the function owner, its
+`search_path` is pinned to `pg_catalog, pg_temp` so that the function body
+cannot resolve operators or objects through a caller- or
+tenant-controlled `search_path`:
 
 ```sql
 CREATE OR REPLACE FUNCTION public.user_search(uname TEXT)
   RETURNS TABLE (usename name, passwd text)
-  LANGUAGE sql SECURITY DEFINER AS
+  LANGUAGE sql SECURITY DEFINER
+  SET search_path = pg_catalog, pg_temp AS
   'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;';
 ```
+
+:::note
+Clusters created with an earlier version of CloudNativePG carry a
+`user_search` function without the pinned `search_path`. The operator
+recreates the function with the `SET search_path` clause automatically
+during reconciliation when the cluster is upgraded.
+:::
 
 Restrict and grant permissions on the lookup function:
 
@@ -221,15 +238,38 @@ replicate similar behavior to the default setup.
 
 ## Pod templates
 
-You can take advantage of pod templates specification in the `template`
-section of a `Pooler` resource. For details, see
-[`PoolerSpec`](cloudnative-pg.v1.md#poolerspec) in the API reference.
 
-Using templates, you can configure pods as you like, including fine control
-over affinity and anti-affinity rules for pods and nodes. By default,
-containers use images from `ghcr.io/cloudnative-pg/pgbouncer`.
+The `Pooler` resource allows you to customize the underlying pods via the
+`template` section. This provides full access to the Kubernetes `PodSpec` for
+advanced configurations like scheduling constraints, custom security contexts,
+or resource overrides.
 
-This example shows `Pooler` specifying `PodAntiAffinity``:
+For a complete list of supported fields, see the
+[`PoolerSpec`](cloudnative-pg.v1.md#poolerspec) API reference.
+
+### Key requirements
+
+- **The `pgbouncer` container name:** When overriding container settings (like
+  images or resources), the name of the container **must** be set to
+  `pgbouncer`. The operator looks for this specific name to manage the
+  PgBouncer process.
+
+- **Mandatory `containers` field:** Since `template` follows the standard
+  Kubernetes `PodSpec` schema, the `containers` field is mandatory.
+
+- If you aren't modifying container-level settings, you must set it to an empty
+  array: `containers: []`.
+
+- If the `containers` field is missing, the API server will throw a
+  `ValidationError`.
+
+### Examples
+
+#### High availability with pod anti-affinity
+
+This configuration uses `podAntiAffinity` to ensure that PgBouncer pods are
+distributed across different nodes, preventing a single node failure from
+taking down the entire pool.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -260,16 +300,63 @@ spec:
             topologyKey: "kubernetes.io/hostname"
 ```
 
-:::note
-    Explicitly set `.spec.template.spec.containers` to `[]` when not modified,
-    as it's a required field for a `PodSpec`. If `.spec.template.spec.containers`
-    isn't set, the Kubernetes api-server returns the following error when trying to
-    apply the manifest:`error validating "pooler.yaml": error validating data:
-    ValidationError(Pooler.spec.template.spec): missing required field
-    "containers"`
+#### Resource limits
+
+You can define resource requests and limits by adding a container named
+`pgbouncer` to the `template` section:
+
+```yaml
+# ...
+  template:
+    metadata:
+      # ...
+    spec:
+      containers:
+        # This name MUST be "pgbouncer"
+        - name: pgbouncer
+          resources:
+            requests:
+              cpu: "0.1"
+              memory: 100Mi
+            limits:
+              cpu: "0.5"
+              memory: 500Mi
+```
+
+## PgBouncer image
+
+By default, CloudNativePG deploys the
+[latest stable PgBouncer image](https://ghcr.io/cloudnative-pg/pgbouncer)
+the operator was built against. You can override that default in three ways.
+When more than one is set, the sources are evaluated top-down — the first
+match in the list below is used; if none match, the operator's built-in
+default applies:
+
+1. An explicit image set on the `pgbouncer` container inside
+   `spec.template.spec.containers` (escape hatch — see
+   [Pod-template override](#pod-template-override) below).
+2. `spec.pgbouncer.image` — an image reference set directly on the `Pooler`.
+3. `spec.pgbouncer.imageCatalogRef` — a reference to an entry in an
+   `ImageCatalog` or `ClusterImageCatalog`.
+
+`spec.pgbouncer.image` and `spec.pgbouncer.imageCatalogRef` are mutually
+exclusive — set at most one.
+
+:::warning[Policy gating]
+    If you enforce admission policies that restrict which PgBouncer images
+    may run, those policies **must gate all three** image sources:
+    `spec.pgbouncer.image`, `spec.pgbouncer.imageCatalogRef`, and the
+    `image` field on a `pgbouncer` container inside
+    `spec.template.spec.containers`. A policy that covers only the first
+    two leaves the pod-template override as an unguarded escape hatch.
+    The same consideration applies to `Cluster.spec.imageName` and
+    `Cluster.spec.imageCatalogRef`.
 :::
 
-This example sets resources and changes the used image:
+### Setting an explicit image
+
+Use `spec.pgbouncer.image` to pin a specific PgBouncer version or pull from
+a private registry:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -281,28 +368,92 @@ spec:
     name: cluster-example
   instances: 3
   type: rw
+  pgbouncer:
+    poolMode: session
+    image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
+```
 
+### Using an image catalog
+
+The `Pooler` resource can manage the PgBouncer container image centrally via
+an `ImageCatalog` or `ClusterImageCatalog`, following the same pattern as
+`Cluster` resources (see [Image Catalog](image_catalog.md)). The catalog
+entry is selected by the `key` defined in the catalog's `componentImages`
+list.
+
+Reference a catalog entry with `spec.pgbouncer.imageCatalogRef`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+  pgbouncer:
+    poolMode: session
+    imageCatalogRef:
+      apiGroup: postgresql.cnpg.io
+      kind: ImageCatalog
+      name: my-catalog
+      key: pgbouncer
+```
+
+To use a cluster-wide catalog instead, set `kind: ClusterImageCatalog` and
+point `name` at the corresponding resource — the rest of the spec is
+identical.
+
+When a catalog entry is updated, the operator automatically reconciles all
+poolers referencing it and rolls out the new image without any change to the
+`Pooler` spec.
+
+### Pod-template override
+
+The pod template can also carry an `image` on the `pgbouncer` container, in
+which case it overrides every other source (including `spec.pgbouncer.image`
+and `spec.pgbouncer.imageCatalogRef`). Treat this as an **escape hatch** —
+use it only when you need to customize other container-level settings
+(resources, environment, security context) and happen to want to pin the
+image in the same place. For routine image changes, prefer
+`spec.pgbouncer.image` or an image catalog: those fields are validated,
+mutually exclusive, and visible to admission policies that gate the
+PgBouncer image (see [Pod templates](#pod-templates) for the broader
+template mechanics):
+
+```yaml
+# ...
   template:
-    metadata:
-      labels:
-        app: pooler
     spec:
       containers:
         - name: pgbouncer
           image: my-pgbouncer:latest
-          resources:
-            requests:
-              cpu: "0.1"
-              memory: 100Mi
-            limits:
-              cpu: "0.5"
-              memory: 500Mi
 ```
+
+### Monitoring the resolved image
+
+The operator stores the resolved image in `status.image` and reflects the
+outcome in `status.phase`, one of `active`, `paused`, `inactive`, or
+`failed`. On `failed`, `status.phaseReason` describes the cause (for
+example, if the catalog or key does not exist). You can inspect the
+current state with:
+
+```shell
+kubectl get pooler pooler-example-rw -o jsonpath='{.status.image}'
+```
+
+:::note[API reference]
+    For details, see [`PgBouncerSpec`](cloudnative-pg.v1.md#pgbouncerspec)
+    in the API reference.
+:::
 
 ## Service Template
 
-Sometimes, your pooler will require some different labels, annotations, or even change
-the type of the service, you can achieve that by using the `serviceTemplate` field:
+Sometimes, your pooler will require some different labels, annotations, or
+even a different Service type. You can achieve that by using the
+`serviceTemplate` field:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -362,8 +513,9 @@ The operator manages most of the [configuration options for PgBouncer](https://w
 allowing you to modify only a subset of them.
 
 :::warning
-    You are responsible for correctly setting the value of each option, as the
-    operator doesn't validate them.
+The operator passes these settings directly to PgBouncer without validation.
+To prevent configuration errors or crash loops, ensure each parameter is
+supported by your specific PgBouncer image version.
 :::
 
 These are the PgBouncer options you can customize, with links to the PgBouncer
@@ -376,7 +528,9 @@ are the ones directly set by PgBouncer.
 - [`cancel_wait_timeout`](https://www.pgbouncer.org/config.html#cancel_wait_timeout)
 - [`client_idle_timeout`](https://www.pgbouncer.org/config.html#client_idle_timeout)
 - [`client_login_timeout`](https://www.pgbouncer.org/config.html#client_login_timeout)
+- [`client_tls_ciphers`](https://www.pgbouncer.org/config.html#client_tls_ciphers)
 - [`client_tls_sslmode`](https://www.pgbouncer.org/config.html#client_tls_sslmode)
+- [`client_tls13_ciphers`](https://www.pgbouncer.org/config.html#client_tls13_ciphers) (1.25+)
 - [`default_pool_size`](https://www.pgbouncer.org/config.html#default_pool_size)
 - [`disable_pqexec`](https://www.pgbouncer.org/config.html#disable_pqexec)
 - [`dns_max_ttl`](https://www.pgbouncer.org/config.html#dns_max_ttl)
@@ -414,6 +568,7 @@ are the ones directly set by PgBouncer.
 - [`server_reset_query_always`](https://www.pgbouncer.org/config.html#server_reset_query_always)
 - [`server_round_robin`](https://www.pgbouncer.org/config.html#server_round_robin)
 - [`server_tls_ciphers`](https://www.pgbouncer.org/config.html#server_tls_ciphers)
+- [`server_tls13_ciphers`](https://www.pgbouncer.org/config.html#server_tls13_ciphers) (1.25+)
 - [`server_tls_protocols`](https://www.pgbouncer.org/config.html#server_tls_protocols)
 - [`server_tls_sslmode`](https://www.pgbouncer.org/config.html#server_tls_sslmode)
 - [`stats_period`](https://www.pgbouncer.org/config.html#stats_period)
@@ -646,11 +801,48 @@ spec:
   - port: metrics
 ```
 
+### TLS for the Metrics Endpoint
+
+Set `.spec.monitoring.tls.enabled: true` to serve the metrics endpoint over
+HTTPS. By default, the cluster's server certificate is being used.
+The certificate is reloaded on every TLS handshake, so rotations are
+picked up without restarting the pod.
+
+```yaml
+spec:
+  monitoring:
+    tls:
+      enabled: true
+```
+
+When `.spec.pgbouncer.clientTLSSecret` is set, the metrics server presents
+that certificate instead.
+
+```yaml
+spec:
+  pgbouncer:
+    clientTLSSecret:
+      name: <CLIENT_TLS_SECRET>
+  monitoring:
+    tls:
+      enabled: true
+```
+
+The generated `PodMonitor` scrapes with `insecureSkipVerify=true` because
+Prometheus scrapes pods by IP and the certificate's SANs do not generally
+cover the pod IP.
+
+If you need strict verification, set `.spec.monitoring.enablePodMonitor: false`
+and manage the `PodMonitor` yourself: the operator-generated one is hardcoded
+to `insecureSkipVerify=true` and overwrites its spec on every reconcile, so a
+manual patch on the generated `PodMonitor` would not survive.
+
 ### Deprecation of Automatic `PodMonitor` Creation
 
-!!!warning "Feature Deprecation Notice"
+:::warning[Feature Deprecation Notice]
     The `.spec.monitoring.enablePodMonitor` field in the `Pooler` resource is
     now deprecated and will be removed in a future version of the operator.
+:::
 
 If you are currently using this feature, we strongly recommend you either
 remove or set `.spec.monitoring.enablePodMonitor` to `false` and manually
@@ -681,7 +873,7 @@ following example:
 ## Pausing connections
 
 The `Pooler` specification allows you to take advantage of PgBouncer's `PAUSE`
-and `RESUME` commands, using only declarative configuration. You can ado this
+and `RESUME` commands, using only declarative configuration. You can do this
 using the `paused` option, which by default is set to `false`. When set to
 `true`, the operator internally invokes the `PAUSE` command in PgBouncer,
 which:

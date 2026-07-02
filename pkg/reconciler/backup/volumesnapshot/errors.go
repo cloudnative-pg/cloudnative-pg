@@ -22,11 +22,14 @@ package volumesnapshot
 import (
 	"context"
 	"errors"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 )
 
 var (
@@ -34,7 +37,7 @@ var (
 	httpStatusCodeRegex  = regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
 )
 
-// isErrorRetryable detects is an error is retryable or not.
+// isNetworkErrorRetryable detects if an error is retryable or not.
 //
 // Important: this function is intended for detecting errors that
 // occur during communication between the operator and the Kubernetes
@@ -43,8 +46,24 @@ var (
 // It is not designed to check errors raised by the CSI driver and
 // exposed by the CSI snapshotter sidecar.
 func isNetworkErrorRetryable(err error) bool {
+	// A transport-level failure to reach the instance manager surfaces as a
+	// net.Error. The HTTP client wraps every such failure in a *net/url.Error,
+	// which itself satisfies net.Error, so this matches all of them: dial
+	// timeout, connection refused or reset, DNS failure, and TLS or certificate
+	// errors. In each case the connection never produced an authenticated
+	// response, so requeuing is safe. It matters most in the finalize step,
+	// where the snapshots are already provisioned and a single failure would
+	// otherwise discard an otherwise complete backup.
+	//
+	// This is intentionally the opposite of the in-request retry in
+	// remote.getReplicaStatusFromPodViaHTTP, which treats a net.Error timeout as
+	// non-retryable: that path retries within a single reconcile, whereas here we
+	// requeue the whole reconcile.
+	var netErr net.Error
+
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||
-		errors.Is(err, context.DeadlineExceeded)
+		errors.Is(err, context.DeadlineExceeded) || remote.IsTransientAuthError(err) ||
+		errors.As(err, &netErr)
 }
 
 // isCSIErrorMessageRetriable detects if a certain error message

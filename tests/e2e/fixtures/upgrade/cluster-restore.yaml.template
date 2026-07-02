@@ -6,6 +6,12 @@ spec:
   instances: 3
   imageName: "${POSTGRES_IMG}"
 
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
   storage:
     size: 1Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

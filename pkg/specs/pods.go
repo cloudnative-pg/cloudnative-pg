@@ -70,6 +70,9 @@ const (
 	// ClusterRoleLabelReplica is written in labels to represent replica servers
 	ClusterRoleLabelReplica = "replica"
 
+	// ClusterRoleLabelUnhealthy is applied to the old primary when a failover starts.
+	ClusterRoleLabelUnhealthy = "unhealthy"
+
 	// PostgresContainerName is the name of the container executing PostgreSQL
 	// inside one Pod
 	PostgresContainerName = "postgres"
@@ -121,8 +124,8 @@ func (c EnvConfig) IsEnvEqual(container corev1.Container) bool {
 
 // CreatePodEnvConfig returns the hash of pod env configuration
 func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
-	// When adding an environment variable here, remember to change the `isReservedEnvironmentVariable`
-	// function in `cluster_webhook.go` too.
+	// When adding an environment variable here, remember to change the `IsReservedEnvironmentVariable`
+	// function in `pkg/postgres/environment.go` too.
 	config := EnvConfig{
 		EnvVars: []corev1.EnvVar{
 			{
@@ -188,15 +191,15 @@ func createClusterPodSpec(
 	return corev1.PodSpec{
 		Hostname: podName,
 		InitContainers: []corev1.Container{
-			createBootstrapContainer(cluster),
+			createBootstrapContainer(cluster, getExtensions(&cluster)),
 		},
 		SchedulerName:                 cluster.Spec.SchedulerName,
 		Containers:                    createPostgresContainers(cluster, envConfig, enableHTTPS),
-		Volumes:                       createPostgresVolumes(&cluster, podName),
+		Volumes:                       createPostgresVolumes(&cluster, podName, getExtensions(&cluster)),
 		SecurityContext:               GetPodSecurityContext(&cluster),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
-		ServiceAccountName:            cluster.Name,
+		ServiceAccountName:            cluster.GetServiceAccountName(),
 		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 		TerminationGracePeriodSeconds: &gracePeriod,
 		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
@@ -213,7 +216,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
-			VolumeMounts:    CreatePostgresVolumeMounts(cluster),
+			VolumeMounts:    CreatePostgresVolumeMounts(cluster, getExtensions(&cluster)),
 			// This is the default startup probe, and can be overridden
 			// the user configuration in cluster.spec.probes.startup
 			StartupProbe: &corev1.Probe{

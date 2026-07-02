@@ -14,12 +14,12 @@ title: Installation and upgrades
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.28/releases/cnpg-1.28.0.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.0.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.28/releases/cnpg-1.28.0.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.0.yaml
 ```
 
 You can verify that with:
@@ -32,7 +32,7 @@ kubectl rollout status deployment \
 ### Using the `cnpg` plugin for `kubectl`
 
 You can use the `cnpg` plugin to override the default configuration options
-that are in the static manifests. 
+that are in the static manifests.
 
 For example, to generate the default latest manifest but change the watch
 namespaces to only be a specific namespace, you could run:
@@ -44,7 +44,7 @@ kubectl cnpg install generate \
 ```
 
 Please refer to ["`cnpg` plugin"](./kubectl-plugin.md#generation-of-installation-manifests) documentation
-for a more comprehensive example. 
+for a more comprehensive example.
 
 :::warning
     If you are deploying CloudNativePG on GKE and get an error (`... failed to
@@ -81,7 +81,7 @@ specific minor release, you can just run:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.28/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.30/manifests/operator-manifest.yaml | \
   kubectl apply --server-side -f -
 ```
 
@@ -267,94 +267,276 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
-### Upgrading to 1.28.0 or 1.27.x
+### Upgrading to 1.30.0, 1.29.2, or 1.28.4
 
 :::info[Important]
     We strongly recommend that all CloudNativePG users upgrade to version
-    1.28.0, or at least to the latest stable version of your current minor release
-    (e.g., 1.27.x).
+    1.30.0, or at least to the latest stable version of your current minor release
+    (e.g., 1.29.2 or 1.28.4).
 :::
 
-### Upgrading to 1.27 from a previous minor version
+These releases introduce changes worth reviewing before you upgrade. Two are
+security changes that apply to **1.30.0, 1.29.2, and 1.28.4**: operator-side
+password encoding (`CVE-2026-55765`) and `search_path` hardening
+(`CVE-2026-55769`). The other three are new in
+**1.30.0** only: the `DatabaseRole` resource for declarative role management,
+safe primary election via a per-cluster Lease, and operator-to-instance
+authentication on the instance manager's status port (`GHSA-7qwx-x8ff-3px9`).
+In addition, if you are upgrading from a release **older than 1.29.1 or 1.28.3**,
+the metrics-exporter privilege separation from `CVE-2026-44477` also applies.
+Each is covered in its own subsection below.
 
-:::info[Important]
-    We strongly recommend that all CloudNativePG users upgrade to version
-    1.27.0, or at least to the latest stable version of your current minor release
-    (e.g., 1.26.1).
+#### Operator-side password encoding (`CVE-2026-55765`)
+
+Starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons
+(`CVE-2026-55765` / `GHSA-w3gf-xc94-wvmj`), CloudNativePG SCRAM-SHA-256 encodes
+role passwords **operator-side**
+(client-side from PostgreSQL's point of view) before issuing
+`CREATE`/`ALTER ROLE` statements. As a result, the literal that reaches
+the PostgreSQL parser (and that extensions such as `pg_stat_statements`
+or `pgaudit` may observe) is the same hash that ends up in
+`pg_authid.rolpassword`, never the cleartext secret. The encoding is
+applied to every basic-auth `Secret` the operator consumes: the
+`postgres` superuser secret, the application-user secret, and any
+managed-role password secret. Passwords already supplied in MD5 or
+SCRAM-SHA-256 shadow form are passed through unchanged.
+
+Since PostgreSQL [14](https://www.postgresql.org/docs/release/14.0/),
+`password_encryption` defaults to `scram-sha-256`, so we do not expect
+existing installations to be affected by this change.
+
+If your cluster has explicitly overridden `password_encryption` to a
+value other than `scram-sha-256` (for example, `md5`) and you want
+PostgreSQL (not the operator) to decide how the password is hashed,
+opt out by setting the annotation `cnpg.io/passwordPassthrough: "enabled"`
+on each basic-auth `Secret` the operator consumes. The operator will
+then forward the password value verbatim, and PostgreSQL will encode it
+according to its own `password_encryption` GUC.
+
+:::warning
+    The `cnpg.io/passwordPassthrough` annotation must be set on the
+    **basic-auth Secret** itself, not on the `Cluster` resource. Placing it
+    on the `Cluster` has no effect, and the operator will continue to apply
+    SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
 :::
 
-Version 1.27 introduces a change in the default behavior of the
-[liveness probe](instance_manager.md#liveness-probe): it now enforces the
-[shutdown of an isolated primary](instance_manager.md#primary-isolation)
-within the `livenessProbeTimeout` (30 seconds).
+:::warning
+    With `cnpg.io/passwordPassthrough: "enabled"` the operator forwards the
+    Secret's `password` value verbatim. If that value is cleartext, as is
+    common on `password_encryption = md5` clusters, extensions such as
+    `pg_stat_statements` or `pgaudit` will observe it.
+:::
 
-If this behavior is not suitable for your environment, you can disable the
-*isolation check* in the liveness probe with the following configuration:
+See ["Opting out of operator-side encoding"](declarative_role_management.md#opting-out-of-operator-side-encoding)
+for details.
 
-```yaml
-spec:
-  probes:
-    liveness:
-      isolationCheck:
-        enabled: false
+#### `search_path` hardening (`CVE-2026-55769`)
+
+Also starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons
+(`CVE-2026-55769` / `GHSA-x8c2-3p4r-v9r6`), CloudNativePG pins the `search_path`
+to a fixed `pg_catalog, public,
+pg_temp` on every connection it opens to PostgreSQL, so that a
+tenant-controlled `ALTER DATABASE`/`ALTER ROLE` setting can no longer
+influence how operator-issued queries resolve unqualified object names.
+The `SECURITY DEFINER` lookup function used by the PgBouncer integration
+is recreated automatically with its own pinned `search_path` during the
+first reconciliation after the upgrade.
+See [Schema resolution and `search_path` hardening](security.md#schema-resolution-and-search_path-hardening)
+for the rationale.
+
+This change also affects custom monitoring queries, which now run inside
+a transaction whose `search_path` is pinned to `pg_catalog, public,
+pg_temp`. If any of your custom metrics reference objects that live in
+other user-defined schemas through an unqualified name, schema-qualify
+them (for example `myschema.mytable`) so they keep resolving after the
+upgrade. User-authored bootstrap (`postInit*`) and logical-import
+post-import SQL are unaffected: they continue to run with the standard
+`"$user", public` resolution.
+
+#### Declarative role management with the `DatabaseRole` resource
+
+Starting from version 1.30.0, you can also manage a PostgreSQL role as a
+standalone [`DatabaseRole`](declarative_role_management.md) resource instead
+of declaring it inline in the Cluster's `.spec.managed.roles` stanza. This is
+an opt-in enhancement and requires no action on upgrade: existing inline roles
+keep working unchanged, and the inline `managed.roles` method remains fully
+supported.
+
+To move an existing inline role under a `DatabaseRole` without disruption,
+create the `DatabaseRole` first and only then remove the matching entry from
+`.spec.managed.roles`. While both exist the Cluster spec always takes
+precedence, so management is handed over only once the inline entry is gone.
+See [Migrating from inline managed roles](declarative_role_management.md#migrating-from-inline-managed-roles-to-a-databaserole)
+for the full procedure.
+
+A `DatabaseRole` does not support `ensure: absent`: where the inline
+`managed.roles` stanza drops a role by setting `ensure: absent`, a
+`DatabaseRole` instead relies on the `databaseRoleReclaimPolicy` field. Delete
+the resource with `databaseRoleReclaimPolicy: delete` to drop the role from
+PostgreSQL, or keep the default `retain` to leave the role in place.
+
+#### Safe primary election
+
+Starting from version 1.30.0, CloudNativePG coordinates primary promotion
+through a per-cluster Kubernetes `Lease`, ensuring that at most one instance
+promotes itself at any given time. The behavior is enabled automatically and
+requires no configuration; the lease timings can optionally be tuned via
+`.spec.primaryLease` (see ["Safe primary election"](failover.md#safe-primary-election)).
+
+:::warning
+This feature requires the operator to manage `Lease` objects in the
+`coordination.k8s.io` API group. The bundled operator manifest and the Helm
+chart grant the required permissions automatically. If you manage the
+operator's RBAC yourself, you must add the `create`, `get`, `list`, `update`
+and `watch` verbs on `leases` in the `coordination.k8s.io` API group before
+upgrading, otherwise primaries will be unable to promote.
+:::
+
+#### Operator-to-instance authentication (`GHSA-7qwx-x8ff-3px9`)
+
+Starting from version 1.30.0, the operator authenticates its calls to the
+sensitive endpoints of the instance manager's status port (backup,
+`pg_controldata`, partial WAL archive, and instance-manager upgrade) by pinning
+an in-memory client certificate. This is enabled automatically and requires no
+configuration. Status, health, and probe endpoints remain unauthenticated.
+This hardening is not backported; on releases earlier than 1.30.0, continue to
+restrict the status port (TCP 8000) with a `NetworkPolicy`, which remains its
+security boundary there. See
+[Operator-to-instance authentication](security.md#operator-to-instance-authentication)
+for details.
+
+:::warning
+This protection has a hard requirement: the status port **must** be served over
+TLS, which has been the default since v1.24. Instances created by an operator
+older than v1.24 serve the status port over plain HTTP; once their instance
+manager is upgraded to 1.30.0 the operator can no longer authenticate to them
+and every call to the protected endpoints is **permanently** rejected with
+`401 Unauthorized`. If you still run such instances, perform a rolling update so
+their Pods are recreated with a TLS-enabled status port. Instances created by
+v1.24 or later are unaffected.
+:::
+
+#### Metrics exporter privilege separation (`CVE-2026-44477`)
+
+This applies only if you are upgrading from a release **older than 1.29.1 or
+1.28.3** (for example 1.29.0, 1.28.2, or any earlier version); installations
+already on 1.29.1, 1.28.3, or later already have this change.
+
+The fix for `CVE-2026-44477` / `GHSA-423p-g724-fr39` makes the metrics exporter
+authenticate as a dedicated `cnpg_metrics_exporter` role with `pg_monitor`
+privileges only, instead of the `postgres` superuser.
+
+Custom monitoring queries that read user-owned tables, or use
+`target_databases: '*'` against databases where `PUBLIC` `CONNECT` has been
+revoked, need explicit `GRANT` statements to `cnpg_metrics_exporter`.
+See ["Custom query privileges and safety"](monitoring.md#custom-query-privileges-and-safety)
+and ["Manually creating the metrics exporter role"](monitoring.md#manually-creating-the-metrics-exporter-role)
+in the monitoring documentation.
+
+## Verifying release assets
+
+CloudNativePG cryptographically signs all official release assets. Verifying these
+signatures ensures the assets originate from the official repository and were
+published through our automated release workflow.
+
+:::info
+Refer to the ["Release integrity and supply chain" section](security.md#release-integrity-and-supply-chain)
+for more information.
+:::
+
+### Prerequisites
+
+- **Signature verification:** [cosign](https://github.com/sigstore/cosign) CLI
+- **SBOM and Provenance:** [Docker Buildx](https://docs.docker.com/build/install-buildx/)
+  (included in Docker Desktop and modern Docker versions)
+
+### Verifying the Operator YAML Deployment
+
+When installing via a direct YAML manifest, you should verify the manifest file
+using the corresponding bundle (the `.sigstore.json` file) provided on the
+[GitHub Release page](https://github.com/cloudnative-pg/cloudnative-pg/releases).
+
+Run the following command:
+
+```bash
+cosign verify-blob \
+  cnpg-{version}.yaml \
+  --bundle cnpg-{version}.sigstore.json \
+  --certificate-identity-regexp "^https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/tags/v" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
-### Upgrading to 1.26 from a previous minor version
+#### Verifying SLSA provenance
 
-:::warning
-    Due to changes in the startup probe for the manager component
-    ([#6623](https://github.com/cloudnative-pg/cloudnative-pg/pull/6623)),
-    upgrading the operator will trigger a restart of your PostgreSQL clusters,
-    even if in-place updates are enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES=true`).
-    Your applications will need to reconnect to PostgreSQL after the upgrade.
+To verify a release binary, download both the artifact and the provenance file
+(`multiple.intoto.jsonl`) from the
+[GitHub release](https://github.com/cloudnative-pg/cloudnative-pg/releases),
+then run:
+
+```shell
+slsa-verifier verify-artifact <ARTIFACT> \
+  --provenance-path multiple.intoto.jsonl \
+  --source-uri github.com/cloudnative-pg/cloudnative-pg
+```
+
+### Verifying the operator container images
+
+Run the following command to verify the signature of the CloudNativePG operator
+images:
+
+```bash
+cosign verify ghcr.io/cloudnative-pg/cloudnative-pg:{tag} \
+  --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/tags/v" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+```
+
+We provide OCI attestations for full transparency. To inspect the Software Bill
+of Materials (SBOM) or build provenance, use the `docker buildx imagetools`
+command:
+
+To view the Software Bill of Materials (SBOM) in SPDX format:
+
+```bash
+docker buildx imagetools inspect ghcr.io/cloudnative-pg/cloudnative-pg:{tag} \
+  --format '{{ json (index .SBOM "linux/amd64").SPDX }}'
+```
+
+To inspect the SLSA Provenance (build details):
+
+```bash
+docker buildx imagetools inspect ghcr.io/cloudnative-pg/cloudnative-pg:{tag} \
+  --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
+```
+
+:::info
+Refer to ["Verifying SLSA provenance"](security.md#verifying-slsa-provenance)
+for SLSA Build Level 3 compliance verification.
 :::
 
-#### Deprecation of backup metrics and fields in the `Cluster` `.status`
+### Verifying PostgreSQL operand images
 
-With the transition to a backup and recovery agnostic approach based on CNPG-I
-plugins in CloudNativePG, which began with version 1.26.0 for Barman Cloud, we
-are starting the deprecation period for the following fields in the `.status`
-section of the `Cluster` resource:
+CloudNativePG maintains container images for all supported PostgreSQL versions
+as part of the [`postgres-containers` project](https://github.com/cloudnative-pg/postgres-containers)
+(also called operand images).
 
-- `firstRecoverabilityPoint`
-- `firstRecoverabilityPointByMethod`
-- `lastSuccessfulBackup`
-- `lastSuccessfulBackupByMethod`
-- `lastFailedBackup`
+To verify the signature of a specific operand image:
 
-The following Prometheus metrics are also deprecated:
+```bash
+cosign verify ghcr.io/cloudnative-pg/postgresql:{tag} \
+  --certificate-identity-regexp="^https://github.com/cloudnative-pg/postgres-containers/" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+```
 
-- `cnpg_collector_first_recoverability_point`
-- `cnpg_collector_last_failed_backup_timestamp`
-- `cnpg_collector_last_available_backup_timestamp`
+To view the Software Bill of Materials (SBOM) in SPDX format:
 
-:::warning
-    If you have migrated to a plugin-based backup and recovery solution such as
-    Barman Cloud, these fields and metrics are no longer synchronized and will
-    not be updated. Users still relying on the in-core support for Barman Cloud
-    and volume snapshots can continue to use these fields for the time being.
-:::
+```bash
+docker buildx imagetools inspect ghcr.io/cloudnative-pg/postgresql:{tag} \
+  --format '{{ json (index .SBOM "linux/amd64").SPDX }}'
+```
 
-Under the new plugin-based approach, multiple backup methods can operate
-simultaneously, each with its own timeline for backup and recovery. For
-example, some plugins may provide snapshots without WAL archiving, while others
-support continuous archiving.
+To inspect the SLSA Provenance (Build details):
 
-Because of this flexibility, maintaining centralized status fields in the
-`Cluster` resource could be misleading or confusing, as they would not
-accurately represent the state across all configured backup methods.
-For this reason, these fields are being deprecated.
-
-Instead, each plugin is responsible for exposing its own backup status
-information and providing metrics back to the instance manager for monitoring
-and operational awareness.
-
-#### Declarative Hibernation in the `cnpg` plugin
-
-In this release, the `cnpg` plugin for `kubectl` transitions from an imperative
-to a [declarative approach for cluster hibernation](declarative_hibernation.md).
-The `hibernate on` and `hibernate off` commands are now convenient shortcuts
-that apply declarative changes to enable or disable hibernation.
-The `hibernate status` command has been removed, as its purpose is now
-fulfilled by the standard `status` command.
-
+```bash
+docker buildx imagetools inspect ghcr.io/cloudnative-pg/postgresql:{tag} \
+  --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
+```

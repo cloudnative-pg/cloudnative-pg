@@ -28,6 +28,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -46,7 +48,7 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 	contextLogger := log.FromContext(ctx)
 
 	// No need to check this on a cluster which has been already deployed
-	if cluster.Status.LatestGeneratedNode != 0 {
+	if cluster.IsInitialized() {
 		return nil, nil
 	}
 
@@ -90,7 +92,7 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 	}
 
 	contextLogger.Debug("proceeding to restore the cluster status")
-	if err := restoreClusterStatus(ctx, r.Client, cluster, highestSerial, primarySerial); err != nil {
+	if err := restoreClusterStatus(ctx, r.Client, cluster, primarySerial); err != nil {
 		return nil, err
 	}
 
@@ -184,7 +186,6 @@ func ensureOrphanServiceIsNotPresent(
 
 // ensureClusterRestoreCanStart is a function where the plugins can inject their custom logic to tell the
 // restore process to wait before starting the process
-// nolint: revive
 func ensureClusterRestoreCanStart(
 	ctx context.Context,
 	c client.Client,
@@ -209,12 +210,16 @@ func restoreClusterStatus(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	latestNodeSerial int,
 	targetPrimaryNodeSerial int,
 ) error {
 	clusterOrig := cluster.DeepCopy()
-	cluster.Status.LatestGeneratedNode = latestNodeSerial
 	cluster.Status.TargetPrimary = specs.GetInstanceName(cluster.Name, targetPrimaryNodeSerial)
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    string(apiv1.ConditionInitialized),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.BootstrapCompleted),
+		Message: "Cluster has been bootstrapped",
+	})
 	return c.Status().Patch(ctx, cluster, client.MergeFrom(clusterOrig))
 }
 

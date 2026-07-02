@@ -79,12 +79,12 @@ func PrintReplicationSlots(
 				exec.DatabaseName(dbName),
 				query)
 			if err != nil {
-				output.WriteString(fmt.Sprintf("Couldn't retrieve restart_lsn for slot %v: %v\n", slot, err))
+				fmt.Fprintf(&output, "Couldn't retrieve restart_lsn for slot %v: %v\n", slot, err)
 			}
 			m[slot] = strings.TrimSpace(restartLsn)
 		}
-		output.WriteString(fmt.Sprintf("Replication slots on %v pod %v: %v\n",
-			pod.Labels[utils.ClusterInstanceRoleLabelName], pod.GetName(), m))
+		fmt.Fprintf(&output, "Replication slots on %v pod %v: %v\n",
+			pod.Labels[utils.ClusterInstanceRoleLabelName], pod.GetName(), m)
 	}
 	return output.String()
 }

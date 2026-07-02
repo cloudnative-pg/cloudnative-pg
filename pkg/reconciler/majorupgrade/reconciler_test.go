@@ -21,12 +21,14 @@ package majorupgrade
 
 import (
 	"fmt"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,23 +44,6 @@ import (
 )
 
 var _ = Describe("Major upgrade job status reconciliation", func() {
-	It("waits until the job completed", func(ctx SpecContext) {
-		job := buildRunningUpgradeJob()
-		cluster := &apiv1.Cluster{}
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
-			WithRuntimeObjects(job, cluster).
-			WithStatusSubresource(cluster).
-			Build()
-
-		result, err := majorVersionUpgradeHandleCompletion(ctx, fakeClient, cluster, job, nil)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(result).ToNot(BeNil())
-
-		// the job has not been deleted
-		Expect(job.ObjectMeta.DeletionTimestamp).To(BeNil())
-	})
-
 	It("deletes the replica PVCs when and makes the cluster use the new image", func(ctx SpecContext) {
 		job := buildCompletedUpgradeJob()
 		cluster := &apiv1.Cluster{
@@ -68,6 +53,16 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 			Spec: apiv1.ClusterSpec{
 				ImageName: "postgres:16",
 			},
+			Status: apiv1.ClusterStatus{
+				TimelineID: 5, // Simulating pre-upgrade timeline
+				// Persisted by Reconcile before the Job was created; completion
+				// carries this set forward instead of re-resolving the catalog.
+				TargetPGDataImageInfo: &apiv1.ImageInfo{
+					Image:        "postgres:16",
+					MajorVersion: 16,
+					Extensions:   []apiv1.ExtensionConfiguration{{Name: "postgis"}},
+				},
+			},
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			buildPrimaryPVC(1),
@@ -75,10 +70,11 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 			buildReplicaPVC(3),
 		}
 
-		objects := []runtime.Object{
+		objects := make([]runtime.Object, 0, 2+len(pvcs))
+		objects = append(objects,
 			job,
 			cluster,
-		}
+		)
 		for i := range pvcs {
 			objects = append(objects, &pvcs[i])
 		}
@@ -88,7 +84,9 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 			WithStatusSubresource(cluster).
 			Build()
 
-		result, err := majorVersionUpgradeHandleCompletion(ctx, fakeClient, cluster, job, pvcs)
+		result, err := majorVersionUpgradeHandleCompletion(
+			ctx, fakeClient, cluster, job, pvcs,
+		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).ToNot(BeNil())
 		Expect(*result).To(Equal(ctrl.Result{Requeue: true}))
@@ -106,10 +104,364 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:16"))
 		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(16))
 
+		// the extension set is carried forward from TargetPGDataImageInfo
+		// rather than re-resolved from the catalog
+		Expect(cluster.Status.PGDataImageInfo.Extensions).To(HaveLen(1))
+		Expect(cluster.Status.PGDataImageInfo.Extensions[0].Name).To(Equal("postgis"))
+
+		// the target marker is cleared on completion
+		Expect(cluster.Status.TargetPGDataImageInfo).To(BeNil())
+
+		// the timeline ID has been reset to 1 to match pg_upgrade behavior
+		Expect(cluster.Status.TimelineID).To(Equal(1))
+
 		// the job has been deleted
 		var tempJob batchv1.Job
 		err = fakeClient.Get(ctx, client.ObjectKeyFromObject(job), &tempJob)
 		Expect(err).To(MatchError(errors.IsNotFound, "is not found"))
+	})
+
+	It("falls back to resolving extensions when TargetPGDataImageInfo is absent", func(ctx SpecContext) {
+		// A Job that predates the TargetPGDataImageInfo field (e.g. created by
+		// an older operator and completing across an operator upgrade) has no
+		// persisted target set, so completion re-resolves from the cluster.
+		job := buildCompletedUpgradeJob()
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-example",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:16",
+			},
+			Status: apiv1.ClusterStatus{
+				TimelineID: 5,
+				// TargetPGDataImageInfo intentionally left nil.
+			},
+		}
+		pvcs := []corev1.PersistentVolumeClaim{buildPrimaryPVC(1)}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(job, cluster).
+			WithStatusSubresource(cluster).
+			Build()
+
+		result, err := majorVersionUpgradeHandleCompletion(ctx, fakeClient, cluster, job, pvcs)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+
+		// The upgrade still completes, resolving the (empty) extension set from
+		// the spec since the cluster uses an image name without extensions.
+		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:16"))
+		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(16))
+		Expect(cluster.Status.PGDataImageInfo.Extensions).To(BeEmpty())
+		Expect(cluster.Status.TargetPGDataImageInfo).To(BeNil())
+	})
+})
+
+var _ = Describe("Major upgrade reconcile early-revert handling", func() {
+	const (
+		oldImage = "postgres:15"
+		newImage = "postgres:16"
+	)
+
+	buildCluster := func(target *apiv1.ImageInfo, statusImage string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				// Spec image matches the on-disk image: the user has reverted.
+				ImageName: oldImage,
+			},
+			Status: apiv1.ClusterStatus{
+				Image: statusImage,
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Image:        oldImage,
+					MajorVersion: 15,
+				},
+				TargetPGDataImageInfo: target,
+			},
+		}
+	}
+
+	It("clears stale TargetPGDataImageInfo and resets Status.Image", func(ctx SpecContext) {
+		// reconcileImage Case 3 has bumped Status.Image to the upgrade target;
+		// majorupgrade.Reconcile previously persisted TargetPGDataImageInfo.
+		// The user then reverted the spec before any Job was created.
+		cluster := buildCluster(
+			&apiv1.ImageInfo{Image: newImage, MajorVersion: 16},
+			newImage,
+		)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(cluster).
+			WithStatusSubresource(cluster).
+			Build()
+
+		result, err := Reconcile(
+			ctx, fakeClient, record.NewFakeRecorder(10),
+			cluster, nil, nil, nil,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeNil())
+
+		var updated apiv1.Cluster
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &updated)).To(Succeed())
+		Expect(updated.Status.TargetPGDataImageInfo).To(BeNil())
+		Expect(updated.Status.Image).To(Equal(oldImage))
+	})
+
+	It("does not patch when there is nothing to clear", func(ctx SpecContext) {
+		// Already-converged state: no target persisted, Status.Image already
+		// matches PGDataImageInfo.Image. We assert no patch happens by
+		// observing that ResourceVersion is unchanged.
+		cluster := buildCluster(nil, oldImage)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(cluster).
+			WithStatusSubresource(cluster).
+			Build()
+
+		var before apiv1.Cluster
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &before)).To(Succeed())
+
+		result, err := Reconcile(
+			ctx, fakeClient, record.NewFakeRecorder(10),
+			cluster, nil, nil, nil,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeNil())
+
+		var after apiv1.Cluster
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &after)).To(Succeed())
+		Expect(after.ResourceVersion).To(Equal(before.ResourceVersion))
+	})
+
+	It("clears the target alone when Status.Image is already correct", func(ctx SpecContext) {
+		// Edge case: reconcileImage already fell through Case 4 on a prior
+		// loop and reset Status.Image, but TargetPGDataImageInfo is still set
+		// because majorupgrade.Reconcile hasn't run since the revert.
+		cluster := buildCluster(
+			&apiv1.ImageInfo{Image: newImage, MajorVersion: 16},
+			oldImage,
+		)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(cluster).
+			WithStatusSubresource(cluster).
+			Build()
+
+		_, err := Reconcile(
+			ctx, fakeClient, record.NewFakeRecorder(10),
+			cluster, nil, nil, nil,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		var updated apiv1.Cluster
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &updated)).To(Succeed())
+		Expect(updated.Status.TargetPGDataImageInfo).To(BeNil())
+		Expect(updated.Status.Image).To(Equal(oldImage))
+	})
+})
+
+var _ = Describe("Major upgrade rollback handling", func() {
+	DescribeTable("deletes the job and resets the image when the user rolls back",
+		func(
+			ctx SpecContext, specImage, statusImage, pgDataImage string, pgDataMajor int, expectedImage string,
+		) {
+			job := buildFailedUpgradeJob()
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-example",
+				},
+				Spec: apiv1.ClusterSpec{
+					ImageName: specImage,
+				},
+				Status: apiv1.ClusterStatus{
+					Image: statusImage,
+					PGDataImageInfo: &apiv1.ImageInfo{
+						Image:        pgDataImage,
+						MajorVersion: pgDataMajor,
+					},
+				},
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithRuntimeObjects(job, cluster).
+				WithStatusSubresource(cluster).
+				Build()
+
+			result, err := handleRollbackIfNeeded(ctx, fakeClient, record.NewFakeRecorder(10), cluster, job)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).ToNot(BeNil())
+			Expect(*result).To(Equal(ctrl.Result{RequeueAfter: 10 * time.Second}))
+
+			// the job has been deleted
+			var tempJob batchv1.Job
+			err = fakeClient.Get(ctx, client.ObjectKeyFromObject(job), &tempJob)
+			Expect(err).To(MatchError(errors.IsNotFound, "is not found"))
+
+			// Status.Image has been reset to the pre-upgrade image
+			var updatedCluster apiv1.Cluster
+			err = fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &updatedCluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedCluster.Status.Image).To(Equal(expectedImage))
+		},
+		Entry("reverted to previous major version",
+			"postgres:15", "postgres:16", "postgres:15", 15, "postgres:15"),
+		Entry("changed to same-major image during upgrade",
+			"postgres:16.1", "postgres:17", "postgres:16.0", 16, "postgres:16.0"),
+	)
+
+	It("clears TargetPGDataImageInfo when rolling back after the Job exists", func(ctx SpecContext) {
+		job := buildFailedUpgradeJob()
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-example",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:15",
+			},
+			Status: apiv1.ClusterStatus{
+				Image: "postgres:16",
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Image:        "postgres:15",
+					MajorVersion: 15,
+				},
+				TargetPGDataImageInfo: &apiv1.ImageInfo{
+					Image:        "postgres:16",
+					MajorVersion: 16,
+				},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(job, cluster).
+			WithStatusSubresource(cluster).
+			Build()
+
+		_, err := handleRollbackIfNeeded(ctx, fakeClient, record.NewFakeRecorder(10), cluster, job)
+		Expect(err).ToNot(HaveOccurred())
+
+		var updated apiv1.Cluster
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &updated)).To(Succeed())
+		Expect(updated.Status.TargetPGDataImageInfo).To(BeNil())
+		Expect(updated.Status.Image).To(Equal("postgres:15"))
+	})
+
+	It("does nothing when the requested version is still higher", func(ctx SpecContext) {
+		job := buildFailedUpgradeJob()
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-example",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:16",
+			},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Image:        "postgres:15",
+					MajorVersion: 15,
+				},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(job, cluster).
+			WithStatusSubresource(cluster).
+			Build()
+
+		result, err := handleRollbackIfNeeded(ctx, fakeClient, record.NewFakeRecorder(10), cluster, job)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeNil())
+
+		// the job is still there
+		var tempJob batchv1.Job
+		err = fakeClient.Get(ctx, client.ObjectKeyFromObject(job), &tempJob)
+		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("deleteAllPodsInMajorUpgradePreparation", func() {
+	It("deletes pods and requeues when pods have no deletion timestamp", func(ctx SpecContext) {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example-1",
+				Namespace: "default",
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(&pod).
+			Build()
+
+		result, err := deleteAllPodsInMajorUpgradePreparation(ctx, fakeClient, []corev1.Pod{pod}, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+		Expect(*result).To(Equal(ctrl.Result{RequeueAfter: 10 * time.Second}))
+	})
+
+	It("requeues when pods are still terminating", func(ctx SpecContext) {
+		now := metav1.Now()
+		terminatingPod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "cluster-example-1",
+				Namespace:         "default",
+				DeletionTimestamp: &now,
+				Finalizers:        []string{"test-finalizer"},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
+
+		result, err := deleteAllPodsInMajorUpgradePreparation(ctx, fakeClient, []corev1.Pod{terminatingPod}, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+		Expect(*result).To(Equal(ctrl.Result{RequeueAfter: 10 * time.Second}))
+	})
+
+	It("returns nil when no pods or jobs exist", func(ctx SpecContext) {
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
+
+		result, err := deleteAllPodsInMajorUpgradePreparation(ctx, fakeClient, nil, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeNil())
+	})
+})
+
+var _ = Describe("Major upgrade job definition", func() {
+	It("sets BackoffLimit to 0", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:16",
+			},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Image:        "postgres:15",
+					MajorVersion: 15,
+				},
+			},
+		}
+		job := createMajorUpgradeJobDefinition(cluster, 1, nil)
+		Expect(job.Spec.BackoffLimit).ToNot(BeNil())
+		Expect(*job.Spec.BackoffLimit).To(Equal(int32(0)))
 	})
 })
 
@@ -220,13 +572,21 @@ func buildCompletedUpgradeJob() *batchv1.Job {
 	}
 }
 
-func buildRunningUpgradeJob() *batchv1.Job {
+func buildFailedUpgradeJob() *batchv1.Job {
 	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster-example-major-upgrade",
+			Labels: map[string]string{
+				utils.JobRoleLabelName: jobMajorUpgrade,
+			},
+		},
 		Spec: batchv1.JobSpec{
-			Completions: ptr.To[int32](1),
+			Completions:  ptr.To[int32](1),
+			BackoffLimit: ptr.To[int32](0),
 		},
 		Status: batchv1.JobStatus{
 			Succeeded: 0,
+			Failed:    1,
 		},
 	}
 }

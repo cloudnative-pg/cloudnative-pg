@@ -36,7 +36,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// nolint: dupl
+//nolint:dupl
 var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 	var (
 		r              ClusterReconciler

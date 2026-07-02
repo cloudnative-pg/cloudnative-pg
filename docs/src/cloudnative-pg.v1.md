@@ -19,6 +19,8 @@ Package v1 contains API Schema definitions for the postgresql v1 API group
 - [Cluster](#cluster)
 - [ClusterImageCatalog](#clusterimagecatalog)
 - [Database](#database)
+- [DatabaseRole](#databaserole)
+- [DatabaseRoleList](#databaserolelist)
 - [FailoverQuorum](#failoverquorum)
 - [ImageCatalog](#imagecatalog)
 - [Pooler](#pooler)
@@ -429,6 +431,24 @@ _Appears in:_
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 
 
+#### CatalogComponentImage
+
+
+
+CatalogComponentImage is a named image entry for a non-PostgreSQL component.
+
+
+
+_Appears in:_
+
+- [ImageCatalogSpec](#imagecatalogspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `key` _string_ | Key is the unique identifier for this image within the catalog. | True |  | MaxLength: 63 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
+| `image` _string_ | Image is the container image reference. | True |  |  |
+
+
 #### CatalogImage
 
 
@@ -445,6 +465,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `image` _string_ | The image reference | True |  |  |
 | `major` _integer_ | The PostgreSQL major version of the image. Must be unique within the catalog. | True |  | Minimum: 10 <br /> |
+| `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | The configuration of the extensions to be added |  |  |  |
 
 
 #### CertificatesConfiguration
@@ -489,6 +510,42 @@ _Appears in:_
 | `clientCASecret` _string_ | The secret containing the Client CA certificate. If not defined, a new secret will be created<br />with a self-signed CA and will be used to generate all the client certificates.<br /><br />Contains:<br /><br />- `ca.crt`: CA that should be used to validate the client certificates,<br />used as `ssl_ca_file` of all the instances.<br />- `ca.key`: key used to generate client certificates, if ReplicationTLSSecret is provided,<br />this can be omitted.<br /> |  |  |  |
 | `serverAltDNSNames` _string array_ | The list of the server alternative DNS names to be added to the generated server TLS certificates, when required. |  |  |  |
 | `expirations` _object (keys:string, values:string)_ | Expiration dates for all certificates. |  |  |  |
+
+
+#### ClientCertificateConfiguration
+
+
+
+ClientCertificateConfiguration configures operator-managed issuance of a TLS
+client certificate for a DatabaseRole.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleSpec](#databaserolespec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `enabled` _boolean_ | Enabled turns on client certificate issuance for this role. When true,<br />the role must have login enabled. Defaults to true when the block is present. |  | true |  |
+
+
+#### ClientCertificateState
+
+
+
+ClientCertificateState holds the observed state of the generated TLS client certificate.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleStatus](#databaserolestatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `expiration` _string_ | Expiration is the expiration time of the generated client certificate, in RFC3339 format. |  |  |  |
+| `message` _string_ | Message contains a human-readable explanation of the current certificate status,<br />such as why issuance was skipped or why an existing Secret was left untouched. |  |  |  |
 
 
 #### Cluster
@@ -576,7 +633,8 @@ _Appears in:_
 | `minSyncReplicas` _integer_ | Minimum number of instances required in synchronous replication with the<br />primary. Undefined or 0 allow writes to complete when no standby is<br />available. |  | 0 | Minimum: 0 <br /> |
 | `maxSyncReplicas` _integer_ | The target value for the synchronous replication quorum, that can be<br />decreased if the number of ready standbys is lower than this.<br />Undefined or 0 disable synchronous replication. |  | 0 | Minimum: 0 <br /> |
 | `postgresql` _[PostgresConfiguration](#postgresconfiguration)_ | Configuration of the PostgreSQL server |  |  |  |
-| `replicationSlots` _[ReplicationSlotsConfiguration](#replicationslotsconfiguration)_ | Replication slots management configuration |  | \{ highAvailability:map[enabled:true] \} |  |
+| `podSelectorRefs` _[PodSelectorRef](#podselectorref) array_ | PodSelectorRefs defines named pod label selectors that can be referenced<br />in pg_hba rules using the $\{podselector:NAME\} syntax in the address field.<br />The operator resolves matching pod IPs and the instance manager expands<br />pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered. |  |  |  |
+| `replicationSlots` _[ReplicationSlotsConfiguration](#replicationslotsconfiguration)_ | Replication slots management configuration |  | \{ highAvailability\: \{ enabled:true \} \} |  |
 | `bootstrap` _[BootstrapConfiguration](#bootstrapconfiguration)_ | Instructions to bootstrap this cluster |  |  |  |
 | `replica` _[ReplicaClusterConfiguration](#replicaclusterconfiguration)_ | Replica cluster configuration |  |  |  |
 | `superuserSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | The secret containing the superuser password. If not defined a new<br />secret will be created with a randomly generated password |  |  |  |
@@ -585,6 +643,7 @@ _Appears in:_
 | `imagePullSecrets` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference) array_ | The list of pull secrets to be used to pull the images |  |  |  |
 | `storage` _[StorageConfiguration](#storageconfiguration)_ | Configuration of the storage of the instances |  |  |  |
 | `serviceAccountTemplate` _[ServiceAccountTemplate](#serviceaccounttemplate)_ | Configure the generation of the service account |  |  |  |
+| `serviceAccountName` _string_ | Name of an existing ServiceAccount in the same namespace to use for the cluster.<br />When specified, the operator will not create a new ServiceAccount<br />but will use the provided one. This is useful for sharing a single<br />ServiceAccount across multiple clusters (e.g., for cloud IAM configurations).<br />If not specified, a ServiceAccount will be created with the cluster name.<br />Mutually exclusive with ServiceAccountTemplate. |  |  | MaxLength: 253 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
 | `walStorage` _[StorageConfiguration](#storageconfiguration)_ | Configuration of the storage for PostgreSQL WAL (Write-Ahead Log) |  |  |  |
 | `ephemeralVolumeSource` _[EphemeralVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#ephemeralvolumesource-v1-core)_ | EphemeralVolumeSource allows the user to configure the source of ephemeral volumes. |  |  |  |
 | `startDelay` _integer_ | The time in seconds that is allowed for a PostgreSQL instance to<br />successfully start up (default 3600).<br />The startup probe failure threshold is derived from this value using the formula:<br />ceiling(startDelay / 10). |  | 3600 |  |
@@ -616,6 +675,7 @@ _Appears in:_
 | `enablePDB` _boolean_ | Manage the `PodDisruptionBudget` resources within the cluster. When<br />configured as `true` (default setting), the pod disruption budgets<br />will safeguard the primary node from being terminated. Conversely,<br />setting it to `false` will result in the absence of any<br />`PodDisruptionBudget` resource, permitting the shutdown of all nodes<br />hosting the PostgreSQL cluster. This latter configuration is<br />advisable for any PostgreSQL cluster employed for<br />development/staging purposes. |  | true |  |
 | `plugins` _[PluginConfiguration](#pluginconfiguration) array_ | The plugins configuration, containing<br />any plugin to be loaded with the corresponding configuration |  |  |  |
 | `probes` _[ProbesConfiguration](#probesconfiguration)_ | The configuration of the probes to be injected<br />in the PostgreSQL Pods. |  |  |  |
+| `primaryLease` _[PrimaryLeaseConfiguration](#primaryleaseconfiguration)_ | Configuration of the Kubernetes `Lease` used to coordinate safe primary<br />election within the cluster. When omitted, the operator applies built-in<br />defaults; tune these values only if you understand the consequences for<br />failover timing. |  |  |  |
 
 
 #### ClusterStatus
@@ -635,13 +695,15 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `instances` _integer_ | The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods. |  |  |  |
 | `readyInstances` _integer_ | The total number of ready instances in the cluster. It is equal to the number of ready instance pods. |  |  |  |
+| `selector` _string_ | Selector is the serialized form of the label selector that identifies<br />the pods managed by this cluster. Populated by the operator and exposed<br />through the scale sub-resource so an autoscaler (such as HPA or VPA)<br />can discover the managed instance pods. |  |  |  |
 | `instancesStatus` _object (keys:[PodStatus](#podstatus), values:string array)_ | InstancesStatus indicates in which status the instances are |  |  |  |
 | `instancesReportedState` _object (keys:[PodName](#podname), values:[InstanceReportedState](#instancereportedstate))_ | The reported state of the instances during the last reconciliation loop |  |  |  |
 | `managedRolesStatus` _[ManagedRoles](#managedroles)_ | ManagedRolesStatus reports the state of the managed roles in the cluster |  |  |  |
 | `tablespacesStatus` _[TablespaceState](#tablespacestate) array_ | TablespacesStatus reports the state of the declarative tablespaces in the cluster |  |  |  |
+| `podSelectorRefs` _[PodSelectorRefStatus](#podselectorrefstatus) array_ | PodSelectorRefs contains the resolved pod IPs for each named selector<br />defined in spec.podSelectorRefs. |  |  |  |
 | `timelineID` _integer_ | The timeline of the Postgres cluster |  |  |  |
 | `topology` _[Topology](#topology)_ | Instances topology. |  |  |  |
-| `latestGeneratedNode` _integer_ | ID of the latest generated node (used to avoid node name clashing) |  |  |  |
+| `latestGeneratedNode` _integer_ | ID of the latest generated node (used to avoid node name clashing)<br />Deprecated: this field is not set anymore |  |  |  |
 | `currentPrimary` _string_ | Current primary instance |  |  |  |
 | `targetPrimary` _string_ | Target primary instance, this is different from the previous one<br />during a switchover or a failover |  |  |  |
 | `lastPromotionToken` _string_ | LastPromotionToken is the last verified promotion token that<br />was used to promote a replica cluster |  |  |  |
@@ -670,12 +732,14 @@ _Appears in:_
 | `targetPrimaryTimestamp` _string_ | The timestamp when the last request for a new primary has occurred |  |  |  |
 | `poolerIntegrations` _[PoolerIntegrations](#poolerintegrations)_ | The integration needed by poolers referencing the cluster |  |  |  |
 | `cloudNativePGOperatorHash` _string_ | The hash of the binary of the operator |  |  |  |
+| `operatorCertificateFingerprint` _string_ | OperatorCertificateFingerprint is the SHA256 fingerprint of the operator's<br />in-memory client certificate public key. The instance manager pins this<br />fingerprint to authenticate requests from the operator. |  |  |  |
 | `availableArchitectures` _[AvailableArchitecture](#availablearchitecture) array_ | AvailableArchitectures reports the available architectures of a cluster |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for cluster object |  |  |  |
 | `instanceNames` _string array_ | List of instance names in the cluster |  |  |  |
 | `onlineUpdateEnabled` _boolean_ | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster |  |  |  |
 | `image` _string_ | Image contains the image name used by the pods |  |  |  |
 | `pgDataImageInfo` _[ImageInfo](#imageinfo)_ | PGDataImageInfo contains the details of the latest image that has run on the current data directory. |  |  |  |
+| `targetPgDataImageInfo` _[ImageInfo](#imageinfo)_ | TargetPGDataImageInfo contains the details of the target image for an<br />in-progress major upgrade. It is set before the upgrade Job is created,<br />and cleared on successful completion or when the upgrade is rolled back. |  |  |  |
 | `pluginStatus` _[PluginStatus](#pluginstatus) array_ | PluginStatus is the status of the loaded plugins |  |  |  |
 | `switchReplicaClusterStatus` _[SwitchReplicaClusterStatus](#switchreplicaclusterstatus)_ | SwitchReplicaClusterStatus is the status of the switch to replica cluster |  |  |  |
 | `demotionToken` _string_ | DemotionToken is a JSON token containing the information<br />from pg_controldata such as Database system identifier, Latest checkpoint's<br />TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO<br />WAL file, and Time of latest checkpoint |  |  |  |
@@ -825,6 +889,65 @@ _Appears in:_
 | `retain` | DatabaseReclaimRetain means the database will be left in its current phase for manual<br />reclamation by the administrator. The default policy is Retain.<br /> |
 
 
+#### DatabaseRole
+
+
+
+DatabaseRole is the Schema for the databaseroles API
+
+
+
+_Appears in:_
+
+- [DatabaseRoleList](#databaserolelist)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
+| `kind` _string_ | `DatabaseRole` | True | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
+| `spec` _[DatabaseRoleSpec](#databaserolespec)_ | Specification of the desired DatabaseRole.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
+| `status` _[DatabaseRoleStatus](#databaserolestatus)_ | Most recently observed status of the DatabaseRole. This data may not be up<br />to date. Populated by the system. Read-only.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status |  |  |  |
+
+
+
+
+#### DatabaseRoleList
+
+
+
+DatabaseRoleList contains a list of DatabaseRoles
+
+
+
+
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
+| `kind` _string_ | `DatabaseRoleList` | True | | |
+| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
+| `items` _[DatabaseRole](#databaserole) array_ |  | True |  |  |
+
+
+#### DatabaseRoleReclaimPolicy
+
+_Underlying type:_ _string_
+
+DatabaseRoleReclaimPolicy describes a policy for end-of-life maintenance of Roles.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleSpec](#databaserolespec)
+
+| Field | Description |
+| --- | --- |
+| `delete` | DatabaseRoleReclaimDelete means the Role will be deleted from Kubernetes on release<br />from its claim.<br /> |
+| `retain` | DatabaseRoleReclaimRetain means the Role will be left in its current phase for manual<br />reclamation by the administrator. The default policy is Retain.<br /> |
+
+
 #### DatabaseRoleRef
 
 
@@ -840,6 +963,62 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `name` _string_ |  |  |  |  |
+
+
+#### DatabaseRoleSpec
+
+
+
+DatabaseRoleSpec represents a role in Postgres
+
+
+
+_Appears in:_
+
+- [DatabaseRole](#databaserole)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the role | True |  |  |
+| `comment` _string_ | Description of the role |  |  |  |
+| `ensure` _[EnsureOption](#ensureoption)_ | Ensure the role is `present` or `absent` - defaults to "present" |  | present | Enum: [present absent] <br /> |
+| `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present).<br />If null, the password will be ignored unless DisablePassword is set.<br />When set, the secret must follow the `kubernetes.io/basic-auth` format<br />and contain both a `username` and a `password` field. |  |  |  |
+| `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
+| `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
+| `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty.<br />Changes to the list are applied to an existing role through<br />`GRANT` and `REVOKE` statements, not only at role creation. |  |  |  |
+| `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Default is `true`. |  | true |  |
+| `disablePassword` _boolean_ | DisablePassword indicates that a role's password should be set to NULL in Postgres |  |  |  |
+| `superuser` _boolean_ | Whether the role is a `superuser` who can override all access<br />restrictions within the database - superuser status is dangerous and<br />should be used only when really needed. You must yourself be a<br />superuser to create a new superuser. Defaults is `false`. |  |  |  |
+| `createdb` _boolean_ | When set to `true`, the role being defined will be allowed to create<br />new databases. Specifying `false` (default) will deny a role the<br />ability to create databases. |  |  |  |
+| `createrole` _boolean_ | Whether the role will be permitted to create, alter, drop, comment<br />on, change the security label for, and grant or revoke membership in<br />other roles. Default is `false`. |  |  |  |
+| `login` _boolean_ | Whether the role is allowed to log in. A role having the `login`<br />attribute can be thought of as a user. Roles without this attribute<br />are useful for managing database privileges, but are not users in<br />the usual sense of the word. Default is `false`. |  |  |  |
+| `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication. Default<br />is `false`. |  |  |  |
+| `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
+| `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
+| `databaseRoleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
+| `clientCertificate` _[ClientCertificateConfiguration](#clientcertificateconfiguration)_ | ClientCertificate configures the operator to generate and renew a TLS client<br />certificate for this role, signed by the cluster's client CA. The certificate<br />is stored in a Secret named `<databaserole-name>-client-cert`.<br />Requires login to be true. |  |  |  |
+
+
+#### DatabaseRoleStatus
+
+
+
+DatabaseRoleStatus defines the observed state of a DatabaseRole
+
+
+
+_Appears in:_
+
+- [DatabaseRole](#databaserole)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `observedGeneration` _integer_ | A sequence number representing the latest<br />desired state that was synchronized |  |  |  |
+| `applied` _boolean_ | Applied is true if the role was reconciled correctly |  |  |  |
+| `message` _string_ | Message is the reconciliation error message |  |  |  |
+| `secretResourceVersion` _string_ | SecretResourceVersion is the resource version of the password secret<br />last applied to the role; a change to it triggers reconciliation. |  |  |  |
+| `clientCertificate` _[ClientCertificateState](#clientcertificatestate)_ | ClientCertificate holds the observed state of the generated TLS client<br />certificate, when client certificate issuance is enabled. |  |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for the DatabaseRole object |  |  |  |
 
 
 #### DatabaseSpec
@@ -936,6 +1115,7 @@ a Role in a PostgreSQL instance
 _Appears in:_
 
 - [DatabaseObjectSpec](#databaseobjectspec)
+- [DatabaseRoleSpec](#databaserolespec)
 - [DatabaseSpec](#databasespec)
 - [ExtensionSpec](#extensionspec)
 - [FDWSpec](#fdwspec)
@@ -980,15 +1160,38 @@ PostgreSQL extensions to the Cluster.
 
 _Appears in:_
 
+- [CatalogImage](#catalogimage)
+- [ImageInfo](#imageinfo)
 - [PostgresConfiguration](#postgresconfiguration)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | The name of the extension, required | True |  | MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
-| `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension, required | True |  |  |
+| `name` _string_ | The name of the extension, required. The limit of 59 characters<br />leaves room for the prefix the operator adds when deriving the<br />extension's Kubernetes Volume name (capped at 63 characters). | True |  | MaxLength: 59 <br />MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$` <br /> |
+| `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension. |  |  |  |
 | `extension_control_path` _string array_ | The list of directories inside the image which should be added to extension_control_path.<br />If not defined, defaults to "/share". |  |  |  |
 | `dynamic_library_path` _string array_ | The list of directories inside the image which should be added to dynamic_library_path.<br />If not defined, defaults to "/lib". |  |  |  |
 | `ld_library_path` _string array_ | The list of directories inside the image which should be added to ld_library_path. |  |  |  |
+| `bin_path` _string array_ | A list of directories within the image to be appended to the<br />PostgreSQL process's `PATH` environment variable. |  |  |  |
+| `env` _[ExtensionEnvVar](#extensionenvvar) array_ | Env is a list of custom environment variables to be set in the<br />PostgreSQL process for this extension. It is the responsibility of the<br />cluster administrator to ensure the variables are correct for the<br />specific extension. Note that changes to these variables require<br />a manual cluster restart to take effect. |  |  |  |
+
+
+#### ExtensionEnvVar
+
+
+
+ExtensionEnvVar defines an environment variable for a specific extension
+image volume.
+
+
+
+_Appears in:_
+
+- [ExtensionConfiguration](#extensionconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the environment variable to be injected into the<br />PostgreSQL process. | True |  | MinLength: 1 <br />Pattern: `^[a-zA-Z_][a-zA-Z0-9_]*$` <br /> |
+| `value` _string_ | Value of the environment variable. CloudNativePG performs a direct<br />replacement of this value, with support for placeholder expansion.<br />The $\{`image_root`\} placeholder resolves to the absolute mount path<br />of the extension's volume (e.g., `/extensions/my-extension`). This<br />is particularly useful for allowing applications or libraries to<br />locate specific directories within the mounted image.<br />Unrecognized placeholders are rejected. To include a literal $\{...\}<br />in the value, escape it as $$\{...\}. | True |  | MinLength: 1 <br /> |
 
 
 #### ExtensionSpec
@@ -1123,6 +1326,27 @@ ImageCatalog is the Schema for the imagecatalogs API
 | `spec` _[ImageCatalogSpec](#imagecatalogspec)_ | Specification of the desired behavior of the ImageCatalog.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
 
 
+#### ImageCatalogComponentRef
+
+
+
+ImageCatalogComponentRef identifies a named image within the componentImages list of an
+ImageCatalog or ClusterImageCatalog.
+
+
+
+_Appears in:_
+
+- [PgBouncerSpec](#pgbouncerspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `apiGroup` _string_ | APIGroup is the group for the resource being referenced.<br />If APIGroup is not specified, the specified Kind must be in the core API group.<br />For any other third-party types, APIGroup is required. |  |  |  |
+| `kind` _string_ | Kind is the type of resource being referenced | True |  |  |
+| `name` _string_ | Name is the name of resource being referenced | True |  |  |
+| `key` _string_ | Key identifies the entry within the catalog's componentImages list. | True |  | MaxLength: 63 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
+
+
 #### ImageCatalogRef
 
 
@@ -1159,6 +1383,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `images` _[CatalogImage](#catalogimage) array_ | List of CatalogImages available in the catalog | True |  | MaxItems: 8 <br />MinItems: 1 <br /> |
+| `componentImages` _[CatalogComponentImage](#catalogcomponentimage) array_ | ComponentImages is a list of named images for components other than PostgreSQL<br />(e.g. pgbouncer). Keys must be unique within a catalog. |  |  | MaxItems: 32 <br /> |
 
 
 #### ImageInfo
@@ -1177,6 +1402,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `image` _string_ | Image is the image name | True |  |  |
 | `majorVersion` _integer_ | MajorVersion is the major version of the image | True |  |  |
+| `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | Extensions contains the container image extensions available for the current Image |  |  |  |
 
 
 #### Import
@@ -1239,6 +1465,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `podName` _string_ | The pod name |  |  |  |
 | `ContainerID` _string_ | The container ID |  |  |  |
+| `sessionID` _string_ | The instance manager session ID. This is a unique identifier generated at instance manager<br />startup and changes on every restart (including container reboots). Used to detect if<br />the instance manager was restarted during long-running operations like backups, which<br />would terminate any running backup process. |  |  |  |
 
 
 #### InstanceReportedState
@@ -1422,7 +1649,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `byStatus` _object (keys:[RoleStatus](#rolestatus), values:string array)_ | ByStatus gives the list of roles in each state |  |  |  |
-| `cannotReconcile` _object (keys:string, values:string array)_ | CannotReconcile lists roles that cannot be reconciled in PostgreSQL,<br />with an explanation of the cause |  |  |  |
+| `cannotReconcile` _object (keys:string, values:string array)_ | CannotReconcile lists roles that cannot be reconciled, with an<br />explanation of the cause. Failures may originate in PostgreSQL<br />(e.g. dropping a role that owns objects) or in Kubernetes (e.g.<br />the referenced password Secret cannot be fetched). |  |  |  |
 | `passwordStatus` _object (keys:string, values:[PasswordState](#passwordstate))_ | PasswordStatus gives the last transaction id and password secret version for each managed role |  |  |  |
 
 
@@ -1668,6 +1895,8 @@ _Appears in:_
 | `parameters` _object (keys:string, values:string)_ | Additional parameters to be passed to PgBouncer - please check<br />the CNPG documentation for a list of options you can configure |  |  |  |
 | `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file) |  |  |  |
 | `paused` _boolean_ | When set to `true`, PgBouncer will disconnect from the PostgreSQL<br />server, first waiting for all queries to complete, and pause all new<br />client connections until this value is set to `false` (default). Internally,<br />the operator calls PgBouncer's `PAUSE` and `RESUME` commands. |  | false |  |
+| `image` _string_ | Image is the pgbouncer container image to use. When set, it takes<br />precedence over ImageCatalogRef and the operator default, but is<br />overridden by an explicit image set in the pod template. |  |  |  |
+| `imageCatalogRef` _[ImageCatalogComponentRef](#imagecatalogcomponentref)_ | ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.<br />Mutually exclusive with Image. |  |  |  |
 
 
 #### PluginConfiguration
@@ -1729,6 +1958,45 @@ _Appears in:_
 - [ClusterStatus](#clusterstatus)
 - [Topology](#topology)
 
+
+
+#### PodSelectorRef
+
+
+
+PodSelectorRef defines a named pod label selector for use in pg_hba rules.
+Pods matching the selector in the Cluster's namespace will have their IPs
+resolved and made available for pg_hba address expansion via the
+`${podselector:NAME}` syntax.
+
+
+
+_Appears in:_
+
+- [ClusterSpec](#clusterspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name is the identifier used to reference this selector in pg_hba rules<br />via the $\{podselector:NAME\} syntax in the address field. | True |  | MinLength: 1 <br />Pattern: `^[a-z]([a-z0-9_-]*[a-z0-9])?$` <br /> |
+| `selector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#labelselector-v1-meta)_ | Selector is a label selector that identifies the pods whose IPs<br />should be resolved. Only pods in the Cluster's namespace are considered. | True |  |  |
+
+
+#### PodSelectorRefStatus
+
+
+
+PodSelectorRefStatus contains the resolved pod IPs for a named selector.
+
+
+
+_Appears in:_
+
+- [ClusterStatus](#clusterstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name corresponds to the name in the spec's PodSelectorRef. | True |  |  |
+| `ips` _string array_ | IPs is the list of pod IPs matching the selector.<br />Each IP is a single address (no CIDR notation). |  |  |  |
 
 
 #### PodStatus
@@ -1841,9 +2109,50 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `enablePodMonitor` _boolean_ | Enable or disable the `PodMonitor` |  | false |  |
-| `podMonitorMetricRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion. |  |  |  |
-| `podMonitorRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping. |  |  |  |
+| `enablePodMonitor` _boolean_ | Enable or disable the `PodMonitor`<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  | false |  |
+| `podMonitorMetricRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
+| `podMonitorRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
+| `tls` _[PoolerMonitoringTLSConfiguration](#poolermonitoringtlsconfiguration)_ | Configure TLS communication for the metrics endpoint.<br />Changing tls.enabled option will force a rollout of all instances. |  |  |  |
+
+
+#### PoolerMonitoringTLSConfiguration
+
+
+
+PoolerMonitoringTLSConfiguration is the type containing the TLS configuration
+for the pooler monitoring
+
+
+
+_Appears in:_
+
+- [PoolerMonitoringConfiguration](#poolermonitoringconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `enabled` _boolean_ | Enable TLS for the monitoring endpoint.<br />Changing this option will force a rollout of all instances. |  | false |  |
+
+
+#### PoolerPhase
+
+_Underlying type:_ _string_
+
+PoolerPhase represents the lifecycle phase of a Pooler.
+
+_Validation:_
+
+- Enum: [active paused inactive failed]
+
+_Appears in:_
+
+- [PoolerStatus](#poolerstatus)
+
+| Field | Description |
+| --- | --- |
+| `active` | PoolerPhaseActive means the pooler is running normally and serving traffic.<br /> |
+| `paused` | PoolerPhasePaused means PgBouncer is up and running but holding new client<br />connections in the queue because spec.pgbouncer.paused is true. The Deployment<br />keeps reconciling; lifting the pause transitions back to Active.<br /> |
+| `inactive` | PoolerPhaseInactive means the pooler cannot make progress because a<br />prerequisite resource is missing (cluster, secret, certificate). The<br />controller retries periodically until the prerequisite shows up. Check<br />status.phaseReason for the specific cause.<br /> |
+| `failed` | PoolerPhaseFailed means the pooler cannot be reconciled due to a<br />configuration error. Check status.phaseReason for details.<br /> |
 
 
 #### PoolerSecrets
@@ -1887,8 +2196,9 @@ _Appears in:_
 | `template` _[PodTemplateSpec](#podtemplatespec)_ | The template of the Pod to be created |  |  |  |
 | `pgbouncer` _[PgBouncerSpec](#pgbouncerspec)_ | The PgBouncer configuration | True |  |  |
 | `deploymentStrategy` _[DeploymentStrategy](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#deploymentstrategy-v1-apps)_ | The deployment strategy to use for pgbouncer to replace existing pods with new ones |  |  |  |
-| `monitoring` _[PoolerMonitoringConfiguration](#poolermonitoringconfiguration)_ | The configuration of the monitoring infrastructure of this pooler.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
+| `monitoring` _[PoolerMonitoringConfiguration](#poolermonitoringconfiguration)_ | The configuration of the monitoring infrastructure of this pooler. |  |  |  |
 | `serviceTemplate` _[ServiceTemplateSpec](#servicetemplatespec)_ | Template for the Service to be created |  |  |  |
+| `serviceAccountName` _string_ | Name of an existing ServiceAccount in the same namespace to use for the pooler.<br />When specified, the operator will not create a new ServiceAccount<br />but will use the provided one. This is useful for sharing a single<br />ServiceAccount across multiple poolers (e.g., for cloud IAM configurations).<br />If not specified, a ServiceAccount will be created with the pooler name. |  |  | MaxLength: 253 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
 
 
 #### PoolerStatus
@@ -1907,6 +2217,10 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `secrets` _[PoolerSecrets](#poolersecrets)_ | The resource version of the config object |  |  |  |
 | `instances` _integer_ | The number of pods trying to be scheduled |  |  |  |
+| `phase` _[PoolerPhase](#poolerphase)_ | Phase summarizes the overall lifecycle state of the Pooler. |  |  | Enum: [active paused inactive failed] <br /> |
+| `phaseReason` _string_ | PhaseReason is a human-readable explanation of the current Phase. |  |  |  |
+| `image` _string_ | Image is the resolved pgbouncer container image that the operator is<br />using for this Pooler, including any override coming from spec.template.<br />While Phase is Active or Paused this field reflects what the Deployment<br />actually runs; while Phase is Inactive or Failed it may carry the last<br />successfully resolved value (or be empty if the Pooler has never reconciled<br />successfully). |  |  |  |
+| `error` _string_ | Error is the latest admission validation error |  |  |  |
 
 
 #### PoolerType
@@ -1942,7 +2256,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `parameters` _object (keys:string, values:string)_ | PostgreSQL configuration options (postgresql.conf) |  |  |  |
 | `synchronous` _[SynchronousReplicaConfiguration](#synchronousreplicaconfiguration)_ | Configuration of the PostgreSQL synchronous replication feature |  |  |  |
-| `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file) |  |  |  |
+| `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file).<br />Use the $\{podselector:NAME\} syntax to reference a pod selector;<br />the rule will be expanded for each Pod IP matching that selector. |  |  |  |
 | `pg_ident` _string array_ | PostgreSQL User Name Maps rules (lines to be appended<br />to the pg_ident.conf file) |  |  |  |
 | `syncReplicaElectionConstraint` _[SyncReplicaElectionConstraints](#syncreplicaelectionconstraints)_ | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be<br />set up. |  |  |  |
 | `shared_preload_libraries` _string array_ | Lists of shared preload libraries to add to the default ones |  |  |  |
@@ -1952,12 +2266,36 @@ _Appears in:_
 | `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | The configuration of the extensions to be added |  |  |  |
 
 
+#### PrimaryLeaseConfiguration
+
+
+
+PrimaryLeaseConfiguration configures the timings of the Kubernetes `Lease`
+that the primary instance holds and renews to coordinate a safe primary
+election. These values map directly onto the underlying Kubernetes
+leader-election parameters.
+
+
+
+_Appears in:_
+
+- [ClusterSpec](#clusterspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `leaseDurationSeconds` _integer_ | How long, in seconds, the primary lease is considered valid before it<br />expires and another instance may acquire it. It must be greater than<br />`renewDeadlineSeconds`.<br />Defaults to 15. |  | 15 | Minimum: 1 <br /> |
+| `renewDeadlineSeconds` _integer_ | How long, in seconds, the current primary keeps retrying to renew the<br />lease before giving up and stopping. It must be smaller than<br />`leaseDurationSeconds`.<br />Defaults to 10. |  | 10 | Minimum: 1 <br /> |
+| `retryPeriodSeconds` _integer_ | How frequently, in seconds, a non-holder instance retries acquiring or<br />renewing the lease.<br />Defaults to 2. |  | 2 | Minimum: 1 <br /> |
+| `releasedLeaseDurationSeconds` _integer_ | The TTL, in seconds, written when the primary explicitly releases the<br />lease on a clean shutdown, allowing a replica to promote without waiting<br />for the full lease duration to expire.<br />Defaults to 1. |  | 1 | Minimum: 1 <br /> |
+
+
 #### PrimaryUpdateMethod
 
 _Underlying type:_ _string_
 
-PrimaryUpdateMethod contains the method to use when upgrading
-the primary server of the cluster as part of rolling updates
+PrimaryUpdateMethod defines the method to use when upgrading
+the primary instance of the cluster as part of rolling updates.
+The default method is "restart"
 
 
 
@@ -2232,7 +2570,7 @@ _Appears in:_
 | `targetXID` _string_ | The target transaction ID |  |  |  |
 | `targetName` _string_ | The target name (to be previously created<br />with `pg_create_restore_point`) |  |  |  |
 | `targetLSN` _string_ | The target LSN (Log Sequence Number) |  |  |  |
-| `targetTime` _string_ | The target time as a timestamp in the RFC3339 standard |  |  |  |
+| `targetTime` _string_ | The target time as a timestamp in RFC3339 format or PostgreSQL timestamp format.<br />Timestamps without an explicit timezone are interpreted as UTC. |  |  |  |
 | `targetImmediate` _boolean_ | End recovery as soon as a consistent state is reached |  |  |  |
 | `exclusive` _boolean_ | Set the target to be exclusive. If omitted, defaults to false, so that<br />in Postgres, `recovery_target_inclusive` will be true |  |  |  |
 
@@ -2321,6 +2659,7 @@ Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 
 _Appears in:_
 
+- [DatabaseRoleSpec](#databaserolespec)
 - [ManagedConfiguration](#managedconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -2328,11 +2667,11 @@ _Appears in:_
 | `name` _string_ | Name of the role | True |  |  |
 | `comment` _string_ | Description of the role |  |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Ensure the role is `present` or `absent` - defaults to "present" |  | present | Enum: [present absent] <br /> |
-| `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present)<br />If null, the password will be ignored unless DisablePassword is set |  |  |  |
+| `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present).<br />If null, the password will be ignored unless DisablePassword is set.<br />When set, the secret must follow the `kubernetes.io/basic-auth` format<br />and contain both a `username` and a `password` field. |  |  |  |
 | `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
 | `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
-| `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty. |  |  |  |
-| `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Defaults is `true`. |  | true |  |
+| `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty.<br />Changes to the list are applied to an existing role through<br />`GRANT` and `REVOKE` statements, not only at role creation. |  |  |  |
+| `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Default is `true`. |  | true |  |
 | `disablePassword` _boolean_ | DisablePassword indicates that a role's password should be set to NULL in Postgres |  |  |  |
 | `superuser` _boolean_ | Whether the role is a `superuser` who can override all access<br />restrictions within the database - superuser status is dangerous and<br />should be used only when really needed. You must yourself be a<br />superuser to create a new superuser. Defaults is `false`. |  |  |  |
 | `createdb` _boolean_ | When set to `true`, the role being defined will be allowed to create<br />new databases. Specifying `false` (default) will deny a role the<br />ability to create databases. |  |  |  |
@@ -2448,6 +2787,7 @@ _Appears in:_
 | `lastCheckTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | The latest time the schedule |  |  |  |
 | `lastScheduleTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Information when was the last time that backup was successfully scheduled. |  |  |  |
 | `nextScheduleTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Next time we will run a backup |  |  |  |
+| `error` _string_ | Error is the latest admission validation error |  |  |  |
 
 
 #### SchemaSpec

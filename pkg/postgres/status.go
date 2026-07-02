@@ -89,13 +89,19 @@ type PostgresqlStatus struct {
 	InstanceManagerVersion     string `json:"instanceManagerVersion"`
 	InstanceArch               string `json:"instanceArch"`
 	IsInstanceManagerUpgrading bool   `json:"isInstanceManagerUpgrading"`
+	// SessionID is a unique identifier generated at instance manager startup.
+	// This ID changes on every instance manager restart (including container reboots),
+	// allowing detection of restarts that don't change the container ID or executable hash.
+	SessionID string `json:"sessionID"`
 
-	// This field represents the Kubelet point-of-view of the readiness
-	// status of this instance and may be slightly stale when the Kubelet has
-	// not still invoked the readiness probe.
+	// IsPodReady mirrors the Pod's PodReady condition, as set by the kubelet
+	// while the node is healthy and by the node lifecycle controller once the
+	// node stops reporting. It is a readiness signal driven by the readiness
+	// probe plus any readiness gates, so it may be briefly stale compared to
+	// the actual PostgreSQL state.
 	//
-	// If you want to check the latest detected status of PostgreSQL, you
-	// need to call HasHTTPStatus().
+	// For the latest PostgreSQL health as seen by the instance manager, use
+	// HasHTTPStatus() instead.
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
@@ -346,6 +352,28 @@ func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
 	}
 
 	return false
+}
+
+// IsPodReadyAndNotReporting returns true if the pod with the given name is
+// marked as ready by the kubelet but is not successfully reporting its status
+// via the /pg/status endpoint. This indicates a likely transient failure
+// (e.g. a network hiccup between the operator and the pod) rather than a
+// genuine PostgreSQL health problem. The second return value is the
+// underlying /pg/status error, meaningful only when the boolean is true.
+//
+// "Not reporting" is the negation of IsPodReporting: the /pg/status call
+// against the pod returned an error.
+func (list PostgresqlStatusList) IsPodReadyAndNotReporting(podname string) (bool, error) {
+	for _, item := range list.Items {
+		if item.Pod.Name == podname {
+			if item.IsPodReady && item.Error != nil {
+				return true, item.Error
+			}
+			return false, nil
+		}
+	}
+
+	return false, nil
 }
 
 // IsComplete checks the PostgreSQL status list for Pods which

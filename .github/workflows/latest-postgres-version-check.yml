@@ -19,10 +19,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: 3.14
 
@@ -78,7 +78,7 @@ jobs:
         if: |
           env.LATEST_POSTGRES_VERSION_IMAGE != env.CURRENT_POSTGRES_VERSION_IMAGE &&
           github.ref == 'refs/heads/main'
-        uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725 # v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           title: "feat: update default PostgreSQL version to ${{ env.LATEST_POSTGRES_VERSION }}"
@@ -92,7 +92,7 @@ jobs:
         if: |
           env.LATEST_POSTGRES_VERSION_IMAGE == env.CURRENT_POSTGRES_VERSION_IMAGE &&
           github.ref == 'refs/heads/main'
-        uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725 # v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           title: "test: Updated Postgres versions used in E2E tests"

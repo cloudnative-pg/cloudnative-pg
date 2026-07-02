@@ -25,13 +25,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -53,6 +54,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -65,17 +67,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-var (
-	scheme = runtime.NewScheme()
-
-	// errNoFreeWALSpace is returned when there isn't enough disk space
-	// available to store at least two WAL files.
-	errNoFreeWALSpace = fmt.Errorf("no free disk space for WALs")
-
-	// errWALArchivePluginNotAvailable is returned when the configured
-	// WAL archiving plugin is not available or cannot be found.
-	errWALArchivePluginNotAvailable = fmt.Errorf("WAL archive plugin not available")
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -127,11 +119,8 @@ func NewCmd() *cobra.Command {
 				return runSubCommand(ctx, instance, pprofHTTPServer, skipNameValidation)
 			})
 
-			if errors.Is(err, errNoFreeWALSpace) {
+			if errors.Is(err, postgres.ErrNoFreeWALSpace) {
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
-			}
-			if errors.Is(err, errWALArchivePluginNotAvailable) {
-				os.Exit(apiv1.MissingWALArchivePlugin)
 			}
 
 			return err
@@ -165,7 +154,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand( //nolint:gocognit,gocyclo
+func runSubCommand( //nolint: gocyclo,gocognit
 	ctx context.Context,
 	instance *postgres.Instance,
 	pprofServer bool,
@@ -179,16 +168,15 @@ func runSubCommand( //nolint:gocognit,gocyclo
 		"build", versions.Info,
 		"skipNameValidation", skipNameValidation)
 
-	contextLogger.Info("Checking for free disk space for WALs before starting PostgreSQL")
-	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
+	restConfig := config.GetConfigOrDie()
+
+	kubeClientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		contextLogger.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
-	} else if !hasDiskSpaceForWals {
-		contextLogger.Info("Detected low-disk space condition, avoid starting the instance")
-		return errNoFreeWALSpace
+		contextLogger.Error(err, "unable to create kubernetes clientset")
+		return err
 	}
 
-	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{
 			ByObject: map[client.Object]cache.ByObject{
@@ -209,6 +197,11 @@ func runSubCommand( //nolint:gocognit,gocyclo
 					},
 				},
 				&apiv1.Subscription{}: {
+					Namespaces: map[string]cache.Config{
+						instance.GetNamespaceName(): {},
+					},
+				},
+				&apiv1.DatabaseRole{}: {
 					Namespaces: map[string]cache.Config{
 						instance.GetNamespaceName(): {},
 					},
@@ -251,17 +244,25 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	postgresStartConditions := concurrency.MultipleExecuted{}
 	exitedConditions := concurrency.MultipleExecuted{}
 
-	var loadedPluginNames []string
 	pluginRepository := repository.New()
-	if loadedPluginNames, err = pluginRepository.RegisterUnixSocketPluginsInPath(
+	if _, err = pluginRepository.RegisterUnixSocketPluginsInPath(
 		configuration.Current.PluginSocketDir,
 	); err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
 	defer pluginRepository.Close()
 
+	leaseRunnable := lease.New(kubeClientset, instance)
+
 	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
-	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter, pluginRepository)
+	reconciler := controller.NewInstanceReconciler(
+		instance,
+		mgr.GetClient(),
+		metricsExporter,
+		pluginRepository,
+		leaseRunnable,
+		webhookv1.NewClusterAdmissionGuard(),
+	)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
 		Named("instance-cluster").
@@ -273,7 +274,11 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
 
 	// database reconciler
-	dbReconciler := controller.NewDatabaseReconciler(mgr, instance)
+	dbReconciler := controller.NewDatabaseReconciler(
+		mgr,
+		instance,
+		webhookv1.NewDatabaseAdmissionGuard(),
+	)
 	if err := dbReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create database controller")
 		return err
@@ -290,6 +295,13 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	subscriptionReconciler := controller.NewSubscriptionReconciler(mgr, instance)
 	if err := subscriptionReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create subscription controller")
+		return err
+	}
+
+	// role reconciler
+	roleReconciler := controller.NewDatabaseRoleReconciler(mgr, instance)
+	if err := roleReconciler.SetupWithManager(mgr); err != nil {
+		contextLogger.Error(err, "unable to create role controller")
 		return err
 	}
 
@@ -357,6 +369,20 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	// which will imply the deletion of the child onlineUpgradeCtx too, again, terminating all the Runnables.
 	onlineUpgradeCtx, onlineUpgradeCancelFunc := context.WithCancel(postgresLifecycleManager.GetGlobalContext())
 	defer onlineUpgradeCancelFunc()
+
+	if err = mgr.Add(leaseRunnable); err != nil {
+		contextLogger.Error(err, "unable to add primary lease runnable")
+		return err
+	}
+	defer func() {
+		// The run context is already cancelled when this defer fires, so we use
+		// context.Background(). We deliberately avoid a timeout: abandoning the
+		// release would force replicas to wait out the full lease TTL before promoting.
+		if releaseErr := leaseRunnable.Release(context.Background()); releaseErr != nil {
+			contextLogger.Error(releaseErr, "failed to release primary lease")
+		}
+	}()
+
 	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
 	if err != nil {
 		contextLogger.Error(err, "unable to create remote webserver runnable")
@@ -370,7 +396,7 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	localSrv, err := webserver.NewLocalWebServer(
 		instance,
 		mgr.GetClient(),
-		mgr.GetEventRecorderFor("local-webserver"),
+		mgr.GetEventRecorderFor("local-webserver"), //nolint:staticcheck
 	)
 	if err != nil {
 		contextLogger.Error(err, "unable to create local webserver runnable")
@@ -408,27 +434,24 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	contextLogger.Info("starting controller-runtime manager")
 	if err := mgr.Start(onlineUpgradeCtx); err != nil {
 		contextLogger.Error(err, "unable to run controller-runtime manager")
+		if errors.Is(err, postgres.ErrNoFreeWALSpace) {
+			return makeUnretryableError(postgres.ErrNoFreeWALSpace)
+		}
+		if hasSpace, checkErr := instance.CheckHasDiskSpaceForWAL(ctx); checkErr == nil && !hasSpace {
+			contextLogger.Warning("Detected low WAL disk space, but the manager error is not WAL-space related",
+				"originalError", err)
+			return makeUnretryableError(fmt.Errorf("%w: %w", postgres.ErrNoFreeWALSpace, err))
+		}
 		return makeUnretryableError(err)
 	}
 
 	contextLogger.Info("Checking for free disk space for WALs after PostgreSQL finished")
-	hasDiskSpaceForWals, err = instance.CheckHasDiskSpaceForWAL(ctx)
+	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
 	} else if !hasDiskSpaceForWals {
 		contextLogger.Info("Detected low-disk space condition")
-		return makeUnretryableError(errNoFreeWALSpace)
-	}
-
-	if instance.Cluster != nil {
-		enabledArchiverPluginName := instance.Cluster.GetEnabledWALArchivePluginName()
-		if enabledArchiverPluginName != "" && !slices.Contains(loadedPluginNames, enabledArchiverPluginName) {
-			contextLogger.Info(
-				"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",
-				"enabledArchiverPluginName", enabledArchiverPluginName,
-				"loadedPluginNames", loadedPluginNames)
-			return makeUnretryableError(errWALArchivePluginNotAvailable)
-		}
+		return makeUnretryableError(postgres.ErrNoFreeWALSpace)
 	}
 
 	return nil

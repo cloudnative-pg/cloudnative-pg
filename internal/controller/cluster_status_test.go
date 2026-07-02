@@ -21,11 +21,13 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 
@@ -33,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -175,6 +178,36 @@ var _ = Describe("cluster_status unit tests", func() {
 					len(mr.pvcs.Items) == len(pvcs)
 			}))
 		})
+	})
+
+	It("produces a scale-subresource selector matching managed instance pods", func() {
+		// updateResourceStatus publishes cluster.GetInstancesSelector() into
+		// .status.selector so VPA/HPA can discover instance pods through the scale
+		// subresource. We exercise the production code (GetInstancesSelector) and
+		// verify both that it has the expected format and that it actually matches
+		// the labels the operator applies to every instance pod.
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pods := generateFakeClusterPods(env.client, cluster, true)
+		Expect(pods).ToNot(BeEmpty())
+
+		selectorString := cluster.GetInstancesSelector()
+
+		// GetInstancesSelector serializes through labels.SelectorFromSet, which
+		// sorts requirements by key. The cluster label key sorts before the pod
+		// role label key, so the expected string lists them in that order.
+		expected := fmt.Sprintf("%s=%s,%s=%s",
+			utils.ClusterLabelName, cluster.Name,
+			utils.PodRoleLabelName, string(utils.PodRoleInstance))
+		Expect(selectorString).To(Equal(expected))
+
+		selector, err := labels.Parse(selectorString)
+		Expect(err).ToNot(HaveOccurred())
+
+		for i := range pods {
+			Expect(selector.Matches(labels.Set(pods[i].Labels))).To(BeTrue(),
+				"selector %q must match pod %s labels %v", selectorString, pods[i].Name, pods[i].Labels)
+		}
 	})
 })
 
@@ -386,5 +419,136 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(state2.IsPrimary).To(BeFalse())
 		Expect(state2.TimeLineID).To(Equal(123))
 		Expect(state2.IP).To(Equal("192.168.1.2"))
+	})
+
+	Context("Pod termination reason detection", func() {
+		It("should detect when a pod has no PostgreSQL container", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Name: "other-container"},
+					},
+				},
+			}
+
+			// When no postgres container exists, hasPostgresContainerTerminationReason returns false
+			result := hasPostgresContainerTerminationReason(pod, func(state *corev1.ContainerState) bool {
+				return state.Terminated != nil
+			})
+			Expect(result).To(BeFalse())
+		})
+
+		It("should detect termination with specific exit code in current state", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: apiv1.MissingWALDiskSpaceExitCode,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			result := hasPostgresContainerTerminationReason(pod, func(state *corev1.ContainerState) bool {
+				return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
+			})
+			Expect(result).To(BeTrue())
+		})
+
+		It("should return false when termination reason does not match", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 1, // Different exit code
+								},
+							},
+						},
+					},
+				},
+			}
+
+			result := hasPostgresContainerTerminationReason(pod, func(state *corev1.ContainerState) bool {
+				return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
+			})
+			Expect(result).To(BeFalse())
+		})
+
+		It("should return false when container is ready despite last termination", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+							Ready: true,
+							LastTerminationState: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: apiv1.MissingWALDiskSpaceExitCode,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			result := hasPostgresContainerTerminationReason(pod, func(state *corev1.ContainerState) bool {
+				return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
+			})
+			Expect(result).To(BeFalse())
+		})
+
+		It("isWALSpaceAvailableOnPod should return true when space is available", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+							Ready: true,
+						},
+					},
+				},
+			}
+
+			Expect(isWALSpaceAvailableOnPod(pod)).To(BeTrue())
+		})
+
+		It("isWALSpaceAvailableOnPod should return false when terminated due to missing disk space", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: apiv1.MissingWALDiskSpaceExitCode,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			Expect(isWALSpaceAvailableOnPod(pod)).To(BeFalse())
+		})
 	})
 })

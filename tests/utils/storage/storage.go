@@ -28,6 +28,8 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -175,4 +177,87 @@ func GetSnapshotList(
 	err := crudClient.List(ctx, list, client.InNamespace(namespace))
 
 	return list, err
+}
+
+const (
+	// IsDefaultClassAnnotation is the annotation used to mark the default StorageClass
+	IsDefaultClassAnnotation = "storageclass.kubernetes.io/is-default-class"
+
+	// DefaultSnapshotClassAnnotation is the annotation on a StorageClass that
+	// names the associated VolumeSnapshotClass for CSI snapshots
+	DefaultSnapshotClassAnnotation = "storage.kubernetes.io/default-snapshot-class"
+)
+
+// GetDefaultStorageClassName returns the name of the cluster's default
+// StorageClass (annotated with is-default-class=true). It returns an error
+// if zero or more than one default is found.
+func GetDefaultStorageClassName(ctx context.Context, iface kubernetes.Interface) (string, error) {
+	scList, err := iface.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("listing storage classes: %w", err)
+	}
+
+	var matches []string
+	for i := range scList.Items {
+		if scList.Items[i].Annotations[IsDefaultClassAnnotation] == "true" {
+			matches = append(matches, scList.Items[i].Name)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("no default storage class found in the cluster")
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("multiple default storage classes found: %v", matches)
+	}
+}
+
+// GetCSIStorageClassName returns the name of the StorageClass annotated with
+// the default-snapshot-class annotation. It returns an empty string (no error)
+// if no such StorageClass exists, and an error if more than one is found.
+func GetCSIStorageClassName(ctx context.Context, iface kubernetes.Interface) (string, error) {
+	scList, err := iface.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("listing storage classes: %w", err)
+	}
+
+	var matches []string
+	for i := range scList.Items {
+		if scList.Items[i].Annotations[DefaultSnapshotClassAnnotation] != "" {
+			matches = append(matches, scList.Items[i].Name)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return "", nil
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("multiple storage classes with %s annotation: %v",
+			DefaultSnapshotClassAnnotation, matches)
+	}
+}
+
+// GetDefaultVolumeSnapshotClassName returns the value of the
+// default-snapshot-class annotation from the named StorageClass. It returns
+// an empty string (no error) if csiStorageClass is empty or the annotation
+// is absent.
+func GetDefaultVolumeSnapshotClassName(
+	ctx context.Context,
+	iface kubernetes.Interface,
+	csiStorageClass string,
+) (string, error) {
+	if csiStorageClass == "" {
+		return "", nil
+	}
+
+	sc, err := iface.StorageV1().StorageClasses().Get(ctx, csiStorageClass, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("getting storage class %q: %w", csiStorageClass, err)
+	}
+
+	return sc.Annotations[DefaultSnapshotClassAnnotation], nil
 }

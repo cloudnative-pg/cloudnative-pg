@@ -40,10 +40,10 @@ spec:
     barmanObjectStore:
       serverName: ${SERVER_NAME}
       destinationPath: s3://cluster-full-backup/
-      endpointURL: https://minio-service.minio:9000
+      endpointURL: https://object-store.object-store:9000
       endpointCA:
         key: ca.crt
-        name: minio-server-ca-secret
+        name: object-store-ca-secret
       s3Credentials:
         accessKeyId:
           name: aws-creds
@@ -72,6 +72,12 @@ spec:
   nodeMaintenanceWindow:
     inProgress: false
     reusePVC: false
+
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
   storage:
     size: 1Gi

@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	"github.com/kballard/go-shellquote"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -63,6 +64,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+const maxConnectionsParameter = "max_connections"
+
 var (
 	// ErrInstanceInRecovery is raised while PostgreSQL is still in recovery mode
 	ErrInstanceInRecovery = fmt.Errorf("instance in recovery")
@@ -77,7 +80,7 @@ var (
 	}
 
 	pgControldataSettingsToParamsMap = map[string]string{
-		"max_connections setting":      "max_connections",
+		"max_connections setting":      maxConnectionsParameter,
 		"max_wal_senders setting":      "max_wal_senders",
 		"max_worker_processes setting": "max_worker_processes",
 		"max_prepared_xacts setting":   "max_prepared_transactions",
@@ -86,7 +89,6 @@ var (
 )
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
-// nolint:gocognit,gocyclo
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, immediate bool) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -146,19 +148,25 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	}
 
 	var envs []string
+	// Operator-controlled command: LogPath and LogFileName are operator
+	// constants, so no shell-quoting layer is needed here. The config-file
+	// literal escaping is still applied for consistency with the WAL-restore
+	// path in getRestoreWalConfig.
 	restoreCmd := fmt.Sprintf(
 		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 		postgresSpec.LogPath, postgresSpec.LogFileName)
-	config := fmt.Sprintf(
-		"recovery_target_action = promote\n"+
-			"restore_command = '%s'\n",
-		restoreCmd)
+	config := configfile.RenderPostgresConfiguration(map[string]string{
+		"recovery_target_action": "promote",
+		"restore_command":        restoreCmd,
+	})
 
-	// nolint:nestif
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration == nil {
-		envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster)
-		if err != nil {
-			return err
+		server, found := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
+		if found && server.BarmanObjectStore != nil {
+			envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster, &server)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -177,13 +185,6 @@ func (info InitInfo) concludeRestore(
 	envs []string,
 ) error {
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
-		return err
-	}
-	// we need a migration here, otherwise the server will not start up if
-	// we recover from a base which has postgresql.auto.conf
-	// the override.conf and include statement is present, what we need to do is to
-	// migrate the content
-	if _, err := info.GetInstance(cluster).migratePostgresAutoConfFile(ctx); err != nil {
 		return err
 	}
 
@@ -227,20 +228,12 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
+	server *apiv1.ExternalCluster,
 ) ([]string, string, error) {
 	contextLogger := log.FromContext(ctx)
-	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
-	if sourceName == "" {
-		return nil, "", fmt.Errorf("recovery source not specified")
-	}
+	contextLogger.Info("Recovering from external cluster", "sourceName", server.Name)
 
-	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
-
-	server, found := cluster.ExternalCluster(sourceName)
-	if !found {
-		return nil, "", fmt.Errorf("missing external cluster: %v", sourceName)
-	}
 	serverName := server.GetServerName()
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
@@ -295,7 +288,7 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 	var envs []string
 	var config string
 
-	// nolint:nestif
+	//nolint:nestif
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
 		contextLogger.Info("Restore through plugin detected, proceeding...")
 		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
@@ -367,7 +360,7 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 
 	defer func() {
 		if err := fileutils.RemoveFile(testWALPath); err != nil {
-			contextLogger.Error(err, "while deleting the temporary wal file: %w")
+			contextLogger.Error(err, "while deleting the temporary wal file")
 		}
 	}()
 
@@ -653,12 +646,10 @@ func getRestoreWalConfig(ctx context.Context, backup *apiv1.Backup) (string, err
 
 	cmd = append(cmd, "%f", "%p")
 
-	recoveryFileContents := fmt.Sprintf(
-		"recovery_target_action = promote\n"+
-			"restore_command = '%s'\n",
-		strings.Join(cmd, " "))
-
-	return recoveryFileContents, nil
+	return configfile.RenderPostgresConfiguration(map[string]string{
+		"recovery_target_action": "promote",
+		"restore_command":        shellquote.Join(cmd...),
+	}), nil
 }
 
 func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {

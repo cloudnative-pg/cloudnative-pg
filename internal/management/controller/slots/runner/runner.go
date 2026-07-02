@@ -147,7 +147,8 @@ func (sr *Replicator) reconcile(ctx context.Context, config *apiv1.ReplicationSl
 }
 
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary
-// nolint: gocognit
+//
+//nolint:gocognit
 func synchronizeReplicationSlots(
 	ctx context.Context,
 	primaryDB *sql.DB,

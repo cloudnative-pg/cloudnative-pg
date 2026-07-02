@@ -1,5 +1,5 @@
 # Move/add to $XDG_CONFIG_HOME/k9s/plugins.yaml
-# Requires the cnpg kubectl plugin. See https://cloudnative-pg.io/documentation/current/kubectl-plugin/
+# Requires the cnpg kubectl plugin. See https://cloudnative-pg.io/docs/devel/kubectl-plugin/
 #
 # Cluster actions:
 #   b         Request a new physical backup

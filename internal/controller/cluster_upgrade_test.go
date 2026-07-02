@@ -22,16 +22,23 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -94,8 +101,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(BeEquivalentTo("the instance is using a different image: postgres:13.10 -> postgres:13.11"))
-		Expect(rollout.needsChangeOperandImage).To(BeTrue())
-		Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperandImage).To(BeTrue())
+		Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 	})
 
 	It("requires rollout when a restart annotation has been added to the cluster", func(ctx SpecContext) {
@@ -115,8 +122,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(Equal("cluster has been explicitly restarted via annotation"))
 		Expect(rollout.canBeInPlace).To(BeFalse())
-		Expect(rollout.needsChangeOperandImage).To(BeFalse())
-		Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 
 		rollout = isInstanceNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeFalse())
@@ -177,8 +184,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		rollout = isInstanceNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(Equal("Postgres needs a restart to apply some configuration changes"))
-		Expect(rollout.needsChangeOperandImage).To(BeFalse())
-		Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 	})
 
 	It("requires pod rollout if executable does not have a hash", func(ctx SpecContext) {
@@ -193,8 +200,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(Equal("pod 'test-1' is not reporting the executable hash"))
 		Expect(rollout.canBeInPlace).To(BeFalse())
-		Expect(rollout.needsChangeOperandImage).To(BeFalse())
-		Expect(rollout.needsChangeOperatorImage).To(BeTrue())
+		Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperatorImage).To(BeTrue())
 	})
 
 	It("checkPodSpecIsOutdated should not return any error", func() {
@@ -229,8 +236,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(BeEquivalentTo("Postgres needs a restart to apply some configuration changes"))
 		Expect(rollout.canBeInPlace).To(BeTrue())
-		Expect(rollout.needsChangeOperandImage).To(BeFalse())
-		Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 	})
 
 	When("the PodSpec annotation is not available", func() {
@@ -250,8 +257,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			rollout := isInstanceNeedingRollout(ctx, status, &cluster)
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(ContainSubstring("scheduler name changed"))
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 	})
 
@@ -275,8 +282,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(ContainSubstring("scheduler-name"))
-		Expect(rollout.needsChangeOperandImage).To(BeFalse())
-		Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+		Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 	})
 
 	When("cluster has resources specified", func() {
@@ -313,8 +320,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
 			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
 			pod, err := specs.NewInstance(context.TODO(), clusterWithResources, 1, true)
@@ -332,8 +339,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
 			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 	})
 
@@ -360,8 +367,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(Equal("environment variable configuration hash changed"))
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
@@ -412,8 +419,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			rollout := isInstanceNeedingRollout(ctx, status, &cluster)
 			Expect(rollout.reason).To(ContainSubstring("the instance is using an old bootstrap container image"))
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeTrue())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeTrue())
 		})
 	})
 
@@ -440,8 +447,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
 			Expect(rollout.reason).To(ContainSubstring("container postgres differs in environment"))
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
@@ -490,8 +497,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			rollout := isInstanceNeedingRollout(ctx, status, &cluster)
 			Expect(rollout.reason).To(ContainSubstring("the instance is using an old bootstrap container image"))
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeTrue())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeTrue())
 		})
 	})
 
@@ -597,8 +604,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should require rollout when the LabelSelector maps are different", func(ctx SpecContext) {
@@ -614,8 +621,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should require rollout when TopologySpreadConstraints is nil in one of the objects", func(ctx SpecContext) {
@@ -629,8 +636,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should not require rollout if pod and spec both lack TopologySpreadConstraints", func(ctx SpecContext) {
@@ -648,8 +655,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(BeEmpty())
 			Expect(rollout.required).To(BeFalse())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 	})
 
@@ -663,8 +670,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(BeEmpty())
 			Expect(rollout.required).To(BeFalse())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should require rollout when the cluster and pod do not have "+
@@ -680,8 +687,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should require rollout when the LabelSelector maps are different", func(ctx SpecContext) {
@@ -699,8 +706,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should require rollout when TopologySpreadConstraints is nil in one of the objects", func(ctx SpecContext) {
@@ -716,8 +723,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 
 		It("should not require rollout if pod and spec both lack TopologySpreadConstraints", func(ctx SpecContext) {
@@ -734,8 +741,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isInstanceNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(BeEmpty())
 			Expect(rollout.required).To(BeFalse())
-			Expect(rollout.needsChangeOperandImage).To(BeFalse())
-			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperandImage).To(BeFalse())
+			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 	})
 })
@@ -812,6 +819,122 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 		Expect(rollout.required).To(BeFalse())
 		Expect(rollout.canBeInPlace).To(BeFalse())
 		Expect(rollout.reason).To(BeEmpty())
+	})
+})
+
+var _ = Describe("isConfigNonUniformityFromUpgrade", func() {
+	const (
+		oldOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:1.27.0"
+		newOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:1.27.1"
+		oldExecHash      = "exec-old"
+		newExecHash      = "exec-new"
+	)
+
+	makeStatus := func(
+		name, image, execHash, configHash string,
+	) postgres.PostgresqlStatus {
+		return postgres.PostgresqlStatus{
+			Pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name:  specs.BootstrapControllerContainerName,
+							Image: image,
+						},
+					},
+				},
+			},
+			ExecutableHash:          execHash,
+			LoadedConfigurationHash: configHash,
+		}
+	}
+
+	// Positive cases: deadlock detected, bypass should trigger
+
+	It("rolling update with uniform groups", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", newOperatorImage, newExecHash, "hash-new"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-old"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-old"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeTrue())
+	})
+
+	It("in-place upgrade with uniform groups", func() {
+		// Same bootstrap image but different executable hashes from binary replacement
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", oldOperatorImage, newExecHash, "hash-new"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-old"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-old"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeTrue())
+	})
+
+	// Negative cases: not a deadlock, should keep waiting
+
+	It("same version, config still propagating", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", oldOperatorImage, oldExecHash, "hash-a"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-b"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-a"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("config propagation within old-version group during upgrade", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", newOperatorImage, newExecHash, "hash-new"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-old-a"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-old-b"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("config propagation within new-version group during upgrade", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", newOperatorImage, newExecHash, "hash-new-stale"),
+				makeStatus("pod-2", newOperatorImage, newExecHash, "hash-new-current"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-old"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	// Edge cases
+
+	It("empty status list", func() {
+		statusList := postgres.PostgresqlStatusList{}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("single pod", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", oldOperatorImage, oldExecHash, "hash-a"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("nil Pod and empty config hash are skipped", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: nil, LoadedConfigurationHash: "hash-a"},
+				{LoadedConfigurationHash: ""},
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-a"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
 	})
 })
 
@@ -917,5 +1040,253 @@ var _ = Describe("checkPodSpec with plugins", Ordered, func() {
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(Equal(
 			"original and target PodSpec differ in containers: container postgres differs in environment"))
+	})
+})
+
+var _ = Describe("Supervised primary update strategy and rollout slots", func() {
+	const namespace = "supervised-test"
+
+	var (
+		reconciler *ClusterReconciler
+		rm         *rolloutManager.Manager
+		k8sClient  k8client.Client
+	)
+
+	BeforeEach(func() {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		k8sClient = fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.Cluster{}).
+			Build()
+
+		// Create namespace
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespace},
+		}
+		Expect(k8sClient.Create(context.Background(), ns)).To(Succeed())
+
+		// Rollout manager with a large cluster delay so we can detect slot consumption
+		rm = rolloutManager.New(time.Hour, 0)
+
+		reconciler = &ClusterReconciler{
+			Client:         k8sClient,
+			Scheme:         scheme,
+			Recorder:       record.NewFakeRecorder(120),
+			rolloutManager: rm,
+		}
+
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	// Helper to create a cluster in the fake client with the given primary update strategy
+	createCluster := func(strategy apiv1.PrimaryUpdateStrategy) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: namespace,
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances:             1,
+				ImageName:             "postgres:16.0",
+				PrimaryUpdateStrategy: strategy,
+				PrimaryUpdateMethod:   apiv1.PrimaryUpdateMethodRestart,
+				StorageConfiguration:  apiv1.StorageConfiguration{Size: "1Gi"},
+			},
+		}
+		cluster.SetDefaults()
+		// Set status fields after SetDefaults() since it may clear them
+		cluster.Status.CurrentPrimary = "test-cluster-1"
+		cluster.Status.Image = "postgres:16.1"
+		cluster.Status.Instances = 1
+		Expect(k8sClient.Create(context.Background(), cluster)).To(Succeed())
+		Expect(k8sClient.Status().Update(context.Background(), cluster)).To(Succeed())
+		return cluster
+	}
+
+	// Helper to build a pod status list where the primary needs rollout (image mismatch)
+	buildPodListWithPrimaryNeedingRollout := func(cluster *apiv1.Cluster) *postgres.PostgresqlStatusList {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Status.CurrentPrimary,
+				Namespace: cluster.Namespace,
+				Annotations: map[string]string{
+					utils.ClusterSerialAnnotationName: "1",
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "postgres",
+						Image: "postgres:16.0", // Different from cluster.Status.Image (16.1) -> triggers rollout
+					},
+				},
+			},
+		}
+		return &postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:            pod,
+					IsPodReady:     true,
+					ExecutableHash: "test_hash",
+				},
+			},
+		}
+	}
+
+	It("supervised cluster does NOT consume a rollout slot", func(ctx SpecContext) {
+		cluster := createCluster(apiv1.PrimaryUpdateStrategySupervised)
+		podList := buildPodListWithPrimaryNeedingRollout(cluster)
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
+
+		// Verify the rollout slot was NOT consumed: a second cluster should still be allowed
+		secondCluster := k8client.ObjectKey{Namespace: namespace, Name: "other-cluster"}
+		result := rm.CoordinateRollout(secondCluster, "other-pod")
+		Expect(result.RolloutAllowed).To(BeTrue(),
+			"supervised strategy should not consume the rollout slot")
+	})
+
+	It("supervised cluster returns true and sets PhaseWaitingForUser", func(ctx SpecContext) {
+		cluster := createCluster(apiv1.PrimaryUpdateStrategySupervised)
+		podList := buildPodListWithPrimaryNeedingRollout(cluster)
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
+
+		// Re-fetch the cluster to see the updated status
+		var updatedCluster apiv1.Cluster
+		Expect(k8sClient.Get(ctx,
+			k8client.ObjectKeyFromObject(cluster),
+			&updatedCluster)).To(Succeed())
+		Expect(updatedCluster.Status.Phase).To(Equal(apiv1.PhaseWaitingForUser))
+	})
+
+	It("unsupervised cluster DOES consume a rollout slot", func(ctx SpecContext) {
+		cluster := createCluster(apiv1.PrimaryUpdateStrategyUnsupervised)
+		podList := buildPodListWithPrimaryNeedingRollout(cluster)
+
+		// Create the pod in the fake client so upgradePod (Delete) can find it
+		pod := podList.Items[0].Pod.DeepCopy()
+		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
+
+		// Verify the rollout slot WAS consumed: a second cluster should be blocked
+		secondCluster := k8client.ObjectKey{Namespace: namespace, Name: "other-cluster"}
+		result := rm.CoordinateRollout(secondCluster, "other-pod")
+		Expect(result.RolloutAllowed).To(BeFalse(),
+			"unsupervised strategy should consume the rollout slot")
+	})
+})
+
+var _ = Describe("archiverSidecarMissingOnPrimary", func() {
+	const sidecarName = "plugin-barman-cloud"
+
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec:       apiv1.ClusterSpec{ImageName: "postgres:17.0"},
+		}
+	})
+
+	// withArchiverSidecar returns a copy of pod with an extra container,
+	// mimicking the sidecar a WAL-archiver plugin injects at evaluation time.
+	// Real plugins (e.g. plugin-barman-cloud) inject it as a native sidecar: an
+	// init container with RestartPolicy=Always.
+	withArchiverSidecar := func(pod *corev1.Pod) *corev1.Pod {
+		out := pod.DeepCopy()
+		out.Spec.InitContainers = append(out.Spec.InitContainers, corev1.Container{
+			Name:          sidecarName,
+			Image:         "plugin-barman-cloud:latest",
+			RestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
+		})
+		return out
+	}
+
+	enableArchiverPlugin := func() {
+		cluster.Spec.Plugins = []apiv1.PluginConfiguration{
+			{
+				Name:          "barman-cloud.cloudnative-pg.io",
+				Enabled:       ptr.To(true),
+				IsWALArchiver: ptr.To(true),
+			},
+		}
+	}
+
+	It("returns false when no WAL-archiver plugin is enabled", func() {
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(archiverSidecarMissingOnPrimary(context.TODO(), pod, &cluster)).To(BeFalse())
+	})
+
+	It("returns true when the primary is missing the injected sidecar", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		// The freshly evaluated spec carries the sidecar, the running primary does not.
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: withArchiverSidecar(pod)})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, pod, &cluster)).To(BeTrue())
+	})
+
+	It("returns false when the primary already has the injected sidecar", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		podWithSidecar := withArchiverSidecar(pod)
+
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: podWithSidecar})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, podWithSidecar, &cluster)).To(BeFalse())
+	})
+
+	It("ignores a missing run-once init container, only native sidecars matter", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		// The evaluated target adds a plain run-once init container (no
+		// RestartPolicy=Always). A missing one of those is not an archiver
+		// sidecar and must not force an in-place recreate.
+		target := pod.DeepCopy()
+		target.Spec.InitContainers = append(target.Spec.InitContainers, corev1.Container{
+			Name:  "some-run-once-init",
+			Image: "init:latest",
+		})
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: target})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, pod, &cluster)).To(BeFalse())
+	})
+
+	It("propagates evaluation errors instead of degrading to a switchover decision", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		evalErr := errors.New("plugin evaluation failed")
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedError: evalErr})
+
+		missing, err := archiverSidecarMissingOnPrimary(ctx, pod, &cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, evalErr)).To(BeTrue(),
+			"the evaluation error must surface so the caller requeues instead of switching over")
+		Expect(missing).To(BeFalse())
 	})
 })

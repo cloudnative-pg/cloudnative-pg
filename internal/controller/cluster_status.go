@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"slices"
 	"sort"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -34,7 +35,6 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -63,6 +63,18 @@ func (resources *managedResources) runningJobNames() []string {
 	result := make([]string, 0, len(resources.jobs.Items))
 	for _, job := range resources.jobs.Items {
 		if !utils.JobHasOneCompletion(job) {
+			result = append(result, job.Name)
+		}
+	}
+	return result
+}
+
+// failedJobNames returns the names of the jobs that have permanently failed,
+// i.e. they have exhausted their backoff limit
+func (resources *managedResources) failedJobNames() []string {
+	result := make([]string, 0, len(resources.jobs.Items))
+	for _, job := range resources.jobs.Items {
+		if utils.JobHasFailed(job) {
 			result = append(result, job.Name)
 		}
 	}
@@ -247,6 +259,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
 	cluster.Status.ReadService = cluster.GetServiceReadName()
 
+	// Expose the label selector for the scale sub-resource so autoscalers
+	// (HPA, VPA) can discover the instance pods managed by this cluster.
+	cluster.Status.Selector = cluster.GetInstancesSelector()
+
 	// If we are switching, check if the target primary is still active
 	// Ignore this check if current primary is empty (it happens during the bootstrap)
 	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary &&
@@ -332,6 +348,22 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	if !cluster.IsReplica() {
 		cluster.Status.DemotionToken = ""
+	}
+
+	if cluster.Status.Instances > 0 {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionInitialized),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.BootstrapCompleted),
+			Message: "Cluster has been bootstrapped",
+		})
+	} else if meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionInitialized)) == nil {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionInitialized),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.BootstrapPending),
+			Message: "Cluster has not been bootstrapped yet",
+		})
 	}
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
@@ -825,16 +857,8 @@ func isWALSpaceAvailableOnPod(pod *corev1.Pod) bool {
 	isTerminatedForMissingWALDiskSpace := func(state *corev1.ContainerState) bool {
 		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
 	}
-	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
-}
-
-// isTerminatedBecauseOfMissingWALArchivePlugin check if a Pod terminated because the
-// WAL archiving plugin was missing when the Pod started
-func isTerminatedBecauseOfMissingWALArchivePlugin(pod *corev1.Pod) bool {
-	isTerminatedForMissingWALDiskSpace := func(state *corev1.ContainerState) bool {
-		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALArchivePlugin
-	}
-	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
+	// Return true if WAL space IS available (i.e., NOT terminated for missing disk space)
+	return !hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
 }
 
 func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *corev1.ContainerState) bool) bool {
@@ -850,21 +874,20 @@ func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *c
 	// This is not an instance Pod as there's no PostgreSQL
 	// container
 	if pgContainerStatus == nil {
+		return false
+	}
+
+	// If the Pod was terminated with the specified reason,
+	// then return true
+	if reason(&pgContainerStatus.State) {
 		return true
 	}
 
-	// If the Pod was terminated because it didn't have enough disk
-	// space, then we have no disk space
-	if reason(&pgContainerStatus.State) {
-		return false
-	}
-
-	// The Pod is now running but not still ready, and last time it
-	// was terminated for missing disk space. Let's wait for it
-	// to be ready before classifying it as having enough disk space
+	// The container is not ready and was last terminated with the specified reason.
+	// Return true to indicate the termination reason was found
 	if !pgContainerStatus.Ready && reason(&pgContainerStatus.LastTerminationState) {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }

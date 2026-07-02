@@ -2,6 +2,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/cloudnative-pg/cloudnative-pg.svg)][latest-release]
 [![GitHub License](https://img.shields.io/github/license/cloudnative-pg/cloudnative-pg)][license]
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9933/badge)][openssf]
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/9933/baseline)][openssf]
 [![OpenSSF Scorecard Badge][openssf-scorecard-badge]][openssf-socrecard-view]
 [![Documentation][documentation-badge]][documentation]
 [![Stack Overflow](https://img.shields.io/badge/stackoverflow-cloudnative--pg-blue?logo=stackoverflow&logoColor=%23F48024&link=https%3A%2F%2Fstackoverflow.com%2Fquestions%2Ftagged%2Fcloudnative-pg)][stackoverflow]
@@ -27,7 +28,7 @@ ongoing maintenance—through its core component, the CloudNativePG operator.
 
 ## Getting Started
 
-The best way to get started is the [Quickstart Guide](https://cloudnative-pg.io/documentation/current/quickstart/).
+The best way to get started is the [Quickstart Guide](https://cloudnative-pg.io/docs/devel/quickstart/).
 
 ## Scope
 
@@ -93,12 +94,14 @@ CloudNativePG can be extended via the [CNPG-I plugin interface](https://github.c
 
 ## Communications
 
-- [Github Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions)
-- [Slack](https://cloud-native.slack.com/archives/C08MAUJ7NPM)
-  (join the [CNCF Slack Workspace](https://communityinviter.com/apps/cloud-native/cncf)).
-- [Twitter](https://twitter.com/CloudNativePg)
-- [Mastodon](https://mastodon.social/@CloudNativePG)
-- [Bluesky](https://bsky.app/profile/cloudnativepg.bsky.social)
+Please refer to the [Getting in touch](https://github.com/cloudnative-pg#getting-in-touch)
+section on the GitHub organization page.
+
+## Community Meetings
+
+Everyone is welcome, no invitation needed. For details, see the
+[Community Meetings](https://github.com/cloudnative-pg#cloudnativepg-community-meetings)
+section on the GitHub organization page.
 
 ## Resources
 
@@ -116,6 +119,9 @@ organization to this list!
 
 ### CloudNativePG at KubeCon
 
+- March 25, 2026, KubeCon Europe 2026 in Amsterdam: ["Cloud Native Theater / Data on Kubernetes Day: From VMs to Kubernetes in a Large Global Bank: A DBA's Journey"](https://kccnceu2026.sched.com/event/2EG01/cloud-native-theater-data-on-kubernetes-day-from-vms-to-kubernetes-in-a-large-global-bank-a-dbas-journey-gabriele-bartolini-edb-laurent-parodi-hsbc) - Gabriele Bartolini, EDB & Laurent Parodi, HSBC
+- March 23, 2026, Data on Kubernetes Day at KubeCon Europe 2026 in Amsterdam: ["Beyond the DBaaS Trap: Achieving Data Sovereignty with Kubernetes and CloudNativePG"](https://colocatedeventseu2026.sched.com/event/2H5Uc/beyond-the-dbaas-trap-achieving-data-sovereignty-with-kubernetes-and-cloudnativepg-floor-drees-gabriele-bartolini-edb) - Floor Drees & Gabriele Bartolini, EDB
+- March 23, 2026, KubeCon Europe 2026 in Amsterdam: ["Project Lightning Talk: Five Minutes by CloudNativePG River"](https://kccnceu2026.sched.com/event/2EWIB/project-lightning-talk-five-minutes-by-cloudnativepg-river-gabriele-quaresima-contributor) - Gabriele Quaresima, Contributor
 - November 10, 2025, KubeCon North America 2025 in Atlanta: ["Project Lightning Talk: CloudNativePG: Running Postgres The Kubernetes Way"](https://www.youtube.com/watch?v=pYwYwehQX3U&t=4s) - Gabriele Bartolini, EDB
 - November 11, 2025, KubeCon North America 2025 in Atlanta: ["Modern PostgreSQL Authorization With Keycloak: Cloud Native Identity Meets Database Security"](https://www.youtube.com/watch?v=TYgPemq06fg) - Yoshiyuki Tabata, Hitachi, Ltd. & Gabriele Bartolini, EDB
 - November 13, 2025, KubeCon North America 2025 in Atlanta: ["Quorum-Based Consistency for Cluster Changes With CloudNativePG Operator"](https://www.youtube.com/watch?v=iQUOO3-JRK4&list=PLj6h78yzYM2MLSW4tUDO2gs2pR5UpiD0C&index=67) - Jeremy Schneider, GEICO Tech & Gabriele Bartolini, EDB
@@ -181,7 +187,7 @@ of Canada, and used with their permission.
 [cncf-landscape]: https://landscape.cncf.io/?item=app-definition-and-development--database--cloudnativepg
 [stackoverflow]: https://stackoverflow.com/questions/tagged/cloudnative-pg
 [latest-release]: https://github.com/cloudnative-pg/cloudnative-pg/releases/latest
-[documentation]: https://cloudnative-pg.io/documentation/current/
+[documentation]: https://cloudnative-pg.io/docs
 [license]: https://github.com/cloudnative-pg/cloudnative-pg?tab=Apache-2.0-1-ov-file#readme
 [openssf]: https://www.bestpractices.dev/projects/9933
 [openssf-scorecard-badge]: https://api.scorecard.dev/projects/github.com/cloudnative-pg/cloudnative-pg/badge

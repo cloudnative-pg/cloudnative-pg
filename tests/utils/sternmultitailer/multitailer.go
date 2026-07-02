@@ -187,7 +187,7 @@ func getLogFile(baseDir string, log stern.Log, openFilesMap map[string]*os.File)
 	if err != nil {
 		return nil, fmt.Errorf("cannot ensure directory existence (%v): %w", dirFile, err)
 	}
-	file, err = os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) // nolint:gosec
+	file, err = os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("cannot open file %v: %w", filePath, err)
 	}

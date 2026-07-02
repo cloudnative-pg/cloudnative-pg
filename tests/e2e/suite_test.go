@@ -22,6 +22,9 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,9 +42,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/cloudvendors"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -65,11 +68,11 @@ var (
 	operatorWasRestarted    bool
 	quickDeletionPeriod     = int64(1)
 	testTimeouts            map[timeouts.Timeout]int
-	minioEnv                = &minio.Env{
-		Namespace:    "minio",
-		ServiceName:  "minio-service.minio",
-		CaSecretName: "minio-server-ca-secret",
-		TLSSecret:    "minio-server-tls-secret",
+	objectStoreEnv          = &objectstore.Env{
+		Namespace:    "object-store",
+		ServiceName:  "object-store.object-store",
+		CaSecretName: "object-store-ca-secret",
+		TLSSecret:    "object-store-tls-secret",
 	}
 )
 
@@ -77,6 +80,50 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	var err error
 	env, err = environment.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
+
+	display := func(s string) string {
+		if strings.TrimSpace(s) == "" {
+			return "<none>"
+		}
+		return s
+	}
+	_, _ = fmt.Fprintf(
+		GinkgoWriter, `
+E2E test configuration:
+  Postgres image:                %s:%s
+  Postgres version:              %d
+  Postgres image repository:     %s
+  PostGIS image repository:      %s
+  Pre-rolling update image:      %s
+  Cloud vendor:                  %s
+  Default storage class:         %s
+  CSI storage class:             %s
+  Default volume snapshot class: %s
+  CNPG deployment method:        %s
+`,
+		env.PostgresImageName, env.PostgresImageTag,
+		env.PostgresVersion,
+		display(env.PostgresImageRepository),
+		display(env.PostGISImageRepository),
+		display(os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")),
+		display(os.Getenv("TEST_CLOUD_VENDOR")),
+		display(env.DefaultStorageClass),
+		display(env.CSIStorageClass),
+		display(env.DefaultVolumeSnapshotClass),
+		display(os.Getenv("CNPG_DEPLOYMENT_METHOD")),
+	)
+
+	// Export detected storage class values as environment variables for
+	// code that uses os.Getenv (e.g. the object storage PVC setup).
+	for k, v := range map[string]string{
+		"E2E_DEFAULT_STORAGE_CLASS":        env.DefaultStorageClass,
+		"E2E_CSI_STORAGE_CLASS":            env.CSIStorageClass,
+		"E2E_DEFAULT_VOLUMESNAPSHOT_CLASS": env.DefaultVolumeSnapshotClass,
+	} {
+		if err := os.Setenv(k, v); err != nil {
+			panic(err)
+		}
+	}
 
 	// Start stern to write the logs of every pod we are interested in. Since we don't have a way to have a selector
 	// matching both the operator's and the clusters' pods, we need to start stern twice.
@@ -98,21 +145,21 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	_ = corev1.AddToScheme(env.Scheme)
 	_ = appsv1.AddToScheme(env.Scheme)
 
-	// Set up a global MinIO service on his own namespace
-	err = namespaces.CreateNamespace(env.Ctx, env.Client, minioEnv.Namespace)
+	// Set up a global object storage service in its own namespace
+	err = namespaces.CreateNamespace(env.Ctx, env.Client, objectStoreEnv.Namespace)
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(func() {
-		err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, minioEnv.Namespace, 300)
+		err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, objectStoreEnv.Namespace, 300)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	minioEnv.Timeout = uint(testTimeouts[timeouts.MinioInstallation])
-	minioClient, err := minio.Deploy(minioEnv, env)
+	objectStoreEnv.Timeout = uint(testTimeouts[timeouts.ObjectStoreInstallation])
+	objectStoreClient, err := objectstore.Deploy(objectStoreEnv, env)
 	Expect(err).ToNot(HaveOccurred())
 
-	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	minioEnv.CaSecretObj = *caSecret
-	objs := map[string]corev1.Pod{
-		"minio": *minioClient,
+	caSecret := objectStoreEnv.CaPair.GenerateCASecret(objectStoreEnv.Namespace, objectStoreEnv.CaSecretName)
+	objectStoreEnv.CaSecretObj = *caSecret
+	objs := map[string]appsv1.Deployment{
+		"object-store": *objectStoreClient,
 	}
 
 	jsonObjs, err := json.Marshal(objs)
@@ -127,6 +174,19 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// accessible to all nodes (specs)
 	if env, err = environment.NewTestingEnvironment(); err != nil {
 		panic(err)
+	}
+
+	// Export detected storage class values as environment variables for
+	// backward compatibility with test code that uses os.Getenv and
+	// YAML template substitution via envsubst.
+	for k, v := range map[string]string{
+		"E2E_DEFAULT_STORAGE_CLASS":        env.DefaultStorageClass,
+		"E2E_CSI_STORAGE_CLASS":            env.CSIStorageClass,
+		"E2E_DEFAULT_VOLUMESNAPSHOT_CLASS": env.DefaultVolumeSnapshotClass,
+	} {
+		if err := os.Setenv(k, v); err != nil {
+			panic(err)
+		}
 	}
 
 	_ = k8sscheme.AddToScheme(env.Scheme)
@@ -144,12 +204,12 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		panic(err)
 	}
 
-	var objs map[string]*corev1.Pod
+	var objs map[string]*appsv1.Deployment
 	if err := json.Unmarshal(jsonObjs, &objs); err != nil {
 		panic(err)
 	}
 
-	minioEnv.Client = objs["minio"]
+	objectStoreEnv.Client = objs["object-store"]
 })
 
 var _ = BeforeEach(func() {

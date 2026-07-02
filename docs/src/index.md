@@ -64,7 +64,7 @@ container images for both the operator and PostgreSQL (the operand).
 
 The CloudNativePG operator container images are available on the
 [`cloudnative-pg` project's GitHub Container Registry](https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg)
-in three different flavors:
+in two different flavors:
 
 - Debian 12 distroless
 - Red Hat UBI 9 micro (suffix `-ubi9`)
@@ -99,7 +99,7 @@ Three image flavors are available, each extending the previous one:
     Barman Cloud plugin, or another supported backup solution.
 :::
 
-By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie`.
+By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie`.
 
 All images are signed and shipped with SBOM and provenance attestations.
 Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.
@@ -111,9 +111,10 @@ For details and support, see the [`postgres-containers` project](https://github.
 - Direct integration with the Kubernetes API server for High Availability,
   eliminating the need for external tools.
 - Self-healing capabilities, including:
-    - Automated failover, promoting the replica with the most up-to-date data,
-      with the option to use quorum-based failover and synchronous replication
-      for increased data durability and safety.
+    - Automated failover, promoting the replica with the most up-to-date data
+      (coordinated by a per-cluster lease that prevents premature promotion),
+      with the option to use quorum-based failover and synchronous
+      replication for increased data durability and safety.
     - Automatic recreation of failed replicas.
 - Planned switchover of the primary instance by promoting a selected replica.
 - Declarative management of key PostgreSQL configurations, including:
@@ -124,7 +125,9 @@ For details and support, see the [`postgres-containers` project](https://github.
     - Tablespaces (including temporary tablespaces).
 - Flexible instance definition, supporting any number of instances (minimum 1
   primary server).
-- Scale-up/down capabilities to dynamically adjust cluster size.
+- Scale-up/down capabilities to dynamically adjust cluster size, with a scale
+  subresource compatible with the Kubernetes Horizontal and Vertical Pod
+  Autoscalers.
 - Read-Write and Read-Only Services, ensuring applications connect correctly:
     - *Read-Write Service*: Routes connections to the primary server.
     - *Read-Only Service*: Distributes connections among replicas for read workloads.

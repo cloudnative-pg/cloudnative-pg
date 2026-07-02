@@ -29,6 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -36,8 +39,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
-	. "github.com/onsi/ginkgo/v2" // nolint
-	. "github.com/onsi/gomega"    // nolint
+	. "github.com/onsi/ginkgo/v2" //nolint
+	. "github.com/onsi/gomega"    //nolint
 )
 
 // CreateConfigMap creates the operator namespace and enables/disable the online upgrade for
@@ -80,9 +83,15 @@ func CreateConfigMap(
 	})
 }
 
+// operatorServiceAccount is the operator's ServiceAccount, used to probe the
+// admission path that the operator itself exercises while bootstrapping a cluster.
+const operatorServiceAccount = "system:serviceaccount:cnpg-system:cnpg-manager"
+
 // InstallLatest installs an operator version with the most recent release tag
 func InstallLatest(
+	ctx context.Context,
 	crudClient client.Client,
+	restConfig *rest.Config,
 	releaseTag string,
 ) {
 	mostRecentReleasePath := "../../releases/cnpg-" + releaseTag + ".yaml"
@@ -124,4 +133,51 @@ func InstallLatest(
 				"deployments cnpg-controller-manager")
 		return err
 	}, 150).ShouldNot(HaveOccurred())
+
+	// The OwnerReferencesPermissionEnforcement admission plugin (enabled on the
+	// test apiservers) resolves the owner GroupVersionKind through the apiserver's
+	// own RESTMapper, which is a different cache from the client RESTMapper checked
+	// above and refreshes from discovery on an interval (~30s). Until it picks up
+	// the freshly installed Cluster CRD, any object created with a blockOwnerDeletion
+	// owner reference to a Cluster is rejected with "no matches for kind Cluster",
+	// and the operator hits this the moment it creates the bootstrap Job.
+	//
+	// The check is only enforced for callers that are not cluster-admin, so probe
+	// while impersonating the operator's ServiceAccount: a privileged client (like
+	// the one used elsewhere in the suite) bypasses the plugin and would not gate
+	// on anything.
+	impersonatedConfig := rest.CopyConfig(restConfig)
+	impersonatedConfig.Impersonate = rest.ImpersonationConfig{UserName: operatorServiceAccount}
+	// Use a self-contained scheme: the probe only needs the core ConfigMap type,
+	// and relying on the caller's scheme to have registered it would be brittle.
+	probeClient, err := client.New(impersonatedConfig, client.Options{Scheme: k8sscheme.Scheme})
+	Expect(err).NotTo(HaveOccurred())
+
+	Eventually(func() error {
+		probe := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "owner-ref-probe-",
+				Namespace:    "cnpg-system",
+				OwnerReferences: []metav1.OwnerReference{
+					// BlockOwnerDeletion is what the admission plugin enforces; Controller
+					// is set only to mirror ctrl.SetControllerReference on the real
+					// bootstrap Job.
+					{
+						APIVersion:         apiv1.SchemeGroupVersion.String(),
+						Kind:               apiv1.ClusterKind,
+						Name:               "owner-ref-probe",
+						UID:                types.UID("00000000-0000-0000-0000-000000000000"),
+						BlockOwnerDeletion: ptr.To(true),
+						Controller:         ptr.To(true),
+					},
+				},
+			},
+		}
+		if err := probeClient.Create(ctx, probe); err != nil {
+			return err
+		}
+		// The probe references a Cluster that does not exist, so the garbage
+		// collector may delete it before we do; a NotFound here is success.
+		return client.IgnoreNotFound(probeClient.Delete(ctx, probe))
+	}, 90).ShouldNot(HaveOccurred())
 }

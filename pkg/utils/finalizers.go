@@ -31,4 +31,12 @@ const (
 	// SubscriptionFinalizerName is the name of the finalizer
 	// triggering the deletion of the subscription
 	SubscriptionFinalizerName = MetadataNamespace + "/deleteSubscription"
+
+	// PluginFinalizerName is the name of the finalizer
+	// triggering the cleanup of a plugin when its service is deleted
+	PluginFinalizerName = MetadataNamespace + "/cleanupPlugin"
+
+	// RoleFinalizerName is the name of the finalizer
+	// triggering the deletion of the role
+	RoleFinalizerName = MetadataNamespace + "/deleteRole"
 )

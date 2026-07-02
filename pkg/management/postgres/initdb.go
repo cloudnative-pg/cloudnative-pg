@@ -299,7 +299,7 @@ func (info InitInfo) GetInstance(cluster *apiv1.Cluster) *Instance {
 	postgresInstance := NewInstance()
 	postgresInstance.PgData = info.PgData
 	postgresInstance.StartupOptions = []string{"listen_addresses='127.0.0.1'"}
-	postgresInstance.Cluster = cluster
+	postgresInstance.SetCluster(cluster)
 	return postgresInstance
 }
 
@@ -436,10 +436,33 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 		return nil
 	}
 
+	// The pool pins search_path to pg_catalog. User-authored init scripts
+	// expect the standard `"$user", public` resolution, so we set that
+	// once at the start of the batch on a dedicated *sql.Conn and reset
+	// at the end. Any user SET inside the script persists across
+	// statements within the same batch, matching PostgreSQL's default
+	// session semantics.
+	ctx := context.Background()
+	conn, err := sqlUser.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring dedicated connection for init queries: %w", err)
+	}
+	defer func() {
+		// Reset in a defer so the pin is restored even if a query fails;
+		// pooled pgx connections keep session GUCs across reuse.
+		if _, resetErr := conn.ExecContext(ctx, `RESET search_path`); resetErr != nil {
+			log.Error(resetErr, "while resetting search_path after init queries")
+		}
+		_ = conn.Close()
+	}()
+
+	if _, err := conn.ExecContext(ctx, `SET search_path TO "$user", public`); err != nil {
+		return fmt.Errorf("setting search_path before init queries: %w", err)
+	}
+
 	for _, sqlQuery := range queries {
 		log.Debug("Executing query", "sqlQuery", sqlQuery)
-		_, err := sqlUser.Exec(sqlQuery)
-		if err != nil {
+		if _, err := conn.ExecContext(ctx, sqlQuery); err != nil {
 			return err
 		}
 	}

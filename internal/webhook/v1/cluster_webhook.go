@@ -23,6 +23,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -39,32 +41,43 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const sharedBuffersParameter = "shared_buffers"
 
+// walLevelMinimal is the "minimal" wal level
+const walLevelMinimal = "minimal"
+
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
 // SetupClusterWebhookWithManager registers the webhook for Cluster in the manager.
 func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Cluster{}).
-		WithValidator(newBypassableValidator(&ClusterCustomValidator{})).
+	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Cluster{}).
+		WithValidator(newBypassableValidator[*apiv1.Cluster](&ClusterCustomValidator{})).
 		WithDefaulter(&ClusterCustomDefaulter{}).
 		Complete()
+}
+
+// NewClusterAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewClusterAdmissionGuard() *guard.Admission[*apiv1.Cluster] {
+	return &guard.Admission[*apiv1.Cluster]{
+		Defaulter: &ClusterCustomDefaulter{},
+		Validator: newBypassableValidator[*apiv1.Cluster](&ClusterCustomValidator{}),
+	}
 }
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
@@ -75,14 +88,8 @@ func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
 // Kind Cluster when those are created or updated.
 type ClusterCustomDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &ClusterCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Cluster.
-func (d *ClusterCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	cluster, ok := obj.(*apiv1.Cluster)
-	if !ok {
-		return fmt.Errorf("expected a Cluster object but got %T", obj)
-	}
+func (d *ClusterCustomDefaulter) Default(_ context.Context, cluster *apiv1.Cluster) error {
 	clusterLog.Info("Defaulting for Cluster", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
 
 	cluster.Default()
@@ -99,15 +106,9 @@ func (d *ClusterCustomDefaulter) Default(_ context.Context, obj runtime.Object) 
 // when it is created, updated, or deleted.
 type ClusterCustomValidator struct{}
 
-var _ webhook.CustomValidator = &ClusterCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
-func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	cluster, ok := obj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a Cluster object but got %T", obj)
-	}
-	clusterLog.Info("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
+func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv1.Cluster) (admission.Warnings, error) {
+	clusterLog.Debug("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
 	allErrs := v.validate(cluster)
@@ -118,26 +119,16 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 	}
 
 	return allWarnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Cluster"},
 		cluster.Name, allErrs)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
 func (v *ClusterCustomValidator) ValidateUpdate(
 	_ context.Context,
-	oldObj, newObj runtime.Object,
+	oldCluster *apiv1.Cluster, cluster *apiv1.Cluster,
 ) (admission.Warnings, error) {
-	cluster, ok := newObj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a Cluster object for the newObj but got %T", newObj)
-	}
-
-	oldCluster, ok := oldObj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a Cluster object for the oldObj but got %T", oldObj)
-	}
-
-	clusterLog.Info("Validation for Cluster upon update", "name", cluster.GetName(), "namespace",
+	clusterLog.Debug("Validation for Cluster upon update", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
 	// applying defaults before validating updates to set any new default
@@ -159,11 +150,7 @@ func (v *ClusterCustomValidator) ValidateUpdate(
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
-func (v *ClusterCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	cluster, ok := obj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a Cluster object but got %T", obj)
-	}
+func (v *ClusterCustomValidator) ValidateDelete(_ context.Context, cluster *apiv1.Cluster) (admission.Warnings, error) {
 	clusterLog.Info("Validation for Cluster upon deletion", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
@@ -222,7 +209,10 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
+		v.validatePodSelectorRefs,
 		v.validateExtensions,
+		v.validateServiceAccountConfig,
+		v.validatePrimaryLease,
 	}
 
 	for _, validate := range validations {
@@ -291,7 +281,7 @@ func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	for i := range r.Spec.Env {
-		if isReservedEnvironmentVariable(r.Spec.Env[i].Name) {
+		if postgres.IsReservedEnvironmentVariable(r.Spec.Env[i].Name) {
 			result = append(
 				result,
 				field.Invalid(field.NewPath("spec", "postgresql", "env").Index(i).Child("name"),
@@ -302,31 +292,6 @@ func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	}
 
 	return result
-}
-
-// isReservedEnvironmentVariable detects if a certain environment variable
-// is reserved for the usage of the operator
-func isReservedEnvironmentVariable(name string) bool {
-	name = strings.ToUpper(name)
-
-	switch {
-	case strings.HasPrefix(name, "CNPG_"):
-		return true
-
-	case strings.HasPrefix(name, "PG"):
-		return true
-
-	case name == "POD_NAME":
-		return true
-
-	case name == "NAMESPACE":
-		return true
-
-	case name == "CLUSTER_NAME":
-		return true
-	}
-
-	return false
 }
 
 // validateInitDB validate the bootstrapping options when initdb
@@ -708,14 +673,16 @@ func (v *ClusterCustomValidator) validateBootstrapRecoverySource(r *apiv1.Cluste
 
 	// Ensure the external cluster definition has enough information
 	// to be used to recover a data directory
-	if externalCluster.BarmanObjectStore == nil && externalCluster.PluginConfiguration == nil {
+	if externalCluster.ConnectionParameters == nil &&
+		externalCluster.BarmanObjectStore == nil &&
+		externalCluster.PluginConfiguration == nil {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "source"),
 				r.Spec.Bootstrap.Recovery.Source,
 				fmt.Sprintf("External cluster %v cannot be used for recovery: "+
-					"both Barman and CNPG-i plugin configurations are missing", r.Spec.Bootstrap.Recovery.Source)))
+					"missing connection parameters, Barman, or CNPG-i configuration", r.Spec.Bootstrap.Recovery.Source)))
 	}
 
 	return result
@@ -1060,6 +1027,18 @@ func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.
 	return result
 }
 
+// postgresParameterNameRegex matches a valid PostgreSQL configuration
+// parameter name: a plain GUC name or a custom (namespaced) one with a
+// single dot. Keys are rendered verbatim into postgresql.conf, so a
+// newline or other unexpected character could inject an arbitrary
+// directive.
+//
+// The pattern follows PostgreSQL's configuration-file lexer (guc-file.l),
+// including the dollar sign it allows in identifiers. It is intentionally
+// restricted to ASCII: the lexer also accepts high-bit bytes, but no real
+// GUC relies on them.
+var postgresParameterNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*(\.[A-Za-z_][A-Za-z0-9_$]*)?$`)
+
 // validateConfiguration determines whether a PostgreSQL configuration is valid
 func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
@@ -1100,6 +1079,17 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
 	for key, value := range r.Spec.PostgresConfiguration.Parameters {
+		if !postgresParameterNameRegex.MatchString(key) {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", key),
+					key,
+					"must be a valid PostgreSQL configuration parameter name "+
+						"(a GUC name, optionally namespaced with a single dot)"))
+			continue
+		}
+
 		_, isFixed := postgres.FixedConfigurationParameters[key]
 		sanitizedValue, presentInSanitizedConfiguration := sanitizedParameters[key]
 		if isFixed && (!presentInSanitizedConfiguration || value != sanitizedValue) {
@@ -1136,7 +1126,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 					"'.instances' field is greater than 1, or this is a replica cluster"))
 	}
 
-	if walLevel == "minimal" {
+	if walLevel == walLevelMinimal {
 		if value, ok := sanitizedParameters[postgres.ParameterMaxWalSenders]; !ok || value != "0" {
 			result = append(
 				result,
@@ -1453,6 +1443,39 @@ func (v *ClusterCustomValidator) validateRecoveryTarget(r *apiv1.Cluster) field.
 		}
 	}
 
+	// PostgreSQL casts recovery_target_xid to TransactionId (uint32); a value
+	// above 2^32-1 would be silently truncated. Use bitSize 32 so we reject
+	// rather than admit a different XID than the user wrote.
+	if recoveryTarget.TargetXID != "" {
+		if _, err := strconv.ParseUint(recoveryTarget.TargetXID, 10, 32); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetXID"),
+				recoveryTarget.TargetXID,
+				"recovery target xid must be a non-negative 32-bit integer"))
+		}
+	}
+
+	// PostgreSQL enforces MAXFNAMELEN (64) on recovery_target_name and on
+	// pg_create_restore_point; mirror it at admission for a better error.
+	if len(recoveryTarget.TargetName) >= 64 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetName"),
+			recoveryTarget.TargetName,
+			"recovery target name must be shorter than 64 bytes"))
+	}
+
+	// pg_create_restore_point accepts arbitrary text, but a name with
+	// newlines or NUL is never legitimate and is a strong signal of a
+	// malformed or hostile spec.
+	if strings.ContainsFunc(recoveryTarget.TargetName, func(r rune) bool {
+		return r < 0x20 || r == 0x7F
+	}) {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetName"),
+			recoveryTarget.TargetName,
+			"recovery target name must not contain ASCII control characters"))
+	}
+
 	// When using a backup catalog, we can identify the backup to be restored
 	// only if the PITR is time-based. If the PITR is not time-based, the user
 	// need to specify a backup ID.
@@ -1582,6 +1605,58 @@ func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field
 			field.NewPath("spec", "minSyncReplicas"),
 			r.Spec.MinSyncReplicas,
 			"minSyncReplicas cannot be greater than maxSyncReplicas"))
+	}
+
+	return result
+}
+
+// validatePrimaryLease checks the consistency of the primary lease timings.
+// These mirror the invariants that client-go's leaderelection.NewLeaderElector
+// enforces at runtime: the lease duration must be strictly greater than the
+// renew deadline, and the renew deadline must be greater than the retry period
+// times the jitter factor. Rejecting violations here is important because a
+// combination that slips through admission would not "just" misbehave: it makes
+// NewLeaderElector return an error, which is fatal to the primary's lease
+// runnable and crash-loops the primary Pod.
+func (v *ClusterCustomValidator) validatePrimaryLease(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	lease := r.Spec.PrimaryLease
+	if lease == nil {
+		return result
+	}
+
+	basePath := field.NewPath("spec", "primaryLease")
+
+	leaseDuration := apiv1.DefaultPrimaryLeaseDurationSeconds
+	if lease.LeaseDurationSeconds != nil {
+		leaseDuration = int(*lease.LeaseDurationSeconds)
+	}
+	renewDeadline := apiv1.DefaultPrimaryLeaseRenewDeadlineSeconds
+	if lease.RenewDeadlineSeconds != nil {
+		renewDeadline = int(*lease.RenewDeadlineSeconds)
+	}
+	retryPeriod := apiv1.DefaultPrimaryLeaseRetryPeriodSeconds
+	if lease.RetryPeriodSeconds != nil {
+		retryPeriod = int(*lease.RetryPeriodSeconds)
+	}
+
+	if leaseDuration <= renewDeadline {
+		result = append(result, field.Invalid(
+			basePath.Child("leaseDurationSeconds"),
+			leaseDuration,
+			"leaseDurationSeconds must be greater than renewDeadlineSeconds"))
+	}
+
+	// client-go rejects renewDeadline <= retryPeriod*JitterFactor (JitterFactor
+	// is 1.2). We replicate the check with exact integer arithmetic, since the
+	// fields are whole seconds: renewDeadline > 1.2*retryPeriod is equivalent to
+	// 5*renewDeadline > 6*retryPeriod.
+	if 5*renewDeadline <= 6*retryPeriod {
+		result = append(result, field.Invalid(
+			basePath.Child("renewDeadlineSeconds"),
+			renewDeadline,
+			"renewDeadlineSeconds must be greater than retryPeriodSeconds multiplied by 1.2"))
 	}
 
 	return result
@@ -1788,14 +1863,16 @@ func (v *ClusterCustomValidator) validateTablespaceNames(r *apiv1.Cluster) field
 	}
 
 	hasTablespace := make(map[string]bool)
+	sanitizedVolumeNames := stringset.New()
 	for idx, tbsConfig := range r.Spec.Tablespaces {
 		name := tbsConfig.Name
+		basePath := field.NewPath("spec", "tablespaces").Index(idx)
 		// NOTE: postgres identifiers are case-insensitive, so we could have
 		// different map keys (names) which are identical for PG
 		_, found := hasTablespace[strings.ToLower(name)]
 		if found {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", "tablespaces").Index(idx),
+				basePath,
 				name,
 				"duplicate tablespace name"))
 			continue
@@ -1804,10 +1881,21 @@ func (v *ClusterCustomValidator) validateTablespaceNames(r *apiv1.Cluster) field
 
 		if _, err := postgres.IsTablespaceNameValid(name); err != nil {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", "tablespaces").Index(idx),
+				basePath,
 				name,
 				err.Error()))
 		}
+
+		sanitizedName := specs.VolumeMountNameForTablespace(name)
+		if sanitizedVolumeNames.Has(sanitizedName) {
+			result = append(result, field.Invalid(
+				basePath,
+				name,
+				fmt.Sprintf("tablespace name results in duplicate volume name %q after sanitization "+
+					"(special characters are converted to hyphens)", sanitizedName),
+			))
+		}
+		sanitizedVolumeNames.Put(sanitizedName)
 	}
 	return result
 }
@@ -1867,13 +1955,51 @@ func (v *ClusterCustomValidator) validateExternalCluster(
 		externalCluster.BarmanObjectStore == nil &&
 		externalCluster.PluginConfiguration == nil {
 		result = append(result,
-			field.Invalid(
+			field.Required(
 				path,
-				externalCluster,
 				"one of connectionParameters, plugin and barmanObjectStore is required"))
 	}
 
+	// The external cluster name and the referenced secret selectors are joined
+	// into filesystem paths under the external secrets directory when the
+	// instance manager dumps the connection material, so they cannot contain a
+	// path separator or a parent-directory reference.
+	const pathComponentMsg = "cannot contain a path separator or a '..' component"
+	if isUnsafePathComponent(externalCluster.Name) {
+		result = append(result, field.Invalid(path.Child("name"), externalCluster.Name, pathComponentMsg))
+	}
+
+	selectors := []struct {
+		name     string
+		selector *corev1.SecretKeySelector
+	}{
+		{"sslCert", externalCluster.SSLCert},
+		{"sslKey", externalCluster.SSLKey},
+		{"sslRootCert", externalCluster.SSLRootCert},
+	}
+	for _, s := range selectors {
+		if s.selector == nil {
+			continue
+		}
+		if isUnsafePathComponent(s.selector.Name) {
+			result = append(result,
+				field.Invalid(path.Child(s.name, "name"), s.selector.Name, pathComponentMsg))
+		}
+		if isUnsafePathComponent(s.selector.Key) {
+			result = append(result,
+				field.Invalid(path.Child(s.name, "key"), s.selector.Key, pathComponentMsg))
+		}
+	}
+
 	return result
+}
+
+// isUnsafePathComponent reports whether a spec-provided value would escape the
+// directory it is meant to be joined into, either through a path separator or a
+// parent-directory reference. The instance manager enforces the same rule at the
+// write site, since it reads the spec directly and can bypass admission.
+func isUnsafePathComponent(value string) bool {
+	return value == "." || value == ".." || strings.ContainsAny(value, `/\`)
 }
 
 func (v *ClusterCustomValidator) validateReplicaClusterChange(r, old *apiv1.Cluster) field.ErrorList {
@@ -1987,17 +2113,15 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 	hasEnabled := replicaClusterConf.Enabled != nil
 	hasPrimary := len(replicaClusterConf.Primary) > 0
 	if hasPrimary && hasEnabled {
-		result = append(result, field.Invalid(
+		result = append(result, field.Forbidden(
 			field.NewPath("spec", "replicaCluster", "enabled"),
-			replicaClusterConf,
 			"replica mode enabled is not compatible with the primary field"))
 	}
 
 	if r.IsReplica() {
 		if r.Spec.Bootstrap == nil {
-			result = append(result, field.Invalid(
+			result = append(result, field.Required(
 				field.NewPath("spec", "bootstrap"),
-				replicaClusterConf,
 				"bootstrap configuration is required for replica mode"))
 		} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
 			// this is needed because we only want to validate this during cluster creation, currently if we would have
@@ -2005,7 +2129,7 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 			len(r.ResourceVersion) == 0 {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "replicaCluster"),
-				replicaClusterConf,
+				replicaClusterConf.Primary,
 				"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
 		}
 	}
@@ -2332,10 +2456,10 @@ func (v *ClusterCustomValidator) validateWALLevelChange(r, old *apiv1.Cluster) f
 	newWALLevel := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
 	oldWALLevel := old.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
 
-	if newWALLevel == "minimal" && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
+	if newWALLevel == walLevelMinimal && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
 		errs = append(errs, field.Invalid(
 			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
-			"minimal",
+			walLevelMinimal,
 			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)",
 				oldWALLevel)))
 	}
@@ -2486,10 +2610,7 @@ func (v *ClusterCustomValidator) validateManagedRoles(r *apiv1.Cluster) field.Er
 
 // validateManagedExtensions validate the managed extensions parameters set by the user
 func (v *ClusterCustomValidator) validateManagedExtensions(r *apiv1.Cluster) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	allErrors = append(allErrors, v.validatePgFailoverSlots(r)...)
-	return allErrors
+	return v.validatePgFailoverSlots(r)
 }
 
 func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field.ErrorList {
@@ -2627,7 +2748,7 @@ func getInTreeBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
 		result = append(
 			result,
 			fmt.Sprintf("Native support for Barman Cloud backups and recovery is deprecated and will be "+
-				"completely removed in CloudNativePG 1.29.0. Found usage in: %s. "+
+				"completely removed in CloudNativePG 1.31.0. Found usage in: %s. "+
 				"Please migrate existing clusters to the new Barman Cloud Plugin to ensure a smooth transition.",
 				pathsStr),
 		)
@@ -2835,6 +2956,38 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		return nil
 	}
 
+	validatePathList := func(
+		paths []string,
+		fieldPath *field.Path,
+	) field.ErrorList {
+		var result field.ErrorList
+		pathSet := stringset.New()
+
+		for j, path := range paths {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				fieldPath.Index(j),
+				pathSet,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+				continue
+			}
+
+			if strings.HasPrefix(filepath.Clean(path), "..") {
+				result = append(result, field.Invalid(
+					fieldPath.Index(j),
+					path,
+					"path must not escape the extension directory",
+				))
+				continue
+			}
+
+			pathSet.Put(path)
+		}
+
+		return result
+	}
+
 	if len(r.Spec.PostgresConfiguration.Extensions) == 0 {
 		return nil
 	}
@@ -2842,40 +2995,142 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 	var result field.ErrorList
 
 	extensionNames := stringset.New()
+	// Track sanitized volume names (e.g., pg_ivm and pg-ivm both become pg-ivm)
+	sanitizedVolumeNames := stringset.New()
 
 	for i, v := range r.Spec.PostgresConfiguration.Extensions {
 		basePath := field.NewPath("spec", "postgresql", "extensions").Index(i)
 		if nameErr := ensureNotEmptyOrDuplicate(basePath.Child("name"), extensionNames, v.Name); nameErr != nil {
 			result = append(result, nameErr)
+			// Skip sanitization check for duplicate names to avoid redundant error reporting
+			continue
 		}
 		extensionNames.Put(v.Name)
 
-		controlPaths := stringset.New()
-		for j, path := range v.ExtensionControlPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("extension_control_path").Index(j),
-				controlPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
+		sanitizedName := specs.SanitizeExtensionNameForVolume(v.Name)
+		if sanitizedVolumeNames.Has(sanitizedName) {
+			result = append(result, field.Invalid(
+				basePath.Child("name"),
+				v.Name,
+				fmt.Sprintf("extension name results in duplicate volume name %q after sanitization "+
+					"(underscores are converted to hyphens)", sanitizedName),
+			))
+		}
+		sanitizedVolumeNames.Put(sanitizedName)
 
-			controlPaths.Put(path)
+		if r.Spec.ImageCatalogRef == nil && v.ImageVolumeSource.Reference == "" {
+			result = append(result,
+				field.Invalid(
+					basePath.Child("image", "reference"),
+					v.ImageVolumeSource.Reference,
+					fmt.Sprintf("Image reference for extension `%s` must be set when no image catalog is configured", v.Name),
+				),
+			)
 		}
 
-		libraryPaths := stringset.New()
-		for j, path := range v.DynamicLibraryPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("dynamic_library_path").Index(j),
-				libraryPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			libraryPaths.Put(path)
-		}
+		result = append(result, validatePathList(v.ExtensionControlPath, basePath.Child("extension_control_path"))...)
+		result = append(result, validatePathList(v.DynamicLibraryPath, basePath.Child("dynamic_library_path"))...)
+		result = append(result, validatePathList(v.LdLibraryPath, basePath.Child("ld_library_path"))...)
+		result = append(result, validatePathList(v.BinPath, basePath.Child("bin_path"))...)
+		result = append(result, validateExtensionEnvVars(v.Env, basePath)...)
 	}
 
 	return result
+}
+
+func validateExtensionEnvVars(envVars []apiv1.ExtensionEnvVar, basePath *field.Path) field.ErrorList {
+	var result field.ErrorList
+	envNames := stringset.New()
+	envFieldPath := basePath.Child("env")
+
+	dedicatedFields := map[string]string{
+		"PATH":            basePath.Child("bin_path").String(),
+		"LD_LIBRARY_PATH": basePath.Child("ld_library_path").String(),
+	}
+
+	for i, envVar := range envVars {
+		envPath := envFieldPath.Index(i)
+
+		// Block env vars that are reserved for operator usage
+		if postgres.IsReservedEnvironmentVariable(envVar.Name) {
+			result = append(result, field.Invalid(
+				envPath.Child("name"),
+				envVar.Name,
+				"the usage of this environment variable is reserved for the operator",
+			))
+		}
+
+		// Block env vars that have dedicated fields
+		if dedicatedField, ok := dedicatedFields[envVar.Name]; ok {
+			result = append(result, field.Forbidden(
+				envPath.Child("name"),
+				fmt.Sprintf("%s must be configured via %s", envVar.Name, dedicatedField),
+			))
+		}
+
+		// Check for unknown placeholders in values
+		if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
+			result = append(result, field.Invalid(
+				envPath.Child("value"),
+				envVar.Value,
+				fmt.Sprintf("unsupported placeholder(s): %s; supported: ${image_root}", strings.Join(unknown, ", ")),
+			))
+		}
+
+		// Check for duplicate names
+		if envNames.Has(envVar.Name) {
+			result = append(result, field.Duplicate(envPath.Child("name"), envVar.Name))
+		}
+		envNames.Put(envVar.Name)
+	}
+
+	return result
+}
+
+// validatePodSelectorRefs checks that podSelectorRefs names are unique and
+// that ${podselector:NAME} references in pg_hba lines correspond to defined selectors.
+func (v *ClusterCustomValidator) validatePodSelectorRefs(r *apiv1.Cluster) field.ErrorList {
+	var allErrors field.ErrorList
+	path := field.NewPath("spec", "podSelectorRefs")
+
+	// Validate selectors and collect known names
+	knownSelectors := stringset.New()
+	for i, ref := range r.Spec.PodSelectorRefs {
+		if knownSelectors.Has(ref.Name) {
+			allErrors = append(allErrors, field.Duplicate(path.Index(i).Child("name"), ref.Name))
+		}
+		knownSelectors.Put(ref.Name)
+
+		allErrors = append(allErrors,
+			validation.ValidateLabelSelector(&ref.Selector,
+				validation.LabelSelectorValidationOptions{},
+				path.Index(i).Child("selector"))...)
+	}
+
+	// Check that ${podselector:NAME} references in pg_hba correspond to defined selectors
+	hbaPath := field.NewPath("spec", "postgresql", "pg_hba")
+	for i, rule := range r.Spec.PostgresConfiguration.PgHBA {
+		if err := hba.ValidateLine(rule, knownSelectors); err != nil {
+			allErrors = append(allErrors,
+				field.Invalid(hbaPath.Index(i), rule, err.Error()),
+			)
+		}
+	}
+
+	return allErrors
+}
+
+// validateServiceAccountConfig validates the ServiceAccount configuration
+// ensuring that serviceAccountName and serviceAccountTemplate are mutually exclusive.
+func (v *ClusterCustomValidator) validateServiceAccountConfig(r *apiv1.Cluster) field.ErrorList {
+	if r.Spec.ServiceAccountName != "" && r.Spec.ServiceAccountTemplate != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "serviceAccountName"),
+				r.Spec.ServiceAccountName,
+				"serviceAccountName and serviceAccountTemplate are mutually exclusive",
+			),
+		}
+	}
+	return nil
 }

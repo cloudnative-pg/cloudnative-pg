@@ -22,11 +22,11 @@ package utils
 import (
 	"database/sql"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 )
 
 // GetPgVersion returns the version of postgres in a semantic format or an error
@@ -46,17 +46,19 @@ func parseVersionNum(versionNum string) (*semver.Version, error) {
 		return nil, err
 	}
 
-	return &semver.Version{
-		Major: versionInt / 10000,
-		Minor: (versionInt / 100) % 100,
-		Patch: versionInt % 100,
-	}, nil
+	return semver.New(
+		versionInt/10000,
+		(versionInt/100)%100,
+		versionInt%100,
+		"",
+		"",
+	), nil
 }
 
 // GetMajorVersionFromPgData read the PG_VERSION file in the data directory
 // returning the major version of the database
 func GetMajorVersionFromPgData(pgData string) (int, error) {
-	content, err := os.ReadFile(path.Join(pgData, "PG_VERSION")) // #nosec
+	content, err := os.ReadFile(filepath.Clean(filepath.Join(pgData, "PG_VERSION")))
 	if err != nil {
 		return 0, err
 	}

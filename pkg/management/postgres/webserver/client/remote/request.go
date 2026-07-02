@@ -40,7 +40,7 @@ func executeRequestWithError[T any](
 ) (*webserver.Response[T], error) {
 	contextLogger := log.FromContext(ctx)
 
-	resp, err := cli.Do(req)
+	resp, err := cli.Do(req) //nolint:gosec // URL built from internal pod IP
 	if err != nil {
 		return nil, fmt.Errorf("while executing http request: %w", err)
 	}
@@ -58,6 +58,17 @@ func executeRequestWithError[T any](
 
 	if resp.StatusCode == http.StatusInternalServerError {
 		return nil, fmt.Errorf("encountered an internal server error status code 500 with body: %s", string(body))
+	}
+
+	// The instance manager guards its protected endpoints by pinning the operator's client
+	// certificate fingerprint: it replies 401 when
+	// no usable client certificate is presented (permanent, e.g. a status port not served
+	// over TLS) and 503 while a presented certificate is not yet recognized (transient
+	// during operator certificate fingerprint propagation). Surface both as a typed
+	// StatusError so callers can tell them apart (see IsTransientAuthError) instead of
+	// failing on an opaque body-unmarshalling error.
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusServiceUnavailable {
+		return nil, &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
 	var result webserver.Response[T]

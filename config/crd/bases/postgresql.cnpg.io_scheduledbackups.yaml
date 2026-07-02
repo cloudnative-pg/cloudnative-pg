@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: scheduledbackups.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -72,6 +72,9 @@ spec:
                 required:
                 - name
                 type: object
+                x-kubernetes-validations:
+                - message: cluster reference is immutable after creation
+                  rule: self == oldSelf
               immediate:
                 description: If the first backup has to be immediately start after
                   creation or not
@@ -167,6 +170,9 @@ spec:
               to date. Populated by the system. Read-only.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
+              error:
+                description: Error is the latest admission validation error
+                type: string
               lastCheckTime:
                 description: The latest time the schedule
                 format: date-time

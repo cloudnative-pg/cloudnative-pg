@@ -39,10 +39,14 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
+	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
@@ -92,17 +96,17 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		rollingUpgradeNamespace = "rolling-upgrade"
 		onlineUpgradeNamespace  = "online-upgrade"
 
-		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml" //nolint:gosec
+		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml"
 
 		// This is a cluster of the previous version, created before the operator upgrade
-		clusterName1 = "cluster1"
-		sampleFile   = fixturesDir + "/upgrade/cluster1.yaml.template"
-		minioPath1   = "minio/cluster-full-backup"
+		clusterName1     = "cluster1"
+		sampleFile       = fixturesDir + "/upgrade/cluster1.yaml.template"
+		objectStorePath1 = "cluster-full-backup"
 
 		// This is a cluster of the previous version, created after the operator upgrade
-		clusterName2 = "cluster2"
-		sampleFile2  = fixturesDir + "/upgrade/cluster2.yaml.template"
-		minioPath2   = "minio/cluster2-full-backup"
+		clusterName2     = "cluster2"
+		sampleFile2      = fixturesDir + "/upgrade/cluster2.yaml.template"
+		objectStorePath2 = "cluster2-full-backup"
 
 		backupName          = "cluster-backup"
 		backupFile          = fixturesDir + "/upgrade/backup1.yaml"
@@ -138,7 +142,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		dockerUsername := os.Getenv("DOCKER_USERNAME")
 		dockerPassword := os.Getenv("DOCKER_PASSWORD")
 		if dockerServer != "" && dockerUsername != "" && dockerPassword != "" {
-			_, _, err := run.Run(fmt.Sprintf(`kubectl -n %v create secret docker-registry
+			_, _, err := run.Run(fmt.Sprintf(
+				`kubectl -n %v create secret docker-registry
 			cnpg-pull-secret
 			--docker-server="%v"
 			--docker-username="%v"
@@ -152,16 +157,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 	})
 
-	// Check that the amount of backups is increasing on minio.
+	// Check that the amount of backups is increasing on the object store.
 	// This check relies on the fact that nothing is performing backups
 	// but a single scheduled backups during the check
 	AssertScheduledBackupsAreScheduled := func(serverName string) {
 		By("verifying scheduled backups are still happening", func() {
-			latestTar := minio.GetFilePath(serverName, "data.tar.gz")
-			currentBackups, err := minio.CountFiles(minioEnv, latestTar)
+			latestTar := objectstore.GetFilePath(serverName, "data.tar.gz")
+			currentBackups, err := objectstore.CountFiles(objectStoreEnv, latestTar)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {
-				return minio.CountFiles(minioEnv, latestTar)
+				return objectstore.CountFiles(objectStoreEnv, latestTar)
 			}, 120).Should(BeNumerically(">", currentBackups))
 		})
 	}
@@ -272,18 +277,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			for i := 1; i < 4; i++ {
-				podName := fmt.Sprintf("%v-%v", clusterName, i)
-				podNamespacedName := types.NamespacedName{
-					Namespace: upgradeNamespace,
-					Name:      podName,
-				}
-				Eventually(func() (string, error) {
-					pod := &corev1.Pod{}
-					if err := env.Client.Get(env.Ctx, podNamespacedName, pod); err != nil {
-						return "", err
-					}
+			// Get all pods in the cluster dynamically
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, upgradeNamespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 
+			for _, pod := range podList.Items {
+				Eventually(func() (string, error) {
 					out, _, err := exec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 						exec.PodLocator{
@@ -294,7 +293,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 						"SELECT count(*) = 0 FROM postswitch")
 					return strings.TrimSpace(out), err
 				}, 240).Should(BeEquivalentTo("t"),
-					"Pod %v should have followed the new primary", podName)
+					"Pod %v should have followed the new primary", pod.Name)
 			}
 		})
 	}
@@ -334,7 +333,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		err := retry.OnError(backoffCheckingEvents, shouldRetry, func() error {
 			eventList := corev1.EventList{}
-			err := env.Client.List(env.Ctx,
+			err := env.Client.List(
+				env.Ctx,
 				&eventList,
 				ctrlclient.MatchingFields{
 					"involvedObject.kind": "Cluster",
@@ -399,13 +399,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		return err
 	}
 
-	cleanupOperatorAndMinio := func() error {
+	cleanupOperatorAndObjectStore := func() error {
 		GinkgoWriter.Println("cleaning up")
 		if CurrentSpecReport().Failed() {
-			// Dump the minio namespace when failed
+			// Dump the object store namespace when failed
 			namespaces.DumpNamespaceObjects(
 				env.Ctx, env.Client,
-				minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log",
+				objectStoreEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"objectstore.log",
 			)
 			// Dump the operator namespace, as operator is changing too
 			operator.Dump(
@@ -420,12 +420,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
 		}
 
-		if _, err := minio.CleanFiles(minioEnv, minioPath1); err != nil {
-			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
+		if _, err := objectstore.CleanFiles(objectStoreEnv, objectStorePath1); err != nil {
+			return fmt.Errorf("encountered an error while cleaning up the object store: %v", err)
 		}
 
-		if _, err := minio.CleanFiles(minioEnv, minioPath2); err != nil {
-			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
+		if _, err := objectstore.CleanFiles(objectStoreEnv, objectStorePath2); err != nil {
+			return fmt.Errorf("encountered an error while cleaning up the object store: %v", err)
 		}
 
 		GinkgoWriter.Println("cleaning up done")
@@ -436,7 +436,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		var namespace string
 		By(fmt.Sprintf(
 			"having a '%s' upgradeNamespace",
-			namespacePrefix), func() {
+			namespacePrefix,
+		), func() {
 			var err error
 			// Create a upgradeNamespace for all the resources
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
@@ -496,9 +497,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// generate random serverNames for the clusters each time
 		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
 		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
-		// Create the secrets used by the clusters and minio
+		// Create the secrets used by the clusters and the object store
 		By("creating the postgres secrets", func() {
-			CreateResourceFromFile(upgradeNamespace, pgSecrets)
+			resources.CreateResourceFromFile(env, upgradeNamespace, pgSecrets)
 		})
 		By("creating the cloud storage credentials", func() {
 			_, err := secrets.CreateObjectStorageSecret(
@@ -506,13 +507,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				env.Client,
 				upgradeNamespace,
 				"aws-creds",
-				"minio",
-				"minio123",
+				objectstore.AccessKeyID,
+				objectstore.SecretAccessKey,
 			)
 			Expect(err).NotTo(HaveOccurred())
 		})
-		By("create the certificates for MinIO", func() {
-			err := minioEnv.CreateCaSecret(env, upgradeNamespace)
+		By("create the certificates for the object store", func() {
+			err := objectStoreEnv.CreateCaSecret(env, upgradeNamespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		// Create the cluster. Since it will take a while, we'll do more stuff
@@ -522,7 +523,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName1)
 			Expect(err).ToNot(HaveOccurred())
-			CreateResourceFromFile(upgradeNamespace, sampleFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile)
 
 			if online {
 				// Upgrading to the new release will trigger a
@@ -544,13 +545,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}
 		})
 
-		// Cluster ready happens after minio is ready
+		// Cluster ready happens after the object store is ready
 		By("having a Cluster with three instances ready", func() {
-			AssertClusterIsReady(upgradeNamespace, clusterName1, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName1, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		By("creating a Pooler with two instances", func() {
-			CreateResourceFromFile(upgradeNamespace, pgBouncerSampleFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, pgBouncerSampleFile)
 		})
 
 		// Now that everything is in place, we add a bit of data we'll use to
@@ -573,11 +574,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		AssertArchiveWalOnMinio(upgradeNamespace, clusterName1, serverName1)
+		objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+			upgradeNamespace, clusterName1, serverName1)
 
-		By("uploading a backup on minio", func() {
+		By("uploading a backup on the object store", func() {
 			// We create a Backup
-			CreateResourceFromFile(upgradeNamespace, backupFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, backupFile)
 		})
 
 		By("verifying that a backup has actually completed", func() {
@@ -591,32 +593,26 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return backup.Status.Phase, err
 			}, 200).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 
-			// A file called data.tar.gz should be available on minio
-			Eventually(func() (int, error, error) {
-				out, _, err := exec.CommandInContainer(
-					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.ContainerLocator{
-						Namespace:     minioEnv.Namespace,
-						PodName:       minioEnv.Client.Name,
-						ContainerName: "mc",
-					}, nil,
-					"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
-				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-				return value, err, atoiErr
+			// A file called data.tar.gz should be available on the object store
+			// under this cluster's server name path (the object store is shared
+			// across upgrade sub-tests).
+			latestTar := objectstore.GetFilePath(serverName1, "data.tar.gz")
+			Eventually(func() (int, error) {
+				return objectstore.CountFiles(objectStoreEnv, latestTar)
 			}, 60).Should(BeEquivalentTo(1))
 		})
 
 		By("creating a ScheduledBackup", func() {
 			// We create a ScheduledBackup
-			CreateResourceFromFile(upgradeNamespace, scheduledBackupFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, scheduledBackupFile)
 		})
 		AssertScheduledBackupsAreScheduled(serverName1)
 
-		assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)
+		pgbouncerasserts.AssertPgBouncerPodsAreReady(env, upgradeNamespace, pgBouncerSampleFile, 2)
 
-		var podUIDs []types.UID
 		podList, err := clusterutils.ListPods(env.Ctx, env.Client, upgradeNamespace, clusterName1)
 		Expect(err).ToNot(HaveOccurred())
+		podUIDs := make([]types.UID, 0, len(podList.Items))
 		for _, pod := range podList.Items {
 			podUIDs = append(podUIDs, pod.GetUID())
 		}
@@ -660,7 +656,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				GinkgoWriter.Printf("online manager rollout not done. Didn't find the expected Events\n")
 			}
 		}
-		AssertClusterIsReady(upgradeNamespace, clusterName1, 300, env)
+		clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName1, 300)
 
 		// the instance pods should not restart
 		By("verifying that the instance pods are not restarted", func() {
@@ -675,15 +671,21 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		AssertConfUpgrade(clusterName1, upgradeNamespace)
 
 		By("verifying connection through pooler after upgrade", func() {
-			assertReadWriteConnectionUsingPgBouncerService(upgradeNamespace, clusterName1, pgBouncerSampleFile, true)
+			pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(
+				env,
+				upgradeNamespace,
+				clusterName1,
+				pgBouncerSampleFile,
+				true,
+			)
 		})
 
 		By("installing a second Cluster on the upgraded operator", func() {
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName2)
 			Expect(err).ToNot(HaveOccurred())
-			CreateResourceFromFile(upgradeNamespace, sampleFile2)
-			AssertClusterIsReady(upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady], env)
+			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile2)
+			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		AssertConfUpgrade(clusterName2, upgradeNamespace)
@@ -692,9 +694,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// create a v1 cluster
 		By("restoring the backup taken from the first Cluster in a new cluster", func() {
 			restoredClusterName := "cluster-restore"
-			CreateResourceFromFile(upgradeNamespace, restoreFile)
-			AssertClusterIsReady(upgradeNamespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow],
-				env)
+			resources.CreateResourceFromFile(env, upgradeNamespace, restoreFile)
+			clusterasserts.AssertClusterIsReady(
+				env,
+				upgradeNamespace,
+				restoredClusterName,
+				testTimeouts[timeouts.ClusterIsReadySlow],
+			)
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"
@@ -737,12 +743,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
 		})
-		AssertArchiveWalOnMinio(upgradeNamespace, clusterName1, serverName1)
+		objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+			upgradeNamespace, clusterName1, serverName1)
 		AssertScheduledBackupsAreScheduled(serverName1)
 
 		By("scaling down the pooler to 0", func() {
-			assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)
-			assertPGBouncerEndpointsContainsPodsIP(upgradeNamespace, pgBouncerSampleFile, 2)
+			pgbouncerasserts.AssertPgBouncerPodsAreReady(env, upgradeNamespace, pgBouncerSampleFile, 2)
+			pgbouncerasserts.AssertPgBouncerEndpointsContainsPodsIP(env, upgradeNamespace, pgBouncerSampleFile, 2)
 
 			Eventually(func(g Gomega) {
 				pooler := apiv1.Pooler{}
@@ -756,7 +763,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				g.Expect(err).ToNot(HaveOccurred())
 			}).Should(Succeed())
 
-			assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 0)
+			pgbouncerasserts.AssertPgBouncerPodsAreReady(env, upgradeNamespace, pgBouncerSampleFile, 0)
 		})
 
 		if testOnlineUpgrade {
@@ -792,8 +799,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-			operator.InstallLatest(env.Client, mostRecentTag)
-			DeferCleanup(cleanupOperatorAndMinio)
+			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
+			DeferCleanup(cleanupOperatorAndObjectStore)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest, false)
@@ -809,8 +816,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-			operator.InstallLatest(env.Client, mostRecentTag)
-			DeferCleanup(cleanupOperatorAndMinio)
+			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
+			DeferCleanup(cleanupOperatorAndObjectStore)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest, true)
@@ -831,7 +838,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
-			DeferCleanup(cleanupOperatorAndMinio)
+			DeferCleanup(cleanupOperatorAndObjectStore)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, true)
@@ -844,7 +851,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			})
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
-			DeferCleanup(cleanupOperatorAndMinio)
+			DeferCleanup(cleanupOperatorAndObjectStore)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, false)

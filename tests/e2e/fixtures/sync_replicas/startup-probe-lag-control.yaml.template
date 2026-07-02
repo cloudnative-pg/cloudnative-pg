@@ -23,7 +23,11 @@ spec:
     startup:
       type: streaming
       maximumLag: 16Mi
-      failureThreshold: 60
+      # High failureThreshold to prevent container restarts during WAL catch-up.
+      # On cloud environments with variable I/O, catching up ~400-500MB of WAL
+      # can take longer than 60 seconds. Container restarts would cause log loss,
+      # making it impossible to verify that the probe correctly detected lag.
+      failureThreshold: 600
       periodSeconds: 1
     readiness:
       failureThreshold: 10

@@ -30,6 +30,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
+
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 // List the available roles excluding all the roles that start with `pg_`
@@ -100,6 +102,14 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 	return roles, nil
 }
 
+func executeRoleStatement(ctx context.Context, db *sql.DB, statement string, suppressLogging bool) error {
+	if suppressLogging {
+		return postgresutils.ExecWithSuppressedLogging(ctx, db, statement)
+	}
+	_, err := db.ExecContext(ctx, statement)
+	return err
+}
+
 // Update the role
 func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
@@ -107,17 +117,23 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while updating role %s with role reconciler: %w", role.Name, err)
 	}
+
 	var query strings.Builder
 
-	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+	fmt.Fprintf(&query, "ALTER ROLE %s", pgx.Identifier{role.Name}.Sanitize())
 	appendRoleOptions(role, &query)
+	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
 	// NOTE: always apply the password update. Since the transaction ID of the role
-	// will change no matter what, the next reconciliation cycle we would update the password
-	appendPasswordOption(role, &query)
+	// will change no matter what, the next reconciliation cycle would diff anyway.
+	// The new xmin is recorded in PasswordState after this call, so subsequent
+	// reconciles compare equal and do not re-issue ALTER ROLE despite the fresh
+	// SCRAM salt.
+	if err := appendPasswordOption(role, &query); err != nil {
+		return wrapErr(err)
+	}
 
-	_, err := db.ExecContext(ctx, query.String())
-	if err != nil {
+	if err := executeRoleStatement(ctx, db, query.String(), roleHasPassword(role)); err != nil {
 		return wrapErr(err)
 	}
 	return nil
@@ -133,23 +149,26 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	}
 
 	var query strings.Builder
-	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+	fmt.Fprintf(&query, "CREATE ROLE %s", pgx.Identifier{role.Name}.Sanitize())
 	appendRoleOptions(role, &query)
 	appendInRoleOptions(role, &query)
-	appendPasswordOption(role, &query)
+	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Creating", "query", query.String())
+	if err := appendPasswordOption(role, &query); err != nil {
+		return wrapErr(err)
+	}
 
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	if _, err := db.ExecContext(ctx, query.String()); err != nil {
+	if err := executeRoleStatement(ctx, db, query.String(), roleHasPassword(role)); err != nil {
 		return wrapErr(err)
 	}
 
 	if len(role.Comment) > 0 {
 		query.Reset()
-		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s IS %s",
-			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
+		fmt.Fprintf(&query, "COMMENT ON ROLE %s IS %s",
+			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment))
 
 		if _, err := db.ExecContext(ctx, query.String()); err != nil {
 			return wrapErr(err)
@@ -167,7 +186,9 @@ func Delete(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 		return fmt.Errorf("while deleting role %s with role reconciler: %w", role.Name, err)
 	}
 
-	query := fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize())
+	// IF EXISTS keeps deletion idempotent: a retry after the role is already
+	// gone (e.g. a failed finalizer update) must not error.
+	query := fmt.Sprintf("DROP ROLE IF EXISTS %s", pgx.Identifier{role.Name}.Sanitize())
 	contextLog.Debug("Dropping", "query", query)
 	_, err := db.ExecContext(ctx, query)
 	if err != nil {
@@ -310,7 +331,7 @@ func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
 			quotedInRoles[i] = pgx.Identifier{inRole}.Sanitize()
 		}
 
-		fmt.Fprintf(query, " IN ROLE %s ", strings.Join(quotedInRoles, ","))
+		fmt.Fprintf(query, " IN ROLE %s", strings.Join(quotedInRoles, ","))
 	}
 }
 
@@ -360,7 +381,16 @@ func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 	fmt.Fprintf(query, " CONNECTION LIMIT %d", role.ConnectionLimit)
 }
 
-func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
+func roleHasPassword(role DatabaseRole) bool {
+	return !role.ignorePassword && role.password.Valid
+}
+
+// appendPasswordOption appends the PASSWORD and VALID UNTIL clauses of a
+// CREATE/ALTER ROLE statement to query. Cleartext passwords are
+// SCRAM-SHA-256 encoded so the SQL literal is never cleartext, unless
+// the Secret backing the role carries the passthrough annotation, in
+// which case the value is forwarded verbatim.
+func appendPasswordOption(role DatabaseRole, query *strings.Builder) error {
 	switch {
 	case role.ignorePassword:
 		// Postgres may allow to set the VALID UNTIL of a role independently of
@@ -369,7 +399,15 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 	case !role.password.Valid:
 		query.WriteString(" PASSWORD NULL")
 	default:
-		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(role.password.String))
+		literal := role.password.String
+		if !role.passwordPassthrough {
+			encoded, err := postgresutils.EnsureEncryptedPassword(literal)
+			if err != nil {
+				return err
+			}
+			literal = encoded
+		}
+		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(literal))
 	}
 
 	if role.ValidUntil.Valid {
@@ -381,4 +419,5 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 		}
 		fmt.Fprintf(query, " VALID UNTIL %s", pq.QuoteLiteral(value))
 	}
+	return nil
 }

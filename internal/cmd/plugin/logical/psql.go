@@ -65,13 +65,14 @@ func getSQLCommand(
 	sqlCommand string,
 	args ...string,
 ) (*psql.Command, error) {
-	psqlArgs := []string{
+	psqlArgs := make([]string, 0, 5+len(args))
+	psqlArgs = append(psqlArgs,
 		connectionString,
 		"-U",
 		"postgres",
 		"-c",
 		sqlCommand,
-	}
+	)
 	psqlArgs = append(psqlArgs, args...)
 	psqlOptions := psql.CommandOptions{
 		Replica:     false,

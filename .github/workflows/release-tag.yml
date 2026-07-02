@@ -19,9 +19,10 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       -
         name: Create tag
+        id: create_tag
         if: github.event.pull_request.merged == true && startsWith(github.head_ref, 'release/v')
         uses: christophebedard/tag-version-commit@57ffb155fc61c8ab098fcfa273469b532c1d4ce7 # v1.7.0
         with:
@@ -29,3 +30,30 @@ jobs:
           version_regex: '^Version tag to ([0-9]+\.[0-9]+\.[0-9]+(?:-[a-z][0-9a-z]*)?)'
           version_tag_prefix: v
           dry_run: false
+      -
+        name: Check if the tag applies to the API repository
+        id: api_tag
+        if: steps.create_tag.outputs.tag != ''
+        env:
+          TAG: ${{ steps.create_tag.outputs.tag }}
+        run: |
+          # The API repository mirrors the API types from main, so it can only be
+          # tagged for releases whose API matches main: the .0 of a new minor and
+          # its release candidates (X.Y.0-rcN, always cut from main). Later patch
+          # releases come from release branches whose API may have diverged.
+          core="${TAG#v}"
+          core="${core%%-*}"
+          if [ "${core##*.}" = "0" ]; then
+            echo "propagate=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "propagate=false" >> "$GITHUB_OUTPUT"
+          fi
+      -
+        name: Propagate the tag to the API repository
+        if: steps.api_tag.outputs.propagate == 'true'
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          repository: cloudnative-pg/api
+          event-type: sync-api
+          client-payload: '{"tag": "${{ steps.create_tag.outputs.tag }}"}'
