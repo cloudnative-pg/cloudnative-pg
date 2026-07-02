@@ -68,6 +68,12 @@ var _ = Describe("Most recent tag", func() {
 		releasesDir, err := filepath.Abs(releaseDirectoryPath)
 		Expect(err).ToNot(HaveOccurred())
 
+		// simulate the common case where HEAD is not exactly on a release tag,
+		// so the result doesn't depend on which commit the checkout sits on
+		original := headExactReleaseTag
+		DeferCleanup(func() { headExactReleaseTag = original })
+		headExactReleaseTag = func() string { return "" }
+
 		GinkgoT().Setenv("BRANCH_NAME", "dev/"+versions.Version)
 
 		tag, err := GetMostRecentReleaseTag(releasesDir)
@@ -79,6 +85,53 @@ var _ = Describe("Most recent tag", func() {
 		} else {
 			Expect(tag).To(BeEquivalentTo(versions.Version))
 		}
+	})
+})
+
+var _ = Describe("Most recent tag when HEAD is on a release tag", func() {
+	var tmpDir string
+
+	BeforeEach(func() {
+		// a dev branch, so the release-branch path is not taken
+		GinkgoT().Setenv("BRANCH_NAME", "dev/test")
+
+		tmpDir = GinkgoT().TempDir()
+		for _, file := range []string{
+			"cnpg-1.29.0.yaml",
+			"cnpg-1.29.1.yaml",
+			"cnpg-1.30.0.yaml",
+		} {
+			f, err := os.Create(filepath.Clean(filepath.Join(tmpDir, file)))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(f.Close()).ToNot(HaveOccurred())
+		}
+
+		original := headExactReleaseTag
+		DeferCleanup(func() { headExactReleaseTag = original })
+	})
+
+	It("falls back to the previous release when HEAD is exactly the latest release tag", func() {
+		headExactReleaseTag = func() string { return "v1.30.0" }
+
+		tag, err := GetMostRecentReleaseTag(tmpDir)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(tag).To(Equal("1.29.1"))
+	})
+
+	It("keeps the latest release once a commit lands on top of the tag", func() {
+		headExactReleaseTag = func() string { return "" }
+
+		tag, err := GetMostRecentReleaseTag(tmpDir)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(tag).To(Equal("1.30.0"))
+	})
+
+	It("keeps the latest release when HEAD is on an rc tag", func() {
+		headExactReleaseTag = func() string { return "v1.30.0-rc1" }
+
+		tag, err := GetMostRecentReleaseTag(tmpDir)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(tag).To(Equal("1.30.0"))
 	})
 })
 
