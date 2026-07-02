@@ -53,9 +53,33 @@ func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 		return versions[1].String(), nil
 	}
 
+	// The morning after a release tag is cut, the latest release is built from the
+	// same commit as the code under test, so the instance manager binary is identical
+	// and no upgrade would be performed. When HEAD is exactly the latest release tag,
+	// fall back to the previous release so the upgrade test always has something to
+	// upgrade from. This self-clears as soon as any commit lands on top of the tag.
+	if len(versions) > 1 {
+		if tag := headExactReleaseTag(); tag != "" {
+			if v, err := semver.NewVersion(tag); err == nil && versions[0].Equal(v) {
+				return versions[1].String(), nil
+			}
+		}
+	}
+
 	// otherwise, we take for granted it's on a dev branch (or just one release available),
 	// so just return the latest release tag
 	return versions[0].String(), nil
+}
+
+// headExactReleaseTag returns the tag that points exactly at HEAD, or an empty
+// string if HEAD is not exactly on a tag. It is a variable so tests can stub the
+// git lookup.
+var headExactReleaseTag = func() string {
+	out, err := exec.Command("git", "describe", "--tags", "--exact-match", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // GetAvailableReleases retrieves all the available releases from
