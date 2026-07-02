@@ -122,8 +122,17 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 		return false, fmt.Errorf("expected 1 primary PostgreSQL but none found")
 	}
 
-	// from now on we know we have a primary instance
+	return r.rolloutRequiredPrimary(ctx, cluster, podList, primaryPostgresqlStatus)
+}
 
+// rolloutRequiredPrimary rolls out the primary instance of the cluster when
+// its current state differs from the desired one
+func (r *ClusterReconciler) rolloutRequiredPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	podList *postgres.PostgresqlStatusList,
+	primaryPostgresqlStatus *postgres.PostgresqlStatus,
+) (bool, error) {
 	if cluster.IsInstanceFenced(primaryPostgresqlStatus.Pod.Name) {
 		return false, nil
 	}
