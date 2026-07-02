@@ -1,0 +1,20 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-inplace-resize
+spec:
+  instances: 3
+
+  resourcesUpdateStrategy: inPlace
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
