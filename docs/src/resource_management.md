@@ -204,11 +204,14 @@ point an in-place vertical autoscaler at the instance pods of a cluster using
 this strategy.
 :::
 
-Remember that PostgreSQL does not adapt its memory configuration to the
-container limits: increasing the memory of the instances does not change
-`shared_buffers` or the other memory-related parameters, which you should
-review and update consistently with the new resources. Note that changing
-`shared_buffers` requires a restart of PostgreSQL.
+PostgreSQL benefits from an in-place memory increase right away: the kernel
+page cache can grow within the new limit, caching more relation data, and
+the backends gain headroom for their working memory. What does not adapt
+automatically is the statically-sized configuration: `shared_buffers`
+(typically sized at about 25% of the available memory) keeps its configured
+value, and raising it requires a restart of PostgreSQL. Parameters that only
+inform the planner, like `effective_cache_size`, can instead be updated
+without a restart.
 
 ## Integration with the Vertical Pod Autoscaler (VPA)
 
