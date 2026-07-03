@@ -106,9 +106,13 @@ func (sr *Replicator) Start(ctx context.Context) error {
 	return nil
 }
 
-func (sr *Replicator) reconcile(ctx context.Context, config *apiv1.ReplicationSlotsConfiguration) error {
-	var err error
-
+// reconcile aligns the replication slots of this instance with those of the primary.
+// The error is a named return value, so that the deferred recover can report
+// a panic to the caller instead of discarding it.
+func (sr *Replicator) reconcile(
+	ctx context.Context,
+	config *apiv1.ReplicationSlotsConfiguration,
+) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("recovered from a panic: %s", r)

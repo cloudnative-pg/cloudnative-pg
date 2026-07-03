@@ -288,3 +288,14 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 })
+
+var _ = Describe("Replicator reconcile", func() {
+	It("returns the recovered error when the reconciliation panics", func(ctx SpecContext) {
+		// a Replicator with a nil instance panics as soon as it dereferences it
+		sr := NewReplicator(nil)
+
+		err := sr.reconcile(ctx, &apiv1.ReplicationSlotsConfiguration{})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("recovered from a panic"))
+	})
+})
