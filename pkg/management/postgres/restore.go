@@ -148,19 +148,18 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	}
 
 	var envs []string
-	config := getRestoreWalConfig()
 
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration == nil {
 		server, found := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
 		if found && server.BarmanObjectStore != nil {
-			envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster, &server)
+			envs, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster, &server)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	return info.concludeRestore(ctx, cli, cluster, config, envs)
+	return info.concludeRestore(ctx, cli, cluster, getRestoreWalConfig(), envs)
 }
 
 func (info InitInfo) concludeRestore(
@@ -215,13 +214,16 @@ func (info InitInfo) concludeRestore(
 	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
 }
 
-// createEnvAndConfigForSnapshotRestore creates env and config for snapshot restore
+// createEnvAndConfigForSnapshotRestore builds the WAL-restore environment for a
+// snapshot restore from an external object store and primes the bootstrap
+// WAL-restore cache. The restore configuration itself is path-independent, so
+// the caller obtains it from getRestoreWalConfig.
 func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
 	server *apiv1.ExternalCluster,
-) ([]string, string, error) {
+) ([]string, error) {
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Recovering from external cluster", "sourceName", server.Name)
@@ -235,7 +237,7 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 		server.BarmanObjectStore,
 		os.Environ())
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	backup := &apiv1.Backup{
@@ -256,7 +258,7 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 
 	setupBootstrapWALRestoreCache(cluster, backup, env)
 
-	return env, getRestoreWalConfig(), nil
+	return env, nil
 }
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
