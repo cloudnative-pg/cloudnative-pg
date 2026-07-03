@@ -41,7 +41,6 @@ import (
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
 	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
-	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -263,8 +262,6 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
-	contextLogger := log.FromContext(ctx)
-
 	cluster, err := info.loadCluster(ctx, cli)
 	if err != nil {
 		return err
@@ -280,57 +277,15 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 		info.ApplicationDatabase = cluster.GetApplicationDatabaseName()
 	}
 
-	var envs []string
 	var config string
-
-	//nolint:nestif
+	var envs []string
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
-		contextLogger.Info("Restore through plugin detected, proceeding...")
-		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
-		if err != nil {
-			return err
-		}
-		if res == nil {
-			return errors.New("empty response from restoreViaPlugin, programmatic error")
-		}
-
-		processEnvironment, err := envmap.ParseEnviron()
-		if err != nil {
-			return fmt.Errorf("error while parsing the process environment: %w", err)
-		}
-
-		pluginEnvironment, err := envmap.Parse(res.Envs)
-		if err != nil {
-			return fmt.Errorf("error while parsing the plugin environment: %w", err)
-		}
-
-		envs = envmap.Merge(processEnvironment, pluginEnvironment).StringSlice()
-		config = res.RestoreConfig
+		config, envs, err = restoreViaPlugin(ctx, cluster, pluginConfiguration)
 	} else {
-		// Before starting the restore we check if the archive destination is safe to use
-		// otherwise, we stop creating the cluster
-		err = info.checkBackupDestination(ctx, cli, cluster)
-		if err != nil {
-			return err
-		}
-
-		// If we need to download data from a backup, we do it
-		backup, env, err := info.loadBackup(ctx, cli, cluster)
-		if err != nil {
-			return err
-		}
-
-		if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
-			return err
-		}
-
-		if err := info.restoreDataDir(ctx, backup, env); err != nil {
-			return err
-		}
-
-		setupBootstrapWALRestoreCache(cluster, backup, env)
-		config = getRestoreWalConfig()
-		envs = env
+		config, envs, err = info.restoreViaBarmanObjectStore(ctx, cli, cluster)
+	}
+	if err != nil {
+		return err
 	}
 
 	return info.concludeRestore(ctx, cli, cluster, config, envs)
@@ -1076,14 +1031,16 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 	})
 }
 
-// restoreViaPlugin tries to restore the cluster using a plugin if available and enabled.
-// Returns true if a restore plugin was found and any error encountered.
+// restoreViaPlugin restores the cluster using the configured recovery source
+// plugin, returning the restore configuration and the environment the plugin
+// produced.
 func restoreViaPlugin(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	plugin *apiv1.PluginConfiguration,
-) (*restore.RestoreResponse, error) {
+) (config string, envs []string, err error) {
 	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Restore through plugin detected, proceeding...")
 
 	plugins := repository.New()
 	defer plugins.Close()
@@ -1093,9 +1050,60 @@ func restoreViaPlugin(
 	pClient, err := pluginClient.NewClient(ctx, pluginEnabledSet)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
-		return nil, err
+		return "", nil, err
 	}
 	defer pClient.Close(ctx)
 
-	return pClient.Restore(ctx, cluster)
+	res, err := pClient.Restore(ctx, cluster)
+	if err != nil {
+		return "", nil, err
+	}
+	if res == nil {
+		return "", nil, errors.New("empty response from restoreViaPlugin, programmatic error")
+	}
+
+	processEnvironment, err := envmap.ParseEnviron()
+	if err != nil {
+		return "", nil, fmt.Errorf("error while parsing the process environment: %w", err)
+	}
+
+	pluginEnvironment, err := envmap.Parse(res.Envs)
+	if err != nil {
+		return "", nil, fmt.Errorf("error while parsing the plugin environment: %w", err)
+	}
+
+	return res.RestoreConfig, envmap.Merge(processEnvironment, pluginEnvironment).StringSlice(), nil
+}
+
+// restoreViaBarmanObjectStore restores the base backup from a Barman Cloud
+// object store, primes the bootstrap WAL-restore cache, and returns the
+// WAL-restore configuration and environment for the recovery phase.
+func (info InitInfo) restoreViaBarmanObjectStore(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+) (config string, envs []string, err error) {
+	// Before starting the restore we check if the archive destination is safe to
+	// use, otherwise we stop creating the cluster.
+	if err := info.checkBackupDestination(ctx, cli, cluster); err != nil {
+		return "", nil, err
+	}
+
+	// If we need to download data from a backup, we do it.
+	backup, env, err := info.loadBackup(ctx, cli, cluster)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
+		return "", nil, err
+	}
+
+	if err := info.restoreDataDir(ctx, backup, env); err != nil {
+		return "", nil, err
+	}
+
+	setupBootstrapWALRestoreCache(cluster, backup, env)
+
+	return getRestoreWalConfig(), env, nil
 }
