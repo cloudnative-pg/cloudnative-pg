@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"go.uber.org/multierr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
@@ -146,7 +147,9 @@ func (sr *Replicator) reconcile(ctx context.Context, config *apiv1.ReplicationSl
 	return err
 }
 
-// synchronizeReplicationSlots aligns the slots in the local instance with those in the primary
+// synchronizeReplicationSlots aligns the slots in the local instance with those in the primary.
+// A failure on a single slot doesn't stop the synchronization: the remaining
+// slots are still processed, and the errors are collected and returned together.
 //
 //nolint:gocognit
 func synchronizeReplicationSlots(
@@ -172,6 +175,7 @@ func synchronizeReplicationSlots(
 
 	mySlotName := config.HighAvailability.GetSlotNameFromInstanceName(podName)
 
+	var errs error
 	for _, slot := range slotsInPrimary.Items {
 		if slot.SlotName == mySlotName {
 			continue
@@ -191,14 +195,15 @@ func synchronizeReplicationSlots(
 		}
 
 		if !slotsInLocal.Has(slot.SlotName) {
-			err := infrastructure.Create(ctx, localDB, slot)
-			if err != nil {
-				return err
+			if err := infrastructure.Create(ctx, localDB, slot); err != nil {
+				errs = multierr.Append(errs,
+					fmt.Errorf("creating replication slot %q: %w", slot.SlotName, err))
+				continue
 			}
 		}
-		err := infrastructure.Update(ctx, localDB, slot)
-		if err != nil {
-			return err
+		if err := infrastructure.Update(ctx, localDB, slot); err != nil {
+			errs = multierr.Append(errs,
+				fmt.Errorf("updating replication slot %q: %w", slot.SlotName, err))
 		}
 	}
 	for _, slot := range slotsInLocal.Items {
@@ -207,19 +212,21 @@ func synchronizeReplicationSlots(
 		//  * the slot used by this node
 		//  * slots holding xmin (this can happen on a former primary, and will prevent VACUUM from
 		//      removing tuples deleted by any later transaction.)
-		if !slotsInPrimary.Has(slot.SlotName) || slot.SlotName == mySlotName || slot.HoldsXmin {
-			if err := infrastructure.Delete(ctx, localDB, slot); err != nil {
-				return err
-			}
+		//  * slots that aren't from HA, when the user turns off the synchronization of user defined
+		//      replication slots
+		shouldDelete := !slotsInPrimary.Has(slot.SlotName) ||
+			slot.SlotName == mySlotName ||
+			slot.HoldsXmin ||
+			(!slot.IsHA && !config.SynchronizeReplicas.GetEnabled())
+		if !shouldDelete {
+			continue
 		}
 
-		// when the user turns off the feature we should delete all the created replication slots that aren't from HA
-		if !slot.IsHA && !config.SynchronizeReplicas.GetEnabled() {
-			if err := infrastructure.Delete(ctx, localDB, slot); err != nil {
-				return err
-			}
+		if err := infrastructure.Delete(ctx, localDB, slot); err != nil {
+			errs = multierr.Append(errs,
+				fmt.Errorf("dropping replication slot %q: %w", slot.SlotName, err))
 		}
 	}
 
-	return nil
+	return errs
 }
