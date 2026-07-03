@@ -132,12 +132,14 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
-          title: "feat: Public Cloud K8S versions update"
+          title: "chore: Public Cloud K8S versions update"
           body: "Update the versions used to test the operator on public cloud providers"
           branch: "k8s-cloud-versions-update"
           author: "public-cloud-k8s-versions-check <public-cloud-k8s-versions-check@users.noreply.github.com>"
+          committer: "public-cloud-k8s-versions-check <public-cloud-k8s-versions-check@users.noreply.github.com>"
+          labels: "no-issue"
           add-paths: |
             .github/**
             Makefile
-          commit-message: "feat: Updated public cloud k8s tested versions"
+          commit-message: "chore: Updated public cloud k8s tested versions"
           signoff: true
