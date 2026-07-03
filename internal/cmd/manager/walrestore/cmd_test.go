@@ -36,6 +36,10 @@ import (
 type fakeCacheClient struct {
 	envs   map[string][]string
 	stores map[string]*apiv1.BarmanObjectStoreConfiguration
+	// storeErr, when set, is returned by GetBarmanObjectStore instead of
+	// cache.ErrCacheMiss, simulating a genuine cache-service failure (as
+	// opposed to the key simply never having been populated).
+	storeErr error
 }
 
 func (f fakeCacheClient) GetCluster() (*apiv1.Cluster, error) {
@@ -52,6 +56,9 @@ func (f fakeCacheClient) GetEnv(key string) ([]string, error) {
 func (f fakeCacheClient) GetBarmanObjectStore(key string) (*apiv1.BarmanObjectStoreConfiguration, error) {
 	if v, ok := f.stores[key]; ok {
 		return v, nil
+	}
+	if f.storeErr != nil {
+		return nil, f.storeErr
 	}
 	return nil, cache.ErrCacheMiss
 }
@@ -208,6 +215,31 @@ var _ = Describe("getWALRestoreSettings", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(maxParallel).To(Equal(2))
 		Expect(options).To(ContainElement("--read-timeout=60"))
+	})
+
+	It("fails instead of falling back to the cluster's own store when the cached "+
+		"bootstrap store lookup fails for a reason other than a cache miss", func(ctx SpecContext) {
+		// No primary elected yet, so this is still within the bootstrap window,
+		// but the cache lookup fails with something other than a miss: a real
+		// failure that has already survived the cache client's own
+		// retry-with-backoff, as opposed to the key simply never having been
+		// populated. Falling through to the cluster's own backup store here
+		// would silently restore WALs from the wrong (and possibly unrelated
+		// or empty) destination instead of failing loudly.
+		cluster := clusterWithOwnBackup("")
+		injectedErr := errors.New("simulated cache-service failure")
+		cacheClient := fakeCacheClient{
+			envs: map[string][]string{cache.WALRestoreKey: {"AWS_ACCESS_KEY_ID=own-key"}},
+			// This must never be used: a genuine cache error must not be
+			// treated the same as "nothing cached yet".
+			stores:   map[string]*apiv1.BarmanObjectStoreConfiguration{},
+			storeErr: injectedErr,
+		}
+
+		options, _, _, err := getWALRestoreSettings(ctx, cacheClient, cluster, podName)
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, injectedErr)).To(BeTrue())
+		Expect(options).To(BeNil())
 	})
 
 	It("ignores the cached bootstrap store once a primary has been elected", func(ctx SpecContext) {

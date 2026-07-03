@@ -344,10 +344,23 @@ func getWALRestoreSettings(
 	// so it is not derivable from the cluster spec here) and caches it for us.
 	// Gating on CurrentPrimary keeps this lookup off a running instance's hot
 	// path, where the key is never set.
+	//
+	// This gate relies on CurrentPrimary never reverting to empty once set.
+	// If that ever stopped being true, a long-running instance could
+	// re-enter this branch and, on a cache miss, silently fall through to
+	// GetRecoverConfiguration below instead of hitting its intended hot-path
+	// resolution.
 	if cluster.Status.CurrentPrimary == "" {
 		barmanConfiguration, configErr := cacheClient.GetBarmanObjectStore(cache.WALRestoreConfigKey)
-		if configErr == nil {
+		switch {
+		case configErr == nil:
 			return walRestoreSettingsFromStore(ctx, cacheClient, barmanConfiguration, barmanConfiguration.ServerName, nil)
+		case !errors.Is(configErr, cache.ErrCacheMiss):
+			// A real failure resolving the bootstrap-cached recovery source store
+			// must not be mistaken for "nothing cached yet": falling through here
+			// would silently restore WALs from the cluster's own (unrelated, and
+			// possibly empty) backup destination instead of the recovery source.
+			return nil, nil, 0, fmt.Errorf("while getting the cached recovery source object store: %w", configErr)
 		}
 	}
 
