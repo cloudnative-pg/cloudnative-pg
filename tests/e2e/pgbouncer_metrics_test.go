@@ -32,6 +32,7 @@ import (
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -103,15 +104,18 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 
 			for _, pod := range podList.Items {
 				podName := pod.GetName()
-				out, err := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod, false)
-				Expect(err).ToNot(HaveOccurred())
-				matches := metricsRegexp.FindAllString(out, -1)
-				Expect(matches).To(
-					HaveLen(len(promMetrics)),
-					"Metric collection issues on %v.\nCollected metrics:\n%v",
-					podName,
-					out,
-				)
+				Eventually(func(g Gomega) error {
+					out, err := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod, false)
+					g.Expect(err).ToNot(HaveOccurred())
+					matches := metricsRegexp.FindAllString(out, -1)
+					g.Expect(matches).To(
+						HaveLen(len(promMetrics)),
+						"Metric collection issues on %v.\nCollected metrics:\n%v",
+						podName,
+						out,
+					)
+					return nil
+				}, testTimeouts[timeouts.Short]).Should(Succeed())
 			}
 		})
 
@@ -144,11 +148,14 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 				Expect(errHTTP).To(HaveOccurred(),
 					"HTTP scrape of %v must fail when monitoring.tls.enabled=true", podName)
 
-				out, err := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod, true)
-				Expect(err).ToNot(HaveOccurred(),
-					"HTTPS scrape of %v must succeed when monitoring.tls.enabled=true", podName)
-				Expect(out).To(ContainSubstring("cnpg_pgbouncer_"),
-					"HTTPS scrape of %v did not return pgbouncer metrics; got:\n%v", podName, out)
+				Eventually(func(g Gomega) error {
+					out, err := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod, true)
+					g.Expect(err).ToNot(HaveOccurred(),
+						"HTTPS scrape of %v must succeed when monitoring.tls.enabled=true", podName)
+					g.Expect(out).To(ContainSubstring("cnpg_pgbouncer_"),
+						"HTTPS scrape of %v did not return pgbouncer metrics; got:\n%v", podName, out)
+					return nil
+				}, testTimeouts[timeouts.Short]).Should(Succeed())
 			}
 		})
 })
