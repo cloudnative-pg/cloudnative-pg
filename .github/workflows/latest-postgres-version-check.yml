@@ -85,6 +85,8 @@ jobs:
           body: "Update default PostgreSQL version from ${{ env.CURRENT_POSTGRES_VERSION }} to ${{ env.LATEST_POSTGRES_VERSION }}"
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          committer: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          labels: "no-issue"
           commit-message: "feat: update default PostgreSQL version to ${{ env.LATEST_POSTGRES_VERSION }}"
           signoff: true
 
@@ -99,6 +101,8 @@ jobs:
           body: "Update the Postgres versions used in E2E tests"
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          committer: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          labels: "no-issue"
           add-paths: ".github/"
           commit-message: "test: Updated Postgres versions used in E2E tests"
           signoff: true
