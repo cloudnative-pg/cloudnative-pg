@@ -93,12 +93,33 @@ var _ = Describe("LogRecordWriter", func() {
 			)
 			log.SetLogger(zapr.NewLogger(zap.New(errorOnlyCore)))
 
+			Expect(globalLoggerLevel()).To(Equal(zapcore.ErrorLevel))
+
 			buf := &bytes.Buffer{}
 			logger := buildUnsampledLogger(zapcore.AddSync(buf))
 			logger.Info(logRecordKey)
 
 			Expect(buf.String()).To(BeEmpty(),
 				"an Info-level record should have been filtered out by the global logger's Error level")
+		})
+	})
+
+	Context("applyFieldRemap", func() {
+		It("leaves the default level/timestamp keys untouched when no remap flags are set", func() {
+			enc := zap.NewProductionEncoderConfig()
+			applyFieldRemap(&enc, nil)
+			Expect(enc.LevelKey).To(Equal(zap.NewProductionEncoderConfig().LevelKey))
+			Expect(enc.TimeKey).To(Equal(zap.NewProductionEncoderConfig().TimeKey))
+		})
+
+		It("renames the level and timestamp keys from --log-field-* flags", func() {
+			enc := zap.NewProductionEncoderConfig()
+			applyFieldRemap(&enc, []string{
+				"--log-field-level=severity",
+				"--log-field-timestamp=timestamp",
+			})
+			Expect(enc.LevelKey).To(Equal("severity"))
+			Expect(enc.TimeKey).To(Equal("timestamp"))
 		})
 	})
 })

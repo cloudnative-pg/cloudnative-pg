@@ -64,10 +64,13 @@ func getRecordLogger() logr.Logger {
 
 // buildUnsampledLogger constructs a JSON logger writing to out without any
 // sampling. It otherwise mirrors the global instance-manager logger built by
-// machinery/pkg/log.Flags.ConfigureLogging: same JSON/RFC3339Nano encoding,
-// the same effective --log-level, and the same --log-field-level/
-// --log-field-timestamp remapping, so audit records only differ from the
-// rest of the pod's log lines in that they're never sampler-dropped.
+// machinery/pkg/log.Flags.ConfigureLogging for Info-level output: same
+// JSON/RFC3339Nano encoding, the same effective --log-level, and the same
+// --log-field-level/--log-field-timestamp field-name remapping, so audit
+// records only differ from the rest of the pod's log lines in that they're
+// never sampler-dropped. LogRecordWriter only ever logs at Info, so the
+// custom level-name encoding ConfigureLogging installs for Warning/Debug/
+// Trace (see machinery/pkg/log.getLogLevelString) isn't replicated here.
 //
 // --log-destination is intentionally not honored here: it's only ever passed
 // to the short-lived wal-archive/wal-restore subcommands, never to the
@@ -76,7 +79,7 @@ func getRecordLogger() logr.Logger {
 func buildUnsampledLogger(out zapcore.WriteSyncer) logr.Logger {
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
-	applyFieldRemap(&encoderConfig)
+	applyFieldRemap(&encoderConfig, log.GetFieldsRemapFlags())
 
 	core := zapcore.NewCore(zapcore.NewJSONEncoder(encoderConfig), out, globalLoggerLevel())
 	l := zapr.NewLogger(zap.New(core))
@@ -97,11 +100,13 @@ func globalLoggerLevel() zapcore.Level {
 	return zapcore.InfoLevel
 }
 
-// applyFieldRemap mirrors the --log-field-level/--log-field-timestamp
-// remapping machinery/pkg/log applies to the global logger's encoder, so the
-// audit logger's JSON schema doesn't diverge from the rest of the pod's logs.
-func applyFieldRemap(enc *zapcore.EncoderConfig) {
-	for _, flag := range log.GetFieldsRemapFlags() {
+// applyFieldRemap applies the --log-field-level/--log-field-timestamp field-name
+// remapping machinery/pkg/log applies to the global logger's encoder (flags in
+// the same "--log-field-level=X"/"--log-field-timestamp=X" form GetFieldsRemapFlags
+// returns), so the audit logger's JSON schema doesn't diverge from the rest of
+// the pod's logs.
+func applyFieldRemap(enc *zapcore.EncoderConfig, flags []string) {
+	for _, flag := range flags {
 		switch {
 		case strings.HasPrefix(flag, "--log-field-level="):
 			enc.LevelKey = strings.TrimPrefix(flag, "--log-field-level=")
