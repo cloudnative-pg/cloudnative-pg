@@ -21,6 +21,7 @@ package logpipe
 
 import (
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -56,31 +57,58 @@ var (
 // bypasses that sampler so every record is forwarded unconditionally.
 func getRecordLogger() logr.Logger {
 	recordLogOnce.Do(func() {
-		recordLogr = buildUnsampledLogger()
+		recordLogr = buildUnsampledLogger(zapcore.AddSync(os.Stderr))
 	})
 	return recordLogr
 }
 
-// buildUnsampledLogger constructs a JSON logger that writes to stderr without
-// any sampling. The format intentionally mirrors the default instance-manager
-// logger (RFC3339 timestamps, JSON encoding) so log aggregators see a
-// consistent schema across all pod log lines.
-func buildUnsampledLogger() logr.Logger {
-	cfg := zap.NewProductionConfig()
-	cfg.Sampling = nil // disable sampling — audit records must never be dropped
-	cfg.EncoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
+// buildUnsampledLogger constructs a JSON logger writing to out without any
+// sampling. It otherwise mirrors the global instance-manager logger built by
+// machinery/pkg/log.Flags.ConfigureLogging: same JSON/RFC3339Nano encoding,
+// the same effective --log-level, and the same --log-field-level/
+// --log-field-timestamp remapping, so audit records only differ from the
+// rest of the pod's log lines in that they're never sampler-dropped.
+//
+// --log-destination is intentionally not honored here: it's only ever passed
+// to the short-lived wal-archive/wal-restore subcommands, never to the
+// long-running `instance run` process that owns this writer, so stderr is
+// always the correct destination in practice.
+func buildUnsampledLogger(out zapcore.WriteSyncer) logr.Logger {
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
+	applyFieldRemap(&encoderConfig)
 
-	zapLogger, err := cfg.Build()
-	if err != nil {
-		// Fallback: global logger may still sample, but is better than nothing
-		return log.GetLogger().GetLogger()
-	}
-
-	l := zapr.NewLogger(zapLogger)
+	core := zapcore.NewCore(zapcore.NewJSONEncoder(encoderConfig), out, globalLoggerLevel())
+	l := zapr.NewLogger(zap.New(core))
 	if podName := os.Getenv("POD_NAME"); podName != "" {
 		l = l.WithValues("logging_pod", podName)
 	}
 	return l
+}
+
+// globalLoggerLevel returns the effective level of the global instance-manager
+// logger, so the unsampled audit logger honors the same --log-level flag
+// instead of hardcoding one. Falls back to Info if the global logger isn't a
+// zap logger, which shouldn't happen once ConfigureLogging has run.
+func globalLoggerLevel() zapcore.Level {
+	if u, ok := log.GetLogger().GetLogger().GetSink().(zapr.Underlier); ok {
+		return u.GetUnderlying().Level()
+	}
+	return zapcore.InfoLevel
+}
+
+// applyFieldRemap mirrors the --log-field-level/--log-field-timestamp
+// remapping machinery/pkg/log applies to the global logger's encoder, so the
+// audit logger's JSON schema doesn't diverge from the rest of the pod's logs.
+func applyFieldRemap(enc *zapcore.EncoderConfig) {
+	for _, flag := range log.GetFieldsRemapFlags() {
+		switch {
+		case strings.HasPrefix(flag, "--log-field-level="):
+			enc.LevelKey = strings.TrimPrefix(flag, "--log-field-level=")
+		case strings.HasPrefix(flag, "--log-field-timestamp="):
+			enc.TimeKey = strings.TrimPrefix(flag, "--log-field-timestamp=")
+		}
+	}
 }
 
 // Write writes the PostgreSQL log record to the instance manager logger

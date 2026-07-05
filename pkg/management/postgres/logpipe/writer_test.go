@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -31,46 +33,26 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// buildTestCore constructs a zapcore.Core that writes JSON to buf.
-// When sampled is true it wraps the core in the same sampler that
-// controller-runtime adds in production mode (100 initial, 100 thereafter
-// per second). When sampled is false no sampler is applied — this mirrors
-// what buildUnsampledLogger does.
-func buildTestCore(buf *bytes.Buffer, sampled bool) zapcore.Core {
+// buildTestCore constructs a sampled zapcore.Core writing JSON to buf, using
+// the same sampler controller-runtime installs in production mode (100
+// initial, 100 thereafter per second). It demonstrates the bug this PR fixes:
+// it does not exercise buildUnsampledLogger itself.
+func buildTestCore(buf *bytes.Buffer) zapcore.Core {
 	enc := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
 	ws := zapcore.AddSync(buf)
 	core := zapcore.NewCore(enc, ws, zap.InfoLevel)
-	if sampled {
-		return zapcore.NewSamplerWithOptions(core, time.Second, 100, 100)
-	}
-	return core
+	return zapcore.NewSamplerWithOptions(core, time.Second, 100, 100)
 }
 
 var _ = Describe("LogRecordWriter", func() {
 	const burst = 200 // must exceed the sampler's initial-pass threshold of 100
 
-	Context("unsampled logger (the fix)", func() {
-		It("forwards every audit record even during a burst", func() {
-			buf := &bytes.Buffer{}
-			logger := zap.New(buildTestCore(buf, false))
-
-			for i := 0; i < burst; i++ {
-				logger.Info(logRecordKey)
-			}
-			Expect(logger.Sync()).To(Succeed())
-
-			lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-			Expect(lines).To(HaveLen(burst),
-				"unsampled logger must emit all %d records; got %d — sampler may still be active", burst, len(lines))
-		})
-	})
-
 	Context("sampled logger (the bug)", func() {
 		It("drops audit records after the first 100 within a second", func() {
 			buf := &bytes.Buffer{}
-			logger := zap.New(buildTestCore(buf, true))
+			logger := zap.New(buildTestCore(buf))
 
-			for i := 0; i < burst; i++ {
+			for range burst {
 				logger.Info(logRecordKey)
 			}
 			Expect(logger.Sync()).To(Succeed())
@@ -81,6 +63,42 @@ var _ = Describe("LogRecordWriter", func() {
 			// under 200 lines — the exact count varies but is always < burst.
 			Expect(len(lines)).To(BeNumerically("<", burst),
 				"sampled logger should drop messages beyond 100/s; got %d lines for %d messages", len(lines), burst)
+		})
+	})
+
+	Context("buildUnsampledLogger (the fix)", func() {
+		It("forwards every audit record even during a burst", func() {
+			buf := &bytes.Buffer{}
+			logger := buildUnsampledLogger(zapcore.AddSync(buf))
+
+			for range burst {
+				logger.Info(logRecordKey)
+			}
+
+			lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+			Expect(lines).To(HaveLen(burst),
+				"unsampled logger must emit all %d records; got %d", burst, len(lines))
+		})
+
+		It("honors the effective level of the global instance-manager logger", func() {
+			originalLogger := log.GetLogger().GetLogger()
+			DeferCleanup(func() {
+				log.SetLogger(originalLogger)
+			})
+
+			errorOnlyCore := zapcore.NewCore(
+				zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+				zapcore.AddSync(&bytes.Buffer{}),
+				zap.ErrorLevel,
+			)
+			log.SetLogger(zapr.NewLogger(zap.New(errorOnlyCore)))
+
+			buf := &bytes.Buffer{}
+			logger := buildUnsampledLogger(zapcore.AddSync(buf))
+			logger.Info(logRecordKey)
+
+			Expect(buf.String()).To(BeEmpty(),
+				"an Info-level record should have been filtered out by the global logger's Error level")
 		})
 	})
 })
