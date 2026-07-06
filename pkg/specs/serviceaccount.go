@@ -36,9 +36,8 @@ import (
 func UpdateServiceAccount(
 	imagePullSecretsNames []string,
 	serviceAccount *corev1.ServiceAccount,
-	automountServiceAccountToken *bool,
 ) error {
-	serviceAccount.AutomountServiceAccountToken = automountServiceAccountToken
+	serviceAccount.AutomountServiceAccountToken = ptr.To(false)
 
 	if serviceAccount.ImagePullSecrets == nil {
 		serviceAccount.ImagePullSecrets = []corev1.LocalObjectReference{}
@@ -91,11 +90,10 @@ func IsServiceAccountAligned(
 	sa *corev1.ServiceAccount,
 	imagePullSecretsNames []string,
 	updatedMetadata metav1.ObjectMeta,
-	automountServiceAccountToken *bool,
 ) bool {
 	contextLogger := log.FromContext(ctx)
 
-	if !ptr.Equal(sa.AutomountServiceAccountToken, automountServiceAccountToken) {
+	if sa.AutomountServiceAccountToken == nil || *sa.AutomountServiceAccountToken {
 		return false
 	}
 

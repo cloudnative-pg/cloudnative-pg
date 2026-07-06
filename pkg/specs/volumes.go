@@ -165,9 +165,7 @@ func createPostgresVolumes(
 		result = append(result, createProjectedVolume(cluster))
 	}
 
-	if cluster.ShouldCreateKubeAPIAccessVolume() {
-		result = append(result, createKubeAPIAccessVolume())
-	}
+	result = append(result, createKubeAPIAccessVolume())
 
 	result = append(result, CreateExtensionVolumes(extensions)...)
 
@@ -254,9 +252,8 @@ type VolumeMountsConfig struct {
 	// require dedicated volume mounts.
 	Extensions []apiv1.ExtensionConfiguration
 	// NeedsKubeAPIAccess controls whether the kube-api-access projected volume
-	// mount is included when automountServiceAccountToken is disabled.
-	// Set to false for containers that do not need Kubernetes API access
-	// (e.g. the bootstrap init container).
+	// mount is included. Set to false for containers that do not need
+	// Kubernetes API access (e.g. the bootstrap init container).
 	NeedsKubeAPIAccess bool
 }
 
@@ -303,7 +300,7 @@ func CreatePostgresVolumeMounts(cfg VolumeMountsConfig) []corev1.VolumeMount {
 		)
 	}
 
-	if cfg.NeedsKubeAPIAccess && cluster.ShouldCreateKubeAPIAccessVolume() {
+	if cfg.NeedsKubeAPIAccess {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
 				Name:      kubeAPIAccessVolumeName,

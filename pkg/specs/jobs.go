@@ -395,7 +395,7 @@ func CreatePrimaryJob(
 					Affinity:                     CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:                  cluster.Spec.Affinity.Tolerations,
 					ServiceAccountName:           cluster.GetServiceAccountName(),
-					AutomountServiceAccountToken: cluster.Spec.AutomountServiceAccountToken,
+					AutomountServiceAccountToken: ptr.To(false),
 					RestartPolicy:                corev1.RestartPolicyNever,
 					NodeSelector:                 cluster.Spec.Affinity.NodeSelector,
 					TopologySpreadConstraints:    cluster.Spec.TopologySpreadConstraints,

@@ -25,7 +25,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -248,19 +247,18 @@ var _ = Describe("Job created via InitDB", func() {
 	})
 })
 
-var _ = Describe("Job automountServiceAccountToken", func() {
+var _ = Describe("Job service account token", func() {
 	const tokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 
 	cluster := apiv1.Cluster{
 		Spec: apiv1.ClusterSpec{
-			AutomountServiceAccountToken: ptr.To(false),
 			Bootstrap: &apiv1.BootstrapConfiguration{
 				InitDB: &apiv1.BootstrapInitDB{},
 			},
 		},
 	}
 
-	It("disables the automount and mounts the token in non-bootstrap containers when false", func() {
+	It("always disables the automount and projects the token for non-bootstrap containers", func() {
 		job := CreatePrimaryJobViaInitdb(cluster, 0)
 		podSpec := job.Spec.Template.Spec
 		Expect(podSpec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
@@ -286,14 +284,5 @@ var _ = Describe("Job automountServiceAccountToken", func() {
 				ReadOnly:  true,
 			}), "container %s should mount the projected token", container.Name)
 		}
-	})
-
-	It("leaves the automount behavior untouched when unset", func() {
-		plainCluster := cluster.DeepCopy()
-		plainCluster.Spec.AutomountServiceAccountToken = nil
-		job := CreatePrimaryJobViaInitdb(*plainCluster, 0)
-		podSpec := job.Spec.Template.Spec
-		Expect(podSpec.AutomountServiceAccountToken).To(BeNil())
-		Expect(podSpec.Volumes).ToNot(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
 	})
 })
