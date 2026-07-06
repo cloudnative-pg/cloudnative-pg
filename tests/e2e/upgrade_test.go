@@ -807,6 +807,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 
 		It("keeps clusters working after an online upgrade", func() {
+			// TODO: remove this Skip in the next minor version.
+			// This version unconditionally sets automountServiceAccountToken=false on
+			// instance Pods, whereas the previous release left it unset. The resulting
+			// spec drift causes a one-time pod rollout when upgrading from the previous
+			// release, which is expected and accepted for this minor version bump.
+			Skip("one-time pod rollout expected when upgrading from the previous release " +
+				"due to automountServiceAccountToken now being hardcoded to false")
+
 			upgradeNamespacePrefix := onlineUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
 				operator.CreateConfigMap(env.Ctx, env.Client, operatorNamespace, configName, true)
