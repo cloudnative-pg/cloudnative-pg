@@ -31,18 +31,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type spyRecordWriter struct {
-	count int
-}
-
-func (s *spyRecordWriter) Write(logpipe.NamedRecord) {
-	s.count++
-}
-
 var _ = Describe("newWALReplayErrorDetector", func() {
 	var (
 		instance *postgres.Instance
-		writer   *spyRecordWriter
 		detector *walReplayErrorDetector
 		now      time.Time
 	)
@@ -52,9 +43,8 @@ var _ = Describe("newWALReplayErrorDetector", func() {
 		Expect(os.WriteFile(filepath.Join(pgData, "standby.signal"), nil, 0o600)).To(Succeed())
 		instance = &postgres.Instance{PgData: pgData}
 		instance.SetCanCheckReadiness(true)
-		writer = &spyRecordWriter{}
 		now = time.Date(2026, 7, 5, 0, 0, 0, 0, time.UTC)
-		detector = newWALReplayErrorDetector(instance, writer).(*walReplayErrorDetector)
+		detector = newWALReplayErrorDetector(instance).(*walReplayErrorDetector)
 		detector.now = func() time.Time { return now }
 	})
 
@@ -70,7 +60,6 @@ var _ = Describe("newWALReplayErrorDetector", func() {
 		Expect(instance.CanCheckReadiness()).To(BeFalse())
 		Expect(instance.StatusError()).To(ContainSubstring(walReplayStalledError))
 		Expect(instance.StatusError()).To(ContainSubstring("same LSN"))
-		Expect(writer.count).To(Equal(3))
 	})
 
 	It("should reset the counter when the failure LSN changes", func() {

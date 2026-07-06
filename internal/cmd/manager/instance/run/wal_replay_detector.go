@@ -41,7 +41,6 @@ var (
 
 type walReplayErrorDetector struct {
 	instance *postgres.Instance
-	next     logpipe.RecordWriter
 	now      func() time.Time
 
 	lsn       string
@@ -49,17 +48,14 @@ type walReplayErrorDetector struct {
 	firstSeen time.Time
 }
 
-func newWALReplayErrorDetector(instance *postgres.Instance, next logpipe.RecordWriter) logpipe.RecordWriter {
+func newWALReplayErrorDetector(instance *postgres.Instance) logpipe.RecordWriter {
 	return &walReplayErrorDetector{
 		instance: instance,
-		next:     next,
 		now:      time.Now,
 	}
 }
 
 func (d *walReplayErrorDetector) Write(record logpipe.NamedRecord) {
-	d.next.Write(record)
-
 	logRecord, ok := record.(*logpipe.LoggingRecord)
 	if !ok {
 		return
