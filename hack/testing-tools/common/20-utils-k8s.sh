@@ -447,8 +447,11 @@ function deploy_operator_with_helm() {
 # become ready. plugin-barman-cloud requires cert-manager because its manifest
 # creates the Issuer/Certificate resources used for the operator<->plugin mTLS.
 function ensure_cert_manager() {
+    # Split so renovate's regex (needs a bare "X_VERSION=", not "local X_VERSION=") still matches.
+    local CERT_MANAGER_DEFAULT_VERSION
     # renovate: datasource=github-releases depName=cert-manager/cert-manager
-    local cert_manager_version="${CERT_MANAGER_VERSION:-v1.20.2}"
+    CERT_MANAGER_DEFAULT_VERSION="v1.20.2"
+    local cert_manager_version="${CERT_MANAGER_VERSION:-${CERT_MANAGER_DEFAULT_VERSION}}"
 
     # shellcheck disable=SC2154
     if ${K8S_CLI} get namespace cert-manager >/dev/null 2>&1; then
