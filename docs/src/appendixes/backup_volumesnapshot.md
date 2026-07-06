@@ -283,22 +283,20 @@ If not specified, the default retry deadline is **10 minutes**.
 
 ### Error Handling
 
-When a retryable error occurs during a volume snapshot operation:
+When an error occurs during a volume snapshot operation:
 
 1. CloudNativePG records the time of the first error.
 2. The system retries the operation every **10 seconds**.
 3. If the error persists beyond the specified deadline (or the default 10
    minutes), the backup is marked as **failed**.
 
-### Retryable Errors
-
-CloudNativePG treats the following types of errors as retryable:
-
-- **Server timeout errors** (HTTP 408, 429, 500, 502, 503, 504)
-- **Conflicts** (optimistic locking errors)
-- **Internal errors**
-- **Context deadline exceeded errors**
-- **Timeout errors from the CSI snapshot controller**
+The CSI driver reports snapshot errors as free text, with no reliable way to
+tell a permanent condition (for example, a missing `VolumeSnapshotClass` or
+invalid credentials) from a transient one, and a condition that looks
+permanent can become resolvable at any point, for example if someone creates
+the missing class or fixes the credentials while CloudNativePG is retrying.
+For this reason, CloudNativePG retries every volume snapshot error the same
+way, until the deadline is reached.
 
 ### Examples
 
