@@ -603,7 +603,7 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	}
 
 	origSa := sa.DeepCopy()
-	err = specs.UpdateServiceAccount(generatedPullSecretNames, &sa, cluster.Spec.AutomountServiceAccountToken)
+	err = specs.UpdateServiceAccount(generatedPullSecretNames, &sa)
 	if err != nil {
 		return fmt.Errorf("while generating service account: %w", err)
 	}
@@ -616,7 +616,6 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 		origSa,
 		generatedPullSecretNames,
 		sa.ObjectMeta,
-		cluster.Spec.AutomountServiceAccountToken,
 	) {
 		return nil
 	}
@@ -665,7 +664,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 			},
 		},
 	}
-	err = specs.UpdateServiceAccount(generatedPullSecretNames, serviceAccount, cluster.Spec.AutomountServiceAccountToken)
+	err = specs.UpdateServiceAccount(generatedPullSecretNames, serviceAccount)
 	if err != nil {
 		return fmt.Errorf("while creating new ServiceAccount: %w", err)
 	}

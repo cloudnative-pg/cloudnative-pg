@@ -1027,13 +1027,6 @@ func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
 }
 
-// ShouldCreateKubeAPIAccessVolume returns whether the operator should
-// explicitly project the ServiceAccount token volume because the automatic
-// mount of the token is disabled
-func (cluster *Cluster) ShouldCreateKubeAPIAccessVolume() bool {
-	return cluster.Spec.AutomountServiceAccountToken != nil && !*cluster.Spec.AutomountServiceAccountToken
-}
-
 // ShouldPromoteFromReplicaCluster returns true if the cluster should promote
 func (cluster *Cluster) ShouldPromoteFromReplicaCluster() bool {
 	// If there's no replica cluster configuration there's no

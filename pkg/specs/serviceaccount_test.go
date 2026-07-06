@@ -22,7 +22,6 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -35,14 +34,20 @@ var _ = Describe("Service accounts", func() {
 
 	It("create a service account with the cluster name", func() {
 		sa := &corev1.ServiceAccount{}
-		err := UpdateServiceAccount(nil, sa, nil)
+		err := UpdateServiceAccount(nil, sa)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(sa.Annotations[utils.OperatorManagedSecretsAnnotationName]).To(Equal("null"))
 	})
 
+	It("always disables automounting of the service account token", func() {
+		sa := &corev1.ServiceAccount{}
+		Expect(UpdateServiceAccount(nil, sa)).To(Succeed())
+		Expect(sa.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
+	})
+
 	It("correctly create the annotation storing the secret names", func() {
 		sa := &corev1.ServiceAccount{}
-		err := UpdateServiceAccount([]string{"one", "two"}, sa, nil)
+		err := UpdateServiceAccount([]string{"one", "two"}, sa)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(sa.Annotations[utils.OperatorManagedSecretsAnnotationName]).To(Equal(`["one","two"]`))
 	})
@@ -50,17 +55,17 @@ var _ = Describe("Service accounts", func() {
 	When("the pull secrets are changed", func() {
 		It("can detect that the ServiceAccount is needing a refresh", func(ctx SpecContext) {
 			sa := &corev1.ServiceAccount{}
-			err := UpdateServiceAccount([]string{"one", "two"}, sa, nil)
+			err := UpdateServiceAccount([]string{"one", "two"}, sa)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two"}, emptyMeta, nil)).To(BeTrue())
-			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two", "three"}, emptyMeta, nil)).To(BeFalse())
+			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two"}, emptyMeta)).To(BeTrue())
+			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two", "three"}, emptyMeta)).To(BeFalse())
 		})
 	})
 
 	When("there are secrets not directly managed by the operator", func() {
 		It("can detect that the ServiceAccount is needing a refresh", func(ctx SpecContext) {
 			sa := &corev1.ServiceAccount{}
-			err := UpdateServiceAccount([]string{"one", "two"}, sa, nil)
+			err := UpdateServiceAccount([]string{"one", "two"}, sa)
 
 			// This image pull secret is not managed by the operator since its name
 			// has not been stored inside the annotation inside the ServiceAccount
@@ -69,8 +74,8 @@ var _ = Describe("Service accounts", func() {
 			})
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two"}, emptyMeta, nil)).To(BeTrue())
-			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two", "three"}, emptyMeta, nil)).To(BeFalse())
+			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two"}, emptyMeta)).To(BeTrue())
+			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two", "three"}, emptyMeta)).To(BeFalse())
 		})
 	})
 
@@ -90,11 +95,11 @@ var _ = Describe("Service accounts", func() {
 			sa := &corev1.ServiceAccount{
 				ObjectMeta: meta,
 			}
-			err := UpdateServiceAccount([]string{}, sa, nil)
+			err := UpdateServiceAccount([]string{}, sa)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(IsServiceAccountAligned(ctx, sa, nil, meta, nil)).To(BeTrue())
-			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta, nil)).To(BeFalse())
+			Expect(IsServiceAccountAligned(ctx, sa, nil, meta)).To(BeTrue())
+			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta)).To(BeFalse())
 		})
 	})
 
@@ -114,32 +119,16 @@ var _ = Describe("Service accounts", func() {
 			sa := &corev1.ServiceAccount{
 				ObjectMeta: meta,
 			}
-			err := UpdateServiceAccount([]string{}, sa, nil)
+			err := UpdateServiceAccount([]string{}, sa)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(IsServiceAccountAligned(ctx, sa, nil, meta, nil)).To(BeTrue())
-			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta, nil)).To(BeFalse())
+			Expect(IsServiceAccountAligned(ctx, sa, nil, meta)).To(BeTrue())
+			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta)).To(BeFalse())
 		})
 	})
 
-	When("automountServiceAccountToken is configured", func() {
-		It("sets and clears the value on the ServiceAccount", func() {
-			sa := &corev1.ServiceAccount{}
-			Expect(UpdateServiceAccount(nil, sa, ptr.To(false))).To(Succeed())
-			Expect(sa.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
-
-			Expect(UpdateServiceAccount(nil, sa, nil)).To(Succeed())
-			Expect(sa.AutomountServiceAccountToken).To(BeNil())
-		})
-
-		It("can detect that the ServiceAccount is needing a refresh", func(ctx SpecContext) {
-			sa := &corev1.ServiceAccount{}
-			err := UpdateServiceAccount(nil, sa, ptr.To(false))
-			Expect(err).ToNot(HaveOccurred())
-
-			Expect(IsServiceAccountAligned(ctx, sa, nil, emptyMeta, ptr.To(false))).To(BeTrue())
-			Expect(IsServiceAccountAligned(ctx, sa, nil, emptyMeta, ptr.To(true))).To(BeFalse())
-			Expect(IsServiceAccountAligned(ctx, sa, nil, emptyMeta, nil)).To(BeFalse())
-		})
+	It("detects a ServiceAccount that has not had automount disabled yet", func(ctx SpecContext) {
+		sa := &corev1.ServiceAccount{}
+		Expect(IsServiceAccountAligned(ctx, sa, nil, emptyMeta)).To(BeFalse())
 	})
 })

@@ -21,7 +21,6 @@ package majorupgrade
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -74,11 +73,8 @@ var _ = Describe("Major upgrade Job generation", func() {
 		Entry("major-upgrade jobs are major upgrades", createMajorUpgradeJobDefinition(&cluster, 1, nil), true),
 	)
 
-	It("mounts the projected token in non-bootstrap containers when the automount is disabled", func() {
-		clusterWithoutAutomount := cluster.DeepCopy()
-		clusterWithoutAutomount.Spec.AutomountServiceAccountToken = ptr.To(false)
-
-		majorUpgradeJob := createMajorUpgradeJobDefinition(clusterWithoutAutomount, 1, nil)
+	It("always disables the automount and projects the token for non-bootstrap containers", func() {
+		majorUpgradeJob := createMajorUpgradeJobDefinition(&cluster, 1, nil)
 		podSpec := majorUpgradeJob.Spec.Template.Spec
 		Expect(podSpec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
 

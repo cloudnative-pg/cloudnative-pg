@@ -753,41 +753,15 @@ var _ = Describe("kube-api-access volume", func() {
 		ReadOnly:  true,
 	}
 
-	It("is not created when automountServiceAccountToken is unset", func() {
+	It("is always created regardless of cluster configuration", func() {
 		cluster := apiv1.Cluster{}
-		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).NotTo(ContainElement(expectedVolume))
-		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: true})).
-			NotTo(ContainElement(expectedMount))
-	})
-
-	It("is not created when automountServiceAccountToken is true", func() {
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				AutomountServiceAccountToken: ptr.To(true),
-			},
-		}
-		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).NotTo(ContainElement(expectedVolume))
-		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: true})).
-			NotTo(ContainElement(expectedMount))
-	})
-
-	It("replicates the volume injected by the ServiceAccount admission controller when false", func() {
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				AutomountServiceAccountToken: ptr.To(false),
-			},
-		}
 		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).To(ContainElement(expectedVolume))
 		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: true})).
 			To(ContainElement(expectedMount))
 	})
 
 	It("is not injected in containers that do not need Kubernetes API access", func() {
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				AutomountServiceAccountToken: ptr.To(false),
-			},
-		}
+		cluster := apiv1.Cluster{}
 		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: false})).
 			NotTo(ContainElement(expectedMount))
 	})
@@ -795,7 +769,6 @@ var _ = Describe("kube-api-access volume", func() {
 	It("coexists with the user defined projected volume", func() {
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				AutomountServiceAccountToken: ptr.To(false),
 				ProjectedVolumeTemplate: &corev1.ProjectedVolumeSource{
 					Sources: []corev1.VolumeProjection{
 						{
