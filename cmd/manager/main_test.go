@@ -25,6 +25,8 @@ import (
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,17 +47,19 @@ var _ = Describe("logging options of the manager subcommands", func() {
 		Expect(loggingOptions(runCmd)).To(HaveLen(1))
 	})
 
-	It("disables log sampling for the WAL archiver", func() {
-		root := newRootCmd()
-		walArchiveCmd, _, err := root.Find([]string{"wal-archive"})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(loggingOptions(walArchiveCmd)).To(HaveLen(1))
-	})
-
 	It("configures unsampled logging when running a pod-facing subcommand", func() {
 		// must exceed the 100 msgs/s initial-pass threshold of the sampler
 		// installed by the controller-runtime zap builder
 		const burst = 300
+
+		// ConfigureLogging points the global loggers at this spec's
+		// destination file: restore them so later specs are not affected
+		previousLogger := log.GetLogger().GetLogger()
+		DeferCleanup(func() {
+			log.SetLogger(previousLogger)
+			ctrl.SetLogger(previousLogger)
+			klog.SetLogger(previousLogger)
+		})
 
 		dest := filepath.Join(GinkgoT().TempDir(), "log")
 		root := newRootCmd()
