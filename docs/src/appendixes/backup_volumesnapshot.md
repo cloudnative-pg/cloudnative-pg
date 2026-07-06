@@ -266,12 +266,12 @@ for details on this standard behavior.
 
 ## Backup Volume Snapshot Deadlines
 
-CloudNativePG supports backups using the volume snapshot method. In some
-environments, volume snapshots may encounter temporary issues that can be
-retried.
+CloudNativePG supports backups using the volume snapshot method. Volume
+snapshot operations may encounter errors, which CloudNativePG retries for a
+configurable amount of time before giving up.
 
 The `backup.cnpg.io/volumeSnapshotDeadline` annotation defines how long
-CloudNativePG should continue retrying recoverable errors before marking the
+CloudNativePG should continue retrying these errors before marking the
 backup as failed.
 
 You can add the `backup.cnpg.io/volumeSnapshotDeadline` annotation to both
@@ -320,7 +320,7 @@ When you define a `ScheduledBackup` with the annotation, any `Backup` resources
 created from this schedule automatically inherit the specified timeout value.
 
 In the following example, all backups created from the schedule will have a
-30-minute timeout for retrying recoverable snapshot errors.
+30-minute timeout for retrying snapshot errors.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
