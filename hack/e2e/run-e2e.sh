@@ -152,7 +152,7 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   reset=${reset:-}
   source "${ROOT_DIR}/hack/testing-tools/common/20-utils-k8s.sh"
 
-  # Getting the operator images need a pull secret
+  # Getting the operator images needs a pull secret
   reset_operator_namespace
   kubectl create namespace cnpg-system
   ensure_image_pull_secret
