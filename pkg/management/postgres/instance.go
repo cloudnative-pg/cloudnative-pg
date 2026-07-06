@@ -208,6 +208,12 @@ type Instance struct {
 	// mightBeUnavailable specifies whether we expect the instance to be down
 	mightBeUnavailable atomic.Bool
 
+	// statusError causes GetStatus to fail when non-empty; an empty string means no error.
+	// It is currently only used by the WAL replay detector, which expects this
+	// process-local state to be cleared by restarting the Pod. Future use cases
+	// need to carefully define when this value should be cleared.
+	statusError atomic.String
+
 	// fenced specifies whether fencing is on for the instance
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
@@ -275,6 +281,14 @@ func (instance *Instance) SetPostgreSQLAutoConfWritable(writeable bool) error {
 // IsReady runs PgIsReady
 func (instance *Instance) IsReady() error {
 	return PgIsReady()
+}
+
+func (instance *Instance) SetStatusError(message string) {
+	instance.statusError.Store(message)
+}
+
+func (instance *Instance) StatusError() string {
+	return instance.statusError.Load()
 }
 
 // IsFenced checks whether the instance is marked as fenced
@@ -824,7 +838,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
-	csvPipe := logpipe.NewLogPipe()
+	csvPipe := logpipe.NewLogPipe(&logpipe.LogRecordWriter{})
 	go func() {
 		if err := csvPipe.Start(ctx); err != nil {
 			log.Info("csv log pipe encountered an error", "err", err)
