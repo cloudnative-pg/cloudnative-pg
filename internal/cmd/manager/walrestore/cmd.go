@@ -189,10 +189,14 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 	}
 
 	// Step 2: return error if the end-of-wal-stream flag is set.
+	// PostgreSQL treats a restore_command failure as "WAL not available from
+	// archive" and can then try streaming via primary_conninfo. When prefetch has
+	// already observed archive exhaustion for this timeline, return one failure to
+	// let PostgreSQL switch sources instead of repeatedly probing the archive.
 	// We skip this step if the flag machinery does not apply to this invocation
 	useEndOfWALStreamFlag := shouldUseEndOfWALStreamFlag(cluster, podName, rewindMode)
 	if useEndOfWALStreamFlag {
-		if err := checkEndOfWALStreamFlag(walRestorer); err != nil {
+		if err := checkEndOfWALStreamFlag(walRestorer, walName); err != nil {
 			return err
 		}
 	}
@@ -220,17 +224,16 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 		return walStatus[0].Err
 	}
 
-	// Step 5: set end-of-wal-stream flag if any download job returned file-not-found
+	// Step 5: set end-of-wal-stream flag if any regular WAL download job returned file-not-found
 	// We skip this step if the flag machinery does not apply to this invocation
-	endOfWALStream := isEndOfWALStream(walStatus)
-	if useEndOfWALStreamFlag && endOfWALStream {
-		contextLog.Info(
-			"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
-
-		// TODO: drop nolint once #11133 (timeline-aware markers) lands
-		err = walRestorer.SetEndOfWALStream() //nolint:staticcheck
-		if err != nil {
+	endOfWALStream := false
+	if useEndOfWALStreamFlag {
+		if endOfWALStream, err = walRestorer.SetEndOfWALStreamFromResults(walStatus); err != nil {
 			return err
+		}
+		if endOfWALStream {
+			contextLog.Info(
+				"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
 		}
 	}
 
@@ -293,35 +296,16 @@ func restoreWALViaPlugins(
 	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName), mode)
 }
 
-// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
-func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer) error {
-	// TODO: drop nolint once #11133 (timeline-aware markers) lands
-	contain, err := walRestorer.IsEndOfWALStream() //nolint:staticcheck
+// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set for the requested WAL timeline.
+func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer, walName string) error {
+	contains, err := walRestorer.ConsumeEndOfWALStreamForWAL(walName)
 	if err != nil {
 		return err
 	}
-
-	if contain {
-		err := walRestorer.ResetEndOfWalStream() //nolint:staticcheck
-		if err != nil {
-			return err
-		}
-
+	if contains {
 		return ErrEndOfWALStreamReached
 	}
 	return nil
-}
-
-// isEndOfWALStream returns true if one of the downloads has returned
-// a file-not-found error
-func isEndOfWALStream(results []barmanRestorer.Result) bool {
-	for _, result := range results {
-		if errors.Is(result.Err, barmanRestorer.ErrWALNotFound) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // mergeEnv merges all the values inside incomingEnv into env
