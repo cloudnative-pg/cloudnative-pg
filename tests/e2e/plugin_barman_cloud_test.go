@@ -104,21 +104,26 @@ var _ = Describe("plugin-barman-cloud",
 				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 			})
 
-			By("archiving the WAL that closes the backup", func() {
-				// The plugin backup does not force the WAL segment holding the
-				// backup-stop record to be archived; on an otherwise idle cluster it
-				// would never be flushed and the standalone restore below could not
-				// reach a consistent recovery point. Switch WAL and wait for it to
-				// reach the object store.
-				objectstoreasserts.AssertArchiveWalOnObjectStore(
-					env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName)
-			})
+			assertArchiveWalClosingPluginBackup(namespace, clusterName)
 
 			// Recover into a new cluster from the backup and confirm the data is
 			// there, exercising the plugin's restore path end to end.
 			backupasserts.AssertClusterRestore(env, testTimeouts, namespace, restoreManifest, restoreTable)
 		})
 	})
+
+// assertArchiveWalClosingPluginBackup switches and archives the WAL segment
+// that closes a plugin backup. Plugin backups don't force the WAL segment
+// holding the backup-stop record to be archived, so a standalone restore on
+// an otherwise idle cluster could miss its consistent recovery point without
+// this.
+func assertArchiveWalClosingPluginBackup(namespace, clusterName string) {
+	GinkgoHelper()
+	By("archiving the WAL that closes the backup", func() {
+		objectstoreasserts.AssertArchiveWalOnObjectStore(
+			env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName)
+	})
+}
 
 // barmanCloudCredentialSecret is the Secret holding the object store credentials
 // that the e2e plugin ObjectStores reference; the tests create it with keys ID/KEY.

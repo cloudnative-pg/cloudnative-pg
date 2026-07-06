@@ -23,7 +23,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
-	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -95,15 +94,7 @@ var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
 					testTimeouts[timeouts.BackupIsReady])
 			})
 
-			By("archiving the WAL that closes the backup", func() {
-				// The plugin backup does not force the WAL segment holding the
-				// backup-stop record to be archived. On an otherwise idle cluster
-				// that segment would never be flushed, so a standalone restore
-				// could not reach a consistent recovery point. Switch WAL and wait
-				// for it to reach the object store.
-				objectstoreasserts.AssertArchiveWalOnObjectStore(
-					env, testTimeouts, objectStoreEnv, namespace, srcClusterName, srcClusterName)
-			})
+			assertArchiveWalClosingPluginBackup(namespace, srcClusterName)
 
 			By("restoring into a new cluster with tablespaces through the plugin", func() {
 				resources.CreateResourceFromFile(env, namespace, restoreManifest)
