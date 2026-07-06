@@ -682,6 +682,7 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	)
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) {
+		logShutdownDiagnostics(ctx)
 		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
 		err = instance.Shutdown(ctx,
