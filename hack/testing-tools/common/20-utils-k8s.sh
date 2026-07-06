@@ -451,7 +451,7 @@ function ensure_cert_manager() {
     local cert_manager_version="${CERT_MANAGER_VERSION:-${CERT_MANAGER_DEFAULT_VERSION}}"
 
     # shellcheck disable=SC2154
-    if ${K8S_CLI} get namespace cert-manager >/dev/null 2>&1; then
+    if ${K8S_CLI} get deployment cert-manager -n cert-manager >/dev/null 2>&1; then
         echo -e "${bright}cert-manager already present, skipping install.${reset}"
     else
         echo -e "${bright}Installing cert-manager ${cert_manager_version}...${reset}"
