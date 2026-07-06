@@ -22,7 +22,6 @@ package logpipe
 import (
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/go-logr/logr"
@@ -42,24 +41,18 @@ type RecordWriter interface {
 
 // LogRecordWriter implements the `RecordWriter` interface writing to the
 // instance manager logger
-type LogRecordWriter struct{}
+type LogRecordWriter struct {
+	logger logr.Logger
+}
 
-var (
-	recordLogOnce sync.Once
-	recordLogr    logr.Logger
-)
-
-// getRecordLogger returns a logr.Logger with sampling disabled.
-// controller-runtime enables a zap sampler in production mode that silently
-// drops repeated log entries sharing the same message. Every PostgreSQL audit
-// record emits msg="record", so a burst of audit activity causes subsequent
-// records — including security-relevant events — to be dropped. This logger
-// bypasses that sampler so every record is forwarded unconditionally.
-func getRecordLogger() logr.Logger {
-	recordLogOnce.Do(func() {
-		recordLogr = buildUnsampledLogger(zapcore.AddSync(os.Stderr))
-	})
-	return recordLogr
+// NewLogRecordWriter builds a LogRecordWriter writing through logger.
+// Callers should build logger via buildUnsampledLogger: controller-runtime
+// enables a zap sampler in production mode that silently drops repeated log
+// entries sharing the same message, and every PostgreSQL audit record emits
+// msg="record", so a burst of audit activity would otherwise cause
+// subsequent records — including security-relevant events — to be dropped.
+func NewLogRecordWriter(logger logr.Logger) *LogRecordWriter {
+	return &LogRecordWriter{logger: logger}
 }
 
 // buildUnsampledLogger constructs a JSON logger writing to out without any
@@ -118,5 +111,5 @@ func applyFieldRemap(enc *zapcore.EncoderConfig, flags []string) {
 
 // Write writes the PostgreSQL log record to the instance manager logger
 func (writer *LogRecordWriter) Write(record NamedRecord) {
-	getRecordLogger().WithName(record.GetName()).Info(logRecordKey, logRecordKey, record)
+	writer.logger.WithName(record.GetName()).Info(logRecordKey, logRecordKey, record)
 }
