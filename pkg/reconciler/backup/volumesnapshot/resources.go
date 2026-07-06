@@ -70,20 +70,6 @@ func (err volumeSnapshotError) Error() string {
 	return *err.InternalError.Message
 }
 
-// IsRetryable returns true if the external snapshotter controller
-// will retry taking the snapshot
-func (err volumeSnapshotError) isRetryable() bool {
-	// The Kubernetes CSI driver/controller will automatically retry snapshot creation
-	// for certain errors, including timeouts. We use pattern matching to identify
-	// these retryable errors and handle them appropriately.
-
-	if err.InternalError.Message == nil {
-		return false
-	}
-
-	return isCSIErrorMessageRetriable(*err.InternalError.Message)
-}
-
 // slice represents a slice of []volumesnapshotv1.VolumeSnapshot
 type slice []volumesnapshotv1.VolumeSnapshot
 

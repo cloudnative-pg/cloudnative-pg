@@ -641,6 +641,15 @@ func (se *Reconciler) waitSnapshotToBeReady(
 	return nil, nil
 }
 
+// handleSnapshotErrors reacts to a VolumeSnapshot.Status.Error reported by
+// the CSI driver. There's no reliable way to tell a permanent condition (a
+// missing VolumeSnapshotClass, bad credentials, an error with no message at
+// all, ...) from a transient one, and a condition that looks permanent
+// today can become resolvable at any point (someone creates the missing
+// class, fixes the credentials, ...). So every error is retried the same
+// way, requeuing until backup.cnpg.io/volumeSnapshotDeadline elapses. The
+// external-snapshotter sidecar itself keeps retrying CreateSnapshot on its
+// own regardless of what CNPG does here.
 func (se *Reconciler) handleSnapshotErrors(
 	ctx context.Context,
 	backup *apiv1.Backup,
@@ -648,10 +657,6 @@ func (se *Reconciler) handleSnapshotErrors(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).
 		WithName("handle_snapshot_errors")
-
-	if !snapshotErr.isRetryable() {
-		return nil, snapshotErr
-	}
 
 	if err := addDeadlineStatus(ctx, se.cli, backup); err != nil {
 		return nil, fmt.Errorf("while adding deadline status: %w", err)
