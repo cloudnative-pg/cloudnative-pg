@@ -128,6 +128,9 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 		})
 
 		validateReplication := func(namespace, clusterAName, clusterBName string) {
+			const replicationTable = "test_replication"
+			marker := fmt.Sprintf("replication-check-%d", time.Now().UnixNano())
+
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -135,35 +138,28 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{Namespace: namespace, PodName: primary.Name},
 				"postgres",
-				"CREATE TABLE test_replication AS SELECT 1;",
+				fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (marker text); INSERT INTO %s VALUES ('%s');",
+					replicationTable, replicationTable, marker),
 			)
 			Expect(err).ToNot(HaveOccurred())
 			_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
 
+			selectMarker := fmt.Sprintf("SELECT marker FROM %s WHERE marker = '%s';", replicationTable, marker)
 			Eventually(func(g Gomega) {
 				podListA, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
 				g.Expect(err).ToNot(HaveOccurred())
 				podListB, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterBName)
 				g.Expect(err).ToNot(HaveOccurred())
 
-				for _, podA := range podListA.Items {
-					_, _, err = exec.QueryInInstancePod(
+				for _, pod := range append(podListA.Items, podListB.Items...) {
+					stdOut, _, err := exec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{Namespace: namespace, PodName: podA.Name},
+						exec.PodLocator{Namespace: namespace, PodName: pod.Name},
 						"postgres",
-						"SELECT * FROM test_replication;",
+						selectMarker,
 					)
 					g.Expect(err).ToNot(HaveOccurred())
-				}
-
-				for _, podB := range podListB.Items {
-					_, _, err = exec.QueryInInstancePod(
-						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{Namespace: namespace, PodName: podB.Name},
-						"postgres",
-						"SELECT * FROM test_replication;",
-					)
-					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(strings.TrimSpace(stdOut)).To(Equal(marker))
 				}
 			}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
 		}
