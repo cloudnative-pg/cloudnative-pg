@@ -195,9 +195,9 @@ func Execute(
 			backupTarget = backup.Spec.Target
 		}
 		switch backupTarget {
-		case apiv1.BackupTargetPrimary, "":
+		case apiv1.BackupTargetPrimary:
 			gomega.Expect(backupStatus.InstanceID.PodName).To(gomega.BeEquivalentTo(cluster.Status.TargetPrimary))
-		case apiv1.BackupTargetStandby:
+		case apiv1.BackupTargetStandby, "":
 			gomega.Expect(backupStatus.InstanceID.PodName).To(gomega.BeElementOf(cluster.Status.InstanceNames))
 			if onlyTargetStandbys {
 				gomega.Expect(backupStatus.InstanceID.PodName).NotTo(gomega.Equal(cluster.Status.TargetPrimary))
