@@ -147,15 +147,16 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
 fi
 
 if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
-  # Getting the operator images need a pull secret
-  kubectl delete namespace cnpg-system || :
-  kubectl create namespace cnpg-system
-  ensure_image_pull_secret
-
   K8S_CLI=kubectl
   bright=${bright:-}
   reset=${reset:-}
   source "${ROOT_DIR}/hack/testing-tools/common/20-utils-k8s.sh"
+
+  # Getting the operator images need a pull secret
+  reset_operator_namespace
+  kubectl create namespace cnpg-system
+  ensure_image_pull_secret
+
   if [[ "${OPERATOR}" == "local" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" == "manifest" ]]; then
     "${ROOT_DIR}/hack/setup-cluster.sh" generate-manifest
   fi
