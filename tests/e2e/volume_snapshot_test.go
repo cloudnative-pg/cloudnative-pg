@@ -919,6 +919,13 @@ var _ = Describe("Verify Volume Snapshot",
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: namespace,
 								Name:      backupName,
+								Annotations: map[string]string{
+									// This now retries like any other volume snapshot
+									// error (see handleSnapshotErrors), so shorten the
+									// deadline to keep the test fast instead of waiting
+									// out the 10-minute default.
+									utils.BackupVolumeSnapshotDeadlineAnnotationName: "1",
+								},
 							},
 							Spec: apiv1.BackupSpec{
 								Target:  apiv1.BackupTargetPrimary,
@@ -929,6 +936,19 @@ var _ = Describe("Verify Volume Snapshot",
 					)
 					Expect(err).ToNot(HaveOccurred())
 
+					// The 1-minute deadline above means the backup should still be
+					// retrying, not failed, for at least the first half of that window.
+					Consistently(func(g Gomega) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      backupName,
+						}, failedBackup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(failedBackup.Status.Phase).ToNot(BeEquivalentTo(apiv1.BackupPhaseFailed))
+					}, "30s", "5s").Should(Succeed())
+
+					// Allow extra margin over RetryTimeout for the 10s reconcile
+					// polling interval.
 					Eventually(func(g Gomega) {
 						err = env.Client.Get(env.Ctx, types.NamespacedName{
 							Namespace: namespace,
@@ -937,7 +957,7 @@ var _ = Describe("Verify Volume Snapshot",
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(failedBackup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
 						g.Expect(failedBackup.Status.Error).To(ContainSubstring("Failed to get snapshot class"))
-					}, RetryTimeout).Should(Succeed())
+					}, RetryTimeout+30).Should(Succeed())
 				})
 
 				By("verifying that the backup connection is cleaned up", func() {

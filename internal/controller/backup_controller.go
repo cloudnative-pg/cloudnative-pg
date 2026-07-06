@@ -691,8 +691,10 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 
 	res, err := r.vsr.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 	if err != nil {
-		// Volume Snapshot errors are not retryable, we need to set this backup as failed
-		// and un-fence the Pod
+		// The reconciler already retried what it could: network errors are
+		// requeued, and snapshot errors reported by the CSI driver are retried
+		// until the volumeSnapshotDeadline elapses. An error here is final, so
+		// we need to set this backup as failed and un-fence the Pod
 		contextLogger.Error(err, "while executing snapshot backup")
 		r.Recorder.Eventf(backup, "Warning", "Error", "snapshot backup failed: %v", err)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster,
