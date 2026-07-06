@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -684,6 +685,80 @@ var _ = Describe("isDeadlineExceeded", func() {
 		exceeded, err := isDeadlineExceeded(backup)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(exceeded).To(BeTrue())
+	})
+})
+
+var _ = Describe("handleSnapshotErrors", func() {
+	var (
+		ctx      context.Context
+		backup   *apiv1.Backup
+		cli      k8client.Client
+		executor *Reconciler
+	)
+
+	BeforeEach(func() {
+		ctx = context.TODO()
+		backup = &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-backup",
+			},
+			Status: apiv1.BackupStatus{
+				PluginMetadata: make(map[string]string),
+			},
+		}
+		cli = fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup).
+			WithStatusSubresource(&apiv1.Backup{}).
+			Build()
+		executor = NewReconcilerBuilder(cli, record.NewFakeRecorder(3)).Build()
+	})
+
+	It("requeues a message that would previously have been treated as permanent", func() {
+		snapshotErr := &volumeSnapshotError{
+			InternalError: volumesnapshotv1.VolumeSnapshotError{
+				Message: ptr.To("Failed to get snapshot class with name wrongSnapshotClass"),
+			},
+			Name:      "snapshot",
+			Namespace: backup.Namespace,
+		}
+
+		res, err := executor.handleSnapshotErrors(ctx, backup, snapshotErr)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeEquivalentTo(&ctrl.Result{RequeueAfter: 10 * time.Second}))
+	})
+
+	It("requeues an error with no message at all", func() {
+		snapshotErr := &volumeSnapshotError{
+			InternalError: volumesnapshotv1.VolumeSnapshotError{Message: nil},
+			Name:          "snapshot",
+			Namespace:     backup.Namespace,
+		}
+
+		res, err := executor.handleSnapshotErrors(ctx, backup, snapshotErr)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeEquivalentTo(&ctrl.Result{RequeueAfter: 10 * time.Second}))
+	})
+
+	It("fails the backup once the deadline is exceeded, regardless of the message", func() {
+		data := metadata{VolumeSnapshotFirstDetectedFailure: time.Now().Add(-20 * time.Minute).Unix()}
+		rawData, err := json.Marshal(data)
+		Expect(err).ToNot(HaveOccurred())
+		backup.Status.PluginMetadata[pluginName] = string(rawData)
+		Expect(cli.Status().Update(ctx, backup)).To(Succeed())
+
+		snapshotErr := &volumeSnapshotError{
+			InternalError: volumesnapshotv1.VolumeSnapshotError{
+				Message: ptr.To("Failed to get snapshot class with name wrongSnapshotClass"),
+			},
+			Name:      "snapshot",
+			Namespace: backup.Namespace,
+		}
+
+		res, err := executor.handleSnapshotErrors(ctx, backup, snapshotErr)
+		Expect(res).To(BeNil())
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("deadline exceeded"))
 	})
 })
 
