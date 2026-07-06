@@ -381,7 +381,11 @@ func CreatePrimaryJob(
 							Env:             envConfig.EnvVars,
 							EnvFrom:         envConfig.EnvFrom,
 							Command:         initCommand,
-							VolumeMounts:    CreatePostgresVolumeMounts(cluster, extList),
+							VolumeMounts: CreatePostgresVolumeMounts(VolumeMountsConfig{
+								Cluster:            cluster,
+								Extensions:         extList,
+								NeedsKubeAPIAccess: true,
+							}),
 							Resources:       cluster.Spec.Resources,
 							SecurityContext: GetSecurityContext(&cluster),
 						},

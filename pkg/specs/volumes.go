@@ -246,9 +246,26 @@ func createVolumesAndVolumeMountsForSQLRefs(
 	return volumes, volumeMounts
 }
 
+// VolumeMountsConfig holds all parameters for CreatePostgresVolumeMounts.
+type VolumeMountsConfig struct {
+	// Cluster is the cluster whose spec drives which volumes are created.
+	Cluster apiv1.Cluster
+	// Extensions is the list of extension configurations whose binaries
+	// require dedicated volume mounts.
+	Extensions []apiv1.ExtensionConfiguration
+	// NeedsKubeAPIAccess controls whether the kube-api-access projected volume
+	// mount is included when automountServiceAccountToken is disabled.
+	// Set to false for containers that do not need Kubernetes API access
+	// (e.g. the bootstrap init container).
+	NeedsKubeAPIAccess bool
+}
+
 // CreatePostgresVolumeMounts creates the volume mounts that are used
 // by PostgreSQL Pods
-func CreatePostgresVolumeMounts(cluster apiv1.Cluster, extensions []apiv1.ExtensionConfiguration) []corev1.VolumeMount {
+func CreatePostgresVolumeMounts(cfg VolumeMountsConfig) []corev1.VolumeMount {
+	cluster := cfg.Cluster
+	extensions := cfg.Extensions
+
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      pgdataVolumeName,
@@ -286,7 +303,7 @@ func CreatePostgresVolumeMounts(cluster apiv1.Cluster, extensions []apiv1.Extens
 		)
 	}
 
-	if cluster.ShouldCreateKubeAPIAccessVolume() {
+	if cfg.NeedsKubeAPIAccess && cluster.ShouldCreateKubeAPIAccessVolume() {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
 				Name:      kubeAPIAccessVolumeName,
