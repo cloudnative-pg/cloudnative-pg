@@ -130,8 +130,8 @@ func (p *LogPipe) Start(ctx context.Context) error {
 }
 
 // collectLogsFromFile opens (blocking) the FIFO file, then starts reading the csv file line by line
-// until the end of the file or an error. recordLogger is the unsampled logger
-// built once by Start, reused across every retry.
+// until the end of the file or an error. recordLogger is built once by Start
+// and passed through.
 func (p *LogPipe) collectLogsFromFile(ctx context.Context, recordLogger logr.Logger) error {
 	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)
 

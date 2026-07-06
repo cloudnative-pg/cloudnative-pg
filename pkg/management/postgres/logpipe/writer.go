@@ -45,12 +45,8 @@ type LogRecordWriter struct {
 	logger logr.Logger
 }
 
-// NewLogRecordWriter builds a LogRecordWriter writing through logger.
-// Callers should build logger via buildUnsampledLogger: controller-runtime
-// enables a zap sampler in production mode that silently drops repeated log
-// entries sharing the same message, and every PostgreSQL audit record emits
-// msg="record", so a burst of audit activity would otherwise cause
-// subsequent records — including security-relevant events — to be dropped.
+// NewLogRecordWriter builds a LogRecordWriter that logs through logger,
+// which should be built via buildUnsampledLogger.
 func NewLogRecordWriter(logger logr.Logger) *LogRecordWriter {
 	return &LogRecordWriter{logger: logger}
 }
@@ -65,10 +61,10 @@ func NewLogRecordWriter(logger logr.Logger) *LogRecordWriter {
 // custom level-name encoding ConfigureLogging installs for Warning/Debug/
 // Trace (see machinery/pkg/log.getLogLevelString) isn't replicated here.
 //
-// --log-destination is intentionally not honored here: it's only ever passed
-// to the short-lived wal-archive/wal-restore subcommands, never to the
-// long-running `instance run` process that owns this writer, so stderr is
-// always the correct destination in practice.
+// --log-destination isn't honored here: in practice it's only ever set for
+// the wal-archive/wal-restore subcommands, never for `instance run` (which
+// owns this writer), so stderr is correct today — though nothing enforces
+// that stays true.
 func buildUnsampledLogger(out zapcore.WriteSyncer) logr.Logger {
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
@@ -93,11 +89,9 @@ func globalLoggerLevel() zapcore.Level {
 	return zapcore.InfoLevel
 }
 
-// applyFieldRemap applies the --log-field-level/--log-field-timestamp field-name
-// remapping machinery/pkg/log applies to the global logger's encoder (flags in
-// the same "--log-field-level=X"/"--log-field-timestamp=X" form GetFieldsRemapFlags
-// returns), so the audit logger's JSON schema doesn't diverge from the rest of
-// the pod's logs.
+// applyFieldRemap sets enc.LevelKey/TimeKey from flags in the
+// "--log-field-level=X"/"--log-field-timestamp=X" form GetFieldsRemapFlags
+// returns.
 func applyFieldRemap(enc *zapcore.EncoderConfig, flags []string) {
 	for _, flag := range flags {
 		switch {
@@ -109,7 +103,7 @@ func applyFieldRemap(enc *zapcore.EncoderConfig, flags []string) {
 	}
 }
 
-// Write writes the PostgreSQL log record to the instance manager logger
+// Write logs record through the writer's logger.
 func (writer *LogRecordWriter) Write(record NamedRecord) {
 	writer.logger.WithName(record.GetName()).Info(logRecordKey, logRecordKey, record)
 }
