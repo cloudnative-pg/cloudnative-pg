@@ -324,6 +324,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		It("3. performing a rolling update when a GUC requiring restart is modified", func() {
 			oldPrimary := gatherCurrentPrimary(namespace)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			oldTimeline := cluster.Status.TimelineID
 
 			By("apply configuration update", func() {
 				postgresParams["shared_buffers"] = "256MB"
@@ -347,6 +350,17 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			})
 
 			checkSwitchoverOccurred(namespace, oldPrimary)
+
+			By("verifying that a single switchover happened", func() {
+				// Every promotion advances the PostgreSQL timeline by one.
+				// Promoting a replica whose restart was still pending would
+				// force a second switchover and leave the timeline at
+				// oldTimeline+2 (issue #11129).
+				Eventually(func() (int, error) {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					return cluster.Status.TimelineID, err
+				}, RetryTimeout).Should(Equal(oldTimeline + 1))
+			})
 		})
 
 		It("4. performing a rolling update when mixed parameters are modified", func() {
