@@ -113,10 +113,10 @@ var _ = Describe("plugin-barman-cloud",
 	})
 
 // assertArchiveWalClosingPluginBackup switches and archives the WAL segment
-// that closes a plugin backup. Plugin backups don't force the WAL segment
-// holding the backup-stop record to be archived, so a standalone restore on
-// an otherwise idle cluster could miss its consistent recovery point without
-// this.
+// that closes a plugin backup. Without this, the segment holding the
+// backup-stop record can stay unarchived until archive_timeout (CNPG's
+// default: 5 minutes) elapses on its own, and a restore attempted before then
+// fails with "WAL ends before consistent recovery point".
 func assertArchiveWalClosingPluginBackup(namespace, clusterName string) {
 	GinkgoHelper()
 	By("archiving the WAL that closes the backup", func() {
