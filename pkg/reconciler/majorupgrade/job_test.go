@@ -74,7 +74,7 @@ var _ = Describe("Major upgrade Job generation", func() {
 		Entry("major-upgrade jobs are major upgrades", createMajorUpgradeJobDefinition(&cluster, 1, nil), true),
 	)
 
-	It("mounts the projected token in every container when the automount is disabled", func() {
+	It("mounts the projected token in non-bootstrap containers when the automount is disabled", func() {
 		clusterWithoutAutomount := cluster.DeepCopy()
 		clusterWithoutAutomount.Spec.AutomountServiceAccountToken = ptr.To(false)
 
@@ -82,9 +82,20 @@ var _ = Describe("Major upgrade Job generation", func() {
 		podSpec := majorUpgradeJob.Spec.Template.Spec
 		Expect(podSpec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
 
-		containers := append(podSpec.InitContainers, podSpec.Containers...)
-		Expect(containers).To(HaveLen(3))
-		for _, container := range containers {
+		Expect(podSpec.InitContainers).To(HaveLen(2))
+		Expect(podSpec.Containers).To(HaveLen(1))
+
+		// The bootstrap init container only copies the manager binary and does
+		// not need Kubernetes API access.
+		bootstrapContainer := podSpec.InitContainers[0]
+		Expect(bootstrapContainer.Name).To(Equal(specs.BootstrapControllerContainerName))
+		Expect(bootstrapContainer.VolumeMounts).NotTo(ContainElement(
+			HaveField("MountPath", "/var/run/secrets/kubernetes.io/serviceaccount"),
+		))
+
+		// All other containers need to reach the Kubernetes API.
+		nonBootstrapContainers := append(podSpec.InitContainers[1:], podSpec.Containers...)
+		for _, container := range nonBootstrapContainers {
 			Expect(container.VolumeMounts).To(ContainElement(
 				HaveField("MountPath", "/var/run/secrets/kubernetes.io/serviceaccount"),
 			), "container %s should mount the projected token", container.Name)

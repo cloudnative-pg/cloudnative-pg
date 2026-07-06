@@ -1092,7 +1092,7 @@ var _ = Describe("automountServiceAccountToken", func() {
 		}
 	})
 
-	It("disables the automount and mounts the token in every container when false", func() {
+	It("disables the automount and mounts the token in non-bootstrap containers when false", func() {
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				AutomountServiceAccountToken: ptr.To(false),
@@ -1102,8 +1102,18 @@ var _ = Describe("automountServiceAccountToken", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pod.Spec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
 		Expect(pod.Spec.Volumes).To(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
-		Expect(allContainers(pod.Spec)).ToNot(BeEmpty())
-		for _, container := range allContainers(pod.Spec) {
+
+		// The bootstrap init container only copies the manager binary and does
+		// not need Kubernetes API access.
+		Expect(pod.Spec.InitContainers).To(HaveLen(1))
+		bootstrapContainer := pod.Spec.InitContainers[0]
+		Expect(bootstrapContainer.Name).To(Equal(BootstrapControllerContainerName))
+		Expect(mountsAtTokenPath(bootstrapContainer)).To(BeFalse(),
+			"bootstrap container should not mount the projected token")
+
+		// All other containers need to reach the Kubernetes API.
+		Expect(pod.Spec.Containers).ToNot(BeEmpty())
+		for _, container := range pod.Spec.Containers {
 			Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
 				Name:      kubeAPIAccessVolumeName,
 				MountPath: tokenMountPath,

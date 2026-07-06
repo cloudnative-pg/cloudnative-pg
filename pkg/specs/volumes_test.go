@@ -302,7 +302,11 @@ var _ = Describe("test createVolumesAndVolumeMountsForSQLRefs", func() {
 
 var _ = DescribeTable("test creation of volume mounts",
 	func(cluster apiv1.Cluster, mounts []corev1.VolumeMount) {
-		mts := CreatePostgresVolumeMounts(cluster, getExtensions(&cluster))
+		mts := CreatePostgresVolumeMounts(VolumeMountsConfig{
+			Cluster:            cluster,
+			Extensions:         getExtensions(&cluster),
+			NeedsKubeAPIAccess: true,
+		})
 		Expect(mts).NotTo(BeEmpty())
 		for _, mt := range mounts {
 			Expect(mts).To(ContainElement(mt))
@@ -752,7 +756,8 @@ var _ = Describe("kube-api-access volume", func() {
 	It("is not created when automountServiceAccountToken is unset", func() {
 		cluster := apiv1.Cluster{}
 		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).NotTo(ContainElement(expectedVolume))
-		Expect(CreatePostgresVolumeMounts(cluster, nil)).NotTo(ContainElement(expectedMount))
+		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: true})).
+			NotTo(ContainElement(expectedMount))
 	})
 
 	It("is not created when automountServiceAccountToken is true", func() {
@@ -762,7 +767,8 @@ var _ = Describe("kube-api-access volume", func() {
 			},
 		}
 		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).NotTo(ContainElement(expectedVolume))
-		Expect(CreatePostgresVolumeMounts(cluster, nil)).NotTo(ContainElement(expectedMount))
+		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: true})).
+			NotTo(ContainElement(expectedMount))
 	})
 
 	It("replicates the volume injected by the ServiceAccount admission controller when false", func() {
@@ -772,7 +778,18 @@ var _ = Describe("kube-api-access volume", func() {
 			},
 		}
 		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).To(ContainElement(expectedVolume))
-		Expect(CreatePostgresVolumeMounts(cluster, nil)).To(ContainElement(expectedMount))
+		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: true})).
+			To(ContainElement(expectedMount))
+	})
+
+	It("is not injected in containers that do not need Kubernetes API access", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				AutomountServiceAccountToken: ptr.To(false),
+			},
+		}
+		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: false})).
+			NotTo(ContainElement(expectedMount))
 	})
 
 	It("coexists with the user defined projected volume", func() {
