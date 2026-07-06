@@ -170,10 +170,6 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		}
 	}
 
-	if _, err := info.restoreCustomWalDir(ctx); err != nil {
-		return err
-	}
-
 	return info.concludeRestore(ctx, cli, cluster, config, envs)
 }
 
@@ -184,6 +180,12 @@ func (info InitInfo) concludeRestore(
 	config string,
 	envs []string,
 ) error {
+	// Set up the pg_wal symlink to the dedicated WAL volume before PostgreSQL
+	// replays WALs, otherwise recovery would accumulate WALs on the data volume.
+	if _, err := info.restoreCustomWalDir(ctx); err != nil {
+		return err
+	}
+
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
@@ -337,10 +339,6 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 		}
 
 		if err := info.restoreDataDir(ctx, backup, env); err != nil {
-			return err
-		}
-
-		if _, err := info.restoreCustomWalDir(ctx); err != nil {
 			return err
 		}
 
