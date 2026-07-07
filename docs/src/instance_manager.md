@@ -75,6 +75,11 @@ every form of recovery. Progress detection requires the
 Linux); with it disabled, the startup probe behaves as if the option were
 off.
 
+A progress observation is considered current for 5 minutes by default,
+which is longer than the time PostgreSQL normally spends replaying a single
+WAL segment. The window can be tuned with
+`.spec.probes.startup.walReplayProgressTimeoutSeconds`.
+
 Reporting the startup probe as passed hands control over to the readiness
 probe, which keeps the instance out of the ready set until PostgreSQL
 accepts connections. From that moment, `startDelay` bounds the time the

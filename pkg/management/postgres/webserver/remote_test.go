@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -76,6 +77,25 @@ var _ = Describe("isWALReplaySkipEnabled", func() {
 			}
 			Expect(isWALReplaySkipEnabled(clusterWithStartupProbe(probe))).To(BeFalse())
 		}
+	})
+})
+
+var _ = Describe("walReplayProgressWindow", func() {
+	It("defaults to five minutes", func() {
+		Expect(walReplayProgressWindow(&apiv1.Cluster{})).To(Equal(postgres.DefaultWALReplayProgressWindow))
+	})
+
+	It("honors the configured timeout", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Probes: &apiv1.ProbesConfiguration{
+					Startup: &apiv1.ProbeWithStrategy{
+						WALReplayProgressTimeoutSeconds: ptr.To(int32(60)),
+					},
+				},
+			},
+		}
+		Expect(walReplayProgressWindow(cluster)).To(Equal(time.Minute))
 	})
 })
 

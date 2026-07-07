@@ -41,12 +41,13 @@ import (
 const DefaultWALSegmentSize = int64(16 * 1024 * 1024)
 
 const (
-	// walReplayProgressWindow is how long an observed sign of WAL replay
-	// progress keeps the startup probe from failing. The replay position
-	// advances at WAL segment granularity (16MB by default), so the
-	// window has to be longer than the time PostgreSQL may reasonably
-	// spend replaying a single segment.
-	walReplayProgressWindow = 5 * time.Minute
+	// DefaultWALReplayProgressWindow is how long an observed sign of WAL
+	// replay progress keeps the startup probe from failing, unless
+	// configured otherwise. The replay position advances at WAL segment
+	// granularity (16MB by default), so the window has to be longer than
+	// the time PostgreSQL may reasonably spend replaying a single
+	// segment.
+	DefaultWALReplayProgressWindow = 5 * time.Minute
 
 	// walReplayMinSampleInterval limits how often we scan the processes
 	// to sample the replay position.
@@ -198,10 +199,10 @@ func (w *walReplayProgress) shouldSample(now time.Time) bool {
 	return true
 }
 
-func (w *walReplayProgress) isProgressing(now time.Time) bool {
+func (w *walReplayProgress) isProgressing(now time.Time, window time.Duration) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return !w.lastProgressAt.IsZero() && now.Sub(w.lastProgressAt) <= walReplayProgressWindow
+	return !w.lastProgressAt.IsZero() && now.Sub(w.lastProgressAt) <= window
 }
 
 // markCompleted latches the completed flag, returning true on the first
@@ -333,9 +334,9 @@ func (instance *Instance) SampleWALReplayPosition() {
 }
 
 // IsWALReplayProgressing tells whether we observed evidence of WAL replay
-// progress recently
-func (instance *Instance) IsWALReplayProgressing() bool {
-	return instance.walReplayProgress.isProgressing(time.Now())
+// progress within the passed window
+func (instance *Instance) IsWALReplayProgressing(window time.Duration) bool {
+	return instance.walReplayProgress.isProgressing(time.Now(), window)
 }
 
 // MarkStartupSkippedForWALReplay records that the startup probe was

@@ -4981,6 +4981,16 @@ spec:
                         - streaming
                         - query
                         type: string
+                      walReplayProgressTimeoutSeconds:
+                        description: |-
+                          How recent, in seconds, the latest observed WAL replay progress
+                          must be for the startup probe to report success while
+                          `succeedDuringWALReplay` is enabled. It has to be longer than the
+                          time PostgreSQL may reasonably spend replaying a single WAL
+                          segment. Defaults to 300.
+                        format: int32
+                        minimum: 1
+                        type: integer
                     type: object
                   startup:
                     description: The startup probe configuration
@@ -5057,6 +5067,16 @@ spec:
                         - streaming
                         - query
                         type: string
+                      walReplayProgressTimeoutSeconds:
+                        description: |-
+                          How recent, in seconds, the latest observed WAL replay progress
+                          must be for the startup probe to report success while
+                          `succeedDuringWALReplay` is enabled. It has to be longer than the
+                          time PostgreSQL may reasonably spend replaying a single WAL
+                          segment. Defaults to 300.
+                        format: int32
+                        minimum: 1
+                        type: integer
                     type: object
                 type: object
               projectedVolumeTemplate:

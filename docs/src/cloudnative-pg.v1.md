@@ -2395,6 +2395,7 @@ _Appears in:_
 | `type` _[ProbeStrategyType](#probestrategytype)_ | The probe strategy |  |  | Enum: [pg_isready streaming query] <br /> |
 | `maximumLag` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#quantity-resource-api)_ | Lag limit. Used only for `streaming` strategy |  |  |  |
 | `succeedDuringWALReplay` _boolean_ | When enabled, the startup probe reports success while PostgreSQL<br />is still replaying WAL and the replay is making progress, instead<br />of failing and having the Pod eventually restarted, which would<br />lose the replay work done so far. When the startup probe has been<br />reported as passed this way, the liveness probe fails if the<br />replay stops making progress for more than `startDelay` before<br />PostgreSQL starts accepting connections. Used only by the startup<br />probe with the `pg_isready` strategy. Progress detection requires<br />the `update_process_title` PostgreSQL parameter to be enabled,<br />which is the default on Linux. |  |  |  |
+| `walReplayProgressTimeoutSeconds` _integer_ | How recent, in seconds, the latest observed WAL replay progress<br />must be for the startup probe to report success while<br />`succeedDuringWALReplay` is enabled. It has to be longer than the<br />time PostgreSQL may reasonably spend replaying a single WAL<br />segment. Defaults to 300. |  |  | Minimum: 1 <br /> |
 
 
 #### ProbesConfiguration

@@ -303,10 +303,10 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 	// keeps the Pod out of the ready set until PostgreSQL accepts
 	// connections) and to the liveness probe (which from now on watches
 	// for a stalled replay, see isReplayStalled).
-	if !ws.instance.WALReplayCompleted() &&
-		isWALReplaySkipEnabled(ws.instance.GetClusterOrDefault()) {
+	cluster := ws.instance.GetClusterOrDefault()
+	if !ws.instance.WALReplayCompleted() && isWALReplaySkipEnabled(cluster) {
 		ws.instance.SampleWALReplayPosition()
-		if ws.instance.IsWALReplayProgressing() {
+		if ws.instance.IsWALReplayProgressing(walReplayProgressWindow(cluster)) {
 			if ws.instance.MarkStartupSkippedForWALReplay() {
 				log.Info("Startup probe reported as passed: WAL replay is in progress")
 			}
@@ -378,6 +378,16 @@ func isWALReplaySkipEnabled(cluster *apiv1.Cluster) bool {
 		return false
 	}
 	return probe.Type == "" || probe.Type == apiv1.ProbeStrategyPgIsReady
+}
+
+// walReplayProgressWindow returns how recent the latest observed replay
+// progress must be for the startup probe to report success
+func walReplayProgressWindow(cluster *apiv1.Cluster) time.Duration {
+	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Startup != nil &&
+		cluster.Spec.Probes.Startup.WALReplayProgressTimeoutSeconds != nil {
+		return time.Duration(*cluster.Spec.Probes.Startup.WALReplayProgressTimeoutSeconds) * time.Second
+	}
+	return postgres.DefaultWALReplayProgressWindow
 }
 
 // walReplayStallTimeout scales the stall timeout with the WAL segment

@@ -41,49 +41,51 @@ var _ = Describe("WAL replay progress tracking", func() {
 
 	Context("progress freshness", func() {
 		It("is not progressing when no progress was ever observed", func() {
-			Expect(tracker.isProgressing(now)).To(BeFalse())
+			Expect(tracker.isProgressing(now, DefaultWALReplayProgressWindow)).To(BeFalse())
 		})
 
 		It("is progressing after progress was observed within the window", func() {
 			tracker.markProgress(now)
-			Expect(tracker.isProgressing(now.Add(walReplayProgressWindow))).To(BeTrue())
+			Expect(tracker.isProgressing(
+				now.Add(DefaultWALReplayProgressWindow), DefaultWALReplayProgressWindow)).To(BeTrue())
 		})
 
 		It("is not progressing when the last observation is older than the window", func() {
 			tracker.markProgress(now)
-			Expect(tracker.isProgressing(now.Add(walReplayProgressWindow + time.Second))).To(BeFalse())
+			Expect(tracker.isProgressing(
+				now.Add(DefaultWALReplayProgressWindow+time.Second), DefaultWALReplayProgressWindow)).To(BeFalse())
 		})
 	})
 
 	Context("control file position observations", func() {
 		It("does not record progress on the first observation", func() {
 			tracker.observePosition("0/3000000|0/2000028", now)
-			Expect(tracker.isProgressing(now)).To(BeFalse())
+			Expect(tracker.isProgressing(now, DefaultWALReplayProgressWindow)).To(BeFalse())
 		})
 
 		It("does not record progress when the position did not change", func() {
 			tracker.observePosition("0/3000000|0/2000028", now)
 			tracker.observePosition("0/3000000|0/2000028", now.Add(time.Minute))
-			Expect(tracker.isProgressing(now.Add(time.Minute))).To(BeFalse())
+			Expect(tracker.isProgressing(now.Add(time.Minute), DefaultWALReplayProgressWindow)).To(BeFalse())
 		})
 
 		It("records progress when the position changed", func() {
 			tracker.observePosition("0/3000000|0/2000028", now)
 			tracker.observePosition("0/4000000|0/2000028", now.Add(time.Minute))
-			Expect(tracker.isProgressing(now.Add(time.Minute))).To(BeTrue())
+			Expect(tracker.isProgressing(now.Add(time.Minute), DefaultWALReplayProgressWindow)).To(BeTrue())
 		})
 
 		It("records progress when only the checkpoint REDO location changed", func() {
 			tracker.observePosition("0/3000000|0/2000028", now)
 			tracker.observePosition("0/3000000|0/2FFFFD8", now.Add(time.Minute))
-			Expect(tracker.isProgressing(now.Add(time.Minute))).To(BeTrue())
+			Expect(tracker.isProgressing(now.Add(time.Minute), DefaultWALReplayProgressWindow)).To(BeTrue())
 		})
 
 		It("ignores empty positions", func() {
 			tracker.observePosition("0/3000000|0/2000028", now)
 			tracker.observePosition("", now.Add(time.Minute))
 			tracker.observePosition("0/3000000|0/2000028", now.Add(2*time.Minute))
-			Expect(tracker.isProgressing(now.Add(2 * time.Minute))).To(BeFalse())
+			Expect(tracker.isProgressing(now.Add(2*time.Minute), DefaultWALReplayProgressWindow)).To(BeFalse())
 		})
 	})
 
@@ -254,10 +256,10 @@ var _ = Describe("WAL replay progress tracking", func() {
 	Context("instance level API", func() {
 		It("exposes progress marking and freshness", func() {
 			instance := &Instance{}
-			Expect(instance.IsWALReplayProgressing()).To(BeFalse())
+			Expect(instance.IsWALReplayProgressing(DefaultWALReplayProgressWindow)).To(BeFalse())
 
 			instance.MarkWALReplayProgress()
-			Expect(instance.IsWALReplayProgressing()).To(BeTrue())
+			Expect(instance.IsWALReplayProgressing(DefaultWALReplayProgressWindow)).To(BeTrue())
 		})
 
 		It("latches startup skip and completion", func() {

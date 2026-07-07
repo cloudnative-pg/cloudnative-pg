@@ -615,6 +615,15 @@ type ProbeWithStrategy struct {
 	// which is the default on Linux.
 	// +optional
 	SucceedDuringWALReplay *bool `json:"succeedDuringWALReplay,omitempty"`
+
+	// How recent, in seconds, the latest observed WAL replay progress
+	// must be for the startup probe to report success while
+	// `succeedDuringWALReplay` is enabled. It has to be longer than the
+	// time PostgreSQL may reasonably spend replaying a single WAL
+	// segment. Defaults to 300.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	WALReplayProgressTimeoutSeconds *int32 `json:"walReplayProgressTimeoutSeconds,omitempty"`
 }
 
 // ProbeStrategyType is the type of the strategy used to declare a PostgreSQL instance
