@@ -4700,6 +4700,16 @@ spec:
                           data durability and safety during failover events in CloudNativePG-managed
                           PostgreSQL clusters.
                         type: boolean
+                      failureDomainKey:
+                        description: |-
+                          FailureDomainKey is a list of node label keys used to define failure domains.
+                          When set, the operator will select synchronous replicas from instances running
+                          on nodes whose label values differ from the primary's node for all specified keys.
+                          This ensures synchronous replication across failure domains such as availability
+                          zones or regions.
+                        items:
+                          type: string
+                        type: array
                       maxStandbyNamesFromCluster:
                         description: |-
                           Specifies the maximum number of local cluster pods that can be
@@ -4751,6 +4761,12 @@ spec:
                         || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost)
                         || self.standbyNamesPost.size()==0))
                 type: object
+                x-kubernetes-validations:
+                - message: syncReplicaElectionConstraint and synchronous.failureDomainKey
+                    are mutually exclusive
+                  rule: '!(self.syncReplicaElectionConstraint.enabled && has(self.synchronous)
+                    && has(self.synchronous.failureDomainKey) && self.synchronous.failureDomainKey.size()
+                    > 0)'
               primaryLease:
                 description: |-
                   Configuration of the Kubernetes `Lease` used to coordinate safe primary

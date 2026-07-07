@@ -248,12 +248,17 @@ func (r *ClusterReconciler) updateResourceStatus(
 	newJobs := int32(len(resources.jobs.Items)) //nolint:gosec
 	cluster.Status.JobCount = newJobs
 
+	topologyLabels := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.NodeLabelsAntiAffinity
+	if sync := cluster.Spec.PostgresConfiguration.Synchronous; sync != nil {
+		topologyLabels = sync.FailureDomainKey
+	}
 	cluster.Status.Topology = getPodsTopology(
 		ctx,
 		resources.instances.Items,
 		resources.nodes,
-		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
+		topologyLabels,
 	)
+	updateSyncReplicationTopologyCondition(cluster)
 
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
@@ -823,7 +828,7 @@ func getPodsTopology(
 	ctx context.Context,
 	pods []corev1.Pod,
 	nodes map[string]corev1.Node,
-	topology apiv1.SyncReplicaElectionConstraints,
+	labelNames []string,
 ) apiv1.Topology {
 	contextLogger := log.FromContext(ctx)
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
@@ -834,7 +839,7 @@ func getPodsTopology(
 		data[podName] = make(map[string]string, 0)
 		nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
 
-		for _, labelName := range topology.NodeLabelsAntiAffinity {
+		for _, labelName := range labelNames {
 			// Prefer pod labels: KEP-4742 propagates node topology labels onto pods
 			// during scheduling, making a node fetch unnecessary on Kubernetes 1.35+.
 			if value, ok := pod.Labels[labelName]; ok {
@@ -857,6 +862,61 @@ func getPodsTopology(
 	}
 
 	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: int32(len(nodesMap))} //nolint:gosec
+}
+
+// updateSyncReplicationTopologyCondition sets the SyncReplicationTopologySatisfied
+// condition on the cluster. It is only set when failureDomainKey is configured on the
+// new synchronous replication API.
+func updateSyncReplicationTopologyCondition(cluster *apiv1.Cluster) {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKey) == 0 {
+		return
+	}
+
+	topology := cluster.Status.Topology
+	if !topology.SuccessfullyExtracted {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonTopologyNotExtracted),
+			Message: "Topology labels could not be extracted from pods or nodes.",
+		})
+		return
+	}
+
+	primary := apiv1.PodName(cluster.Status.CurrentPrimary)
+	primaryDomain, ok := topology.Instances[primary]
+	if !ok {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonTopologyNotExtracted),
+			Message: "Topology information for the primary instance is not available.",
+		})
+		return
+	}
+
+	for podName, podDomain := range topology.Instances {
+		if podName == primary {
+			continue
+		}
+		if !primaryDomain.MatchesTopology(podDomain) {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionTrue,
+				Reason:  string(apiv1.ConditionReasonTopologySatisfied),
+				Message: "At least one synchronous replica is in a different failure domain than the primary.",
+			})
+			return
+		}
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+		Status:  metav1.ConditionFalse,
+		Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+		Message: "No synchronous replica in a different failure domain than the primary exists.",
+	})
 }
 
 // isWALSpaceAvailableOnPod check if a Pod terminated because it has no

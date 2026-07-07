@@ -47,8 +47,8 @@ func explicitSynchronousStandbyNamesDataDurabilityRequired(
 ) postgres.SynchronousStandbyNamesConfig {
 	config := cluster.Spec.PostgresConfiguration.Synchronous
 
-	// Create the list of pod names
-	clusterInstancesList := getSortedInstanceNames(cluster)
+	// Create the list of pod names, filtering to cross-domain instances first
+	clusterInstancesList := filterCrossDomainInstances(cluster, getSortedInstanceNames(cluster))
 
 	// Cap the number of standby names using the configuration on the cluster
 	if config.MaxStandbyNamesFromCluster != nil && len(clusterInstancesList) > *config.MaxStandbyNamesFromCluster {
@@ -84,8 +84,8 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(
 ) postgres.SynchronousStandbyNamesConfig {
 	config := cluster.Spec.PostgresConfiguration.Synchronous
 
-	// Create the list of healthy replicas
-	instancesList := getSortedNonPrimaryHealthyInstanceNames(cluster)
+	// Create the list of healthy replicas, filtering to cross-domain instances first
+	instancesList := filterCrossDomainInstances(cluster, getSortedNonPrimaryHealthyInstanceNames(cluster))
 
 	// Cap the number of standby names using the configuration on the cluster
 	if config.MaxStandbyNamesFromCluster != nil && len(instancesList) > *config.MaxStandbyNamesFromCluster {
@@ -113,6 +113,43 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(
 		NumSync:      syncReplicaNumber,
 		StandbyNames: instancesList,
 	}
+}
+
+// filterCrossDomainInstances returns only those instances that are in a different
+// failure domain than the primary, as defined by failureDomainKey. If failureDomainKey
+// is not set, topology extraction failed, or the primary has no topology entry, the
+// original list is returned unchanged.
+func filterCrossDomainInstances(cluster *apiv1.Cluster, instances []string) []string {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKey) == 0 {
+		return instances
+	}
+
+	topology := cluster.Status.Topology
+	if !topology.SuccessfullyExtracted {
+		return instances
+	}
+
+	primary := apiv1.PodName(cluster.Status.CurrentPrimary)
+	primaryDomain, ok := topology.Instances[primary]
+	if !ok {
+		return instances
+	}
+
+	result := make([]string, 0, len(instances))
+	for _, instance := range instances {
+		if instance == cluster.Status.CurrentPrimary {
+			continue
+		}
+		instanceDomain, ok := topology.Instances[apiv1.PodName(instance)]
+		if !ok {
+			continue
+		}
+		if !primaryDomain.MatchesTopology(instanceDomain) {
+			result = append(result, instance)
+		}
+	}
+	return result
 }
 
 // getSortedInstanceNames gets a list of all the known PostgreSQL instances in a
