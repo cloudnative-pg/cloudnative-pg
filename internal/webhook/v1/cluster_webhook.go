@@ -2675,17 +2675,30 @@ func getWALReplaySkipWarnings(r *apiv1.Cluster) admission.Warnings {
 		return result
 	}
 
-	if readiness := r.Spec.Probes.Readiness; readiness != nil && readiness.SucceedDuringWALReplay != nil {
-		result = append(result,
-			"spec.probes.readiness.succeedDuringWALReplay is ignored: the option is only honored by the startup probe.")
+	if readiness := r.Spec.Probes.Readiness; readiness != nil {
+		if readiness.SucceedDuringWALReplay != nil {
+			result = append(result,
+				"spec.probes.readiness.succeedDuringWALReplay is ignored: the option is only honored by the startup probe.")
+		}
+		if readiness.WALReplayProgressTimeoutSeconds != nil {
+			result = append(result,
+				"spec.probes.readiness.walReplayProgressTimeoutSeconds is ignored: "+
+					"the option is only honored by the startup probe.")
+		}
 	}
 
-	if startup := r.Spec.Probes.Startup; startup != nil &&
-		startup.SucceedDuringWALReplay != nil && *startup.SucceedDuringWALReplay &&
-		startup.Type != "" && startup.Type != apiv1.ProbeStrategyPgIsReady {
-		result = append(result, fmt.Sprintf(
-			"spec.probes.startup.succeedDuringWALReplay is ignored with the %q startup strategy: "+
-				"the option is only honored with the default pg_isready strategy.", startup.Type))
+	if startup := r.Spec.Probes.Startup; startup != nil {
+		enabled := startup.SucceedDuringWALReplay != nil && *startup.SucceedDuringWALReplay
+		if enabled && startup.Type != "" && startup.Type != apiv1.ProbeStrategyPgIsReady {
+			result = append(result, fmt.Sprintf(
+				"spec.probes.startup.succeedDuringWALReplay is ignored with the %q startup strategy: "+
+					"the option is only honored with the default pg_isready strategy.", startup.Type))
+		}
+		if !enabled && startup.WALReplayProgressTimeoutSeconds != nil {
+			result = append(result,
+				"spec.probes.startup.walReplayProgressTimeoutSeconds is ignored "+
+					"while succeedDuringWALReplay is not enabled.")
+		}
 	}
 
 	return result

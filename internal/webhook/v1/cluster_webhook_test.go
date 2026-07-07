@@ -6627,6 +6627,50 @@ var _ = Describe("getWALReplaySkipWarnings", func() {
 		}
 		Expect(getWALReplaySkipWarnings(cluster)).To(BeEmpty())
 	})
+
+	It("warns when the progress timeout is set on the readiness probe", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Probes: &apiv1.ProbesConfiguration{
+					Readiness: &apiv1.ProbeWithStrategy{
+						WALReplayProgressTimeoutSeconds: ptr.To(int32(60)),
+					},
+				},
+			},
+		}
+		warnings := getWALReplaySkipWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("readiness.walReplayProgressTimeoutSeconds"))
+	})
+
+	It("warns when the progress timeout is set without enabling the option", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Probes: &apiv1.ProbesConfiguration{
+					Startup: &apiv1.ProbeWithStrategy{
+						WALReplayProgressTimeoutSeconds: ptr.To(int32(60)),
+					},
+				},
+			},
+		}
+		warnings := getWALReplaySkipWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("succeedDuringWALReplay is not enabled"))
+	})
+
+	It("does not warn about the progress timeout when the option is enabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Probes: &apiv1.ProbesConfiguration{
+					Startup: &apiv1.ProbeWithStrategy{
+						SucceedDuringWALReplay:          ptr.To(true),
+						WALReplayProgressTimeoutSeconds: ptr.To(int32(60)),
+					},
+				},
+			},
+		}
+		Expect(getWALReplaySkipWarnings(cluster)).To(BeEmpty())
+	})
 })
 
 var _ = Describe("getStorageWarnings", func() {
