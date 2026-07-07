@@ -45,6 +45,30 @@ By default, the `startDelay` is set to `3600` seconds. It is recommended to
 adjust this setting based on the time PostgreSQL needs to fully initialize in
 your specific environment.
 
+### WAL replay during startup
+
+An instance can spend a long time replaying WAL before it is able to accept
+connections, for example a replica catching up after a restart, or a primary
+performing crash recovery. Killing the Pod in this situation is
+counterproductive, since the replay work done so far would be lost and
+repeated at every restart.
+
+For this reason, while PostgreSQL is still replaying WAL and the replay is
+making progress, the startup probe reports success instead of failing when
+the configured startup strategy is not satisfied yet. Progress is detected
+by sampling the title of the PostgreSQL startup process, which reports the
+WAL segment being replayed in every form of recovery. Progress detection
+requires the `update_process_title` PostgreSQL parameter to be enabled,
+which is the default.
+
+Reporting the startup probe as passed hands control over to the readiness
+probe, which keeps the instance out of the ready set until PostgreSQL
+accepts connections. From that moment, `startDelay` bounds the time the
+replay is allowed to proceed *without making progress* rather than the total
+startup time: if the replay stalls for more than `startDelay` seconds before
+PostgreSQL accepts connections, the liveness probe fails and the Pod is
+restarted.
+
 :::warning
     Setting `.spec.startDelay` too low can cause the liveness probe to activate
     prematurely, potentially resulting in unnecessary Pod restarts if PostgreSQL

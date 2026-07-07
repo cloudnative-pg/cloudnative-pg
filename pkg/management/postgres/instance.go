@@ -205,6 +205,11 @@ type Instance struct {
 	// it's used by the readiness probe to know whether it should be short-circuited
 	canCheckReadiness atomic.Bool
 
+	// walReplayProgress tracks evidence that PostgreSQL is making progress
+	// replaying WAL while not accepting connections yet, so that the
+	// startup probe can avoid failing during a long but healthy recovery
+	walReplayProgress walReplayProgress
+
 	// mightBeUnavailable specifies whether we expect the instance to be down
 	mightBeUnavailable atomic.Bool
 

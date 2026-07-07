@@ -293,6 +293,26 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		return
 	}
 
+	// While PostgreSQL is not accepting connections because it is still
+	// replaying WAL, and the replay is making progress, we report the
+	// startup probe as passed instead of letting it fail and having the
+	// kubelet kill the Pod, losing all the replay work done so far.
+	//
+	// The kubelet stops invoking the startup probe after the first
+	// success, so this hands control over to the readiness probe (which
+	// keeps the Pod out of the ready set until PostgreSQL accepts
+	// connections) and to the liveness probe (which from now on watches
+	// for a stalled replay, see isReplayStalled).
+	if !ws.instance.WALReplayCompleted() {
+		ws.instance.SampleWALReplayPosition()
+		if ws.instance.IsWALReplayProgressing() {
+			ws.instance.MarkStartupSkippedForWALReplay()
+			log.Trace("Startup probe skipped: WAL replay is in progress")
+			_, _ = fmt.Fprint(w, "Skipped")
+			return
+		}
+	}
+
 	ws.startupChecker.IsHealthy(req.Context(), w)
 }
 
@@ -303,7 +323,39 @@ func (ws *remoteWebserverEndpoints) failSafe(w http.ResponseWriter, _ *http.Requ
 
 // This is the liveness probe
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, req *http.Request) {
+	if ws.isReplayStalled() {
+		log.Info("Liveness probe failing: WAL replay has stalled " +
+			"after the startup probe was reported as passed")
+		http.Error(w, "WAL replay has stalled", http.StatusInternalServerError)
+		return
+	}
+
 	ws.livenessChecker.IsHealthy(req.Context(), w)
+}
+
+// isReplayStalled detects a WAL replay that stopped making progress after
+// the startup probe was reported as passed because a replay was in
+// progress. In that case the startup probe is not run anymore by the
+// kubelet, and the liveness probe is the only way left to have a Pod
+// stuck in recovery restarted. The time allowed without progress is the
+// same the startup probe would have allowed without this feature, that
+// is .spec.startDelay.
+func (ws *remoteWebserverEndpoints) isReplayStalled() bool {
+	if !ws.instance.StartupSkippedForWALReplay() || ws.instance.WALReplayCompleted() {
+		return false
+	}
+
+	// PostgreSQL accepting connections means recovery reached its target:
+	// disarm replay progress tracking permanently. This check does not
+	// depend on the log messages locale.
+	if err := ws.instance.IsReady(); err == nil {
+		ws.instance.MarkWALReplayCompleted()
+		return false
+	}
+
+	ws.instance.SampleWALReplayPosition()
+	startDelay := time.Duration(ws.instance.GetClusterOrDefault().GetMaxStartDelay()) * time.Second
+	return ws.instance.IsWALReplayStalledFor(startDelay)
 }
 
 // This is the readiness probe
