@@ -176,6 +176,10 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(strings.TrimSpace(stdout)).To(Equal(fmt.Sprintf("%d", expectedTimeline)))
+				// Check the Cluster's status is aligned
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(cluster.Status.TimelineID).To(Equal(expectedTimeline))
 			}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
 		}
 
