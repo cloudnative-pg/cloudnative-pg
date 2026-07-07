@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -247,6 +248,33 @@ var _ = Describe("status error state", func() {
 		status, err := instance.GetStatus()
 		Expect(err).To(MatchError(ContainSubstring("WAL replay error")))
 		Expect(status.Pod.Name).To(BeEmpty())
+	})
+})
+
+var _ = Describe("WAL replay progress", func() {
+	It("stores when WAL replay progress was last observed", func() {
+		instance := &Instance{}
+		now := time.Date(2026, 7, 6, 0, 0, 0, 0, time.UTC)
+
+		instance.SetWALReplayProgressLastObservedAt(now)
+
+		lastObservedAt := instance.GetWALReplayProgressLastObservedAt()
+		Expect(lastObservedAt).To(BeTemporally("==", now))
+	})
+
+	It("returns the Unix epoch when WAL replay progress has not been observed", func() {
+		instance := &Instance{}
+
+		lastObservedAt := instance.GetWALReplayProgressLastObservedAt()
+		Expect(lastObservedAt).To(BeTemporally("==", time.Unix(0, 0)))
+	})
+
+	It("tracks when WAL replay progress detection has stopped", func() {
+		instance := &Instance{}
+
+		instance.StopWALReplayProgressDetection()
+
+		Expect(instance.IsWALReplayProgressDetectionStopped()).To(BeTrue())
 	})
 })
 

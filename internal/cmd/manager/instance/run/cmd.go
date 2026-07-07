@@ -308,6 +308,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	// postgres CSV logs handler (PGAudit too)
 	postgresLogPipe := logpipe.NewLogPipe(logpipe.MultiRecordWriter{
 		newWALReplayErrorDetector(instance),
+		newWALReplayProgressDetector(instance),
 		&logpipe.LogRecordWriter{},
 	})
 	if err := mgr.Add(postgresLogPipe); err != nil {

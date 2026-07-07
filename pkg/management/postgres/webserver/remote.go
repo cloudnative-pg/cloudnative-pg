@@ -293,6 +293,14 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		return
 	}
 
+	lastObservedAt := ws.instance.GetWALReplayProgressLastObservedAt()
+	if !ws.instance.IsWALReplayProgressDetectionStopped() && time.Since(lastObservedAt) <= 5*time.Minute {
+		log.Trace("Startup probe skipped")
+		_, _ = fmt.Fprint(w, "Skipped")
+		return
+	}
+
+	ws.instance.StopWALReplayProgressDetection()
 	ws.startupChecker.IsHealthy(req.Context(), w)
 }
 

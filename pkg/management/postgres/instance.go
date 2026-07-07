@@ -76,6 +76,8 @@ const (
 	pqPingReject     = 1 // server is alive but rejecting connections
 	pqPingNoResponse = 2 // could not establish connection
 	pgPingNoAttempt  = 3 // connection not attempted (bad params)
+
+	walReplayProgressDetectionStopped = math.MaxInt64
 )
 
 // GetPostgresExecutableName returns the name of the PostgreSQL executable
@@ -214,6 +216,10 @@ type Instance struct {
 	// need to carefully define when this value should be cleared.
 	statusError atomic.String
 
+	// walReplayProgressLastObservedAtUnixNano specifies when PostgreSQL last reported WAL replay progress
+	// Uses walReplayProgressDetectionStopped when progress detection can stop
+	walReplayProgressLastObservedAtUnixNano atomic.Int64
+
 	// fenced specifies whether fencing is on for the instance
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
@@ -289,6 +295,30 @@ func (instance *Instance) SetStatusError(message string) {
 
 func (instance *Instance) StatusError() string {
 	return instance.statusError.Load()
+}
+
+// SetWALReplayProgressLastObservedAt records when PostgreSQL last reported WAL
+// replay progress during startup.
+func (instance *Instance) SetWALReplayProgressLastObservedAt(observedAt time.Time) {
+	instance.walReplayProgressLastObservedAtUnixNano.Store(observedAt.UnixNano())
+}
+
+// StopWALReplayProgressDetection marks WAL replay progress detection as no
+// longer needed for this process.
+func (instance *Instance) StopWALReplayProgressDetection() {
+	instance.walReplayProgressLastObservedAtUnixNano.Store(walReplayProgressDetectionStopped)
+}
+
+// IsWALReplayProgressDetectionStopped returns true when WAL replay progress
+// detection has been stopped for this process.
+func (instance *Instance) IsWALReplayProgressDetectionStopped() bool {
+	return instance.walReplayProgressLastObservedAtUnixNano.Load() == walReplayProgressDetectionStopped
+}
+
+// GetWALReplayProgressLastObservedAt returns the latest PostgreSQL startup
+// progress log observation timestamp.
+func (instance *Instance) GetWALReplayProgressLastObservedAt() time.Time {
+	return time.Unix(0, instance.walReplayProgressLastObservedAtUnixNano.Load())
 }
 
 // IsFenced checks whether the instance is marked as fenced
