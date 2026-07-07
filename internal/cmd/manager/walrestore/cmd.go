@@ -322,16 +322,8 @@ func mergeEnv(env []string, incomingEnv []string) {
 
 // getWALRestoreSettings resolves the barman-cloud-wal-restore command-line
 // options, the environment carrying the object store credentials, and the
-// prefetch parallelism to use for a WAL restore.
-//
-// During the bootstrap recovery Job no primary has been elected yet
-// (cluster.Status.CurrentPrimary is empty) and there is no instance-manager
-// cache. The Job, which is the only component able to resolve the recovery
-// source object store (for a recovery.backup reference the store lives only in
-// the referenced Backup CR and is not derivable from the cluster spec),
-// pre-populates the local webserver cache with the wal-restore options and
-// credentials. We honor those here so the recovery replay restores WALs from
-// the source store, just like a replica does.
+// prefetch parallelism to use for a WAL restore. See the bootstrap-recovery
+// gate below for how a Job-populated cache fits into this.
 func getWALRestoreSettings(
 	ctx context.Context,
 	cacheClient local.CacheClient,
@@ -354,6 +346,9 @@ func getWALRestoreSettings(
 		barmanConfiguration, configErr := cacheClient.GetBarmanObjectStore(cache.WALRestoreConfigKey)
 		switch {
 		case configErr == nil:
+			// The cached recovery-source store's ServerName is always populated by
+			// loadBackup (from the Backup CR, or from the external cluster's
+			// GetServerName()), so passing it again here is not a real fallback.
 			return walRestoreSettingsFromStore(ctx, cacheClient, barmanConfiguration, barmanConfiguration.ServerName, nil)
 		case !errors.Is(configErr, cache.ErrCacheMiss):
 			// A real failure resolving the bootstrap-cached recovery source store
