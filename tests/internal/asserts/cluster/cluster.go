@@ -601,3 +601,26 @@ func AssertPrimaryUpdateMethod(
 		return testsutils.FirstEndpointSliceIP(endpointSlice), err
 	}, timeout).Should(BeEquivalentTo(currentPrimaryPod.Status.PodIP))
 }
+
+// AssertPluginLoaded waits until the named CNPG-I plugin is reported as
+// loaded in the cluster status, with a version, within timeoutSeconds.
+func AssertPluginLoaded(
+	env *environment.TestingEnvironment,
+	namespace, clusterName, pluginName string,
+	timeoutSeconds int,
+) {
+	GinkgoHelper()
+	Eventually(func(g Gomega) {
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		var pluginVersion string
+		for _, plugin := range cluster.Status.PluginStatus {
+			if plugin.Name == pluginName {
+				pluginVersion = plugin.Version
+			}
+		}
+		g.Expect(pluginVersion).ToNot(BeEmpty(),
+			"the %s plugin is not reported as loaded in the cluster status", pluginName)
+	}, timeoutSeconds).Should(Succeed())
+}

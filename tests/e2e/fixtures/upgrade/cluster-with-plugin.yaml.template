@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-plugin-upgrade
+spec:
+  instances: 2
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Archive WALs through plugin-barman-cloud. The referenced ObjectStore is
+  # created by the test.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: cluster-plugin-upgrade
