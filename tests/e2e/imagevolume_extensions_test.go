@@ -42,6 +42,7 @@ import (
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -404,7 +405,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 					Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
 				},
 			})
-			err = env.Client.Update(env.Ctx, catalog)
+			err = objects.Update(env.Ctx, env.Client, catalog)
 			Expect(err).ToNot(HaveOccurred())
 
 			extensionConfig := apiv1.ExtensionConfiguration{Name: "pgvector"}

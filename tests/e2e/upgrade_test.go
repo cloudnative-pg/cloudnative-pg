@@ -48,6 +48,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -181,7 +182,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		cluster.Spec.PostgresConfiguration.Parameters["max_replication_slots"] = "16"
 		cluster.Spec.PostgresConfiguration.Parameters["maintenance_work_mem"] = "256MB"
 		cluster.Spec.PostgresConfiguration.PgHBA[0] = "host all all all trust"
-		return env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(oldCluster))
+		return objects.Patch(env.Ctx, env.Client, cluster, ctrlclient.MergeFrom(oldCluster))
 	}
 
 	AssertConfUpgrade := func(clusterName, upgradeNamespace string) {

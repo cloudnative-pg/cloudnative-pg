@@ -89,11 +89,7 @@ func List(
 		retry.DelayType(retry.FixedDelay)).
 		Do(
 			func() error {
-				err := crudClient.List(ctx, objectList, opts...)
-				if err != nil {
-					return err
-				}
-				return nil
+				return crudClient.List(ctx, objectList, opts...)
 			},
 		)
 	return err
@@ -123,12 +119,14 @@ func Patch(
 	return err
 }
 
-// Get retrieves an object for the given object key from the Kubernetes Cluster
-func Get(
+// PatchStatus patches an object's status subresource in the Kubernetes cluster,
+// retrying on transient errors. See Patch for the rationale behind retrying.
+func PatchStatus(
 	ctx context.Context,
 	crudClient client.Client,
-	objectKey client.ObjectKey,
 	object client.Object,
+	patch client.Patch,
+	opts ...client.SubResourcePatchOption,
 ) error {
 	err := retry.New(
 		retry.Delay(PollingTime*time.Second),
@@ -136,11 +134,46 @@ func Get(
 		retry.DelayType(retry.FixedDelay)).
 		Do(
 			func() error {
-				err := crudClient.Get(ctx, objectKey, object)
-				if err != nil {
-					return err
-				}
-				return nil
+				return crudClient.Status().Patch(ctx, object, patch, opts...)
+			},
+		)
+	return err
+}
+
+// Get retrieves an object for the given object key from the Kubernetes Cluster
+func Get(
+	ctx context.Context,
+	crudClient client.Client,
+	objectKey client.ObjectKey,
+	object client.Object,
+	opts ...client.GetOption,
+) error {
+	err := retry.New(
+		retry.Delay(PollingTime*time.Second),
+		retry.Attempts(RetryAttempts),
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				return crudClient.Get(ctx, objectKey, object, opts...)
+			},
+		)
+	return err
+}
+
+// Update updates an object in the Kubernetes Cluster
+func Update(
+	ctx context.Context,
+	crudClient client.Client,
+	object client.Object,
+	opts ...client.UpdateOption,
+) error {
+	err := retry.New(
+		retry.Delay(PollingTime*time.Second),
+		retry.Attempts(RetryAttempts),
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				return crudClient.Update(ctx, object, opts...)
 			},
 		)
 	return err

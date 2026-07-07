@@ -44,6 +44,7 @@ import (
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -566,7 +567,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updated := cluster.DeepCopy()
 				updated.Spec.PostgresConfiguration.Parameters["max_connections"] = fmt.Sprintf("%v",
 					newMaxConnectionsValue)
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 

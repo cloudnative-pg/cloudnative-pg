@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -303,14 +304,14 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				walPVC := &corev1.PersistentVolumeClaim{}
 				Expect(env.Client.Get(env.Ctx, walPVCKey, walPVC)).To(Succeed())
 				controllerutil.AddFinalizer(walPVC, holdFinalizer)
-				Expect(env.Client.Update(env.Ctx, walPVC)).To(Succeed())
+				Expect(objects.Update(env.Ctx, env.Client, walPVC)).To(Succeed())
 			})
 			// Always release the WAL PVC, otherwise namespace teardown would hang.
 			DeferCleanup(func() {
 				walPVC := &corev1.PersistentVolumeClaim{}
 				if err := env.Client.Get(env.Ctx, walPVCKey, walPVC); err == nil {
 					if controllerutil.RemoveFinalizer(walPVC, holdFinalizer) {
-						_ = env.Client.Update(env.Ctx, walPVC)
+						_ = objects.Update(env.Ctx, env.Client, walPVC)
 					}
 				}
 			})
@@ -357,7 +358,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				walPVC := &corev1.PersistentVolumeClaim{}
 				Expect(env.Client.Get(env.Ctx, walPVCKey, walPVC)).To(Succeed())
 				controllerutil.RemoveFinalizer(walPVC, holdFinalizer)
-				Expect(env.Client.Update(env.Ctx, walPVC)).To(Succeed())
+				Expect(objects.Update(env.Ctx, env.Client, walPVC)).To(Succeed())
 			})
 
 			By("verifying the instance is recreated and rejoins as a ready standby", func() {

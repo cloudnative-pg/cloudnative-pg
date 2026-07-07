@@ -28,6 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -122,7 +123,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			originalCluster := cluster.DeepCopy()
 			cluster.Spec.Probes = probesConfiguration.DeepCopy()
 
-			err = env.Client.Patch(ctx, &cluster, client.MergeFrom(originalCluster))
+			err = objects.Patch(env.Ctx, env.Client, &cluster, client.MergeFrom(originalCluster))
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -165,7 +166,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			originalCluster := cluster.DeepCopy()
 			cluster.Spec.Probes = &apiv1.ProbesConfiguration{}
 
-			err = env.Client.Patch(ctx, &cluster, client.MergeFrom(originalCluster))
+			err = objects.Patch(env.Ctx, env.Client, &cluster, client.MergeFrom(originalCluster))
 			Expect(err).ToNot(HaveOccurred())
 		})
 
