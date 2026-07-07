@@ -39,7 +39,9 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
@@ -2663,7 +2665,8 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getSharedBuffersWarnings(r)...)
 	list = append(list, getMonitoringFieldsWarnings(r)...)
 	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
-	return append(list, getSynchronousReplicationWarnings(r)...)
+	list = append(list, getSynchronousReplicationWarnings(r)...)
+	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
 
 func getMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {
@@ -3153,5 +3156,26 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		"This cluster has no synchronous replication configured. " +
 			"A primary failure can cause data loss for transactions not yet replicated. " +
 			"Consider configuring .spec.postgresql.synchronous to protect against data loss.",
+	}
+}
+
+func getFailureDomainTopologyWarnings(r *apiv1.Cluster) admission.Warnings {
+	sync := r.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKey) == 0 {
+		return nil
+	}
+
+	condition := meta.FindStatusCondition(
+		r.Status.Conditions,
+		string(apiv1.ConditionSyncReplicationTopologySatisfied),
+	)
+	if condition == nil || condition.Status != metav1.ConditionFalse {
+		return nil
+	}
+
+	return admission.Warnings{
+		"failureDomainKey is configured but the topology constraint is not currently satisfied: " +
+			condition.Message +
+			" Check that replicas exist in different failure domains and that node topology labels are set.",
 	}
 }

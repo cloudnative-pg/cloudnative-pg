@@ -7081,3 +7081,75 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
 	})
 })
+
+var _ = Describe("getFailureDomainTopologyWarnings", func() {
+	makeCluster := func(failureDomainKey []string, conditions []metav1.Condition) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{}
+		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+			Method:           apiv1.SynchronousReplicaConfigurationMethodAny,
+			Number:           1,
+			FailureDomainKey: failureDomainKey,
+		}
+		cluster.Status.Conditions = conditions
+		return cluster
+	}
+
+	It("returns no warning when failureDomainKey is not set", func() {
+		cluster := makeCluster(nil, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+				Message: "No cross-domain replica exists.",
+			},
+		})
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the condition is True", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionTrue,
+				Reason:  string(apiv1.ConditionReasonTopologySatisfied),
+				Message: "At least one synchronous replica is in a different failure domain than the primary.",
+			},
+		})
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the condition is absent", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, nil)
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when the condition is False due to insufficient cross-domain replicas", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+				Message: "No synchronous replica in a different failure domain than the primary exists.",
+			},
+		})
+		warnings := getFailureDomainTopologyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
+		Expect(warnings[0]).To(ContainSubstring("No synchronous replica"))
+	})
+
+	It("returns a warning when the condition is False due to topology not extracted", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonTopologyNotExtracted),
+				Message: "Topology labels could not be extracted from pods or nodes.",
+			},
+		})
+		warnings := getFailureDomainTopologyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
+		Expect(warnings[0]).To(ContainSubstring("Topology labels could not be extracted"))
+	})
+})

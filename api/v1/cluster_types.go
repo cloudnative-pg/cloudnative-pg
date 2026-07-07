@@ -2786,6 +2786,7 @@ type RoleConfiguration struct {
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyInstances",description="Number of ready instances"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Cluster current status"
 // +kubebuilder:printcolumn:name="Primary",type="string",JSONPath=".status.currentPrimary",description="Primary pod"
+// +kubebuilder:printcolumn:name="SyncTopology",type="string",JSONPath=".status.conditions[?(@.type=='SyncReplicationTopologySatisfied')].reason",description="Failure domain topology satisfaction status",priority=1
 
 // Cluster defines the API schema for a highly available PostgreSQL database cluster
 // managed by CloudNativePG.
