@@ -22,6 +22,7 @@ package e2e
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
@@ -83,16 +84,26 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 			targetVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
 			Expect(err).ToNot(HaveOccurred())
 			targetMajor := targetVersion.Major()
+			targetTag := strconv.FormatUint(targetMajor, 10)
 
 			currentVersion, err := version.FromTag(env.PostgresImageTag)
 			Expect(err).ToNot(HaveOccurred())
 			startMajor := currentVersion.Major()
-			if startMajor >= targetMajor {
+
+			switch {
+			case startMajor == targetMajor:
 				startMajor = targetMajor - 1
+			case startMajor > targetMajor:
+				// env.PostgresImageTag is a not-yet-released beta ahead of the
+				// operator's default: upgrade to it instead of ignoring it, keeping
+				// its raw tag (e.g. "19beta1") since beta images aren't published
+				// under a plain major-number tag.
+				startMajor, targetMajor = targetMajor, startMajor
+				targetTag = strings.Split(env.PostgresImageTag, "-")[0]
 			}
 
 			startImage := env.OfficialMinimalImageName(strconv.FormatUint(startMajor, 10))
-			targetImage := env.MinimalImageName(strconv.FormatUint(targetMajor, 10))
+			targetImage := env.MinimalImageName(targetTag)
 
 			namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
