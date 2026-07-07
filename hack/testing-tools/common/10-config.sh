@@ -92,6 +92,12 @@ export ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 export ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
 export ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
 
+# plugin-barman-cloud release version. Available options:
+#  - "release" (default): the latest published release
+#  - "main":              the current snapshot from the main branch
+#  - "vX.Y.Z" / "X.Y.Z":  a specific pinned release
+export BARMAN_PLUGIN_VERSION=${BARMAN_PLUGIN_VERSION:-"release"}
+
 # --- GENERIC ADD-ON CONSTANTS (Shared CSI/Snapshotter versions for Renovate) ---
 
 # Define default CSI driver version

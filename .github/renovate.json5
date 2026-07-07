@@ -46,7 +46,7 @@
         '/^Makefile$/',
         '/^hack/setup-cluster.sh$/',
         '/^hack/testing-tools/k8s-engines/[^/]+/settings\\.sh$/',
-        '/^hack/testing-tools/common/40-utils-registry\\.sh$/'
+        '/^hack/testing-tools/common/[^/]+\\.sh$/'
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*["\']?(?<currentValue>[^@"\'\\s]+?)(?:@(?<currentDigest>sha256:[a-f0-9]+))?["\']?\\s',
