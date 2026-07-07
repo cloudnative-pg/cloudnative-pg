@@ -307,7 +307,9 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		isWALReplaySkipEnabled(ws.instance.GetClusterOrDefault()) {
 		ws.instance.SampleWALReplayPosition()
 		if ws.instance.IsWALReplayProgressing() {
-			ws.instance.MarkStartupSkippedForWALReplay()
+			if ws.instance.MarkStartupSkippedForWALReplay() {
+				log.Info("Startup probe reported as passed: WAL replay is in progress")
+			}
 			log.Trace("Startup probe skipped: WAL replay is in progress")
 			_, _ = fmt.Fprint(w, "Skipped")
 			return
@@ -350,7 +352,9 @@ func (ws *remoteWebserverEndpoints) isReplayStalled() bool {
 	// disarm replay progress tracking permanently. This check does not
 	// depend on the log messages locale.
 	if err := ws.instance.IsReady(); err == nil {
-		ws.instance.MarkWALReplayCompleted()
+		if ws.instance.MarkWALReplayCompleted() {
+			log.Info("WAL replay completed: PostgreSQL is accepting connections")
+		}
 		return false
 	}
 

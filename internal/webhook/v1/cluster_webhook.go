@@ -2662,7 +2662,33 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getStorageWarnings(r)...)
 	list = append(list, getSharedBuffersWarnings(r)...)
 	list = append(list, getMonitoringFieldsWarnings(r)...)
+	list = append(list, getWALReplaySkipWarnings(r)...)
 	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+}
+
+// getWALReplaySkipWarnings warns about skipOnWALReplay values that are
+// accepted by the schema but ignored at runtime
+func getWALReplaySkipWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.Probes == nil {
+		return result
+	}
+
+	if readiness := r.Spec.Probes.Readiness; readiness != nil && readiness.SkipOnWALReplay != nil {
+		result = append(result,
+			"spec.probes.readiness.skipOnWALReplay is ignored: the option is only honored by the startup probe.")
+	}
+
+	if startup := r.Spec.Probes.Startup; startup != nil &&
+		startup.SkipOnWALReplay != nil && *startup.SkipOnWALReplay &&
+		startup.Type != "" && startup.Type != apiv1.ProbeStrategyPgIsReady {
+		result = append(result, fmt.Sprintf(
+			"spec.probes.startup.skipOnWALReplay is ignored with the %q startup strategy: "+
+				"the option is only honored with the default pg_isready strategy.", startup.Type))
+	}
+
+	return result
 }
 
 func getMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {

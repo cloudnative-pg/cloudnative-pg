@@ -188,6 +188,69 @@ var _ = Describe("WAL replay progress tracking", func() {
 		})
 	})
 
+	Context("state persistence", func() {
+		var stateFile string
+
+		BeforeEach(func() {
+			stateFile = filepath.Join(GinkgoT().TempDir(), "state.json")
+		})
+
+		It("latches each transition only once", func() {
+			Expect(tracker.markStartupSkipped()).To(BeTrue())
+			Expect(tracker.markStartupSkipped()).To(BeFalse())
+			Expect(tracker.markCompleted()).To(BeTrue())
+			Expect(tracker.markCompleted()).To(BeFalse())
+		})
+
+		It("restores a startup skip latch, restarting the stall clock", func() {
+			tracker.load(stateFile, now)
+			tracker.markProgress(now)
+			tracker.markStartupSkipped()
+
+			loadTime := now.Add(30 * time.Minute)
+			restored := &walReplayProgress{}
+			restored.load(stateFile, loadTime)
+
+			Expect(restored.isStartupSkipped()).To(BeTrue())
+			Expect(restored.isCompleted()).To(BeFalse())
+			Expect(restored.isStalled(loadTime.Add(time.Hour), time.Hour)).To(BeFalse())
+			Expect(restored.isStalled(loadTime.Add(time.Hour+time.Second), time.Hour)).To(BeTrue())
+		})
+
+		It("restores a completed latch without arming stall detection", func() {
+			tracker.load(stateFile, now)
+			tracker.markStartupSkipped()
+			tracker.markCompleted()
+
+			restored := &walReplayProgress{}
+			restored.load(stateFile, now.Add(time.Hour))
+
+			Expect(restored.isCompleted()).To(BeTrue())
+			Expect(restored.isStalled(now.Add(48*time.Hour), time.Hour)).To(BeFalse())
+		})
+
+		It("starts from a clean state when the file is missing", func() {
+			tracker.load(stateFile, now)
+			Expect(tracker.isStartupSkipped()).To(BeFalse())
+			Expect(tracker.isCompleted()).To(BeFalse())
+		})
+
+		It("discards an unreadable state file", func() {
+			Expect(os.WriteFile(stateFile, []byte("not json"), 0o600)).To(Succeed())
+			tracker.load(stateFile, now)
+			Expect(tracker.isStartupSkipped()).To(BeFalse())
+			Expect(tracker.isCompleted()).To(BeFalse())
+		})
+
+		It("does not write any file when persistence is not configured", func() {
+			dir := GinkgoT().TempDir()
+			tracker.markStartupSkipped()
+			entries, err := os.ReadDir(dir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(entries).To(BeEmpty())
+		})
+	})
+
 	Context("instance level API", func() {
 		It("exposes progress marking and freshness", func() {
 			instance := &Instance{}

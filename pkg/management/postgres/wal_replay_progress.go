@@ -21,6 +21,7 @@ package postgres
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -85,6 +87,73 @@ type walReplayProgress struct {
 	// walSegmentSize caches the WAL segment size read from the control
 	// file, zero until the first successful read
 	walSegmentSize int64
+
+	// stateFile is where the one-shot latches are persisted so that they
+	// survive an in-place restart of the instance manager (online
+	// upgrade): the kubelet keeps its startup probe state across the
+	// re-exec, so we have to keep ours too. Empty disables persistence.
+	stateFile string
+}
+
+// walReplayProgressState is the persisted part of walReplayProgress
+type walReplayProgressState struct {
+	StartupSkipped bool `json:"startupSkipped,omitempty"`
+	Completed      bool `json:"completed,omitempty"`
+}
+
+// persist saves the one-shot latches to the state file. It must be called
+// with the mutex held. Errors are logged and ignored: without persistence
+// the latches simply behave as before, in memory only.
+func (w *walReplayProgress) persist() {
+	if w.stateFile == "" {
+		return
+	}
+
+	content, err := json.Marshal(walReplayProgressState{
+		StartupSkipped: w.startupSkipped,
+		Completed:      w.completed,
+	})
+	if err != nil {
+		log.Warning("Error while encoding the WAL replay progress state", "err", err.Error())
+		return
+	}
+
+	tempFile := w.stateFile + ".tmp"
+	if err := os.WriteFile(tempFile, content, 0o600); err != nil {
+		log.Warning("Error while writing the WAL replay progress state", "err", err.Error())
+		return
+	}
+	if err := os.Rename(tempFile, w.stateFile); err != nil {
+		log.Warning("Error while saving the WAL replay progress state", "err", err.Error())
+	}
+}
+
+// load restores the one-shot latches from the state file, if present.
+// When a startup probe skip was latched by a previous instance manager
+// process, the stall clock restarts from now: a progressing instance gets
+// a full fresh timeout, while a stuck one is still detected.
+func (w *walReplayProgress) load(stateFile string, now time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.stateFile = stateFile
+
+	content, err := os.ReadFile(stateFile) //nolint:gosec
+	if err != nil {
+		return
+	}
+
+	var state walReplayProgressState
+	if err := json.Unmarshal(content, &state); err != nil {
+		log.Warning("Discarding unreadable WAL replay progress state", "err", err.Error())
+		return
+	}
+
+	w.startupSkipped = state.StartupSkipped
+	w.completed = state.Completed
+	if w.startupSkipped && !w.completed {
+		w.lastProgressAt = now
+	}
 }
 
 func (w *walReplayProgress) markProgress(now time.Time) {
@@ -135,10 +204,17 @@ func (w *walReplayProgress) isProgressing(now time.Time) bool {
 	return !w.lastProgressAt.IsZero() && now.Sub(w.lastProgressAt) <= walReplayProgressWindow
 }
 
-func (w *walReplayProgress) markCompleted() {
+// markCompleted latches the completed flag, returning true on the first
+// transition
+func (w *walReplayProgress) markCompleted() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.completed {
+		return false
+	}
 	w.completed = true
+	w.persist()
+	return true
 }
 
 func (w *walReplayProgress) isCompleted() bool {
@@ -147,10 +223,17 @@ func (w *walReplayProgress) isCompleted() bool {
 	return w.completed
 }
 
-func (w *walReplayProgress) markStartupSkipped() {
+// markStartupSkipped latches the startup skip flag, returning true on the
+// first transition
+func (w *walReplayProgress) markStartupSkipped() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.startupSkipped {
+		return false
+	}
 	w.startupSkipped = true
+	w.persist()
+	return true
 }
 
 func (w *walReplayProgress) isStartupSkipped() bool {
@@ -224,9 +307,10 @@ func (instance *Instance) MarkWALReplayProgress() {
 }
 
 // MarkWALReplayCompleted records that PostgreSQL started accepting
-// connections, disarming WAL replay progress tracking
-func (instance *Instance) MarkWALReplayCompleted() {
-	instance.walReplayProgress.markCompleted()
+// connections, disarming WAL replay progress tracking. It returns true
+// the first time the transition happens.
+func (instance *Instance) MarkWALReplayCompleted() bool {
+	return instance.walReplayProgress.markCompleted()
 }
 
 // WALReplayCompleted tells whether PostgreSQL started accepting
@@ -255,9 +339,20 @@ func (instance *Instance) IsWALReplayProgressing() bool {
 }
 
 // MarkStartupSkippedForWALReplay records that the startup probe was
-// reported as passed because WAL replay was in progress
-func (instance *Instance) MarkStartupSkippedForWALReplay() {
-	instance.walReplayProgress.markStartupSkipped()
+// reported as passed because WAL replay was in progress. It returns true
+// the first time the transition happens.
+func (instance *Instance) MarkStartupSkippedForWALReplay() bool {
+	return instance.walReplayProgress.markStartupSkipped()
+}
+
+// LoadWALReplayProgressState restores the WAL replay probe latches
+// persisted by a previous instance manager process of this Pod, and
+// enables their persistence for this process
+func (instance *Instance) LoadWALReplayProgressState() {
+	instance.walReplayProgress.load(
+		filepath.Join(postgres.ScratchDataDirectory, "wal-replay-progress.json"),
+		time.Now(),
+	)
 }
 
 // StartupSkippedForWALReplay tells whether the startup probe was reported

@@ -6565,6 +6565,70 @@ var _ = Describe("getRetentionPolicyWarnings", func() {
 	})
 })
 
+var _ = Describe("getWALReplaySkipWarnings", func() {
+	It("returns no warnings without probes configuration", func() {
+		Expect(getWALReplaySkipWarnings(&apiv1.Cluster{})).To(BeEmpty())
+	})
+
+	It("returns no warnings when the option is used with the default strategy", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Probes: &apiv1.ProbesConfiguration{
+					Startup: &apiv1.ProbeWithStrategy{
+						SkipOnWALReplay: ptr.To(true),
+					},
+				},
+			},
+		}
+		Expect(getWALReplaySkipWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("warns when the option is set on the readiness probe", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Probes: &apiv1.ProbesConfiguration{
+					Readiness: &apiv1.ProbeWithStrategy{
+						SkipOnWALReplay: ptr.To(true),
+					},
+				},
+			},
+		}
+		warnings := getWALReplaySkipWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("readiness"))
+	})
+
+	It("warns when the option is enabled with a custom startup strategy", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Probes: &apiv1.ProbesConfiguration{
+					Startup: &apiv1.ProbeWithStrategy{
+						SkipOnWALReplay: ptr.To(true),
+						Type:            apiv1.ProbeStrategyStreaming,
+					},
+				},
+			},
+		}
+		warnings := getWALReplaySkipWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("streaming"))
+	})
+
+	It("does not warn about the strategy when the option is disabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Probes: &apiv1.ProbesConfiguration{
+					Startup: &apiv1.ProbeWithStrategy{
+						SkipOnWALReplay: ptr.To(false),
+						Type:            apiv1.ProbeStrategyStreaming,
+					},
+				},
+			},
+		}
+		Expect(getWALReplaySkipWarnings(cluster)).To(BeEmpty())
+	})
+})
+
 var _ = Describe("getStorageWarnings", func() {
 	It("returns no warnings when storage is properly configured", func() {
 		cluster := &apiv1.Cluster{

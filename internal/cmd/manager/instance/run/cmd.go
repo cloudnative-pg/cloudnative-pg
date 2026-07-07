@@ -109,6 +109,12 @@ func NewCmd() *cobra.Command {
 			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
 
+			// Restore the WAL replay probe latches persisted by a
+			// previous instance manager process of this Pod, since the
+			// kubelet keeps its startup probe state across an in-place
+			// instance manager upgrade
+			instance.LoadWALReplayProgressState()
+
 			// Since version 0.19.0 of controller-runtime, it is not allowed to create multiple controllers with the
 			// same name. As this part of the code is run inside a retry block, we need to allow SkipNameValidation
 			// only on retries, because a previous run may have already created a controller
