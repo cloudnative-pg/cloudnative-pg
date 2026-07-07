@@ -551,4 +551,90 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(isWALSpaceAvailableOnPod(pod)).To(BeFalse())
 		})
 	})
+
+	Describe("getPodsTopology", func() {
+		const zoneLabel = "topology.kubernetes.io/zone"
+
+		makePod := func(name, nodeName string, podLabels map[string]string) corev1.Pod {
+			return corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Labels: podLabels},
+				Spec:       corev1.PodSpec{NodeName: nodeName},
+			}
+		}
+
+		makeNode := func(name string, nodeLabels map[string]string) corev1.Node {
+			return corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Labels: nodeLabels},
+			}
+		}
+
+		topology := apiv1.SyncReplicaElectionConstraints{
+			Enabled:                true,
+			NodeLabelsAntiAffinity: []string{zoneLabel},
+		}
+
+		It("reads topology labels from pod labels (KEP-4742 path)", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
+				makePod("pod-2", "node-2", map[string]string{zoneLabel: "az2"}),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, topology)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
+			Expect(result.Instances["pod-2"][zoneLabel]).To(Equal("az2"))
+			Expect(result.NodesUsed).To(BeEquivalentTo(2))
+		})
+
+		It("falls back to node labels when pod labels are absent", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", nil),
+				makePod("pod-2", "node-2", nil),
+			}
+			nodes := map[string]corev1.Node{
+				"node-1": makeNode("node-1", map[string]string{zoneLabel: "az1"}),
+				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
+			}
+			result := getPodsTopology(context.Background(), pods, nodes, topology)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
+			Expect(result.Instances["pod-2"][zoneLabel]).To(Equal("az2"))
+		})
+
+		It("uses pod label when available and falls back to node for others", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
+				makePod("pod-2", "node-2", nil),
+			}
+			nodes := map[string]corev1.Node{
+				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
+			}
+			result := getPodsTopology(context.Background(), pods, nodes, topology)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
+			Expect(result.Instances["pod-2"][zoneLabel]).To(Equal("az2"))
+		})
+
+		It("returns empty topology when a pod label is absent and node is not found", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", nil),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, topology)
+
+			Expect(result.SuccessfullyExtracted).To(BeFalse())
+		})
+
+		It("returns successfully extracted topology when no labels are configured", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", nil),
+			}
+			emptyTopology := apiv1.SyncReplicaElectionConstraints{Enabled: true}
+			result := getPodsTopology(context.Background(), pods, nil, emptyTopology)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.NodesUsed).To(BeEquivalentTo(1))
+		})
+	})
 })
