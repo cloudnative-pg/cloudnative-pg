@@ -7040,3 +7040,44 @@ var _ = Describe("ServiceAccount configuration validation", func() {
 		Expect(result[0].Detail).To(ContainSubstring("mutually exclusive"))
 	})
 })
+
+var _ = Describe("getSynchronousReplicationWarnings", func() {
+	It("returns no warning for a single-instance cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 1},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a multi-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning when the current synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method: apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number: 1,
+					},
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the legacy synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MinSyncReplicas: 1,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+})
