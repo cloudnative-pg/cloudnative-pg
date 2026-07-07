@@ -181,15 +181,23 @@ func Execute(
 	}, timeoutSeconds).ShouldNot(gomega.HaveOccurred())
 
 	backupStatus := backup.GetStatus()
-	if cluster.Spec.Backup != nil {
-		backupTarget := cluster.Spec.Backup.Target
+	// Resolve the target the way the operator does: the backup's own target
+	// wins over the cluster default. Clusters backed up through a plugin have
+	// no backup section, so the check cannot depend on it; when no target is
+	// set anywhere the elected instance is the operator's choice and is not
+	// asserted.
+	if cluster.Spec.Backup != nil || backup.Spec.Target != "" {
+		var backupTarget apiv1.BackupTarget
+		if cluster.Spec.Backup != nil {
+			backupTarget = cluster.Spec.Backup.Target
+		}
 		if backup.Spec.Target != "" {
 			backupTarget = backup.Spec.Target
 		}
 		switch backupTarget {
-		case apiv1.BackupTargetPrimary, "":
+		case apiv1.BackupTargetPrimary:
 			gomega.Expect(backupStatus.InstanceID.PodName).To(gomega.BeEquivalentTo(cluster.Status.TargetPrimary))
-		case apiv1.BackupTargetStandby:
+		case apiv1.BackupTargetStandby, "":
 			gomega.Expect(backupStatus.InstanceID.PodName).To(gomega.BeElementOf(cluster.Status.InstanceNames))
 			if onlyTargetStandbys {
 				gomega.Expect(backupStatus.InstanceID.PodName).NotTo(gomega.Equal(cluster.Status.TargetPrimary))
@@ -341,6 +349,74 @@ func CreateClusterFromExternalClusterBackupWithPITROnObjectStore(
 									Key: "KEY",
 								},
 							},
+						},
+					},
+				},
+			},
+		},
+	}
+	obj, err := objects.Create(ctx, crudClient, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
+}
+
+// CreateClusterFromExternalClusterBackupWithPITRUsingPlugin creates a cluster
+// that recovers up to targetTime from the backups of sourceClusterName through
+// a CNPG-I plugin. The plugin ObjectStore is expected to be named after the
+// source cluster, which is also the server name its backups are stored under.
+func CreateClusterFromExternalClusterBackupWithPITRUsingPlugin(
+	ctx context.Context,
+	crudClient client.Client,
+	namespace,
+	restoredClusterName,
+	sourceClusterName,
+	pluginName,
+	targetTime string,
+) (*apiv1.Cluster, error) {
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+
+	restoreCluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      restoredClusterName,
+			Namespace: namespace,
+		},
+		Spec: apiv1.ClusterSpec{
+			// The PITR restore asserts expect a primary with two streaming
+			// replicas.
+			Instances: 3,
+
+			StorageConfiguration: apiv1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+			WalStorage: &apiv1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+
+			Bootstrap: &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					Source: sourceClusterName,
+					RecoveryTarget: &apiv1.RecoveryTarget{
+						TargetTime: targetTime,
+					},
+				},
+			},
+
+			ExternalClusters: []apiv1.ExternalCluster{
+				{
+					Name: sourceClusterName,
+					PluginConfiguration: &apiv1.PluginConfiguration{
+						Name: pluginName,
+						Parameters: map[string]string{
+							"barmanObjectName": sourceClusterName,
+							"serverName":       sourceClusterName,
 						},
 					},
 				},

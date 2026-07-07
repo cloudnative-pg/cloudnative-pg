@@ -190,6 +190,10 @@ The script can be configured through the following environment variables:
 - `CNPG_CHART_VERSION`: when `CNPG_DEPLOYMENT_METHOD=helm`, pin the chart to
   this version (passed as `--version`). Unset by default, in which case the
   latest published chart is installed.
+- `BARMAN_PLUGIN_VERSION`: the `plugin-barman-cloud` build to install (kind/k3d
+  only) for the plugin-based backup tests: `release` (default) for the latest
+  published release, `main` for the current snapshot, or a pinned version such
+  as `v0.12.0`.
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:
@@ -231,6 +235,7 @@ type provided.
 | `observability`                   |
 | `replication`                     |
 | `plugin`                          |
+| `plugin-barman-cloud`             |
 | `postgres-configuration`          |
 | `pod-scheduling`                  |
 | `cluster-metadata`                |
@@ -429,6 +434,14 @@ Options supported are:
   **Note:** The `helm` method is only supported on
   Kind and k3d clusters. Other environments will
   ignore this and always use `manifest`.
+
+- barman_plugin (`barman_plugin_version` or `bp` for short)
+  The `plugin-barman-cloud` build to install for the plugin-based backup tests.
+  Only applied on Kind and k3d clusters. Default value is `release`. Available
+  values are:
+  - release: the latest published plugin release (default)
+  - main: the current snapshot from the main branch
+  - a pinned version such as `v0.12.0`
 
 Example:
 1. Trigger an e2e test to run all test cases with `lowest` test level.

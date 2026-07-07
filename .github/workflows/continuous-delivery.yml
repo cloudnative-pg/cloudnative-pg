@@ -38,6 +38,10 @@ on:
         options:
           - manifest
           - helm
+      barman_plugin:
+        description: 'plugin-barman-cloud version to install (kind/k3d only): release (default), main, or a pinned version like v0.12.0'
+        required: false
+        default: 'release'
   schedule:
     - cron:  '0 1 * * *'
 
@@ -118,6 +122,7 @@ jobs:
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
       cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
+      barman_plugin_version: ${{ env.BARMAN_PLUGIN_VERSION }}
     steps:
       - name: Check for Command
         id: command
@@ -142,6 +147,7 @@ jobs:
           FEATURE_TYPE=""
           LOG_LEVEL="debug"
           CNPG_DEPLOYMENT_METHOD="manifest"
+          BARMAN_PLUGIN_VERSION="release"
 
           for ARG in $ARGS; do
             IFS='=' read name value <<< $ARG
@@ -164,6 +170,9 @@ jobs:
               "cnpg_deployment_method"|"deployment-method"|"dm")
               CNPG_DEPLOYMENT_METHOD="${value}"
               ;;
+              "barman_plugin"|"barman_plugin_version"|"bp")
+              BARMAN_PLUGIN_VERSION="${value}"
+              ;;
               *)
               ;;
             esac
@@ -175,6 +184,7 @@ jobs:
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
           echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
+          echo "BARMAN_PLUGIN_VERSION=${BARMAN_PLUGIN_VERSION}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
         uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3
@@ -202,6 +212,7 @@ jobs:
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
       cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
+      barman_plugin_version: ${{ env.BARMAN_PLUGIN_VERSION }}
     steps:
       - name: Parse input to env
         env:
@@ -212,6 +223,7 @@ jobs:
           INPUT_FEATURE_TYPE: ${{ github.event.inputs.feature_type }}
           INPUT_LOG_LEVEL: ${{ github.event.inputs.log_level }}
           INPUT_CNPG_DEPLOYMENT_METHOD: ${{ github.event.inputs.cnpg_deployment_method }}
+          INPUT_BARMAN_PLUGIN_VERSION: ${{ github.event.inputs.barman_plugin }}
         run: |
           # Set the defaults for workflow dispatch
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]]; then
@@ -221,6 +233,7 @@ jobs:
             FEATURE_TYPE="${INPUT_FEATURE_TYPE}"
             LOG_LEVEL="${INPUT_LOG_LEVEL}"
             CNPG_DEPLOYMENT_METHOD="${INPUT_CNPG_DEPLOYMENT_METHOD}"
+            BARMAN_PLUGIN_VERSION="${INPUT_BARMAN_PLUGIN_VERSION}"
           fi
           # Set the defaults for schedule dispatch
           if [[ "${EVENT_NAME}" == 'schedule' ]]; then
@@ -230,6 +243,7 @@ jobs:
             FEATURE_TYPE=""
             LOG_LEVEL="debug"
             CNPG_DEPLOYMENT_METHOD="manifest"
+            BARMAN_PLUGIN_VERSION="release"
           fi
           echo "DEPTH=${DEPTH}" >> $GITHUB_ENV
           echo "LIMIT=${LIMIT}" >> $GITHUB_ENV
@@ -237,6 +251,7 @@ jobs:
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
           echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
+          echo "BARMAN_PLUGIN_VERSION=${BARMAN_PLUGIN_VERSION}" >> $GITHUB_ENV
 
   evaluate_options:
     name: Evaluate workflow options
@@ -258,6 +273,7 @@ jobs:
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
       cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
+      barman_plugin_version: ${{ env.BARMAN_PLUGIN_VERSION }}
       runs_on: ${{ steps.set-runner.outputs.runs_on }}
     steps:
       - name: From command
@@ -270,6 +286,7 @@ jobs:
           WD_FEATURE_TYPE: ${{ needs.test_arguments.outputs.feature_type }}
           WD_LOG_LEVEL: ${{ needs.test_arguments.outputs.log_level }}
           WD_CNPG_DEPLOYMENT_METHOD: ${{ needs.test_arguments.outputs.cnpg_deployment_method }}
+          WD_BARMAN_PLUGIN_VERSION: ${{ needs.test_arguments.outputs.barman_plugin_version }}
           IC_GITHUB_REF: ${{ needs.check_commenter.outputs.github_ref }}
           IC_DEPTH: ${{ needs.check_commenter.outputs.depth }}
           IC_LIMIT: ${{ needs.check_commenter.outputs.limit }}
@@ -277,6 +294,7 @@ jobs:
           IC_FEATURE_TYPE: ${{ needs.check_commenter.outputs.feature_type }}
           IC_LOG_LEVEL: ${{ needs.check_commenter.outputs.log_level }}
           IC_CNPG_DEPLOYMENT_METHOD: ${{ needs.check_commenter.outputs.cnpg_deployment_method }}
+          IC_BARMAN_PLUGIN_VERSION: ${{ needs.check_commenter.outputs.barman_plugin_version }}
         run: |
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]; then
             echo "GITHUB_REF=${WD_GITHUB_REF}" >> $GITHUB_ENV
@@ -286,6 +304,7 @@ jobs:
             echo "FEATURE_TYPE=${WD_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${WD_LOG_LEVEL}" >> $GITHUB_ENV
             echo "CNPG_DEPLOYMENT_METHOD=${WD_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
+            echo "BARMAN_PLUGIN_VERSION=${WD_BARMAN_PLUGIN_VERSION}" >> $GITHUB_ENV
           fi
           if [[ "${EVENT_NAME}" == 'issue_comment' ]]; then
             echo "GITHUB_REF=${IC_GITHUB_REF}" >> $GITHUB_ENV
@@ -295,6 +314,7 @@ jobs:
             echo "FEATURE_TYPE=${IC_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${IC_LOG_LEVEL}" >> $GITHUB_ENV
             echo "CNPG_DEPLOYMENT_METHOD=${IC_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
+            echo "BARMAN_PLUGIN_VERSION=${IC_BARMAN_PLUGIN_VERSION}" >> $GITHUB_ENV
           fi
 
       - name: Set runner based on organization
@@ -681,6 +701,8 @@ jobs:
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -770,6 +792,7 @@ jobs:
         name: Run Kind End-to-End tests
         env:
           ENABLE_APISERVER_AUDIT: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run:
           make e2e-test-kind
       -
@@ -877,6 +900,8 @@ jobs:
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -964,6 +989,7 @@ jobs:
       - name: Run K3D End-to-End tests
         env:
           ENABLE_APISERVER_AUDIT: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           make e2e-test-k3d
       - # Summarize the failed E2E test cases if there are any
