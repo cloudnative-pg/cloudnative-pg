@@ -602,6 +602,19 @@ type ProbeWithStrategy struct {
 	// Lag limit. Used only for `streaming` strategy
 	// +optional
 	MaximumLag *resource.Quantity `json:"maximumLag,omitempty"`
+
+	// When enabled, the startup probe reports success while PostgreSQL
+	// is still replaying WAL and the replay is making progress, instead
+	// of failing and having the Pod eventually restarted, which would
+	// lose the replay work done so far. When the startup probe has been
+	// reported as passed this way, the liveness probe fails if the
+	// replay stops making progress for more than `startDelay` before
+	// PostgreSQL starts accepting connections. Used only by the startup
+	// probe with the `pg_isready` strategy. Progress detection requires
+	// the `update_process_title` PostgreSQL parameter to be enabled,
+	// which is the default on Linux.
+	// +optional
+	SkipOnWALReplay *bool `json:"skipOnWALReplay,omitempty"`
 }
 
 // ProbeStrategyType is the type of the strategy used to declare a PostgreSQL instance

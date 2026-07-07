@@ -28,7 +28,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
+
+// DefaultWALSegmentSize is the default WAL segment size of PostgreSQL,
+// used when the actual segment size cannot be read from the control file
+const DefaultWALSegmentSize = int64(16 * 1024 * 1024)
 
 const (
 	// walReplayProgressWindow is how long an observed sign of WAL replay
@@ -55,16 +63,15 @@ const (
 type walReplayProgress struct {
 	mu sync.Mutex
 
-	// lastProgressAt is the last time we observed evidence of replay
-	// progress, either from a "redo in progress" log message or from an
-	// advancement of the replay position in the control file
+	// lastProgressAt is the last time we observed an advancement of the
+	// replay position
 	lastProgressAt time.Time
 
-	// lastPosition is the last replay position sampled from the control
-	// file
+	// lastPosition is the last replay position sampled from the startup
+	// process title
 	lastPosition string
 
-	// lastSampleAt is the last time we sampled the control file
+	// lastSampleAt is the last time we sampled the replay position
 	lastSampleAt time.Time
 
 	// startupSkipped records that the startup probe was reported as
@@ -74,6 +81,10 @@ type walReplayProgress struct {
 	// completed records that PostgreSQL started accepting connections,
 	// after which replay progress tracking is no longer needed
 	completed bool
+
+	// walSegmentSize caches the WAL segment size read from the control
+	// file, zero until the first successful read
+	walSegmentSize int64
 }
 
 func (w *walReplayProgress) markProgress(now time.Time) {
@@ -82,10 +93,9 @@ func (w *walReplayProgress) markProgress(now time.Time) {
 	w.lastProgressAt = now
 }
 
-// observePosition compares a replay position sampled from the control file
-// with the previous sample, and records progress when it changed. A single
-// sample carries no evidence of progress, so the first observation only
-// stores the position.
+// observePosition compares a sampled replay position with the previous
+// sample, and records progress when it changed. A single sample carries no
+// evidence of progress, so the first observation only stores the position.
 func (w *walReplayProgress) observePosition(position string, now time.Time) {
 	if position == "" {
 		return
@@ -103,8 +113,8 @@ func (w *walReplayProgress) observePosition(position string, now time.Time) {
 	w.lastPosition = position
 }
 
-// shouldSample rate-limits control file sampling, returning true at most
-// once every walReplayMinSampleInterval
+// shouldSample rate-limits replay position sampling, returning true at
+// most once every walReplayMinSampleInterval
 func (w *walReplayProgress) shouldSample(now time.Time) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -261,4 +271,33 @@ func (instance *Instance) StartupSkippedForWALReplay() bool {
 // as passed
 func (instance *Instance) IsWALReplayStalledFor(timeout time.Duration) bool {
 	return instance.walReplayProgress.isStalled(time.Now(), timeout)
+}
+
+// WALSegmentSize returns the WAL segment size of the instance read from
+// the control file, or DefaultWALSegmentSize when it cannot be
+// determined. The value is cached after the first successful read.
+func (instance *Instance) WALSegmentSize() int64 {
+	instance.walReplayProgress.mu.Lock()
+	cached := instance.walReplayProgress.walSegmentSize
+	instance.walReplayProgress.mu.Unlock()
+	if cached != 0 {
+		return cached
+	}
+
+	out, err := instance.GetPgControldata()
+	if err != nil {
+		log.Debug("Error while reading the WAL segment size", "err", err.Error())
+		return DefaultWALSegmentSize
+	}
+
+	size, err := utils.ParsePgControldataOutput(out).GetBytesPerWALSegment()
+	if err != nil {
+		log.Debug("Error while parsing the WAL segment size", "err", err.Error())
+		return DefaultWALSegmentSize
+	}
+
+	instance.walReplayProgress.mu.Lock()
+	instance.walReplayProgress.walSegmentSize = int64(size)
+	instance.walReplayProgress.mu.Unlock()
+	return int64(size)
 }

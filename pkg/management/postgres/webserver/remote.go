@@ -303,7 +303,8 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 	// keeps the Pod out of the ready set until PostgreSQL accepts
 	// connections) and to the liveness probe (which from now on watches
 	// for a stalled replay, see isReplayStalled).
-	if !ws.instance.WALReplayCompleted() {
+	if !ws.instance.WALReplayCompleted() &&
+		isWALReplaySkipEnabled(ws.instance.GetClusterOrDefault()) {
 		ws.instance.SampleWALReplayPosition()
 		if ws.instance.IsWALReplayProgressing() {
 			ws.instance.MarkStartupSkippedForWALReplay()
@@ -355,7 +356,38 @@ func (ws *remoteWebserverEndpoints) isReplayStalled() bool {
 
 	ws.instance.SampleWALReplayPosition()
 	startDelay := time.Duration(ws.instance.GetClusterOrDefault().GetMaxStartDelay()) * time.Second
-	return ws.instance.IsWALReplayStalledFor(startDelay)
+	return ws.instance.IsWALReplayStalledFor(
+		walReplayStallTimeout(startDelay, ws.instance.WALSegmentSize()))
+}
+
+// isWALReplaySkipEnabled tells whether the startup probe should report
+// success while WAL replay is progressing. The feature is opt-in, and it
+// is limited to the default pg_isready startup strategy so that custom
+// startup strategies keep their configured semantics.
+func isWALReplaySkipEnabled(cluster *apiv1.Cluster) bool {
+	if cluster.Spec.Probes == nil || cluster.Spec.Probes.Startup == nil {
+		return false
+	}
+
+	probe := cluster.Spec.Probes.Startup
+	if probe.SkipOnWALReplay == nil || !*probe.SkipOnWALReplay {
+		return false
+	}
+	return probe.Type == "" || probe.Type == apiv1.ProbeStrategyPgIsReady
+}
+
+// walReplayStallTimeout scales the stall timeout with the WAL segment
+// size of the instance: the observed replay position advances once per
+// segment, so with segments larger than the default 16MiB the same replay
+// speed crosses segment boundaries proportionally less often, and using
+// the unscaled timeout could restart an instance that is still making
+// progress within a segment.
+func walReplayStallTimeout(startDelay time.Duration, walSegmentSize int64) time.Duration {
+	const defaultWALSegmentSize = int64(16 * 1024 * 1024)
+	if walSegmentSize <= defaultWALSegmentSize {
+		return startDelay
+	}
+	return startDelay * time.Duration(walSegmentSize/defaultWALSegmentSize)
 }
 
 // This is the readiness probe

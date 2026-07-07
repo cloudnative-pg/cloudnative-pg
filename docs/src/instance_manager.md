@@ -53,13 +53,27 @@ performing crash recovery. Killing the Pod in this situation is
 counterproductive, since the replay work done so far would be lost and
 repeated at every restart.
 
-For this reason, while PostgreSQL is still replaying WAL and the replay is
-making progress, the startup probe reports success instead of failing when
-the configured startup strategy is not satisfied yet. Progress is detected
-by sampling the title of the PostgreSQL startup process, which reports the
-WAL segment being replayed in every form of recovery. Progress detection
-requires the `update_process_title` PostgreSQL parameter to be enabled,
-which is the default.
+The `skipOnWALReplay` option makes the startup probe report success while
+PostgreSQL is still replaying WAL and the replay is making progress, instead
+of failing while waiting for connections to be accepted:
+
+```yaml
+# ... snip
+spec:
+  startDelay: 3600
+  probes:
+    startup:
+      skipOnWALReplay: true
+```
+
+The option is disabled by default, and it is honored only with the default
+`pg_isready` startup strategy, so that custom startup strategies keep their
+configured semantics. Progress is detected by sampling the title of the
+PostgreSQL startup process, which reports the WAL segment being replayed in
+every form of recovery. Progress detection requires the
+`update_process_title` PostgreSQL parameter to be enabled (the default on
+Linux); with it disabled, the startup probe behaves as if the option were
+off.
 
 Reporting the startup probe as passed hands control over to the readiness
 probe, which keeps the instance out of the ready set until PostgreSQL
@@ -67,7 +81,9 @@ accepts connections. From that moment, `startDelay` bounds the time the
 replay is allowed to proceed *without making progress* rather than the total
 startup time: if the replay stalls for more than `startDelay` seconds before
 PostgreSQL accepts connections, the liveness probe fails and the Pod is
-restarted.
+restarted. Since progress is observed at WAL segment granularity, the stall
+timeout is scaled proportionally when the instance uses WAL segments larger
+than the default 16MiB.
 
 :::warning
     Setting `.spec.startDelay` too low can cause the liveness probe to activate
