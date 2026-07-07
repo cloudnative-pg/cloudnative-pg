@@ -6575,7 +6575,7 @@ var _ = Describe("getWALReplaySkipWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				Probes: &apiv1.ProbesConfiguration{
 					Startup: &apiv1.ProbeWithStrategy{
-						SkipOnWALReplay: ptr.To(true),
+						SucceedDuringWALReplay: ptr.To(true),
 					},
 				},
 			},
@@ -6588,7 +6588,7 @@ var _ = Describe("getWALReplaySkipWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				Probes: &apiv1.ProbesConfiguration{
 					Readiness: &apiv1.ProbeWithStrategy{
-						SkipOnWALReplay: ptr.To(true),
+						SucceedDuringWALReplay: ptr.To(true),
 					},
 				},
 			},
@@ -6603,8 +6603,8 @@ var _ = Describe("getWALReplaySkipWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				Probes: &apiv1.ProbesConfiguration{
 					Startup: &apiv1.ProbeWithStrategy{
-						SkipOnWALReplay: ptr.To(true),
-						Type:            apiv1.ProbeStrategyStreaming,
+						SucceedDuringWALReplay: ptr.To(true),
+						Type:                   apiv1.ProbeStrategyStreaming,
 					},
 				},
 			},
@@ -6619,8 +6619,8 @@ var _ = Describe("getWALReplaySkipWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				Probes: &apiv1.ProbesConfiguration{
 					Startup: &apiv1.ProbeWithStrategy{
-						SkipOnWALReplay: ptr.To(false),
-						Type:            apiv1.ProbeStrategyStreaming,
+						SucceedDuringWALReplay: ptr.To(false),
+						Type:                   apiv1.ProbeStrategyStreaming,
 					},
 				},
 			},

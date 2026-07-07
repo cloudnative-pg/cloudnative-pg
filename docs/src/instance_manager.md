@@ -53,7 +53,7 @@ performing crash recovery. Killing the Pod in this situation is
 counterproductive, since the replay work done so far would be lost and
 repeated at every restart.
 
-The `skipOnWALReplay` option makes the startup probe report success while
+The `succeedDuringWALReplay` option makes the startup probe report success while
 PostgreSQL is still replaying WAL and the replay is making progress, instead
 of failing while waiting for connections to be accepted:
 
@@ -63,7 +63,7 @@ spec:
   startDelay: 3600
   probes:
     startup:
-      skipOnWALReplay: true
+      succeedDuringWALReplay: true
 ```
 
 The option is disabled by default, and it is honored only with the default

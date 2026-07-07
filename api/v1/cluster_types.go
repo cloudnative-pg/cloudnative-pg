@@ -614,7 +614,7 @@ type ProbeWithStrategy struct {
 	// the `update_process_title` PostgreSQL parameter to be enabled,
 	// which is the default on Linux.
 	// +optional
-	SkipOnWALReplay *bool `json:"skipOnWALReplay,omitempty"`
+	SucceedDuringWALReplay *bool `json:"succeedDuringWALReplay,omitempty"`
 }
 
 // ProbeStrategyType is the type of the strategy used to declare a PostgreSQL instance

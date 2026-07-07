@@ -48,19 +48,19 @@ var _ = Describe("isWALReplaySkipEnabled", func() {
 	})
 
 	It("is disabled when explicitly turned off", func() {
-		probe := &apiv1.ProbeWithStrategy{SkipOnWALReplay: ptr.To(false)}
+		probe := &apiv1.ProbeWithStrategy{SucceedDuringWALReplay: ptr.To(false)}
 		Expect(isWALReplaySkipEnabled(clusterWithStartupProbe(probe))).To(BeFalse())
 	})
 
 	It("is enabled with the default startup strategy", func() {
-		probe := &apiv1.ProbeWithStrategy{SkipOnWALReplay: ptr.To(true)}
+		probe := &apiv1.ProbeWithStrategy{SucceedDuringWALReplay: ptr.To(true)}
 		Expect(isWALReplaySkipEnabled(clusterWithStartupProbe(probe))).To(BeTrue())
 	})
 
 	It("is enabled with the explicit pg_isready strategy", func() {
 		probe := &apiv1.ProbeWithStrategy{
-			SkipOnWALReplay: ptr.To(true),
-			Type:            apiv1.ProbeStrategyPgIsReady,
+			SucceedDuringWALReplay: ptr.To(true),
+			Type:                   apiv1.ProbeStrategyPgIsReady,
 		}
 		Expect(isWALReplaySkipEnabled(clusterWithStartupProbe(probe))).To(BeTrue())
 	})
@@ -71,8 +71,8 @@ var _ = Describe("isWALReplaySkipEnabled", func() {
 			apiv1.ProbeStrategyQuery,
 		} {
 			probe := &apiv1.ProbeWithStrategy{
-				SkipOnWALReplay: ptr.To(true),
-				Type:            strategy,
+				SucceedDuringWALReplay: ptr.To(true),
+				Type:                   strategy,
 			}
 			Expect(isWALReplaySkipEnabled(clusterWithStartupProbe(probe))).To(BeFalse())
 		}

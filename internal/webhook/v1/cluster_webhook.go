@@ -2666,7 +2666,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 }
 
-// getWALReplaySkipWarnings warns about skipOnWALReplay values that are
+// getWALReplaySkipWarnings warns about succeedDuringWALReplay values that are
 // accepted by the schema but ignored at runtime
 func getWALReplaySkipWarnings(r *apiv1.Cluster) admission.Warnings {
 	var result admission.Warnings
@@ -2675,16 +2675,16 @@ func getWALReplaySkipWarnings(r *apiv1.Cluster) admission.Warnings {
 		return result
 	}
 
-	if readiness := r.Spec.Probes.Readiness; readiness != nil && readiness.SkipOnWALReplay != nil {
+	if readiness := r.Spec.Probes.Readiness; readiness != nil && readiness.SucceedDuringWALReplay != nil {
 		result = append(result,
-			"spec.probes.readiness.skipOnWALReplay is ignored: the option is only honored by the startup probe.")
+			"spec.probes.readiness.succeedDuringWALReplay is ignored: the option is only honored by the startup probe.")
 	}
 
 	if startup := r.Spec.Probes.Startup; startup != nil &&
-		startup.SkipOnWALReplay != nil && *startup.SkipOnWALReplay &&
+		startup.SucceedDuringWALReplay != nil && *startup.SucceedDuringWALReplay &&
 		startup.Type != "" && startup.Type != apiv1.ProbeStrategyPgIsReady {
 		result = append(result, fmt.Sprintf(
-			"spec.probes.startup.skipOnWALReplay is ignored with the %q startup strategy: "+
+			"spec.probes.startup.succeedDuringWALReplay is ignored with the %q startup strategy: "+
 				"the option is only honored with the default pg_isready strategy.", startup.Type))
 	}
 

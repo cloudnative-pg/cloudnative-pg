@@ -374,7 +374,7 @@ func isWALReplaySkipEnabled(cluster *apiv1.Cluster) bool {
 	}
 
 	probe := cluster.Spec.Probes.Startup
-	if probe.SkipOnWALReplay == nil || !*probe.SkipOnWALReplay {
+	if probe.SucceedDuringWALReplay == nil || !*probe.SucceedDuringWALReplay {
 		return false
 	}
 	return probe.Type == "" || probe.Type == apiv1.ProbeStrategyPgIsReady

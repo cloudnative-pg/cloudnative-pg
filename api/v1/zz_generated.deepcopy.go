@@ -2926,8 +2926,8 @@ func (in *ProbeWithStrategy) DeepCopyInto(out *ProbeWithStrategy) {
 		x := (*in).DeepCopy()
 		*out = &x
 	}
-	if in.SkipOnWALReplay != nil {
-		in, out := &in.SkipOnWALReplay, &out.SkipOnWALReplay
+	if in.SucceedDuringWALReplay != nil {
+		in, out := &in.SucceedDuringWALReplay, &out.SucceedDuringWALReplay
 		*out = new(bool)
 		**out = **in
 	}
