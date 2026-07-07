@@ -156,6 +156,7 @@ func Status(
 		status.printInstancesStatus()
 	}
 	status.printPluginStatus(verbosity)
+	status.printFailureDomainStatus()
 
 	if len(errs) > 0 {
 		fmt.Println()
@@ -1415,4 +1416,141 @@ func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(
 	} else {
 		status.AddLine("Last Failed Backup:", "-")
 	}
+}
+
+// failureDomainGroup holds the instances sharing a single failure domain.
+type failureDomainGroup struct {
+	// display is the human-readable label value(s) for this domain
+	display string
+	// instances is the sorted list of pod names in this domain
+	instances []string
+	// hasPrimary is true when the current primary is in this domain
+	hasPrimary bool
+}
+
+// groupInstancesByFailureDomain groups topology instances into failure domain
+// entries ordered by first appearance (sorted instance names within each group).
+// Returns nil when failureDomainKey is not configured or topology extraction failed.
+func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKey) == 0 {
+		return nil
+	}
+
+	topology := cluster.Status.Topology
+	if !topology.SuccessfullyExtracted || len(topology.Instances) == 0 {
+		return nil
+	}
+
+	keys := sync.FailureDomainKey
+
+	instanceNames := make([]string, 0, len(topology.Instances))
+	for podName := range topology.Instances {
+		instanceNames = append(instanceNames, string(podName))
+	}
+	sort.Strings(instanceNames)
+
+	groupMap := make(map[string]*failureDomainGroup)
+	groupOrder := make([]string, 0)
+
+	for _, name := range instanceNames {
+		labels := topology.Instances[apiv1.PodName(name)]
+
+		vals := make([]string, len(keys))
+		for i, k := range keys {
+			vals[i] = labels[k]
+		}
+		sig := strings.Join(vals, "\x00")
+
+		var display string
+		if len(keys) == 1 {
+			display = vals[0]
+		} else {
+			parts := make([]string, len(keys))
+			for i, k := range keys {
+				parts[i] = k + "=" + vals[i]
+			}
+			display = strings.Join(parts, ", ")
+		}
+
+		if _, exists := groupMap[sig]; !exists {
+			groupMap[sig] = &failureDomainGroup{display: display}
+			groupOrder = append(groupOrder, sig)
+		}
+		g := groupMap[sig]
+		g.instances = append(g.instances, name)
+		if name == cluster.Status.CurrentPrimary {
+			g.hasPrimary = true
+		}
+	}
+
+	result := make([]failureDomainGroup, len(groupOrder))
+	for i, sig := range groupOrder {
+		result[i] = *groupMap[sig]
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].display < result[j].display
+	})
+	return result
+}
+
+func (fullStatus *PostgresqlStatus) printFailureDomainStatus() {
+	cluster := fullStatus.Cluster
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKey) == 0 {
+		return
+	}
+
+	condition := meta.FindStatusCondition(
+		cluster.Status.Conditions,
+		string(apiv1.ConditionSyncReplicationTopologySatisfied),
+	)
+
+	headerColor := aurora.Green
+	if condition != nil && condition.Status == metav1.ConditionFalse {
+		headerColor = aurora.Yellow
+	}
+	fmt.Println(headerColor("Failure Domain Topology"))
+
+	topology := cluster.Status.Topology
+	if !topology.SuccessfullyExtracted {
+		fmt.Println(aurora.Yellow("Topology labels could not be extracted from pods or nodes"))
+		fmt.Println()
+		return
+	}
+
+	groups := groupInstancesByFailureDomain(cluster)
+	if len(groups) == 0 {
+		fmt.Println(aurora.Yellow("No topology information available yet"))
+		fmt.Println()
+		return
+	}
+
+	domainHeader := "Domain"
+	if len(sync.FailureDomainKey) == 1 {
+		domainHeader = sync.FailureDomainKey[0]
+	}
+
+	table := tabby.New()
+	table.AddHeader(domainHeader, "Instances", "Primary Domain")
+	for _, g := range groups {
+		primaryMark := "No"
+		if g.hasPrimary {
+			primaryMark = "Yes"
+		}
+		table.AddLine(g.display, strings.Join(g.instances, ", "), primaryMark)
+	}
+	table.Print()
+
+	if condition != nil {
+		switch condition.Status {
+		case metav1.ConditionTrue:
+			fmt.Println(aurora.Green(fmt.Sprintf("Constraint: %s (%s)", condition.Status, condition.Reason)))
+		case metav1.ConditionFalse:
+			fmt.Println(aurora.Yellow(
+				fmt.Sprintf("Constraint: %s (%s) - %s", condition.Status, condition.Reason, condition.Message),
+			))
+		}
+	}
+	fmt.Println()
 }

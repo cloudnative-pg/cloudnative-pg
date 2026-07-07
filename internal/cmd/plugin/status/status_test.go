@@ -112,3 +112,87 @@ var _ = Describe("getWalArchivingStatus", func() {
 		Expect(result).To(ContainSubstring("Disabled"))
 	})
 })
+
+var _ = Describe("groupInstancesByFailureDomain", func() {
+	const (
+		zoneLabel   = "topology.kubernetes.io/zone"
+		regionLabel = "topology.kubernetes.io/region"
+		primary     = "cluster-1"
+		replica1    = "cluster-2"
+		replica2    = "cluster-3"
+	)
+
+	makeCluster := func(
+		failureDomainKey []string,
+		instances map[apiv1.PodName]apiv1.PodTopologyLabels,
+		extracted bool,
+	) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{}
+		cluster.Status.CurrentPrimary = primary
+		cluster.Status.Topology = apiv1.Topology{
+			SuccessfullyExtracted: extracted,
+			Instances:             instances,
+		}
+		if failureDomainKey != nil {
+			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+				FailureDomainKey: failureDomainKey,
+			}
+		}
+		return cluster
+	}
+
+	It("returns nil when failureDomainKey is not set", func() {
+		cluster := makeCluster(nil, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary: {zoneLabel: "az1"},
+		}, true)
+		Expect(groupInstancesByFailureDomain(cluster)).To(BeNil())
+	})
+
+	It("returns nil when topology extraction failed", func() {
+		cluster := makeCluster([]string{zoneLabel}, nil, false)
+		Expect(groupInstancesByFailureDomain(cluster)).To(BeNil())
+	})
+
+	It("groups instances into two domains with a single key", func() {
+		cluster := makeCluster([]string{zoneLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az2"},
+			replica2: {zoneLabel: "az1"},
+		}, true)
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(2))
+
+		// az1 comes first (cluster-1 < cluster-2 in sort order)
+		Expect(groups[0].display).To(Equal("az1"))
+		Expect(groups[0].instances).To(ConsistOf(primary, replica2))
+		Expect(groups[0].hasPrimary).To(BeTrue())
+
+		Expect(groups[1].display).To(Equal("az2"))
+		Expect(groups[1].instances).To(ConsistOf(replica1))
+		Expect(groups[1].hasPrimary).To(BeFalse())
+	})
+
+	It("produces a single group when all instances share the same domain", func() {
+		cluster := makeCluster([]string{zoneLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az1"},
+		}, true)
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(1))
+		Expect(groups[0].hasPrimary).To(BeTrue())
+	})
+
+	It("formats the display value as key=value pairs for multiple keys", func() {
+		cluster := makeCluster([]string{zoneLabel, regionLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1", regionLabel: "us-east-1"},
+			replica1: {zoneLabel: "az2", regionLabel: "us-east-1"},
+		}, true)
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(2))
+		Expect(groups[0].display).To(ContainSubstring("topology.kubernetes.io/zone=az1"))
+		Expect(groups[0].display).To(ContainSubstring("topology.kubernetes.io/region=us-east-1"))
+	})
+})

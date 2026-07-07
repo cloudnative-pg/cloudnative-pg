@@ -34,6 +34,11 @@ spec:
       jsonPath: .status.currentPrimary
       name: Primary
       type: string
+    - description: Failure domain topology satisfaction status
+      jsonPath: .status.conditions[?(@.type=='SyncReplicationTopologySatisfied')].reason
+      name: SyncTopology
+      priority: 1
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
