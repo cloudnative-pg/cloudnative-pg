@@ -184,7 +184,7 @@ var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminat
 	})
 })
 
-var _ = Describe("ensureInstancesAreCreated recovers a lost first-primary bootstrap Job (#11036)", func() {
+var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap Job", func() {
 	var env *testingEnvironment
 	var namespace string
 
@@ -269,6 +269,60 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost first-primary bootst
 		var jobs batchv1.JobList
 		Expect(env.client.List(ctx, &jobs)).To(Succeed())
 		Expect(jobs.Items).To(BeEmpty(), "the pre-existing Job lives only in resources, none should be created")
+	})
+
+	It("recreates the join Job for a replica whose PVC exists but never got a Job", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 2
+		})
+
+		// A running primary and a replica whose data PVC was created but, for
+		// whatever reason (e.g. a lost race analogous to #11036), the join Job
+		// never was: no Pod and no Job exist for it (see #7709).
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		replicaName := specs.GetInstanceName(cluster.Name, 2)
+		cluster.Status.Instances = 2
+		cluster.Status.ReadyInstances = 1
+		cluster.Status.InstanceNames = []string{primaryName, replicaName}
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{replicaName}
+
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		primaryPod.Status = corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+		}
+
+		pvcGroup := newFakePVC(env.client, cluster, 2, persistentvolumeclaim.StatusInitializing)
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(30 * time.Second))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(HaveLen(1), "the join Job for the replica should have been recreated")
+		Expect(jobs.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(replicaName))
+
+		var pvcs corev1.PersistentVolumeClaimList
+		Expect(env.client.List(ctx, &pvcs)).To(Succeed())
+		for _, pvc := range pvcs.Items {
+			serial, serr := specs.GetNodeSerial(pvc.ObjectMeta)
+			Expect(serr).ToNot(HaveOccurred())
+			Expect(serial).To(Equal(2), "no PVC for a different serial should have been created")
+		}
 	})
 })
 
