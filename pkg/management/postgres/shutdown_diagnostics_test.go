@@ -32,7 +32,7 @@ var _ = Describe("shutdown diagnostics", func() {
 	It("collects process information from procfs", func() {
 		procRoot := GinkgoT().TempDir()
 		pidDir := filepath.Join(procRoot, "123")
-		Expect(os.Mkdir(pidDir, 0o755)).To(Succeed())
+		Expect(os.Mkdir(pidDir, 0o750)).To(Succeed())
 
 		files := map[string]string{
 			"cmdline": "postgres\x00autovacuum worker\x00",
@@ -40,7 +40,6 @@ var _ = Describe("shutdown diagnostics", func() {
 			"status":  "Name:\tpostgres\nState:\tT (stopped)\n",
 			"wchan":   "do_signal_stop\n",
 			"io":      "read_bytes: 0\n",
-			"limits":  "Limit Soft Limit Hard Limit Units\n",
 			"syscall": "operation not permitted\n",
 			"stack":   "permission denied\n",
 			"sched":   "postgres (123, #threads: 1)\n",

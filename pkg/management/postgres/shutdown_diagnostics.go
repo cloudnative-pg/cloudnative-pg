@@ -29,22 +29,64 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
-func logShutdownDiagnostics(ctx context.Context) {
-	diagCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+const (
+	shutdownDiagnosticsSamples  = 3
+	shutdownDiagnosticsInterval = 3 * time.Second
+	// shutdownDiagnosticsFirstSampleWait caps how long the shutdown escalation
+	// waits for the first sample: reads of /proc/[pid]/{cmdline,status} can
+	// block in the kernel and cannot be cancelled from Go.
+	shutdownDiagnosticsFirstSampleWait = 3 * time.Second
+)
 
+// logShutdownDiagnostics logs a few samples of the state of the processes
+// still running in the container. It waits for the first sample, so that the
+// processes that resisted the fast shutdown are captured before the immediate
+// shutdown starts killing them, while the remaining samples are collected in
+// the background: the processes that survive them are the ones worth
+// investigating.
+func logShutdownDiagnostics(ctx context.Context) {
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("PostgreSQL shutdown diagnostics",
-		"sample", 1,
-		"processes", collectProcDiagnostics(diagCtx, "/proc"))
-	time.Sleep(3 * time.Second)
-	contextLogger.Info("PostgreSQL shutdown diagnostics",
-		"sample", 2,
-		"processes", collectProcDiagnostics(diagCtx, "/proc"))
-	time.Sleep(3 * time.Second)
-	contextLogger.Info("PostgreSQL shutdown diagnostics",
-		"sample", 3,
-		"processes", collectProcDiagnostics(diagCtx, "/proc"))
+
+	firstSampleLogged := make(chan struct{})
+	go func() {
+		// The collection is detached from the caller's cancellation on
+		// purpose: the samples must survive the manager teardown that may
+		// be in progress while this code runs.
+		diagCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+
+		for sample := 1; sample <= shutdownDiagnosticsSamples; sample++ {
+			processes := collectProcDiagnostics(diagCtx, "/proc")
+			for i := range processes {
+				// One record per process: a single record with every process
+				// would exceed the 16KiB line limit enforced by the container
+				// runtimes, and would be split into fragments of invalid JSON.
+				contextLogger.Info("PostgreSQL shutdown diagnostics",
+					"sample", sample,
+					"pid", processes[i].PID,
+					"files", processes[i].Files)
+			}
+			if sample == 1 {
+				close(firstSampleLogged)
+			}
+			if sample == shutdownDiagnosticsSamples {
+				return
+			}
+
+			select {
+			case <-time.After(shutdownDiagnosticsInterval):
+			case <-diagCtx.Done():
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-firstSampleLogged:
+	case <-time.After(shutdownDiagnosticsFirstSampleWait):
+		contextLogger.Info(
+			"Shutdown diagnostics collection is still running, proceeding with the immediate shutdown")
+	}
 }
 
 type procDiagnostics struct {
@@ -92,7 +134,7 @@ func collectProcDiagnostics(ctx context.Context, procRoot string) []procDiagnost
 }
 
 func readProcLines(fileName string, maxLines int, nullSeparated bool) []string {
-	data, err := os.ReadFile(fileName)
+	data, err := os.ReadFile(filepath.Clean(fileName))
 	if err != nil {
 		return []string{err.Error()}
 	}
