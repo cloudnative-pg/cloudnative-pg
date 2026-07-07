@@ -301,3 +301,89 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		})
 	})
 })
+
+var _ = Describe("filterCrossDomainInstances", func() {
+	const (
+		zoneLabel = "topology.kubernetes.io/zone"
+		primary   = "pod-1"
+		replica1  = "pod-2"
+		replica2  = "pod-3"
+	)
+
+	makeClusterWithTopology := func(
+		instances map[apiv1.PodName]apiv1.PodTopologyLabels,
+		failureDomainKey []string,
+	) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{}
+		cluster.Status.CurrentPrimary = primary
+		cluster.Status.Topology = apiv1.Topology{
+			SuccessfullyExtracted: true,
+			Instances:             instances,
+		}
+		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+			Method:           apiv1.SynchronousReplicaConfigurationMethodAny,
+			Number:           1,
+			FailureDomainKey: failureDomainKey,
+		}
+		return cluster
+	}
+
+	It("returns all instances when failureDomainKey is not set", func() {
+		cluster := makeClusterWithTopology(map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az1"},
+		}, nil)
+		cluster.Spec.PostgresConfiguration.Synchronous.FailureDomainKey = nil
+
+		Expect(filterCrossDomainInstances(cluster, []string{replica1, replica2})).
+			To(ConsistOf(replica1, replica2))
+	})
+
+	It("returns all instances when topology extraction failed", func() {
+		cluster := makeClusterWithTopology(nil, []string{zoneLabel})
+		cluster.Status.Topology.SuccessfullyExtracted = false
+
+		Expect(filterCrossDomainInstances(cluster, []string{replica1, replica2})).
+			To(ConsistOf(replica1, replica2))
+	})
+
+	It("returns all instances when primary has no topology entry", func() {
+		cluster := makeClusterWithTopology(map[apiv1.PodName]apiv1.PodTopologyLabels{
+			replica1: {zoneLabel: "az2"},
+		}, []string{zoneLabel})
+
+		Expect(filterCrossDomainInstances(cluster, []string{replica1})).
+			To(ConsistOf(replica1))
+	})
+
+	It("returns only cross-domain instances", func() {
+		cluster := makeClusterWithTopology(map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az1"},
+			replica2: {zoneLabel: "az2"},
+		}, []string{zoneLabel})
+
+		Expect(filterCrossDomainInstances(cluster, []string{replica1, replica2})).
+			To(ConsistOf(replica2))
+	})
+
+	It("excludes the primary even if present in the list", func() {
+		cluster := makeClusterWithTopology(map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az2"},
+		}, []string{zoneLabel})
+
+		Expect(filterCrossDomainInstances(cluster, []string{primary, replica1})).
+			To(ConsistOf(replica1))
+	})
+
+	It("excludes instances with no topology entry", func() {
+		cluster := makeClusterWithTopology(map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica2: {zoneLabel: "az2"},
+		}, []string{zoneLabel})
+
+		Expect(filterCrossDomainInstances(cluster, []string{replica1, replica2})).
+			To(ConsistOf(replica2))
+	})
+})

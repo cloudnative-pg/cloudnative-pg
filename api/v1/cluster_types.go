@@ -1183,6 +1183,12 @@ const (
 	// has had at least one running instance, at which point it is set to True
 	// and never cleared.
 	ConditionInitialized ClusterConditionType = "Initialized"
+
+	// ConditionSyncReplicationTopologySatisfied is True when at least one
+	// synchronous replica is running in a different failure domain than the
+	// primary, as defined by .spec.postgresql.synchronous.topologyKey.
+	// Only set when topologyKey is configured.
+	ConditionSyncReplicationTopologySatisfied ClusterConditionType = "SyncReplicationTopologySatisfied"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1239,6 +1245,18 @@ const (
 	// BootstrapPending is the reason set on ConditionInitialized=False while the
 	// cluster has not yet completed its first bootstrap.
 	BootstrapPending ConditionReason = "BootstrapPending"
+
+	// ConditionReasonTopologySatisfied means at least one synchronous replica is
+	// in a different failure domain than the primary.
+	ConditionReasonTopologySatisfied ConditionReason = "Satisfied"
+
+	// ConditionReasonTopologyNotExtracted means topology labels could not be
+	// extracted from pods or nodes, so the constraint cannot be evaluated.
+	ConditionReasonTopologyNotExtracted ConditionReason = "TopologyNotExtracted"
+
+	// ConditionReasonInsufficientCrossDomainReplicas means topologyKey is set but
+	// no synchronous replica in a different failure domain than the primary exists.
+	ConditionReasonInsufficientCrossDomainReplicas ConditionReason = "InsufficientCrossDomainReplicas"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
@@ -1552,6 +1570,14 @@ type SynchronousReplicaConfiguration struct {
 	// PostgreSQL clusters.
 	// +optional
 	FailoverQuorum bool `json:"failoverQuorum"`
+
+	// FailureDomainKey is a list of node label keys used to define failure domains.
+	// When set, the operator will select synchronous replicas from instances running
+	// on nodes whose label values differ from the primary's node for all specified keys.
+	// This ensures synchronous replication across failure domains such as availability
+	// zones or regions.
+	// +optional
+	FailureDomainKey []string `json:"failureDomainKey,omitempty"`
 }
 
 // PodSelectorRef defines a named pod label selector for use in pg_hba rules.
@@ -1582,6 +1608,7 @@ type PodSelectorRefStatus struct {
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
+// +kubebuilder:validation:XValidation:rule="!(self.syncReplicaElectionConstraint.enabled && has(self.synchronous) && has(self.synchronous.failureDomainKey) && self.synchronous.failureDomainKey.size() > 0)",message="syncReplicaElectionConstraint and synchronous.failureDomainKey are mutually exclusive"
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
 	// +optional

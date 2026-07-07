@@ -568,17 +568,14 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			}
 		}
 
-		topology := apiv1.SyncReplicaElectionConstraints{
-			Enabled:                true,
-			NodeLabelsAntiAffinity: []string{zoneLabel},
-		}
+		labelNames := []string{zoneLabel}
 
 		It("reads topology labels from pod labels (KEP-4742 path)", func() {
 			pods := []corev1.Pod{
 				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
 				makePod("pod-2", "node-2", map[string]string{zoneLabel: "az2"}),
 			}
-			result := getPodsTopology(context.Background(), pods, nil, topology)
+			result := getPodsTopology(context.Background(), pods, nil, labelNames)
 
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
 			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
@@ -595,7 +592,7 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 				"node-1": makeNode("node-1", map[string]string{zoneLabel: "az1"}),
 				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
 			}
-			result := getPodsTopology(context.Background(), pods, nodes, topology)
+			result := getPodsTopology(context.Background(), pods, nodes, labelNames)
 
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
 			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
@@ -610,7 +607,7 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			nodes := map[string]corev1.Node{
 				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
 			}
-			result := getPodsTopology(context.Background(), pods, nodes, topology)
+			result := getPodsTopology(context.Background(), pods, nodes, labelNames)
 
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
 			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
@@ -621,7 +618,7 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			pods := []corev1.Pod{
 				makePod("pod-1", "node-1", nil),
 			}
-			result := getPodsTopology(context.Background(), pods, nil, topology)
+			result := getPodsTopology(context.Background(), pods, nil, labelNames)
 
 			Expect(result.SuccessfullyExtracted).To(BeFalse())
 		})
@@ -630,11 +627,109 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			pods := []corev1.Pod{
 				makePod("pod-1", "node-1", nil),
 			}
-			emptyTopology := apiv1.SyncReplicaElectionConstraints{Enabled: true}
-			result := getPodsTopology(context.Background(), pods, nil, emptyTopology)
+			result := getPodsTopology(context.Background(), pods, nil, nil)
 
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
 			Expect(result.NodesUsed).To(BeEquivalentTo(1))
+		})
+	})
+
+	Describe("updateSyncReplicationTopologyCondition", func() {
+		const zoneLabel = "topology.kubernetes.io/zone"
+
+		makeCluster := func(
+			failureDomainKey []string,
+			primary string,
+			instances map[apiv1.PodName]apiv1.PodTopologyLabels,
+			extracted bool,
+		) *apiv1.Cluster {
+			cluster := &apiv1.Cluster{}
+			if len(failureDomainKey) > 0 {
+				cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+					Method:           apiv1.SynchronousReplicaConfigurationMethodAny,
+					Number:           1,
+					FailureDomainKey: failureDomainKey,
+				}
+			}
+			cluster.Status.CurrentPrimary = primary
+			cluster.Status.Topology = apiv1.Topology{
+				SuccessfullyExtracted: extracted,
+				Instances:             instances,
+			}
+			return cluster
+		}
+
+		getCondition := func(cluster *apiv1.Cluster) *metav1.Condition {
+			for i := range cluster.Status.Conditions {
+				if cluster.Status.Conditions[i].Type == string(apiv1.ConditionSyncReplicationTopologySatisfied) {
+					return &cluster.Status.Conditions[i]
+				}
+			}
+			return nil
+		}
+
+		It("does not set the condition when failureDomainKey is not configured", func() {
+			cluster := makeCluster(nil, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az2"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			Expect(getCondition(cluster)).To(BeNil())
+		})
+
+		It("sets condition to False with TopologyNotExtracted when extraction failed", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", nil, false)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonTopologyNotExtracted)))
+		})
+
+		It("sets condition to False with TopologyNotExtracted when primary has no topology entry", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-2": {zoneLabel: "az2"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonTopologyNotExtracted)))
+		})
+
+		It("sets condition to True when a replica is in a different failure domain", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az2"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonTopologySatisfied)))
+		})
+
+		It("sets condition to False when all replicas are in the same failure domain as the primary", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az1"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
+		})
+
+		It("sets condition to False when the cluster has no replicas", func() {
+			cluster := makeCluster([]string{zoneLabel}, "primary-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"primary-1": {zoneLabel: "az1"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
 		})
 	})
 })

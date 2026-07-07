@@ -194,6 +194,7 @@ FQDN
 FQDNs
 FailoverQuorum
 FailoverQuorumStatus
+FailureDomainKey
 Fei
 Filesystem
 Fluentd
