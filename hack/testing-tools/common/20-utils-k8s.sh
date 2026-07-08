@@ -489,6 +489,7 @@ function install_barman_cloud_plugin() {
     local selector="${BARMAN_PLUGIN_VERSION:-release}"
     local repo="cloudnative-pg/plugin-barman-cloud"
     local manifest_url
+    local operator_namespace="cnpg-system"
 
     case "${selector}" in
         release)
@@ -522,12 +523,27 @@ function install_barman_cloud_plugin() {
         printf '%bError: manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         return 1
     fi
+
+    # Force every namespaced object onto the namespace this script installs
+    # the operator into, rather than trusting whatever the release manifest
+    # happens to hardcode: the two are not guaranteed to match.
+    local kustomize_dir
+    kustomize_dir="$(mktemp -d)"
+    cp "${manifest_file}" "${kustomize_dir}/manifest.yaml"
+    cat > "${kustomize_dir}/kustomization.yaml" <<EOF
+resources:
+- manifest.yaml
+namespace: ${operator_namespace}
+EOF
+    "${K8S_CLI}" kustomize "${kustomize_dir}" > "${manifest_file}"
+    rm -rf "${kustomize_dir}"
+
     retry 5 "${K8S_CLI}" apply --server-side --force-conflicts -f "${manifest_file}"
 
-    ${K8S_CLI} -n cnpg-system rollout status deploy/barman-cloud --timeout=5m
+    ${K8S_CLI} -n "${operator_namespace}" rollout status deploy/barman-cloud --timeout=5m
 
     local image
-    image=$(${K8S_CLI} get deployment barman-cloud -n cnpg-system \
+    image=$(${K8S_CLI} get deployment barman-cloud -n "${operator_namespace}" \
         -o jsonpath='{.spec.template.spec.containers[0].image}')
     export BARMAN_PLUGIN_VERSION_RESOLVED="${image##*:}"
     printf '%bplugin-barman-cloud installed: selector=%s resolved=%s (image %s)%b\n' \
