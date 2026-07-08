@@ -1246,6 +1246,12 @@ jobs:
         # It can still take a while to deploy rook.
         name: Set up Rook
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
+        env:
+          # Authenticates the raw.githubusercontent.com fetches below: anonymous
+          # requests share a per-IP rate limit across all GitHub Actions runners
+          # and can 429 during a nightly burst; an authenticated request gets its
+          # own, much higher quota.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           timeout_minutes: 27
           max_attempts: 1
@@ -1254,12 +1260,12 @@ jobs:
             # renovate: datasource=github-releases depName=mikefarah/yq
             go install github.com/mikefarah/yq/v4@v4
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
-            kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/common.yaml
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/crds.yaml | kubectl apply -f -
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/common.yaml | kubectl apply -f -
             # csi-operator.yaml defines the csi.ceph.io CRDs that operator.yaml's CRs rely on
-            kubectl apply -f ${ROOK_BASE_URL}/csi-operator.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
-            curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi-operator.yaml | kubectl apply -f -
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/operator.yaml | kubectl apply -f -
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
               sed '/^ *#/d;/^ *$/d' | \
               yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
                 .spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.storageClassName = \"${STORAGECLASSNAME}\" |
@@ -1273,8 +1279,8 @@ jobs:
             done
             echo "Waiting for Rook OSDs to be available"
             kubectl wait deploy -n rook-ceph --for condition=available --timeout 480s -l app=rook-ceph-osd
-            kubectl apply -f ${ROOK_BASE_URL}/csi/rbd/storageclass.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/csi/rbd/snapshotclass.yaml
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi/rbd/storageclass.yaml | kubectl apply -f -
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi/rbd/snapshotclass.yaml | kubectl apply -f -
             kubectl annotate storageclass ${{env.E2E_DEFAULT_STORAGE_CLASS}} storage.kubernetes.io/default-snapshot-class=${{env.E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}} --overwrite
       -
         name: Prepare patch for customization
@@ -1562,6 +1568,12 @@ jobs:
           envsubst < hack/e2e/eks-cluster.yaml.template > hack/e2e/eks-cluster.yaml
       -
         name: Setup EKS
+        env:
+          # Authenticates the raw.githubusercontent.com fetches below: anonymous
+          # requests share a per-IP rate limit across all GitHub Actions runners
+          # and can 429 during a nightly burst; an authenticated request gets its
+          # own, much higher quota.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Setting up EKS cluster
           echo "create cluster"
@@ -1580,13 +1592,13 @@ jobs:
 
           # Installing CRD for support volumeSnapshot
           SNAPSHOTTER_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${{env.EXTERNAL_SNAPSHOTTER_VERSION}}
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml | kubectl apply -f -
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml | kubectl apply -f -
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml | kubectl apply -f -
 
           ## Controller
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml | kubectl apply -f -
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml | kubectl apply -f -
 
           # Install volume snapshot class
           kubectl apply -f hack/e2e/volumesnapshotclass-ebs-csi.yaml
