@@ -451,10 +451,12 @@ function deploy_operator_with_helm() {
 # become ready. plugin-barman-cloud requires cert-manager because its manifest
 # creates the Issuer/Certificate resources used for the operator<->plugin mTLS.
 function ensure_cert_manager() {
-    # Split so renovate's regex (needs a bare "X_VERSION=", not "local X_VERSION=") still matches.
-    local CERT_MANAGER_DEFAULT_VERSION
-    # renovate: datasource=github-releases depName=cert-manager/cert-manager
-    CERT_MANAGER_DEFAULT_VERSION="v1.20.2"
+    # Pinned below v1.19 (unlike main, not renovate-managed here): cert-manager
+    # v1.19+ CRDs set selectableFields, which is unknown to the CRD schema on
+    # Kubernetes <1.31 and makes `apply --server-side` fail. This branch still
+    # tests kind v1.29.14, so don't bump past the v1.18.x line (last one
+    # supporting k8s 1.29) even if a renovate backport tries to.
+    local CERT_MANAGER_DEFAULT_VERSION="v1.18.6"
     local cert_manager_version="${CERT_MANAGER_VERSION:-${CERT_MANAGER_DEFAULT_VERSION}}"
 
     # shellcheck disable=SC2154
