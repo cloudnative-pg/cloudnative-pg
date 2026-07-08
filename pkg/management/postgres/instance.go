@@ -1073,7 +1073,12 @@ func (instance *Instance) waitUntilConfigShaMatches() error {
 
 	return retry.OnError(retry.DefaultRetry, errorIsRetryable, func() error {
 		var sha string
-		row := db.QueryRow(fmt.Sprintf("SHOW %s", postgres.CNPGConfigSha256))
+		// Read the loaded hash exactly like GetStatus does in probes.go, so
+		// this wait and the reported status agree on when a reload landed.
+		// A configuration without the hash yields '' and keeps retrying.
+		row := db.QueryRow(
+			"SELECT COALESCE(current_setting($1, true), '')",
+			postgres.CNPGConfigSha256)
 		err = row.Scan(&sha)
 		if err != nil {
 			return err
