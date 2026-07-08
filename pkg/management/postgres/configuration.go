@@ -436,13 +436,13 @@ func selectAdditionalExtensions(
 		nil
 }
 
-// configurePostgresForImport configures Postgres to be optimized for the firt import
+// configurePostgresForImport configures Postgres to be optimized for the first import
 // process, by writing dedicated options the override.conf file just for this phase
 func configurePostgresForImport(ctx context.Context, pgData string) (changed bool, err error) {
 	contextLogger := log.FromContext(ctx)
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
-	// Force the following GUCs to optmize the loading process
+	// Force the following GUCs to optimize the loading process
 	options := map[string]string{
 		"archive_mode":     "off",
 		"fsync":            "off",
