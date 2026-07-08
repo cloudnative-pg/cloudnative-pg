@@ -881,28 +881,39 @@ var _ = Describe("Verify Volume Snapshot",
 				By("checking the new replicas have been created using the snapshot", func() {
 					pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
 					Expect(err).ToNot(HaveOccurred())
+					matched := 0
 					for _, pvc := range pvcList.Items {
 						if pvc.Labels[utils.ClusterInstanceRoleLabelName] == specs.ClusterRoleLabelReplica &&
 							pvc.Labels[utils.ClusterLabelName] == clusterToSnapshotName {
 							Expect(pvc.Spec.DataSource.Kind).To(Equal(apiv1.VolumeSnapshotKind))
 							Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(apiv1.VolumeSnapshotKind))
+							matched++
 						}
 					}
+					// Each new replica has both a PGDATA and a WAL PVC (this
+					// cluster configures separate walStorage), so 2 replicas
+					// means 4 matching PVCs, not 2.
+					Expect(matched).To(Equal(4), "expected 4 replica PVCs (PGDATA + WAL, x2 replicas) provisioned from the snapshot")
 				})
 
-				// we need to verify the streaming replica continue works
+				// Query each replica pod directly: a cluster-wide service
+				// connection always resolves to the primary, and would not
+				// confirm that a specific replica has caught up.
 				By("verifying the correct data exists in the new pod of the scaled cluster", func() {
 					podList, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace,
 						clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(podList.Items).To(HaveLen(2))
-					tableLocator := pgasserts.TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToSnapshotName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    tableName,
+					query := fmt.Sprintf("SELECT count(*) FROM %s", tableName)
+					for _, pod := range podList.Items {
+						Eventually(func() (string, error) {
+							stdOut, _, err := exec.QueryInInstancePod(
+								env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+								exec.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
+								postgres.AppDBName, query)
+							return strings.TrimSpace(stdOut), err
+						}, RetryTimeout).Should(Equal("6"), "replica pod %s did not catch up", pod.Name)
 					}
-					pgasserts.AssertDataExpectedCount(env, tableLocator, 6)
 				})
 			})
 
