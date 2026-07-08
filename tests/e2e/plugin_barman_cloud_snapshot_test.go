@@ -242,6 +242,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 					captureSnapshotNames(backup, clusterName, namespace, snapshotDataEnv, snapshotWalEnv)
 				})
 
+				//nolint:dupl
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 					// Create a "test" table with values 1,2
 					tableLocator := pgasserts.TableLocator{
