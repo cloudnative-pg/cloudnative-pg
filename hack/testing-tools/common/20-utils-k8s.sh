@@ -454,7 +454,7 @@ function ensure_cert_manager() {
     # Split so renovate's regex (needs a bare "X_VERSION=", not "local X_VERSION=") still matches.
     local CERT_MANAGER_DEFAULT_VERSION
     # renovate: datasource=github-releases depName=cert-manager/cert-manager
-    CERT_MANAGER_DEFAULT_VERSION="v1.20.2"
+    CERT_MANAGER_DEFAULT_VERSION="v1.21.0"
     local cert_manager_version="${CERT_MANAGER_VERSION:-${CERT_MANAGER_DEFAULT_VERSION}}"
 
     # shellcheck disable=SC2154
