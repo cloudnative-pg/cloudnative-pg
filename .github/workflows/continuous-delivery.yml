@@ -951,10 +951,12 @@ jobs:
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       - name: Install K3D
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           K3D_URL="https://github.com/k3d-io/k3d/releases/download/${{ env.K3D_VERSION }}"
-          curl -sL "${K3D_URL}/k3d-linux-amd64" -o /tmp/k3d
-          curl -sL "${K3D_URL}/checksums.txt" -o /tmp/k3d-checksums.txt
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL "${K3D_URL}/k3d-linux-amd64" -o /tmp/k3d
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL "${K3D_URL}/checksums.txt" -o /tmp/k3d-checksums.txt
           grep '_dist/k3d-linux-amd64$' /tmp/k3d-checksums.txt | sed 's|_dist/k3d-linux-amd64|/tmp/k3d|' | sha256sum -c -
           install /tmp/k3d /usr/local/bin/k3d
           k3d version
@@ -1554,12 +1556,15 @@ jobs:
       -
         name: Install eksctl
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           timeout_minutes: 1
           max_attempts: 3
           command: |
             mkdir -p "$HOME/.local/bin"
-            curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 \
+              -fsSL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
               | tar xz -C $HOME/.local/bin
             echo "$HOME/.local/bin" >> $GITHUB_PATH
       -
@@ -1613,6 +1618,7 @@ jobs:
         name: Setup Velero
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
           VELERO_VERSION: "v1.18.2"
           # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
@@ -1647,7 +1653,8 @@ jobs:
               --create-bucket-configuration LocationConstraint="${AWS_REGION}"
 
             # Download Velero, extract and place it in $PATH
-            curl -sL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" | tar xz
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 \
+              -fsSL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" | tar xz
             mv velero-${VELERO_VERSION}-linux-amd64/velero $HOME/.local/bin
 
             # Set Velero-specific credentials
