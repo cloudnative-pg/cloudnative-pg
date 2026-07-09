@@ -187,7 +187,8 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 			WillReturnError(errors.New("mock create failure"))
 
 		// no advance is expected for slot3: creating it failed. slot4 is
-		// still created and advanced, and the stale slot is still dropped.
+		// still created and advanced, and the stale slot's deletion is
+		// still attempted (and also fails, to prove both errors are collected).
 		mockLocal.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
 			WithArgs(slot4, true).
 			WillReturnResult(sqlmock.NewResult(1, 1))

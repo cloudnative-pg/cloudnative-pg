@@ -64,8 +64,7 @@ func ReconcileReplicationSlots(
 }
 
 // reconcilePrimaryHAReplicationSlots reconciles the HA replication slots of the primary instance.
-// A failure on a single slot doesn't stop the reconciliation: the remaining
-// slots are still processed, and the errors are collected and returned together.
+// A failure on one slot doesn't stop the rest; errors are collected and returned together.
 func reconcilePrimaryHAReplicationSlots(
 	ctx context.Context,
 	db *sql.DB,
@@ -131,22 +130,17 @@ func reconcilePrimaryHAReplicationSlots(
 		}
 	}
 
-	if errs != nil {
-		return reconcile.Result{}, errs
-	}
-
 	if needToReschedule {
-		return reconcile.Result{RequeueAfter: time.Second}, nil
+		return reconcile.Result{RequeueAfter: time.Second}, errs
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, errs
 }
 
 // dropReplicationSlots cleans up the HA replication slots when the feature is disabled.
 // If both the HA replication slots and the user defined replication slots features are disabled,
 // we also clean up the slots that fall under the user defined replication slots feature here.
-// A failure on a single slot doesn't stop the cleanup: the remaining slots are
-// still processed, and the errors are collected and returned together.
+// A failure on one slot doesn't stop the rest; errors are collected and returned together.
 func dropReplicationSlots(
 	ctx context.Context,
 	db *sql.DB,
@@ -192,13 +186,9 @@ func dropReplicationSlots(
 		}
 	}
 
-	if errs != nil {
-		return reconcile.Result{}, errs
-	}
-
 	if needToReschedule {
-		return reconcile.Result{RequeueAfter: time.Second}, nil
+		return reconcile.Result{RequeueAfter: time.Second}, errs
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, errs
 }

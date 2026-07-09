@@ -106,9 +106,8 @@ func (sr *Replicator) Start(ctx context.Context) error {
 	return nil
 }
 
-// reconcile aligns the replication slots of this instance with those of the primary.
-// The error is a named return value, so that the deferred recover can report
-// a panic to the caller instead of discarding it.
+// reconcile's error is a named return value, so that the deferred recover
+// can report a panic to the caller instead of discarding it.
 func (sr *Replicator) reconcile(
 	ctx context.Context,
 	config *apiv1.ReplicationSlotsConfiguration,
@@ -152,8 +151,7 @@ func (sr *Replicator) reconcile(
 }
 
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary.
-// A failure on a single slot doesn't stop the synchronization: the remaining
-// slots are still processed, and the errors are collected and returned together.
+// A failure on one slot doesn't stop the rest; errors are collected and returned together.
 //
 //nolint:gocognit
 func synchronizeReplicationSlots(
@@ -216,8 +214,7 @@ func synchronizeReplicationSlots(
 		//  * the slot used by this node
 		//  * slots holding xmin (this can happen on a former primary, and will prevent VACUUM from
 		//      removing tuples deleted by any later transaction.)
-		//  * slots that aren't from HA, when the user turns off the synchronization of user defined
-		//      replication slots
+		//  * non-HA slots, when synchronizeReplicas is disabled
 		shouldDelete := !slotsInPrimary.Has(slot.SlotName) ||
 			slot.SlotName == mySlotName ||
 			slot.HoldsXmin ||
