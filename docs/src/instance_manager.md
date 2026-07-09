@@ -50,8 +50,11 @@ The `.spec.startDelay` parameter specifies the maximum time, in seconds,
 allowed for the startup probe to succeed.
 
 By default, the `startDelay` is set to `3600` seconds. It is recommended to
-adjust this setting based on the time PostgreSQL needs to fully initialize in
-your specific environment.
+adjust this setting based on the time PostgreSQL needs to start in your
+specific environment. With the default `pg_isready` strategy, this only
+needs to cover the time required for the postmaster to come alive, while
+with the `query` and `streaming` strategies it must also account for the
+time needed to complete recovery and accept connections.
 
 :::warning
     Setting `.spec.startDelay` too low can cause the liveness probe to activate
