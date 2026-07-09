@@ -123,20 +123,33 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(
 // express a placement preference and never degrade synchronous replication
 // below the behavior of a cluster without them.
 func filterCrossDomainInstances(cluster *apiv1.Cluster, instances []string) []string {
+	crossDomain, ok := crossDomainInstances(cluster, instances)
+	if !ok || len(crossDomain) == 0 {
+		return instances
+	}
+	return crossDomain
+}
+
+// crossDomainInstances returns the instances that are in a failure domain
+// different from the primary's, as defined by podFailureDomainKeys or
+// nodeFailureDomainKeys. The second return value is false when the failure
+// domain keys are not configured or the topology cannot be used (extraction
+// failed, or the primary has no topology entry).
+func crossDomainInstances(cluster *apiv1.Cluster, instances []string) ([]string, bool) {
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
 	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
-		return instances
+		return nil, false
 	}
 
 	topology := cluster.Status.Topology
 	if !topology.SuccessfullyExtracted {
-		return instances
+		return nil, false
 	}
 
 	primary := apiv1.PodName(cluster.Status.CurrentPrimary)
 	primaryDomain, ok := topology.Instances[primary]
 	if !ok {
-		return instances
+		return nil, false
 	}
 
 	result := make([]string, 0, len(instances))
@@ -152,16 +165,28 @@ func filterCrossDomainInstances(cluster *apiv1.Cluster, instances []string) []st
 			result = append(result, instance)
 		}
 	}
+	return result, true
+}
 
-	// When no replica lies in a failure domain different from the primary's
-	// (for example, when the configured labels are missing on every instance
-	// and all the domains collapse to the same value), the constraint is not
-	// applied, so that a placement preference never disables or blocks
-	// synchronous replication.
-	if len(result) == 0 {
-		return instances
+// ElectableCrossDomainStandbys returns the standby instances that are in a
+// failure domain different from the primary's, among the same candidates used
+// to build synchronous_standby_names for the configured data durability. The
+// second return value is false when the failure domain keys are not
+// configured or the topology cannot be used.
+func ElectableCrossDomainStandbys(cluster *apiv1.Cluster) ([]string, bool) {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync == nil {
+		return nil, false
 	}
-	return result
+
+	var candidates []string
+	switch sync.DataDurability {
+	case apiv1.DataDurabilityLevelPreferred:
+		candidates = getSortedNonPrimaryHealthyInstanceNames(cluster)
+	default:
+		candidates = getSortedInstanceNames(cluster)
+	}
+	return crossDomainInstances(cluster, candidates)
 }
 
 // getSortedInstanceNames gets a list of all the known PostgreSQL instances in a
