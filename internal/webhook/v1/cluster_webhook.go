@@ -114,6 +114,10 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv
 	allErrs := v.validate(cluster)
 	allWarnings := v.getAdmissionWarnings(cluster)
 
+	// Raised at creation time only, to avoid repeating the warning on every
+	// update of an already accepted configuration
+	allWarnings = append(allWarnings, getSynchronousReplicationWarnings(cluster)...)
+
 	if len(allErrs) == 0 {
 		return allWarnings, nil
 	}
@@ -2662,8 +2666,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getStorageWarnings(r)...)
 	list = append(list, getSharedBuffersWarnings(r)...)
 	list = append(list, getMonitoringFieldsWarnings(r)...)
-	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
-	return append(list, getSynchronousReplicationWarnings(r)...)
+	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 }
 
 func getMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {
