@@ -554,6 +554,7 @@ SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
+SyncReplicationTopologySatisfied
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
@@ -1200,6 +1201,7 @@ networkpolicy
 nextScheduleTime
 nginx
 nodeAffinity
+nodeFailureDomainKeys
 nodeLabelsAntiAffinity
 nodeMaintenanceWindow
 nodeSelector
@@ -1299,6 +1301,7 @@ podAntiAffinity
 podAntiAffinityType
 podCount
 podDisruptionBudgets
+podFailureDomainKeys
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
@@ -1590,6 +1593,7 @@ synchronizereplicasconfiguration
 synchronousreplicaconfiguration
 synchronousreplicaconfigurationmethod
 syncreplicaelectionconstraints
+syncreplicas
 sys
 syslog
 systemID

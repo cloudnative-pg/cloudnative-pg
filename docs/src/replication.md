@@ -475,6 +475,69 @@ spec:
 5. When the replicas are back, `synchronous_standby_names` will be back to
    the initial state.
 
+### Failure Domain-Aware Synchronous Replication
+
+CloudNativePG can restrict the choice of synchronous standbys to instances
+located in a failure domain different from the primary's, such as another
+availability zone. The labels that define the failure domains are declared
+through one of the following options of the `.spec.postgresql.synchronous`
+stanza:
+
+- `nodeFailureDomainKeys`: a list of node label keys, resolved from the labels
+  of the node hosting each instance (for example,
+  `topology.kubernetes.io/zone`)
+- `podFailureDomainKeys`: a list of pod label keys, resolved from the labels of
+  each instance pod, without ever consulting the node
+
+The two options are mutually exclusive, and so are the failure domain keys and
+the `syncReplicaElectionConstraint` option of the deprecated API. Two
+instances belong to the same failure domain when all the listed labels carry
+the same values.
+
+When at least one eligible standby is in a failure domain different from the
+primary's, only the standbys outside the primary's failure domain are used to
+populate `synchronous_standby_names`. The keys express a placement preference:
+when no eligible standby is in a different failure domain, or the topology
+cannot be extracted (for example, the node hosting a pod was deleted, or a
+label listed in `podFailureDomainKeys` is missing from a pod), the constraint
+is not applied and the synchronous standbys are selected as if the keys were
+not configured.
+
+The `SyncReplicationTopologySatisfied` condition in the cluster status reports
+whether the placement preference is currently honored, and the
+`kubectl cnpg status` command shows how the instances are spread across the
+failure domains.
+
+For example, the following cluster keeps two synchronous standbys, chosen from
+the instances running in a different availability zone than the primary
+whenever possible:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-syncreplicas
+spec:
+  instances: 5
+
+  postgresql:
+    synchronous:
+      nodeFailureDomainKeys:
+      - topology.kubernetes.io/zone
+      method: first
+      number: 2
+
+  storage:
+    size: 1Gi
+```
+
+::::note[Topology labels on pods]
+Starting from Kubernetes 1.35, the `topology.kubernetes.io/zone` and
+`topology.kubernetes.io/region` labels are automatically copied from the node
+onto each pod at scheduling time, making them natural candidates for
+`podFailureDomainKeys`.
+::::
+
 ## Synchronous Replication (Deprecated)
 
 :::warning
