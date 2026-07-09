@@ -6,8 +6,8 @@ github.com/Masterminds/semver/v3 v3.5.0 h1:kQceYJfbupGfZOKZQg0kou0DgAKhzDg2NZPAw
 github.com/Masterminds/semver/v3 v3.5.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/acobaugh/osrelease v0.1.0 h1:Yb59HQDGGNhCj4suHaFQQfBps5wyoKLSSX/J/+UifRE=
 github.com/acobaugh/osrelease v0.1.0/go.mod h1:4bFEs0MtgHNHBrmHCt67gNisnabCRAlzdVasCEGHTWY=
-github.com/ardentperf/barman-cloud v0.0.0-20260708130229-a40d41ab4e97 h1:JPF9DaAB6CMe6qTi5Lupn5nktGn635U2SPw6DyMrggw=
-github.com/ardentperf/barman-cloud v0.0.0-20260708130229-a40d41ab4e97/go.mod h1:PSCttn1xs8qNmwoTemDtVTqz9FMhSfKO2bSow8O+u5s=
+github.com/ardentperf/barman-cloud v0.0.0-20260706155341-1953fc7a9396 h1:EaZf7WY4neviFAoEdKLlRBDiD+HQmRya5A/k0Fcjw2g=
+github.com/ardentperf/barman-cloud v0.0.0-20260706155341-1953fc7a9396/go.mod h1:PSCttn1xs8qNmwoTemDtVTqz9FMhSfKO2bSow8O+u5s=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/avast/retry-go/v5 v5.0.0 h1:kf1Qc2UsTZ4qq8elDymqfbISvkyMuhgRxuJqX2NHP7k=
