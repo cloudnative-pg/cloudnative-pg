@@ -1430,10 +1430,11 @@ type failureDomainGroup struct {
 
 // groupInstancesByFailureDomain groups topology instances into failure domain
 // entries ordered by first appearance (sorted instance names within each group).
-// Returns nil when failureDomainKey is not configured or topology extraction failed.
+// Returns nil when no failure domain keys are configured or topology extraction
+// failed.
 func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup {
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
-	if sync == nil || len(sync.FailureDomainKey) == 0 {
+	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
 		return nil
 	}
 
@@ -1442,7 +1443,7 @@ func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup 
 		return nil
 	}
 
-	keys := sync.FailureDomainKey
+	keys := sync.FailureDomainKeys()
 
 	instanceNames := make([]string, 0, len(topology.Instances))
 	for podName := range topology.Instances {
@@ -1497,7 +1498,7 @@ func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup 
 func (fullStatus *PostgresqlStatus) printFailureDomainStatus() {
 	cluster := fullStatus.Cluster
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
-	if sync == nil || len(sync.FailureDomainKey) == 0 {
+	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
 		return
 	}
 
@@ -1527,8 +1528,8 @@ func (fullStatus *PostgresqlStatus) printFailureDomainStatus() {
 	}
 
 	domainHeader := "Domain"
-	if len(sync.FailureDomainKey) == 1 {
-		domainHeader = sync.FailureDomainKey[0]
+	if keys := sync.FailureDomainKeys(); len(keys) == 1 {
+		domainHeader = keys[0]
 	}
 
 	table := tabby.New()

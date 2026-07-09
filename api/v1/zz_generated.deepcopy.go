@@ -3750,8 +3750,13 @@ func (in *SynchronousReplicaConfiguration) DeepCopyInto(out *SynchronousReplicaC
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.FailureDomainKey != nil {
-		in, out := &in.FailureDomainKey, &out.FailureDomainKey
+	if in.PodFailureDomainKeys != nil {
+		in, out := &in.PodFailureDomainKeys, &out.PodFailureDomainKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.NodeFailureDomainKeys != nil {
+		in, out := &in.NodeFailureDomainKeys, &out.NodeFailureDomainKeys
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

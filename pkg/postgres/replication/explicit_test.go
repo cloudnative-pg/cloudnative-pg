@@ -312,7 +312,7 @@ var _ = Describe("filterCrossDomainInstances", func() {
 
 	makeClusterWithTopology := func(
 		instances map[apiv1.PodName]apiv1.PodTopologyLabels,
-		failureDomainKey []string,
+		failureDomainKeys []string,
 	) *apiv1.Cluster {
 		cluster := &apiv1.Cluster{}
 		cluster.Status.CurrentPrimary = primary
@@ -321,19 +321,19 @@ var _ = Describe("filterCrossDomainInstances", func() {
 			Instances:             instances,
 		}
 		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-			Method:           apiv1.SynchronousReplicaConfigurationMethodAny,
-			Number:           1,
-			FailureDomainKey: failureDomainKey,
+			Method:                apiv1.SynchronousReplicaConfigurationMethodAny,
+			Number:                1,
+			NodeFailureDomainKeys: failureDomainKeys,
 		}
 		return cluster
 	}
 
-	It("returns all instances when failureDomainKey is not set", func() {
+	It("returns all instances when no failure domain keys are set", func() {
 		cluster := makeClusterWithTopology(map[apiv1.PodName]apiv1.PodTopologyLabels{
 			primary:  {zoneLabel: "az1"},
 			replica1: {zoneLabel: "az1"},
 		}, nil)
-		cluster.Spec.PostgresConfiguration.Synchronous.FailureDomainKey = nil
+		cluster.Spec.PostgresConfiguration.Synchronous.NodeFailureDomainKeys = nil
 
 		Expect(filterCrossDomainInstances(cluster, []string{replica1, replica2})).
 			To(ConsistOf(replica1, replica2))

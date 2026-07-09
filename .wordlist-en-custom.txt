@@ -194,7 +194,7 @@ FQDN
 FQDNs
 FailoverQuorum
 FailoverQuorumStatus
-FailureDomainKey
+FailureDomainKeys
 Fei
 Filesystem
 Fluentd
@@ -318,6 +318,7 @@ Nenciarini
 NetworkPolicies
 NetworkPolicy
 NodeAffinity
+NodeFailureDomainKeys
 NodeMaintenanceWindow
 NodeSelector
 NodesUsed
@@ -378,6 +379,7 @@ PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
 PodDisruptionBudgets
+PodFailureDomainKeys
 PodMonitor
 PodName
 PodSecurityContext

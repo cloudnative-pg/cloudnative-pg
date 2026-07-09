@@ -1186,8 +1186,9 @@ const (
 
 	// ConditionSyncReplicationTopologySatisfied is True when at least one
 	// synchronous replica is running in a different failure domain than the
-	// primary, as defined by .spec.postgresql.synchronous.topologyKey.
-	// Only set when topologyKey is configured.
+	// primary, as defined by .spec.postgresql.synchronous.podFailureDomainKeys
+	// or .spec.postgresql.synchronous.nodeFailureDomainKeys.
+	// Only set when one of those fields is configured.
 	ConditionSyncReplicationTopologySatisfied ClusterConditionType = "SyncReplicationTopologySatisfied"
 )
 
@@ -1254,8 +1255,9 @@ const (
 	// extracted from pods or nodes, so the constraint cannot be evaluated.
 	ConditionReasonTopologyNotExtracted ConditionReason = "TopologyNotExtracted"
 
-	// ConditionReasonInsufficientCrossDomainReplicas means topologyKey is set but
-	// no synchronous replica in a different failure domain than the primary exists.
+	// ConditionReasonInsufficientCrossDomainReplicas means failure domain keys
+	// are set but no synchronous replica in a different failure domain than
+	// the primary exists.
 	ConditionReasonInsufficientCrossDomainReplicas ConditionReason = "InsufficientCrossDomainReplicas"
 )
 
@@ -1523,6 +1525,7 @@ const (
 // Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
 // need to be considered.
 // +kubebuilder:validation:XValidation:rule="self.dataDurability!='preferred' || ((!has(self.standbyNamesPre) || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost) || self.standbyNamesPost.size()==0))",message="dataDurability set to 'preferred' requires empty 'standbyNamesPre' and empty 'standbyNamesPost'"
+// +kubebuilder:validation:XValidation:rule="!(has(self.podFailureDomainKeys) && self.podFailureDomainKeys.size() > 0 && has(self.nodeFailureDomainKeys) && self.nodeFailureDomainKeys.size() > 0)",message="podFailureDomainKeys and nodeFailureDomainKeys are mutually exclusive"
 type SynchronousReplicaConfiguration struct {
 	// Method to select synchronous replication standbys from the listed
 	// servers, accepting 'any' (quorum-based synchronous replication) or
@@ -1571,13 +1574,33 @@ type SynchronousReplicaConfiguration struct {
 	// +optional
 	FailoverQuorum bool `json:"failoverQuorum"`
 
-	// FailureDomainKey is a list of node label keys used to define failure domains.
-	// When set, the operator will select synchronous replicas from instances running
-	// on nodes whose label values differ from the primary's node for all specified keys.
-	// This ensures synchronous replication across failure domains such as availability
-	// zones or regions.
+	// PodFailureDomainKeys is a list of Pod label keys used to define failure
+	// domains. The values are read exclusively from the labels of each
+	// instance Pod: a listed label that is not present on the Pod resolves to
+	// an empty value, and the Node hosting the Pod is never consulted. When
+	// set, the operator selects synchronous replicas from instances whose
+	// label values differ from the primary's for all the specified keys, so
+	// that synchronous replication spans failure domains such as availability
+	// zones or regions. Starting from Kubernetes 1.35, the
+	// `topology.kubernetes.io/zone` and `topology.kubernetes.io/region`
+	// labels are automatically copied from the Node onto each Pod at
+	// scheduling time.
+	// Mutually exclusive with `nodeFailureDomainKeys`.
 	// +optional
-	FailureDomainKey []string `json:"failureDomainKey,omitempty"`
+	PodFailureDomainKeys []string `json:"podFailureDomainKeys,omitempty"`
+
+	// NodeFailureDomainKeys is a list of Node label keys used to define
+	// failure domains. The values are read exclusively from the labels of the
+	// Node hosting each instance Pod: when a Node cannot be found (for
+	// example, drained or deleted after the Pod was scheduled), the whole
+	// topology extraction fails and the constraint is not applied. When set,
+	// the operator selects synchronous replicas from instances running on
+	// nodes whose label values differ from the primary's node for all the
+	// specified keys, so that synchronous replication spans failure domains
+	// such as availability zones or regions.
+	// Mutually exclusive with `podFailureDomainKeys`.
+	// +optional
+	NodeFailureDomainKeys []string `json:"nodeFailureDomainKeys,omitempty"`
 }
 
 // PodSelectorRef defines a named pod label selector for use in pg_hba rules.
@@ -1608,7 +1631,7 @@ type PodSelectorRefStatus struct {
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
-// +kubebuilder:validation:XValidation:rule="!(self.syncReplicaElectionConstraint.enabled && has(self.synchronous) && has(self.synchronous.failureDomainKey) && self.synchronous.failureDomainKey.size() > 0)",message="syncReplicaElectionConstraint and synchronous.failureDomainKey are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!(self.syncReplicaElectionConstraint.enabled && has(self.synchronous) && ((has(self.synchronous.podFailureDomainKeys) && self.synchronous.podFailureDomainKeys.size() > 0) || (has(self.synchronous.nodeFailureDomainKeys) && self.synchronous.nodeFailureDomainKeys.size() > 0)))",message="syncReplicaElectionConstraint and synchronous failure domain keys are mutually exclusive"
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
 	// +optional

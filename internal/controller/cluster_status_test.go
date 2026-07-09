@@ -570,12 +570,12 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 
 		labelNames := []string{zoneLabel}
 
-		It("reads topology labels from pod labels (KEP-4742 path)", func() {
+		It("reads pod failure domain keys from pod labels without consulting nodes", func() {
 			pods := []corev1.Pod{
 				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
 				makePod("pod-2", "node-2", map[string]string{zoneLabel: "az2"}),
 			}
-			result := getPodsTopology(context.Background(), pods, nil, labelNames)
+			result := getPodsTopology(context.Background(), pods, nil, labelNames, nil)
 
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
 			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
@@ -583,7 +583,22 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(result.NodesUsed).To(BeEquivalentTo(2))
 		})
 
-		It("falls back to node labels when pod labels are absent", func() {
+		It("resolves a missing pod label to an empty value without consulting the node", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
+				makePod("pod-2", "node-2", nil),
+			}
+			nodes := map[string]corev1.Node{
+				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
+			}
+			result := getPodsTopology(context.Background(), pods, nodes, labelNames, nil)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
+			Expect(result.Instances["pod-2"]).To(HaveKeyWithValue(zoneLabel, ""))
+		})
+
+		It("reads node failure domain keys from node labels", func() {
 			pods := []corev1.Pod{
 				makePod("pod-1", "node-1", nil),
 				makePod("pod-2", "node-2", nil),
@@ -592,33 +607,31 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 				"node-1": makeNode("node-1", map[string]string{zoneLabel: "az1"}),
 				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
 			}
-			result := getPodsTopology(context.Background(), pods, nodes, labelNames)
+			result := getPodsTopology(context.Background(), pods, nodes, nil, labelNames)
 
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
 			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
 			Expect(result.Instances["pod-2"][zoneLabel]).To(Equal("az2"))
 		})
 
-		It("uses pod label when available and falls back to node for others", func() {
+		It("ignores pod labels when reading node failure domain keys", func() {
 			pods := []corev1.Pod{
-				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
-				makePod("pod-2", "node-2", nil),
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az9"}),
 			}
 			nodes := map[string]corev1.Node{
-				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
+				"node-1": makeNode("node-1", map[string]string{zoneLabel: "az1"}),
 			}
-			result := getPodsTopology(context.Background(), pods, nodes, labelNames)
+			result := getPodsTopology(context.Background(), pods, nodes, nil, labelNames)
 
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
 			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
-			Expect(result.Instances["pod-2"][zoneLabel]).To(Equal("az2"))
 		})
 
-		It("returns empty topology when a pod label is absent and node is not found", func() {
+		It("returns empty topology when a node failure domain key is configured and the node is not found", func() {
 			pods := []corev1.Pod{
 				makePod("pod-1", "node-1", nil),
 			}
-			result := getPodsTopology(context.Background(), pods, nil, labelNames)
+			result := getPodsTopology(context.Background(), pods, nil, nil, labelNames)
 
 			Expect(result.SuccessfullyExtracted).To(BeFalse())
 		})
@@ -627,28 +640,29 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			pods := []corev1.Pod{
 				makePod("pod-1", "node-1", nil),
 			}
-			result := getPodsTopology(context.Background(), pods, nil, nil)
+			result := getPodsTopology(context.Background(), pods, nil, nil, nil)
 
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
 			Expect(result.NodesUsed).To(BeEquivalentTo(1))
 		})
+
 	})
 
 	Describe("updateSyncReplicationTopologyCondition", func() {
 		const zoneLabel = "topology.kubernetes.io/zone"
 
 		makeCluster := func(
-			failureDomainKey []string,
+			failureDomainKeys []string,
 			primary string,
 			instances map[apiv1.PodName]apiv1.PodTopologyLabels,
 			extracted bool,
 		) *apiv1.Cluster {
 			cluster := &apiv1.Cluster{}
-			if len(failureDomainKey) > 0 {
+			if len(failureDomainKeys) > 0 {
 				cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-					Method:           apiv1.SynchronousReplicaConfigurationMethodAny,
-					Number:           1,
-					FailureDomainKey: failureDomainKey,
+					Method:                apiv1.SynchronousReplicaConfigurationMethodAny,
+					Number:                1,
+					NodeFailureDomainKeys: failureDomainKeys,
 				}
 			}
 			cluster.Status.CurrentPrimary = primary
@@ -668,7 +682,7 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			return nil
 		}
 
-		It("does not set the condition when failureDomainKey is not configured", func() {
+		It("does not set the condition when no failure domain keys are configured", func() {
 			cluster := makeCluster(nil, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
 				"pod-1": {zoneLabel: "az1"},
 				"pod-2": {zoneLabel: "az2"},
