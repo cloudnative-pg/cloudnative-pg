@@ -100,7 +100,10 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection",
 			By("verifying second cluster is on timeline 2", func() {
 				Eventually(func() (int, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, secondClusterName)
-					return cluster.Status.TimelineID, err
+					if err != nil {
+						return 0, err
+					}
+					return cluster.Status.TimelineID, nil
 				}, 60).Should(BeEquivalentTo(2))
 			})
 
@@ -132,6 +135,12 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection",
 					firstClusterName,
 					testTimeouts[timeouts.ClusterIsReadyQuick],
 				)
+			})
+
+			By("verifying first cluster stayed on timeline 1", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, firstClusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.Status.TimelineID).To(BeEquivalentTo(1))
 			})
 
 			By("deleting the first cluster", func() {
