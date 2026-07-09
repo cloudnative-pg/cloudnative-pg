@@ -36,14 +36,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Plugin port of the "timeline divergence" scenario:
-// two clusters archive through plugin-barman-cloud to a shared archive.
-// The second Cluster is on timeline 2 and archived a `00000002.history`
-// history file.
-// The test validates that the first Cluster can be scaled to 2 instances
-// successfully, preventing the new replica from downloading timeline history
-// files with timeline IDs greater than the first cluster's current timeline.
-// Runs on kind/k3d only, where the plugin and the shared object store are installed.
+// Plugin port of the in-core "timeline divergence protection" test:
+// verifies a replica refuses to adopt a timeline-history file for a
+// timeline ahead of its own cluster's, from an object store shared
+// with a second, already-diverged cluster.
+// Runs on kind/k3d only, where the plugin and shared store are set up.
 var _ = Describe("plugin-barman-cloud timeline divergence protection",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelBackupRestore), func() {
 		const (
@@ -123,12 +120,10 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection",
 			})
 
 			By("verifying new replica is streaming", func() {
-				// Critical: This verifies the replica successfully joins despite timeline 2
-				// history file existing in the shared archive. If the replica were to download
-				// the incompatible timeline 2 history file, PostgreSQL would crash with
-				// "requested timeline 2 is not a child of this server's history" and enter
-				// a crash-loop, causing this assertion to timeout. The validation logic must
-				// reject the future timeline file to allow the replica to join successfully.
+				// Confirms the timeline guard held: if the replica adopted the shared
+				// archive's timeline-2 history file, Postgres would crash-loop on
+				// "requested timeline 2 is not a child of this server's history",
+				// and this streaming check would time out instead of passing.
 				replicationasserts.AssertClusterStandbysAreStreaming(
 					env,
 					namespace,
