@@ -583,19 +583,28 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(result.NodesUsed).To(BeEquivalentTo(2))
 		})
 
-		It("resolves a missing pod label to an empty value without consulting the node", func() {
+		It("fails the extraction when a pod failure domain label is missing, without consulting the node", func() {
 			pods := []corev1.Pod{
 				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
 				makePod("pod-2", "node-2", nil),
 			}
+			// the node carries the label: it must not be used as a fallback
 			nodes := map[string]corev1.Node{
 				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
 			}
 			result := getPodsTopology(context.Background(), pods, nodes, labelNames, nil)
 
+			Expect(result.SuccessfullyExtracted).To(BeFalse())
+		})
+
+		It("keeps a pod label explicitly set to an empty value", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: ""}),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, labelNames, nil)
+
 			Expect(result.SuccessfullyExtracted).To(BeTrue())
-			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
-			Expect(result.Instances["pod-2"]).To(HaveKeyWithValue(zoneLabel, ""))
+			Expect(result.Instances["pod-1"]).To(HaveKeyWithValue(zoneLabel, ""))
 		})
 
 		It("reads node failure domain keys from node labels", func() {
