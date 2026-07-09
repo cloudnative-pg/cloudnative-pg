@@ -847,7 +847,10 @@ func getPodsTopology(
 	for _, pod := range pods {
 		podName := apiv1.PodName(pod.Name)
 		data[podName] = make(map[string]string, 0)
-		nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
+		// a pod that has not been scheduled yet must not count as a used node
+		if pod.Spec.NodeName != "" {
+			nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
+		}
 
 		for _, labelName := range podLabelNames {
 			data[podName][labelName] = pod.Labels[labelName]
