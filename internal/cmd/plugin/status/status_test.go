@@ -184,6 +184,19 @@ var _ = Describe("groupInstancesByFailureDomain", func() {
 		Expect(groups[0].hasPrimary).To(BeTrue())
 	})
 
+	It("renders an empty label value as <empty>", func() {
+		cluster := makeCluster([]string{zoneLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: ""},
+		}, true)
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(2))
+		Expect(groups[0].display).To(Equal("<empty>"))
+		Expect(groups[0].instances).To(ConsistOf(replica1))
+		Expect(groups[1].display).To(Equal("az1"))
+	})
+
 	It("formats the display value as key=value pairs for multiple keys", func() {
 		cluster := makeCluster([]string{zoneLabel, regionLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
 			primary:  {zoneLabel: "az1", regionLabel: "us-east-1"},

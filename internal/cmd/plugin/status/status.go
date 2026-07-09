@@ -1428,6 +1428,15 @@ type failureDomainGroup struct {
 	hasPrimary bool
 }
 
+// displayFailureDomainValue renders a failure domain label value, making an
+// empty value visible in the status output.
+func displayFailureDomainValue(value string) string {
+	if value == "" {
+		return "<empty>"
+	}
+	return value
+}
+
 // groupInstancesByFailureDomain groups topology instances into failure domain
 // entries ordered by first appearance (sorted instance names within each group).
 // Returns nil when no failure domain keys are configured or topology extraction
@@ -1465,11 +1474,11 @@ func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup 
 
 		var display string
 		if len(keys) == 1 {
-			display = vals[0]
+			display = displayFailureDomainValue(vals[0])
 		} else {
 			parts := make([]string, len(keys))
 			for i, k := range keys {
-				parts[i] = k + "=" + vals[i]
+				parts[i] = k + "=" + displayFailureDomainValue(vals[i])
 			}
 			display = strings.Join(parts, ", ")
 		}
@@ -1507,9 +1516,11 @@ func (fullStatus *PostgresqlStatus) printFailureDomainStatus() {
 		string(apiv1.ConditionSyncReplicationTopologySatisfied),
 	)
 
-	headerColor := aurora.Green
-	if condition != nil && condition.Status == metav1.ConditionFalse {
-		headerColor = aurora.Yellow
+	// a missing condition means the topology has not been evaluated yet, so
+	// green is reserved for an explicitly satisfied constraint
+	headerColor := aurora.Yellow
+	if condition != nil && condition.Status == metav1.ConditionTrue {
+		headerColor = aurora.Green
 	}
 	fmt.Println(headerColor("Failure Domain Topology"))
 
