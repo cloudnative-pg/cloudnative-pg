@@ -830,9 +830,9 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 // getPodsTopology returns a map with all the information about the pods
 // topology. Each label key is read from a single source: the keys in
 // podLabelNames are resolved from the labels of the instance Pod (a missing
-// label resolves to an empty value), while the keys in nodeLabelNames are
-// resolved from the labels of the Node hosting the Pod, and a missing Node
-// makes the whole extraction fail.
+// label makes the whole extraction fail), while the keys in nodeLabelNames
+// are resolved from the labels of the Node hosting the Pod, and a missing
+// Node makes the whole extraction fail.
 func getPodsTopology(
 	ctx context.Context,
 	pods []corev1.Pod,
@@ -853,7 +853,17 @@ func getPodsTopology(
 		}
 
 		for _, labelName := range podLabelNames {
-			data[podName][labelName] = pod.Labels[labelName]
+			value, ok := pod.Labels[labelName]
+			if !ok {
+				// a configured failure domain label missing from the pod is a
+				// misconfiguration: failing the extraction surfaces it through
+				// the topology condition, while resolving it to an empty value
+				// would silently merge the pod into a shared pseudo-domain
+				contextLogger.Debug("pod label not found, skipping pod topology matching",
+					"podName", pod.Name, "labelName", labelName)
+				return apiv1.Topology{}
+			}
+			data[podName][labelName] = value
 		}
 
 		if len(nodeLabelNames) == 0 {

@@ -1576,8 +1576,9 @@ type SynchronousReplicaConfiguration struct {
 
 	// PodFailureDomainKeys is a list of Pod label keys used to define failure
 	// domains. The values are read exclusively from the labels of each
-	// instance Pod: a listed label that is not present on the Pod resolves to
-	// an empty value, and the Node hosting the Pod is never consulted. When
+	// instance Pod: a listed label that is not present on the Pod makes the
+	// whole topology extraction fail, so that the constraint is not applied,
+	// and the Node hosting the Pod is never consulted. When
 	// set, the operator selects synchronous replicas from instances whose
 	// label values differ from the primary's for all the specified keys, so
 	// that synchronous replication spans failure domains such as availability
