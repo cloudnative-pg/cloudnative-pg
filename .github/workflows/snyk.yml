@@ -55,6 +55,9 @@ jobs:
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          # snyk/snyk:golang bundles a fixed Go toolchain that can lag behind
+          # go.mod's toolchain requirement; let 'go list' fetch a newer one.
+          GOTOOLCHAIN: auto
         with:
           args: --sarif-file-output=snyk-test.sarif
 
