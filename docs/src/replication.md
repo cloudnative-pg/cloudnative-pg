@@ -151,6 +151,16 @@ defined). When defined, two options are mandatory:
 - `number`: the number of synchronous standby servers that transactions must
   wait for responses from
 
+:::info[Important]
+    Before enabling synchronous replication, make sure the cluster has enough
+    standby servers to tolerate the loss of one of them, or write operations
+    will be suspended whenever the number of available synchronous standbys
+    drops below the requested one. As a general rule, plan for synchronous
+    replication in clusters with at least three instances. In smaller
+    clusters, consider setting `dataDurability` to `preferred` if self-healing
+    is more important than strict data durability in your environment.
+:::
+
 ### Quorum-based Synchronous Replication
 
 In PostgreSQL, quorum-based synchronous replication ensures that transaction
