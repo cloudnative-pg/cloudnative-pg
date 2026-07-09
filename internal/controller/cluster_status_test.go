@@ -691,6 +691,19 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(getCondition(cluster)).To(BeNil())
 		})
 
+		It("removes a stale condition when the failure domain keys are removed", func() {
+			cluster := makeCluster(nil, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+			}, true)
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:   string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status: metav1.ConditionFalse,
+				Reason: string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+			})
+			updateSyncReplicationTopologyCondition(cluster)
+			Expect(getCondition(cluster)).To(BeNil())
+		})
+
 		It("sets condition to False with TopologyNotExtracted when extraction failed", func() {
 			cluster := makeCluster([]string{zoneLabel}, "pod-1", nil, false)
 			updateSyncReplicationTopologyCondition(cluster)
