@@ -333,6 +333,14 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				})
 
 				By("failing to promote B with the invalid token", func() {
+					// The Unrecoverable phase proves the operator has evaluated and
+					// rejected the token; only after that it makes sense to check
+					// that the designated primary keeps running in recovery.
+					Eventually(func(g Gomega) {
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterBName)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(cluster.Status.Phase).To(BeEquivalentTo(apiv1.PhaseUnrecoverable))
+					}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
 					Consistently(func(g Gomega) {
 						pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
 						g.Expect(err).ToNot(HaveOccurred())
@@ -347,9 +355,6 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(strings.Trim(stdOut, "\n")).To(Equal("t"))
 					}, 60, 10).Should(Succeed())
-					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterBName)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(cluster.Status.Phase).To(BeEquivalentTo(apiv1.PhaseUnrecoverable))
 				})
 
 				By("promoting B with the right token", func() {
