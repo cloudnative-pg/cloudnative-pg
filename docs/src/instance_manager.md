@@ -25,7 +25,7 @@ of the Pod, the instance manager acts as a backend to handle the
 ## Startup Probe
 
 The startup probe ensures that a PostgreSQL instance, whether a primary or
-standby, has fully started.
+standby, has started up.
 
 :::info
     By default, the startup probe uses
@@ -33,6 +33,14 @@ standby, has fully started.
     However, the behavior can be customized by specifying a different startup
     strategy.
 :::
+
+With the default `pg_isready` strategy, an instance is considered started as
+soon as PostgreSQL is alive, even if it is still rejecting connections while
+it completes its startup sequence (for example, a standby performing crash
+recovery or replaying WAL). This prevents the kubelet from repeatedly
+restarting an instance that is legitimately recovering. The instance remains
+unready, and therefore excluded from the ready endpoints of the services,
+until the readiness probe reports that it accepts connections.
 
 While the startup probe is running, the liveness and readiness probes remain
 disabled. Following Kubernetes standards, if the startup probe fails, the
@@ -105,8 +113,13 @@ To accommodate these requirements, CloudNativePG extends the
 - `type`: specifies the criteria for considering the probe successful. Accepted
   values, in increasing order of complexity/depth, include:
 
-    - `pg_isready`: marks the probe as successful when the `pg_isready` command
-      exits with `0`. This is the default for primary instances and replicas.
+    - `pg_isready`: relies on the exit code of the `pg_isready` command. The
+      startup probe is successful when the server is either accepting
+      connections or alive but rejecting them, which happens while PostgreSQL
+      completes its startup sequence (for example, a standby replaying WAL
+      after a crash). The readiness probe is successful only when the server
+      is accepting connections. This is the default for primary instances and
+      replicas.
     - `query`: marks the probe as successful when a basic query is executed on
       the `postgres` database locally.
     - `streaming`: marks the probe as successful when the replica begins
@@ -142,6 +155,14 @@ probes:
     type: streaming
     maximumLag: 16Mi
 ```
+
+:::info
+    The `query` and `streaming` strategies require PostgreSQL to accept
+    connections, so a startup probe using them keeps failing while an
+    instance replays WAL after a crash. When using these strategies, make
+    sure that `startDelay` (or your custom `failureThreshold`) allows enough
+    time for recovery to complete.
+:::
 
 ## Liveness Probe
 
