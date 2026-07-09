@@ -117,8 +117,11 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(
 
 // filterCrossDomainInstances returns only those instances that are in a different
 // failure domain than the primary, as defined by podFailureDomainKeys or
-// nodeFailureDomainKeys. If neither is set, topology extraction failed, or the
-// primary has no topology entry, the original list is returned unchanged.
+// nodeFailureDomainKeys. If neither is set, topology extraction failed, the
+// primary has no topology entry, or no instance is in a different failure
+// domain than the primary, the original list is returned unchanged: the keys
+// express a placement preference and never degrade synchronous replication
+// below the behavior of a cluster without them.
 func filterCrossDomainInstances(cluster *apiv1.Cluster, instances []string) []string {
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
 	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
@@ -148,6 +151,15 @@ func filterCrossDomainInstances(cluster *apiv1.Cluster, instances []string) []st
 		if !primaryDomain.MatchesTopology(instanceDomain) {
 			result = append(result, instance)
 		}
+	}
+
+	// When no replica lies in a failure domain different from the primary's
+	// (for example, when the configured labels are missing on every instance
+	// and all the domains collapse to the same value), the constraint is not
+	// applied, so that a placement preference never disables or blocks
+	// synchronous replication.
+	if len(result) == 0 {
+		return instances
 	}
 	return result
 }

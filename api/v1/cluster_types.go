@@ -1585,6 +1585,9 @@ type SynchronousReplicaConfiguration struct {
 	// `topology.kubernetes.io/zone` and `topology.kubernetes.io/region`
 	// labels are automatically copied from the Node onto each Pod at
 	// scheduling time.
+	// When no replica lies in a failure domain different from the primary's,
+	// the constraint is not applied and synchronous replicas are selected as
+	// if this field were not set.
 	// Mutually exclusive with `nodeFailureDomainKeys`.
 	// +optional
 	PodFailureDomainKeys []string `json:"podFailureDomainKeys,omitempty"`
@@ -1598,6 +1601,9 @@ type SynchronousReplicaConfiguration struct {
 	// nodes whose label values differ from the primary's node for all the
 	// specified keys, so that synchronous replication spans failure domains
 	// such as availability zones or regions.
+	// When no replica lies in a failure domain different from the primary's,
+	// the constraint is not applied and synchronous replicas are selected as
+	// if this field were not set.
 	// Mutually exclusive with `podFailureDomainKeys`.
 	// +optional
 	NodeFailureDomainKeys []string `json:"nodeFailureDomainKeys,omitempty"`
