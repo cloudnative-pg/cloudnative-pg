@@ -246,8 +246,7 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 							case <-stopLoad:
 								GinkgoWriter.Println("Terminating load")
 								return
-							default:
-								continue
+							case <-time.After(100 * time.Millisecond):
 							}
 						}
 					}()
