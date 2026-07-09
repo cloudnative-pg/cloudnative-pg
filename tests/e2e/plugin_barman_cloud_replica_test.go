@@ -164,8 +164,8 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 			}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
 		}
 
-		waitForTimelineIncrease := func(namespace, clusterName string, expectedTimeline int) bool {
-			return Eventually(func(g Gomega) {
+		waitForExpectedTimeline := func(namespace, clusterName string, expectedTimeline int) {
+			Eventually(func(g Gomega) {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				stdout, _, err := exec.QueryInInstancePod(
@@ -198,15 +198,11 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				DeferCleanup(func() error {
 					// Since we use multiple times the same cluster names for the same object store instance, we need
 					// to clean it up between tests
-					_, err = objectstore.CleanFiles(objectStoreEnv, path.Join(objectStoreName, clusterAName))
-					if err != nil {
+					if _, err := objectstore.CleanFiles(objectStoreEnv, path.Join(objectStoreName, clusterAName)); err != nil {
 						return err
 					}
-					_, err = objectstore.CleanFiles(objectStoreEnv, path.Join(objectStoreName, clusterBName))
-					if err != nil {
-						return err
-					}
-					return nil
+					_, err := objectstore.CleanFiles(objectStoreEnv, path.Join(objectStoreName, clusterBName))
+					return err
 				})
 
 				stopLoad := make(chan struct{})
@@ -276,7 +272,6 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 					primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
 					Expect(err).ToNot(HaveOccurred())
 					_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
-					Expect(err).ToNot(HaveOccurred())
 
 					Eventually(func() (apiv1.BackupPhase, error) {
 						err = env.Client.Get(env.Ctx, types.NamespacedName{
@@ -366,7 +361,7 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				})
 
 				By("reaching the target timeline", func() {
-					waitForTimelineIncrease(namespace, clusterBName, expectedTimeline)
+					waitForExpectedTimeline(namespace, clusterBName, expectedTimeline)
 				})
 
 				By("verifying B contains the primary", func() {
