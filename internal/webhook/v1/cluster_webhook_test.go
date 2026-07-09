@@ -7083,6 +7083,18 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
 	})
 
+	It("returns no warning for a replica cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
 	It("returns no warning when the legacy API sets maxSyncReplicas only", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{

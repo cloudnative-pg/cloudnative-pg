@@ -3144,6 +3144,12 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		return nil
 	}
 
+	// A replica cluster replays data from another cluster: losing its
+	// designated primary doesn't lose data from the topology
+	if r.IsReplica() {
+		return nil
+	}
+
 	if r.Spec.PostgresConfiguration.Synchronous != nil {
 		return nil
 	}
