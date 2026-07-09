@@ -40,6 +40,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
@@ -914,8 +915,7 @@ func updateSyncReplicationTopologyCondition(cluster *apiv1.Cluster) {
 	}
 
 	primary := apiv1.PodName(cluster.Status.CurrentPrimary)
-	primaryDomain, ok := topology.Instances[primary]
-	if !ok {
+	if _, ok := topology.Instances[primary]; !ok {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
 			Status:  metav1.ConditionFalse,
@@ -925,26 +925,24 @@ func updateSyncReplicationTopologyCondition(cluster *apiv1.Cluster) {
 		return
 	}
 
-	for podName, podDomain := range topology.Instances {
-		if podName == primary {
-			continue
-		}
-		if !primaryDomain.MatchesTopology(podDomain) {
-			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
-				Status:  metav1.ConditionTrue,
-				Reason:  string(apiv1.ConditionReasonTopologySatisfied),
-				Message: "At least one synchronous replica is in a different failure domain than the primary.",
-			})
-			return
-		}
+	// use the same candidates and filtering criterion used to build
+	// synchronous_standby_names, so that the condition cannot diverge from
+	// what the replication path actually elects
+	if crossDomainStandbys, _ := replication.ElectableCrossDomainStandbys(cluster); len(crossDomainStandbys) > 0 {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ConditionReasonTopologySatisfied),
+			Message: "At least one electable synchronous standby is in a different failure domain than the primary.",
+		})
+		return
 	}
 
 	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 		Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
 		Status:  metav1.ConditionFalse,
 		Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
-		Message: "No synchronous replica in a different failure domain than the primary exists.",
+		Message: "No electable synchronous standby in a different failure domain than the primary exists.",
 	})
 }
 

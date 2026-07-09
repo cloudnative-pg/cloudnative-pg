@@ -685,6 +685,11 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 				}
 			}
 			cluster.Status.CurrentPrimary = primary
+			names := make([]string, 0, len(instances))
+			for name := range instances {
+				names = append(names, string(name))
+			}
+			cluster.Status.InstancesStatus = map[apiv1.PodStatus][]string{apiv1.PodHealthy: names}
 			cluster.Status.Topology = apiv1.Topology{
 				SuccessfullyExtracted: extracted,
 				Instances:             instances,
@@ -760,6 +765,26 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 				"pod-1": {zoneLabel: "az1"},
 				"pod-2": {zoneLabel: "az1"},
 			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
+		})
+
+		It("sets condition to False when the only cross-domain replica is not electable", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az1"},
+				"pod-3": {zoneLabel: "az2"},
+			}, true)
+			// with preferred data durability only healthy replicas are
+			// electable: the cross-domain pod-3 must not satisfy the condition
+			cluster.Spec.PostgresConfiguration.Synchronous.DataDurability = apiv1.DataDurabilityLevelPreferred
+			cluster.Status.InstancesStatus = map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"pod-1", "pod-2"},
+				apiv1.PodFailed:  {"pod-3"},
+			}
 			updateSyncReplicationTopologyCondition(cluster)
 			cond := getCondition(cluster)
 			Expect(cond).NotTo(BeNil())
