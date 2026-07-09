@@ -646,6 +646,16 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(result.NodesUsed).To(BeEquivalentTo(1))
 		})
 
+		It("does not count unscheduled pods as used nodes", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", nil),
+				makePod("pod-2", "", nil),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, nil, nil)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.NodesUsed).To(BeEquivalentTo(1))
+		})
 	})
 
 	Describe("updateSyncReplicationTopologyCondition", func() {
