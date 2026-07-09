@@ -248,15 +248,19 @@ func (r *ClusterReconciler) updateResourceStatus(
 	newJobs := int32(len(resources.jobs.Items)) //nolint:gosec
 	cluster.Status.JobCount = newJobs
 
-	topologyLabels := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.NodeLabelsAntiAffinity
-	if sync := cluster.Spec.PostgresConfiguration.Synchronous; sync != nil {
-		topologyLabels = sync.FailureDomainKey
+	var podLabelKeys []string
+	nodeLabelKeys := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.NodeLabelsAntiAffinity
+	if sync := cluster.Spec.PostgresConfiguration.Synchronous; sync != nil &&
+		(len(sync.PodFailureDomainKeys) > 0 || len(sync.NodeFailureDomainKeys) > 0) {
+		podLabelKeys = sync.PodFailureDomainKeys
+		nodeLabelKeys = sync.NodeFailureDomainKeys
 	}
 	cluster.Status.Topology = getPodsTopology(
 		ctx,
 		resources.instances.Items,
 		resources.nodes,
-		topologyLabels,
+		podLabelKeys,
+		nodeLabelKeys,
 	)
 	updateSyncReplicationTopologyCondition(cluster)
 
@@ -823,12 +827,18 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	return nil
 }
 
-// getPodsTopology returns a map with all the information about the pods topology
+// getPodsTopology returns a map with all the information about the pods
+// topology. Each label key is read from a single source: the keys in
+// podLabelNames are resolved from the labels of the instance Pod (a missing
+// label resolves to an empty value), while the keys in nodeLabelNames are
+// resolved from the labels of the Node hosting the Pod, and a missing Node
+// makes the whole extraction fail.
 func getPodsTopology(
 	ctx context.Context,
 	pods []corev1.Pod,
 	nodes map[string]corev1.Node,
-	labelNames []string,
+	podLabelNames []string,
+	nodeLabelNames []string,
 ) apiv1.Topology {
 	contextLogger := log.FromContext(ctx)
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
@@ -839,24 +849,23 @@ func getPodsTopology(
 		data[podName] = make(map[string]string, 0)
 		nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
 
-		for _, labelName := range labelNames {
-			// Prefer pod labels: KEP-4742 propagates node topology labels onto pods
-			// during scheduling, making a node fetch unnecessary on Kubernetes 1.35+.
-			if value, ok := pod.Labels[labelName]; ok {
-				data[podName][labelName] = value
-				continue
-			}
+		for _, labelName := range podLabelNames {
+			data[podName][labelName] = pod.Labels[labelName]
+		}
 
-			// Fall back to reading from the node object for older clusters or when
-			// the PodTopologyLabelsAdmission feature gate is disabled.
-			node, ok := nodes[pod.Spec.NodeName]
-			if !ok {
-				// node not found, it means that:
-				// - the node could have been drained
-				// - others
-				contextLogger.Debug("node not found, skipping pod topology matching")
-				return apiv1.Topology{}
-			}
+		if len(nodeLabelNames) == 0 {
+			continue
+		}
+
+		node, ok := nodes[pod.Spec.NodeName]
+		if !ok {
+			// node not found, it means that:
+			// - the node could have been drained
+			// - others
+			contextLogger.Debug("node not found, skipping pod topology matching")
+			return apiv1.Topology{}
+		}
+		for _, labelName := range nodeLabelNames {
 			data[podName][labelName] = node.Labels[labelName]
 		}
 	}
@@ -865,11 +874,11 @@ func getPodsTopology(
 }
 
 // updateSyncReplicationTopologyCondition sets the SyncReplicationTopologySatisfied
-// condition on the cluster. It is only set when failureDomainKey is configured on the
-// new synchronous replication API.
+// condition on the cluster. It is only set when podFailureDomainKeys or
+// nodeFailureDomainKeys is configured on the new synchronous replication API.
 func updateSyncReplicationTopologyCondition(cluster *apiv1.Cluster) {
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
-	if sync == nil || len(sync.FailureDomainKey) == 0 {
+	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
 		return
 	}
 

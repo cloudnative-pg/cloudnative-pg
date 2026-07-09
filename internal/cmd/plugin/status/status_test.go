@@ -123,7 +123,7 @@ var _ = Describe("groupInstancesByFailureDomain", func() {
 	)
 
 	makeCluster := func(
-		failureDomainKey []string,
+		failureDomainKeys []string,
 		instances map[apiv1.PodName]apiv1.PodTopologyLabels,
 		extracted bool,
 	) *apiv1.Cluster {
@@ -133,15 +133,15 @@ var _ = Describe("groupInstancesByFailureDomain", func() {
 			SuccessfullyExtracted: extracted,
 			Instances:             instances,
 		}
-		if failureDomainKey != nil {
+		if failureDomainKeys != nil {
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				FailureDomainKey: failureDomainKey,
+				NodeFailureDomainKeys: failureDomainKeys,
 			}
 		}
 		return cluster
 	}
 
-	It("returns nil when failureDomainKey is not set", func() {
+	It("returns nil when no failure domain keys are set", func() {
 		cluster := makeCluster(nil, map[apiv1.PodName]apiv1.PodTopologyLabels{
 			primary: {zoneLabel: "az1"},
 		}, true)

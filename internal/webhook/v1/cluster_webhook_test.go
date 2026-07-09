@@ -7083,18 +7083,18 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 })
 
 var _ = Describe("getFailureDomainTopologyWarnings", func() {
-	makeCluster := func(failureDomainKey []string, conditions []metav1.Condition) *apiv1.Cluster {
+	makeCluster := func(failureDomainKeys []string, conditions []metav1.Condition) *apiv1.Cluster {
 		cluster := &apiv1.Cluster{}
 		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-			Method:           apiv1.SynchronousReplicaConfigurationMethodAny,
-			Number:           1,
-			FailureDomainKey: failureDomainKey,
+			Method:                apiv1.SynchronousReplicaConfigurationMethodAny,
+			Number:                1,
+			NodeFailureDomainKeys: failureDomainKeys,
 		}
 		cluster.Status.Conditions = conditions
 		return cluster
 	}
 
-	It("returns no warning when failureDomainKey is not set", func() {
+	It("returns no warning when no failure domain keys are set", func() {
 		cluster := makeCluster(nil, []metav1.Condition{
 			{
 				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),

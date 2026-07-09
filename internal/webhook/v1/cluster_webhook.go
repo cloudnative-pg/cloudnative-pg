@@ -3161,7 +3161,7 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 
 func getFailureDomainTopologyWarnings(r *apiv1.Cluster) admission.Warnings {
 	sync := r.Spec.PostgresConfiguration.Synchronous
-	if sync == nil || len(sync.FailureDomainKey) == 0 {
+	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
 		return nil
 	}
 
@@ -3174,8 +3174,8 @@ func getFailureDomainTopologyWarnings(r *apiv1.Cluster) admission.Warnings {
 	}
 
 	return admission.Warnings{
-		"failureDomainKey is configured but the topology constraint is not currently satisfied: " +
+		"failure domain keys are configured but the topology constraint is not currently satisfied: " +
 			condition.Message +
-			" Check that replicas exist in different failure domains and that node topology labels are set.",
+			" Check that replicas exist in different failure domains and that the topology labels are set.",
 	}
 }
