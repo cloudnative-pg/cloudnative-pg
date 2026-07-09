@@ -3145,7 +3145,9 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		return nil
 	}
 
-	if r.Spec.MinSyncReplicas > 0 {
+	// The legacy API enables synchronous replication through maxSyncReplicas:
+	// minSyncReplicas is only the floor used when not enough replicas are ready
+	if r.Spec.MaxSyncReplicas > 0 {
 		return nil
 	}
 
