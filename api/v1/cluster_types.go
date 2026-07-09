@@ -1631,7 +1631,7 @@ type PodSelectorRefStatus struct {
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
-// +kubebuilder:validation:XValidation:rule="!(self.syncReplicaElectionConstraint.enabled && has(self.synchronous) && ((has(self.synchronous.podFailureDomainKeys) && self.synchronous.podFailureDomainKeys.size() > 0) || (has(self.synchronous.nodeFailureDomainKeys) && self.synchronous.nodeFailureDomainKeys.size() > 0)))",message="syncReplicaElectionConstraint and synchronous failure domain keys are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!(has(self.syncReplicaElectionConstraint) && self.syncReplicaElectionConstraint.enabled && has(self.synchronous) && ((has(self.synchronous.podFailureDomainKeys) && self.synchronous.podFailureDomainKeys.size() > 0) || (has(self.synchronous.nodeFailureDomainKeys) && self.synchronous.nodeFailureDomainKeys.size() > 0)))",message="syncReplicaElectionConstraint and synchronous failure domain keys are mutually exclusive"
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
 	// +optional

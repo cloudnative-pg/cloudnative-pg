@@ -4796,10 +4796,10 @@ spec:
                 x-kubernetes-validations:
                 - message: syncReplicaElectionConstraint and synchronous failure domain
                     keys are mutually exclusive
-                  rule: '!(self.syncReplicaElectionConstraint.enabled && has(self.synchronous)
-                    && ((has(self.synchronous.podFailureDomainKeys) && self.synchronous.podFailureDomainKeys.size()
-                    > 0) || (has(self.synchronous.nodeFailureDomainKeys) && self.synchronous.nodeFailureDomainKeys.size()
-                    > 0)))'
+                  rule: '!(has(self.syncReplicaElectionConstraint) && self.syncReplicaElectionConstraint.enabled
+                    && has(self.synchronous) && ((has(self.synchronous.podFailureDomainKeys)
+                    && self.synchronous.podFailureDomainKeys.size() > 0) || (has(self.synchronous.nodeFailureDomainKeys)
+                    && self.synchronous.nodeFailureDomainKeys.size() > 0)))'
               primaryLease:
                 description: |-
                   Configuration of the Kubernetes `Lease` used to coordinate safe primary
