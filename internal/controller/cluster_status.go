@@ -879,6 +879,13 @@ func getPodsTopology(
 func updateSyncReplicationTopologyCondition(cluster *apiv1.Cluster) {
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
 	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
+		// the condition must not survive the removal of the failure domain
+		// keys, or consumers such as the webhook warnings would keep reading
+		// a stale result
+		meta.RemoveStatusCondition(
+			&cluster.Status.Conditions,
+			string(apiv1.ConditionSyncReplicationTopologySatisfied),
+		)
 		return
 	}
 
