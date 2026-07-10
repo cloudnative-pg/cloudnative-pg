@@ -31,11 +31,11 @@ spec:
         name: barman-cloud.cloudnative-pg.io
         parameters:
           barmanObjectName: shared-timeline
-          serverName: shared-timeline-test
+          serverName: shared-timeline-test-plugin
 
   plugins:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
       parameters:
         barmanObjectName: shared-timeline
-        serverName: shared-timeline-test
+        serverName: shared-timeline-test-plugin

@@ -46,7 +46,7 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection",
 		const (
 			level                 = tests.High
 			sharedObjectStoreName = "shared-timeline"
-			sharedArchiveName     = "shared-timeline-test"
+			sharedArchiveName     = "shared-timeline-test-plugin"
 			timelineFixturesDir   = fixturesDir + "/plugin_barman_cloud/timeline_divergence"
 			firstClusterFile      = timelineFixturesDir + "/cluster-plugin-tl-divergence-1.yaml.template"
 			secondClusterFile     = timelineFixturesDir + "/cluster-plugin-tl-divergence-2.yaml.template"
