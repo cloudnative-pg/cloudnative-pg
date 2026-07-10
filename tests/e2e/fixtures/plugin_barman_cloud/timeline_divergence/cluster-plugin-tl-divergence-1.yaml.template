@@ -24,4 +24,4 @@ spec:
       isWALArchiver: true
       parameters:
         barmanObjectName: shared-timeline
-        serverName: shared-timeline-test
+        serverName: shared-timeline-test-plugin
