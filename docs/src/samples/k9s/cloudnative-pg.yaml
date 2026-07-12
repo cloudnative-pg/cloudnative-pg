@@ -1,4 +1,4 @@
-# Move/add to $XDG_CONFIG_HOME/k9s/plugins.yaml
+# Move/add to $XDG_CONFIG_HOME/k9s/plugins/cloudnative-pg.yaml
 # Requires the cnpg kubectl plugin. See https://cloudnative-pg.io/docs/devel/kubectl-plugin/
 #
 # Cluster actions:
