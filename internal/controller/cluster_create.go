@@ -1819,6 +1819,18 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 		return r.recreateReplicaBootstrapJob(ctx, cluster, serial, pgdataDataSource, pvcGroupComplete)
 	}
 
+	// A previous attempt may have been interrupted while creating the PVC
+	// group: recreate any missing PVC, choosing the storage source from the
+	// bootstrap configuration, before creating the Job. A Job whose Pod
+	// references a PVC that does not exist stays pending forever, and its
+	// presence blocks the rest of the reconciliation behind the running-jobs
+	// guard.
+	if !pvcGroupComplete {
+		if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, serial); !res.IsZero() || err != nil {
+			return res, err
+		}
+	}
+
 	// Set TargetPrimary defensively: if it is not set the instance manager would
 	// shut the primary down as soon as it starts (see reconcileOldPrimary).
 	if cluster.Status.TargetPrimary != instanceToCreate.Name {

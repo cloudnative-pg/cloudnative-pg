@@ -328,6 +328,59 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap Job", func
 		}
 	})
 
+	It("recreates the missing WAL PVC of the primary before creating the init Job", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		// An incomplete PVC group is classified unusable, not dangling.
+		cluster.Status.UnusablePVC = []string{primaryName}
+
+		// The first-primary bootstrap was interrupted after creating the PGDATA
+		// PVC but before the WAL PVC: creating the init Job in this state would
+		// leave its Pod pending forever on a volume that does not exist.
+		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
+			NodeSerial: 1,
+			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
+			Storage:    cluster.Spec.StorageConfiguration,
+		})
+		Expect(err).ToNot(HaveOccurred())
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		Expect(env.client.Create(ctx, pvc)).To(Succeed())
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{*pvc}},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var walPVC corev1.PersistentVolumeClaim
+		Expect(env.client.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      primaryName + "-wal",
+		}, &walPVC)).To(Succeed(), "the missing WAL PVC should have been recreated")
+		serial, err := specs.GetNodeSerial(walPVC.ObjectMeta)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(serial).To(Equal(1))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(HaveLen(1))
+		Expect(jobs.Items[0].Labels[utils.JobRoleLabelName]).To(Equal("initdb"))
+		Expect(persistentvolumeclaim.IsUsedByPodSpec(
+			jobs.Items[0].Spec.Template.Spec, primaryName, primaryName+"-wal",
+		)).To(BeTrue(), "the init Job must mount the whole PVC group")
+	})
+
 	It("fails cleanly when the primary PVC's snapshot source no longer exists", func(ctx SpecContext) {
 		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
 			c.Spec.Instances = 1
