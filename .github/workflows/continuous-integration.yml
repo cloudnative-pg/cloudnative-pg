@@ -241,7 +241,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Run govulncheck
-        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1
         with:
           go-version-file: go.mod
           # Override the default value of "stable" for go-version-input.
@@ -252,7 +252,7 @@ jobs:
           check-latest: true
 
       - name: Run govulncheck (tests module)
-        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1
         with:
           go-version-file: tests/go.mod
           go-version-input: ""
