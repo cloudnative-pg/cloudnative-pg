@@ -99,6 +99,30 @@ func List(
 	return err
 }
 
+// Patch patches an object in the Kubernetes cluster, retrying on transient
+// errors. Forwarding a mutation to an admission webhook can intermittently
+// fail with a 500/503 on any cluster that routes that hop through a proxy
+// layer (for example an apiserver-network-proxy/konnectivity), so the patch
+// is worth retrying just like objects.Get and objects.List retry reads.
+func Patch(
+	ctx context.Context,
+	crudClient client.Client,
+	object client.Object,
+	patch client.Patch,
+	opts ...client.PatchOption,
+) error {
+	err := retry.New(
+		retry.Delay(PollingTime*time.Second),
+		retry.Attempts(RetryAttempts),
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				return crudClient.Patch(ctx, object, patch, opts...)
+			},
+		)
+	return err
+}
+
 // Get retrieves an object for the given object key from the Kubernetes Cluster
 func Get(
 	ctx context.Context,
