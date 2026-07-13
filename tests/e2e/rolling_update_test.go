@@ -39,6 +39,7 @@ import (
 	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -402,7 +403,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		By("updating the catalog", func() {
 			// Update to the latest minor
 			catalog.GetSpec().Images[0].Image = updatedImageName
-			err := env.Client.Update(env.Ctx, catalog)
+			err := objects.Update(env.Ctx, env.Client, catalog)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, 900)

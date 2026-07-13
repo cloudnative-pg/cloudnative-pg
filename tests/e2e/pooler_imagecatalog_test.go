@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -153,7 +154,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 					client.ObjectKey{Namespace: namespace, Name: catalogName},
 					&catalog)).To(Succeed())
 				catalog.Spec.ComponentImages[0].Image = updatedImage
-				Expect(env.Client.Update(env.Ctx, &catalog)).To(Succeed())
+				Expect(objects.Update(env.Ctx, env.Client, &catalog)).To(Succeed())
 			})
 
 			By("verifying the pooler status image is updated after the catalog change", func() {
@@ -316,7 +317,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 				catalog.Spec.ComponentImages = []apiv1.CatalogComponentImage{
 					{Key: "nonexistent-key", Image: pgbouncerImage},
 				}
-				Expect(env.Client.Update(env.Ctx, &catalog)).To(Succeed())
+				Expect(objects.Update(env.Ctx, env.Client, &catalog)).To(Succeed())
 			})
 
 			By("verifying the pooler recovers to active and the deployment is created", func() {

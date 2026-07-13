@@ -173,7 +173,7 @@ func CopyOperatorPullSecretToServiceAccount(
 	sa.ImagePullSecrets = append(sa.ImagePullSecrets, corev1.LocalObjectReference{
 		Name: pullSecretName,
 	})
-	if err := crudClient.Patch(ctx, &sa, client.MergeFrom(original)); err != nil {
+	if err := objects.Patch(ctx, crudClient, &sa, client.MergeFrom(original)); err != nil {
 		return fmt.Errorf("while patching service account with pull secret: %w", err)
 	}
 

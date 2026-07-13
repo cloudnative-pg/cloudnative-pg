@@ -93,7 +93,7 @@ func PatchStatusCondition(
 		}
 		clusterNoConditions := cluster.DeepCopy()
 		clusterNoConditions.Status.Conditions = nil
-		return crudClient.Patch(ctx, clusterNoConditions, client.MergeFrom(cluster))
+		return objects.Patch(ctx, crudClient, clusterNoConditions, client.MergeFrom(cluster))
 	})
 	if err != nil {
 		return err
@@ -264,5 +264,5 @@ func UpgradeSubscription(
 		return err
 	}
 
-	return crudClient.Patch(ctx, newSubscription, client.MergeFrom(subscription))
+	return objects.Patch(ctx, crudClient, newSubscription, client.MergeFrom(subscription))
 }

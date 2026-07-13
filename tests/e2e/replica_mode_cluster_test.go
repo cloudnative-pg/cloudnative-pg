@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -258,7 +259,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				updateTime := time.Now().Truncate(time.Second)
 				cluster.Spec.ReplicaCluster.Enabled = ptr.To(true)
-				err = env.Client.Update(ctx, cluster)
+				err = objects.Update(ctx, env.Client, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func(g Gomega) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterOneName)
@@ -285,7 +286,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterTwoName)
 				Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
-				err = env.Client.Update(ctx, cluster)
+				err = objects.Update(ctx, env.Client, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterTwoName, testTimeouts[timeouts.ClusterIsReady])
 			})
@@ -790,7 +791,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				Expect(err).ToNot(HaveOccurred())
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.Primary = clusterBName
-				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				Expect(objects.Patch(env.Ctx, env.Client, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
@@ -821,7 +822,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = invalidToken
 				cluster.Spec.ReplicaCluster.Primary = clusterBName
-				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				Expect(objects.Patch(env.Ctx, env.Client, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 
 			By("failing to promote B with the invalid token", func() {
@@ -850,7 +851,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = token
 				cluster.Spec.ReplicaCluster.Primary = clusterBName
-				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				Expect(objects.Patch(env.Ctx, env.Client, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 
 			By("reaching the target timeline", func() {
