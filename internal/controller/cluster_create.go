@@ -1526,6 +1526,63 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
 }
 
+// recreateReplicaBootstrapJob rebuilds the bootstrap Job of a replica whose
+// PVCs exist but have no Job advancing them. Mirroring buildPrimaryInstanceJob,
+// the Job variant is decided by the PGDATA PVC's own DataSource, the
+// authoritative record of what is really on the volume: recomputing the
+// candidate storage source from the live Backup list could disagree with the
+// volume's actual content when backups or snapshots changed after the PVCs
+// were created, and a snapshot-restore Job completes successfully even against
+// a volume that was never cloned, leaving a broken replica behind an
+// apparently successful bootstrap.
+//
+// When part of the PVC group is missing, the snapshot sources the absent
+// volumes were meant to be cloned from cannot be reconstructed: recreate the
+// missing PVCs empty and rebuild the whole replica through a join, which
+// discards any existing content and takes a fresh copy from the primary.
+func (r *ClusterReconciler) recreateReplicaBootstrapJob(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	serial int,
+	pgdataDataSource *corev1.TypedLocalObjectReference,
+	pvcGroupComplete bool,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if !pvcGroupComplete {
+		pgdataDataSource = nil
+		if err := persistentvolumeclaim.CreateInstancePVCs(ctx, r.Client, cluster, nil, serial); err != nil {
+			return ctrl.Result{}, fmt.Errorf("cannot recreate the missing PVCs of instance %v: %w",
+				specs.GetInstanceName(cluster.Name, serial), err)
+		}
+	}
+
+	job := specs.JoinReplicaInstance(*cluster, serial)
+	if pgdataDataSource != nil {
+		job = specs.RestoreReplicaInstance(*cluster, serial)
+	}
+
+	contextLogger.Info("Recreating the bootstrap Job for a replica whose PVCs are not ready",
+		"job", job.Name,
+		"role", job.Labels[utils.JobRoleLabelName],
+	)
+
+	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
+		"Recreating instance %v-%v", cluster.Name, serial)
+
+	if err := r.RegisterPhase(ctx, cluster,
+		apiv1.PhaseCreatingReplica,
+		fmt.Sprintf("Creating replica %v", job.Name)); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if res, err := r.createInstanceJob(ctx, cluster, job, false); err != nil || !res.IsZero() {
+		return res, err
+	}
+
+	return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop
+}
+
 // ensureInstancesAreCreated recreates any missing instance
 func (r *ClusterReconciler) ensureInstancesAreCreated(
 	ctx context.Context,
@@ -1700,13 +1757,24 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 	}
 
 	instancePVCNames := make([]string, 0)
-	var primaryDataSource *corev1.TypedLocalObjectReference
+	var pgdataDataSource *corev1.TypedLocalObjectReference
 	for _, pvc := range persistentvolumeclaim.FilterByPodSpec(resources.pvcs.Items, instanceToCreate.Spec) {
 		instancePVCNames = append(instancePVCNames, pvc.Name)
 		if pvc.Name == instanceToCreate.Name {
-			primaryDataSource = pvc.Spec.DataSource
+			pgdataDataSource = pvc.Spec.DataSource
 		}
 	}
+
+	// A previous attempt may have been interrupted between creating the PVCs:
+	// compare the existing PVCs with the volumes the instance mounts to detect
+	// a PVC group that is missing some of its members.
+	expectedPVCCount := 0
+	for _, volume := range instanceToCreate.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			expectedPVCCount++
+		}
+	}
+	pvcGroupComplete := len(instancePVCNames) == expectedPVCCount
 
 	// If a Job is already advancing these PVCs, wait for it to complete.
 	for i := range resources.jobs.Items {
@@ -1729,11 +1797,9 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 	// guards against. Once a primary is running, joinReplicaInstance owns Job
 	// creation for replicas (it creates the Job and then the PVCs), so a
 	// podless replica PVC without a Job means a previous attempt did not get
-	// that far; recreate the join Job there.
+	// that far; recreate its bootstrap Job there.
 	if cluster.Status.CurrentPrimary != "" && instanceToCreate.Name != cluster.Status.TargetPrimary {
-		contextLogger.Info("Recreating the join Job for an instance whose PVCs are not ready",
-			"instance", instanceToCreate.Name)
-		return r.joinReplicaInstance(ctx, serial, cluster)
+		return r.recreateReplicaBootstrapJob(ctx, cluster, serial, pgdataDataSource, pvcGroupComplete)
 	}
 
 	// Set TargetPrimary defensively: if it is not set the instance manager would
@@ -1744,7 +1810,7 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 		}
 	}
 
-	job, err := r.buildPrimaryInstanceJob(ctx, cluster, serial, primaryDataSource)
+	job, err := r.buildPrimaryInstanceJob(ctx, cluster, serial, pgdataDataSource)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
