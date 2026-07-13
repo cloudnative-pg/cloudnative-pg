@@ -259,7 +259,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				updateTime := time.Now().Truncate(time.Second)
 				cluster.Spec.ReplicaCluster.Enabled = ptr.To(true)
-				err = objects.Update(env.Ctx, env.Client, cluster)
+				err = objects.Update(ctx, env.Client, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func(g Gomega) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterOneName)
@@ -286,7 +286,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterTwoName)
 				Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
-				err = objects.Update(env.Ctx, env.Client, cluster)
+				err = objects.Update(ctx, env.Client, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterTwoName, testTimeouts[timeouts.ClusterIsReady])
 			})

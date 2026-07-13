@@ -123,7 +123,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			originalCluster := cluster.DeepCopy()
 			cluster.Spec.Probes = probesConfiguration.DeepCopy()
 
-			err = objects.Patch(env.Ctx, env.Client, &cluster, client.MergeFrom(originalCluster))
+			err = objects.Patch(ctx, env.Client, &cluster, client.MergeFrom(originalCluster))
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -166,7 +166,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			originalCluster := cluster.DeepCopy()
 			cluster.Spec.Probes = &apiv1.ProbesConfiguration{}
 
-			err = objects.Patch(env.Ctx, env.Client, &cluster, client.MergeFrom(originalCluster))
+			err = objects.Patch(ctx, env.Client, &cluster, client.MergeFrom(originalCluster))
 			Expect(err).ToNot(HaveOccurred())
 		})
 
