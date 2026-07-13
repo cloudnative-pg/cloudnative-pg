@@ -508,7 +508,9 @@ wait for acknowledgments that cannot arrive.
 The `SyncReplicationTopologySatisfied` condition in the cluster status reports
 whether the placement preference is currently honored, and the
 `kubectl cnpg status` command shows how the instances are spread across the
-failure domains.
+failure domains. The condition only evaluates the cluster instances: standby
+names supplied through `standbyNamesPre` and `standbyNamesPost` are outside
+the operator's knowledge and are not part of the check.
 
 For example, the following cluster keeps two synchronous standbys, chosen from
 the instances running in a different availability zone than the primary
