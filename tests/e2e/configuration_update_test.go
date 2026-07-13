@@ -159,6 +159,8 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 
 	generateBaseCluster := func(namespace string) *apiv1.Cluster {
+		storageClass := env.DefaultStorageClass
+		Expect(storageClass).ToNot(BeEmpty())
 		return &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterName,
