@@ -163,6 +163,14 @@ you have a Kubernetes cluster and `kubectl` is configured to point to it
 (this should be the default when you are running tests locally as per the
 instructions in the above section).
 
+The test suite itself is driven exclusively by a YAML configuration file
+(`tests/e2e/config.yaml` by default): the suite reads no environment
+variables. The `hack/e2e` scripts generate that file before invoking the
+suite, using the variables below as their inputs. See
+[the e2e configuration file](#the-e2e-configuration-file) for the file format
+and for how to run the suite directly (e.g. through `ginkgo` or an IDE) with
+a hand-written file.
+
 The script can be configured through the following environment variables:
 
 - `CONTROLLER_IMG`: the controller image to deploy on K8s
@@ -212,6 +220,64 @@ Replace `-kind` with `-k3d` to run it on `k3d`.
 
 > [!IMPORTANT]
 > Upgrade tests are currently disabled with Helm deployment.
+
+### The e2e configuration file
+
+The suite is configured by a single YAML file, loaded from
+`tests/e2e/config.yaml` (relative to the suite working directory) or from the
+path passed through the `--e2e-config` flag of the test binary. When the
+default file does not exist, the suite runs with defaults: the operator
+default PostgreSQL image, `kind` as cloud vendor, medium test depth, and
+storage classes autodetected from the cluster.
+
+The `hack/e2e` scripts generate this file automatically from their
+environment (the variables documented above), right before each `ginkgo`
+invocation, through
+[`hack/e2e/generate-e2e-config.sh`](../../hack/e2e/generate-e2e-config.sh).
+The generated file may contain credentials: it is git-ignored, written with
+mode 0600, and must not be moved into directories uploaded as CI artifacts.
+
+For a direct run (plain `ginkgo`, `go test`, or an IDE) you can hand-write
+the file. All fields are optional:
+
+``` yaml
+postgres:
+  image: ghcr.io/cloudnative-pg/postgresql:18.1-standard-trixie
+  preRollingUpdateImage: ghcr.io/cloudnative-pg/postgresql:18
+  imageRepository: ghcr.io/cloudnative-pg/postgresql
+  postgisImageRepository: ghcr.io/cloudnative-pg/postgis
+storage:
+  storageClass: standard        # empty: autodetected from the cluster
+  csiStorageClass: csi-hostpath-sc
+  volumeSnapshotClass: csi-hostpath-snapclass
+cloudVendor: kind               # kind|k3d|aks|eks|gke|ocp
+depth: 2                        # 0 (only critical tests) to 4 (all tests)
+labelFilter: "backup-restore || basic"
+skipUpgradeSuite: true
+timeouts:                       # partial override of the default timeouts
+  failover: 240
+deployment:
+  method: manifest
+  barmanPluginVersion: release
+registryPullSecret:             # pull secret for a private registry
+  server: registry.example.com
+  username: user
+  password: secret
+azure:                          # Azure Blob Storage backup tests only
+  storageAccount: account
+  storageKey: key
+  blobContainer: container
+preserveNamespaces:
+  - my-namespace
+majorUpgrade:                   # postgres-trunk-containers variants only
+  imageRegistry: registry.example.com/trunk
+  skipArchiveScenario: false
+```
+
+Unknown fields are rejected, so typos fail the run immediately instead of
+being silently ignored. When `labelFilter` is set it overrides any
+`--label-filter` passed on the `ginkgo` command line; when it is empty the
+command-line filter applies as usual.
 
 ### Using feature type test selection/filter
 
@@ -272,7 +338,9 @@ live cluster during `BeforeSuite` by looking at the
 `storage.kubernetes.io/default-snapshot-class` annotations on
 StorageClass objects. You can override detection by setting the
 `E2E_DEFAULT_STORAGE_CLASS`, `E2E_CSI_STORAGE_CLASS`, and
-`E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` environment variables explicitly.
+`E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` environment variables (which the scripts
+write into the `storage` section of the configuration file), or by filling
+that section directly in a hand-written file.
 
 #### On kind
 
@@ -318,7 +386,7 @@ The Go test framework auto-detects storage class configuration from the live
 cluster (see above). You can override any value by setting
 `E2E_DEFAULT_STORAGE_CLASS`, `E2E_CSI_STORAGE_CLASS`, or
 `E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` in the environment before running the
-script.
+script, which writes them into the configuration file it generates.
 
 We have also provided a shortcut to this script in the main `Makefile`:
 
