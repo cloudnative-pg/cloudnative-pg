@@ -1783,15 +1783,21 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 	}
 
 	// A previous attempt may have been interrupted between creating the PVCs:
-	// compare the existing PVCs with the volumes the instance mounts to detect
-	// a PVC group that is missing some of its members.
-	expectedPVCCount := 0
-	for _, volume := range instanceToCreate.Spec.Volumes {
-		if volume.PersistentVolumeClaim != nil {
-			expectedPVCCount++
+	// detect a PVC group that is missing some of its members. The expected
+	// group is derived from the cluster specification, the same source the
+	// PVC classifier uses, so that a pod template customized through the
+	// podPatch annotation cannot skew the comparison.
+	pvcGroupComplete := true
+	for _, expectedName := range persistentvolumeclaim.GetExpectedInstancePVCNamesFromCluster(
+		cluster, instanceToCreate.Name,
+	) {
+		if !slices.ContainsFunc(resources.pvcs.Items, func(pvc corev1.PersistentVolumeClaim) bool {
+			return pvc.Name == expectedName
+		}) {
+			pvcGroupComplete = false
+			break
 		}
 	}
-	pvcGroupComplete := len(instancePVCNames) == expectedPVCCount
 
 	// If a Job is already advancing these PVCs, wait for it to complete.
 	for i := range resources.jobs.Items {
