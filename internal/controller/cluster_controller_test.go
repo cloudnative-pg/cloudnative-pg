@@ -194,6 +194,69 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap Job", func
 		namespace = newFakeNamespace(env.client)
 	})
 
+	It("bootstraps the first primary through the real PVC classifier handoff", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+
+		// Fresh bootstrap: no instance exists yet.
+		cluster.Status.Instances = 0
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = nil
+		cluster.Status.TargetPrimary = ""
+		cluster.Status.CurrentPrimary = ""
+
+		// First pass: createPrimaryInstance creates the PVC group, records the
+		// target primary and defers Job creation to the PVC-driven path.
+		res, err := env.clusterReconciler.createPrimaryInstance(ctx, cluster)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		Expect(cluster.Status.TargetPrimary).To(Equal(primaryName))
+
+		var pvcs corev1.PersistentVolumeClaimList
+		Expect(env.client.List(ctx, &pvcs)).To(Succeed())
+		Expect(pvcs.Items).To(HaveLen(2), "the PGDATA and WAL PVCs should have been created")
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(BeEmpty(), "createPrimaryInstance must not create the Job itself")
+
+		// Any client write-back strips TypeMeta from the in-memory object (see
+		// the note in newFakeCNPGCluster): restore it as the fresh Get of the
+		// next reconciliation pass would see it, since the Job ownership set by
+		// the specs builders copies it verbatim.
+		cluster.TypeMeta = metav1.TypeMeta{
+			Kind:       apiv1.ClusterKind,
+			APIVersion: apiv1.SchemeGroupVersion.String(),
+		}
+
+		// Next pass: the production classifier computes the PVC buckets the
+		// routing consumes. The PVC phase is set by the PV controller in a real
+		// cluster; mirror it in memory before classifying.
+		for i := range pvcs.Items {
+			pvcs.Items[i].Status.Phase = corev1.ClaimBound
+		}
+		persistentvolumeclaim.EnrichStatus(ctx, cluster, nil, nil, pvcs.Items)
+		Expect(cluster.Status.Instances).To(Equal(1))
+		Expect(cluster.Status.DanglingPVC).ToNot(BeEmpty())
+
+		resources := &managedResources{pvcs: pvcs}
+		res, err = env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(HaveLen(1), "the init Job should be created off the classified PVC state")
+		Expect(jobs.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(primaryName))
+		Expect(jobs.Items[0].Labels[utils.JobRoleLabelName]).To(Equal("initdb"))
+		Expect(persistentvolumeclaim.IsUsedByPodSpec(
+			jobs.Items[0].Spec.Template.Spec, primaryName, primaryName+"-wal",
+		)).To(BeTrue(), "the init Job must mount the whole PVC group")
+	})
+
 	It("recreates the initdb Job reusing serial 1 when the primary PVC is stuck initializing", func(ctx SpecContext) {
 		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
 			c.Spec.Instances = 1
