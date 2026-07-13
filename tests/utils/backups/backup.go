@@ -22,7 +22,6 @@ package backups
 import (
 	"context"
 	"fmt"
-	"os"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/onsi/gomega"
@@ -32,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -225,7 +225,7 @@ func CreateClusterFromBackupUsingPITR(
 	if err != nil {
 		return nil, err
 	}
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	storageClassName := config.Current().Storage.StorageClass
 	restoreCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
@@ -286,7 +286,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnObjectStore(
 	sourceClusterName,
 	targetTime string,
 ) (*apiv1.Cluster, error) {
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	storageClassName := config.Current().Storage.StorageClass
 
 	restoreCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -379,7 +379,7 @@ func CreateClusterFromExternalClusterBackupWithPITRUsingPlugin(
 	pluginName,
 	targetTime string,
 ) (*apiv1.Cluster, error) {
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	storageClassName := config.Current().Storage.StorageClass
 
 	restoreCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{

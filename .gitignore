@@ -23,6 +23,7 @@
 _*/
 tests/e2e/out/
 tests/e2e/*_logs/
+tests/e2e/config.yaml
 
 # goreleaser
 /dist/

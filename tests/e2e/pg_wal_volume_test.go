@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -104,7 +103,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
-			WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+			WalStorageClass := env.DefaultStorageClass
 			cluster.Spec.WalStorage = &apiv1.StorageConfiguration{
 				Size:         "1Gi",
 				StorageClass: &WalStorageClass,

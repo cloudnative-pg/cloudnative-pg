@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -34,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
@@ -141,7 +141,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 			Expect(err).ToNot(HaveOccurred())
 			Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-			Expect(storage.SetSnapshotNameAsEnv(&snapshotList, backup, storage.EnvVarsForSnapshots{
+			Expect(storage.SetSnapshotTemplateVariables(&snapshotList, backup, storage.SnapshotTemplateVariables{
 				DataSnapshot: dataEnv,
 				WalSnapshot:  walEnv,
 			})).To(Succeed())
@@ -209,17 +209,14 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 			})
 
 			It("correctly executes PITR with a cold snapshot", func() {
-				DeferCleanup(func() error {
-					for _, envvar := range []string{
+				DeferCleanup(func() {
+					for _, templateVar := range []string{
 						snapshotDataEnv,
 						snapshotWalEnv,
 						recoveryTargetTimeEnv,
 					} {
-						if err := os.Unsetenv(envvar); err != nil {
-							return err
-						}
+						config.UnsetTemplateVariable(templateVar)
 					}
-					return nil
 				})
 
 				By("creating the cluster to snapshot, archiving through the plugin", func() {
@@ -262,8 +259,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 						namespace, clusterName,
 					)
 					Expect(err).ToNot(HaveOccurred())
-					err = os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
-					Expect(err).ToNot(HaveOccurred())
+					config.SetTemplateVariable(recoveryTargetTimeEnv, recoveryTargetTime)
 
 					forward, conn, err := postgres.ForwardPSQLConnection(
 						env.Ctx,
@@ -370,12 +366,9 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 			})
 
 			It("should execute a backup with online set to true", func() {
-				DeferCleanup(func() error {
-					if err := os.Unsetenv(snapshotDataEnv); err != nil {
-						return err
-					}
-
-					return os.Unsetenv(snapshotWalEnv)
+				DeferCleanup(func() {
+					config.UnsetTemplateVariable(snapshotDataEnv)
+					config.UnsetTemplateVariable(snapshotWalEnv)
 				})
 
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {

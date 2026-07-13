@@ -22,15 +22,12 @@ package cloudvendors
 
 import (
 	"fmt"
-	"os"
+
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 )
 
 // TestEnvVendor is the type of cloud vendor the e2e test is running on
 type TestEnvVendor string
-
-// testVendorEnvVarName holds the env variable name used externally to
-// define a specific cloud vendor
-const testVendorEnvVarName = "TEST_CLOUD_VENDOR"
 
 // AKS azure cloud cluster
 var AKS = TestEnvVendor("aks")
@@ -61,16 +58,11 @@ var vendors = map[string]*TestEnvVendor{
 
 // TestCloudVendor creates the environment for testing
 func TestCloudVendor() (*TestEnvVendor, error) {
-	vendorEnv, exists := os.LookupEnv(testVendorEnvVarName)
-	if exists {
-		if vendor, ok := vendors[vendorEnv]; ok {
-			return vendor, nil
-		}
-		return nil, fmt.Errorf("unknown cloud vendor %s", vendorEnv)
+	vendorName := config.Current().CloudVendor
+	if vendor, ok := vendors[vendorName]; ok {
+		return vendor, nil
 	}
-
-	// if none above, it is a kind
-	return &KIND, nil
+	return nil, fmt.Errorf("unknown cloud vendor %s", vendorName)
 }
 
 // EnvProfile represents the capabilities of different cloud environments for testing
