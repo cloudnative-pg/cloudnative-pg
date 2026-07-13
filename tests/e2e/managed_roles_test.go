@@ -293,7 +293,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				updated.Spec.Managed.Roles[0].CreateDB = expectedCreateDB
 				updated.Spec.Managed.Roles[0].CreateRole = expectedCreateRole
 				updated.Spec.Managed.Roles[0].ConnectionLimit = expectedConnLmt
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -325,7 +325,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(err).ToNot(HaveOccurred())
 				updated := cluster.DeepCopy()
 				updated.Spec.Managed.Roles[0].Login = true
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -364,7 +364,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					Name: newUserName,
 				}
 				updated.Spec.Managed.Roles = append(updated.Spec.Managed.Roles, role)
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -394,7 +394,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						updated.Spec.Managed.Roles[i].Comment = ""
 					}
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -427,7 +427,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						updated.Spec.Managed.Roles[i].InRoles = []string{username}
 					}
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func() int {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -452,7 +452,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						}
 					}
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func(g Gomega) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -474,7 +474,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						}
 					}
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func(g Gomega) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -494,7 +494,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						updated.Spec.Managed.Roles[i].InRoles = []string{unrealizableUser}
 					}
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 				// user not changed
 				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPod, postgres.PostgresDBName,
@@ -578,7 +578,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					}
 				}
 
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -608,7 +608,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						updated.Spec.Managed.Roles[i].Ensure = apiv1.EnsureAbsent
 					}
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
