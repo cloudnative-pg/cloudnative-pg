@@ -328,6 +328,97 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap Job", func
 		}
 	})
 
+	It("fails cleanly when the primary PVC's snapshot source no longer exists", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					VolumeSnapshots: &apiv1.DataSource{
+						Storage: corev1.TypedLocalObjectReference{
+							APIGroup: ptr.To(volumesnapshotv1.GroupName),
+							Kind:     apiv1.VolumeSnapshotKind,
+							Name:     "bootstrap-snapshot",
+						},
+					},
+				},
+			}
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		// The PGDATA PVC was cloned from a snapshot that has since been
+		// deleted: the bootstrap Job cannot be rebuilt without its metadata,
+		// and the reconciler must fail with a clear error instead of
+		// dereferencing the missing source.
+		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
+			NodeSerial: 1,
+			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
+			Storage:    cluster.Spec.StorageConfiguration,
+			Source: &corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To(volumesnapshotv1.GroupName),
+				Kind:     apiv1.VolumeSnapshotKind,
+				Name:     "bootstrap-snapshot",
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		Expect(env.client.Create(ctx, pvc)).To(Succeed())
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{*pvc}},
+		}
+
+		_, err = env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).To(HaveOccurred())
+		Expect(err).ToNot(MatchError(ErrNextLoop))
+		Expect(err.Error()).To(ContainSubstring("no longer exists"))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(BeEmpty(), "no Job should be created when the recovery source is gone")
+	})
+
+	It("fails cleanly when the Backup the primary recovers from no longer exists", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					Backup: &apiv1.BackupSource{
+						LocalObjectReference: apiv1.LocalObjectReference{Name: "vanished-backup"},
+					},
+				},
+			}
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		pvcGroup := newFakePVC(env.client, cluster, 1, persistentvolumeclaim.StatusInitializing)
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: pvcGroup},
+		}
+
+		_, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).To(HaveOccurred())
+		Expect(err).ToNot(MatchError(ErrNextLoop))
+		Expect(err.Error()).To(ContainSubstring("vanished-backup"))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(BeEmpty(), "no Job should be created when the origin Backup is gone")
+	})
+
 	It("recreates a snapshot-restore Job when the replica PVC was cloned from a volume snapshot", func(ctx SpecContext) {
 		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
 			c.Spec.Instances = 2
