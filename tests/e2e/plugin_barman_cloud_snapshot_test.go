@@ -54,8 +54,7 @@ import (
 // backup is still taken with the native volumeSnapshot method, but WAL archiving
 // (and the WAL source used during recovery) goes through plugin-barman-cloud
 // rather than the deprecated in-core barmanObjectStore. The in-core variants are
-// left in place. Runs on kind/k3d only, where the plugin and the shared object
-// store are installed.
+// left in place.
 var _ = Describe("plugin-barman-cloud volume snapshots",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelSnapshot, tests.LabelBackupRestore), func() {
 		const level = tests.High
@@ -64,8 +63,8 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
+			if IsOpenshift() {
+				Skip("This test case is not applicable on OpenShift clusters")
 			}
 		})
 
