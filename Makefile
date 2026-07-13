@@ -59,7 +59,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.21.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
 CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.16.0
+GORELEASER_VERSION ?= v2.17.0
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
 SPELLCHECK_VERSION ?= 0.63.0@sha256:66991f6dec77ecddc48df138cab6661f2635e8946972f7b8f40a243b406ad2cd
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
