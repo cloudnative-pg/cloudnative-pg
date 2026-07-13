@@ -259,7 +259,7 @@ func ScaleSize(
 	}
 	originalCluster := cluster.DeepCopy()
 	cluster.Spec.Instances = newClusterSize
-	err = crudClient.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+	err = objects.Patch(ctx, crudClient, cluster, client.MergeFrom(originalCluster))
 	if err != nil {
 		return err
 	}

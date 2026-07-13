@@ -34,6 +34,7 @@ import (
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -146,7 +147,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			originPVC := primaryWALPVC.DeepCopy()
 			newSize := *resource.NewScaledQuantity(2, resource.Giga)
 			primaryWALPVC.Spec.Resources.Requests[corev1.ResourceStorage] = newSize
-			Expect(env.Client.Patch(env.Ctx, primaryWALPVC, ctrlclient.MergeFrom(originPVC))).To(Succeed())
+			Expect(objects.Patch(env.Ctx, env.Client, primaryWALPVC, ctrlclient.MergeFrom(originPVC))).To(Succeed())
 			Eventually(func(g Gomega) int64 {
 				err := env.Client.Get(env.Ctx,
 					types.NamespacedName{Namespace: primaryPod.Namespace, Name: primaryWALPVC.Name},
