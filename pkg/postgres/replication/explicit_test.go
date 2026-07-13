@@ -194,6 +194,37 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				StandbyNames: []string{"three", "two", "one"},
 			}))
 		})
+
+		It("keeps the full instance list when the cross-domain replicas are fewer than the requested number", func() {
+			cluster := createFakeCluster("example")
+			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+				Method:                apiv1.SynchronousReplicaConfigurationMethodFirst,
+				Number:                2,
+				NodeFailureDomainKeys: []string{"topology.kubernetes.io/zone"},
+			}
+			cluster.Status = apiv1.ClusterStatus{
+				CurrentPrimary: "one",
+				InstancesStatus: map[apiv1.PodStatus][]string{
+					apiv1.PodHealthy: {"one", "two", "three"},
+				},
+				Topology: apiv1.Topology{
+					SuccessfullyExtracted: true,
+					Instances: map[apiv1.PodName]apiv1.PodTopologyLabels{
+						"one":   {"topology.kubernetes.io/zone": "az1"},
+						"two":   {"topology.kubernetes.io/zone": "az1"},
+						"three": {"topology.kubernetes.io/zone": "az2"},
+					},
+				},
+			}
+
+			// a filtered list with a single name and two required
+			// acknowledgments would block every synchronous commit
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      2,
+				StandbyNames: []string{"three", "two", "one"},
+			}))
+		})
 	})
 
 	When("Data durability is preferred", func() {
@@ -364,6 +395,36 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				StandbyNames: []string{"three", "two"},
 			}))
 		})
+
+		It("applies the constraint with a single cross-domain replica, capping the required number", func() {
+			cluster := createFakeCluster("example")
+			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+				DataDurability:        apiv1.DataDurabilityLevelPreferred,
+				Method:                apiv1.SynchronousReplicaConfigurationMethodFirst,
+				Number:                2,
+				NodeFailureDomainKeys: []string{"topology.kubernetes.io/zone"},
+			}
+			cluster.Status = apiv1.ClusterStatus{
+				CurrentPrimary: "one",
+				InstancesStatus: map[apiv1.PodStatus][]string{
+					apiv1.PodHealthy: {"one", "two", "three"},
+				},
+				Topology: apiv1.Topology{
+					SuccessfullyExtracted: true,
+					Instances: map[apiv1.PodName]apiv1.PodTopologyLabels{
+						"one":   {"topology.kubernetes.io/zone": "az1"},
+						"two":   {"topology.kubernetes.io/zone": "az1"},
+						"three": {"topology.kubernetes.io/zone": "az2"},
+					},
+				},
+			}
+
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      1,
+				StandbyNames: []string{"three"},
+			}))
+		})
 	})
 })
 
@@ -427,6 +488,18 @@ var _ = Describe("filterCrossDomainInstances", func() {
 			replica1: {zoneLabel: "az1"},
 			replica2: {zoneLabel: "az1"},
 		}, []string{zoneLabel})
+
+		Expect(filterCrossDomainInstances(cluster, []string{replica1, replica2})).
+			To(ConsistOf(replica1, replica2))
+	})
+
+	It("returns all instances when the cross-domain instances are fewer than the requested number", func() {
+		cluster := makeClusterWithTopology(map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az1"},
+			replica2: {zoneLabel: "az2"},
+		}, []string{zoneLabel})
+		cluster.Spec.PostgresConfiguration.Synchronous.Number = 2
 
 		Expect(filterCrossDomainInstances(cluster, []string{replica1, replica2})).
 			To(ConsistOf(replica1, replica2))

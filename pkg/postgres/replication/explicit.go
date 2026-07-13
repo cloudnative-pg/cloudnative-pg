@@ -118,16 +118,32 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(
 // filterCrossDomainInstances returns only those instances that are in a different
 // failure domain than the primary, as defined by podFailureDomainKeys or
 // nodeFailureDomainKeys. If neither is set, topology extraction failed, the
-// primary has no topology entry, or no instance is in a different failure
-// domain than the primary, the original list is returned unchanged: the keys
-// express a placement preference and never degrade synchronous replication
-// below the behavior of a cluster without them.
+// primary has no topology entry, or there are not enough cross-domain
+// instances to satisfy the configured number of synchronous standbys, the
+// original list is returned unchanged: the keys express a placement
+// preference and never degrade synchronous replication below the behavior of
+// a cluster without them. In particular, with required data durability a
+// filtered list shorter than the configured number would leave transactions
+// waiting for acknowledgments that can never arrive.
 func filterCrossDomainInstances(cluster *apiv1.Cluster, instances []string) []string {
 	crossDomain, ok := crossDomainInstances(cluster, instances)
-	if !ok || len(crossDomain) == 0 {
+	if !ok || len(crossDomain) < minimumCrossDomainStandbys(cluster) {
 		return instances
 	}
 	return crossDomain
+}
+
+// minimumCrossDomainStandbys returns how many cross-domain standbys are
+// needed for the failure domain constraint to be applied. With preferred
+// data durability one standby is enough, since the number of required
+// acknowledgments is capped to the available standbys; with required data
+// durability the whole configured number must be available.
+func minimumCrossDomainStandbys(cluster *apiv1.Cluster) int {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync.DataDurability == apiv1.DataDurabilityLevelPreferred {
+		return 1
+	}
+	return sync.Number
 }
 
 // crossDomainInstances returns the instances that are in a failure domain
@@ -168,15 +184,16 @@ func crossDomainInstances(cluster *apiv1.Cluster, instances []string) ([]string,
 	return result, true
 }
 
-// ElectableCrossDomainStandbys returns the standby instances that are in a
-// failure domain different from the primary's, among the same candidates used
-// to build synchronous_standby_names for the configured data durability. The
-// second return value is false when the failure domain keys are not
-// configured or the topology cannot be used.
-func ElectableCrossDomainStandbys(cluster *apiv1.Cluster) ([]string, bool) {
+// CrossDomainConstraintSatisfied reports whether enough electable standbys
+// are in a failure domain different from the primary's for the failure
+// domain constraint to be applied to synchronous_standby_names, using the
+// same candidates and threshold as the replication path. The second return
+// value is false when the failure domain keys are not configured or the
+// topology cannot be used.
+func CrossDomainConstraintSatisfied(cluster *apiv1.Cluster) (satisfied bool, topologyUsable bool) {
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
 	if sync == nil {
-		return nil, false
+		return false, false
 	}
 
 	var candidates []string
@@ -186,7 +203,11 @@ func ElectableCrossDomainStandbys(cluster *apiv1.Cluster) ([]string, bool) {
 	default:
 		candidates = getSortedInstanceNames(cluster)
 	}
-	return crossDomainInstances(cluster, candidates)
+	crossDomain, ok := crossDomainInstances(cluster, candidates)
+	if !ok {
+		return false, false
+	}
+	return len(crossDomain) >= minimumCrossDomainStandbys(cluster), true
 }
 
 // getSortedInstanceNames gets a list of all the known PostgreSQL instances in a
