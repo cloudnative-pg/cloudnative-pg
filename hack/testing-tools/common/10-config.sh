@@ -102,15 +102,15 @@ export BARMAN_PLUGIN_VERSION=${BARMAN_PLUGIN_VERSION:-"release"}
 
 # Define default CSI driver version
 # renovate: datasource=github-releases depName=kubernetes-csi/csi-driver-host-path
-CSI_DRIVER_HOST_PATH_DEFAULT_VERSION="v1.17.0"
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION="v1.17.1"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
-EXTERNAL_SNAPSHOTTER_VERSION="v8.4.0"
+EXTERNAL_SNAPSHOTTER_VERSION="v8.6.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-provisioner
-EXTERNAL_PROVISIONER_VERSION="v6.1.0"
+EXTERNAL_PROVISIONER_VERSION="v6.3.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-resizer
-EXTERNAL_RESIZER_VERSION="v2.0.0"
+EXTERNAL_RESIZER_VERSION="v2.2.1"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-attacher
-EXTERNAL_ATTACHER_VERSION="v4.10.0"
+EXTERNAL_ATTACHER_VERSION="v4.12.0"
 
 # Exporting CSI variables for use in setup scripts
 export CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
