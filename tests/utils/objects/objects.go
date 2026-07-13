@@ -95,6 +95,17 @@ func List(
 	return err
 }
 
+// isRetryableWriteError reports whether err is a transient failure worth
+// retrying, as opposed to a decisive rejection from the API server (a stale
+// resourceVersion, a validation failure, an RBAC denial) that would recur
+// unchanged on a subsequent attempt with the same request.
+func isRetryableWriteError(err error) bool {
+	return !errors.IsConflict(err) &&
+		!errors.IsInvalid(err) &&
+		!errors.IsForbidden(err) &&
+		!errors.IsBadRequest(err)
+}
+
 // Patch patches an object in the Kubernetes cluster, retrying on transient
 // errors. Forwarding a mutation to an admission webhook can intermittently
 // fail with a 500/503 on any cluster that routes that hop through a proxy
@@ -110,7 +121,8 @@ func Patch(
 	err := retry.New(
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),
-		retry.DelayType(retry.FixedDelay)).
+		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(isRetryableWriteError)).
 		Do(
 			func() error {
 				return crudClient.Patch(ctx, object, patch, opts...)
@@ -131,7 +143,8 @@ func PatchStatus(
 	err := retry.New(
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),
-		retry.DelayType(retry.FixedDelay)).
+		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(isRetryableWriteError)).
 		Do(
 			func() error {
 				return crudClient.Status().Patch(ctx, object, patch, opts...)
@@ -160,7 +173,11 @@ func Get(
 	return err
 }
 
-// Update updates an object in the Kubernetes Cluster
+// Update updates an object in the Kubernetes Cluster, retrying on transient
+// errors. Unlike Patch, Update sends the object's resourceVersion, so a retry
+// after a successful-but-unacknowledged write would otherwise surface as a
+// spurious conflict rather than a no-op; isRetryableWriteError avoids
+// retrying that case.
 func Update(
 	ctx context.Context,
 	crudClient client.Client,
@@ -170,7 +187,8 @@ func Update(
 	err := retry.New(
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),
-		retry.DelayType(retry.FixedDelay)).
+		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(isRetryableWriteError)).
 		Do(
 			func() error {
 				return crudClient.Update(ctx, object, opts...)
