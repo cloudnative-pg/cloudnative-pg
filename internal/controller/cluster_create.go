@@ -1243,8 +1243,8 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 // buildPrimaryInstanceJob builds the bootstrap Job for the first primary
 // instance, selecting the variant (initdb, recovery, pgBaseBackup or volume
 // snapshot restore) according to the cluster bootstrap configuration. It is
-// invoked both at first-primary creation and from the unified
-// PVC-state-driven path when an initializing primary PVC has no Job yet.
+// invoked from the unified PVC-state-driven path (ensureInstanceBootstrapJob)
+// when an initializing primary PVC has no Job advancing it.
 //
 // dataSource is the PGDATA PVC's own Spec.DataSource, if any: since the PVC
 // already exists by the time this runs, its DataSource is the authoritative
@@ -1268,6 +1268,16 @@ func (r *ClusterReconciler) buildPrimaryInstanceJob(
 		if err != nil {
 			return nil, err
 		}
+		// getOriginBackup tolerates a missing Backup object by returning nil:
+		// fail here rather than building a Job that points to a recovery
+		// source that no longer exists.
+		if backup == nil && cluster.Spec.Bootstrap.Recovery.Backup != nil {
+			return nil, fmt.Errorf(
+				"cannot build the bootstrap Job for instance %v: the Backup %q it recovers from no longer exists",
+				specs.GetInstanceName(cluster.Name, nodeSerial),
+				cluster.Spec.Bootstrap.Recovery.Backup.Name,
+			)
+		}
 	}
 
 	switch {
@@ -1280,6 +1290,13 @@ func (r *ClusterReconciler) buildPrimaryInstanceJob(
 		)
 		if err != nil {
 			return nil, err
+		}
+		if metadata == nil {
+			return nil, fmt.Errorf(
+				"cannot build the bootstrap Job for instance %v: the data source %q of its PGDATA PVC no longer exists",
+				specs.GetInstanceName(cluster.Name, nodeSerial),
+				dataSource.Name,
+			)
 		}
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
 		return specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup), nil
