@@ -28,6 +28,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -107,7 +108,7 @@ var _ = Describe("Test destroy instance", func() {
 					Equal(2),
 					"The number of PVCs is incorrect")
 
-				err = env.Client.Patch(env.Ctx, &pod, ctrlclient.MergeFrom(originalPod))
+				err = objects.Patch(env.Ctx, env.Client, &pod, ctrlclient.MergeFrom(originalPod))
 				Expect(err).ToNot(
 					HaveOccurred(),
 					"failed to patch pod with unrecoverable instance annotation")

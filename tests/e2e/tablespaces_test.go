@@ -50,6 +50,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -192,7 +193,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(cluster.Spec.Tablespaces[0].Temporary).To(BeFalse())
 				updatedCluster := cluster.DeepCopy()
 				updatedCluster.Spec.Tablespaces[0].Temporary = true
-				err = env.Client.Patch(env.Ctx, updatedCluster, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updatedCluster, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 
 				cluster = updatedCluster
@@ -848,7 +849,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 				updated := cluster.DeepCopy()
 				updated.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("waiting for the cluster to be ready", func() {
@@ -874,7 +875,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						},
 					},
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 
 				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -912,7 +913,7 @@ func addTablespaces(cluster *apiv1.Cluster, tbsSlice []apiv1.TablespaceConfigura
 	updated := cluster.DeepCopy()
 	updated.Spec.Tablespaces = append(updated.Spec.Tablespaces, tbsSlice...)
 
-	err := env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+	err := objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 	Expect(err).ToNot(HaveOccurred())
 }
 
@@ -923,7 +924,7 @@ func updateTablespaceOwner(cluster *apiv1.Cluster, tablespaceName, newOwner stri
 			updated.Spec.Tablespaces[idx].Owner.Name = newOwner
 		}
 	}
-	err := env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+	err := objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 	Expect(err).ToNot(HaveOccurred())
 }
 
@@ -1323,7 +1324,7 @@ func hibernateOn(
 		originCluster := cluster.DeepCopy()
 		cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOn
 
-		err = crudClient.Patch(context.Background(), cluster, client.MergeFrom(originCluster))
+		err = objects.Patch(context.Background(), crudClient, cluster, client.MergeFrom(originCluster))
 		return err
 	default:
 		return fmt.Errorf("unknown method: %v", method)
@@ -1349,7 +1350,7 @@ func hibernateOff(
 		originCluster := cluster.DeepCopy()
 		cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOff
 
-		err = crudClient.Patch(context.Background(), cluster, client.MergeFrom(originCluster))
+		err = objects.Patch(context.Background(), crudClient, cluster, client.MergeFrom(originCluster))
 		return err
 	default:
 		return fmt.Errorf("unknown method: %v", method)

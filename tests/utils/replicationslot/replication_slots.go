@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 )
 
 // PrintReplicationSlots prints replications slots with their restart_lsn
@@ -227,7 +228,7 @@ func ToggleHAReplicationSlots(
 	}
 
 	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(enable)
-	err = crudClient.Patch(ctx, clusterToggle, client.MergeFrom(cluster))
+	err = objects.Patch(ctx, crudClient, clusterToggle, client.MergeFrom(cluster))
 	if err != nil {
 		return err
 	}
@@ -255,7 +256,7 @@ func ToggleSynchronizeReplicationSlots(
 	}
 
 	clusterToggle.Spec.ReplicationSlots.SynchronizeReplicas.Enabled = ptr.To(enable)
-	err = crudClient.Patch(ctx, clusterToggle, client.MergeFrom(cluster))
+	err = objects.Patch(ctx, crudClient, clusterToggle, client.MergeFrom(cluster))
 	if err != nil {
 		return err
 	}

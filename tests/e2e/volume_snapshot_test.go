@@ -45,6 +45,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -570,7 +571,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 					updated := cluster.DeepCopy()
 					updated.Spec.Instances = 1
-					err = env.Client.Patch(env.Ctx, updated, k8client.MergeFrom(cluster))
+					err = objects.Patch(env.Ctx, env.Client, updated, k8client.MergeFrom(cluster))
 					Expect(err).ToNot(HaveOccurred())
 				})
 

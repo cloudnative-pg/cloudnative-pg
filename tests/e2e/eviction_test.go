@@ -34,6 +34,7 @@ import (
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -81,7 +82,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		pod.Status.Phase = "Failed"
 		pod.Status.Reason = "Evicted"
 		// Patching the Pod status
-		err = env.Client.Status().Patch(env.Ctx, &pod, patch)
+		err = objects.PatchStatus(env.Ctx, env.Client, &pod, patch)
 		if err != nil {
 			return fmt.Errorf("failed to patch status for Pod: %v", pod.Name)
 		}

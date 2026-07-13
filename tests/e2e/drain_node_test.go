@@ -35,6 +35,7 @@ import (
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -604,7 +605,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 					updated := cluster.DeepCopy()
 					updated.Spec.EnablePDB = ptr.To(true)
-					err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+					err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 					Expect(err).ToNot(HaveOccurred())
 				})
 
