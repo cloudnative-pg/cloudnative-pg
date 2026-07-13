@@ -7071,7 +7071,7 @@ var _ = Describe("getFailureDomainTopologyWarnings", func() {
 				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
 				Status:  metav1.ConditionTrue,
 				Reason:  string(apiv1.ConditionReasonTopologySatisfied),
-				Message: "At least one synchronous replica is in a different failure domain than the primary.",
+				Message: "Enough electable synchronous standbys are in a different failure domain than the primary.",
 			},
 		})
 		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
@@ -7088,13 +7088,13 @@ var _ = Describe("getFailureDomainTopologyWarnings", func() {
 				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
 				Status:  metav1.ConditionFalse,
 				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
-				Message: "No synchronous replica in a different failure domain than the primary exists.",
+				Message: "Not enough electable synchronous standbys in a different failure domain than the primary.",
 			},
 		})
 		warnings := getFailureDomainTopologyWarnings(cluster)
 		Expect(warnings).To(HaveLen(1))
 		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
-		Expect(warnings[0]).To(ContainSubstring("No synchronous replica"))
+		Expect(warnings[0]).To(ContainSubstring("Not enough electable synchronous standbys"))
 	})
 
 	It("returns a warning when the condition is False due to topology not extracted", func() {

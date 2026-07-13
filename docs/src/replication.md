@@ -494,14 +494,16 @@ the `syncReplicaElectionConstraint` option of the deprecated API. Two
 instances belong to the same failure domain when all the listed labels carry
 the same values.
 
-When at least one eligible standby is in a failure domain different from the
-primary's, only the standbys outside the primary's failure domain are used to
-populate `synchronous_standby_names`. The keys express a placement preference:
-when no eligible standby is in a different failure domain, or the topology
-cannot be extracted (for example, the node hosting a pod was deleted, or a
-label listed in `podFailureDomainKeys` is missing from a pod), the constraint
-is not applied and the synchronous standbys are selected as if the keys were
-not configured.
+When the standbys in failure domains different from the primary's are enough
+to satisfy the configured `number` of synchronous standbys (with `preferred`
+data durability, one is enough), only the standbys outside the primary's
+failure domain are used to populate `synchronous_standby_names`. The keys
+express a placement preference: when the cross-domain standbys are not
+enough, or the topology cannot be extracted (for example, the node hosting a
+pod was deleted, or a label listed in `podFailureDomainKeys` is missing from
+a pod), the constraint is not applied and the synchronous standbys are
+selected as if the keys were not configured, so that write transactions never
+wait for acknowledgments that cannot arrive.
 
 The `SyncReplicationTopologySatisfied` condition in the cluster status reports
 whether the placement preference is currently honored, and the

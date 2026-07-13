@@ -792,6 +792,22 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
 		})
 
+		It("sets condition to False when the cross-domain replicas are fewer than the requested number", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az1"},
+				"pod-3": {zoneLabel: "az2"},
+			}, true)
+			// with required data durability the constraint is applied only when
+			// the cross-domain replicas cover the whole requested number
+			cluster.Spec.PostgresConfiguration.Synchronous.Number = 2
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
+		})
+
 		It("sets condition to False when the cluster has no replicas", func() {
 			cluster := makeCluster([]string{zoneLabel}, "primary-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
 				"primary-1": {zoneLabel: "az1"},

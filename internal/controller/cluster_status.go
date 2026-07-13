@@ -925,24 +925,25 @@ func updateSyncReplicationTopologyCondition(cluster *apiv1.Cluster) {
 		return
 	}
 
-	// use the same candidates and filtering criterion used to build
+	// use the same candidates and threshold used to build
 	// synchronous_standby_names, so that the condition cannot diverge from
 	// what the replication path actually elects
-	if crossDomainStandbys, _ := replication.ElectableCrossDomainStandbys(cluster); len(crossDomainStandbys) > 0 {
+	if satisfied, _ := replication.CrossDomainConstraintSatisfied(cluster); satisfied {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
 			Status:  metav1.ConditionTrue,
 			Reason:  string(apiv1.ConditionReasonTopologySatisfied),
-			Message: "At least one electable synchronous standby is in a different failure domain than the primary.",
+			Message: "Enough electable synchronous standbys are in a different failure domain than the primary.",
 		})
 		return
 	}
 
 	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
-		Status:  metav1.ConditionFalse,
-		Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
-		Message: "No electable synchronous standby in a different failure domain than the primary exists.",
+		Type:   string(apiv1.ConditionSyncReplicationTopologySatisfied),
+		Status: metav1.ConditionFalse,
+		Reason: string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+		Message: "Not enough electable synchronous standbys in a different failure domain than the primary; " +
+			"the failure domain constraint is not applied.",
 	})
 }
 
