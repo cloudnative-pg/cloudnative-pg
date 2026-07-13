@@ -40,7 +40,6 @@ import (
 // recreated from the backup. It verifies tablespaces survive a plugin
 // backup/restore round-trip; the in-core variant (which shares its cluster with
 // owner/temporary-tablespace and volume-snapshot sub-tests) is left in place.
-// Runs on kind/k3d only.
 var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelTablespaces, tests.LabelBackupRestore), func() {
 		const (
@@ -59,8 +58,8 @@ var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
+			if IsOpenshift() {
+				Skip("This test case is not applicable on OpenShift clusters")
 			}
 		})
 
