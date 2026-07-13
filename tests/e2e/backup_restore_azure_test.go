@@ -45,7 +45,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 	const (
 		tableName = "to_restore"
 	)
-	AzureConfiguration := backups.NewAzureConfigurationFromEnv()
+	AzureConfiguration := backups.NewAzureConfiguration()
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(tests.High) {
@@ -232,7 +232,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 	)
 
 	currentTimestamp := new(string)
-	AzureConfiguration := backups.NewAzureConfigurationFromEnv()
+	AzureConfiguration := backups.NewAzureConfiguration()
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {

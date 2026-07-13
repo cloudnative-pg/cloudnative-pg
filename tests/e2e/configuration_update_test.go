@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -159,7 +158,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 
 	generateBaseCluster := func(namespace string) *apiv1.Cluster {
-		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		storageClass := env.DefaultStorageClass
 		Expect(storageClass).ToNot(BeEmpty())
 
 		return &apiv1.Cluster{

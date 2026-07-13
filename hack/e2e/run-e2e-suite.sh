@@ -25,6 +25,7 @@ set -eEuo pipefail
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 FEATURE_TYPE=${FEATURE_TYPE:-""}
 readonly ROOT_DIR
+source "${ROOT_DIR}/hack/e2e/generate-e2e-config.sh"
 
 if [ "${DEBUG-}" = true ]; then
   set -x
@@ -57,14 +58,11 @@ go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
 
-LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
-readonly LABEL_FILTERS
-
-echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
+echo "E2E tests are running with the following feature types: ${FEATURE_TYPE:-<all>}"
 
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
 RC_GINKGO=0
-export TEST_SKIP_UPGRADE=true
+generate_e2e_config true
 cd "${ROOT_DIR}/tests"
 
 # E2E_GINKGO_NODES overrides everything below when set, for pinning
@@ -102,7 +100,6 @@ else
 fi
 
 ginkgo --nodes="${GINKGO_NODES}" --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
-      ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
       ${GITHUB_ACTIONS:+--github-output} --force-newlines \
       --output-dir "${ROOT_DIR}/tests/e2e/out/" \
       --json-report  "report.json" -v ./e2e/... || RC_GINKGO=$?
