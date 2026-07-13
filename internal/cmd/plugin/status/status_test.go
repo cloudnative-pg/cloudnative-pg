@@ -129,6 +129,11 @@ var _ = Describe("groupInstancesByFailureDomain", func() {
 	) *apiv1.Cluster {
 		cluster := &apiv1.Cluster{}
 		cluster.Status.CurrentPrimary = primary
+		names := make([]string, 0, len(instances))
+		for name := range instances {
+			names = append(names, string(name))
+		}
+		cluster.Status.InstancesStatus = map[apiv1.PodStatus][]string{apiv1.PodHealthy: names}
 		cluster.Status.Topology = apiv1.Topology{
 			SuccessfullyExtracted: extracted,
 			Instances:             instances,
@@ -182,6 +187,21 @@ var _ = Describe("groupInstancesByFailureDomain", func() {
 		groups := groupInstancesByFailureDomain(cluster)
 		Expect(groups).To(HaveLen(1))
 		Expect(groups[0].hasPrimary).To(BeTrue())
+	})
+
+	It("marks instances that are not ready", func() {
+		cluster := makeCluster([]string{zoneLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az2"},
+		}, true)
+		cluster.Status.InstancesStatus = map[apiv1.PodStatus][]string{
+			apiv1.PodHealthy: {primary},
+			apiv1.PodFailed:  {replica1},
+		}
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(2))
+		Expect(groups[1].instances).To(ConsistOf(replica1 + " (not ready)"))
 	})
 
 	It("renders an empty label value as <empty>", func() {

@@ -1460,6 +1460,11 @@ func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup 
 	}
 	sort.Strings(instanceNames)
 
+	healthyInstances := make(map[string]bool, len(instanceNames))
+	for _, name := range cluster.Status.InstancesStatus[apiv1.PodHealthy] {
+		healthyInstances[name] = true
+	}
+
 	groupMap := make(map[string]*failureDomainGroup)
 	groupOrder := make([]string, 0)
 
@@ -1488,10 +1493,15 @@ func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup 
 			groupOrder = append(groupOrder, sig)
 		}
 		g := groupMap[sig]
-		g.instances = append(g.instances, name)
 		if name == cluster.Status.CurrentPrimary {
 			g.hasPrimary = true
 		}
+		// mark instances that cannot be elected as synchronous standbys, so
+		// the table cannot be read as contradicting the topology condition
+		if !healthyInstances[name] {
+			name += " (not ready)"
+		}
+		g.instances = append(g.instances, name)
 	}
 
 	result := make([]failureDomainGroup, len(groupOrder))
