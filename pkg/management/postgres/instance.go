@@ -212,6 +212,14 @@ type Instance struct {
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
 
+	// walReplayErrorDetected is set to true when the instance manager detects
+	// a fatal WAL replay error pattern in the PostgreSQL log output (e.g.
+	// "record with incorrect prev-link" or "contrecord is requested by").
+	// While the flag is set the readiness probe will fail so that Kubernetes
+	// stops routing traffic to this replica and the operator excludes it from
+	// failover candidate selection.
+	walReplayErrorDetected atomic.Bool
+
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
 	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
 
@@ -290,6 +298,27 @@ func (instance *Instance) CanCheckReadiness() bool {
 // MightBeUnavailable checks whether we expect the instance to be down
 func (instance *Instance) MightBeUnavailable() bool {
 	return instance.mightBeUnavailable.Load()
+}
+
+// HasWALReplayErrorDetected returns true when the instance manager has
+// detected a fatal WAL replay error pattern in the PostgreSQL log output.
+// While this flag is set the replica is considered unhealthy.
+func (instance *Instance) HasWALReplayErrorDetected() bool {
+	return instance.walReplayErrorDetected.Load()
+}
+
+// SetWALReplayErrorDetected marks the instance as having encountered an
+// unrecoverable WAL replay error. The flag is read by the readiness probe
+// and the /pg/status handler.
+func (instance *Instance) SetWALReplayErrorDetected() {
+	instance.walReplayErrorDetected.Store(true)
+}
+
+// ResetWALReplayErrorDetected clears the WAL replay error flag. This must be
+// called each time PostgreSQL starts (or restarts) so that a fresh process
+// gets a clean slate.
+func (instance *Instance) ResetWALReplayErrorDetected() {
+	instance.walReplayErrorDetected.Store(false)
 }
 
 // SetFencing marks whether the instance is fenced, if enabling, marks also any down to be tolerated
@@ -831,9 +860,18 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 		}
 	}()
 
-	rawPipe := logpipe.NewRawLineLogPipe(
+	// Clear any WAL replay error that may have been set by a previous PostgreSQL
+	// process so that a fresh restart begins with a clean slate.
+	instance.ResetWALReplayErrorDetected()
+
+	// Use the observer variant of the raw log pipe so that the WAL replay error
+	// detector shares the single FIFO reader, avoiding FIFO fan-out issues that
+	// would occur if a second goroutine opened the same FIFO independently.
+	walErrorObserver := instance.buildWALReplayErrorObserver()
+	rawPipe := logpipe.NewRawLineLogPipeWithObserver(
 		filepath.Join(postgres.LogPath, postgres.LogFileName),
 		logpipe.LoggingCollectorRecordName,
+		walErrorObserver,
 	)
 	go func() {
 		if err := rawPipe.Start(ctx); err != nil {
@@ -870,6 +908,28 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 
 	return inner()
 }
+
+// buildWALReplayErrorObserver returns a function suitable for use as the
+// lineObserver argument of logpipe.NewRawLineLogPipeWithObserver.
+// It scans each raw log line for the known fatal WAL replay error patterns
+// and sets the instance's walReplayErrorDetected flag on first match.
+func (instance *Instance) buildWALReplayErrorObserver() func(line []byte) {
+	triggered := false
+	return func(line []byte) {
+		if triggered {
+			return
+		}
+		if logpipe.IsWALReplayErrorLine(string(line)) {
+			log.Warning("Detected unrecoverable WAL replay error in PostgreSQL log;"+
+				" marking replica as unhealthy",
+				"logLine", string(line),
+			)
+			triggered = true
+			instance.SetWALReplayErrorDetected()
+		}
+	}
+}
+
 
 // GetSuperUserDB gets a connection to the "postgres" database on this instance
 func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
