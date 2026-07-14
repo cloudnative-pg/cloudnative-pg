@@ -80,6 +80,15 @@ func (r *PoolerReconciler) updateDeployment(
 	// either Phase=Failed (catalog currently broken) or Status.Image is empty
 	// (no prior success). Unrelated spec changes wait until
 	// updatePoolerStatus resolves the image again.
+	// If the image is empty but the phase is not failed, we attempt to resolve
+	// the image in-memory (this is needed when running with older CRDs where
+	// status.image and status.phase are stripped by the API server).
+	if pooler.Status.Image == "" && pooler.Status.Phase != apiv1.PoolerPhaseFailed {
+		if resolvedImage, err := r.resolvePoolerImage(ctx, pooler); err == nil {
+			pooler.Status.Image = resolvedImage
+		}
+	}
+
 	if pooler.Status.Phase == apiv1.PoolerPhaseFailed || pooler.Status.Image == "" {
 		contextLog.Info("Skipping deployment reconciliation: pgbouncer image is not resolved",
 			"phase", pooler.Status.Phase,
