@@ -832,18 +832,26 @@ func getPodsTopology(
 	for _, pod := range pods {
 		podName := apiv1.PodName(pod.Name)
 		data[podName] = make(map[string]string, 0)
-		node, ok := nodes[pod.Spec.NodeName]
-		if !ok {
-			// node not found, it means that:
-			// - the node could have been drained
-			// - others
-			contextLogger.Debug("node not found, skipping pod topology matching")
-			return apiv1.Topology{}
-		}
-
 		nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
 
 		for _, labelName := range topology.NodeLabelsAntiAffinity {
+			// Prefer pod labels: KEP-4742 propagates node topology labels onto pods
+			// during scheduling, making a node fetch unnecessary on Kubernetes 1.35+.
+			if value, ok := pod.Labels[labelName]; ok {
+				data[podName][labelName] = value
+				continue
+			}
+
+			// Fall back to reading from the node object for older clusters or when
+			// the PodTopologyLabelsAdmission feature gate is disabled.
+			node, ok := nodes[pod.Spec.NodeName]
+			if !ok {
+				// node not found, it means that:
+				// - the node could have been drained
+				// - others
+				contextLogger.Debug("node not found, skipping pod topology matching")
+				return apiv1.Topology{}
+			}
 			data[podName][labelName] = node.Labels[labelName]
 		}
 	}
