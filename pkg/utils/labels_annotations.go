@@ -332,6 +332,10 @@ const (
 	// password_encryption setting, restoring the behavior the operator had
 	// before client-side encoding was introduced.
 	PasswordPassthroughAnnotationName = MetadataNamespace + "/passwordPassthrough"
+
+	// SwitchoverMaxReplayLagAnnotationName is the name of the annotation specifying the max WAL replay lag for switchover.
+	// Replay lag is calculated as ReceivedLsn - ReplayLsn.
+	SwitchoverMaxReplayLagAnnotationName = MetadataNamespace + "/switchoverMaxReplayLag"
 )
 
 type annotationStatus string

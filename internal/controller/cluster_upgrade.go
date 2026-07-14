@@ -29,6 +29,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -48,6 +50,11 @@ var errLogShippingReplicaElected = errors.New("log shipping replica elected as a
 // errRolloutDelayed is raised when a pod rollout has been delayed because
 // of the operator configuration
 var errRolloutDelayed = errors.New("pod rollout delayed")
+
+// errReplayLagIsTooHigh is raised when a pod update process needs to select
+// a new primary before upgrading the old primary, but the chosen instance
+// has a replay lag that is too high
+var errReplayLagIsTooHigh = errors.New("chosen new primary has a WAL replay lag that is too high")
 
 type rolloutReason = string
 
@@ -253,6 +260,61 @@ func (r *ClusterReconciler) updatePrimaryPod(
 				"targetPrimary", targetInstance.Pod.Name,
 			)
 			return false, errLogShippingReplicaElected
+		}
+
+		// We verify the WAL replay lag of the chosen standby.
+		// If the replay lag is too high, we delay the switchover to avoid
+		// leaving the cluster without a writable primary for too long.
+		receivedLSN, err := targetInstance.ReceivedLsn.Parse()
+		if err != nil {
+			contextLogger.Error(err, "unable to parse received LSN of target primary", "lsn", targetInstance.ReceivedLsn)
+			return false, err
+		}
+		replayLSN, err := targetInstance.ReplayLsn.Parse()
+		if err != nil {
+			contextLogger.Error(err, "unable to parse replay LSN of target primary", "lsn", targetInstance.ReplayLsn)
+			return false, err
+		}
+
+		var lag uint64
+		if receivedLSN > replayLSN {
+			lag = receivedLSN - replayLSN
+		}
+
+		// Default max replay lag threshold is 40Mi (41943040 bytes)
+		var maxReplayLag *uint64 = ptr.To(uint64(41943040))
+		if val, ok := cluster.Annotations[utils.SwitchoverMaxReplayLagAnnotationName]; ok {
+			if val == "disabled" || val == "false" || val == "-1" {
+				maxReplayLag = nil
+			} else {
+				q, err := resource.ParseQuantity(val)
+				if err != nil {
+					contextLogger.Error(err, "invalid value for switchoverMaxReplayLag annotation", "value", val)
+					return false, err
+				}
+				maxReplayLag = ptr.To(uint64(q.Value()))
+			}
+		}
+
+		if maxReplayLag != nil && lag > *maxReplayLag {
+			contextLogger.Info(
+				"chosen new primary has a WAL replay lag that is too high. Delaying the switchover",
+				"updateReason", reason,
+				"currentPrimary", primaryPod.Name,
+				"targetPrimary", targetInstance.Pod.Name,
+				"lagBytes", lag,
+				"maxReplayLagBytes", *maxReplayLag,
+			)
+			r.Recorder.Eventf(
+				cluster,
+				"Warning",
+				"SwitchoverDelayed",
+				"Replay lag of target instance %s (%d bytes) is higher than the maximum threshold (%d bytes)",
+				targetInstance.Pod.Name,
+				lag,
+				*maxReplayLag,
+			)
+			return false, errReplayLagIsTooHigh
 		}
 
 		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
