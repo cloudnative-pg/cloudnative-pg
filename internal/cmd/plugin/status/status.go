@@ -154,9 +154,9 @@ func Status(
 			status.printPodDisruptionBudgetStatus()
 		}
 		status.printInstancesStatus()
+		status.printFailureDomainStatus()
 	}
 	status.printPluginStatus(verbosity)
-	status.printFailureDomainStatus()
 
 	if len(errs) > 0 {
 		fmt.Println()
