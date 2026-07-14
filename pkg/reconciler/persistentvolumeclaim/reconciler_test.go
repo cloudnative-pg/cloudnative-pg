@@ -31,6 +31,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -630,16 +631,32 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		className := "fast-class"
 		pvc.Spec.VolumeAttributesClassName = &className
 
+		// Rebuild the fake client for this test to count Patch calls
+		patchCount := 0
+		cli = fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, &pvc).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object,
+					patch client.Patch, opts ...client.PatchOption,
+				) error {
+					patchCount++
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			}).
+			Build()
+
 		storage := &apiv1.StorageConfiguration{
 			Size: "1Gi",
 			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-				VolumeAttributesClassName: &className,
+				VolumeAttributesClassName: new("fast-class"),
 			},
 		}
 
 		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(*pvc.Spec.VolumeAttributesClassName).To(Equal(className))
+		Expect(pvc.Spec.VolumeAttributesClassName).To(HaveValue(Equal(className)))
+		Expect(patchCount).To(BeZero(), "no patch should be issued for an already-correct PVC")
 	})
 
 	It("updates VolumeAttributesClassName when it differs from the expected value", func() {
