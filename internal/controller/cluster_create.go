@@ -1171,7 +1171,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	// Ensure the PVCs for the first node exist, picking the right storage
 	// source if we are bootstrapping from a backup or a volume snapshot. This
 	// blocks until the source is ready.
-	if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, nodeSerial); !res.IsZero() || err != nil {
+	if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, nodeSerial, nil); !res.IsZero() || err != nil {
 		return res, err
 	}
 
@@ -1201,10 +1201,19 @@ func (r *ClusterReconciler) createPrimaryInstance(
 // selecting the proper storage source when bootstrapping from a backup or a
 // volume snapshot. A non-zero result means the bootstrap source is not ready
 // yet and the caller should requeue.
+//
+// existingDataSource is the PGDATA PVC's own Spec.DataSource, if the PGDATA
+// PVC already exists (a previous attempt got at least that far). When set, it
+// must agree with the storage source resolved here: the PGDATA PVC's
+// DataSource is fixed at creation time, while the resolution below re-reads
+// the current Backup/cluster state, and the two must not be allowed to
+// silently diverge (for example a sibling PVC being recreated from a
+// different snapshot than the one PGDATA actually holds).
 func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	nodeSerial int,
+	existingDataSource *corev1.TypedLocalObjectReference,
 ) (ctrl.Result, error) {
 	var recoverySnapshot *persistentvolumeclaim.StorageSource
 
@@ -1225,6 +1234,12 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 		recoverySnapshot = persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
 	}
 
+	if err := validateStorageSourceAgreesWithExisting(
+		recoverySnapshot, existingDataSource, cluster.Name, nodeSerial,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Create the PVCs from the cluster definition, and if bootstrapping from
 	// recoverySnapshot, use that as the source
 	if err := persistentvolumeclaim.CreateInstancePVCs(
@@ -1238,6 +1253,40 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// validateStorageSourceAgreesWithExisting fails cleanly instead of recreating
+// a sibling PVC (typically WAL) from a storage source that disagrees with the
+// PGDATA PVC already on disk. existingDataSource is nil when the PGDATA PVC
+// does not exist yet (fresh bootstrap): there is nothing to compare against,
+// and candidate is free to be whatever the current cluster/Backup state
+// resolves to.
+func validateStorageSourceAgreesWithExisting(
+	candidate *persistentvolumeclaim.StorageSource,
+	existingDataSource *corev1.TypedLocalObjectReference,
+	clusterName string,
+	nodeSerial int,
+) error {
+	if existingDataSource == nil {
+		return nil
+	}
+
+	var candidateDataSource *corev1.TypedLocalObjectReference
+	if candidate != nil {
+		candidateDataSource = &candidate.DataSource
+	}
+
+	if candidateDataSource != nil && reflect.DeepEqual(*candidateDataSource, *existingDataSource) {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"cannot recreate the missing PVCs of instance %v: the resolved recovery source (%v) "+
+			"disagrees with the data source already recorded on its PGDATA PVC (%v)",
+		specs.GetInstanceName(clusterName, nodeSerial),
+		candidateDataSource,
+		existingDataSource,
+	)
 }
 
 // buildPrimaryInstanceJob builds the bootstrap Job for the first primary
@@ -1830,9 +1879,11 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 	// bootstrap configuration, before creating the Job. A Job whose Pod
 	// references a PVC that does not exist stays pending forever, and its
 	// presence blocks the rest of the reconciliation behind the running-jobs
-	// guard.
+	// guard. When the PGDATA PVC already exists, the resolved source must
+	// agree with what PGDATA actually holds, or the sibling PVC would be
+	// recreated from a different snapshot than the one already restored.
 	if !pvcGroupComplete {
-		if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, serial); !res.IsZero() || err != nil {
+		if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, serial, pgdataDataSource); !res.IsZero() || err != nil {
 			return res, err
 		}
 	}
