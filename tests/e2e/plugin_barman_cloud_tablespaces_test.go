@@ -59,8 +59,8 @@ var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
+			if !(IsKind() || IsK3D() || IsEKS() || IsAKS() || IsGKE() || IsOpenshift()) {
+				Skip("This test only runs on kind, k3d, EKS, AKS, GKE, or OpenShift clusters")
 			}
 		})
 
