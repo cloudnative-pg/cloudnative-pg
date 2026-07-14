@@ -166,15 +166,13 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
     deploy_operator_from_source
   fi
 
-  # Install plugin-barman-cloud for the plugin-based backup tests. Restricted to
-  # local engines (kind/k3d) for now; cloud-vendor coverage will follow with the
-  # backup test ports.
+  # Install plugin-barman-cloud for the plugin-based backup tests.
   case "${TEST_CLOUD_VENDOR:-}" in
-    kind | k3d)
+    kind | k3d | eks | aks | gke)
       install_barman_cloud_plugin
       ;;
     *)
-      echo "Skipping plugin-barman-cloud install on '${TEST_CLOUD_VENDOR:-}' (only kind/k3d for now)."
+      echo "Skipping plugin-barman-cloud install on '${TEST_CLOUD_VENDOR:-}'."
       ;;
   esac
 fi

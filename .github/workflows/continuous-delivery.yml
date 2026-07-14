@@ -1135,6 +1135,8 @@ jobs:
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -1482,6 +1484,8 @@ jobs:
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -1875,6 +1879,8 @@ jobs:
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -2191,6 +2197,8 @@ jobs:
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
