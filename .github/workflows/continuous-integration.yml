@@ -671,8 +671,8 @@ jobs:
       - name: Output images
         if: env.PUSH == 'true'
         env:
-          DISTROLESS: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
-          UBI: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
+          DISTROLESS: ${{ steps.bake-push.outputs.metadata && fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] || '' }}
+          UBI: ${{ steps.bake-push.outputs.metadata && fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] || '' }}
         run: |
           echo "CONTROLLER_IMG=${DISTROLESS}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG_UBI=${UBI}" >> $GITHUB_ENV

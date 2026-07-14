@@ -277,7 +277,7 @@ jobs:
         name: Image for OLM
         id: olm-image
         env:
-          ubi_tags: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
+          ubi_tags: ${{ steps.bake-push.outputs.metadata && fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] || '' }}
         run: |
           echo "olm_image=$(echo "$ubi_tags" | tr ',' '\n' | grep -v 'latest' | sed 's/^ *//g' | head -n 1)" >> $GITHUB_OUTPUT
       -

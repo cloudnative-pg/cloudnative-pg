@@ -352,7 +352,7 @@ jobs:
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
       controller_img: ${{ env.CONTROLLER_IMG }}
-      controller_img_digest: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['containerimage.digest'] }}
+      controller_img_digest: ${{ steps.bake-push.outputs.metadata && fromJSON(steps.bake-push.outputs.metadata)['distroless']['containerimage.digest'] || '' }}
       controller_img_prime_digest: ${{ steps.build-prime.outputs.digest }}
       controller_img_ubi: ${{ env.CONTROLLER_IMG_UBI }}
       index_img: ${{ env.INDEX_IMG }}
@@ -495,8 +495,8 @@ jobs:
       -
         name: Output images
         env:
-          DISTROLESS: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
-          UBI: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
+          DISTROLESS: ${{ steps.bake-push.outputs.metadata && fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] || '' }}
+          UBI: ${{ steps.bake-push.outputs.metadata && fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] || '' }}
         run: |
           echo "CONTROLLER_IMG=${DISTROLESS}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG_UBI=${UBI}" >> $GITHUB_ENV
@@ -508,7 +508,7 @@ jobs:
         id: generate-manifest
         env:
           CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
-          CONTROLLER_IMG_DIGEST: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['containerimage.digest'] }}
+          CONTROLLER_IMG_DIGEST: ${{ steps.bake-push.outputs.metadata && fromJSON(steps.bake-push.outputs.metadata)['distroless']['containerimage.digest'] || '' }}
         run: |
           make generate-manifest
       -
