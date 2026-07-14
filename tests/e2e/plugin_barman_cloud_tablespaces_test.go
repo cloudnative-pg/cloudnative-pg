@@ -58,9 +58,6 @@ var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if IsOpenshift() {
-				Skip("This test case is not applicable on OpenShift clusters")
-			}
 		})
 
 		It("backs up and restores a cluster with tablespaces through the plugin", func() {

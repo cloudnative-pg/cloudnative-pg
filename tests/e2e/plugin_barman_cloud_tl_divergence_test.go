@@ -56,9 +56,6 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if IsOpenshift() {
-				Skip("This test case is not applicable on OpenShift clusters")
-			}
 		})
 
 		It("protects replicas from downloading future timeline history files", func() {

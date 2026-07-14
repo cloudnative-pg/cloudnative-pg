@@ -59,9 +59,6 @@ var _ = Describe("plugin-barman-cloud scheduled backups, standby target and PITR
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if IsOpenshift() {
-				Skip("This test case is not applicable on OpenShift clusters")
-			}
 		})
 
 		Context("on a cluster archiving through the plugin", Ordered, func() {

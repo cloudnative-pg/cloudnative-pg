@@ -62,9 +62,6 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if IsOpenshift() {
-				Skip("This test case is not applicable on OpenShift clusters")
-			}
 		})
 
 		It("keeps WAL archiving working across a Postgres major upgrade", func() {
