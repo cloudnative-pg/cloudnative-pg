@@ -172,8 +172,13 @@ func (r *ClusterReconciler) switchPrimary(
 	targetPrimaryName string,
 	reason rolloutReason,
 ) (bool, error) {
-	r.Recorder.Eventf(cluster, "Normal", "Switchover",
-		"Initiating switchover to %s to upgrade %s", targetPrimaryName, currentPrimaryName)
+	if targetPrimaryName == apiv1.PendingSwitchoverMarker {
+		r.Recorder.Eventf(cluster, "Normal", "Switchover",
+			"Initiating switchover to upgrade %s", currentPrimaryName)
+	} else {
+		r.Recorder.Eventf(cluster, "Normal", "Switchover",
+			"Initiating switchover to %s to upgrade %s", targetPrimaryName, currentPrimaryName)
+	}
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade, reason); err != nil {
 		return false, err
 	}
@@ -248,16 +253,16 @@ func (r *ClusterReconciler) updatePrimaryPod(
 
 		// Before promoting a replica, the instance manager will wait for the WAL receiver
 		// process to be down. We're doing that to avoid losing data written on the primary.
-		// This protection can work only when the streaming connection is active.
-		// Given that, we refuse to promote a replica when the streaming connection
-		// is not active.
+		// We check if there's any active WAL receiver among standbys.
+		// Given that, we refuse to initiate switchover when the streaming connection
+		// is not active for the target primary candidate.
 		if !targetInstance.IsWalReceiverActive {
 			contextLogger.Info(
-				"chosen new primary is still not connected via streaming replication. "+
+				"chosen new primary candidate is still not connected via streaming replication. "+
 					"Delaying the switchover",
 				"updateReason", reason,
 				"currentPrimary", primaryPod.Name,
-				"targetPrimary", targetInstance.Pod.Name,
+				"targetPrimaryCandidate", targetInstance.Pod.Name,
 			)
 			return false, errLogShippingReplicaElected
 		}
@@ -298,10 +303,10 @@ func (r *ClusterReconciler) updatePrimaryPod(
 
 		if maxReplayLag != nil && lag > *maxReplayLag {
 			contextLogger.Info(
-				"chosen new primary has a WAL replay lag that is too high. Delaying the switchover",
+				"chosen new primary candidate has a WAL replay lag that is too high. Delaying the switchover",
 				"updateReason", reason,
 				"currentPrimary", primaryPod.Name,
-				"targetPrimary", targetInstance.Pod.Name,
+				"targetPrimaryCandidate", targetInstance.Pod.Name,
 				"lagBytes", lag,
 				"maxReplayLagBytes", *maxReplayLag,
 			)
@@ -309,7 +314,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 				cluster,
 				"Warning",
 				"SwitchoverDelayed",
-				"Replay lag of target instance %s (%d bytes) is higher than the maximum threshold (%d bytes)",
+				"Replay lag of target instance candidate %s (%d bytes) is higher than the maximum threshold (%d bytes)",
 				targetInstance.Pod.Name,
 				lag,
 				*maxReplayLag,
@@ -320,10 +325,10 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
 			"reason", reason,
 			"currentPrimary", primaryPod.Name,
-			"targetPrimary", targetInstance.Pod.Name)
+			"targetPrimaryCandidate", targetInstance.Pod.Name)
 		podList.LogStatus(ctx)
 
-		return r.switchPrimary(ctx, cluster, primaryPod.Name, targetInstance.Pod.Name, reason)
+		return r.switchPrimary(ctx, cluster, primaryPod.Name, apiv1.PendingSwitchoverMarker, reason)
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
