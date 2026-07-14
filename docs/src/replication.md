@@ -153,12 +153,12 @@ defined). When defined, two options are mandatory:
 
 :::info[Important]
     Before enabling synchronous replication, make sure the cluster has enough
-    standby servers to tolerate the loss of one of them, or write operations
-    will be suspended whenever the number of available synchronous standbys
-    drops below the requested one. As a general rule, plan for synchronous
-    replication in clusters with at least three instances. In smaller
-    clusters, consider setting `dataDurability` to `preferred` if self-healing
-    is more important than strict data durability in your environment.
+    standby servers to tolerate the loss of one of them (see the note on write
+    pauses above). As a general rule, plan for synchronous replication in
+    clusters with at least three instances. In smaller clusters (one
+    synchronous standby), consider setting `dataDurability` to `preferred` if
+    self-healing is more important than strict data durability in your
+    environment.
 :::
 
 ### Quorum-based Synchronous Replication

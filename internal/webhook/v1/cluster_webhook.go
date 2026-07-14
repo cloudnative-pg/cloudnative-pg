@@ -2659,6 +2659,10 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 	return result
 }
 
+// getAdmissionWarnings collects warnings shared by ValidateCreate and
+// ValidateUpdate. The synchronous replication warning is intentionally not
+// included here: it is raised by ValidateCreate only, see
+// getSynchronousReplicationWarnings.
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
 	list := getMaintenanceWindowsAdmissionWarnings(r)
 	list = append(list, getInTreeBarmanWarnings(r)...)
