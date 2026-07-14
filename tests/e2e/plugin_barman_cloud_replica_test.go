@@ -72,9 +72,6 @@ var _ = Describe("plugin-barman-cloud replica cluster from backup",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if IsOpenshift() {
-				Skip("This test case is not applicable on OpenShift clusters")
-			}
 		})
 
 		It("bootstraps a replica cluster from a plugin backup", func() {
