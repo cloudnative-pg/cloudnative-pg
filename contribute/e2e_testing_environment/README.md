@@ -190,10 +190,9 @@ The script can be configured through the following environment variables:
 - `CNPG_CHART_VERSION`: when `CNPG_DEPLOYMENT_METHOD=helm`, pin the chart to
   this version (passed as `--version`). Unset by default, in which case the
   latest published chart is installed.
-- `BARMAN_PLUGIN_VERSION`: the `plugin-barman-cloud` build to install (kind/k3d
-  only) for the plugin-based backup tests: `release` (default) for the latest
-  published release, `main` for the current snapshot, or a pinned version such
-  as `v0.12.0`.
+- `BARMAN_PLUGIN_VERSION`: the `plugin-barman-cloud` build to install for the
+  plugin-based backup tests: `release` (default) for the latest published release,
+  `main` for the current snapshot, or a pinned version such as `v0.12.0`.
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:

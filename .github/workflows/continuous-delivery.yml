@@ -22,9 +22,9 @@ on:
         description: >
           Feature Type (backup-restore, basic, cluster-metadata, declarative-database-roles, declarative-databases,
           disruptive, image-volume-extensions, importing-databases, maintenance, no-openshift, observability, operator,
-          performance, plugin, pod-scheduling, postgres-configuration, postgres-major-upgrade, publication-subscription,
-          recovery, replication, security, self-healing, service-connectivity, smoke, snapshot, storage, tablespaces,
-          upgrade)
+          performance, plugin, plugin-barman-cloud, pod-scheduling, postgres-configuration, postgres-major-upgrade,
+          publication-subscription, recovery, replication, security, self-healing, service-connectivity, smoke, snapshot,
+          storage, tablespaces, upgrade)
         required: false
       log_level:
         description: 'Log level for operator (error, warning, info, debug(default), trace)'
