@@ -1234,8 +1234,17 @@ func (instance *Instance) removePgControlFileBackup() error {
 	return nil
 }
 
-// Rewind uses pg_rewind to align this data directory with the contents of the primary node.
-// If postgres major version is >= 13, add "--restore-target-wal" option
+// pgRewindRetry is the retry configuration for transient pg_rewind failures,
+// such as a WAL segment whose restoration from the archive failed
+var pgRewindRetry = wait.Backoff{
+	Duration: 5 * time.Second,
+	Factor:   2,
+	Steps:    4,
+}
+
+// Rewind uses pg_rewind to align this data directory with the contents of the primary
+// node, using the "--restore-target-wal" option to fetch from the WAL archive any
+// segment that was already recycled locally
 func (instance *Instance) Rewind(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -1272,11 +1281,26 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 		"pgdata", instance.PgData,
 		"options", options)
 
-	pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
-	pgRewindCmd.Env = instance.buildPostgresEnv()
-	err = execlog.RunStreaming(pgRewindCmd, pgRewindName)
+	// pg_rewind writes nothing into the target data directory until it has
+	// collected every WAL segment it needs, so a run aborted by a failed WAL
+	// restoration can be safely retried from scratch, reusing the segments
+	// that were already fetched. Retrying here avoids handing a transient
+	// failure back to the reconciliation loop, whose exponential backoff
+	// would keep the instance down for much longer.
+	retryUntilContextCancelled := func(_ error) bool {
+		return ctx.Err() == nil
+	}
+	err = retry.OnError(pgRewindRetry, retryUntilContextCancelled, func() error {
+		pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
+		pgRewindCmd.Env = instance.buildPostgresEnv()
+		if err := execlog.RunStreaming(pgRewindCmd, pgRewindName); err != nil {
+			contextLogger.Error(err, "Failed to execute pg_rewind", "options", options)
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
-		contextLogger.Error(err, "Failed to execute pg_rewind", "options", options)
 		return fmt.Errorf("error executing pg_rewind: %w", err)
 	}
 
