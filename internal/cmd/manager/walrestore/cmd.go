@@ -30,6 +30,7 @@ import (
 
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
+	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
@@ -131,7 +132,7 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 		return err
 	}
 
-	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath)
+	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath, rewindMode)
 	if err != nil {
 		// With the current implementation, this happens when both of the following conditions are met:
 		//
@@ -270,6 +271,7 @@ func restoreWALViaPlugins(
 	walName string,
 	pgData string,
 	destinationPathName string,
+	rewindMode bool,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -289,7 +291,12 @@ func restoreWALViaPlugins(
 	}
 	defer client.Close(ctx)
 
-	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName))
+	mode := wal.WALRestoreRequest_MODE_RECOVERY
+	if rewindMode {
+		mode = wal.WALRestoreRequest_MODE_REWIND
+	}
+
+	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName), mode)
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
