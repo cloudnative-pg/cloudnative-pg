@@ -35,6 +35,16 @@ function _curl_github() {
   curl -H "${auth_header}" "$@"
 }
 
+# _apply_github: fetches a manifest from a raw.githubusercontent.com URL
+# (authenticated via _curl_github when GITHUB_TOKEN is set, which is what
+# actually avoids the anonymous per-IP rate limit shared by GitHub Actions
+# runners) and applies it. The retry is only a fallback for genuine transient
+# network errors, not the fix for 429s.
+function _apply_github() {
+  local url=$1
+  _curl_github -fsSL --retry 5 --retry-delay 2 "${url}" | "${K8S_CLI}" apply -f -
+}
+
 # wait_for(type, namespace, name, interval, retries)
 # Waits until a specified Kubernetes object exists.
 function wait_for() {
@@ -274,25 +284,25 @@ function deploy_csi_host_path() {
   # --- 1. Install External Snapshotter CRDs and Controller (Versions sourced from 10-config.sh) ---
 
   ## Apply CRDs
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+  _apply_github "${CSI_BASE_URL}/external-snapshotter/${EXTERNAL_SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml"
+  _apply_github "${CSI_BASE_URL}/external-snapshotter/${EXTERNAL_SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml"
+  _apply_github "${CSI_BASE_URL}/external-snapshotter/${EXTERNAL_SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml"
 
   ## Apply RBAC and Controller
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
+  _apply_github "${CSI_BASE_URL}/external-snapshotter/${EXTERNAL_SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml"
+  _apply_github "${CSI_BASE_URL}/external-snapshotter/${EXTERNAL_SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml"
+  _apply_github "${CSI_BASE_URL}/external-snapshotter/${EXTERNAL_SNAPSHOTTER_VERSION}/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml"
 
   # --- 2. Install External Sidecar Components ---
 
   ## Install external provisioner
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-provisioner/"${EXTERNAL_PROVISIONER_VERSION}"/deploy/kubernetes/rbac.yaml
+  _apply_github "${CSI_BASE_URL}/external-provisioner/${EXTERNAL_PROVISIONER_VERSION}/deploy/kubernetes/rbac.yaml"
 
   ## Install external attacher
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-attacher/"${EXTERNAL_ATTACHER_VERSION}"/deploy/kubernetes/rbac.yaml
+  _apply_github "${CSI_BASE_URL}/external-attacher/${EXTERNAL_ATTACHER_VERSION}/deploy/kubernetes/rbac.yaml"
 
   ## Install external resizer
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-resizer/"${EXTERNAL_RESIZER_VERSION}"/deploy/kubernetes/rbac.yaml
+  _apply_github "${CSI_BASE_URL}/external-resizer/${EXTERNAL_RESIZER_VERSION}/deploy/kubernetes/rbac.yaml"
 
   # --- 3. Install Driver and Plugin ---
 
@@ -302,21 +312,21 @@ function deploy_csi_host_path() {
     sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
 
   # Apply driver info and plugin deployment
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-driverinfo.yaml
+  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-driverinfo.yaml"
   "${K8S_CLI}" apply -f "${plugin_file}"
   rm "${plugin_file}"
 
   # --- 4. Configure Storage Classes ---
 
   ## Create VolumeSnapshotClass
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-snapshotclass.yaml
+  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-snapshotclass.yaml"
 
   ## Patch VolumeSnapshotClass to allow snapshots of running PostgreSQL instances
   ## by ignoring read failures during snapshot creation
   "${K8S_CLI}" patch volumesnapshotclass csi-hostpath-snapclass -p '{"parameters":{"ignoreFailedRead":"true"}}' --type merge
 
   ## Create StorageClass
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
+  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/examples/csi-storageclass.yaml"
 
   ## Annotate the StorageClass to set the default snapshot class
   "${K8S_CLI}" annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapclass
