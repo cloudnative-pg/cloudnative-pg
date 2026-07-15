@@ -25,6 +25,10 @@
 # variables: this file is the only channel between the scripts and the
 # suite.
 
+if [ -z "${ROOT_DIR:-}" ]; then
+  ROOT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")/../../")
+fi
+
 # yaml_string prints its argument as a YAML double-quoted scalar
 yaml_string() {
   local value=$1
