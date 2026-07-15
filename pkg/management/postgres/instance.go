@@ -1292,11 +1292,13 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	retryUntilContextCancelled := func(_ error) bool {
 		return ctx.Err() == nil
 	}
+	attempt := 0
 	err = retry.OnError(pgRewindRetry, retryUntilContextCancelled, func() error {
+		attempt++
 		pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
 		pgRewindCmd.Env = instance.buildPostgresEnv()
 		if err := execlog.RunStreaming(pgRewindCmd, pgRewindName); err != nil {
-			contextLogger.Error(err, "Failed to execute pg_rewind", "options", options)
+			contextLogger.Error(err, "Failed to execute pg_rewind", "attempt", attempt, "options", options)
 			return err
 		}
 

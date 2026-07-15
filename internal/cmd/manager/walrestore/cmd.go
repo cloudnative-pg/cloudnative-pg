@@ -250,6 +250,7 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 
 	contextLog.Info("WAL restore command completed (parallel)",
 		"walName", walName,
+		"rewindMode", rewindMode,
 		"maxParallel", maxParallel,
 		"successfulWalRestore", successfulWalRestore,
 		"failedWalRestore", maxParallel-successfulWalRestore,
