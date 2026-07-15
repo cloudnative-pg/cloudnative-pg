@@ -1255,8 +1255,8 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 		"--target-pgdata", instance.PgData,
 	)
 
-	// make sure restore_command is set in override.conf
-	if _, err := configurePostgresOverrideConfFile(instance.PgData, primaryConnInfo, ""); err != nil {
+	// make sure a rewind-mode restore_command is set in override.conf
+	if _, err := configurePostgresOverrideConfFileForRewind(instance.PgData, primaryConnInfo); err != nil {
 		return err
 	}
 
