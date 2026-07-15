@@ -84,8 +84,6 @@ type TestingEnvironment struct {
 	PostgresImageName          string
 	PostgresImageTag           string
 	PostgresVersion            uint64
-	PostgresImageRepository    string
-	PostGISImageRepository     string
 	DefaultStorageClass        string
 	CSIStorageClass            string
 	DefaultVolumeSnapshotClass string
@@ -144,9 +142,6 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	imageReference := reference.New(cfg.Postgres.Image)
 	env.PostgresImageName = imageReference.Name
 	env.PostgresImageTag = imageReference.Tag
-
-	env.PostgresImageRepository = cfg.Postgres.ImageRepository
-	env.PostGISImageRepository = cfg.Postgres.PostGISImageRepository
 
 	postgresImageVersion, err := version.FromTag(imageReference.Tag)
 	if err != nil {
@@ -259,21 +254,21 @@ func (env *TestingEnvironment) MinimalImageName(tag string) string {
 // PostGISImageName returns the full image name for the official CloudNativePG PostGIS image.
 // Example: ghcr.io/cloudnative-pg/postgis:17-3-standard-trixie
 func (env *TestingEnvironment) PostGISImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s", env.PostGISImageRepository, tag, PostGISSuffix)
+	return fmt.Sprintf("%s:%s-%s", config.Current().Postgres.PostGISImageRepository, tag, PostGISSuffix)
 }
 
 // OfficialStandardImageName returns the full image name for the official CloudNativePG standard Postgres image.
 // This is used for major upgrade tests where source images must come from the official registry.
 // Example: ghcr.io/cloudnative-pg/postgresql:16-standard-trixie
 func (env *TestingEnvironment) OfficialStandardImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, StandardSuffix)
+	return fmt.Sprintf("%s:%s-%s", config.Current().Postgres.ImageRepository, tag, StandardSuffix)
 }
 
 // OfficialMinimalImageName returns the full image name for the official CloudNativePG minimal Postgres image.
 // This is used for major upgrade tests where source images must come from the official registry.
 // Example: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
 func (env *TestingEnvironment) OfficialMinimalImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, MinimalSuffix)
+	return fmt.Sprintf("%s:%s-%s", config.Current().Postgres.ImageRepository, tag, MinimalSuffix)
 }
 
 // SystemImageName returns the full image name for a system Postgres image.
@@ -288,5 +283,5 @@ func (env *TestingEnvironment) SystemImageName(tag string) string {
 // System images include barman-cloud tools for backup and recovery.
 // Example: ghcr.io/cloudnative-pg/postgresql:16-system-trixie
 func (env *TestingEnvironment) OfficialSystemImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, SystemSuffix)
+	return fmt.Sprintf("%s:%s-%s", config.Current().Postgres.ImageRepository, tag, SystemSuffix)
 }
