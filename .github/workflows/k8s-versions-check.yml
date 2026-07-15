@@ -62,21 +62,28 @@ jobs:
       -
         name: Get updated AKS versions
         run: |
-          curl -fsSL https://releases.aks.azure.com/parsed_data.json | \
+          RESULT=$(curl -fsSL https://releases.aks.azure.com/parsed_data.json | \
             jq --arg min "$MINIMAL_K8S" --arg region "West Europe" '
               def ver: split("(")[0] | split(".") | map(tonumber);    # "1.33.12" -> [1,33,12]
-              [ .Sections.KubernetesSupportedVersions.Components[].ByRegion[]
-                | select(.Regions | index($region))    # the bucket that contains West Europe
-                | .KubernetesVersionList[]
-                | select(.IsPreview == false and .IsLTS == false)    # GA, standard tier only
-                | .VersionName | split("(")[0]
-              ]
-              | unique
-              | map(select((ver)[0:2] >= ($min | split(".") | map(tonumber))))
-              | group_by(ver[0:2])      # one bucket per minor
-              | map(max_by(ver))        # latest patch per minor
-              | sort_by(ver) | reverse
-            ' | tee .github/aks_versions.json
+              .Sections.KubernetesSupportedVersions.Components.KubernetesVersions.RegionalStatuses
+              | [.[][] | select(.RegionName == $region)][0] as $r
+              | if $r.InProgress then
+                  {inProgress: true}
+                else
+                  {inProgress: false, versions: ($r.Current.KubernetesVersionList
+                      | map(select(.IsPreview == false and .IsLTS == false) | .VersionName | split("(")[0])
+                      | unique
+                      | map(select((ver)[0:2] >= ($min | split(".") | map(tonumber))))
+                      | group_by(ver[0:2])
+                      | map(max_by(ver))
+                      | sort_by(ver) | reverse)}
+                end
+            ')
+          if jq -e '.inProgress' <<< "$RESULT" > /dev/null; then
+            echo "::warning::AKS rollout in progress for West Europe, skipping update and leaving .github/aks_versions.json unchanged"
+          else
+            jq '.versions' <<< "$RESULT" | tee .github/aks_versions.json
+          fi
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
       -
         name: Get updated kind node version
