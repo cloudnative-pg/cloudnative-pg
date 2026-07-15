@@ -61,6 +61,18 @@ const sharedBuffersParameter = "shared_buffers"
 // walLevelMinimal is the "minimal" wal level
 const walLevelMinimal = "minimal"
 
+// extensionPathContainmentBase is a synthetic placeholder standing in for an
+// extension's mount point, used only to check that a user-supplied path
+// stays contained once joined the same way the instance manager joins it at
+// runtime (see CollectBinPaths and absolutizePaths). The webhook validates
+// the Cluster spec at admission time, before any Pod exists, so the real
+// mount point isn't available yet, and it doesn't need to be: filepath.Join's
+// ".." resolution is purely syntactic, so whether the result stays under the
+// base depends only on the shape of the joined path, not on what the base
+// actually is. Any fixed placeholder therefore gives the same containment
+// answer the real mount point would.
+const extensionPathContainmentBase = "/mount"
+
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
@@ -2973,7 +2985,21 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				continue
 			}
 
-			if strings.HasPrefix(filepath.Clean(path), "..") {
+			// Resolve the path the same way CollectBinPaths and absolutizePaths
+			// join it under the extension's mount point at runtime, then check
+			// containment on the result. This also catches an absolute path with
+			// embedded traversal, such as "/a/../../../../etc": filepath.Join
+			// treats a leading separator as just another path segment, so that
+			// value resolves to "/etc" and escapes the mount point, even though
+			// checking the raw, unstripped path for a ".." prefix would miss it.
+			// The comparison requires a separator boundary (an exact match, or a
+			// prefix match followed by a separator) rather than a bare
+			// strings.HasPrefix, so that a sibling directory sharing the base as
+			// a string prefix (e.g. a path resolving to the containment base plus
+			// "-evil") is not wrongly accepted as contained.
+			resolvedPath := filepath.Join(extensionPathContainmentBase, path)
+			if resolvedPath != extensionPathContainmentBase &&
+				!strings.HasPrefix(resolvedPath, extensionPathContainmentBase+string(filepath.Separator)) {
 				result = append(result, field.Invalid(
 					fieldPath.Index(j),
 					path,

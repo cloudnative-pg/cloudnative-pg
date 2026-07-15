@@ -6124,6 +6124,62 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[3].Field).To(ContainSubstring("bin_path[0]"))
 	})
 
+	It("returns an error for an absolute path with embedded traversal", func() {
+		// "/a/../../../../etc" cleans to "/etc", which does not start with
+		// "..", so a check that only cleans the raw path would accept it.
+		// Both CollectBinPaths and absolutizePaths join this path under the
+		// extension's mount point with filepath.Join, which strips the
+		// leading separator and then resolves the embedded "..", so this
+		// value still escapes the mount point at runtime.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/a/../../../../etc",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
+	It("returns no error for a path prefixed with a path separator that does not escape", func() {
+		// A leading "/" is intentionally accepted as equivalent to no leading
+		// separator (see the CollectBinPaths doc comment): filepath.Join
+		// treats "/opt/custom/lib" the same as "opt/custom/lib" when joining
+		// it under the extension's mount point, so it never escapes.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/opt/custom/share",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
 	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
