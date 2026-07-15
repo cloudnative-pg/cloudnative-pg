@@ -986,5 +986,15 @@ jobs:
           rm -fr bundle.Dockerfile *.zip bundle/
 
       - name: Test bundle
+        env:
+          # Authenticates the raw.githubusercontent.com fetch below: anonymous
+          # requests share a per-IP rate limit across all GitHub Actions runners
+          # and can 429 during a burst; an authenticated request gets its own,
+          # much higher quota. Downloading to a file first (rather than piping
+          # into `bash <(curl ...)`) also means a failed fetch aborts the step
+          # instead of silently running an empty script.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${OPP_SCRIPT_VERSION}/ci/scripts/opp.sh") "${TEST}" "operators/cloudnative-pg/${VERSION}/"
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL \
+            -o opp.sh "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${OPP_SCRIPT_VERSION}/ci/scripts/opp.sh"
+          bash opp.sh "${TEST}" "operators/cloudnative-pg/${VERSION}/"
