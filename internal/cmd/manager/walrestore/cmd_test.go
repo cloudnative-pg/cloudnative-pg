@@ -136,6 +136,30 @@ var _ = Describe("Function shouldUseEndOfWALStreamFlag", func() {
 	})
 })
 
+var _ = Describe("Function maxWALFilesPerInvocation", func() {
+	It("returns 1 when no parallel WAL configuration is present", func() {
+		Expect(maxWALFilesPerInvocation(&apiv1.BarmanObjectStoreConfiguration{}, false)).To(Equal(1))
+	})
+
+	It("returns the configured maxParallel", func() {
+		configuration := &apiv1.BarmanObjectStoreConfiguration{
+			Wal: &apiv1.WalBackupConfiguration{
+				MaxParallel: 3,
+			},
+		}
+		Expect(maxWALFilesPerInvocation(configuration, false)).To(Equal(3))
+	})
+
+	It("returns 1 in rewind mode, ignoring the configured maxParallel", func() {
+		configuration := &apiv1.BarmanObjectStoreConfiguration{
+			Wal: &apiv1.WalBackupConfiguration{
+				MaxParallel: 3,
+			},
+		}
+		Expect(maxWALFilesPerInvocation(configuration, true)).To(Equal(1))
+	})
+})
+
 var _ = Describe("Function isEndOfWALStream", func() {
 	It("returns true when the requested WAL was not found", func() {
 		results := []barmanRestorer.Result{

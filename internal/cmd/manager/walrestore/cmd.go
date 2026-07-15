@@ -205,15 +205,7 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 
 	// Step 3: gather the WAL files names to restore. If the required file isn't a regular WAL, we download it directly.
 	var walFilesList []string
-	maxParallel := 1
-	if barmanConfiguration.Wal != nil && barmanConfiguration.Wal.MaxParallel > 1 {
-		maxParallel = barmanConfiguration.Wal.MaxParallel
-	}
-	if rewindMode {
-		// pg_rewind walks the WAL backward, so prefetching the segments
-		// that follow the requested one would be useless
-		maxParallel = 1
-	}
+	maxParallel := maxWALFilesPerInvocation(barmanConfiguration, rewindMode)
 	if postgres.IsWALFile(walName) {
 		// If this is a regular WAL file, we try to prefetch
 		if walFilesList, err = gatherWALFilesToRestore(walName, maxParallel); err != nil {
@@ -413,6 +405,24 @@ func gatherWALFilesToRestore(walName string, parallel int) (walList []string, er
 	}
 
 	return walList, err
+}
+
+// maxWALFilesPerInvocation returns how many WAL files a single wal-restore
+// invocation may fetch: the requested one, plus the ones that follow it up to
+// the configured maxParallel, to be prefetched into the spool. Prefetching is
+// disabled when restoring on behalf of pg_rewind, which walks the WAL
+// backward: the following segments would never be requested, and past the end
+// of the timeline they do not even exist
+func maxWALFilesPerInvocation(barmanConfiguration *apiv1.BarmanObjectStoreConfiguration, rewindMode bool) int {
+	if rewindMode {
+		return 1
+	}
+
+	if barmanConfiguration.Wal != nil && barmanConfiguration.Wal.MaxParallel > 1 {
+		return barmanConfiguration.Wal.MaxParallel
+	}
+
+	return 1
 }
 
 // shouldUseEndOfWALStreamFlag returns true when the end-of-wal-stream flag
