@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -390,11 +391,26 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				ShouldNot(HaveOccurred())
 		})
 
+		// listSpoolContents returns the exact content of the spool directory,
+		// one file name per line. The TestFileExist/TestDirectoryEmpty helpers
+		// cannot express "the spool contains no WAL files": kubectl exec runs
+		// the command with no shell, so glob patterns are never expanded.
+		listSpoolContents := func() (string, error) {
+			stdout, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"ls", "-A", SpoolDirectory)
+			return strings.TrimSpace(stdout), err
+		}
+
 		// Invoke the wal-restore command in rewind mode requesting the #7 file,
 		// with the end-of-wal-stream flag still set.
 		// Expected outcome:
-		//		exit code 0, #7 is in the output location, no files in the spool directory.
-		//		The flag is neither consumed nor unset.
+		//		exit code 0, #7 is in the output location, nothing is prefetched
+		//		into the spool directory, and the flag is neither consumed nor unset.
 		By("invoking the wal-restore command in rewind mode with a stale end-of-wal-stream flag", func() {
 			_, _, err := exec.CommandInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -409,17 +425,11 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"#7 wal is in the output location")
-			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "00000001*") }).
+			Eventually(listSpoolContents).
 				WithTimeout(RetryTimeout).
-				Should(BeFalse(),
-					"no wals in the spool directory, rewind mode does not prefetch")
-			Eventually(func() bool {
-				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
-			}).
-				WithTimeout(RetryTimeout).
-				Should(BeTrue(),
-					"end-of-wal-stream flag is not consumed by the rewind mode")
+				Should(Equal("end-of-wal-stream"),
+					"the spool directory contains the untouched end-of-wal-stream flag "+
+						"and no prefetched wals")
 		})
 
 		// Invoke the wal-restore command through exec requesting the #8 file.
@@ -435,13 +445,10 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				}, nil,
 				"/controller/manager", "wal-restore", walFile8, PgWalPath+"/"+walFile8)
 			Expect(err).To(HaveOccurred(), "exit code should be 1 since the flag is set")
-			Eventually(func() bool {
-				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
-			}).
+			Eventually(listSpoolContents).
 				WithTimeout(RetryTimeout).
-				Should(BeFalse(),
-					"end-of-wal-stream flag is unset")
+				Should(BeEmpty(),
+					"end-of-wal-stream flag is consumed and unset")
 		})
 
 		// Generate a new wal file; the archive also contains WAL #8.
@@ -470,10 +477,11 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"#8 wal is in the output location")
-			Eventually(func() bool { return testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory) }).
+			Eventually(listSpoolContents).
 				WithTimeout(RetryTimeout).
-				Should(BeTrue(),
-					"spool directory is empty, end-of-wal-stream flag is not set by the rewind mode")
+				Should(BeEmpty(),
+					"the spool directory is empty: no prefetched wals, and no "+
+						"end-of-wal-stream flag set by the rewind mode")
 		})
 	})
 })
