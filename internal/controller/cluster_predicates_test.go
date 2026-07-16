@@ -21,10 +21,13 @@ package controller
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -146,4 +149,32 @@ var _ = Describe("nodesPredicate", func() {
 		Entry("when a node taints changed",
 			nodeWithKarpenterNoSchedulableTaint, nodeWithAutoscalerTaint, true),
 	)
+})
+
+var _ = Describe("isBeingDeletedPredicate", func() {
+	deletionTime := metav1.Now()
+	beingDeleted := &apiv1.Database{
+		ObjectMeta: metav1.ObjectMeta{
+			DeletionTimestamp: &deletionTime,
+			Finalizers:        []string{utils.DatabaseFinalizerName},
+		},
+	}
+	notBeingDeleted := &apiv1.Database{}
+
+	// The create event matters most: on an operator restart the initial cache
+	// sync delivers lingering resources as create events, and that is the moment
+	// the deletion cleanup must be re-triggered.
+	It("admits an object carrying a deletionTimestamp on every event type", func() {
+		Expect(isBeingDeletedPredicate.Create(event.CreateEvent{Object: beingDeleted})).To(BeTrue())
+		Expect(isBeingDeletedPredicate.Update(event.UpdateEvent{ObjectNew: beingDeleted})).To(BeTrue())
+		Expect(isBeingDeletedPredicate.Delete(event.DeleteEvent{Object: beingDeleted})).To(BeTrue())
+		Expect(isBeingDeletedPredicate.Generic(event.GenericEvent{Object: beingDeleted})).To(BeTrue())
+	})
+
+	It("rejects an object that is not being deleted on every event type", func() {
+		Expect(isBeingDeletedPredicate.Create(event.CreateEvent{Object: notBeingDeleted})).To(BeFalse())
+		Expect(isBeingDeletedPredicate.Update(event.UpdateEvent{ObjectNew: notBeingDeleted})).To(BeFalse())
+		Expect(isBeingDeletedPredicate.Delete(event.DeleteEvent{Object: notBeingDeleted})).To(BeFalse())
+		Expect(isBeingDeletedPredicate.Generic(event.GenericEvent{Object: notBeingDeleted})).To(BeFalse())
+	})
 })

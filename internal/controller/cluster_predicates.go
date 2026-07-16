@@ -74,6 +74,15 @@ var (
 			return isUsefulClusterSecret(e.ObjectNew)
 		},
 	}
+
+	// isBeingDeletedPredicate admits only objects that already carry a
+	// deletionTimestamp. The cluster controller watches the owned Database,
+	// Publication and Subscription resources solely to re-run the deletion
+	// cleanup after a restart, so resources that are not being deleted must not
+	// enqueue a Cluster reconcile.
+	isBeingDeletedPredicate = predicate.NewPredicateFuncs(func(object client.Object) bool {
+		return !object.GetDeletionTimestamp().IsZero()
+	})
 )
 
 func (r *ClusterReconciler) nodesPredicate() predicate.Funcs {

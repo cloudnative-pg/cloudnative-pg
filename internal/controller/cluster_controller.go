@@ -1323,6 +1323,29 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			// The cluster only consumes spec.passwordSecret (to maintain the
 			// instance RBAC), so status-only changes are irrelevant here.
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
+		// Watch the owned Database, Publication and Subscription resources only
+		// while they are being deleted. Their reconcilers run in the instance
+		// manager, so when the cluster is torn down together with its pods the
+		// finalizer can only be removed by notifyDeletionToOwnedResources during
+		// the cluster's own deletion. If the operator is down while the namespace
+		// is deleted, the Cluster object is gone and nothing would ever re-trigger
+		// that cleanup after a restart; these watches deliver the lingering
+		// resources on the initial cache sync so the cleanup runs.
+		Watches(
+			&apiv1.Database{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
+		).
+		Watches(
+			&apiv1.Publication{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
+		).
+		Watches(
+			&apiv1.Subscription{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
 		)
 
 	if configuration.Current.OperatorNamespace != "" {
@@ -1601,6 +1624,34 @@ func (r *ClusterReconciler) mapDatabaseRolesToClusters() handler.MapFunc {
 				},
 			},
 		}
+	}
+}
+
+// mapClusterOwnedResourceToCluster maps a namespaced resource that references its
+// Cluster through the `cluster` field (Database, Publication, Subscription) to a
+// reconcile request for that Cluster. It resolves the reference by name instead of
+// through an owner reference, so it keeps working after the Cluster object is gone:
+// that is what allows notifyDeletionToOwnedResources to strip a lingering finalizer
+// when the operator sees the resource again after a restart.
+func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []reconcile.Request {
+	owned, ok := obj.(interface {
+		GetClusterRef() corev1.LocalObjectReference
+	})
+	if !ok {
+		return nil
+	}
+	clusterName := owned.GetClusterRef().Name
+	if clusterName == "" {
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      clusterName,
+			},
+		},
 	}
 }
 
