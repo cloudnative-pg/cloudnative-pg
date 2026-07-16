@@ -1283,6 +1283,11 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	// already fetched. Retrying here avoids handing a transient failure back
 	// to the reconciliation loop, whose exponential backoff would keep the
 	// instance down for much longer.
+	//
+	// This retries every pg_rewind failure, not just a failed WAL restoration:
+	// pg_rewind doesn't expose a way to tell the two apart, so a permanent
+	// failure (e.g. a bad connection string) also gets retried here before
+	// surfacing, rather than failing immediately.
 	retryUntilContextCancelled := func(_ error) bool {
 		return ctx.Err() == nil
 	}
