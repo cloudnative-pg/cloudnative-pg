@@ -432,7 +432,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 						"and no prefetched wals")
 		})
 
-		// Invoke the wal-restore command through exec requesting the #8 file.
+		// Reset state for the next scenario: this plain (non-rewind) invocation
+		// clears the stale flag from the step above. It does not fetch
+		// walFile8 itself; #8 is forged onto the archive and restored below.
 		// Expected outcome:
 		//		exit code 1, the flag is consumed and unset.
 		By("consuming the end-of-wal-stream flag with a regular invocation", func() {
