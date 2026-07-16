@@ -649,7 +649,7 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		storage := &apiv1.StorageConfiguration{
 			Size: "1Gi",
 			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-				VolumeAttributesClassName: new("fast-class"),
+				VolumeAttributesClassName: ptr.To("fast-class"),
 			},
 		}
 
