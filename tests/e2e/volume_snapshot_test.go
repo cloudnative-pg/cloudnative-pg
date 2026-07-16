@@ -81,7 +81,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 		updateClusterSnapshotClass := func(namespace, clusterName, className string) {
 			cluster := &apiv1.Cluster{}
-			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 				var err error
 				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())

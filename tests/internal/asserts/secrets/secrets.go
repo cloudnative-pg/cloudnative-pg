@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	secretsutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 
 	. "github.com/onsi/ginkgo/v2" //nolint
@@ -64,7 +65,7 @@ func AssertUpdateSecret(
 	}).Should(Succeed())
 
 	secret.Data[field] = []byte(value)
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 		return env.Client.Update(env.Ctx, &secret)
 	})
 	Expect(err).ToNot(HaveOccurred())
