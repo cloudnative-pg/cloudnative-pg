@@ -281,7 +281,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
 			clusterutils.AddTopologySpreadConstraint(cluster)
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
@@ -504,7 +504,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodRestart
 			clusterutils.AddTopologySpreadConstraint(cluster)
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})

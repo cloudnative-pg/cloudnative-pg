@@ -97,7 +97,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 					},
 				},
 			}
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
