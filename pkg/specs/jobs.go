@@ -368,7 +368,7 @@ func CreatePrimaryJob(
 					},
 				},
 				Spec: corev1.PodSpec{
-					Hostname: jobName,
+					Hostname:           jobName,
 					EnableServiceLinks: ptr.To(false),
 					InitContainers: []corev1.Container{
 						createBootstrapContainer(cluster, extList),

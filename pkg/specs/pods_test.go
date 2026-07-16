@@ -1064,4 +1064,22 @@ var _ = Describe("NewInstance", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
 	})
+
+	It("disables service links to prevent argument list too long errors", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+		Expect(pod.Spec.EnableServiceLinks).NotTo(BeNil())
+		Expect(*pod.Spec.EnableServiceLinks).To(BeFalse())
+	})
 })
