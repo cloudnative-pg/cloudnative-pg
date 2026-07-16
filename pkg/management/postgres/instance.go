@@ -1271,12 +1271,6 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 
 	options = append(options, "--restore-target-wal")
 
-	// Make sure PostgreSQL control file is not empty
-	err := instance.managePgControlFileBackup()
-	if err != nil {
-		return err
-	}
-
 	contextLogger.Info("Starting up pg_rewind",
 		"pgdata", instance.PgData,
 		"options", options)
@@ -1293,8 +1287,15 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 		return ctx.Err() == nil
 	}
 	attempt := 0
-	err = retry.OnError(pgRewindRetry, retryUntilContextCancelled, func() error {
+	err := retry.OnError(pgRewindRetry, retryUntilContextCancelled, func() error {
 		attempt++
+
+		// Runs on every attempt, not just the first: a failed pg_rewind is
+		// exactly what can leave this needing repair before the next one.
+		if err := instance.managePgControlFileBackup(); err != nil {
+			return err
+		}
+
 		pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
 		pgRewindCmd.Env = instance.buildPostgresEnv()
 		if err := execlog.RunStreaming(pgRewindCmd, pgRewindName); err != nil {
