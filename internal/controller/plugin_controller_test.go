@@ -31,6 +31,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -406,6 +407,100 @@ var _ = Describe("PluginReconciler", func() {
 			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName))
 		})
 
+		It("should remove the legacy finalizer even when the service no longer matches the plugin checks", func() {
+			// No annotations: isPluginService fails, but the finalizer must
+			// still be removed or the service could never be deleted
+			service := createPluginService(nil)
+			service.Finalizers = []string{utils.PluginFinalizerName}
+			Expect(fakeClient.Create(ctx, service)).To(Succeed())
+
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(service)}
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(time.Second))
+
+			var updatedService corev1.Service
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &updatedService)).To(Succeed())
+			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName))
+		})
+
+		It("should unblock deletion of a service still carrying the legacy finalizer", func() {
+			annotations := map[string]string{
+				utils.PluginServerSecretAnnotationName: serverSecretName,
+				utils.PluginClientSecretAnnotationName: clientSecretName,
+				utils.PluginPortAnnotationName:         pluginPort,
+			}
+
+			service := createPluginService(annotations)
+			service.Finalizers = []string{utils.PluginFinalizerName}
+			serverSecret := createSecret(serverSecretName, serverCertPEM, serverKeyPEM)
+			clientSecret := createSecret(clientSecretName, clientCertPEM, clientKeyPEM)
+
+			Expect(fakeClient.Create(ctx, service)).To(Succeed())
+			Expect(fakeClient.Create(ctx, serverSecret)).To(Succeed())
+			Expect(fakeClient.Create(ctx, clientSecret)).To(Succeed())
+
+			// Delete: the finalizer keeps the object around, terminating
+			Expect(fakeClient.Delete(ctx, service)).To(Succeed())
+			var terminating corev1.Service
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &terminating)).To(Succeed())
+			Expect(terminating.DeletionTimestamp.IsZero()).To(BeFalse())
+
+			// Reconcile strips the finalizer, letting the deletion complete
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(service)}
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &corev1.Service{})
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+
+			// The follow-up reconcile of the deleted service is a clean no-op
+			_, err = reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pluginRepository.registeredPlugins).ToNot(HaveKey(pluginName))
+		})
+
+		It("should keep the plugin registered while the service is terminating with a foreign finalizer", func() {
+			annotations := map[string]string{
+				utils.PluginServerSecretAnnotationName: serverSecretName,
+				utils.PluginClientSecretAnnotationName: clientSecretName,
+				utils.PluginPortAnnotationName:         pluginPort,
+			}
+
+			service := createPluginService(annotations)
+			service.Finalizers = []string{"example.com/other-controller"}
+			serverSecret := createSecret(serverSecretName, serverCertPEM, serverKeyPEM)
+			clientSecret := createSecret(clientSecretName, clientCertPEM, clientKeyPEM)
+
+			Expect(fakeClient.Create(ctx, service)).To(Succeed())
+			Expect(fakeClient.Create(ctx, serverSecret)).To(Succeed())
+			Expect(fakeClient.Create(ctx, clientSecret)).To(Succeed())
+
+			// First reconcile to register the plugin
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(service)}
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
+
+			// Delete: the foreign finalizer keeps the object terminating,
+			// and the plugin must stay registered until it disappears
+			Expect(fakeClient.Delete(ctx, service)).To(Succeed())
+			_, err = reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
+
+			// Once the foreign finalizer goes away the object disappears and
+			// the next reconcile cleans up the plugin
+			var terminating corev1.Service
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &terminating)).To(Succeed())
+			terminating.Finalizers = nil
+			Expect(fakeClient.Update(ctx, &terminating)).To(Succeed())
+
+			_, err = reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pluginRepository.registeredPlugins).ToNot(HaveKey(pluginName))
+		})
+
 		It("should cleanup plugin when service is deleted (NotFound path)", func() {
 			annotations := map[string]string{
 				utils.PluginServerSecretAnnotationName: serverSecretName,
@@ -438,7 +533,7 @@ var _ = Describe("PluginReconciler", func() {
 			Expect(pluginRepository.registeredPlugins).ToNot(HaveKey(pluginName))
 		})
 
-		It("should not cleanup plugin if finalizer is not present on deletion", func() {
+		It("should not cleanup plugin when the service was never tracked by the reconciler", func() {
 			annotations := map[string]string{
 				utils.PluginServerSecretAnnotationName: serverSecretName,
 				utils.PluginClientSecretAnnotationName: clientSecretName,
@@ -467,14 +562,14 @@ var _ = Describe("PluginReconciler", func() {
 			_, err := reconciler.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Since there was no finalizer, the reconciler doesn't handle deletion cleanup
-			// This demonstrates why the finalizer is important
-			// In real scenarios, without the finalizer, plugins would be orphaned
+			// The plugin was registered out of band, so the reconciler has no
+			// service-to-plugin mapping for it: the NotFound reconcile cannot
+			// know which plugin the service was serving and leaves the pool alone
 			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
 		})
 
 		It("should return nil when service is not found (already deleted)", func() {
-			// This simulates the case where the service has been fully deleted after finalizer cleanup
+			// This simulates a reconcile request for a service that never existed
 			req := ctrl.Request{
 				NamespacedName: client.ObjectKey{
 					Namespace: testNamespace,

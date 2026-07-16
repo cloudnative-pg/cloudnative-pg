@@ -91,7 +91,7 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.Get(ctx, req.NamespacedName, &service); err != nil {
 		// This also happens when you delete a resource in k8s
 		if apierrs.IsNotFound(err) {
-			if name, ok := r.pluginNames.LoadAndDelete(req.NamespacedName.String()); ok {
+			if name, ok := r.pluginNames.LoadAndDelete(req.String()); ok {
 				contextLogger.Info("Plugin service deleted, removing from pool",
 					"pluginName", name)
 				r.Plugins.ForgetPlugin(name.(string))
@@ -101,6 +101,19 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		// This is a real error, maybe the RBAC configuration is wrong?
 		return ctrl.Result{}, fmt.Errorf("cannot get the resource: %w", err)
+	}
+
+	// Remove the legacy finalizer (e.g., after upgrade from an older version)
+	// before any plugin service check: a Service that no longer matches the
+	// plugin label or annotations would otherwise keep the finalizer forever,
+	// blocking its deletion.
+	if controllerutil.ContainsFinalizer(&service, utils.PluginFinalizerName) {
+		contextLogger.Debug("Removing legacy finalizer from plugin service")
+		controllerutil.RemoveFinalizer(&service, utils.PluginFinalizerName)
+		if err := r.Update(ctx, &service); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	if !isPluginService(&service, r.OperatorNamespace) {
@@ -115,22 +128,14 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	// Cache the service→plugin mapping for cleanup on deletion without finalizer
-	r.pluginNames.Store(req.NamespacedName.String(), pluginName)
+	// Cache the service→plugin mapping for cleanup on deletion
+	r.pluginNames.Store(req.String(), pluginName)
 
-	// Handle deletion
+	// A service being deleted has nothing to reconcile: the plugin is
+	// removed from the pool by the NotFound branch above as soon as the
+	// object disappears.
 	if !service.DeletionTimestamp.IsZero() {
-		return ctrl.Result{}, r.handleDeletion(ctx, &service, pluginName)
-	}
-
-	// Remove finalizer if still present (e.g., after upgrade from older version)
-	if controllerutil.ContainsFinalizer(&service, utils.PluginFinalizerName) {
-		contextLogger.Debug("Removing legacy finalizer from plugin service")
-		controllerutil.RemoveFinalizer(&service, utils.PluginFinalizerName)
-		if err := r.Update(ctx, &service); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{RequeueAfter: time.Second}, nil
+		return ctrl.Result{}, nil
 	}
 
 	res, err := r.reconcile(ctx, &service, pluginName)
@@ -294,32 +299,6 @@ func (r *PluginReconciler) reconcile(
 		"Successfully registered plugin %s at %s", pluginName, pluginAddress)
 
 	return ctrl.Result{}, nil
-}
-
-func (r *PluginReconciler) handleDeletion(
-	ctx context.Context,
-	service *corev1.Service,
-	pluginName string,
-) error {
-	contextLogger := log.FromContext(ctx).WithValues("pluginName", pluginName)
-
-	if controllerutil.ContainsFinalizer(service, utils.PluginFinalizerName) {
-		contextLogger.Info("Removing plugin from pool due to service deletion")
-		r.Recorder.Eventf(service, "Normal", "PluginCleanup",
-			"Removing plugin %s from pool due to service deletion", pluginName)
-		r.Plugins.ForgetPlugin(pluginName)
-
-		contextLogger.Debug("Removing finalizer from plugin service")
-		controllerutil.RemoveFinalizer(service, utils.PluginFinalizerName)
-		if err := r.Update(ctx, service); err != nil {
-			contextLogger.Error(err, "Error while removing finalizer from plugin service")
-			r.Recorder.Eventf(service, "Warning", "FinalizerRemovalFailed",
-				"Failed to remove finalizer: %v. Check RBAC permissions or API server connectivity", err)
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (r *PluginReconciler) getSecret(
