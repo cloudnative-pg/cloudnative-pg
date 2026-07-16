@@ -1242,6 +1242,23 @@ var pgRewindRetry = wait.Backoff{
 	Steps:    4,
 }
 
+// pgRewindShouldRetry reports whether a failed pg_rewind attempt should be
+// retried. pg_rewind does not start copying anything into the target data
+// directory until it has collected every WAL segment it needs (its only
+// writes before that point come from the ordinary crash recovery it runs on
+// a target that was not shut down cleanly), so a run aborted by a failed WAL
+// restoration can be safely retried from scratch, reusing the segments that
+// were already fetched.
+//
+// This retries every pg_rewind failure, not just a failed WAL restoration:
+// pg_rewind doesn't expose a way to tell the two apart, so a permanent
+// failure (e.g. a bad connection string) also gets retried here before
+// surfacing, rather than failing immediately. The only thing that stops the
+// retries is the context being cancelled.
+func pgRewindShouldRetry(ctx context.Context, _ error) bool {
+	return ctx.Err() == nil
+}
+
 // Rewind uses pg_rewind to align this data directory with the contents of the primary
 // node, using the "--restore-target-wal" option to fetch from the WAL archive any
 // segment that was already recycled locally
@@ -1275,24 +1292,13 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 		"pgdata", instance.PgData,
 		"options", options)
 
-	// pg_rewind does not start copying anything into the target data directory
-	// until it has collected every WAL segment it needs (its only writes before
-	// that point come from the ordinary crash recovery it runs on a target that
-	// was not shut down cleanly), so a run aborted by a failed WAL restoration
-	// can be safely retried from scratch, reusing the segments that were
-	// already fetched. Retrying here avoids handing a transient failure back
-	// to the reconciliation loop, whose exponential backoff would keep the
-	// instance down for much longer.
-	//
-	// This retries every pg_rewind failure, not just a failed WAL restoration:
-	// pg_rewind doesn't expose a way to tell the two apart, so a permanent
-	// failure (e.g. a bad connection string) also gets retried here before
-	// surfacing, rather than failing immediately.
-	retryUntilContextCancelled := func(_ error) bool {
-		return ctx.Err() == nil
-	}
+	// Retrying here avoids handing a transient failure back to the
+	// reconciliation loop, whose exponential backoff would keep the instance
+	// down for much longer.
 	attempt := 0
-	err := retry.OnError(pgRewindRetry, retryUntilContextCancelled, func() error {
+	err := retry.OnError(pgRewindRetry, func(err error) bool {
+		return pgRewindShouldRetry(ctx, err)
+	}, func() error {
 		attempt++
 
 		// Runs on every attempt, not just the first: a failed pg_rewind is
