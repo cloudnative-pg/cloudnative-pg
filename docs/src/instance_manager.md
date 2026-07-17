@@ -57,9 +57,8 @@ with the `query` and `streaming` strategies it must also account for the
 time needed to complete recovery and accept connections.
 
 :::warning
-    Setting `.spec.startDelay` too low can cause the liveness probe to activate
-    prematurely, potentially resulting in unnecessary Pod restarts if PostgreSQL
-    hasn’t fully initialized.
+    Setting `.spec.startDelay` too low can cause the startup probe to fail
+    before PostgreSQL has started up, resulting in unnecessary Pod restarts.
 :::
 
 CloudNativePG configures the startup probe with the following default parameters:
@@ -118,11 +117,9 @@ To accommodate these requirements, CloudNativePG extends the
 
     - `pg_isready`: relies on the exit code of the `pg_isready` command. The
       startup probe is successful when the server is either accepting
-      connections or alive but rejecting them, which happens while PostgreSQL
-      completes its startup sequence (for example, a standby replaying WAL
-      after a crash). The readiness probe is successful only when the server
-      is accepting connections. This is the default for primary instances and
-      replicas.
+      connections or alive but rejecting them, as described above. The
+      readiness probe is successful only when the server is accepting
+      connections. This is the default for primary instances and replicas.
     - `query`: marks the probe as successful when a basic query is executed on
       the `postgres` database locally.
     - `streaming`: marks the probe as successful when the replica begins

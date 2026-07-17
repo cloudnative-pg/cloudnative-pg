@@ -38,7 +38,7 @@ func (pgIsReadyChecker) IsHealthy(_ context.Context, instance *postgres.Instance
 
 // startupPgIsReadyChecker is the pg_isready strategy for the startup probe.
 // A server that is alive but rejecting connections has already started up
-// and is completing its startup sequence (i.e. crash recovery or WAL
+// and is completing its startup sequence (e.g. crash recovery or WAL
 // replay): reporting it as started prevents the kubelet from killing it
 // while it recovers. The readiness probe keeps failing until the server
 // accepts connections.

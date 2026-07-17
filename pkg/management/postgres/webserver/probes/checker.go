@@ -149,9 +149,7 @@ func getProbeRunnerFromCluster(probeType probeType, cluster apiv1.Cluster) runne
 }
 
 // newPgIsReadyChecker creates the pg_isready strategy runner for the passed
-// probe type. The startup probe considers a server that is alive but
-// rejecting connections as already started up, while the readiness probe
-// requires it to accept connections.
+// probe type, wrapping it in startupPgIsReadyChecker for the startup probe.
 func newPgIsReadyChecker(probeType probeType) runner {
 	if probeType == probeTypeStartup {
 		return startupPgIsReadyChecker{inner: pgIsReadyChecker{}}
