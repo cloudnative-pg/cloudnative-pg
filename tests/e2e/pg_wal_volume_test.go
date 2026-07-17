@@ -37,6 +37,7 @@ import (
 	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -101,7 +102,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 
 	// Inline function to patch walStorage in existing cluster
 	updateWalStorage := func(namespace, clusterName string) {
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")

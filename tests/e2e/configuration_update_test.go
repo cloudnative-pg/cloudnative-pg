@@ -76,7 +76,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 	updateClusterPostgresParams := func(paramsMap map[string]string, namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -88,7 +88,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 	updateClusterPostgresPgHBA := func(namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -100,7 +100,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 	updateClusterPostgresPgIdent := func(namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -113,7 +113,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	checkErrorOutFixedAndBlockedConfigurationParameter := func(params map[string]string, namespace string) {
 		// Update the configuration
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
@@ -224,7 +224,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		}
 
 		cluster := &apiv1.Cluster{}
-		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err = retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			cluster.Spec.ImageName = env.StandardImageName(targetTag)
@@ -281,7 +281,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
 			clusterutils.AddTopologySpreadConstraint(cluster)
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
@@ -504,7 +504,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodRestart
 			clusterutils.AddTopologySpreadConstraint(cluster)
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
