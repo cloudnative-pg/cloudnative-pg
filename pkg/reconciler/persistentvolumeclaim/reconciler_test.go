@@ -600,6 +600,7 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		pvc         corev1.PersistentVolumeClaim
 		cli         client.Client
 		ctx         context.Context
+		patchCount  int
 	)
 
 	BeforeEach(func() {
@@ -610,9 +611,18 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 			},
 		}
 		pvc = makePVC(clusterName, "1", "1", NewPgDataCalculator(), false)
+		patchCount = 0
 		cli = fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithObjects(cluster, &pvc).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object,
+					patch client.Patch, opts ...client.PatchOption,
+				) error {
+					patchCount++
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			}).
 			Build()
 	})
 
@@ -631,25 +641,10 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		className := "fast-class"
 		pvc.Spec.VolumeAttributesClassName = &className
 
-		// Rebuild the fake client for this test to count Patch calls
-		patchCount := 0
-		cli = fake.NewClientBuilder().
-			WithScheme(scheme.BuildWithAllKnownScheme()).
-			WithObjects(cluster, &pvc).
-			WithInterceptorFuncs(interceptor.Funcs{
-				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object,
-					patch client.Patch, opts ...client.PatchOption,
-				) error {
-					patchCount++
-					return c.Patch(ctx, obj, patch, opts...)
-				},
-			}).
-			Build()
-
 		storage := &apiv1.StorageConfiguration{
 			Size: "1Gi",
 			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-				VolumeAttributesClassName: ptr.To("fast-class"),
+				VolumeAttributesClassName: ptr.To(className),
 			},
 		}
 
@@ -674,6 +669,7 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(*pvc.Spec.VolumeAttributesClassName).To(Equal(expectedClassName))
+		Expect(patchCount).To(Equal(1))
 	})
 
 	It("sets VolumeAttributesClassName to nil when template specifies nil", func() {
@@ -690,5 +686,6 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.VolumeAttributesClassName).To(BeNil())
+		Expect(patchCount).To(Equal(1))
 	})
 })
