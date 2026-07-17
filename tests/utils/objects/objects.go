@@ -106,6 +106,16 @@ func isRetryableWriteError(err error) bool {
 		!errors.IsBadRequest(err)
 }
 
+// IsRetryableConflictOrTransientError reports whether err is a Conflict or a
+// transient write failure (see isRetryableWriteError). Callers running their
+// own read-modify-write retry loop (get the object, mutate it, write it
+// back) should retry on both: a Conflict means another writer raced this one
+// and a fresh read will succeed, while a transient failure means the same
+// attempt is worth repeating unchanged.
+func IsRetryableConflictOrTransientError(err error) bool {
+	return errors.IsConflict(err) || isRetryableWriteError(err)
+}
+
 // Patch patches an object in the Kubernetes cluster, retrying on transient
 // errors. Forwarding a mutation to an admission webhook can intermittently
 // fail with a 500/503 on any cluster that routes that hop through a proxy
