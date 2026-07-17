@@ -159,7 +159,8 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 					},
 				}
 				clusterutils.AddTopologySpreadConstraint(cluster)
-				Expect(env.Client.Create(env.Ctx, cluster)).To(Succeed())
+				_, err := objects.Create(env.Ctx, env.Client, cluster)
+				Expect(err).To(Succeed())
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			})
 

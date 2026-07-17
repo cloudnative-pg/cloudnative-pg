@@ -373,7 +373,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			err := env.Client.Create(env.Ctx, catalog)
 			Expect(err).ToNot(HaveOccurred())
 			clusterutils.AddTopologySpreadConstraint(cluster)
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			resources.CreateResourceFromFile(env, namespace, databaseManifest)

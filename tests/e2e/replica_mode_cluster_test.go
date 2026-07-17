@@ -113,7 +113,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			assertReplicaClusterTopology(replicaNamespace, replicaName)
 
 			By("increasing max_connections to 120 on the replica cluster", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, replicaNamespace, replicaName)
 					if err != nil {
 						return err
@@ -151,7 +151,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("decreasing max_connections to 110 on the replica cluster", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, replicaNamespace, replicaName)
 					if err != nil {
 						return err

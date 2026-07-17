@@ -38,6 +38,7 @@ import (
 	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -218,7 +219,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 
 			By("updating pg_hba and pg_ident of the Cluster to allow cert authentication for the app user", func() {
 				cluster := &apiv1.Cluster{}
-				err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err = retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					var err error
 					cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
