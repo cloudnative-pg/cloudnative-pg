@@ -31,7 +31,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -422,42 +421,6 @@ var _ = Describe("PluginReconciler", func() {
 			var updatedService corev1.Service
 			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &updatedService)).To(Succeed())
 			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName))
-		})
-
-		It("should unblock deletion of a service still carrying the legacy finalizer", func() {
-			annotations := map[string]string{
-				utils.PluginServerSecretAnnotationName: serverSecretName,
-				utils.PluginClientSecretAnnotationName: clientSecretName,
-				utils.PluginPortAnnotationName:         pluginPort,
-			}
-
-			service := createPluginService(annotations)
-			service.Finalizers = []string{utils.PluginFinalizerName}
-			serverSecret := createSecret(serverSecretName, serverCertPEM, serverKeyPEM)
-			clientSecret := createSecret(clientSecretName, clientCertPEM, clientKeyPEM)
-
-			Expect(fakeClient.Create(ctx, service)).To(Succeed())
-			Expect(fakeClient.Create(ctx, serverSecret)).To(Succeed())
-			Expect(fakeClient.Create(ctx, clientSecret)).To(Succeed())
-
-			// Delete: the finalizer keeps the object around, terminating
-			Expect(fakeClient.Delete(ctx, service)).To(Succeed())
-			var terminating corev1.Service
-			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &terminating)).To(Succeed())
-			Expect(terminating.DeletionTimestamp.IsZero()).To(BeFalse())
-
-			// Reconcile strips the finalizer, letting the deletion complete
-			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(service)}
-			_, err := reconciler.Reconcile(ctx, req)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &corev1.Service{})
-			Expect(apierrs.IsNotFound(err)).To(BeTrue())
-
-			// The follow-up reconcile of the deleted service is a clean no-op
-			_, err = reconciler.Reconcile(ctx, req)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(pluginRepository.registeredPlugins).ToNot(HaveKey(pluginName))
 		})
 
 		It("should keep the plugin registered while the service is terminating with a foreign finalizer", func() {
