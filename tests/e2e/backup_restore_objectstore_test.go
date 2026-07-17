@@ -739,7 +739,7 @@ var _ = Describe("Object storage - Backup and restore", Label(tests.LabelBackupR
 			})
 
 			By("scaling first cluster to 2 instances", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, firstClusterName)
 					if err != nil {
 						return err

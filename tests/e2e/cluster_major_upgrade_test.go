@@ -529,7 +529,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 
 		cluster := scenario.startingCluster
 		clusterutils.AddTopologySpreadConstraint(cluster)
-		err := env.Client.Create(env.Ctx, cluster)
+		_, err := objects.Create(env.Ctx, env.Client, cluster)
 		Expect(err).NotTo(HaveOccurred())
 		clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 
