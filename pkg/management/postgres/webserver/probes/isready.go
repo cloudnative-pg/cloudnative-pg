@@ -21,6 +21,9 @@ package probes
 
 import (
 	"context"
+	"errors"
+
+	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -31,4 +34,25 @@ type pgIsReadyChecker struct{}
 // IsHealthy implements the runner interface
 func (pgIsReadyChecker) IsHealthy(_ context.Context, instance *postgres.Instance) error {
 	return instance.IsReady()
+}
+
+// startupPgIsReadyChecker is the pg_isready strategy for the startup probe.
+// A server that is alive but rejecting connections has already started up
+// and is completing its startup sequence (e.g. crash recovery or WAL
+// replay): reporting it as started prevents the kubelet from killing it
+// while it recovers. The readiness probe keeps failing until the server
+// accepts connections.
+type startupPgIsReadyChecker struct {
+	inner runner
+}
+
+// IsHealthy implements the runner interface
+func (c startupPgIsReadyChecker) IsHealthy(ctx context.Context, instance *postgres.Instance) error {
+	err := c.inner.IsHealthy(ctx, instance)
+	if errors.Is(err, postgres.ErrPgRejectingConnection) {
+		log.FromContext(ctx).Info(
+			"PostgreSQL is alive but rejecting connections, considering the instance as started up")
+		return nil
+	}
+	return err
 }
