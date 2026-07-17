@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -108,7 +109,7 @@ func reconcileVolumeAttributeClass(
 	}
 
 	expectedVolumeAttributesClassName := storageConfiguration.PersistentVolumeClaimTemplate.VolumeAttributesClassName
-	if expectedVolumeAttributesClassName == pvc.Spec.VolumeAttributesClassName {
+	if ptr.Equal(expectedVolumeAttributesClassName, pvc.Spec.VolumeAttributesClassName) {
 		return nil
 	}
 
