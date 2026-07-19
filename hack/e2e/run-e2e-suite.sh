@@ -67,18 +67,30 @@ RC_GINKGO=0
 export TEST_SKIP_UPGRADE=true
 cd "${ROOT_DIR}/tests"
 
-# Size ginkgo's parallelism to the runner instead of a fixed value, so we
-# don't starve the kind control plane (apiserver/etcd/kubelet/containerd) on
-# small runners while leaving most of a big runner's CPUs idle. Reserve
-# ~25% of the available cores for the control plane and system pods, and
-# use the rest as ginkgo workers.
-AVAILABLE_CORES=$(nproc)
-RESERVED_CORES=$(( (AVAILABLE_CORES + 3) / 4 ))
-GINKGO_NODES=$(( AVAILABLE_CORES - RESERVED_CORES ))
-if [ "${GINKGO_NODES}" -lt 1 ]; then
-  GINKGO_NODES=1
-fi
-echo "Detected ${AVAILABLE_CORES} CPU(s); running ginkgo with ${GINKGO_NODES} node(s)"
+# kind/k3d run their control plane (apiserver/etcd/kubelet/containerd) on the
+# same runner as the ginkgo workers, so parallelism must be sized to the
+# runner to leave it headroom. That's also the default for a bare local
+# invocation (e.g. running this script outside of run-e2e-local.sh), which
+# always means a local kind/k3d cluster. The remote cloud vendors only talk
+# to a cluster over the network, so they gain nothing from capping
+# parallelism to the runner's own core count and instead just need enough
+# workers to fit the suite in the CI timeout.
+case "${TEST_CLOUD_VENDOR:-}" in
+  eks|gke|aks|ocp)
+    GINKGO_NODES=4
+    ;;
+  *)
+    # Reserve ~25% of the available cores for the control plane and system
+    # pods, and use the rest as ginkgo workers.
+    AVAILABLE_CORES=$(nproc)
+    RESERVED_CORES=$(( (AVAILABLE_CORES + 3) / 4 ))
+    GINKGO_NODES=$(( AVAILABLE_CORES - RESERVED_CORES ))
+    if [ "${GINKGO_NODES}" -lt 1 ]; then
+      GINKGO_NODES=1
+    fi
+    echo "Detected ${AVAILABLE_CORES} CPU(s); running ginkgo with ${GINKGO_NODES} node(s)"
+    ;;
+esac
 
 ginkgo --nodes="${GINKGO_NODES}" --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
       ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
