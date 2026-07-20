@@ -491,6 +491,10 @@ function ensure_cert_manager() {
 #   - "release" (default): the latest published release
 #   - "main":              the current snapshot from the main branch
 #   - "vX.Y.Z" / "X.Y.Z":  a specific pinned release
+#   - "pr-<number>":       a plugin-barman-cloud pull request. Installs the
+#                          testing images its CI publishes for the PR (tagged
+#                          "pr-<number>"), with the manifest taken from the
+#                          PR's head ref.
 #   - "<branch>":          a same-repo plugin-barman-cloud branch. Installs the
 #                          testing images its CI publishes for the branch. The
 #                          manifest checked into the branch still points at the
@@ -524,6 +528,13 @@ function install_barman_cloud_plugin() {
             # clear message instead of a confusing 404.
             if [[ "${selector}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
                 manifest_url="https://github.com/${repo}/releases/download/v${selector#v}/manifest.yaml"
+            elif [[ "${selector}" =~ ^pr-[0-9]+$ ]]; then
+                # A plugin-barman-cloud pull request: its CI publishes the
+                # testing images under the "pr-<number>" tag (the pull_request
+                # ref name is "<number>/merge", not the branch name), and the
+                # matching manifest is served from the PR's head ref.
+                manifest_url="https://raw.githubusercontent.com/${repo}/refs/pull/${selector#pr-}/head/manifest.yaml"
+                branch_tag="${selector}"
             elif [[ "${selector}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
                 # Anything else is treated as a plugin-barman-cloud branch name,
                 # validated with a conservative charset so a malformed value
