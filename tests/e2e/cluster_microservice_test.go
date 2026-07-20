@@ -24,10 +24,11 @@ import (
 	"os"
 	"strings"
 
-	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
@@ -154,18 +155,32 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		importClusterNonexistentDB := fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
 		resources.CreateResourceFromFile(env, namespace, importClusterNonexistentDB)
 		By("having a imported Cluster in failed state", func() {
+			// Job-free bootstrap (#11228) replaced the microservice import Job
+			// with a self-bootstrapping instance Pod; a nonexistent source
+			// database makes every bootstrap attempt fail identically, so the
+			// pod's postgres container restarts (RestartPolicy is Always for
+			// instance Pods) instead of the Job accumulating a failed count.
+			//
+			// DECISION-1-DEPENDENT: whether this import error is classified as
+			// retriable (crash-loop until restartCount>=6) or non-retriable
+			// (immediate exit) is still open on #11228, so this only asserts
+			// the one signal both tiers share: the bootstrap pod restarts at
+			// least once instead of the cluster silently getting created.
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      importedClusterName + "-1-import",
+				Name:      specs.GetInstanceName(importedClusterName, 1),
 			}
-			// Eventually the number of failed job should be greater than 1
-			// which will ensure the cluster not getting created
-			job := &batchv1.Job{}
+			pod := &corev1.Pod{}
 			Eventually(func(g Gomega) int32 {
-				err := env.Client.Get(env.Ctx, namespacedName, job)
-				g.Expect(err).ToNot(HaveOccurred())
-				return job.Status.Failed
-			}, 100).Should(BeEquivalentTo(1))
+				g.Expect(env.Client.Get(env.Ctx, namespacedName, pod)).To(Succeed())
+				for _, cs := range pod.Status.ContainerStatuses {
+					if cs.Name == specs.PostgresContainerName {
+						return cs.RestartCount
+					}
+				}
+				return 0
+			}, 100).Should(BeNumerically(">", 0),
+				"the bootstrap pod for the imported instance should be crash-looping")
 		})
 	})
 

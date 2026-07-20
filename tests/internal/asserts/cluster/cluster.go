@@ -28,6 +28,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lib/pq"
@@ -46,6 +48,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/jobs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -328,6 +331,80 @@ func AssertClusterIsReady(
 			}, timeout, 2).Should(Succeed(), "Replicas are attached via streaming connection")
 		}
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
+	})
+}
+
+// AssertNoBootstrapJobCreatedDuring runs fn (typically a cluster/instance
+// creation-and-wait call) while concurrently polling for any batch/v1 Job in
+// the namespace, then fails if one was ever observed.
+//
+// Job-free bootstrap (#11228) replaced every initdb/join/pgbasebackup/
+// restore/restoresnapshot Job with a self-bootstrapping instance Pod; a
+// completed Job is deleted by the operator's cleanup shortly after it
+// finishes (cleanupCompletedJobs), so a point-in-time check after fn returns
+// would miss one that already came and went. Only the pg_upgrade
+// major-upgrade Job is unaffected by #11228 and would also fail this check,
+// so call it only around cluster/instance creation, never around an upgrade.
+func AssertNoBootstrapJobCreatedDuring(
+	env *environment.TestingEnvironment,
+	namespace string,
+	fn func(),
+) {
+	GinkgoHelper()
+
+	var sawJob atomic.Bool
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				jobList, err := jobs.List(env.Ctx, env.Client, namespace)
+				if err == nil && len(jobList.Items) > 0 {
+					sawJob.Store(true)
+				}
+			}
+		}
+	}()
+
+	fn()
+
+	close(stop)
+	wg.Wait()
+
+	Expect(sawJob.Load()).To(BeFalse(),
+		"no bootstrap Job should ever be created while provisioning the cluster")
+}
+
+// AssertClusterInstancesHaveNoRestart verifies that none of the cluster's
+// instance pods have ever restarted their postgres container. Called right
+// after a cluster reaches Ready, this proves the bootstrap phase completed
+// without the container crashing, which RestartCount would still reflect
+// even after readiness is reached.
+func AssertClusterInstancesHaveNoRestart(
+	env *environment.TestingEnvironment,
+	namespace, clusterName string,
+) {
+	GinkgoHelper()
+	By(fmt.Sprintf("verifying no instance pod of %s restarted during bootstrap", clusterName), func() {
+		podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			for _, cs := range pod.Status.ContainerStatuses {
+				if cs.Name != specs.PostgresContainerName {
+					continue
+				}
+				Expect(cs.RestartCount).To(BeEquivalentTo(0),
+					"pod %s should reach Ready without restarting its postgres container", pod.Name)
+			}
+		}
 	})
 }
 
