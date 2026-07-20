@@ -1346,6 +1346,11 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&apiv1.Subscription{},
 			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
 			builder.WithPredicates(isBeingDeletedPredicate),
+		).
+		Watches(
+			&apiv1.DatabaseRole{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
 		)
 
 	if configuration.Current.OperatorNamespace != "" {
@@ -1628,11 +1633,9 @@ func (r *ClusterReconciler) mapDatabaseRolesToClusters() handler.MapFunc {
 }
 
 // mapClusterOwnedResourceToCluster maps a namespaced resource that references its
-// Cluster through the `cluster` field (Database, Publication, Subscription) to a
-// reconcile request for that Cluster. It resolves the reference by name instead of
-// through an owner reference, so it keeps working after the Cluster object is gone:
-// that is what allows notifyDeletionToOwnedResources to strip a lingering finalizer
-// when the operator sees the resource again after a restart.
+// Cluster through the `cluster` field to a reconcile request for that Cluster.
+// It resolves the cluster reference by the spec instead of through an owner reference,
+// so it keeps working after the Cluster object is gone.
 func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []reconcile.Request {
 	owned, ok := obj.(interface {
 		GetClusterRef() corev1.LocalObjectReference
