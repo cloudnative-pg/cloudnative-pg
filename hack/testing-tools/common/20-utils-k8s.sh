@@ -491,6 +491,14 @@ function ensure_cert_manager() {
 #   - "release" (default): the latest published release
 #   - "main":              the current snapshot from the main branch
 #   - "vX.Y.Z" / "X.Y.Z":  a specific pinned release
+#   - "<branch>":          a same-repo plugin-barman-cloud branch. Installs the
+#                          testing images its CI publishes for the branch. The
+#                          manifest checked into the branch still points at the
+#                          "main" testing images, so both the operator
+#                          Deployment image and the sidecar image are repointed
+#                          at the branch's testing images (tag = branch name
+#                          with every "/" replaced by "-", mirroring the plugin
+#                          Taskfile).
 # Requires the operator to be installed first. Exports
 # BARMAN_PLUGIN_VERSION_RESOLVED with the concrete version that was deployed
 # (read back from the running deployment image) so the test suite can log it.
@@ -500,6 +508,8 @@ function install_barman_cloud_plugin() {
     local repo="cloudnative-pg/plugin-barman-cloud"
     local manifest_url
     local operator_namespace="cnpg-system"
+    # Non-empty only in branch mode; holds the derived testing image tag.
+    local branch_tag=""
 
     case "${selector}" in
         release)
@@ -514,8 +524,15 @@ function install_barman_cloud_plugin() {
             # clear message instead of a confusing 404.
             if [[ "${selector}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
                 manifest_url="https://github.com/${repo}/releases/download/v${selector#v}/manifest.yaml"
+            elif [[ "${selector}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
+                # Anything else is treated as a plugin-barman-cloud branch name,
+                # validated with a conservative charset so a malformed value
+                # fails fast instead of building a bogus raw URL. A nonexistent
+                # branch still fails later with the "manifest not found" error.
+                manifest_url="https://raw.githubusercontent.com/${repo}/refs/heads/${selector}/manifest.yaml"
+                branch_tag="${selector//\//-}"
             else
-                printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main" or a version like v0.12.0)%b\n' \
+                printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main", a version like v0.12.0, or a plugin-barman-cloud branch name)%b\n' \
                     "${bright}" "${selector}" "${reset}" >&2
                 return 1
             fi
@@ -545,6 +562,40 @@ resources:
 - manifest.yaml
 namespace: ${operator_namespace}
 EOF
+    # In branch mode the checked-in manifest still references the "main" testing
+    # images, so repoint both at the branch's testing images. The Deployment
+    # image is handled by the images transformer; the sidecar image is delivered
+    # to the operator through the SIDECAR_IMAGE env var, which the manifest wires
+    # up via a secretKeyRef into a content-hashed Secret. Patching the env var
+    # with a literal value (and dropping the valueFrom) overrides that
+    # indirection directly, so the hashed Secret name never has to be known.
+    if [[ -n "${branch_tag}" ]]; then
+        local plugin_image="ghcr.io/cloudnative-pg/plugin-barman-cloud-testing"
+        local sidecar_image="ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar-testing"
+        cat >> "${kustomize_dir}/kustomization.yaml" <<EOF
+images:
+- name: ${plugin_image}
+  newTag: ${branch_tag}
+patches:
+- target:
+    kind: Deployment
+    name: barman-cloud
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: barman-cloud
+    spec:
+      template:
+        spec:
+          containers:
+          - name: barman-cloud
+            env:
+            - name: SIDECAR_IMAGE
+              value: ${sidecar_image}:${branch_tag}
+              valueFrom: null
+EOF
+    fi
     "${K8S_CLI}" kustomize "${kustomize_dir}" > "${manifest_file}"
     rm -rf "${kustomize_dir}"
 
