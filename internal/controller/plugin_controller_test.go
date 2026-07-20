@@ -348,7 +348,7 @@ var _ = Describe("PluginReconciler", func() {
 	})
 
 	Context("when handling plugin service lifecycle with finalizers", func() {
-		It("should not add finalizer when reconciling a new plugin service", func() {
+		It("should not add finalizer when reconciling a new plugin service (regression guard)", func() {
 			annotations := map[string]string{
 				utils.PluginServerSecretAnnotationName: serverSecretName,
 				utils.PluginClientSecretAnnotationName: clientSecretName,
@@ -372,7 +372,7 @@ var _ = Describe("PluginReconciler", func() {
 			// Verify no finalizer was added
 			var updatedService corev1.Service
 			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &updatedService)).To(Succeed())
-			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName))
+			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName)) //nolint:staticcheck
 
 			// Verify plugin was registered
 			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
@@ -386,7 +386,7 @@ var _ = Describe("PluginReconciler", func() {
 			}
 
 			service := createPluginService(annotations)
-			service.Finalizers = []string{utils.PluginFinalizerName}
+			service.Finalizers = []string{utils.PluginFinalizerName} //nolint:staticcheck
 			serverSecret := createSecret(serverSecretName, serverCertPEM, serverKeyPEM)
 			clientSecret := createSecret(clientSecretName, clientCertPEM, clientKeyPEM)
 
@@ -403,14 +403,14 @@ var _ = Describe("PluginReconciler", func() {
 			// Verify finalizer was removed
 			var updatedService corev1.Service
 			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &updatedService)).To(Succeed())
-			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName))
+			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName)) //nolint:staticcheck
 		})
 
 		It("should remove the legacy finalizer even when the service no longer matches the plugin checks", func() {
 			// No annotations: isPluginService fails, but the finalizer must
 			// still be removed or the service could never be deleted
 			service := createPluginService(nil)
-			service.Finalizers = []string{utils.PluginFinalizerName}
+			service.Finalizers = []string{utils.PluginFinalizerName} //nolint:staticcheck
 			Expect(fakeClient.Create(ctx, service)).To(Succeed())
 
 			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(service)}
@@ -420,7 +420,7 @@ var _ = Describe("PluginReconciler", func() {
 
 			var updatedService corev1.Service
 			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &updatedService)).To(Succeed())
-			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName))
+			Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName)) //nolint:staticcheck
 		})
 
 		It("should keep the plugin registered while the service is terminating with a foreign finalizer", func() {

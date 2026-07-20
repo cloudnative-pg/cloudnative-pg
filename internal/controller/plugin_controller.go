@@ -106,13 +106,13 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("cannot get the resource: %w", err)
 	}
 
-	// Remove the legacy finalizer (e.g., after upgrade from an older version)
-	// before any plugin service check: a Service that no longer matches the
-	// plugin label or annotations would otherwise keep the finalizer forever,
-	// blocking its deletion.
-	if controllerutil.ContainsFinalizer(&service, utils.PluginFinalizerName) {
+	// Remove the legacy finalizer (see PluginFinalizerName for why it's
+	// kept around) before any plugin service check: a Service that no
+	// longer matches the plugin label or annotations would otherwise keep
+	// the finalizer forever, blocking its deletion.
+	if controllerutil.ContainsFinalizer(&service, utils.PluginFinalizerName) { //nolint:staticcheck
 		contextLogger.Debug("Removing legacy finalizer from plugin service")
-		controllerutil.RemoveFinalizer(&service, utils.PluginFinalizerName)
+		controllerutil.RemoveFinalizer(&service, utils.PluginFinalizerName) //nolint:staticcheck
 		if err := r.Update(ctx, &service); err != nil {
 			contextLogger.Error(err, "Error while removing legacy finalizer from plugin service")
 			r.Recorder.Eventf(&service, "Warning", "FinalizerRemovalFailed",
