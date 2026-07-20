@@ -106,7 +106,10 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			resources.CreateResourceFromFile(env, namespace, postInitTemplateSQLSecretRef)
 			resources.CreateResourceFromFile(env, namespace, postInitTemplateSQLConfigMapRef)
 
-			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, postInitSQLCluster)
+			clusterasserts.AssertNoBootstrapJobCreatedDuring(env, namespace, func() {
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, postInitSQLCluster)
+			})
+			clusterasserts.AssertClusterInstancesHaveNoRestart(env, namespace, clusterName)
 
 			// Data defined by postInitSQL, postInitApplicationSQL and postInitTemplateSQL
 			assertPostInitData(namespace, clusterName, "sql",

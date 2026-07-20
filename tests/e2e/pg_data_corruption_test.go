@@ -22,7 +22,6 @@ package e2e
 import (
 	"fmt"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -343,15 +342,15 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				Expect(walPVC.DeletionTimestamp).ToNot(BeNil(), "the WAL PVC should be terminating")
 			})
 
-			joinJobKey := types.NamespacedName{Namespace: namespace, Name: victimName + "-join"}
+			instancePodKey := types.NamespacedName{Namespace: namespace, Name: victimName}
 			By("verifying the instance is NOT recreated while the WAL PVC is terminating", func() {
-				// Without the fix the operator creates the join Job immediately and
-				// its Pod stays Pending; with the fix no Job is created until the
-				// previous WAL PVC is gone.
+				// Without the fix the operator recreates the instance Pod for this
+				// serial immediately and it stays Pending; with the fix no new Pod
+				// is created until the previous WAL PVC is gone.
 				Consistently(func() bool {
-					err := env.Client.Get(env.Ctx, joinJobKey, &batchv1.Job{})
+					err := env.Client.Get(env.Ctx, instancePodKey, &corev1.Pod{})
 					return apierrs.IsNotFound(err)
-				}, 30, 3).Should(BeTrue(), "a join Job must not be created while the previous WAL PVC is terminating")
+				}, 30, 3).Should(BeTrue(), "the instance Pod must not be recreated while the previous WAL PVC is terminating")
 			})
 
 			By("releasing the WAL PVC", func() {

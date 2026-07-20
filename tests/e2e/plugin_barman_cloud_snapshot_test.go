@@ -304,13 +304,16 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot and PITR", func() {
-					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, restoreManifest)
-					clusterasserts.AssertClusterIsReady(
-						env,
-						namespace,
-						clusterToRestoreName,
-						testTimeouts[timeouts.ClusterIsReadySlow],
-					)
+					clusterasserts.AssertNoBootstrapJobCreatedDuring(env, namespace, func() {
+						clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, restoreManifest)
+						clusterasserts.AssertClusterIsReady(
+							env,
+							namespace,
+							clusterToRestoreName,
+							testTimeouts[timeouts.ClusterIsReadySlow],
+						)
+					})
+					clusterasserts.AssertClusterInstancesHaveNoRestart(env, namespace, clusterToRestoreName)
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
