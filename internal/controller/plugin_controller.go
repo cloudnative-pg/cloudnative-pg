@@ -92,6 +92,9 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// This also happens when you delete a resource in k8s
 		if apierrs.IsNotFound(err) {
 			if name, ok := r.pluginNames.LoadAndDelete(req.String()); ok {
+				// No Kubernetes event: the Service is already gone, and an
+				// event on a reconstructed reference risks landing on a
+				// future Service with the same name.
 				contextLogger.Info("Plugin service deleted, removing from pool",
 					"pluginName", name)
 				r.Plugins.ForgetPlugin(name.(string))
@@ -131,7 +134,6 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	// Cache the service→plugin mapping for cleanup on deletion
 	r.pluginNames.Store(req.String(), pluginName)
 
 	// A service being deleted has nothing to reconcile: the plugin is
