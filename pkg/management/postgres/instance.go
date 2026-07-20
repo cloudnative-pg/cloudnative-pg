@@ -212,6 +212,13 @@ type Instance struct {
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
 
+	// bootstrapProgress, when not nil, means an in-process bootstrap of the
+	// data directory is currently running. It carries the mode and start time
+	// so the status endpoints can report it. It is deliberately independent
+	// from mightBeUnavailable: a bootstrapping instance must not be counted as
+	// reporting its status, or it would break primary-before-replica ordering.
+	bootstrapProgress atomic.Pointer[BootstrapProgress]
+
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
 	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
 
@@ -290,6 +297,36 @@ func (instance *Instance) CanCheckReadiness() bool {
 // MightBeUnavailable checks whether we expect the instance to be down
 func (instance *Instance) MightBeUnavailable() bool {
 	return instance.mightBeUnavailable.Load()
+}
+
+// BootstrapProgress describes an in-process bootstrap that is currently running.
+type BootstrapProgress struct {
+	// Mode is the bootstrap method being executed.
+	Mode string
+
+	// Since is the time the bootstrap started.
+	Since time.Time
+}
+
+// StartBootstrap marks the instance as being bootstrapped with the given mode.
+func (instance *Instance) StartBootstrap(mode string) {
+	instance.bootstrapProgress.Store(&BootstrapProgress{Mode: mode, Since: time.Now()})
+}
+
+// CompleteBootstrap clears the in-process bootstrap marker.
+func (instance *Instance) CompleteBootstrap() {
+	instance.bootstrapProgress.Store(nil)
+}
+
+// IsBootstrapInProgress reports whether an in-process bootstrap is running.
+func (instance *Instance) IsBootstrapInProgress() bool {
+	return instance.bootstrapProgress.Load() != nil
+}
+
+// GetBootstrapProgress returns the in-process bootstrap currently running, or
+// nil when the instance is not being bootstrapped.
+func (instance *Instance) GetBootstrapProgress() *BootstrapProgress {
+	return instance.bootstrapProgress.Load()
 }
 
 // SetFencing marks whether the instance is fenced, if enabling, marks also any down to be tolerated
