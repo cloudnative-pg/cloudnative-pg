@@ -23,11 +23,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/bootstrap"
 )
 
 type restoreRunnable struct {
@@ -43,8 +43,6 @@ type restoreRunnable struct {
 }
 
 func (r *restoreRunnable) Start(ctx context.Context) error {
-	contextLogger := log.FromContext(ctx)
-
 	// we will wait this way for the mgr and informers to be online
 	if err := management.WaitForGetClusterWithClient(ctx, r.cli, client.ObjectKey{
 		Name:      r.clusterName,
@@ -62,8 +60,10 @@ func (r *restoreRunnable) Start(ctx context.Context) error {
 		TablespaceMapFile: r.tablespaceMapFile,
 	}
 
-	if err := info.RestoreSnapshot(ctx, r.cli, r.immediate); err != nil {
-		contextLogger.Error(err, "Error while restoring a backup")
+	if err := bootstrap.Execute(ctx, r.cli, nil, info, bootstrap.Instruction{
+		Mode:      bootstrap.ModeRestoreSnapshot,
+		Immediate: r.immediate,
+	}); err != nil {
 		return err
 	}
 
