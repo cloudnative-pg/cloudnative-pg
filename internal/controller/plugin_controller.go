@@ -111,6 +111,9 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		contextLogger.Debug("Removing legacy finalizer from plugin service")
 		controllerutil.RemoveFinalizer(&service, utils.PluginFinalizerName)
 		if err := r.Update(ctx, &service); err != nil {
+			contextLogger.Error(err, "Error while removing legacy finalizer from plugin service")
+			r.Recorder.Eventf(&service, "Warning", "FinalizerRemovalFailed",
+				"Failed to remove legacy finalizer: %v", err)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: time.Second}, nil
