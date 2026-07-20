@@ -21,7 +21,6 @@ SPDX-License-Identifier: Apache-2.0
 package initdb
 
 import (
-	"context"
 	"os"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -33,6 +32,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/bootstrap"
 )
 
 // NewCmd generates the "init" subcommand
@@ -109,7 +109,7 @@ func NewCmd() *cobra.Command {
 				PostInitSQLRefsFolder:            postInitSQLRefsFolder,
 			}
 
-			return initSubCommand(ctx, info)
+			return bootstrap.Execute(ctx, nil, nil, info, bootstrap.Instruction{Mode: bootstrap.ModeInitDB})
 		},
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
@@ -149,20 +149,4 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&postInitTemplateSQLRefsFolder, "post-init-template-sql-refs-folder",
 		"", "The folder contains a set of SQL files to be executed in alphabetical order")
 	return cmd
-}
-
-func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
-	contextLogger := log.FromContext(ctx)
-	err := info.EnsureTargetDirectoriesDoNotExist(ctx)
-	if err != nil {
-		return err
-	}
-
-	err = info.Bootstrap(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error while bootstrapping data directory")
-		return err
-	}
-
-	return nil
 }

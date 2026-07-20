@@ -21,19 +21,17 @@ SPDX-License-Identifier: Apache-2.0
 package join
 
 import (
-	"context"
 	"os"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/bootstrap"
 )
 
 // NewCmd creates the new "join" command
@@ -55,6 +53,8 @@ func NewCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			contextLogger := log.FromContext(ctx)
+
 			// The fields in the instance are needed to correctly
 			// download the secret containing the TLS
 			// certificates
@@ -70,7 +70,13 @@ func NewCmd() *cobra.Command {
 				PodName:    podName,
 			}
 
-			return joinSubCommand(ctx, instance, info)
+			client, err := management.NewControllerRuntimeClient()
+			if err != nil {
+				contextLogger.Error(err, "Error creating Kubernetes client")
+				return err
+			}
+
+			return bootstrap.Execute(ctx, client, instance, info, bootstrap.Instruction{Mode: bootstrap.ModeJoin})
 		},
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
@@ -92,42 +98,4 @@ func NewCmd() *cobra.Command {
 		"the current cluster in k8s, used to download TLS certificates")
 
 	return cmd
-}
-
-func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postgres.InitInfo) error {
-	contextLogger := log.FromContext(ctx)
-
-	if err := info.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
-		return err
-	}
-
-	client, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		contextLogger.Error(err, "Error creating Kubernetes client")
-		return err
-	}
-
-	// Download the cluster definition from the API server
-	var cluster apiv1.Cluster
-	if err := client.Get(ctx,
-		ctrl.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
-		&cluster,
-	); err != nil {
-		contextLogger.Error(err, "Error while getting cluster")
-		return err
-	}
-	instance.SetCluster(&cluster)
-
-	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
-		contextLogger.Error(err, "Error while refreshing secrets")
-		return err
-	}
-
-	// Run "pg_basebackup" to download the data directory from the primary
-	if err := info.Join(ctx, &cluster); err != nil {
-		contextLogger.Error(err, "Error joining node")
-		return err
-	}
-
-	return nil
 }

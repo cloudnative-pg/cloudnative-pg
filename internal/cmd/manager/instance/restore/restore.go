@@ -21,17 +21,13 @@ package restore
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 
-	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
-	"github.com/cloudnative-pg/machinery/pkg/fileutils"
-	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/bootstrap"
 )
 
 type restoreRunnable struct {
@@ -59,7 +55,7 @@ func (r *restoreRunnable) Start(ctx context.Context) error {
 		PgWal:       r.pgWal,
 	}
 
-	if err := restoreSubCommand(ctx, info, r.cli); err != nil {
+	if err := bootstrap.Execute(ctx, r.cli, nil, info, bootstrap.Instruction{Mode: bootstrap.ModeRestore}); err != nil {
 		return fmt.Errorf("while restoring cluster: %s", err)
 	}
 
@@ -67,42 +63,4 @@ func (r *restoreRunnable) Start(ctx context.Context) error {
 	// the manager to quit
 	r.cancel()
 	return nil
-}
-
-func restoreSubCommand(ctx context.Context, info postgres.InitInfo, cli client.Client) error {
-	contextLogger := log.FromContext(ctx)
-	if err := info.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
-		return err
-	}
-
-	if err := info.Restore(ctx, cli); err != nil {
-		contextLogger.Error(err, "Error while restoring a backup")
-		cleanupDataDirectoryIfNeeded(ctx, err, info.PgData)
-		return err
-	}
-
-	contextLogger.Info("restore command execution completed without errors")
-
-	return nil
-}
-
-func cleanupDataDirectoryIfNeeded(ctx context.Context, restoreError error, dataDirectory string) {
-	contextLogger := log.FromContext(ctx)
-
-	var barmanError *barmanCommand.CloudRestoreError
-	if !errors.As(restoreError, &barmanError) {
-		return
-	}
-
-	if !barmanError.IsRetriable() {
-		return
-	}
-
-	contextLogger.Info("Cleaning up data directory", "directory", dataDirectory)
-	if err := fileutils.RemoveDirectory(dataDirectory); err != nil && !os.IsNotExist(err) {
-		contextLogger.Error(
-			err,
-			"error occurred cleaning up data directory",
-			"directory", dataDirectory)
-	}
 }
