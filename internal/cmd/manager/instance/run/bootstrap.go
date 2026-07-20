@@ -183,7 +183,37 @@ func runBootstrap(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	completed, err := bootstrap.IsCompleted(info.PgData)
+	cli, err := management.NewControllerRuntimeClient()
+	if err != nil {
+		return fmt.Errorf("while creating the Kubernetes client for bootstrap: %w", err)
+	}
+
+	// Load the cluster before checking the completion marker: the marker is
+	// scoped to the instance identity, and the cluster UID is part of that
+	// identity. The cluster is already known to exist here (run's PreRunE waits
+	// for it), and the fetch is needed anyway by the restore recovery-CA step
+	// below.
+	var cluster apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: info.Namespace,
+		Name:      info.ClusterName,
+	}, &cluster); err != nil {
+		return fmt.Errorf("while loading the cluster for the bootstrap: %w", err)
+	}
+
+	// The marker certifies that THIS instance bootstrapped this data directory.
+	// Because the marker lives inside PGDATA it travels inside volume snapshots,
+	// so a PVC cloned from a snapshot already carries the source instance's
+	// marker; scoping the check to the identity is what makes such a clone run
+	// phase-0 instead of wrongly skipping it.
+	identity := bootstrap.MarkerIdentity{
+		Namespace:   info.Namespace,
+		ClusterName: info.ClusterName,
+		ClusterUID:  string(cluster.UID),
+		PodName:     info.PodName,
+	}
+
+	completed, err := bootstrap.IsCompleted(info.PgData, identity)
 	if err != nil {
 		return fmt.Errorf("while checking the bootstrap completion marker: %w", err)
 	}
@@ -194,17 +224,12 @@ func runBootstrap(
 
 	contextLogger.Info("Starting in-process bootstrap", "mode", instruction.Mode)
 
-	cli, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		return fmt.Errorf("while creating the Kubernetes client for bootstrap: %w", err)
-	}
-
 	// A restore-based bootstrap may reach a TLS-protected barman object store (the
 	// base backup download and, during WAL replay, wal-restore) before the
 	// instance manager and its certificate reconciler run, so write the
 	// recovery-source endpoint CA to disk first. The file lives on an emptyDir
 	// shared with the normal run, so it survives the handover to instance-run.
-	if err := writeRecoveryBarmanEndpointCA(ctx, cli, info, instruction.Mode); err != nil {
+	if err := writeRecoveryBarmanEndpointCA(ctx, cli, &cluster, instruction.Mode); err != nil {
 		return err
 	}
 
@@ -255,7 +280,7 @@ func runBootstrap(
 		return bootErr
 	}
 
-	if err := bootstrap.WriteCompletedMarker(info.PgData, instruction.Mode); err != nil {
+	if err := bootstrap.WriteCompletedMarker(info.PgData, instruction.Mode, identity); err != nil {
 		return err
 	}
 
@@ -273,27 +298,19 @@ func runBootstrap(
 func writeRecoveryBarmanEndpointCA(
 	ctx context.Context,
 	cli client.Client,
-	info postgres.InitInfo,
+	cluster *apiv1.Cluster,
 	mode bootstrap.Mode,
 ) error {
 	if mode != bootstrap.ModeRestore && mode != bootstrap.ModeRestoreSnapshot {
 		return nil
 	}
 
-	var cluster apiv1.Cluster
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: info.Namespace,
-		Name:      info.ClusterName,
-	}, &cluster); err != nil {
-		return fmt.Errorf("while loading the cluster for the recovery barman endpoint CA: %w", err)
-	}
-
-	backup, err := loadRecoveryBackup(ctx, cli, &cluster)
+	backup, err := loadRecoveryBackup(ctx, cli, cluster)
 	if err != nil {
 		return fmt.Errorf("while loading the recovery backup for the barman endpoint CA: %w", err)
 	}
 
-	if _, err := instancecertificate.RefreshRecoveryBarmanEndpointCA(ctx, cli, &cluster, backup); err != nil {
+	if _, err := instancecertificate.RefreshRecoveryBarmanEndpointCA(ctx, cli, cluster, backup); err != nil {
 		return fmt.Errorf("while writing the recovery barman endpoint CA: %w", err)
 	}
 
