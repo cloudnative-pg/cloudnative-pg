@@ -1,8 +1,8 @@
-ARG BASE=gcr.io/distroless/static-debian12:nonroot@sha256:b7bb25d9f7c31d2bdd1982feb4dafcaf137703c7075dbe2febb41c24212b946f
+ARG BASE=gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6
 
 # This builder stage it's only because we need a command
 # to create a symlink and we do not have it in a distroless image
-FROM gcr.io/distroless/static-debian12:debug-nonroot@sha256:e8506419f1230f0622c8209e2dcb28c6166644b2515aa586997bc1fb01bab6a0 AS builder
+FROM gcr.io/distroless/static-debian13:debug-nonroot@sha256:484ecde2ed1526bebde050a7eb3bc57caef805165975602e44e445e1c20d8117 AS builder
 ARG TARGETARCH
 SHELL ["/busybox/sh", "-c"]
 RUN ln -sf operator/manager_${TARGETARCH} manager
