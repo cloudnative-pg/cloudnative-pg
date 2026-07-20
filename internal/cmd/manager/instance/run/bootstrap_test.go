@@ -22,6 +22,13 @@ package run
 import (
 	"encoding/base64"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/bootstrap"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -113,6 +120,88 @@ var _ = Describe("bootstrap flag parsing", func() {
 			opts := bootstrapOptions{mode: "initdb", initDBFlags: `--encoding "UTF8`}
 			_, err := opts.initInfo("/var/pgdata", "pod", "cluster", "default")
 			Expect(err).To(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("recovery barman endpoint CA phase-0 wiring", func() {
+	const (
+		clusterName = "cluster-example"
+		namespace   = "default"
+	)
+
+	newClient := func(objects ...client.Object) client.Client {
+		return fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(objects...).
+			Build()
+	}
+
+	info := postgres.InitInfo{ClusterName: clusterName, Namespace: namespace}
+
+	Describe("writeRecoveryBarmanEndpointCA", func() {
+		It("is a no-op for non-restore modes without touching the API", func(ctx SpecContext) {
+			// The client has no cluster: any Get would fail, so a nil result proves
+			// the mode gate returned before issuing one.
+			cli := newClient()
+			for _, mode := range []bootstrap.Mode{
+				bootstrap.ModeInitDB, bootstrap.ModeJoin, bootstrap.ModePgBaseBackup,
+			} {
+				Expect(writeRecoveryBarmanEndpointCA(ctx, cli, info, mode)).To(Succeed())
+			}
+		})
+
+		It("runs for restore and restoresnapshot and no-ops when the recovery source has no CA", func(ctx SpecContext) {
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+			}
+			cli := newClient(cluster)
+			for _, mode := range []bootstrap.Mode{bootstrap.ModeRestore, bootstrap.ModeRestoreSnapshot} {
+				Expect(writeRecoveryBarmanEndpointCA(ctx, cli, info, mode)).To(Succeed())
+			}
+		})
+
+		It("fails for a restore mode when the cluster cannot be loaded", func(ctx SpecContext) {
+			cli := newClient()
+			Expect(writeRecoveryBarmanEndpointCA(ctx, cli, info, bootstrap.ModeRestore)).ToNot(Succeed())
+		})
+	})
+
+	Describe("loadRecoveryBackup", func() {
+		It("loads the referenced recovery backup", func(ctx SpecContext) {
+			backup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{Name: "origin", Namespace: namespace},
+			}
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							Backup: &apiv1.BackupSource{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "origin"},
+							},
+						},
+					},
+				},
+			}
+			loaded, err := loadRecoveryBackup(ctx, newClient(backup), cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(loaded).ToNot(BeNil())
+			Expect(loaded.Name).To(Equal("origin"))
+		})
+
+		It("returns nil when the cluster does not recover from a backup reference", func(ctx SpecContext) {
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{Source: "src"},
+					},
+				},
+			}
+			loaded, err := loadRecoveryBackup(ctx, newClient(), cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(loaded).To(BeNil())
 		})
 	})
 })

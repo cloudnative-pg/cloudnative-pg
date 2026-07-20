@@ -199,6 +199,15 @@ func runBootstrap(
 		return fmt.Errorf("while creating the Kubernetes client for bootstrap: %w", err)
 	}
 
+	// A restore-based bootstrap may reach a TLS-protected barman object store (the
+	// base backup download and, during WAL replay, wal-restore) before the
+	// instance manager and its certificate reconciler run, so write the
+	// recovery-source endpoint CA to disk first. The file lives on an emptyDir
+	// shared with the normal run, so it survives the handover to instance-run.
+	if err := writeRecoveryBarmanEndpointCA(ctx, cli, info, instruction.Mode); err != nil {
+		return err
+	}
+
 	// When the status port is served over TLS, the kubelet probes handshake
 	// against it, so we must load the server certificate before serving. On a
 	// plain-HTTP status port this is skipped entirely.
@@ -254,6 +263,66 @@ func runBootstrap(
 	contextLogger.Info("In-process bootstrap completed", "mode", instruction.Mode)
 
 	return nil
+}
+
+// writeRecoveryBarmanEndpointCA writes the recovery-source barman endpoint CA to
+// disk for the restore and restoresnapshot bootstraps, so barman-cloud can reach
+// a TLS-protected object store before the instance manager's certificate
+// reconciler runs. It is a no-op for the other modes and when the recovery source
+// carries no endpoint CA.
+func writeRecoveryBarmanEndpointCA(
+	ctx context.Context,
+	cli client.Client,
+	info postgres.InitInfo,
+	mode bootstrap.Mode,
+) error {
+	if mode != bootstrap.ModeRestore && mode != bootstrap.ModeRestoreSnapshot {
+		return nil
+	}
+
+	var cluster apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: info.Namespace,
+		Name:      info.ClusterName,
+	}, &cluster); err != nil {
+		return fmt.Errorf("while loading the cluster for the recovery barman endpoint CA: %w", err)
+	}
+
+	backup, err := loadRecoveryBackup(ctx, cli, &cluster)
+	if err != nil {
+		return fmt.Errorf("while loading the recovery backup for the barman endpoint CA: %w", err)
+	}
+
+	if _, err := instancecertificate.RefreshRecoveryBarmanEndpointCA(ctx, cli, &cluster, backup); err != nil {
+		return fmt.Errorf("while writing the recovery barman endpoint CA: %w", err)
+	}
+
+	return nil
+}
+
+// loadRecoveryBackup loads the Backup object referenced by the recovery stanza,
+// when recovering from a Backup reference. It returns nil when recovering from an
+// external cluster or from volume snapshots, mirroring the operator's origin
+// backup lookup.
+func loadRecoveryBackup(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+) (*apiv1.Backup, error) {
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.Recovery == nil ||
+		cluster.Spec.Bootstrap.Recovery.Backup == nil {
+		return nil, nil
+	}
+
+	var backup apiv1.Backup
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Spec.Bootstrap.Recovery.Backup.Name,
+	}, &backup); err != nil {
+		return nil, err
+	}
+	return &backup, nil
 }
 
 // loadServerCertificate reads the instance server certificate into memory so

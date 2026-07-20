@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -202,7 +203,7 @@ var _ = Describe("ApplyBootstrapOverlay", func() {
 		Expect(ApplyBootstrapOverlay(pod, NewJoinInstruction(apiv1.Cluster{}))).ToNot(Succeed())
 	})
 
-	It("adds the barman endpoint CA on a recovery overlay but not on a snapshot replica", func() {
+	It("never mounts the barman endpoint CA on a restore or snapshot overlay", func() {
 		clusterWithCA := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 			Spec: apiv1.ClusterSpec{
@@ -218,13 +219,72 @@ var _ = Describe("ApplyBootstrapOverlay", func() {
 				},
 			},
 		}
-		recoveryPod := runPod()
-		Expect(ApplyBootstrapOverlay(recoveryPod, NewRecoveryInstruction(clusterWithCA, nil))).To(Succeed())
-		Expect(recoveryPod.Spec.Volumes).To(ContainElement(HaveField("Name", "barman-endpoint-ca")))
 
-		replicaPod := runPod()
-		replicaCluster := apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
-		Expect(ApplyBootstrapOverlay(replicaPod, NewRestoreSnapshotReplicaInstruction(replicaCluster))).To(Succeed())
-		Expect(replicaPod.Spec.Volumes).To(BeEmpty())
+		// The recovery endpoint CA is written to disk during the in-process
+		// bootstrap, never mounted, so the overlay adds no CA volume, mount or env.
+		for _, instruction := range []BootstrapInstruction{
+			NewRecoveryInstruction(clusterWithCA, nil),
+			NewRestoreSnapshotInstruction(clusterWithCA, &metav1.ObjectMeta{}, nil),
+		} {
+			pod := runPod()
+			Expect(ApplyBootstrapOverlay(pod, instruction)).To(Succeed())
+			Expect(pod.Spec.Volumes).ToNot(ContainElement(HaveField("Name", "barman-endpoint-ca")))
+			Expect(pod.Spec.Containers[0].VolumeMounts).ToNot(ContainElement(HaveField("Name", "barman-endpoint-ca")))
+			Expect(pod.Spec.Containers[0].Env).ToNot(ContainElement(HaveField("Name", "AWS_CA_BUNDLE")))
+			Expect(pod.Spec.Containers[0].Env).ToNot(ContainElement(HaveField("Name", "REQUESTS_CA_BUNDLE")))
+		}
+	})
+
+	It("never mounts an overlay volume onto a writable instance-manager directory", func() {
+		// The base pod carries no volume mounts, so every mount present after the
+		// overlay was added by it. None may target CertificatesDir (where the
+		// instance manager reconciles server.crt/server.key) nor PGDATA/pg_wal: a
+		// read-only Secret or ConfigMap mount would shadow those directories and
+		// break the pod once it keeps running as the instance (see #11228).
+		recoveryCluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						Backup: &apiv1.BackupSource{
+							EndpointCA: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "ca"},
+								Key:                  "ca.crt",
+							},
+						},
+					},
+				},
+			},
+		}
+		initDBCluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						PostInitApplicationSQLRefs: &apiv1.SQLRefs{
+							SecretRefs: []apiv1.SecretKeySelector{
+								{LocalObjectReference: apiv1.LocalObjectReference{Name: "s"}, Key: "k"},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		forbidden := []string{postgres.CertificatesDir, PgDataPath, PgWalPath}
+
+		for _, instruction := range []BootstrapInstruction{
+			NewInitDBInstruction(initDBCluster),
+			NewRecoveryInstruction(recoveryCluster, nil),
+			NewRestoreSnapshotInstruction(recoveryCluster, &metav1.ObjectMeta{}, nil),
+			NewRestoreSnapshotReplicaInstruction(recoveryCluster),
+		} {
+			pod := runPod()
+			Expect(ApplyBootstrapOverlay(pod, instruction)).To(Succeed())
+			for _, mount := range pod.Spec.Containers[0].VolumeMounts {
+				Expect(forbidden).ToNot(ContainElement(mount.MountPath),
+					"overlay mount %q must not shadow a writable instance directory", mount.Name)
+			}
+		}
 	})
 })

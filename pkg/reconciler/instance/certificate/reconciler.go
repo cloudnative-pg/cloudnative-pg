@@ -271,34 +271,6 @@ func (r *Reconciler) refreshServerCA(ctx context.Context, cluster *apiv1.Cluster
 // Important: this function is deprecated and will be replaced by the relative feature
 // in the plugin-barman-cloud project
 func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	// refreshFileFromSecret receive a secret and rewrite the file corresponding to
-	// the key to the provided location. Implementated with an inner function to discourage
-	// reuse.
-	refreshFileFromSecret := func(
-		secret *corev1.Secret,
-		key, destLocation string,
-	) (bool, error) {
-		contextLogger := log.FromContext(ctx)
-		data, ok := secret.Data[key]
-		if !ok {
-			return false, fmt.Errorf("missing %s entry in Secret", key)
-		}
-
-		changed, err := fileutils.WriteFileAtomic(destLocation, data, 0o600)
-		if err != nil {
-			return false, fmt.Errorf("while writing file: %w", err)
-		}
-
-		if changed {
-			contextLogger.Info("Refreshed configuration file",
-				"filename", destLocation,
-				"secret", secret.Name,
-				"key", key)
-		}
-
-		return changed, nil
-	}
-
 	endpointCAs := map[string]*apiv1.SecretKeySelector{}
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
 		endpointCAs[postgresSpec.BarmanBackupEndpointCACertificateLocation] = cluster.Spec.Backup.BarmanObjectStore.EndpointCA
@@ -312,20 +284,99 @@ func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1
 
 	var changed bool
 	for target, secretKeySelector := range endpointCAs {
-		var secret corev1.Secret
-		err := r.cli.Get(
-			ctx,
-			client.ObjectKey{Namespace: cluster.Namespace, Name: secretKeySelector.Name},
-			&secret)
-		if err != nil {
-			return false, err
-		}
-		c, err := refreshFileFromSecret(&secret, secretKeySelector.Key, target)
+		c, err := writeEndpointCAFromSecret(ctx, r.cli, cluster.Namespace, secretKeySelector, target)
 		changed = changed || c
 		if err != nil {
 			return changed, err
 		}
 	}
+	return changed, nil
+}
+
+// RefreshRecoveryBarmanEndpointCA writes to disk the barman endpoint CA of the
+// recovery source, so that an instance initializing its data directory in-process
+// (a restore, or a volume snapshot restore with PITR) can reach a TLS-protected
+// object store before the instance manager, and this certificate reconciler, are
+// running. It mirrors the recovery-source precedence the bootstrap Job used to
+// encode as a Secret volume mount, and writes to the restore CA location the
+// barman-cloud commands read through AWS_CA_BUNDLE. It is a no-op when the
+// recovery source has no endpoint CA.
+func RefreshRecoveryBarmanEndpointCA(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) (bool, error) {
+	endpointCA := recoveryBarmanEndpointCA(cluster, backup)
+	if endpointCA == nil || endpointCA.Name == "" || endpointCA.Key == "" {
+		return false, nil
+	}
+
+	return writeEndpointCAFromSecret(
+		ctx, cli, cluster.Namespace, endpointCA, postgresSpec.BarmanRestoreEndpointCACertificateLocation)
+}
+
+// recoveryBarmanEndpointCA selects the endpoint CA of the recovery source with
+// the same precedence the bootstrap Job builders used: the recovery backup
+// reference, then the origin backup status, then the recovery source external
+// cluster. It returns nil when the cluster does not bootstrap from recovery or
+// the source carries no endpoint CA.
+func recoveryBarmanEndpointCA(cluster *apiv1.Cluster, backup *apiv1.Backup) *apiv1.SecretKeySelector {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return nil
+	}
+	recovery := cluster.Spec.Bootstrap.Recovery
+
+	switch {
+	case recovery.Backup != nil && recovery.Backup.EndpointCA != nil:
+		return recovery.Backup.EndpointCA
+	case backup != nil && backup.Status.EndpointCA != nil:
+		return backup.Status.EndpointCA
+	case recovery.Source != "":
+		if externalCluster, ok := cluster.ExternalCluster(recovery.Source); ok &&
+			externalCluster.BarmanObjectStore != nil {
+			return externalCluster.BarmanObjectStore.EndpointCA
+		}
+	}
+
+	return nil
+}
+
+// writeEndpointCAFromSecret fetches the referenced Secret and writes the selected
+// key to destLocation with an atomic write. It is the single writer of the barman
+// endpoint CA files, shared by the steady-state reconcile and the in-process
+// bootstrap, so the write logic is not duplicated.
+func writeEndpointCAFromSecret(
+	ctx context.Context,
+	cli client.Client,
+	namespace string,
+	selector *apiv1.SecretKeySelector,
+	destLocation string,
+) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
+	var secret corev1.Secret
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: selector.Name}, &secret); err != nil {
+		return false, err
+	}
+
+	data, ok := secret.Data[selector.Key]
+	if !ok {
+		return false, fmt.Errorf("missing %s entry in Secret", selector.Key)
+	}
+
+	changed, err := fileutils.WriteFileAtomic(destLocation, data, 0o600)
+	if err != nil {
+		return false, fmt.Errorf("while writing file: %w", err)
+	}
+
+	if changed {
+		contextLogger.Info("Refreshed configuration file",
+			"filename", destLocation,
+			"secret", secret.Name,
+			"key", selector.Key)
+	}
+
 	return changed, nil
 }
 
