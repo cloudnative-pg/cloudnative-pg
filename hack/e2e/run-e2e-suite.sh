@@ -67,18 +67,39 @@ RC_GINKGO=0
 export TEST_SKIP_UPGRADE=true
 cd "${ROOT_DIR}/tests"
 
-# Size ginkgo's parallelism to the runner instead of a fixed value, so we
-# don't starve the kind control plane (apiserver/etcd/kubelet/containerd) on
-# small runners while leaving most of a big runner's CPUs idle. Reserve
-# ~25% of the available cores for the control plane and system pods, and
-# use the rest as ginkgo workers.
-AVAILABLE_CORES=$(nproc)
-RESERVED_CORES=$(( (AVAILABLE_CORES + 3) / 4 ))
-GINKGO_NODES=$(( AVAILABLE_CORES - RESERVED_CORES ))
-if [ "${GINKGO_NODES}" -lt 1 ]; then
-  GINKGO_NODES=1
+# E2E_GINKGO_NODES overrides everything below when set, for pinning
+# parallelism by hand (debugging a flake, or a runner/vendor the heuristic
+# below doesn't fit).
+if [ -n "${E2E_GINKGO_NODES:-}" ]; then
+  GINKGO_NODES="${E2E_GINKGO_NODES}"
+  echo "E2E_GINKGO_NODES set; running ginkgo with ${GINKGO_NODES} node(s)"
+else
+  # kind/k3d run their control plane (apiserver/etcd/kubelet/containerd) on
+  # the same runner as the ginkgo workers, so parallelism must be sized to
+  # the runner to leave it headroom. A bare/unrecognized TEST_CLOUD_VENDOR
+  # (e.g. a local run outside run-e2e-local.sh) falls into this case too,
+  # since that always means a local kind/k3d cluster. The remote cloud
+  # vendors below only talk to a cluster over the network, so they gain
+  # nothing from capping parallelism to the runner's own core count and
+  # instead just need enough workers to fit the suite in the CI timeout.
+  case "${TEST_CLOUD_VENDOR:-}" in
+    eks|gke|aks|ocp)
+      GINKGO_NODES=4
+      echo "Running on ${TEST_CLOUD_VENDOR}; running ginkgo with ${GINKGO_NODES} node(s)"
+      ;;
+    *)
+      # Reserve ~25% of the available cores for the control plane and system
+      # pods, and use the rest as ginkgo workers.
+      AVAILABLE_CORES=$(nproc)
+      RESERVED_CORES=$(( (AVAILABLE_CORES + 3) / 4 ))
+      GINKGO_NODES=$(( AVAILABLE_CORES - RESERVED_CORES ))
+      if [ "${GINKGO_NODES}" -lt 1 ]; then
+        GINKGO_NODES=1
+      fi
+      echo "Detected ${AVAILABLE_CORES} CPU(s); running ginkgo with ${GINKGO_NODES} node(s)"
+      ;;
+  esac
 fi
-echo "Detected ${AVAILABLE_CORES} CPU(s); running ginkgo with ${GINKGO_NODES} node(s)"
 
 ginkgo --nodes="${GINKGO_NODES}" --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
       ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
