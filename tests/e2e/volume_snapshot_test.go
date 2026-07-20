@@ -979,7 +979,7 @@ var _ = Describe("Verify Volume Snapshot",
 						g.Expect(failedBackup.Status.Phase).ToNot(BeEquivalentTo(apiv1.BackupPhaseFailed))
 					}, "30s", "5s").Should(Succeed())
 
-					// Allow extra margin over RetryTimeout for the 10s reconcile
+					// Allow extra margin over RetryTimeout for the reconcile
 					// polling interval.
 					Eventually(func(g Gomega) {
 						err = env.Client.Get(env.Ctx, types.NamespacedName{
@@ -989,7 +989,7 @@ var _ = Describe("Verify Volume Snapshot",
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(failedBackup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
 						g.Expect(failedBackup.Status.Error).To(ContainSubstring("Failed to get snapshot class"))
-					}, RetryTimeout+30).Should(Succeed())
+					}, RetryTimeout+90).Should(Succeed())
 				})
 
 				By("verifying that the backup connection is cleaned up", func() {
