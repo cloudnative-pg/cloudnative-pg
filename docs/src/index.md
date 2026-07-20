@@ -66,7 +66,7 @@ The CloudNativePG operator container images are available on the
 [`cloudnative-pg` project's GitHub Container Registry](https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg)
 in two different flavors:
 
-- Debian 12 distroless
+- Debian 13 distroless
 - Red Hat UBI 9 micro (suffix `-ubi9`)
 
 Red Hat UBI images are primarily intended for OLM consumption.
