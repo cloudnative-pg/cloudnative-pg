@@ -91,16 +91,23 @@ var _ = Describe("reconcilePods instance recreation while a PVC is terminating (
 		return cluster, resources, statusList
 	}
 
-	It("creates the join Job when no previous PVC is terminating", func(ctx SpecContext) {
+	It("creates the bootstrapping Pod when no previous PVC is terminating", func(ctx SpecContext) {
 		cluster, resources, statusList := newRecreatingCluster(ctx)
 
 		res, err := env.clusterReconciler.reconcilePods(ctx, cluster, resources, statusList)
 		Expect(err).To(MatchError(ErrNextLoop))
 		Expect(res.RequeueAfter).To(Equal(30 * time.Second))
 
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the bootstrapping Pod for the recreated instance should have been created")
+		Expect(pods.Items[0].Annotations).To(
+			HaveKeyWithValue(utils.BootstrapInstanceAnnotationName, "join"),
+			"the recreated replica Pod must carry the join bootstrap overlay")
+
 		var jobs batchv1.JobList
 		Expect(env.client.List(ctx, &jobs)).To(Succeed())
-		Expect(jobs.Items).To(HaveLen(1), "the join Job for the recreated instance should have been created")
+		Expect(jobs.Items).To(BeEmpty(), "no bootstrap Job should be created")
 	})
 
 	It("defers recreation while a previous PVC for the same serial is still terminating", func(ctx SpecContext) {
@@ -120,9 +127,9 @@ var _ = Describe("reconcilePods instance recreation while a PVC is terminating (
 		Expect(err).To(MatchError(ErrNextLoop))
 		Expect(res.RequeueAfter).To(Equal(time.Second))
 
-		var jobs batchv1.JobList
-		Expect(env.client.List(ctx, &jobs)).To(Succeed())
-		Expect(jobs.Items).To(BeEmpty(), "no join Job should be created while the previous PVC is terminating")
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no bootstrapping Pod should be created while the previous PVC is terminating")
 	})
 })
 
@@ -184,7 +191,7 @@ var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminat
 	})
 })
 
-var _ = Describe("ensureInstancesAreCreated recovers a lost first-primary bootstrap Job (#11036)", func() {
+var _ = Describe("ensureInstancesAreCreated recreates a lost bootstrapping Pod", func() {
 	var env *testingEnvironment
 	var namespace string
 
@@ -193,14 +200,14 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost first-primary bootst
 		namespace = newFakeNamespace(env.client)
 	})
 
-	It("recreates the initdb Job reusing serial 1 when the primary PVC is stuck initializing", func(ctx SpecContext) {
+	It("recreates the initdb Pod reusing serial 1 when the primary PVC is initializing (#11036)", func(ctx SpecContext) {
 		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
 			c.Spec.Instances = 1
 		})
 
 		// The first-primary bootstrap created the data PVC for serial 1 and patched
 		// the cluster status (TargetPrimary set, Instances flipped to 1) but lost the
-		// optimistic lock before creating the initdb Job: no Pod and no Job exist.
+		// optimistic lock before creating the bootstrapping Pod: no Pod exists.
 		primaryName := specs.GetInstanceName(cluster.Name, 1)
 		cluster.Status.Instances = 1
 		cluster.Status.ReadyInstances = 0
@@ -219,48 +226,66 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost first-primary bootst
 		Expect(err).To(MatchError(ErrNextLoop))
 		Expect(res.RequeueAfter).To(Equal(time.Second))
 
+		// No bootstrap Job must ever be created.
 		var jobs batchv1.JobList
 		Expect(env.client.List(ctx, &jobs)).To(Succeed())
-		Expect(jobs.Items).To(HaveLen(1), "the bootstrap Job for serial 1 should have been recreated")
-		Expect(jobs.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(primaryName))
+		Expect(jobs.Items).To(BeEmpty(), "no bootstrap Job must be created")
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the bootstrapping Pod for serial 1 should have been recreated")
+		Expect(pods.Items[0].Name).To(Equal(primaryName))
+		Expect(pods.Items[0].Annotations).To(
+			HaveKeyWithValue(utils.BootstrapInstanceAnnotationName, "initdb"),
+			"the recreated primary Pod must carry the initdb bootstrap overlay")
 
 		// No serial-2 instance or PVC must be created: the existing serial must be reused.
+		var reusedPVCSerial int
 		var pvcs corev1.PersistentVolumeClaimList
 		Expect(env.client.List(ctx, &pvcs)).To(Succeed())
 		for _, pvc := range pvcs.Items {
 			serial, serr := specs.GetNodeSerial(pvc.ObjectMeta)
 			Expect(serr).ToNot(HaveOccurred())
 			Expect(serial).To(Equal(1), "no PVC for a different serial should have been created")
+			reusedPVCSerial = serial
 		}
-
-		var pods corev1.PodList
-		Expect(env.client.List(ctx, &pods)).To(Succeed())
-		Expect(pods.Items).To(BeEmpty(), "no Pod should be created while the PVC is still initializing")
+		Expect(reusedPVCSerial).To(Equal(1))
 	})
 
-	It("waits instead of recreating the init Job when one already exists", func(ctx SpecContext) {
+	It("recreates the join Pod for a replica whose PVC never finished bootstrapping", func(ctx SpecContext) {
 		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
-			c.Spec.Instances = 1
+			c.Spec.Instances = 2
 		})
 
 		primaryName := specs.GetInstanceName(cluster.Name, 1)
-		cluster.Status.Instances = 1
-		cluster.Status.ReadyInstances = 0
-		cluster.Status.InstanceNames = []string{primaryName}
+		replicaName := specs.GetInstanceName(cluster.Name, 2)
+		cluster.Status.Instances = 2
+		cluster.Status.ReadyInstances = 1
+		cluster.Status.InstanceNames = []string{primaryName, replicaName}
+		cluster.Status.CurrentPrimary = primaryName
 		cluster.Status.TargetPrimary = primaryName
-		cluster.Status.DanglingPVC = []string{primaryName}
+		cluster.Status.DanglingPVC = []string{replicaName}
 
-		// The initializing PVC already has its bootstrap Job: the recovery path
-		// must defer to the regular wait, not create a second Job.
-		pvcGroup := newFakePVC(env.client, cluster, 1, persistentvolumeclaim.StatusInitializing)
-		existingJob := specs.CreatePrimaryJobViaInitdb(*cluster, 1)
-		cluster.SetInheritedDataAndOwnership(&existingJob.ObjectMeta)
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		primaryPod.Status = corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+		}
+
+		// The replica's data PVC exists but never became ready and has no Pod: the
+		// bootstrapping Pod was evicted before finishing.
+		pvcGroup := newFakePVC(env.client, cluster, 2, persistentvolumeclaim.StatusInitializing)
 
 		resources := &managedResources{
-			pvcs: corev1.PersistentVolumeClaimList{Items: pvcGroup},
-			jobs: batchv1.JobList{Items: []batchv1.Job{*existingJob}},
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcGroup},
 		}
-		statusList := postgres.PostgresqlStatusList{}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+			},
+		}
 
 		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
 		Expect(err).To(MatchError(ErrNextLoop))
@@ -268,7 +293,15 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost first-primary bootst
 
 		var jobs batchv1.JobList
 		Expect(env.client.List(ctx, &jobs)).To(Succeed())
-		Expect(jobs.Items).To(BeEmpty(), "the pre-existing Job lives only in resources, none should be created")
+		Expect(jobs.Items).To(BeEmpty(), "no bootstrap Job must be created")
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the bootstrapping Pod for serial 2 should have been recreated")
+		Expect(pods.Items[0].Name).To(Equal(replicaName))
+		Expect(pods.Items[0].Annotations).To(
+			HaveKeyWithValue(utils.BootstrapInstanceAnnotationName, "join"),
+			"the recreated replica Pod must carry the join bootstrap overlay")
 	})
 })
 

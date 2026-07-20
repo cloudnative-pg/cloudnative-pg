@@ -93,19 +93,21 @@ func (s statuses) getSorted(label status) []string {
 	return s[label]
 }
 
-// EnsureHealthyPVCsAnnotation makes sure that all healthy PVCs are marked as ready
+// EnsureHealthyPVCsAnnotation makes sure that every healthy PVC whose owning Pod
+// is ready is marked as ready.
 func EnsureHealthyPVCsAnnotation(
 	ctx context.Context,
 	cli client.Client,
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
+	pods []corev1.Pod,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
 	getPVC := func(name string) *corev1.PersistentVolumeClaim {
-		for _, pvc := range pvcs {
-			if name == pvc.Name {
-				return &pvc
+		for i := range pvcs {
+			if name == pvcs[i].Name {
+				return &pvcs[i]
 			}
 		}
 
@@ -126,7 +128,16 @@ func EnsureHealthyPVCsAnnotation(
 			continue
 		}
 
-		contextLogger.Info("PVC is already attached to the pod, marking it as ready",
+		// A PVC becomes ready only once its instance has finished bootstrapping,
+		// which the operator observes as the owning Pod turning ready. Marking it
+		// while the Pod is still bootstrapping in-process would flip a not-yet
+		// initialized data directory to ready, making it indistinguishable from a
+		// fully bootstrapped one on the reattach path.
+		if !isOwningPodReady(*pvc, pods) {
+			continue
+		}
+
+		contextLogger.Info("PVC is attached to a ready pod, marking it as ready",
 			"pvc", pvc.Name)
 		if err := setPVCStatusReady(ctx, cli, pvc); err != nil {
 			contextLogger.Error(err, "can't update PVC annotation as ready")
@@ -135,6 +146,18 @@ func EnsureHealthyPVCsAnnotation(
 	}
 
 	return nil
+}
+
+// isOwningPodReady reports whether the Pod mounting the given PVC is ready. A
+// PVC without a matching Pod, or whose Pod is not ready, returns false.
+func isOwningPodReady(pvc corev1.PersistentVolumeClaim, pods []corev1.Pod) bool {
+	for i := range pods {
+		if podUsesPVC(pods[i], pvc) {
+			return utils.IsPodReady(pods[i])
+		}
+	}
+
+	return false
 }
 
 // MarkPVCReadyForCompletedJobs marks as ready all the PVCs used by completed Jobs
