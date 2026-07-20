@@ -142,12 +142,10 @@ func buildRestoreSnapshotReplicaArgs(cluster apiv1.Cluster) []string {
 // in-process, instead of relying on a dedicated Job. It mirrors, field for
 // field, what the bootstrap Job builders used to produce.
 type BootstrapInstruction struct {
-	cluster             apiv1.Cluster
-	backup              *apiv1.Backup
-	mode                string
-	args                []string
-	addInitDBExtras     bool
-	addBarmanEndpointCA bool
+	cluster         apiv1.Cluster
+	mode            string
+	args            []string
+	addInitDBExtras bool
 }
 
 // NewInitDBInstruction builds the overlay for the initdb bootstrap.
@@ -178,30 +176,31 @@ func NewPgBaseBackupInstruction(cluster apiv1.Cluster) BootstrapInstruction {
 	}
 }
 
-// NewRecoveryInstruction builds the overlay for a recovery from a backup.
-func NewRecoveryInstruction(cluster apiv1.Cluster, backup *apiv1.Backup) BootstrapInstruction {
+// NewRecoveryInstruction builds the overlay for a recovery from a backup. The
+// recovery endpoint CA is not mounted here: it is written to disk during the
+// in-process bootstrap (phase 0), the same way the instance manager owns the CA
+// files in steady state. The backup argument is kept for call-site symmetry with
+// the operator, which resolves it while checking the recovery source.
+func NewRecoveryInstruction(cluster apiv1.Cluster, _ *apiv1.Backup) BootstrapInstruction {
 	return BootstrapInstruction{
-		cluster:             cluster,
-		backup:              backup,
-		mode:                bootstrapModeRestore,
-		args:                buildRecoveryArgs(cluster),
-		addBarmanEndpointCA: true,
+		cluster: cluster,
+		mode:    bootstrapModeRestore,
+		args:    buildRecoveryArgs(cluster),
 	}
 }
 
 // NewRestoreSnapshotInstruction builds the overlay for a primary restored from a
-// volume snapshot.
+// volume snapshot. As for the recovery overlay, the barman endpoint CA is written
+// during the in-process bootstrap rather than mounted here.
 func NewRestoreSnapshotInstruction(
 	cluster apiv1.Cluster,
 	object *metav1.ObjectMeta,
-	backup *apiv1.Backup,
+	_ *apiv1.Backup,
 ) BootstrapInstruction {
 	return BootstrapInstruction{
-		cluster:             cluster,
-		backup:              backup,
-		mode:                bootstrapModeRestoreSnapshot,
-		args:                buildRestoreSnapshotArgs(cluster, object),
-		addBarmanEndpointCA: true,
+		cluster: cluster,
+		mode:    bootstrapModeRestoreSnapshot,
+		args:    buildRestoreSnapshotArgs(cluster, object),
 	}
 }
 
@@ -234,10 +233,6 @@ func ApplyBootstrapOverlay(pod *corev1.Pod, instruction BootstrapInstruction) er
 
 	if instruction.addInitDBExtras {
 		applyInitDBOverlayExtras(pod, instruction.cluster)
-	}
-
-	if instruction.addBarmanEndpointCA {
-		addBarmanEndpointCAToPodSpecFromCluster(instruction.cluster, instruction.backup, &pod.Spec)
 	}
 
 	if pod.Annotations == nil {
