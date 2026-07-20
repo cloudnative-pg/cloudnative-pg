@@ -35,8 +35,7 @@ import (
 // is bootstrapped from that backup via externalClusters[].plugin and streams
 // from the source. It is added alongside the in-core variant (which shares its
 // source cluster with a volume-snapshot test), and stays until the in-core
-// Barman Cloud support is removed. Runs on kind/k3d only, where the plugin and
-// the shared object store are installed.
+// Barman Cloud support is removed.
 var _ = Describe("plugin-barman-cloud replica cluster from backup",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelReplication, tests.LabelBackupRestore), func() {
 		const (
@@ -52,9 +51,6 @@ var _ = Describe("plugin-barman-cloud replica cluster from backup",
 		BeforeEach(func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
-			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
 			}
 		})
 

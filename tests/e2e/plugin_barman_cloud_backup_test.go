@@ -38,8 +38,7 @@ import (
 // Plugin counterparts of the in-core object-store backup scenarios that go
 // beyond a plain backup/restore round-trip: scheduled backups, choosing the
 // backup target, and point-in-time recovery. They share one cluster archiving
-// through plugin-barman-cloud; the in-core variants are left in place. Runs on
-// kind/k3d only.
+// through plugin-barman-cloud; the in-core variants are left in place.
 var _ = Describe("plugin-barman-cloud scheduled backups, standby target and PITR",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelBackupRestore), func() {
 		const (
@@ -59,9 +58,6 @@ var _ = Describe("plugin-barman-cloud scheduled backups, standby target and PITR
 		BeforeEach(func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
-			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
 			}
 		})
 
