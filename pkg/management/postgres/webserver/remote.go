@@ -285,6 +285,17 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 
 // isServerStartedUp evaluates the startup probe
 func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req *http.Request) {
+	// While an in-process bootstrap is running there is no PostgreSQL socket to
+	// probe yet, and the copy phase can take much longer than the startup
+	// probe budget. We report it healthy to avoid being killed by the kubelet.
+	// Once the bootstrap completes the flag is cleared and genuine startup
+	// gating resumes.
+	if ws.instance.IsBootstrapInProgress() {
+		log.Trace("Startup probe skipped, bootstrap in progress")
+		_, _ = fmt.Fprint(w, "Skipped")
+		return
+	}
+
 	// If `pg_rewind` is running, it means that the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
@@ -318,6 +329,25 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 
 // This probe is for the instance status, including replication
 func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
+	// While an in-process bootstrap is running PostgreSQL is not up yet. We
+	// reply with a 503 carrying a recognizable body rather than a valid status
+	// payload: a valid payload would make the operator treat the pod as
+	// reporting its status and short-circuit the reconciliation guards.
+	if progress := ws.instance.GetBootstrapProgress(); progress != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(struct {
+			Error string    `json:"error"`
+			Mode  string    `json:"mode"`
+			Since time.Time `json:"since"`
+		}{
+			Error: "bootstrapping",
+			Mode:  progress.Mode,
+			Since: progress.Since,
+		})
+		return
+	}
+
 	// Extract the status of the current instance
 	status, err := ws.instance.GetStatus()
 	if err != nil {
@@ -377,6 +407,13 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 	exitedCondition concurrency.MultipleExecuted,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Replacing the instance manager binary while an in-process bootstrap
+		// is running is undefined, so we reject the request.
+		if ws.instance.IsBootstrapInProgress() {
+			http.Error(w, "instance manager is bootstrapping", http.StatusConflict)
+			return
+		}
+
 		// No need to handle this request if it is not a put
 		if r.Method != http.MethodPut {
 			http.Error(w, "wrong method used", http.StatusMethodNotAllowed)
