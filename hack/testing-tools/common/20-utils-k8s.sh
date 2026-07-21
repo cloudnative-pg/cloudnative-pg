@@ -535,11 +535,14 @@ function install_barman_cloud_plugin() {
                 # matching manifest is served from the PR's head ref.
                 manifest_url="https://raw.githubusercontent.com/${repo}/refs/pull/${selector#pr-}/head/manifest.yaml"
                 branch_tag="${selector}"
-            elif [[ "${selector}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
+            elif [[ "${selector}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ && "${selector}" != *".."* ]]; then
                 # Anything else is treated as a plugin-barman-cloud branch name,
                 # validated with a conservative charset so a malformed value
                 # fails fast instead of building a bogus raw URL. A nonexistent
                 # branch still fails later with the "manifest not found" error.
+                # ".." is rejected outright: curl normalizes "../" in the URL
+                # path by default, so a crafted selector could otherwise escape
+                # the pinned "${repo}" and reach an arbitrary repo/branch.
                 manifest_url="https://raw.githubusercontent.com/${repo}/refs/heads/${selector}/manifest.yaml"
                 branch_tag="${selector//\//-}"
             else
