@@ -613,6 +613,15 @@ EOF
     "${K8S_CLI}" kustomize "${kustomize_dir}" > "${manifest_file}"
     rm -rf "${kustomize_dir}"
 
+    # The images transformer above is a silent no-op if plugin_image no longer
+    # matches what the manifest actually references, so check the rewrite
+    # landed instead of installing a manifest that's still pinned to "main".
+    if [[ -n "${branch_tag}" ]] && ! grep -qF "${plugin_image}:${branch_tag}" "${manifest_file}"; then
+        printf '%bError: expected image %s:%s not found in the generated manifest; the plugin-barman-cloud image name may have changed%b\n' \
+            "${bright}" "${plugin_image}" "${branch_tag}" "${reset}" >&2
+        return 1
+    fi
+
     retry 5 "${K8S_CLI}" apply --server-side --force-conflicts -f "${manifest_file}"
 
     ${K8S_CLI} -n "${operator_namespace}" rollout status deploy/barman-cloud --timeout=5m
