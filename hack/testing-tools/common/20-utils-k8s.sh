@@ -187,11 +187,15 @@ function print_operator_image() {
 # reset_operator_namespace: deletes the cnpg-system namespace and any
 # cluster-scoped resources left by a previous operator installation, then waits
 # for finalization so the next apply doesn't race a terminating namespace.
-# Plugin services are deleted first so the operator can still clear their
-# cnpg.io/cleanupPlugin finalizer. Cluster-scoped resources (webhooks,
-# ClusterRoles, ClusterRoleBindings) must be removed explicitly because they
-# survive namespace deletion and would block Helm from adopting them (missing
-# ownership labels).
+# Plugin services are deleted first because deploy_operator_from_manifest can
+# target an arbitrary released operator version, and every version released so
+# far still puts a cnpg.io/cleanupPlugin finalizer on the plugin Service; that
+# finalizer only got removed on unreleased main/branch tips (#10940), so
+# deleting cnpg-system wholesale can still wedge the namespace against a
+# released operator. Safe to drop once no supported release predates that fix.
+# Cluster-scoped resources (webhooks, ClusterRoles, ClusterRoleBindings) must be
+# removed explicitly because they survive namespace deletion and would block Helm
+# from adopting them (missing ownership labels).
 function reset_operator_namespace() {
     # Must run before "helm uninstall": that would tear down a helm-deployed
     # operator first, leaving nothing to clear the finalizer below.
