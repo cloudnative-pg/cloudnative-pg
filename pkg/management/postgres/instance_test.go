@@ -666,3 +666,19 @@ var _ = Describe("EnrichMetricsConnError", func() {
 		Expect(EnrichMetricsConnError(original)).To(Equal(original))
 	})
 })
+
+var _ = Describe("pgRewindShouldRetry", func() {
+	It("retries regardless of the error while the context is live", func() {
+		ctx := context.Background()
+		Expect(pgRewindShouldRetry(ctx, nil)).To(BeTrue())
+		Expect(pgRewindShouldRetry(ctx, errors.New("could not restore file from archive"))).To(BeTrue())
+		Expect(pgRewindShouldRetry(ctx, errors.New("connection refused"))).To(BeTrue())
+	})
+
+	It("stops retrying once the context is cancelled, regardless of the error", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		Expect(pgRewindShouldRetry(ctx, nil)).To(BeFalse())
+		Expect(pgRewindShouldRetry(ctx, errors.New("could not restore file from archive"))).To(BeFalse())
+	})
+})
