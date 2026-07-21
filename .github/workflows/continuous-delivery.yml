@@ -39,7 +39,7 @@ on:
           - manifest
           - helm
       barman_plugin:
-        description: 'plugin-barman-cloud version to install (kind/k3d only): release (default), main, or a pinned version like v0.12.0'
+        description: 'plugin-barman-cloud version to install (kind/k3d only): release (default), main, a pinned version like v0.12.0, pr-<number> for a pull request, or a branch name'
         required: false
         default: 'release'
   schedule:
