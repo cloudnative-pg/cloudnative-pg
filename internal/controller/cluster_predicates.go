@@ -75,14 +75,26 @@ var (
 		},
 	}
 
-	// isBeingDeletedPredicate admits only objects that already carry a
-	// deletionTimestamp. The cluster controller watches the owned Database,
-	// Publication and Subscription resources solely to re-run the deletion
-	// cleanup after a restart, so resources that are not being deleted must not
-	// enqueue a Cluster reconcile.
-	isBeingDeletedPredicate = predicate.NewPredicateFuncs(func(object client.Object) bool {
+	isBeingDeleted = func(object client.Object) bool {
 		return !object.GetDeletionTimestamp().IsZero()
-	})
+	}
+
+	// isBeingDeletedPredicate admits owned resources that are being deleted,
+	// plus everything delivered by the initial cache sync.
+	isBeingDeletedPredicate = predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return e.IsInInitialList || isBeingDeleted(e.Object)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return isBeingDeleted(e.Object)
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return isBeingDeleted(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return isBeingDeleted(e.ObjectNew)
+		},
+	}
 )
 
 func (r *ClusterReconciler) nodesPredicate() predicate.Funcs {

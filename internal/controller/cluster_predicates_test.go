@@ -171,6 +171,13 @@ var _ = Describe("isBeingDeletedPredicate", func() {
 		Expect(isBeingDeletedPredicate.Generic(event.GenericEvent{Object: beingDeleted})).To(BeTrue())
 	})
 
+	It("admits an object that is not being deleted but belongs to the initialization scan", func() {
+		Expect(isBeingDeletedPredicate.Create(event.CreateEvent{
+			Object:          notBeingDeleted,
+			IsInInitialList: true,
+		})).To(BeTrue())
+	})
+
 	It("rejects an object that is not being deleted on every event type", func() {
 		Expect(isBeingDeletedPredicate.Create(event.CreateEvent{Object: notBeingDeleted})).To(BeFalse())
 		Expect(isBeingDeletedPredicate.Update(event.UpdateEvent{ObjectNew: notBeingDeleted})).To(BeFalse())

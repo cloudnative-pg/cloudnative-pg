@@ -964,6 +964,14 @@ var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 		Expect(mapClusterOwnedResourceToCluster(ctx, sub)).To(ConsistOf(expectedRequest))
 	})
 
+	It("maps a DatabaseRole to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		sub := &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "sub"},
+			Spec:       apiv1.DatabaseRoleSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, sub)).To(ConsistOf(expectedRequest))
+	})
+
 	It("returns nil when the cluster reference is empty", func(ctx SpecContext) {
 		db := &apiv1.Database{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "db"}}
 		Expect(mapClusterOwnedResourceToCluster(ctx, db)).To(BeNil())
