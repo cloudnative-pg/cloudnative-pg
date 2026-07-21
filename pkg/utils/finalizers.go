@@ -32,7 +32,12 @@ const (
 	// triggering the deletion of the subscription
 	SubscriptionFinalizerName = MetadataNamespace + "/deleteSubscription"
 
-	// PluginFinalizerName is the name of the finalizer
-	// triggering the cleanup of a plugin when its service is deleted
+	// PluginFinalizerName is the name of the legacy finalizer that used to
+	// trigger the cleanup of a plugin when its service was deleted.
+	//
+	// Deprecated: no longer added to new plugin Services; the operator
+	// only strips it for backward compatibility with objects created by
+	// an older version. Safe to remove once version 1.30 reaches end of
+	// support.
 	PluginFinalizerName = MetadataNamespace + "/cleanupPlugin"
 )
