@@ -493,6 +493,18 @@ function ensure_cert_manager() {
 #   - "release" (default): the latest published release
 #   - "main":              the current snapshot from the main branch
 #   - "vX.Y.Z" / "X.Y.Z":  a specific pinned release
+#   - "pr-<number>":       a plugin-barman-cloud pull request. Installs the
+#                          testing images its CI publishes for the PR (tagged
+#                          "pr-<number>"), with the manifest taken from the
+#                          PR's head ref.
+#   - "<branch>":          a same-repo plugin-barman-cloud branch. Installs the
+#                          testing images its CI publishes for the branch. The
+#                          manifest checked into the branch still points at the
+#                          "main" testing images, so both the operator
+#                          Deployment image and the sidecar image are repointed
+#                          at the branch's testing images (tag = branch name
+#                          with every "/" replaced by "-", mirroring the plugin
+#                          Taskfile).
 # Requires the operator to be installed first. Exports
 # BARMAN_PLUGIN_VERSION_RESOLVED with the concrete version that was deployed
 # (read back from the running deployment image) so the test suite can log it.
@@ -502,6 +514,8 @@ function install_barman_cloud_plugin() {
     local repo="cloudnative-pg/plugin-barman-cloud"
     local manifest_url
     local operator_namespace="cnpg-system"
+    # Non-empty only in branch mode; holds the derived testing image tag.
+    local branch_tag=""
 
     case "${selector}" in
         release)
@@ -516,8 +530,25 @@ function install_barman_cloud_plugin() {
             # clear message instead of a confusing 404.
             if [[ "${selector}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
                 manifest_url="https://github.com/${repo}/releases/download/v${selector#v}/manifest.yaml"
+            elif [[ "${selector}" =~ ^pr-[0-9]+$ ]]; then
+                # A plugin-barman-cloud pull request: its CI publishes the
+                # testing images under the "pr-<number>" tag (the pull_request
+                # ref name is "<number>/merge", not the branch name), and the
+                # matching manifest is served from the PR's head ref.
+                manifest_url="https://raw.githubusercontent.com/${repo}/refs/pull/${selector#pr-}/head/manifest.yaml"
+                branch_tag="${selector}"
+            elif [[ "${selector}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ && "${selector}" != *".."* ]]; then
+                # Anything else is treated as a plugin-barman-cloud branch name,
+                # validated with a conservative charset so a malformed value
+                # fails fast instead of building a bogus raw URL. A nonexistent
+                # branch still fails later with the "manifest not found" error.
+                # ".." is rejected outright: curl normalizes "../" in the URL
+                # path by default, so a crafted selector could otherwise escape
+                # the pinned "${repo}" and reach an arbitrary repo/branch.
+                manifest_url="https://raw.githubusercontent.com/${repo}/refs/heads/${selector}/manifest.yaml"
+                branch_tag="${selector//\//-}"
             else
-                printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main" or a version like v0.12.0)%b\n' \
+                printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main", a version like v0.12.0, pr-<number> for a pull request, or a branch name)%b\n' \
                     "${bright}" "${selector}" "${reset}" >&2
                 return 1
             fi
@@ -547,8 +578,51 @@ resources:
 - manifest.yaml
 namespace: ${operator_namespace}
 EOF
+    # In branch mode the checked-in manifest still references the "main" testing
+    # images, so repoint both at the branch's testing images. The Deployment
+    # image is handled by the images transformer; the sidecar image is delivered
+    # to the operator through the SIDECAR_IMAGE env var, which the manifest wires
+    # up via a secretKeyRef into a content-hashed Secret. Patching the env var
+    # with a literal value (and dropping the valueFrom) overrides that
+    # indirection directly, so the hashed Secret name never has to be known.
+    if [[ -n "${branch_tag}" ]]; then
+        local plugin_image="ghcr.io/cloudnative-pg/plugin-barman-cloud-testing"
+        local sidecar_image="ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar-testing"
+        cat >> "${kustomize_dir}/kustomization.yaml" <<EOF
+images:
+- name: ${plugin_image}
+  newTag: ${branch_tag}
+patches:
+- target:
+    kind: Deployment
+    name: barman-cloud
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: barman-cloud
+    spec:
+      template:
+        spec:
+          containers:
+          - name: barman-cloud
+            env:
+            - name: SIDECAR_IMAGE
+              value: ${sidecar_image}:${branch_tag}
+              valueFrom: null
+EOF
+    fi
     "${K8S_CLI}" kustomize "${kustomize_dir}" > "${manifest_file}"
     rm -rf "${kustomize_dir}"
+
+    # The images transformer above is a silent no-op if plugin_image no longer
+    # matches what the manifest actually references, so check the rewrite
+    # landed instead of installing a manifest that's still pinned to "main".
+    if [[ -n "${branch_tag}" ]] && ! grep -qF "${plugin_image}:${branch_tag}" "${manifest_file}"; then
+        printf '%bError: expected image %s:%s not found in the generated manifest; the plugin-barman-cloud image name may have changed%b\n' \
+            "${bright}" "${plugin_image}" "${branch_tag}" "${reset}" >&2
+        return 1
+    fi
 
     retry 5 "${K8S_CLI}" apply --server-side --force-conflicts -f "${manifest_file}"
 
