@@ -1283,14 +1283,16 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 		"pgdata", instance.PgData,
 		"options", options)
 
-	// pg_rewind does not start copying anything into the target data directory
-	// until it has collected every WAL segment it needs (its only writes before
-	// that point come from the ordinary crash recovery it runs on a target that
-	// was not shut down cleanly), so a run aborted by a failed WAL restoration
-	// can be safely retried from scratch, reusing the segments that were
-	// already fetched. Retrying here avoids handing a transient failure back
-	// to the reconciliation loop, whose exponential backoff would keep the
-	// instance down for much longer.
+	// pg_rewind is a single-pass tool: it invokes restore_command itself to fetch
+	// the WAL it needs, but if one of those calls fails it aborts instead of
+	// retrying, even for transient errors. It does not start copying anything
+	// into the target data directory until it has collected every WAL segment
+	// it needs (its only writes before that point come from the ordinary crash
+	// recovery it runs on a target that was not shut down cleanly), so a run
+	// aborted by a failed WAL restoration can be safely retried from scratch
+	// here, reusing the segments that were already fetched. Retrying here
+	// avoids handing a transient failure back to the reconciliation loop, whose
+	// exponential backoff would keep the instance down for much longer.
 	attempt := 0
 	err := retry.OnError(pgRewindRetry, func(err error) bool {
 		return pgRewindShouldRetry(ctx, err)
