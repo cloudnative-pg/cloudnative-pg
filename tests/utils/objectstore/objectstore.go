@@ -52,9 +52,9 @@ import (
 
 const (
 	// rustfsImage is the image used to run a RustFS server
-	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8-glibc"
+	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.9-glibc"
 	// awsCliImage is the image used to run the AWS CLI S3 client
-	awsCliImage = "docker.io/amazon/aws-cli:2.35.19"
+	awsCliImage = "docker.io/amazon/aws-cli:2.36.4"
 	// busyboxImage is used by the init container that prepares writable
 	// working directories for the RustFS server
 	busyboxImage = "docker.io/library/busybox:1.38.0"
