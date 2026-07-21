@@ -770,6 +770,40 @@ func LoadEnforcedParametersFromPgControldata(pgData string) (map[string]int, err
 	return enforcedParams, nil
 }
 
+// LoadStartupParameterValue asks PostgreSQL which value the given parameter
+// will have at startup with the current configuration files, by running
+// `postgres -C <name>`. It works while the server is not running: when no
+// configuration file sets the parameter, it returns the built-in default.
+func LoadStartupParameterValue(pgData string, name string) (int, error) {
+	var stdoutBuffer bytes.Buffer
+	var stderrBuffer bytes.Buffer
+	postgresCmd := exec.Command(GetPostgresExecutableName(),
+		"-D", pgData,
+		"-C", name) // #nosec G204
+	postgresCmd.Stdout = &stdoutBuffer
+	postgresCmd.Stderr = &stderrBuffer
+	// the postgres executable needs the parent environment (PATH above all)
+	// to locate itself while evaluating the -C flag
+	postgresCmd.Env = append(os.Environ(), "LANG=C", "LC_MESSAGES=C")
+	if err := postgresCmd.Run(); err != nil {
+		log.Error(err, "while reading the startup value of a parameter",
+			"name", name,
+			"stderr", stderrBuffer.String(),
+			"stdout", stdoutBuffer.String())
+		return 0, err
+	}
+
+	value, err := strconv.Atoi(strings.TrimSpace(stdoutBuffer.String()))
+	if err != nil {
+		log.Error(err, "while parsing the startup value of a parameter",
+			"name", name,
+			"value", stdoutBuffer.String())
+		return 0, err
+	}
+
+	return value, nil
+}
+
 // LoadEnforcedParametersFromCluster loads the enforced parameters which defined in cluster spec
 func LoadEnforcedParametersFromCluster(
 	cluster *apiv1.Cluster,
