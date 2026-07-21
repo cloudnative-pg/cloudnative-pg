@@ -113,3 +113,49 @@ var _ = Describe("instance reconciler health probe certificate", func() {
 			Expect(pgInstance.GetServerCertificate()).ToNot(BeNil())
 		})
 })
+
+var _ = Describe("enforced parameters alignment for followers", func() {
+	It("treats a parameter missing from the comparison map as zero", func() {
+		options := enforcedParametersToAlign(
+			map[string]int{"max_connections": 200},
+			map[string]int{},
+		)
+		Expect(options).To(Equal(map[string]string{"max_connections": "200"}))
+	})
+
+	It("keeps the pg_controldata value when it is higher than the startup value", func() {
+		options := enforcedParametersToAlign(
+			map[string]int{"max_connections": 200},
+			map[string]int{"max_connections": 100},
+		)
+		Expect(options).To(Equal(map[string]string{"max_connections": "200"}))
+	})
+
+	It("changes nothing when the cluster spec is at least as high as pg_controldata", func() {
+		options := enforcedParametersToAlign(
+			map[string]int{"max_connections": 100, "max_wal_senders": 10},
+			map[string]int{"max_connections": 200, "max_wal_senders": 10},
+		)
+		Expect(options).To(BeEmpty())
+	})
+
+	It("evaluates each parameter independently", func() {
+		options := enforcedParametersToAlign(
+			map[string]int{
+				"max_connections":           200,
+				"max_wal_senders":           10,
+				"max_worker_processes":      32,
+				"max_prepared_transactions": 0,
+			},
+			map[string]int{
+				"max_connections":      100,
+				"max_wal_senders":      35,
+				"max_worker_processes": 8,
+			},
+		)
+		Expect(options).To(Equal(map[string]string{
+			"max_connections":      "200",
+			"max_worker_processes": "32",
+		}))
+	})
+})
