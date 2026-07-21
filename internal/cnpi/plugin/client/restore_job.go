@@ -26,7 +26,10 @@ import (
 	"slices"
 
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // ErrNoPluginSupportsRestoreJobHooksCapability is raised when no plugin supports the restore job hooks capability
@@ -62,8 +65,15 @@ func (data *data) innerRestore(
 		if err != nil {
 			return nil, err
 		}
+
+		// Computed here so the plugin gets the operator's decision instead
+		// of re-deriving it independently (e.g. from a Cluster annotation).
+		checkEmptyWalArchive := utils.IsEmptyWalArchiveCheckEnabled(
+			&metav1.ObjectMeta{Annotations: cluster.GetAnnotations()})
+
 		request := restore.RestoreRequest{
-			ClusterDefinition: clusterDefinition,
+			ClusterDefinition:    clusterDefinition,
+			CheckEmptyWalArchive: &checkEmptyWalArchive,
 		}
 		res, err := plugin.RestoreJobHooksClient().Restore(ctx, &request)
 		if err != nil {
