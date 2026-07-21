@@ -302,6 +302,30 @@ var _ = Describe("Secrets", func() {
 			"thisTest-superuser",
 		}))
 	})
+
+	It("grants the origin backup endpoint CA secret in the Role rules", func() {
+		backup.Status.EndpointCA = &apiv1.SecretKeySelector{
+			LocalObjectReference: apiv1.LocalObjectReference{Name: "origin-endpoint-ca"},
+			Key:                  "ca.crt",
+		}
+		role := CreateRole(RoleOptions{Cluster: cluster, BackupOrigin: backup})
+		Expect(role.Rules[1].ResourceNames).To(ContainElement("origin-endpoint-ca"))
+	})
+
+	It("grants the recovery backup reference endpoint CA secret in the Role rules", func() {
+		cluster.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+			Recovery: &apiv1.BootstrapRecovery{
+				Backup: &apiv1.BackupSource{
+					EndpointCA: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{Name: "recovery-endpoint-ca"},
+						Key:                  "ca.crt",
+					},
+				},
+			},
+		}
+		role := CreateRole(RoleOptions{Cluster: cluster})
+		Expect(role.Rules[1].ResourceNames).To(ContainElement("recovery-endpoint-ca"))
+	})
 })
 
 var _ = Describe("Database Roles", func() {
