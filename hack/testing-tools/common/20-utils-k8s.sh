@@ -546,7 +546,7 @@ function install_barman_cloud_plugin() {
                 manifest_url="https://raw.githubusercontent.com/${repo}/refs/heads/${selector}/manifest.yaml"
                 branch_tag="${selector//\//-}"
             else
-                printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main", a version like v0.12.0, or a plugin-barman-cloud branch name)%b\n' \
+                printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main", a version like v0.12.0, pr-<number> for a pull request, or a branch name)%b\n' \
                     "${bright}" "${selector}" "${reset}" >&2
                 return 1
             fi
