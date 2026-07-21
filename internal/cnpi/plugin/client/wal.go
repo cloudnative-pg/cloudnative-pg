@@ -35,14 +35,16 @@ func (data *data) ArchiveWAL(
 	ctx context.Context,
 	cluster client.Object,
 	sourceFileName string,
+	checkEmptyWalArchive bool,
 ) error {
-	return wrapAsPluginErrorIfNeeded(data.innerArchiveWAL(ctx, cluster, sourceFileName))
+	return wrapAsPluginErrorIfNeeded(data.innerArchiveWAL(ctx, cluster, sourceFileName, checkEmptyWalArchive))
 }
 
 func (data *data) innerArchiveWAL(
 	ctx context.Context,
 	cluster client.Object,
 	sourceFileName string,
+	checkEmptyWalArchive bool,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -64,8 +66,9 @@ func (data *data) innerArchiveWAL(
 
 		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
 		request := wal.WALArchiveRequest{
-			ClusterDefinition: serializedCluster,
-			SourceFileName:    sourceFileName,
+			ClusterDefinition:    serializedCluster,
+			SourceFileName:       sourceFileName,
+			CheckEmptyWalArchive: &checkEmptyWalArchive,
 		}
 
 		pluginLogger.Trace(
