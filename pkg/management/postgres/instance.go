@@ -1221,8 +1221,25 @@ func (instance *Instance) removePgControlFileBackup() error {
 	return nil
 }
 
-// Rewind uses pg_rewind to align this data directory with the contents of the primary node.
-// If postgres major version is >= 13, add "--restore-target-wal" option
+// pgRewindRetry is the retry configuration for transient pg_rewind failures,
+// such as a WAL segment whose restoration from the archive failed
+var pgRewindRetry = wait.Backoff{
+	Duration: 5 * time.Second,
+	Factor:   2,
+	Steps:    4,
+}
+
+// pgRewindShouldRetry retries every pg_rewind failure, not just a failed WAL
+// restoration: pg_rewind doesn't expose a way to tell the two apart, so a
+// permanent failure (e.g. a bad connection string) also gets retried before
+// surfacing. The only thing that stops the retries is context cancellation.
+func pgRewindShouldRetry(ctx context.Context, _ error) bool {
+	return ctx.Err() == nil
+}
+
+// Rewind uses pg_rewind to align this data directory with the contents of the primary
+// node, using the "--restore-target-wal" option to fetch from the WAL archive any
+// segment that was already recycled locally
 func (instance *Instance) Rewind(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -1242,28 +1259,49 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 		"--target-pgdata", instance.PgData,
 	)
 
-	// make sure restore_command is set in override.conf
-	if _, err := configurePostgresOverrideConfFile(instance.PgData, primaryConnInfo, ""); err != nil {
+	// make sure a rewind-mode restore_command is set in override.conf
+	if _, err := configurePostgresOverrideConfFileForRewind(instance.PgData, primaryConnInfo); err != nil {
 		return err
 	}
 
 	options = append(options, "--restore-target-wal")
 
-	// Make sure PostgreSQL control file is not empty
-	err := instance.managePgControlFileBackup()
-	if err != nil {
-		return err
-	}
-
 	contextLogger.Info("Starting up pg_rewind",
 		"pgdata", instance.PgData,
 		"options", options)
 
-	pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
-	pgRewindCmd.Env = instance.buildPostgresEnv()
-	err = execlog.RunStreaming(pgRewindCmd, pgRewindName)
+	// pg_rewind is a single-pass tool: it invokes restore_command itself to fetch
+	// the WAL it needs, but if one of those calls fails it aborts instead of
+	// retrying, even for transient errors. It does not start copying anything
+	// into the target data directory until it has collected every WAL segment
+	// it needs (its only writes before that point come from the ordinary crash
+	// recovery it runs on a target that was not shut down cleanly), so a run
+	// aborted by a failed WAL restoration can be safely retried from scratch
+	// here, reusing the segments that were already fetched. Retrying here
+	// avoids handing a transient failure back to the reconciliation loop, whose
+	// exponential backoff would keep the instance down for much longer.
+	attempt := 0
+	err := retry.OnError(pgRewindRetry, func(err error) bool {
+		return pgRewindShouldRetry(ctx, err)
+	}, func() error {
+		attempt++
+
+		// Runs on every attempt, not just the first: a failed pg_rewind is
+		// exactly what can leave this needing repair before the next one.
+		if err := instance.managePgControlFileBackup(); err != nil {
+			return err
+		}
+
+		pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
+		pgRewindCmd.Env = instance.buildPostgresEnv()
+		if err := execlog.RunStreaming(pgRewindCmd, pgRewindName); err != nil {
+			contextLogger.Error(err, "Failed to execute pg_rewind", "attempt", attempt, "options", options)
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
-		contextLogger.Error(err, "Failed to execute pg_rewind", "options", options)
 		return fmt.Errorf("error executing pg_rewind: %w", err)
 	}
 

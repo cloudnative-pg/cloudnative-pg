@@ -20,6 +20,9 @@ SPDX-License-Identifier: Apache-2.0
 package walrestore
 
 import (
+	"errors"
+	"fmt"
+
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	"k8s.io/utils/ptr"
 
@@ -112,6 +115,80 @@ var _ = Describe("Function isStreamingAvailable", func() {
 			},
 		}
 		Expect(isStreamingAvailable(&cluster, "primaryPod")).To(BeTrue())
+	})
+})
+
+var _ = Describe("Function shouldUseEndOfWALStreamFlag", func() {
+	cluster := apiv1.Cluster{
+		Status: apiv1.ClusterStatus{
+			CurrentPrimary: "primaryPod",
+		},
+	}
+
+	It("returns false in rewind mode, even when streaming is available", func() {
+		Expect(isStreamingAvailable(&cluster, "replicaPod")).To(BeTrue())
+		Expect(shouldUseEndOfWALStreamFlag(&cluster, "replicaPod", true)).To(BeFalse())
+	})
+
+	It("follows streaming availability when not in rewind mode", func() {
+		Expect(shouldUseEndOfWALStreamFlag(&cluster, "replicaPod", false)).To(BeTrue())
+		Expect(shouldUseEndOfWALStreamFlag(&cluster, "primaryPod", false)).To(BeFalse())
+	})
+})
+
+var _ = Describe("Function maxWALFilesPerInvocation", func() {
+	It("returns 1 when no parallel WAL configuration is present", func() {
+		Expect(maxWALFilesPerInvocation(&apiv1.BarmanObjectStoreConfiguration{}, false)).To(Equal(1))
+	})
+
+	It("returns the configured maxParallel", func() {
+		configuration := &apiv1.BarmanObjectStoreConfiguration{
+			Wal: &apiv1.WalBackupConfiguration{
+				MaxParallel: 3,
+			},
+		}
+		Expect(maxWALFilesPerInvocation(configuration, false)).To(Equal(3))
+	})
+
+	It("returns 1 in rewind mode, ignoring the configured maxParallel", func() {
+		configuration := &apiv1.BarmanObjectStoreConfiguration{
+			Wal: &apiv1.WalBackupConfiguration{
+				MaxParallel: 3,
+			},
+		}
+		Expect(maxWALFilesPerInvocation(configuration, true)).To(Equal(1))
+	})
+})
+
+var _ = Describe("Function isEndOfWALStream", func() {
+	It("returns true when the requested WAL was not found", func() {
+		results := []barmanRestorer.Result{
+			{Err: barmanRestorer.ErrWALNotFound},
+		}
+		Expect(isEndOfWALStream(results)).To(BeTrue())
+	})
+
+	It("returns true when only a prefetched WAL was not found", func() {
+		results := []barmanRestorer.Result{
+			{Err: nil},
+			{Err: fmt.Errorf("while restoring the prefetched WAL: %w", barmanRestorer.ErrWALNotFound)},
+		}
+		Expect(isEndOfWALStream(results)).To(BeTrue())
+	})
+
+	It("returns false when every WAL was restored", func() {
+		results := []barmanRestorer.Result{
+			{Err: nil},
+			{Err: nil},
+		}
+		Expect(isEndOfWALStream(results)).To(BeFalse())
+	})
+
+	It("returns false when a restore failed with an error other than not-found", func() {
+		results := []barmanRestorer.Result{
+			{Err: errors.New("connection reset by peer")},
+		}
+		Expect(isEndOfWALStream(results)).To(BeFalse())
 	})
 })
 
