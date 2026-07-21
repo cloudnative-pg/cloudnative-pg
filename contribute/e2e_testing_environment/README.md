@@ -192,8 +192,10 @@ The script can be configured through the following environment variables:
   latest published chart is installed.
 - `BARMAN_PLUGIN_VERSION`: the `plugin-barman-cloud` build to install (kind/k3d
   only) for the plugin-based backup tests: `release` (default) for the latest
-  published release, `main` for the current snapshot, or a pinned version such
-  as `v0.12.0`.
+  published release, `main` for the current snapshot, a pinned version such
+  as `v0.12.0`, `pr-<number>` to install the testing images its CI publishes
+  for a pull request, or the name of a `plugin-barman-cloud` branch to install
+  the testing images its CI publishes for that branch.
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:
@@ -442,6 +444,10 @@ Options supported are:
   - release: the latest published plugin release (default)
   - main: the current snapshot from the main branch
   - a pinned version such as `v0.12.0`
+  - `pr-<number>`, to install the testing images its CI publishes for a
+    pull request
+  - the name of a `plugin-barman-cloud` branch, to install the testing images
+    its CI publishes for that branch
 
 Example:
 1. Trigger an e2e test to run all test cases with `lowest` test level.
