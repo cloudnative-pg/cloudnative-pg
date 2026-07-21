@@ -23,6 +23,7 @@ import (
 	"context"
 
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
+	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -154,12 +155,14 @@ type WalCapabilities interface {
 
 	// RestoreWAL calls the loaded plugins to archive a WAL file.
 	// This call returns a boolean indicating if the WAL was restored
-	// by a plugin and the occurred error.
+	// by a plugin and the occurred error. The mode tells the plugins
+	// the context the WAL file is being restored in.
 	RestoreWAL(
 		ctx context.Context,
 		cluster client.Object,
 		sourceWALName string,
 		destinationFileName string,
+		mode wal.WALRestoreRequest_Mode,
 	) (bool, error)
 }
 
