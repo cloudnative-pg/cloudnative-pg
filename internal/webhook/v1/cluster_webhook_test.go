@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -7077,7 +7076,6 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				Instances:       3,
 				MinSyncReplicas: 1,
-				MaxSyncReplicas: 2,
 			},
 		}
 		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
@@ -7093,28 +7091,5 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 			},
 		}
 		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
-	})
-
-	It("returns no warning when the legacy API sets maxSyncReplicas only", func() {
-		cluster := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 2,
-			},
-		}
-		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
-	})
-
-	It("is raised on creation but not on update", func() {
-		cluster := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{Instances: 3},
-		}
-		v := &ClusterCustomValidator{}
-
-		createWarnings, _ := v.ValidateCreate(context.Background(), cluster)
-		Expect(createWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
-
-		updateWarnings, _ := v.ValidateUpdate(context.Background(), cluster, cluster)
-		Expect(updateWarnings).NotTo(ContainElement(ContainSubstring("no synchronous replication configured")))
 	})
 })

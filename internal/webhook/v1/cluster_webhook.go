@@ -114,10 +114,6 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv
 	allErrs := v.validate(cluster)
 	allWarnings := v.getAdmissionWarnings(cluster)
 
-	// Raised at creation time only, to avoid repeating the warning on every
-	// update of an already accepted configuration
-	allWarnings = append(allWarnings, getSynchronousReplicationWarnings(cluster)...)
-
 	if len(allErrs) == 0 {
 		return allWarnings, nil
 	}
@@ -2659,10 +2655,6 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 	return result
 }
 
-// getAdmissionWarnings collects warnings shared by ValidateCreate and
-// ValidateUpdate. The synchronous replication warning is intentionally not
-// included here: it is raised by ValidateCreate only, see
-// getSynchronousReplicationWarnings.
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
 	list := getMaintenanceWindowsAdmissionWarnings(r)
 	list = append(list, getInTreeBarmanWarnings(r)...)
@@ -2670,7 +2662,8 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getStorageWarnings(r)...)
 	list = append(list, getSharedBuffersWarnings(r)...)
 	list = append(list, getMonitoringFieldsWarnings(r)...)
-	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+	return append(list, getSynchronousReplicationWarnings(r)...)
 }
 
 func getMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {
@@ -3158,9 +3151,7 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		return nil
 	}
 
-	// The legacy API enables synchronous replication through maxSyncReplicas:
-	// minSyncReplicas is only the floor used when not enough replicas are ready
-	if r.Spec.MaxSyncReplicas > 0 {
+	if r.Spec.MinSyncReplicas > 0 {
 		return nil
 	}
 
