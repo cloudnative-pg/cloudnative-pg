@@ -79,6 +79,21 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 			continue
 		}
 
+		// A resource-only drift is applied through the resize subresource:
+		// nothing restarts, so no rollout slot is consumed and the loop
+		// proceeds to the next instance. A resize the API server rejects
+		// (e.g. it would change the pod QoS class) degrades to the standard
+		// rollout below.
+		if podRollout.canBeResizedInPlace {
+			err := r.resizeInstanceInPlace(ctx, cluster, postgresqlStatus.Pod, podRollout.reason)
+			if err == nil {
+				continue
+			}
+			if !errors.Is(err, errInPlaceResizeRejected) {
+				return false, err
+			}
+		}
+
 		managerResult := r.rolloutManager.CoordinateRollout(client.ObjectKeyFromObject(cluster), postgresqlStatus.Pod.Name)
 		if !managerResult.RolloutAllowed {
 			r.Recorder.Eventf(
@@ -107,8 +122,17 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 		return false, fmt.Errorf("expected 1 primary PostgreSQL but none found")
 	}
 
-	// from now on we know we have a primary instance
+	return r.rolloutRequiredPrimary(ctx, cluster, podList, primaryPostgresqlStatus)
+}
 
+// rolloutRequiredPrimary rolls out the primary instance of the cluster when
+// its current state differs from the desired one
+func (r *ClusterReconciler) rolloutRequiredPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	podList *postgres.PostgresqlStatusList,
+	primaryPostgresqlStatus *postgres.PostgresqlStatus,
+) (bool, error) {
 	if cluster.IsInstanceFenced(primaryPostgresqlStatus.Pod.Name) {
 		return false, nil
 	}
@@ -117,6 +141,19 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	podRollout := isInstanceNeedingRollout(ctx, *primaryPostgresqlStatus, cluster)
 	if !podRollout.required {
 		return false, nil
+	}
+
+	// A resize does not restart anything, so the primary is treated like any
+	// replica: no switchover, no supervised-strategy involvement. If the API
+	// server rejects the resize, the standard rollout below takes over.
+	if podRollout.canBeResizedInPlace {
+		err := r.resizeInstanceInPlace(ctx, cluster, primaryPostgresqlStatus.Pod, podRollout.reason)
+		if err == nil {
+			return false, nil
+		}
+		if !errors.Is(err, errInPlaceResizeRejected) {
+			return false, err
+		}
 	}
 
 	// if the primary instance is marked for restart due to hot standby sensitive parameter decrease,
@@ -304,6 +341,12 @@ type rollout struct {
 	required     bool
 	canBeInPlace bool
 
+	// canBeResizedInPlace is true when the drift is limited to container
+	// resources that can be applied through the resize subresource, with
+	// no restart involved (not to be confused with canBeInPlace, which
+	// refers to an in-place restart of PostgreSQL)
+	canBeResizedInPlace bool
+
 	needsToChangeOperatorImage bool
 	needsToChangeOperandImage  bool
 
@@ -433,6 +476,7 @@ func isPodNeedingRollout(
 		"pod projected volume is outdated":         checkProjectedVolumeIsOutdated,
 		"pod image is outdated":                    checkPodImageIsOutdated,
 		"cluster has different restart annotation": checkClusterHasDifferentRestartAnnotation,
+		"pod resize is infeasible":                 checkPodResizeStuckInfeasible,
 	}
 
 	podRollout := applyCheckers(checkers)
@@ -477,6 +521,31 @@ func hasValidPodSpec(pod *corev1.Pod) bool {
 	}
 	err := json.Unmarshal([]byte(podSpecAnnotation), &corev1.PodSpec{})
 	return err == nil
+}
+
+// checkPodResizeStuckInfeasible detects instances whose in-place resize was
+// accepted by the API server but reported as infeasible by the kubelet: the
+// node can never satisfy the new resources, so the only way forward is
+// recreating the pod, letting the scheduler place it on a suitable node
+func checkPodResizeStuckInfeasible(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
+	if cluster.GetResourcesUpdateStrategy() != apiv1.ResourcesUpdateStrategyInPlace {
+		return rollout{}, nil
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodResizePending &&
+			condition.Status == corev1.ConditionTrue &&
+			condition.Reason == corev1.PodReasonInfeasible {
+			return rollout{
+				required: true,
+				reason: fmt.Sprintf(
+					"the in-place resize of pod '%s' is infeasible on its node, recreating the pod: %s",
+					pod.Name, condition.Message),
+			}, nil
+		}
+	}
+
+	return rollout{}, nil
 }
 
 func checkPodNeedsUpdatedTopology(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
@@ -733,14 +802,58 @@ func checkPodSpecIsOutdated(
 	}
 
 	match, diff := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec)
-	if !match {
-		return rollout{
-			required: true,
-			reason:   "original and target PodSpec differ in " + diff,
-		}, nil
+	if match {
+		// The stored pod spec is up-to-date. With the in-place strategy the
+		// live resources are still authoritative: a resize applied before a
+		// change of the desired resources was reverted, or issued by an
+		// external actor, leaves the annotation aligned while the running
+		// containers are not.
+		if cluster.GetResourcesUpdateStrategy() != apiv1.ResourcesUpdateStrategyInPlace {
+			return rollout{}, nil
+		}
+		if len(specs.GetResizableContainerResourceDrifts(&pod.Spec, &targetPod.Spec)) == 0 {
+			return rollout{}, nil
+		}
+		return evaluateResourcesOnlyDrift(pod, targetPod), nil
 	}
 
-	return rollout{}, nil
+	if cluster.GetResourcesUpdateStrategy() == apiv1.ResourcesUpdateStrategyInPlace {
+		if restMatch, _ := specs.ComparePodSpecsIgnoringContainerResources(storedPodSpec, targetPod.Spec); restMatch {
+			return evaluateResourcesOnlyDrift(pod, targetPod), nil
+		}
+	}
+
+	return rollout{
+		required: true,
+		reason:   "original and target PodSpec differ in " + diff,
+	}, nil
+}
+
+// evaluateResourcesOnlyDrift decides how to reconcile an instance pod whose
+// only drift from the target spec is in the container resources: resized in
+// place when the cluster supports it and the delta allows it, recreated
+// otherwise
+func evaluateResourcesOnlyDrift(pod *corev1.Pod, targetPod *corev1.Pod) rollout {
+	if !utils.HavePodsResize() {
+		return rollout{
+			required: true,
+			reason: "container resources changed, recreating the pod: " +
+				"the cluster does not support in-place pod resize",
+		}
+	}
+
+	if ok, reason := specs.CanResizeInPlace(&pod.Spec, &targetPod.Spec); !ok {
+		return rollout{
+			required: true,
+			reason:   "container resources changed, recreating the pod: " + reason,
+		}
+	}
+
+	return rollout{
+		required:            true,
+		canBeResizedInPlace: true,
+		reason:              "container resources changed, resizing the pod in place",
+	}
 }
 
 // recreatePrimaryInPlace deletes the primary Pod so the operator recreates it

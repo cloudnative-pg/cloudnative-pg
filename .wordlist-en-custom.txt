@@ -461,6 +461,9 @@ ReplicationTLSSecret
 ResizingPVC
 ResourceRequirements
 ResourceVersion
+ResourcesUpdateStrategy
+ResourcesUpdateStrategyInPlace
+ResourcesUpdateStrategyRecreate
 RestoreJobHook
 RestoreJobHookCapabilities
 RetentionPolicy
@@ -1033,6 +1036,7 @@ img
 immediateCheckpoint
 impactful
 importsource
+inPlace
 inProgress
 inRoles
 indistinctively
@@ -1429,6 +1433,8 @@ resizingPVC
 resourceRequirements
 resourceVersion
 resourcerequirements
+resourcesUpdateStrategy
+resourcesupdatestrategy
 restoreAdditionalCommandArgs
 restoreJobHookCapabilities
 resync
