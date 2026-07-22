@@ -1548,18 +1548,22 @@ func (instance *Instance) DropConnections() error {
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
-	result := buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName()) + " dbname=postgres"
-
-	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
-	if len(standbyTCPUserTimeout) == 0 {
-		// Default to 5000ms (5 seconds) if not explicitly set
-		standbyTCPUserTimeout = "5000"
+	if instance.useDirectPrimaryConnections() {
+		if instance.Cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
+			return "" // stop streaming while the operator is choosing the new primary
+		}
+		primaryHostname := fmt.Sprintf("%s.%s-any", instance.Cluster.Status.TargetPrimary, instance.Cluster.Name)
+		return buildPrimaryConnInfo(primaryHostname, instance.GetPodName())
 	}
+	return buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
+}
 
-	result = fmt.Sprintf("%s tcp_user_timeout='%s'", result,
-		strings.ReplaceAll(strings.ReplaceAll(standbyTCPUserTimeout, `\`, `\\`), `'`, `\'`))
-
-	return result
+func (instance *Instance) useDirectPrimaryConnections() bool {
+	if instance.Cluster == nil {
+		return false // happens in tests...
+	}
+	value, _ := strconv.ParseBool(instance.Cluster.Annotations[utils.DirectPrimaryConnectionsAnnotationName])
+	return value
 }
 
 // HandleInstanceCommandRequests execute a command requested by the reconciliation
