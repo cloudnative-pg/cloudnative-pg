@@ -886,6 +886,16 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
+	// Handle instances explicitly marked as unrecoverable before the active-instances
+	// gate below. A Pod that is Pending or Terminating is never "active", so the gate
+	// would otherwise return early and the alpha.cnpg.io/unrecoverable annotation would
+	// have no effect on exactly those states. This mirrors the unschedulable-instances
+	// handling above, which sits before the same gate for the same structural reason
+	// (its target Pods are Pending too).
+	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
+		return res, err
+	}
+
 	if !resources.allInstancesAreActive() {
 		contextLogger = contextLogger.WithValues(
 			"inactiveInstances", resources.inactiveInstanceNames())
@@ -1101,14 +1111,6 @@ func (r *ClusterReconciler) reconcilePods(
 	// pods joining the node that we already have.
 	if cluster.Status.Instances == 0 {
 		return r.createPrimaryInstance(ctx, cluster)
-	}
-
-	// Handle instances marked as unrecoverable before waiting for pods to be ready.
-	// This ensures pods annotated with alpha.cnpg.io/unrecoverable=true are
-	// deleted even when they can't report their status (e.g., postgres process
-	// not running, startup probe failing).
-	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
-		return res, err
 	}
 
 	// Stop acting here if there are non-ready Pods unless in maintenance reusing PVCs.
