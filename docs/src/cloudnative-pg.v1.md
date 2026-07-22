@@ -2790,6 +2790,26 @@ _Appears in:_
 | `error` _string_ | Error is the latest admission validation error |  |  |  |
 
 
+#### SchemaPermissionsSpec
+
+
+
+SchemaPermissionsSpec groups the privileges that can be granted or revoked
+on a schema, keyed by privilege. Each entry reuses the `grant`/`revoke`
+model already used for foreign data wrapper and server usage.
+
+
+
+_Appears in:_
+
+- [SchemaSpec](#schemaspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `usage` _[UsageSpec](#usagespec) array_ | List of roles for which the `USAGE` privilege on the schema is granted or revoked.<br />Maps to `GRANT USAGE ON SCHEMA ... TO ...` / `REVOKE USAGE ON SCHEMA ... FROM ...`. |  |  |  |
+| `create` _[UsageSpec](#usagespec) array_ | List of roles for which the `CREATE` privilege on the schema is granted or revoked.<br />Maps to `GRANT CREATE ON SCHEMA ... TO ...` / `REVOKE CREATE ON SCHEMA ... FROM ...`. |  |  |  |
+
+
 #### SchemaSpec
 
 
@@ -2807,6 +2827,7 @@ _Appears in:_
 | `name` _string_ | Name of the object (extension, schema, FDW, server) | True |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Specifies whether an object (e.g schema) should be present or absent<br />in the database. If set to `present`, the object will be created if<br />it does not exist. If set to `absent`, the extension/schema will be<br />removed if it exists. |  | present | Enum: [present absent] <br /> |
 | `owner` _string_ | The role name of the user who owns the schema inside PostgreSQL.<br />It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the<br />`OWNER TO` command of `ALTER SCHEMA`. | True |  |  |
+| `permissions` _[SchemaPermissionsSpec](#schemapermissionsspec)_ | Permissions defines the privileges to grant or revoke on the schema,<br />keyed by privilege. Each entry carries a role name and a type of<br />`grant` (default) or `revoke`, mirroring the existing usage model. |  |  |  |
 
 
 
@@ -3284,6 +3305,7 @@ UsageSpec configures a usage for a foreign data wrapper
 _Appears in:_
 
 - [FDWSpec](#fdwspec)
+- [SchemaPermissionsSpec](#schemapermissionsspec)
 - [ServerSpec](#serverspec)
 
 | Field | Description | Required | Default | Validation |
