@@ -1065,3 +1065,41 @@ var _ = Describe("NewInstance", func() {
 		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
 	})
 })
+
+var _ = Describe("service account token", func() {
+	const tokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+	mountsAtTokenPath := func(container corev1.Container) bool {
+		for _, mount := range container.VolumeMounts {
+			if mount.MountPath == tokenMountPath {
+				return true
+			}
+		}
+		return false
+	}
+
+	It("always disables the automount and projects the token for non-bootstrap containers", func() {
+		pod, err := buildInstance(apiv1.Cluster{}, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pod.Spec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
+		Expect(pod.Spec.Volumes).To(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
+
+		// The bootstrap init container only copies the manager binary and does
+		// not need Kubernetes API access.
+		Expect(pod.Spec.InitContainers).To(HaveLen(1))
+		bootstrapContainer := pod.Spec.InitContainers[0]
+		Expect(bootstrapContainer.Name).To(Equal(BootstrapControllerContainerName))
+		Expect(mountsAtTokenPath(bootstrapContainer)).To(BeFalse(),
+			"bootstrap container should not mount the projected token")
+
+		// All other containers need to reach the Kubernetes API.
+		Expect(pod.Spec.Containers).ToNot(BeEmpty())
+		for _, container := range pod.Spec.Containers {
+			Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+				Name:      kubeAPIAccessVolumeName,
+				MountPath: tokenMountPath,
+				ReadOnly:  true,
+			}), "container %s should mount the projected token", container.Name)
+		}
+	})
+})

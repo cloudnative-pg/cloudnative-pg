@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -88,6 +89,9 @@ func ComparePodSpecs(
 		},
 		"service-account-name": func() bool {
 			return currentPodSpec.ServiceAccountName == targetPodSpec.ServiceAccountName
+		},
+		"automount-service-account-token": func() bool {
+			return ptr.Equal(currentPodSpec.AutomountServiceAccountToken, targetPodSpec.AutomountServiceAccountToken)
 		},
 		"scheduler-name": func() bool {
 			return currentPodSpec.SchedulerName == targetPodSpec.SchedulerName

@@ -200,6 +200,7 @@ func createClusterPodSpec(
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
 		ServiceAccountName:            cluster.GetServiceAccountName(),
+		AutomountServiceAccountToken:  ptr.To(false),
 		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 		TerminationGracePeriodSeconds: &gracePeriod,
 		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
@@ -216,7 +217,11 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
-			VolumeMounts:    CreatePostgresVolumeMounts(cluster, getExtensions(&cluster)),
+			VolumeMounts: CreatePostgresVolumeMounts(VolumeMountsConfig{
+				Cluster:            cluster,
+				Extensions:         getExtensions(&cluster),
+				NeedsKubeAPIAccess: true,
+			}),
 			// This is the default startup probe, and can be overridden
 			// the user configuration in cluster.spec.probes.startup
 			StartupProbe: &corev1.Probe{

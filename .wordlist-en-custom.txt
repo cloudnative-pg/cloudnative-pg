@@ -18,6 +18,7 @@ AppArmorProfile
 Armando
 AuthQuery
 AuthQuerySecret
+AutomountServiceAccountToken
 Autoscaler
 AvailableArchitecture
 AvailableArchitectures
@@ -516,6 +517,7 @@ ServerSpec
 ServerTLSSecret
 ServiceAccount
 ServiceAccountTemplate
+ServiceAccounts
 ServiceMonitor
 ServiceSelectorType
 ServiceSelectorTypeR
@@ -668,6 +670,7 @@ authQuerySecret
 authn
 authz
 autocompletion
+automounted
 autoscaler
 autoscalers
 autovacuum

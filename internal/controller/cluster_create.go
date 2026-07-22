@@ -611,7 +611,12 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	cluster.SetInheritedData(&sa.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
 
-	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
+	if specs.IsServiceAccountAligned(
+		ctx,
+		origSa,
+		generatedPullSecretNames,
+		sa.ObjectMeta,
+	) {
 		return nil
 	}
 

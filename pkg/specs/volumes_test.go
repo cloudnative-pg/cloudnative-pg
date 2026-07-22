@@ -302,7 +302,11 @@ var _ = Describe("test createVolumesAndVolumeMountsForSQLRefs", func() {
 
 var _ = DescribeTable("test creation of volume mounts",
 	func(cluster apiv1.Cluster, mounts []corev1.VolumeMount) {
-		mts := CreatePostgresVolumeMounts(cluster, getExtensions(&cluster))
+		mts := CreatePostgresVolumeMounts(VolumeMountsConfig{
+			Cluster:            cluster,
+			Extensions:         getExtensions(&cluster),
+			NeedsKubeAPIAccess: true,
+		})
 		Expect(mts).NotTo(BeEmpty())
 		for _, mt := range mounts {
 			Expect(mts).To(ContainElement(mt))
@@ -696,5 +700,90 @@ var _ = Describe("ImageVolume Extensions", func() {
 			Expect(SanitizeExtensionNameForUpgradeTargetVolume(maxName)).
 				To(HaveLen(rfc1123LabelMaxLength))
 		})
+	})
+})
+
+var _ = Describe("kube-api-access volume", func() {
+	expectedVolume := corev1.Volume{
+		Name: "kube-api-access",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+				Sources: []corev1.VolumeProjection{
+					{
+						ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+							Path:              "token",
+							ExpirationSeconds: ptr.To[int64](3607),
+						},
+					},
+					{
+						ConfigMap: &corev1.ConfigMapProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "kube-root-ca.crt",
+							},
+							Items: []corev1.KeyToPath{
+								{
+									Key:  "ca.crt",
+									Path: "ca.crt",
+								},
+							},
+						},
+					},
+					{
+						DownwardAPI: &corev1.DownwardAPIProjection{
+							Items: []corev1.DownwardAPIVolumeFile{
+								{
+									Path: "namespace",
+									FieldRef: &corev1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.namespace",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expectedMount := corev1.VolumeMount{
+		Name:      "kube-api-access",
+		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+		ReadOnly:  true,
+	}
+
+	It("is always created regardless of cluster configuration", func() {
+		cluster := apiv1.Cluster{}
+		Expect(createPostgresVolumes(&cluster, "pod-1", nil)).To(ContainElement(expectedVolume))
+		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: true})).
+			To(ContainElement(expectedMount))
+	})
+
+	It("is not injected in containers that do not need Kubernetes API access", func() {
+		cluster := apiv1.Cluster{}
+		Expect(CreatePostgresVolumeMounts(VolumeMountsConfig{Cluster: cluster, NeedsKubeAPIAccess: false})).
+			NotTo(ContainElement(expectedMount))
+	})
+
+	It("coexists with the user defined projected volume", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ProjectedVolumeTemplate: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							ConfigMap: &corev1.ConfigMapProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "user-provided",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		volumes := createPostgresVolumes(&cluster, "pod-1", nil)
+		Expect(volumes).To(ContainElement(expectedVolume))
+		Expect(volumes).To(ContainElement(createProjectedVolume(&cluster)))
 	})
 })
