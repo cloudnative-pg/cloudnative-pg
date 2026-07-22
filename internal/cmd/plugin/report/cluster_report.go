@@ -49,7 +49,7 @@ type clusterReport struct {
 // Kubernetes object manifests
 func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputFormat, folder string) error {
 	objects := []struct {
-		content interface{}
+		content any
 		name    string
 	}{
 		{content: cr.cluster, name: "cluster"},
