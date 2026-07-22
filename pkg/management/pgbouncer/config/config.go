@@ -201,9 +201,14 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		parameters["auth_file"] = authFilePath
 	}
 
-	if explicitAuthUser, ok := parameters["auth_user"]; ok {
+	// auth_user has its own slot in the pgbouncer.ini template, so an override
+	// is applied to that value and the key is removed from the generic
+	// parameters block to avoid emitting the setting twice. An empty value is
+	// ignored so it cannot blank the user derived from the auth query secret.
+	if explicitAuthUser := parameters["auth_user"]; explicitAuthUser != "" {
 		authQueryUser = explicitAuthUser
 	}
+	delete(parameters, "auth_user")
 
 	if secrets.ServerTLS != nil {
 		parameters["server_tls_cert_file"] = serverTLSCertPath
