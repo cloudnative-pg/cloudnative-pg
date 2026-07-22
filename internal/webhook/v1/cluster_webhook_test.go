@@ -3881,6 +3881,103 @@ var _ = Describe("validation of replication slots configuration", func() {
 		Expect(result).To(BeEmpty())
 	})
 
+	It("rejects a slotPrefix that makes the HA slot name exceed the PostgreSQL limit", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster-name"},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled:    ptr.To(true),
+						SlotPrefix: strings.Repeat("a", 60),
+					},
+				},
+			},
+		}
+
+		result := v.validateReplicationSlots(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.replicationSlots.highAvailability.slotPrefix"))
+	})
+
+	// Boundary: with cluster name "c" and a single instance the instance name is
+	// "c-1" (3 characters), so a 60-character prefix yields a 63-character slot
+	// name (the maximum PostgreSQL allows) and a 61-character prefix yields 64.
+	It("accepts a slotPrefix whose slot name is exactly at the 63-character limit", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c"},
+			Spec: apiv1.ClusterSpec{
+				Instances: 1,
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled:    ptr.To(true),
+						SlotPrefix: strings.Repeat("a", 60),
+					},
+				},
+			},
+		}
+
+		result := v.validateReplicationSlots(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects a slotPrefix whose slot name is one character over the limit", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c"},
+			Spec: apiv1.ClusterSpec{
+				Instances: 1,
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled:    ptr.To(true),
+						SlotPrefix: strings.Repeat("a", 61),
+					},
+				},
+			},
+		}
+
+		result := v.validateReplicationSlots(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.replicationSlots.highAvailability.slotPrefix"))
+	})
+
+	It("accepts the default slotPrefix with a maximum-length cluster name", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: strings.Repeat("a", 50)},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled: ptr.To(true),
+					},
+				},
+			},
+		}
+
+		result := v.validateReplicationSlots(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("ignores slotPrefix length when HA replication slots are disabled", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster-name"},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled:    ptr.To(false),
+						SlotPrefix: strings.Repeat("a", 60),
+					},
+					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
+						Enabled: ptr.To(true),
+					},
+				},
+			},
+		}
+
+		result := v.validateReplicationSlots(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
 	It("allows enabling replication slots on the fly", func() {
 		oldCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
