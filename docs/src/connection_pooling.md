@@ -236,6 +236,10 @@ This gives you the flexibility — and responsibility — to manage the
 authentication process yourself. You can follow the instructions above to
 replicate similar behavior to the default setup.
 
+If PgBouncer needs to authenticate as a different user than the one derived
+from your secret, you can override it with the `auth_user` parameter (see
+[PgBouncer configuration options](#pgbouncer-configuration-options)).
+
 ## Pod templates
 
 
