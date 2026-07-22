@@ -353,11 +353,6 @@ spec:
                     required:
                     - name
                     type: object
-                  authUser:
-                    description: |-
-                      The username used by the pooler to execute the AuthQuery.
-                      By default this will be extracted from the AuthQuerySecret.
-                    type: string
                   clientCASecret:
                     description: |-
                       ClientCASecret provides PgBouncer’s client_tls_ca_file, the root
