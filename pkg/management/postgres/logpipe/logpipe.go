@@ -35,6 +35,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/go-logr/logr"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -89,6 +91,10 @@ func (p *LogPipe) GetExitedCondition() *concurrency.Executed {
 func (p *LogPipe) Start(ctx context.Context) error {
 	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)
 	defer filenameLog.Info("Exited log pipe")
+	// Built once here, before the collection goroutine starts, and reused by
+	// every retry of collectLogsFromFile so audit records don't rebuild their
+	// unsampled logger on every reconnect.
+	recordLogger := buildUnsampledLogger(zapcore.AddSync(os.Stderr))
 	go func() {
 		defer p.exited.Broadcast()
 		for {
@@ -110,7 +116,7 @@ func (p *LogPipe) Start(ctx context.Context) error {
 			}
 			p.initialized.Broadcast()
 
-			if err := p.collectLogsFromFile(ctx); err != nil {
+			if err := p.collectLogsFromFile(ctx, recordLogger); err != nil {
 				if errors.Is(err, context.Canceled) {
 					return
 				}
@@ -124,8 +130,9 @@ func (p *LogPipe) Start(ctx context.Context) error {
 }
 
 // collectLogsFromFile opens (blocking) the FIFO file, then starts reading the csv file line by line
-// until the end of the file or an error.
-func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
+// until the end of the file or an error. recordLogger is built once by Start
+// and passed through.
+func (p *LogPipe) collectLogsFromFile(ctx context.Context, recordLogger logr.Logger) error {
 	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)
 
 	defer func() {
@@ -151,7 +158,7 @@ func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
 	// the cancellation signal happened
 	go func() {
 		defer close(errChan)
-		errChan <- p.streamLogFromCSVFile(ctx, f, &LogRecordWriter{})
+		errChan <- p.streamLogFromCSVFile(ctx, f, NewLogRecordWriter(recordLogger))
 	}()
 	select {
 	case <-ctx.Done():
