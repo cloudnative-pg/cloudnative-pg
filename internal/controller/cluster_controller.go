@@ -1321,9 +1321,9 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&apiv1.DatabaseRole{},
 			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
 			// The cluster only consumes spec.passwordSecret (to maintain the
-			// instance RBAC), so status-only changes are irrelevant here. ORed with
-			// isBeingDeletedPredicate so this watch also covers what the
-			// Database/Publication/Subscription watches below covers.
+			// instance RBAC), so status-only changes are irrelevant here. OR-ed with
+			// isBeingDeletedPredicate so a reconciliation loop can be enqueued
+			// to remove the finalizer from the resource.
 			builder.WithPredicates(predicate.Or(
 				predicate.GenerationChangedPredicate{},
 				isBeingDeletedPredicate,
@@ -1332,9 +1332,9 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		// Watch the owned Database, Publication and Subscription resources only
 		// while they are being deleted. Their reconcilers run in the instance
 		// manager, so when the cluster is torn down together with its pods the
-		// finalizer can only be removed by notifyDeletionToOwnedResources during
-		// the cluster's own deletion. If the operator is down while the namespace
-		// is deleted, the Cluster object is gone and nothing would ever re-trigger
+		// finalizer can only be removed by the operator controller.
+		// If the operator is down while the namespace is deleted,
+		// the Cluster object is gone and nothing would ever re-trigger
 		// that cleanup after a restart; these watches deliver the lingering
 		// resources on the initial cache sync so the cleanup runs.
 		Watches(
@@ -1615,10 +1615,7 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 
 // mapClusterOwnedResourceToCluster maps a namespaced resource that references its
 // Cluster through the `cluster` field to a reconcile request for that Cluster.
-// It resolves the cluster reference by name instead of through an owner reference,
-// so it keeps working after the Cluster object is gone: that is what allows
-// notifyDeletionToOwnedResources to strip a lingering finalizer when the operator
-// sees the resource again after a restart.
+// It resolves the cluster reference by name instead of through an owner reference.
 func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []reconcile.Request {
 	owned, ok := obj.(interface {
 		GetClusterRef() corev1.LocalObjectReference
