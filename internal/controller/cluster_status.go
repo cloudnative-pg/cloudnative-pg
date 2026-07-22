@@ -40,6 +40,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
@@ -248,12 +249,21 @@ func (r *ClusterReconciler) updateResourceStatus(
 	newJobs := int32(len(resources.jobs.Items)) //nolint:gosec
 	cluster.Status.JobCount = newJobs
 
+	var podLabelKeys []string
+	nodeLabelKeys := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.NodeLabelsAntiAffinity
+	if sync := cluster.Spec.PostgresConfiguration.Synchronous; sync != nil &&
+		(len(sync.PodFailureDomainKeys) > 0 || len(sync.NodeFailureDomainKeys) > 0) {
+		podLabelKeys = sync.PodFailureDomainKeys
+		nodeLabelKeys = sync.NodeFailureDomainKeys
+	}
 	cluster.Status.Topology = getPodsTopology(
 		ctx,
 		resources.instances.Items,
 		resources.nodes,
-		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
+		podLabelKeys,
+		nodeLabelKeys,
 	)
+	updateSyncReplicationTopologyCondition(cluster)
 
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
@@ -818,12 +828,18 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	return nil
 }
 
-// getPodsTopology returns a map with all the information about the pods topology
+// getPodsTopology returns a map with all the information about the pods
+// topology. Each label key is read from a single source: the keys in
+// podLabelNames are resolved from the labels of the instance Pod (a missing
+// label makes the whole extraction fail), while the keys in nodeLabelNames
+// are resolved from the labels of the Node hosting the Pod, and a missing
+// Node makes the whole extraction fail.
 func getPodsTopology(
 	ctx context.Context,
 	pods []corev1.Pod,
 	nodes map[string]corev1.Node,
-	topology apiv1.SyncReplicaElectionConstraints,
+	podLabelNames []string,
+	nodeLabelNames []string,
 ) apiv1.Topology {
 	contextLogger := log.FromContext(ctx)
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
@@ -832,6 +848,29 @@ func getPodsTopology(
 	for _, pod := range pods {
 		podName := apiv1.PodName(pod.Name)
 		data[podName] = make(map[string]string, 0)
+		// a pod that has not been scheduled yet must not count as a used node
+		if pod.Spec.NodeName != "" {
+			nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
+		}
+
+		for _, labelName := range podLabelNames {
+			value, ok := pod.Labels[labelName]
+			if !ok {
+				// a configured failure domain label missing from the pod is a
+				// misconfiguration: failing the extraction surfaces it through
+				// the topology condition, while resolving it to an empty value
+				// would silently merge the pod into a shared pseudo-domain
+				contextLogger.Debug("pod label not found, skipping pod topology matching",
+					"podName", pod.Name, "labelName", labelName)
+				return apiv1.Topology{}
+			}
+			data[podName][labelName] = value
+		}
+
+		if len(nodeLabelNames) == 0 {
+			continue
+		}
+
 		node, ok := nodes[pod.Spec.NodeName]
 		if !ok {
 			// node not found, it means that:
@@ -840,15 +879,72 @@ func getPodsTopology(
 			contextLogger.Debug("node not found, skipping pod topology matching")
 			return apiv1.Topology{}
 		}
-
-		nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
-
-		for _, labelName := range topology.NodeLabelsAntiAffinity {
+		for _, labelName := range nodeLabelNames {
 			data[podName][labelName] = node.Labels[labelName]
 		}
 	}
 
 	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: int32(len(nodesMap))} //nolint:gosec
+}
+
+// updateSyncReplicationTopologyCondition sets the SyncReplicationTopologySatisfied
+// condition on the cluster. It is only set when podFailureDomainKeys or
+// nodeFailureDomainKeys is configured on the new synchronous replication API.
+func updateSyncReplicationTopologyCondition(cluster *apiv1.Cluster) {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
+		// the condition must not survive the removal of the failure domain
+		// keys, or consumers such as the webhook warnings would keep reading
+		// a stale result
+		meta.RemoveStatusCondition(
+			&cluster.Status.Conditions,
+			string(apiv1.ConditionSyncReplicationTopologySatisfied),
+		)
+		return
+	}
+
+	topology := cluster.Status.Topology
+	if !topology.SuccessfullyExtracted {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonTopologyNotExtracted),
+			Message: "Topology labels could not be extracted from pods or nodes.",
+		})
+		return
+	}
+
+	primary := apiv1.PodName(cluster.Status.CurrentPrimary)
+	if _, ok := topology.Instances[primary]; !ok {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonTopologyNotExtracted),
+			Message: "Topology information for the primary instance is not available.",
+		})
+		return
+	}
+
+	// use the same candidates and threshold used to build
+	// synchronous_standby_names, so that the condition cannot diverge from
+	// what the replication path actually elects
+	if satisfied, _ := replication.CrossDomainConstraintSatisfied(cluster); satisfied {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ConditionReasonTopologySatisfied),
+			Message: "Enough electable synchronous standbys are in a different failure domain than the primary.",
+		})
+		return
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:   string(apiv1.ConditionSyncReplicationTopologySatisfied),
+		Status: metav1.ConditionFalse,
+		Reason: string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+		Message: "Not enough electable synchronous standbys in a different failure domain than the primary; " +
+			"the failure domain constraint is not applied.",
+	})
 }
 
 // isWALSpaceAvailableOnPod check if a Pod terminated because it has no

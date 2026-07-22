@@ -34,6 +34,11 @@ spec:
       jsonPath: .status.currentPrimary
       name: Primary
       type: string
+    - description: Failure domain topology satisfaction status
+      jsonPath: .status.conditions[?(@.type=='SyncReplicationTopologySatisfied')].reason
+      name: SyncTopology
+      priority: 1
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
@@ -4715,6 +4720,25 @@ spec:
                         - any
                         - first
                         type: string
+                      nodeFailureDomainKeys:
+                        description: |-
+                          NodeFailureDomainKeys is a list of Node label keys used to define
+                          failure domains. The values are read exclusively from the labels of the
+                          Node hosting each instance Pod: when a Node cannot be found (for
+                          example, drained or deleted after the Pod was scheduled), the whole
+                          topology extraction fails and the constraint is not applied. When set,
+                          the operator selects synchronous replicas from instances running on
+                          nodes whose label values differ from the primary's node for all the
+                          specified keys, so that synchronous replication spans failure domains
+                          such as availability zones or regions.
+                          When the replicas in failure domains different from the primary's are
+                          not enough to satisfy the configured number of synchronous standbys,
+                          the constraint is not applied and synchronous replicas are selected as
+                          if this field were not set.
+                          Mutually exclusive with `podFailureDomainKeys`.
+                        items:
+                          type: string
+                        type: array
                       number:
                         description: |-
                           Specifies the number of synchronous standby servers that
@@ -4724,6 +4748,28 @@ spec:
                         - message: The number of synchronous replicas should be greater
                             than zero
                           rule: self > 0
+                      podFailureDomainKeys:
+                        description: |-
+                          PodFailureDomainKeys is a list of Pod label keys used to define failure
+                          domains. The values are read exclusively from the labels of each
+                          instance Pod: a listed label that is not present on the Pod makes the
+                          whole topology extraction fail, so that the constraint is not applied,
+                          and the Node hosting the Pod is never consulted. When
+                          set, the operator selects synchronous replicas from instances whose
+                          label values differ from the primary's for all the specified keys, so
+                          that synchronous replication spans failure domains such as availability
+                          zones or regions. Starting from Kubernetes 1.35, the
+                          `topology.kubernetes.io/zone` and `topology.kubernetes.io/region`
+                          labels are automatically copied from the Node onto each Pod at
+                          scheduling time.
+                          When the replicas in failure domains different from the primary's are
+                          not enough to satisfy the configured number of synchronous standbys,
+                          the constraint is not applied and synchronous replicas are selected as
+                          if this field were not set.
+                          Mutually exclusive with `nodeFailureDomainKeys`.
+                        items:
+                          type: string
+                        type: array
                       standbyNamesPost:
                         description: |-
                           A user-defined list of application names to be added to
@@ -4750,7 +4796,19 @@ spec:
                       rule: self.dataDurability!='preferred' || ((!has(self.standbyNamesPre)
                         || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost)
                         || self.standbyNamesPost.size()==0))
+                    - message: podFailureDomainKeys and nodeFailureDomainKeys are
+                        mutually exclusive
+                      rule: '!(has(self.podFailureDomainKeys) && self.podFailureDomainKeys.size()
+                        > 0 && has(self.nodeFailureDomainKeys) && self.nodeFailureDomainKeys.size()
+                        > 0)'
                 type: object
+                x-kubernetes-validations:
+                - message: syncReplicaElectionConstraint and synchronous failure domain
+                    keys are mutually exclusive
+                  rule: '!(has(self.syncReplicaElectionConstraint) && self.syncReplicaElectionConstraint.enabled
+                    && has(self.synchronous) && ((has(self.synchronous.podFailureDomainKeys)
+                    && self.synchronous.podFailureDomainKeys.size() > 0) || (has(self.synchronous.nodeFailureDomainKeys)
+                    && self.synchronous.nodeFailureDomainKeys.size() > 0)))'
               primaryLease:
                 description: |-
                   Configuration of the Kubernetes `Lease` used to coordinate safe primary

@@ -194,6 +194,7 @@ FQDN
 FQDNs
 FailoverQuorum
 FailoverQuorumStatus
+FailureDomainKeys
 Fei
 Filesystem
 Fluentd
@@ -317,6 +318,7 @@ Nenciarini
 NetworkPolicies
 NetworkPolicy
 NodeAffinity
+NodeFailureDomainKeys
 NodeMaintenanceWindow
 NodeSelector
 NodesUsed
@@ -377,6 +379,7 @@ PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
 PodDisruptionBudgets
+PodFailureDomainKeys
 PodMonitor
 PodName
 PodSecurityContext
@@ -551,6 +554,7 @@ SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
+SyncReplicationTopologySatisfied
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
@@ -1197,6 +1201,7 @@ networkpolicy
 nextScheduleTime
 nginx
 nodeAffinity
+nodeFailureDomainKeys
 nodeLabelsAntiAffinity
 nodeMaintenanceWindow
 nodeSelector
@@ -1296,6 +1301,7 @@ podAntiAffinity
 podAntiAffinityType
 podCount
 podDisruptionBudgets
+podFailureDomainKeys
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
@@ -1587,6 +1593,7 @@ synchronizereplicasconfiguration
 synchronousreplicaconfiguration
 synchronousreplicaconfigurationmethod
 syncreplicaelectionconstraints
+syncreplicas
 sys
 syslog
 systemID
