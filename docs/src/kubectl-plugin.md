@@ -1061,6 +1061,13 @@ to request an online/hot backup or an offline/cold one: additionally, you can
 also tune online backups by explicitly setting the `--immediate-checkpoint` and
 `--wait-for-archive` options.
 
+You can use the `--dry-run` option to preview the `Backup` resource that would
+be created, without actually submitting it to the API server:
+
+```sh
+kubectl cnpg backup CLUSTER --dry-run
+```
+
 The ["Backup" section](./backup.md) contains more information about
 the configuration settings.
 
