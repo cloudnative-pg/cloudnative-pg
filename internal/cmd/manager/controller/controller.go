@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -77,6 +78,10 @@ const (
 	// operatorClientCertCommonName is the fallback CN for the operator's in-memory
 	// client certificate when the Pod hostname cannot be determined.
 	operatorClientCertCommonName = "cloudnative-pg-operator"
+
+	// helmReleaseSecretType is the Secret type Helm uses to store release
+	// manifests (one revision per Secret).
+	helmReleaseSecretType corev1.SecretType = "helm.sh/release.v1"
 )
 
 // leaderElectionConfiguration contains the leader parameters that will be passed to controllerruntime.Options.
@@ -132,6 +137,19 @@ func RunController(
 		LeaderElectionReleaseOnCancel: true,
 	}
 
+	byObject := map[client.Object]cache.ByObject{
+		// Helm stores each release revision as a Secret containing the full
+		// (compressed, base64-encoded) manifest. These can be large, and
+		// CNPG has no use for them, but the default cache would otherwise
+		// list, watch, and store every one of them in every watched
+		// namespace. Excluding them at the informer level, rather than via
+		// a controller predicate, means they never get listed/watched/stored
+		// at all.
+		&corev1.Secret{}: {
+			Field: fields.OneTermNotEqualSelector("type", string(helmReleaseSecretType)),
+		},
+	}
+
 	// EndpointSlices are watched only to detect CNPG-i plugin rollouts, and
 	// plugins are deployed in the operator namespace. Restricting the informer
 	// to that namespace avoids listing and watching every EndpointSlice in the
@@ -144,18 +162,16 @@ func RunController(
 	// it. When the namespace is unknown (e.g. local development without
 	// OPERATOR_NAMESPACE set) we simply fall back to the default caching.
 	if conf.OperatorNamespace != "" {
-		managerOptions.Cache = cache.Options{
-			ByObject: map[client.Object]cache.ByObject{
-				&discoveryv1.EndpointSlice{}: {
-					Namespaces: map[string]cache.Config{
-						conf.OperatorNamespace: {},
-					},
-				},
+		byObject[&discoveryv1.EndpointSlice{}] = cache.ByObject{
+			Namespaces: map[string]cache.Config{
+				conf.OperatorNamespace: {},
 			},
 		}
 	} else {
 		setupLog.Info("Plugin EndpointSlice watch disabled: OPERATOR_NAMESPACE not set")
 	}
+
+	managerOptions.Cache = cache.Options{ByObject: byObject}
 
 	if conf.WatchNamespace != "" {
 		namespaces := conf.WatchedNamespaces()
