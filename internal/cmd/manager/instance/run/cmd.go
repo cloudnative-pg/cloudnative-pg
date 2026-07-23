@@ -306,7 +306,10 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	}
 
 	// postgres CSV logs handler (PGAudit too)
-	postgresLogPipe := logpipe.NewLogPipe()
+	postgresLogPipe := logpipe.NewLogPipe(logpipe.MultiRecordWriter{
+		newWALReplayErrorDetector(instance),
+		&logpipe.LogRecordWriter{},
+	})
 	if err := mgr.Add(postgresLogPipe); err != nil {
 		contextLogger.Error(err, "unable to add CSV logs handler")
 		return err

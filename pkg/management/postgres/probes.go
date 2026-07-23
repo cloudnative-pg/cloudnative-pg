@@ -45,6 +45,10 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		MightBeUnavailable:     instance.MightBeUnavailable(),
 	}
 
+	if statusError := instance.StatusError(); statusError != "" {
+		return result, errors.New(statusError)
+	}
+
 	// this deferred function may override the error returned. Take extra care.
 	defer func() {
 		if !result.MightBeUnavailable {

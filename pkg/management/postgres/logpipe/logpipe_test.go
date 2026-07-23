@@ -40,6 +40,17 @@ func (writer *SpyRecordWriter) Write(record NamedRecord) {
 }
 
 var _ = Describe("CSV file reader", func() {
+	It("can write records to multiple writers", func() {
+		record := &LoggingRecord{Message: "test"}
+		writerOne := SpyRecordWriter{}
+		writerTwo := SpyRecordWriter{}
+
+		MultiRecordWriter{&writerOne, &writerTwo}.Write(record)
+
+		Expect(writerOne.records).To(ConsistOf(record))
+		Expect(writerTwo.records).To(ConsistOf(record))
+	})
+
 	When("given CSV logs from logging_collector", func() {
 		It("can read multiple CSV lines", func(ctx SpecContext) {
 			f, err := os.Open("testdata/two_lines.csv")
