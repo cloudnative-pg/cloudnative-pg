@@ -461,6 +461,17 @@ func GetPodSecurityContext(cluster *apiv1.Cluster) *corev1.PodSecurityContext {
 		FSGroup:        &gid,
 	}
 
+	// Special case meaning we want to nil the nil (for OpenShift-like cluster who assign a value >0 automatically)
+	if uid = -1 {
+		defaultContext.RunAsUser = nil
+	}
+	
+	// Special case meaning we want to nil the group (for OpenShift-like cluster who assign a value >0 automatically)
+	if gid = -1 {
+		defaultContext.RunAsGroup = nil
+		defaultContext.FSGroup = nil
+	}
+
 	if cluster.Spec.PodSecurityContext == nil {
 		return defaultContext
 	}
