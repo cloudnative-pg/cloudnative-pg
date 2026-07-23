@@ -1473,7 +1473,7 @@ kubectl cnpg subscription sync-sequences destination-cluster \
 The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
 popular terminal-based UI to interact with Kubernetes clusters.
 
-See [`k9s/plugins.yml`](samples/k9s/plugins.yml) for details.
+See [`K9s repo`](https://github.com/derailed/k9s/blob/master/plugins/cloudnative-pg.yaml) for details.
 
 ## Permissions required by the plugin
 
