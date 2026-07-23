@@ -474,6 +474,12 @@ func GetPodSecurityContext(cluster *apiv1.Cluster) *corev1.PodSecurityContext {
 	if definedContext.RunAsGroup == nil {
 		definedContext.RunAsGroup = defaultContext.RunAsGroup
 	}
+	if definedContext.RunAsNonRoot == nil {
+		definedContext.RunAsNonRoot = defaultContext.RunAsNonRoot
+	}
+	if definedContext.FSGroup == nil {
+		definedContext.FSGroup = defaultContext.FSGroup
+	}
 	if definedContext.SeccompProfile == nil {
 		definedContext.SeccompProfile = defaultContext.SeccompProfile
 	}
