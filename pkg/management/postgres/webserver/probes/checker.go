@@ -90,6 +90,20 @@ func (e *executor) IsHealthy(
 ) {
 	contextLogger := log.FromContext(ctx)
 
+	// If the instance manager has detected a fatal WAL replay error the
+	// replica is stuck and cannot make further replay progress.  Fail the
+	// probe immediately so that:
+	//   1. Kubernetes marks the pod NotReady and stops routing traffic to it.
+	//   2. The operator sees Error != nil in the /pg/status response and can
+	//      exclude this replica from failover candidate selection.
+	if e.instance.HasWALReplayErrorDetected() {
+		const msg = "replica has an unrecoverable WAL replay error; " +
+			"instance is marked unhealthy until PostgreSQL is restarted"
+		contextLogger.Warning(fmt.Sprintf("%s probe failing due to WAL replay error", e.probeType))
+		http.Error(w, fmt.Sprintf("%s check failed: %s", e.probeType, msg), http.StatusInternalServerError)
+		return
+	}
+
 	var cluster apiv1.Cluster
 	if err := e.cache.tryGetLatestClusterWithTimeout(ctx, &cluster); err != nil {
 		contextLogger = contextLogger.WithValues("apiServerReachable", false,
@@ -117,6 +131,7 @@ func (e *executor) IsHealthy(
 	contextLogger.Trace(fmt.Sprintf("%s probe succeeding", e.probeType))
 	_, _ = fmt.Fprint(w, "OK")
 }
+
 
 func getProbeRunnerFromCluster(probeType probeType, cluster apiv1.Cluster) runner {
 	var probe *apiv1.ProbeWithStrategy

@@ -166,15 +166,27 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
 	// or change the target primary if the current one is not valid anymore.
-	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
-		contextLogger.Info("Failing over", "newPrimary", mostAdvancedInstance.Pod.Name)
+	// Similarly, this handles apiv1.PendingSwitchoverMarker for a switchover.
+	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker || cluster.Status.TargetPrimary == apiv1.PendingSwitchoverMarker {
+		isSwitchover := cluster.Status.TargetPrimary == apiv1.PendingSwitchoverMarker
+		actionVerb := "Failing over"
+		actionEvent := "FailoverTarget"
+		phase := apiv1.PhaseFailOver
+
+		if isSwitchover {
+			actionVerb = "Switching over"
+			actionEvent = "SwitchoverTarget"
+			phase = apiv1.PhaseSwitchover
+		}
+
+		contextLogger.Info(actionVerb, "newPrimary", mostAdvancedInstance.Pod.Name)
 		status.LogStatus(ctx)
-		contextLogger.Debug("Cluster status before failover", "instances", resources.instances)
-		r.Recorder.Eventf(cluster, "Normal", "FailoverTarget",
-			"Failing over from %v to %v",
+		contextLogger.Debug(fmt.Sprintf("Cluster status before %s", actionVerb), "instances", resources.instances)
+		r.Recorder.Eventf(cluster, "Normal", actionEvent,
+			"%s from %v to %v", actionVerb,
 			cluster.Status.CurrentPrimary, mostAdvancedInstance.Pod.Name)
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-			fmt.Sprintf("Failing over from %v to %v", cluster.Status.CurrentPrimary, mostAdvancedInstance.Pod.Name),
+		if err := r.RegisterPhase(ctx, cluster, phase,
+			fmt.Sprintf("%s from %v to %v", actionVerb, cluster.Status.CurrentPrimary, mostAdvancedInstance.Pod.Name),
 		); err != nil {
 			return "", err
 		}

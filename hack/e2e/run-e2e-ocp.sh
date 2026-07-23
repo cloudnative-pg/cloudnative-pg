@@ -205,5 +205,10 @@ oc wait ingresscontroller.operator.openshift.io/default \
   -n openshift-ingress-operator \
   --for=condition=Available=True --timeout=2m
 
+echo "Installing cert-manager and plugin-barman-cloud"
+export K8S_CLI=oc
+source "${ROOT_DIR}/hack/testing-tools/common/20-utils-k8s.sh"
+install_barman_cloud_plugin
+
 echo "Running the e2e tests"
 "${ROOT_DIR}/hack/e2e/run-e2e.sh"

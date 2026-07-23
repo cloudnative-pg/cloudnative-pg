@@ -89,6 +89,30 @@ func NewRawLineLogPipe(fileName, name string) *LineLogPipe {
 	}
 }
 
+// NewRawLineLogPipeWithObserver returns a logPipe for raw output that
+// additionally calls observer for every non-empty line before writing
+// the line to the logger. This allows callers to inspect lines for
+// interesting patterns (e.g. fatal WAL replay errors) without the FIFO
+// fan-out problems that would arise from a second independent reader.
+func NewRawLineLogPipeWithObserver(fileName, name string, observer func(line []byte)) *LineLogPipe {
+	logger := log.WithName(name).WithValues("source", fileName)
+
+	return &LineLogPipe{
+		fileName: fileName,
+		handler: func(line []byte) {
+			if len(line) == 0 {
+				return
+			}
+			if observer != nil {
+				observer(line)
+			}
+			logger.Info(string(line))
+		},
+		initialized: concurrency.NewExecuted(),
+		exited:      concurrency.NewExecuted(),
+	}
+}
+
 // Start a new goroutine running the logging collector core, reading
 // from a process logging raw strings to a file and redirecting its content to stdout in JSON format.
 // The goroutine is started just once for a given file.
