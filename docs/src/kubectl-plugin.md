@@ -1407,7 +1407,7 @@ The `cnpg subscription drop` command seamlessly complements the `create` command
 You can drop a `SUBSCRIPTION` with the following command structure:
 
 ```sh
-kubectl cnpg subcription drop \
+kubectl cnpg subscription drop \
   --subscription SUBSCRIPTION_NAME \
   LOCAL_CLUSTER [options]
 ```

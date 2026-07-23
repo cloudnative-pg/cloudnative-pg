@@ -704,7 +704,7 @@ const (
 	// PhaseFirstPrimary for an starting cluster
 	PhaseFirstPrimary = "Setting up primary"
 
-	// PhaseCreatingReplica everytime we add a new replica
+	// PhaseCreatingReplica every time we add a new replica
 	PhaseCreatingReplica = "Creating a new replica"
 
 	// PhaseUpgrade upgrade in process
