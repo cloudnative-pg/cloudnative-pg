@@ -929,3 +929,55 @@ var _ = Describe("reconcileResources surfaces a permanently failed instance crea
 			Expect(updated.Status.PhaseReason).To(ContainSubstring(failedJob.Name))
 		})
 })
+
+var _ = Describe("mapClusterOwnedResourceToCluster", func() {
+	const (
+		ns             = "ns"
+		referencedName = "referenced-cluster"
+	)
+	expectedRequest := reconcile.Request{
+		NamespacedName: types.NamespacedName{Namespace: ns, Name: referencedName},
+	}
+	clusterRef := corev1.LocalObjectReference{Name: referencedName}
+
+	It("maps a Database to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "db"},
+			Spec:       apiv1.DatabaseSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, db)).To(ConsistOf(expectedRequest))
+	})
+
+	It("maps a Publication to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		pub := &apiv1.Publication{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "pub"},
+			Spec:       apiv1.PublicationSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, pub)).To(ConsistOf(expectedRequest))
+	})
+
+	It("maps a Subscription to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		sub := &apiv1.Subscription{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "sub"},
+			Spec:       apiv1.SubscriptionSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, sub)).To(ConsistOf(expectedRequest))
+	})
+
+	It("maps a DatabaseRole to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		sub := &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "sub"},
+			Spec:       apiv1.DatabaseRoleSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, sub)).To(ConsistOf(expectedRequest))
+	})
+
+	It("returns nil when the cluster reference is empty", func(ctx SpecContext) {
+		db := &apiv1.Database{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "db"}}
+		Expect(mapClusterOwnedResourceToCluster(ctx, db)).To(BeNil())
+	})
+
+	It("returns nil for an object that does not reference a cluster", func(ctx SpecContext) {
+		Expect(mapClusterOwnedResourceToCluster(ctx, &corev1.Secret{})).To(BeNil())
+	})
+})

@@ -1319,10 +1319,38 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		).
 		Watches(
 			&apiv1.DatabaseRole{},
-			handler.EnqueueRequestsFromMapFunc(r.mapDatabaseRolesToClusters()),
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
 			// The cluster only consumes spec.passwordSecret (to maintain the
-			// instance RBAC), so status-only changes are irrelevant here.
-			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+			// instance RBAC), so status-only changes are irrelevant here. OR-ed with
+			// isBeingDeletedPredicate so a reconciliation loop can be enqueued
+			// to remove the finalizer from the resource.
+			builder.WithPredicates(predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				isBeingDeletedPredicate,
+			)),
+		).
+		// Watch the owned Database, Publication and Subscription resources only
+		// while they are being deleted. Their reconcilers run in the instance
+		// manager, so when the cluster is torn down together with its pods the
+		// finalizer can only be removed by the operator controller.
+		// If the operator is down while the namespace is deleted,
+		// the Cluster object is gone and nothing would ever re-trigger
+		// that cleanup after a restart; these watches deliver the lingering
+		// resources on the initial cache sync so the cleanup runs.
+		Watches(
+			&apiv1.Database{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
+		).
+		Watches(
+			&apiv1.Publication{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
+		).
+		Watches(
+			&apiv1.Subscription{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
 		)
 
 	if configuration.Current.OperatorNamespace != "" {
@@ -1585,22 +1613,28 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 	}
 }
 
-// mapDatabaseRolesToClusters returns a function mapping roles to their corresponding cluster
-func (r *ClusterReconciler) mapDatabaseRolesToClusters() handler.MapFunc {
-	return func(_ context.Context, obj client.Object) []reconcile.Request {
-		role, ok := obj.(*apiv1.DatabaseRole)
-		if !ok || role.Spec.ClusterRef.Name == "" {
-			return nil
-		}
+// mapClusterOwnedResourceToCluster maps a namespaced resource that references its
+// Cluster through the `cluster` field to a reconcile request for that Cluster.
+// It resolves the cluster reference by name instead of through an owner reference.
+func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []reconcile.Request {
+	owned, ok := obj.(interface {
+		GetClusterRef() corev1.LocalObjectReference
+	})
+	if !ok {
+		return nil
+	}
+	clusterName := owned.GetClusterRef().Name
+	if clusterName == "" {
+		return nil
+	}
 
-		return []reconcile.Request{
-			{
-				NamespacedName: types.NamespacedName{
-					Namespace: role.GetNamespace(),
-					Name:      role.Spec.ClusterRef.Name,
-				},
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      clusterName,
 			},
-		}
+		},
 	}
 }
 
