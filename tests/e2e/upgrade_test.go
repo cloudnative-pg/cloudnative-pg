@@ -880,11 +880,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				// This spec owns its operator lifecycle, so it tears down cnpg-system
 				// itself. cleanupOperatorAndObjectStore is not reused: it also cleans
 				// object store paths that only the in-core upgrade specs create, which
-				// would fail here. The plugin is removed before cnpg-system because the operator
-				// puts a cnpg.io/cleanupPlugin finalizer on the plugin Service, so
-				// deleting cnpg-system wholesale would otherwise wedge the namespace
-				// on that finalizer; removing the plugin while the operator is still
-				// up lets it be cleared.
+				// would fail here.
 				DeferCleanup(func() {
 					if CurrentSpecReport().Failed() {
 						namespaces.DumpNamespaceObjects(env.Ctx, env.Client,
@@ -892,11 +888,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 						operator.Dump(env.Ctx, env.Client,
 							operatorNamespace, "out/"+CurrentSpecReport().LeafNodeText+"operator.log")
 					}
-					_, stderr, err := run.Run(fmt.Sprintf(
-						"kubectl delete deployment,service barman-cloud -n %s "+
-							"--ignore-not-found --wait=true --timeout=2m",
-						operatorNamespace))
-					Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
 					Expect(namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 120)).
 						To(Succeed())
 				})
