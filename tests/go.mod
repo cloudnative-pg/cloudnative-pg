@@ -9,8 +9,8 @@ require (
 	github.com/avast/retry-go/v5 v5.0.0
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/cloudnative-pg v0.0.0-00010101000000-000000000000
-	github.com/cloudnative-pg/machinery v0.5.0
-	github.com/go-logr/logr v1.4.3
+	github.com/cloudnative-pg/machinery v0.5.1-0.20260723111933-8e3b55a68832
+	github.com/go-logr/logr v1.4.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.6.0
 	github.com/lib/pq v1.12.3
