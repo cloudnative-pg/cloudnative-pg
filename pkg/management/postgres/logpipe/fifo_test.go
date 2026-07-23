@@ -90,8 +90,8 @@ var _ = Describe("ensureLogFifo", func() {
 		})
 	})
 
-	When("a symlink points at a genuine FIFO (Lstat is not followed)", func() {
-		It("removes the symlink itself, leaving the target FIFO untouched", func() {
+	When("a symlink resolves to a genuine FIFO (Stat follows it)", func() {
+		It("accepts it without removing anything, since the resolved path is a usable FIFO", func() {
 			targetFifo := filepath.Join(dir, "target.fifo")
 			Expect(ensureLogFifo(logger, targetFifo)).To(Succeed())
 			Expect(isFifo(targetFifo)).To(BeTrue())
@@ -99,16 +99,37 @@ var _ = Describe("ensureLogFifo", func() {
 			symlinkPath := filepath.Join(dir, "postgres.json")
 			Expect(os.Symlink(targetFifo, symlinkPath)).To(Succeed())
 
+			// CreateFifo now resolves the path (os.Stat), matching the reader
+			// that opens it, so a link to a real FIFO is a valid stream: keep it.
+			Expect(ensureLogFifo(logger, symlinkPath)).To(Succeed())
+
+			// both the symlink and its target survive untouched
+			_, statErr := os.Lstat(symlinkPath)
+			Expect(statErr).ToNot(HaveOccurred())
+			Expect(isFifo(targetFifo)).To(BeTrue())
+		})
+	})
+
+	When("a symlink resolves to a regular file (Stat follows it to a non-FIFO)", func() {
+		It("reports ErrExistsNotFifo and removes the symlink, leaving the target untouched", func() {
+			target := filepath.Join(dir, "target.txt")
+			Expect(os.WriteFile(target, []byte("not a fifo"), 0o600)).To(Succeed())
+
+			symlinkPath := filepath.Join(dir, "postgres.json")
+			Expect(os.Symlink(target, symlinkPath)).To(Succeed())
+
 			err := ensureLogFifo(logger, symlinkPath)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.Is(err, compatibility.ErrExistsNotFifo)).To(BeTrue())
 
-			// the symlink name is gone...
+			// os.Remove drops the symlink name, not its target...
 			_, statErr := os.Lstat(symlinkPath)
 			Expect(os.IsNotExist(statErr)).To(BeTrue())
 
-			// ...but the FIFO it pointed to is untouched
-			Expect(isFifo(targetFifo)).To(BeTrue())
+			// ...so the file it pointed at survives (os.Remove cannot have
+			// touched the target through the link)
+			_, statErr = os.Lstat(target)
+			Expect(statErr).ToNot(HaveOccurred())
 		})
 	})
 
