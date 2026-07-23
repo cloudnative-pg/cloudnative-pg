@@ -192,7 +192,8 @@ function print_operator_image() {
 # far still puts a cnpg.io/cleanupPlugin finalizer on the plugin Service; that
 # finalizer only got removed on unreleased main/branch tips (#10940), so
 # deleting cnpg-system wholesale can still wedge the namespace against a
-# released operator. Safe to drop once no supported release predates that fix.
+# released operator. 1.30 is the newest release branch and still predates the
+# fix, so this is safe to drop once 1.30 reaches EOL.
 # Cluster-scoped resources (webhooks, ClusterRoles, ClusterRoleBindings) must be
 # removed explicitly because they survive namespace deletion and would block Helm
 # from adopting them (missing ownership labels).
