@@ -38,6 +38,24 @@ import (
 
 // Destroy implements destroy subcommand
 func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool) error {
+	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instanceName, plugin.Namespace)
+	if err != nil {
+		return err
+	}
+
+	// PVCs are detached or deleted before the pod so the operator's reconcile loop
+	// can't see dangling PVCs and recreate the pod. This matches the deletion order
+	// in ensureInstanceIsDeleted.
+	if keepPVC {
+		if err := detachInstancePVCs(ctx, pvcs, clusterName, instanceName); err != nil {
+			return err
+		}
+	} else {
+		if err := deleteInstancePVCs(ctx, pvcs, instanceName); err != nil {
+			return err
+		}
+	}
+
 	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
 		return err
 	}
@@ -63,34 +81,44 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 		}
 	}
 
-	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instanceName, plugin.Namespace)
-	if err != nil {
-		return err
-	}
-
 	if keepPVC {
-		// we remove the ownership from the pvcs if present
-		for i := range pvcs {
-			if _, isOwned := controller.IsOwnedByCluster(&pvcs[i]); !isOwned {
-				continue
-			}
-
-			pvcs[i].OwnerReferences = removeOwnerReference(pvcs[i].OwnerReferences, clusterName)
-			pvcs[i].Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusDetached
-			pvcs[i].Labels[utils.InstanceNameLabelName] = instanceName
-			err = plugin.Client.Update(ctx, &pvcs[i])
-			if err != nil {
-				return fmt.Errorf("error updating metadata for persistent volume claim %s: %v",
-					clusterName, err)
-			}
-		}
 		fmt.Printf("Instance %s of cluster %s has been destroyed and the PVC was kept\n",
 			instanceName,
 			clusterName,
 		)
-		return nil
+	} else {
+		fmt.Printf("Instance %s of cluster %s is destroyed\n", instanceName, clusterName)
 	}
 
+	return nil
+}
+
+// detachInstancePVCs removes the ownership from the pvcs if present
+func detachInstancePVCs(
+	ctx context.Context,
+	pvcs []corev1.PersistentVolumeClaim,
+	clusterName, instanceName string,
+) error {
+	for i := range pvcs {
+		if _, isOwned := controller.IsOwnedByCluster(&pvcs[i]); !isOwned {
+			continue
+		}
+
+		pvcs[i].OwnerReferences = removeOwnerReference(pvcs[i].OwnerReferences, clusterName)
+		pvcs[i].Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusDetached
+		pvcs[i].Labels[utils.InstanceNameLabelName] = instanceName
+		if err := plugin.Client.Update(ctx, &pvcs[i]); err != nil {
+			return fmt.Errorf("error updating metadata for persistent volume claim %s: %v",
+				clusterName, err)
+		}
+	}
+	return nil
+}
+
+// deleteInstancePVCs deletes the pvcs owned by the cluster, or unowned pvcs that
+// still carry the instance label and the detached annotation from a previous
+// keep-pvc run
+func deleteInstancePVCs(ctx context.Context, pvcs []corev1.PersistentVolumeClaim, instanceName string) error {
 	for i := range pvcs {
 		if pvcs[i].Labels == nil {
 			pvcs[i].Labels = map[string]string{}
@@ -104,14 +132,11 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 		if isOwned ||
 			(pvcs[i].Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusDetached &&
 				pvcs[i].Labels[utils.InstanceNameLabelName] == instanceName) {
-			if err = plugin.Client.Delete(ctx, &pvcs[i]); err != nil {
+			if err := plugin.Client.Delete(ctx, &pvcs[i]); err != nil {
 				return fmt.Errorf("error deleting pvc %s: %v", pvcs[i].Name, err)
 			}
 		}
 	}
-
-	fmt.Printf("Instance %s of cluster %s is destroyed\n", instanceName, clusterName)
-
 	return nil
 }
 
