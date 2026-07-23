@@ -58,6 +58,10 @@ and the following suite of E2E tests are performed on that cluster:
      * Operator upgrade
      * Operator High Availability
 
+* **Reduced RBAC deployment:**
+  * Operator Deployment
+  * Node drain
+
 * **Observability:**
      * Metrics collection
      * PgBouncer Metrics
