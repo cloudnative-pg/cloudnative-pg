@@ -2662,7 +2662,8 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getStorageWarnings(r)...)
 	list = append(list, getSharedBuffersWarnings(r)...)
 	list = append(list, getMonitoringFieldsWarnings(r)...)
-	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+	return append(list, getSynchronousReplicationWarnings(r)...)
 }
 
 func getMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {
@@ -3133,4 +3134,30 @@ func (v *ClusterCustomValidator) validateServiceAccountConfig(r *apiv1.Cluster) 
 		}
 	}
 	return nil
+}
+
+func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
+	if r.Spec.Instances < 2 {
+		return nil
+	}
+
+	// A replica cluster replays data from another cluster: losing its
+	// designated primary doesn't lose data from the topology
+	if r.IsReplica() {
+		return nil
+	}
+
+	if r.Spec.PostgresConfiguration.Synchronous != nil {
+		return nil
+	}
+
+	if r.Spec.MinSyncReplicas > 0 {
+		return nil
+	}
+
+	return admission.Warnings{
+		"This cluster has no synchronous replication configured. " +
+			"A primary failure can cause data loss for transactions not yet replicated. " +
+			"Consider configuring .spec.postgresql.synchronous to protect against data loss.",
+	}
 }

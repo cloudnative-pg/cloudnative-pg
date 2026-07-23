@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -7038,5 +7039,93 @@ var _ = Describe("ServiceAccount configuration validation", func() {
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.serviceAccountName"))
 		Expect(result[0].Detail).To(ContainSubstring("mutually exclusive"))
+	})
+})
+
+var _ = Describe("getSynchronousReplicationWarnings", func() {
+	It("returns no warning for a single-instance cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 1},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a multi-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning when the current synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method: apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number: 1,
+					},
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the legacy synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MinSyncReplicas: 1,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when only maxSyncReplicas is set", func() {
+		// minSyncReplicas is the floor that self-healing can't erase: with it
+		// left at zero, a transient shortfall of ready replicas collapses the
+		// effective synchronous requirement to zero (see getSyncReplicasData
+		// in pkg/postgres/replication/legacy.go), so maxSyncReplicas alone does
+		// not guarantee durability.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: 2,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning for a replica cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a two-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 2},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("is raised on both creation and update", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		v := &ClusterCustomValidator{}
+
+		createWarnings, _ := v.ValidateCreate(context.Background(), cluster)
+		Expect(createWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
+
+		updateWarnings, _ := v.ValidateUpdate(context.Background(), cluster, cluster)
+		Expect(updateWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
 	})
 })

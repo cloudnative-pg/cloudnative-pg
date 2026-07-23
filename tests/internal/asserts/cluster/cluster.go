@@ -416,8 +416,14 @@ func AssertClusterDefault(
 
 		validator := webhookv1.ClusterCustomValidator{}
 		validationWarn, validationErr := validator.ValidateCreate(env.Ctx, cluster)
-		Expect(validationWarn).To(BeEmpty())
 		Expect(validationErr).ToNot(HaveOccurred())
+		// The fixtures used by this test intentionally omit synchronous
+		// replication, so the only warning they can legitimately raise is
+		// the one about that.
+		Expect(validationWarn).To(Or(
+			BeEmpty(),
+			HaveEach(ContainSubstring("no synchronous replication configured")),
+		))
 	})
 }
 

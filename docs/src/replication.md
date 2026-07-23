@@ -125,9 +125,12 @@ CloudNativePG supports both
     By default, synchronous replication pauses write operations if the required
     number of standby nodes for WAL replication during transaction commits is
     unavailable. This behavior prioritizes data durability and aligns with
-    PostgreSQL DBA best practices. However, if self-healing is a higher priority
+    PostgreSQL DBA best practices. As a general rule, plan for synchronous
+    replication in clusters with at least three instances, to tolerate the loss
+    of one of them. However, if self-healing is a higher priority
     than strict data durability in your setup, this setting can be adjusted. For
-    details on managing this behavior, refer to the [Data Durability and Synchronous Replication](#data-durability-and-synchronous-replication)
+    details on managing this behavior, refer to the
+    [Data Durability and Synchronous Replication](#data-durability-and-synchronous-replication)
     section.
 :::
 
