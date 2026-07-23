@@ -96,7 +96,7 @@ repository:
   url: https://github.com/cloudnative-pg/cloudnative-pg
   status: active
   accepts-change-request: true
-  accepts-automated-change-request: false
+  accepts-automated-change-request: true
   no-third-party-packages: false
   core-team:
     - name: Gabriele Bartolini
