@@ -23,7 +23,6 @@ package importdb
 import (
 	"context"
 	"fmt"
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/services"
@@ -50,9 +50,9 @@ func ImportDatabaseMicroservice(
 	databaseName string,
 ) (*apiv1.Cluster, error) {
 	if imageName == "" {
-		imageName = os.Getenv("POSTGRES_IMG")
+		imageName = config.Current().Postgres.Image
 	}
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	storageClassName := config.Current().Storage.StorageClass
 	host, err := services.GetHostName(ctx, crudClient, namespace, sourceClusterName)
 	if err != nil {
 		return nil, err
@@ -132,9 +132,9 @@ func ImportDatabasesMonolith(
 	roles []string,
 ) (*apiv1.Cluster, error) {
 	if imageName == "" {
-		imageName = os.Getenv("POSTGRES_IMG")
+		imageName = config.Current().Postgres.Image
 	}
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	storageClassName := config.Current().Storage.StorageClass
 	host, err := services.GetHostName(ctx, crudClient, namespace, sourceClusterName)
 	if err != nil {
 		return nil, err

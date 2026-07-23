@@ -31,6 +31,8 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 )
 
 // GetMostRecentReleaseTag retrieves the most recent release tag from
@@ -118,7 +120,7 @@ func GetAvailableReleases(releasesPath string) ([]*semver.Version, error) {
 }
 
 func isReleasePullRequestBranch() bool {
-	branchName := os.Getenv("BRANCH_NAME")
+	branchName := config.Current().BranchName
 	if branchName == "" {
 		branchNameBytes, err := exec.Command("git", "symbolic-ref", "--short", "-q", "HEAD").Output()
 		if err != nil {

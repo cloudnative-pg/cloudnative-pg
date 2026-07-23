@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strings"
 	"time"
@@ -39,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
@@ -514,16 +514,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName        = "replica_mode_snapshot"
 			)
 
-			DeferCleanup(func() error {
-				err := os.Unsetenv(snapshotDataEnv)
-				if err != nil {
-					return err
-				}
-				err = os.Unsetenv(snapshotWalEnv)
-				if err != nil {
-					return err
-				}
-				return nil
+			DeferCleanup(func() {
+				config.UnsetTemplateVariable(snapshotDataEnv)
+				config.UnsetTemplateVariable(snapshotWalEnv)
 			})
 
 			var backup *apiv1.Backup
@@ -566,11 +559,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-				envVars := storage.EnvVarsForSnapshots{
+				templateVars := storage.SnapshotTemplateVariables{
 					DataSnapshot: snapshotDataEnv,
 					WalSnapshot:  snapshotWalEnv,
 				}
-				err = storage.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
+				err = storage.SetSnapshotTemplateVariables(&snapshotList, backup, templateVars)
 				Expect(err).ToNot(HaveOccurred())
 			})
 

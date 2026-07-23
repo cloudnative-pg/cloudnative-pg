@@ -25,7 +25,6 @@ package objectstore
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -44,6 +43,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -338,8 +338,8 @@ func defaultSVC(namespace string) corev1.Service {
 // defaultPVC returns a default PVC for the object storage server
 func defaultPVC(namespace string) (corev1.PersistentVolumeClaim, error) {
 	const claimName = "object-store-pv-claim"
-	storageClass, ok := os.LookupEnv("E2E_DEFAULT_STORAGE_CLASS")
-	if !ok {
+	storageClass := config.Current().Storage.StorageClass
+	if storageClass == "" {
 		return corev1.PersistentVolumeClaim{}, fmt.Errorf("storage class not defined")
 	}
 
