@@ -159,6 +159,32 @@ var _ = Describe("EnsureHealthyPVCsAnnotation", func() {
 		cluster *apiv1.Cluster
 	)
 
+	podFor := func(pvcName string, ready bool) corev1.Pod {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pvcName,
+				Namespace: "default",
+			},
+			Spec: corev1.PodSpec{
+				Volumes: []corev1.Volume{
+					{
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: pvcName,
+							},
+						},
+					},
+				},
+			},
+		}
+		if ready {
+			pod.Status.Conditions = []corev1.PodCondition{
+				{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+			}
+		}
+		return pod
+	}
+
 	BeforeEach(func() {
 		ctx = context.Background()
 		cluster = &apiv1.Cluster{
@@ -172,33 +198,44 @@ var _ = Describe("EnsureHealthyPVCsAnnotation", func() {
 		}
 	})
 
-	It("should mark healthy PVCs as ready", func() {
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-pvc",
-				Namespace: "default",
-				Annotations: map[string]string{
-					utils.PVCStatusAnnotationName: StatusInitializing,
+	// The readiness gate: a healthy PVC flips to ready only when its owning pod
+	// is ready, and stays initializing while the pod is still bootstrapping or
+	// while the PVC has no pod at all.
+	DescribeTable("readiness gate on a single healthy PVC",
+		func(pods []corev1.Pod, expected PVCStatus) {
+			pvc := corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pvc",
+					Namespace: "default",
+					Annotations: map[string]string{
+						utils.PVCStatusAnnotationName: StatusInitializing,
+					},
 				},
-			},
-		}
+			}
 
-		cluster.Status.HealthyPVC = []string{"test-pvc"}
+			cluster.Status.HealthyPVC = []string{"test-pvc"}
 
-		cli := fake.NewClientBuilder().
-			WithScheme(scheme.BuildWithAllKnownScheme()).
-			WithObjects(&pvc).
-			Build()
+			cli := fake.NewClientBuilder().
+				WithScheme(scheme.BuildWithAllKnownScheme()).
+				WithObjects(&pvc).
+				Build()
 
-		err := EnsureHealthyPVCsAnnotation(ctx, cli, cluster, []corev1.PersistentVolumeClaim{pvc})
-		Expect(err).ToNot(HaveOccurred())
+			err := EnsureHealthyPVCsAnnotation(ctx, cli, cluster,
+				[]corev1.PersistentVolumeClaim{pvc}, pods)
+			Expect(err).ToNot(HaveOccurred())
 
-		// Verify the PVC was updated
-		var updatedPVC corev1.PersistentVolumeClaim
-		err = cli.Get(ctx, types.NamespacedName{Name: "test-pvc", Namespace: "default"}, &updatedPVC)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(updatedPVC.Annotations[utils.PVCStatusAnnotationName]).To(Equal(StatusReady))
-	})
+			var updatedPVC corev1.PersistentVolumeClaim
+			err = cli.Get(ctx, types.NamespacedName{Name: "test-pvc", Namespace: "default"}, &updatedPVC)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedPVC.Annotations[utils.PVCStatusAnnotationName]).To(Equal(expected))
+		},
+		Entry("marks it ready when the owning pod is ready",
+			[]corev1.Pod{podFor("test-pvc", true)}, StatusReady),
+		Entry("keeps it initializing while the owning pod is still bootstrapping",
+			[]corev1.Pod{podFor("test-pvc", false)}, StatusInitializing),
+		Entry("keeps it initializing when it has no owning pod",
+			nil, StatusInitializing),
+	)
 
 	It("should skip PVCs already marked as ready", func() {
 		pvc := corev1.PersistentVolumeClaim{
@@ -218,7 +255,8 @@ var _ = Describe("EnsureHealthyPVCsAnnotation", func() {
 			WithObjects(&pvc).
 			Build()
 
-		err := EnsureHealthyPVCsAnnotation(ctx, cli, cluster, []corev1.PersistentVolumeClaim{pvc})
+		err := EnsureHealthyPVCsAnnotation(ctx, cli, cluster,
+			[]corev1.PersistentVolumeClaim{pvc}, nil)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -229,12 +267,13 @@ var _ = Describe("EnsureHealthyPVCsAnnotation", func() {
 			WithScheme(scheme.BuildWithAllKnownScheme()).
 			Build()
 
-		err := EnsureHealthyPVCsAnnotation(ctx, cli, cluster, []corev1.PersistentVolumeClaim{})
+		err := EnsureHealthyPVCsAnnotation(ctx, cli, cluster,
+			[]corev1.PersistentVolumeClaim{}, nil)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("could not find the pvc: missing-pvc"))
 	})
 
-	It("should handle multiple healthy PVCs", func() {
+	It("should handle multiple healthy PVCs with ready pods", func() {
 		pvc1 := corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-pvc-1",
@@ -262,7 +301,10 @@ var _ = Describe("EnsureHealthyPVCsAnnotation", func() {
 			WithObjects(&pvc1, &pvc2).
 			Build()
 
-		err := EnsureHealthyPVCsAnnotation(ctx, cli, cluster, []corev1.PersistentVolumeClaim{pvc1, pvc2})
+		err := EnsureHealthyPVCsAnnotation(ctx, cli, cluster,
+			[]corev1.PersistentVolumeClaim{pvc1, pvc2},
+			[]corev1.Pod{podFor("test-pvc-1", true), podFor("test-pvc-2", true)},
+		)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Verify both PVCs were updated

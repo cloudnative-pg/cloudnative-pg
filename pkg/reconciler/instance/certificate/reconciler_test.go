@@ -267,3 +267,89 @@ var _ = Describe("ensure the status-port server certificate is loaded", func() {
 		Expect(handler.GetServerCertificate()).To(BeNil())
 	})
 })
+
+var _ = Describe("recovery barman endpoint CA", func() {
+	specCA := &apiv1.SecretKeySelector{
+		LocalObjectReference: apiv1.LocalObjectReference{Name: "spec-ca"},
+		Key:                  "ca.crt",
+	}
+	statusCA := &apiv1.SecretKeySelector{
+		LocalObjectReference: apiv1.LocalObjectReference{Name: "status-ca"},
+		Key:                  "ca.crt",
+	}
+	externalCA := &apiv1.SecretKeySelector{
+		LocalObjectReference: apiv1.LocalObjectReference{Name: "external-ca"},
+		Key:                  "ca.crt",
+	}
+
+	It("prefers the recovery backup reference CA over the backup status CA", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						Backup: &apiv1.BackupSource{EndpointCA: specCA},
+					},
+				},
+			},
+		}
+		backup := &apiv1.Backup{Status: apiv1.BackupStatus{EndpointCA: statusCA}}
+		Expect(recoveryBarmanEndpointCA(cluster, backup)).To(Equal(specCA))
+	})
+
+	It("falls back to the backup status CA when the reference has none", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						Backup: &apiv1.BackupSource{},
+					},
+				},
+			},
+		}
+		backup := &apiv1.Backup{Status: apiv1.BackupStatus{EndpointCA: statusCA}}
+		Expect(recoveryBarmanEndpointCA(cluster, backup)).To(Equal(statusCA))
+	})
+
+	It("uses the recovery source external cluster CA", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{Source: "src"},
+				},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:              "src",
+						BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{EndpointCA: externalCA},
+					},
+				},
+			},
+		}
+		Expect(recoveryBarmanEndpointCA(cluster, nil)).To(Equal(externalCA))
+	})
+
+	It("returns nil when the cluster does not bootstrap from recovery", func() {
+		Expect(recoveryBarmanEndpointCA(&apiv1.Cluster{}, nil)).To(BeNil())
+	})
+
+	It("returns nil when the recovery source has no endpoint CA", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{Source: "src"},
+				},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{Name: "src", BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{}},
+				},
+			},
+		}
+		Expect(recoveryBarmanEndpointCA(cluster, nil)).To(BeNil())
+	})
+
+	It("is a no-op without a recovery endpoint CA", func(ctx SpecContext) {
+		// No objects in the client: a read would fail, proving we never issue one.
+		cli := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
+		changed, err := RefreshRecoveryBarmanEndpointCA(ctx, cli, &apiv1.Cluster{}, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(changed).To(BeFalse())
+	})
+})

@@ -83,6 +83,7 @@ func NewCmd() *cobra.Command {
 	var pprofHTTPServer bool
 	var statusPortTLS bool
 	var metricsPortTLS bool
+	var bootstrapOpts bootstrapOptions
 
 	cmd := &cobra.Command{
 		Use: "run [flags]",
@@ -108,6 +109,20 @@ func NewCmd() *cobra.Command {
 			instance.PgData = pgData
 			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
+
+			// Phase 0: if the operator asked for a bootstrap and the data
+			// directory is not already initialized, do it in-process before the
+			// manager (whose in-pod reconciler would otherwise write into an
+			// empty PGDATA) is started.
+			if instruction, requested := bootstrapOpts.instruction(); requested {
+				info, err := bootstrapOpts.initInfo(pgData, podName, clusterName, namespace)
+				if err != nil {
+					return err
+				}
+				if err := runBootstrap(ctx, instance, info, instruction); err != nil {
+					return err
+				}
+			}
 
 			// Since version 0.19.0 of controller-runtime, it is not allowed to create multiple controllers with the
 			// same name. As this part of the code is run inside a retry block, we need to allow SkipNameValidation
@@ -151,6 +166,7 @@ func NewCmd() *cobra.Command {
 		"Enable TLS for communicating with the operator")
 	cmd.Flags().BoolVar(&metricsPortTLS, "metrics-port-tls", false,
 		"Enable TLS for metrics scraping")
+	bootstrapOpts.registerFlags(cmd)
 	return cmd
 }
 

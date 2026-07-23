@@ -433,6 +433,18 @@ func backupSecrets(cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) []string 
 			cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name)
 	}
 
+	// The recovery source endpoint CA is read through the Kubernetes API while
+	// the instance initializes its data directory in-process, so the instance
+	// ServiceAccount must be allowed to read it. When the recovery source is a
+	// Backup reference the CA can come from the spec or, more commonly, from the
+	// origin Backup status.
+	if bootstrap := cluster.Spec.Bootstrap; bootstrap != nil &&
+		bootstrap.Recovery != nil &&
+		bootstrap.Recovery.Backup != nil &&
+		bootstrap.Recovery.Backup.EndpointCA != nil {
+		result = append(result, bootstrap.Recovery.Backup.EndpointCA.Name)
+	}
+
 	if backupOrigin != nil {
 		result = append(
 			result,
@@ -443,6 +455,9 @@ func backupSecrets(cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) []string 
 		result = append(
 			result,
 			googleCredentialsSecrets(backupOrigin.Status.Google)...)
+		if backupOrigin.Status.EndpointCA != nil {
+			result = append(result, backupOrigin.Status.EndpointCA.Name)
+		}
 	}
 
 	return result

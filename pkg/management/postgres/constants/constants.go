@@ -59,4 +59,10 @@ const (
 	// if present, requires the WAL archiver to check that the backup object
 	// store is empty.
 	CheckEmptyWalArchiveFile = ".check-empty-wal-archive"
+
+	// BootstrapCompletedFile is the name of the file, written inside PGDATA as
+	// the last step of an in-process bootstrap, that certifies the data
+	// directory has been fully initialized. It lives inside PGDATA so the
+	// per-mode cleanup removes it atomically with the data it certifies.
+	BootstrapCompletedFile = ".cnpg-bootstrap-completed"
 )

@@ -124,13 +124,23 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 	// This test checks for separate and dedicated pg_wal volume well behaving, by
 	// ensuring WAL files are archived to the correct location and a symlink
 	// to the PATH is present inside the PGDATA.
+	//
+	// The fixture is a 3-instance cluster with a dedicated walStorage volume,
+	// so it exercises both initdb (instance 1) and join (instances 2 and 3)
+	// bootstrapping with walStorage configured: the Job used to lay out
+	// pg_wal before run's ReconcileWalDirectory ran, and #11228 replaced it
+	// with in-process ordering inside the bootstrapping Pod, so this is also
+	// the walStorage variant of the no-bootstrap-Job assertions.
 	It("having a dedicated WAL volume", func() {
 		const namespacePrefix = "pg-wal-volume-e2e"
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithPgWal)
+		clusterasserts.AssertNoBootstrapJobCreatedDuring(env, namespace, func() {
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithPgWal)
+		})
+		clusterasserts.AssertClusterInstancesHaveNoRestart(env, namespace, clusterName)
 		verifyPgWal(namespace)
 	})
 

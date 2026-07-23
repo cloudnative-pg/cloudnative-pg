@@ -73,9 +73,12 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			// Create the destination Cluster
 			dstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, dstClusterBasic)
 			Expect(err).ToNot(HaveOccurred())
-			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, dstClusterName, dstClusterBasic)
-			// We give more time than the usual 600s, since the recovery is slower
-			clusterasserts.AssertClusterIsReady(env, namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+			clusterasserts.AssertNoBootstrapJobCreatedDuring(env, namespace, func() {
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, dstClusterName, dstClusterBasic)
+				// We give more time than the usual 600s, since the recovery is slower
+				clusterasserts.AssertClusterIsReady(env, namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+			})
+			clusterasserts.AssertClusterInstancesHaveNoRestart(env, namespace, dstClusterName)
 
 			secretName := dstClusterName + apiv1.ApplicationUserSecretSuffix
 

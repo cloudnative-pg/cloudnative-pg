@@ -24,7 +24,6 @@ import (
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -1580,82 +1579,5 @@ var _ = Describe("generateNodeSerial", func() {
 			"unrelated-pod",
 		))
 		Expect(serial).To(Equal(1))
-	})
-})
-
-var _ = Describe("ensureJobAdoptable", func() {
-	const (
-		clusterName = "cluster-example"
-		namespace   = "default"
-		jobName     = "cluster-example-2-join"
-	)
-
-	newCluster := func() *apiv1.Cluster {
-		return &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
-		}
-	}
-
-	ownedJob := func() *batchv1.Job {
-		cluster := newCluster()
-		return &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      jobName,
-				Namespace: namespace,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: apiv1.SchemeGroupVersion.String(),
-						Kind:       apiv1.ClusterKind,
-						Name:       cluster.Name,
-						Controller: ptr.To(true),
-					},
-				},
-			},
-		}
-	}
-
-	It("returns a zero result when the Job is owned by this cluster", func(ctx SpecContext) {
-		cli := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
-			WithObjects(ownedJob()).
-			Build()
-		r := &ClusterReconciler{Client: cli}
-		result, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(result.IsZero()).To(BeTrue())
-	})
-
-	It("requeues when the Job is not yet in the cache", func(ctx SpecContext) {
-		cli := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
-			Build()
-		r := &ClusterReconciler{Client: cli}
-		result, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(result.RequeueAfter).To(BeNumerically(">", 0))
-	})
-
-	It("returns an error when the Job is not owned by this cluster", func(ctx SpecContext) {
-		job := ownedJob()
-		job.OwnerReferences[0].Name = "other-cluster"
-		cli := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
-			WithObjects(job).
-			Build()
-		r := &ClusterReconciler{Client: cli}
-		_, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
-		Expect(err).To(MatchError(ContainSubstring("refusing to adopt job")))
-	})
-
-	It("returns an error when the Job has no owner reference", func(ctx SpecContext) {
-		job := ownedJob()
-		job.OwnerReferences = nil
-		cli := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
-			WithObjects(job).
-			Build()
-		r := &ClusterReconciler{Client: cli}
-		_, err := r.ensureJobAdoptable(ctx, newCluster(), jobName)
-		Expect(err).To(MatchError(ContainSubstring("refusing to adopt job")))
 	})
 })

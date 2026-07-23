@@ -1085,7 +1085,9 @@ func (r *ClusterReconciler) reconcilePods(
 		return res, err
 	}
 
-	if err := persistentvolumeclaim.EnsureHealthyPVCsAnnotation(ctx, r.Client, cluster, resources.pvcs.Items); err != nil {
+	if err := persistentvolumeclaim.EnsureHealthyPVCsAnnotation(
+		ctx, r.Client, cluster, resources.pvcs.Items, resources.instances.Items,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
