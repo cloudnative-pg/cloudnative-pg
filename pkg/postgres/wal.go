@@ -26,6 +26,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
+
+	"github.com/cloudnative-pg/machinery/pkg/types"
 )
 
 const (
@@ -181,6 +184,48 @@ func WalSegmentsPerFile(walSegmentSize int64) int32 {
 	// we compute the number of wal segments in a file, by dividing
 	// the "max segment number" by the wal segment size.
 	return int32(0xFFFFFFFF / walSegmentSize) //nolint:gosec
+}
+
+// TimelineHistoryFileName returns the name of the history file for the given timeline
+func TimelineHistoryFileName(timeline int) string {
+	return fmt.Sprintf("%08X.history", timeline)
+}
+
+// FindTimelineForkPoint scans the content of a timeline history file (as
+// served by the instance manager's timeline-history endpoint) for the entry
+// recording where the timeline the history file belongs to forked away from
+// parentTLI, and returns the LSN at which that happened.
+//
+// A timeline history file lists, one line per past timeline switch, every
+// ancestor timeline in the current timeline's history:
+// "<parentTLI>\t<forkLSN>\t<reason>". A replica still on parentTLI forked
+// away from the current timeline's history at forkLSN: any WAL the replica
+// holds past forkLSN was never part of the current timeline.
+//
+// Returns false when parentTLI does not appear in the history, which means
+// the fork point could not be determined (parentTLI is not an ancestor of
+// the current timeline, or the history content could not be read).
+func FindTimelineForkPoint(historyContent string, parentTLI int) (types.LSN, bool) {
+	for _, line := range strings.Split(historyContent, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		tli, err := strconv.Atoi(fields[0])
+		if err != nil || tli != parentTLI {
+			continue
+		}
+
+		return types.LSN(fields[1]), true
+	}
+
+	return "", false
 }
 
 // NextSegments generate the list of all possible segment names starting

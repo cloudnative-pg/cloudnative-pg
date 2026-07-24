@@ -85,6 +85,20 @@ type InstanceClient interface {
 	// ArchivePartialWAL trigger the archiver for the latest partial WAL
 	// file created in a specific Pod
 	ArchivePartialWAL(context.Context, *corev1.Pod) (string, error)
+
+	// GetTimelineHistoryFromInstance retrieves the current timeline and, if
+	// past timeline 1, the content of its history file, from the given Pod.
+	GetTimelineHistoryFromInstance(ctx context.Context, pod *corev1.Pod) (TimelineHistoryResponse, error)
+}
+
+// TimelineHistoryResponse carries the current timeline of an instance and,
+// if it has one, the content of its history file.
+type TimelineHistoryResponse struct {
+	// TimelineID is the instance's current timeline.
+	TimelineID int
+	// Content is the content of TimelineID's history file, empty when
+	// TimelineID is 1 (which never has a history file).
+	Content string
 }
 
 type instanceClientImpl struct {
@@ -302,6 +316,52 @@ func (r *instanceClientImpl) UpgradeInstanceManager(
 	}
 
 	return fmt.Errorf("the instance manager upgrade path returned the following error: '%s", string(body))
+}
+
+// GetTimelineHistoryFromInstance retrieves the current timeline and, if past
+// timeline 1, the content of its history file, from the given Pod, via the
+// instance manager's PathPgTimelineHistory endpoint.
+func (r *instanceClientImpl) GetTimelineHistoryFromInstance(
+	ctx context.Context,
+	pod *corev1.Pod,
+) (TimelineHistoryResponse, error) {
+	statusURL := url.Build(
+		GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, url.PathPgTimelineHistory, url.StatusPort)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
+	if err != nil {
+		return TimelineHistoryResponse{}, err
+	}
+
+	r.Timeout = defaultRequestTimeout
+	resp, err := r.Do(req) //nolint:gosec // URL built from internal pod IP
+	if err != nil {
+		return TimelineHistoryResponse{}, err
+	}
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.FromContext(ctx).Error(err, "while closing body")
+		}
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return TimelineHistoryResponse{}, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return TimelineHistoryResponse{}, &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		TimelineID int    `json:"timelineID"`
+		Data       string `json:"data,omitempty"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return TimelineHistoryResponse{}, err
+	}
+
+	return TimelineHistoryResponse{TimelineID: result.TimelineID, Content: result.Data}, nil
 }
 
 func isEOF(err error) bool {

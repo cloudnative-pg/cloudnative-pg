@@ -66,6 +66,10 @@ const (
 	// PathPgArchivePartial is the URL path to interact with the partial wal archive
 	PathPgArchivePartial string = "/pg/archive/partial"
 
+	// PathPgTimelineHistory is the URL path serving the content of the
+	// current timeline's history file, if any
+	PathPgTimelineHistory string = "/pg/timeline/history"
+
 	// PathMetrics is the URL path for Metrics
 	PathMetrics string = "/metrics"
 
