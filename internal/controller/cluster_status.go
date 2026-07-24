@@ -775,6 +775,12 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		}
 	}
 
+	// Detect and surface any replica whose WAL receiver has stalled behind
+	// the current primary's timeline, confirming (via a fork-point check)
+	// whether it has diverged past recovery. Always runs; containment is
+	// handled separately, see reconcileDivergedReplicaContainment.
+	r.evaluateReplicaDivergence(ctx, cluster, statuses)
+
 	// we update the system ID field in the cluster status
 	switch detectedSystemID.Len() {
 	case 0:

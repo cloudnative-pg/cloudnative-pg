@@ -324,6 +324,13 @@ const (
 	// be deleted with the contents of their PVCs.
 	UnrecoverableInstanceAnnotationName = AlphaMetadataNamespace + "/unrecoverable"
 
+	// DivergedReplicaHandlingAnnotationName is the name of the annotation controlling
+	// what the operator does once a surviving replica is confirmed to have diverged
+	// onto a history the current primary no longer shares (see DivergedReplicaHandlingAuto
+	// and DivergedReplicaHandlingDetectOnly). Detection and surfacing of a diverged
+	// replica always happen regardless of this setting.
+	DivergedReplicaHandlingAnnotationName = AlphaMetadataNamespace + "/divergedReplicaHandling"
+
 	// PasswordPassthroughAnnotationName is the name of the annotation that, when
 	// set to "enabled" on a basic-auth Secret consumed by the operator, instructs
 	// the role reconciler to send the password literal verbatim in

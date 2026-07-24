@@ -1067,6 +1067,31 @@ type ClusterStatus struct {
 	// +optional
 	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 
+	// ReplicaDivergenceWatermarks tracks, for a replica currently behind the
+	// current primary's timeline, the highest received LSN observed and since
+	// when it has been frozen at that value. Keyed by instance name and reset
+	// whenever the current primary's timeline changes, so every new failover
+	// starts this clock fresh. Used to require a grace period of no progress
+	// before the fork-point check that confirms a divergence runs. Cleared
+	// once the replica catches up, or once it graduates to
+	// `replicaWalIssues`.
+	// +optional
+	ReplicaDivergenceWatermarks map[PodName]ReplicaDivergenceWatermark `json:"replicaDivergenceWatermarks,omitempty"`
+
+	// ReplicaWalIssues reports the non-primary instances whose WAL receiver
+	// has stalled behind the current primary's timeline for longer than the
+	// detection grace period. An instance is reported as "Diverged" once a
+	// fork-point check confirms its received WAL goes past the point where
+	// the current primary's timeline forked away from it (in which case it is
+	// also fenced and excluded from the primary's replication slots, unless
+	// the `alpha.cnpg.io/divergedReplicaHandling` annotation is set to
+	// `detectOnly`), or as "Stuck" when the fork-point check could not
+	// confirm a divergence. A "Stuck" instance is always surfaced, never
+	// fenced. Entries are cleared once the instance is rebuilt (a new Pod)
+	// or, for "Stuck" instances, once they catch up.
+	// +optional
+	ReplicaWalIssues map[PodName]ReplicaWalIssueStatus `json:"replicaWalIssues,omitempty"`
+
 	// The timestamp when the last request for a new primary has occurred
 	// +optional
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
@@ -1164,6 +1189,85 @@ type InstanceReportedState struct {
 	IP string `json:"ip,omitempty"`
 }
 
+// ReplicaDivergenceWatermark is the high-water mark tracked for a replica
+// that is behind the current primary's timeline, used to require its
+// received LSN to be frozen for a grace period before the fork-point check
+// runs. See ClusterStatus.ReplicaDivergenceWatermarks.
+type ReplicaDivergenceWatermark struct {
+	// TimeLineID is the current primary's timeline this watermark was
+	// recorded against. A change in this value resets the watermark.
+	TimeLineID int `json:"timeLineID"`
+
+	// ReceivedLSN is the highest received LSN observed for this instance
+	// while behind TimeLineID.
+	ReceivedLSN string `json:"receivedLSN"`
+
+	// Since is when ReceivedLSN was first observed at its current value.
+	Since string `json:"since"`
+}
+
+// ReplicaWalIssueKind classifies why a replica's WAL receiver is reported as
+// stalled behind the current primary's timeline in
+// ClusterStatus.ReplicaWalIssues.
+type ReplicaWalIssueKind string
+
+const (
+	// ReplicaWalIssueStuck means the replica's WAL receiver has stalled
+	// behind the current primary's timeline, but the fork-point check could
+	// not confirm the replica has progressed past the point where the
+	// current primary's timeline forked away from it. The replica is
+	// surfaced but never fenced: it may still be able to catch up once the
+	// root cause (e.g. a network issue) resolves.
+	ReplicaWalIssueStuck ReplicaWalIssueKind = "Stuck"
+
+	// ReplicaWalIssueDiverged means the fork-point check confirmed the
+	// replica's received WAL goes past the point where the current primary's
+	// timeline forked away from it: the replica can never catch up with the
+	// current primary and holds writes that were discarded when the primary
+	// was promoted.
+	ReplicaWalIssueDiverged ReplicaWalIssueKind = "Diverged"
+)
+
+// ReplicaWalIssueStatus describes a non-primary instance whose WAL receiver
+// is reported as stalled behind the current primary's timeline. See
+// ClusterStatus.ReplicaWalIssues.
+type ReplicaWalIssueStatus struct {
+	// Kind classifies the issue.
+	Kind ReplicaWalIssueKind `json:"kind"`
+
+	// DetectedTimeLineID is the timeline the instance was on when the issue
+	// was confirmed.
+	DetectedTimeLineID int `json:"detectedTimeLineID"`
+
+	// ForkLSN is the LSN at which the current primary's timeline forked away
+	// from DetectedTimeLineID, when the fork-point check was able to
+	// determine it.
+	// +optional
+	ForkLSN string `json:"forkLSN,omitempty"`
+
+	// ReceivedLSN is the instance's received LSN at the moment the issue was
+	// confirmed. Together with ForkLSN it bounds the range of WAL
+	// (ForkLSN, ReceivedLSN] the replica holds that the current primary does
+	// not, for a Kind of Diverged.
+	// +optional
+	ReceivedLSN string `json:"receivedLSN,omitempty"`
+
+	// DetectedAt is when the issue was confirmed.
+	DetectedAt string `json:"detectedAt"`
+
+	// Parked is true once the instance has been fenced as containment for a
+	// confirmed divergence. Only ever set for a Kind of Diverged.
+	// +optional
+	Parked bool `json:"parked,omitempty"`
+
+	// PodUID is the UID of the Pod that was evaluated when the issue was
+	// confirmed. Used to detect that the instance has since been rebuilt
+	// (for example with `kubectl cnpg destroy`) even though it kept the same
+	// name, so containment can be lifted and the entry cleared.
+	// +optional
+	PodUID string `json:"podUID,omitempty"`
+}
+
 // ClusterConditionType defines types of cluster conditions
 type ClusterConditionType string
 
@@ -1183,6 +1287,11 @@ const (
 	// has had at least one running instance, at which point it is set to True
 	// and never cleared.
 	ConditionInitialized ClusterConditionType = "Initialized"
+	// ConditionReplicasHealthy is False when at least one non-primary
+	// instance is reported in ClusterStatus.ReplicaWalIssues (stalled behind
+	// the current primary's timeline, whether confirmed diverged or merely
+	// stuck), and True otherwise.
+	ConditionReplicasHealthy ClusterConditionType = "ReplicasHealthy"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1239,6 +1348,16 @@ const (
 	// BootstrapPending is the reason set on ConditionInitialized=False while the
 	// cluster has not yet completed its first bootstrap.
 	BootstrapPending ConditionReason = "BootstrapPending"
+
+	// ConditionReasonAllReplicasHealthy is the reason set on
+	// ConditionReplicasHealthy=True when no instance is reported in
+	// ClusterStatus.ReplicaWalIssues.
+	ConditionReasonAllReplicasHealthy ConditionReason = "AllReplicasHealthy"
+
+	// ConditionReasonReplicaWalIssues is the reason set on
+	// ConditionReplicasHealthy=False when at least one instance is reported
+	// in ClusterStatus.ReplicaWalIssues.
+	ConditionReasonReplicaWalIssues ConditionReason = "ReplicaWalIssues"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster

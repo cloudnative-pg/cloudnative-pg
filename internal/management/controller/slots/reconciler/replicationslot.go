@@ -87,6 +87,16 @@ func reconcilePrimaryHAReplicationSlots(
 			continue
 		}
 
+		// A replica fenced as containment for a confirmed timeline divergence
+		// can never catch up: leaving its slot in expectedSlots would keep it
+		// alive forever (the instance stays part of the cluster until a
+		// manual rebuild), pinning WAL on the primary via the slot's
+		// restart_lsn. Excluding it here lets the cleanup loop below drop it
+		// like any other slot that is no longer expected.
+		if issue, ok := cluster.Status.ReplicaWalIssues[apiv1.PodName(instanceName)]; ok && issue.Parked {
+			continue
+		}
+
 		slotName := cluster.GetSlotNameFromInstanceName(instanceName)
 		expectedSlots[slotName] = true
 

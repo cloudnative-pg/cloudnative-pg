@@ -1611,6 +1611,31 @@ func (cluster *Cluster) IsFailoverQuorumActive() bool {
 	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }
 
+// DivergedReplicaHandlingAuto is the default value of the
+// DivergedReplicaHandlingAnnotationName annotation: a replica confirmed to
+// have diverged onto a history the current primary no longer shares is
+// fenced and its replication slot on the primary is dropped, in addition to
+// being surfaced. Safe as the default because fencing is reversible.
+const DivergedReplicaHandlingAuto = "auto"
+
+// DivergedReplicaHandlingDetectOnly is the value of the
+// DivergedReplicaHandlingAnnotationName annotation that disables containment
+// of a confirmed-diverged replica: the operator still detects and surfaces
+// it (status condition, per-instance state, event, metric) but does not
+// fence it or touch its replication slot.
+const DivergedReplicaHandlingDetectOnly = "detectOnly"
+
+// GetDivergedReplicaHandlingMode returns the effective value of the
+// DivergedReplicaHandlingAnnotationName annotation, defaulting to
+// DivergedReplicaHandlingAuto for any unset or unrecognized value.
+func (cluster *Cluster) GetDivergedReplicaHandlingMode() string {
+	if cluster.Annotations[utils.DivergedReplicaHandlingAnnotationName] == DivergedReplicaHandlingDetectOnly {
+		return DivergedReplicaHandlingDetectOnly
+	}
+
+	return DivergedReplicaHandlingAuto
+}
+
 // GetPodSelectorIPs builds a map from podSelectorRef names to their resolved
 // pod IPs, using status data populated by the operator. Returns nil when
 // no resolved podSelectorRefs are present in the status.
