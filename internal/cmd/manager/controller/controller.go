@@ -137,7 +137,7 @@ func RunController(
 		LeaderElectionReleaseOnCancel: true,
 	}
 
-	byObject := map[client.Object]cache.ByObject{
+	cacheFilters := map[client.Object]cache.ByObject{
 		// Helm stores each release revision as a Secret containing the full
 		// (compressed, base64-encoded) manifest. These can be large, and
 		// CNPG has no use for them, but the default cache would otherwise
@@ -163,7 +163,7 @@ func RunController(
 	// OPERATOR_NAMESPACE set) we simply fall back to the default (unrestricted)
 	// EndpointSlice caching.
 	if conf.OperatorNamespace != "" {
-		byObject[&discoveryv1.EndpointSlice{}] = cache.ByObject{
+		cacheFilters[&discoveryv1.EndpointSlice{}] = cache.ByObject{
 			Namespaces: map[string]cache.Config{
 				conf.OperatorNamespace: {},
 			},
@@ -172,7 +172,7 @@ func RunController(
 		setupLog.Info("Plugin EndpointSlice watch disabled: OPERATOR_NAMESPACE not set")
 	}
 
-	managerOptions.Cache = cache.Options{ByObject: byObject}
+	managerOptions.Cache = cache.Options{ByObject: cacheFilters}
 
 	if conf.WatchNamespace != "" {
 		namespaces := conf.WatchedNamespaces()
