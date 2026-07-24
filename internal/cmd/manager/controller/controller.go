@@ -160,7 +160,8 @@ func RunController(
 	// empty namespace key is interpreted by controller-runtime as "all
 	// namespaces", which would silently widen the cache instead of narrowing
 	// it. When the namespace is unknown (e.g. local development without
-	// OPERATOR_NAMESPACE set) we simply fall back to the default caching.
+	// OPERATOR_NAMESPACE set) we simply fall back to the default (unrestricted)
+	// EndpointSlice caching.
 	if conf.OperatorNamespace != "" {
 		byObject[&discoveryv1.EndpointSlice{}] = cache.ByObject{
 			Namespaces: map[string]cache.Config{
