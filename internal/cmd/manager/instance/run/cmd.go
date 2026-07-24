@@ -262,6 +262,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		pluginRepository,
 		leaseRunnable,
 		webhookv1.NewClusterAdmissionGuard(),
+		mgr.GetEventRecorderFor("instance-controller"), //nolint:staticcheck
 	)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).

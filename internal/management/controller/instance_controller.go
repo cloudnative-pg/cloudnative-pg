@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,6 +82,22 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 	// to int32 to support ARM-based 32 bit architectures
 	Steps: math.MaxInt32,
 }
+
+// walReceiverStallGraceInPromotion is the amount of time waitForWalReceiverDown
+// tolerates its own WAL receiver reporting up without its received LSN
+// advancing, before giving up on the wait and proceeding with the promotion
+// anyway (see CNP-8534: a frozen primary keeps sending replication
+// keepalives, which keep the receiver's row alive forever while it makes no
+// actual progress).
+//
+// The value equals the primary Lease's default duration and sits comfortably
+// above keepalive/status-interval jitter (~10s). By the time a candidate
+// reaches this wait it has already acquired the lease, which the operator's
+// own failover gate only grants after 60s of cluster-wide LSN stall (see
+// walReceiversStalledGracePeriod in internal/controller/replicas.go); this
+// wait's grace period is therefore a re-confirmation window, not the primary
+// evidence, so it is kept short.
+const walReceiverStallGraceInPromotion = 15 * time.Second
 
 // shouldRequeue specifies whether a new reconciliation loop should be triggered
 type shoudRequeue bool
@@ -1300,7 +1317,7 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down
-		err := r.waitForWalReceiverDown(ctx)
+		err := r.waitForWalReceiverDown(ctx, cluster)
 		if err != nil {
 			return err
 		}
@@ -1343,26 +1360,103 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	return changed, r.client.Status().Update(ctx, cluster)
 }
 
-// waitForWalReceiverDown wait until the wal receiver is down, and it's used
-// to grab all the WAL files from a replica
-func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context) error {
+// waitForWalReceiverDown waits until the wal receiver is down, so a
+// promotion doesn't discard WAL that is still streaming in (think about a
+// clean switchover). This is an RPO optimization bounded by LSN progress,
+// not an unconditional precondition to promote: if the WAL receiver stays
+// up but its received LSN stops advancing for walReceiverStallGraceInPromotion,
+// the wait is abandoned and the caller proceeds with the promotion anyway.
+// See CNP-8534 and walReceiverStallDecision for the rationale.
+func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
+
+	var lastLSN cnpgTypes.LSN
+	lastProgressAt := time.Now()
 
 	// This is not really exponential backoff as RetryUntilWalReceiverDown
 	// doesn't contain any increment
 	return wait.ExponentialBackoff(RetryUntilWalReceiverDown, func() (done bool, err error) {
-		status, err := r.instance.IsWALReceiverActive()
+		active, err := r.instance.IsWALReceiverActive()
 		if err != nil {
 			return true, err
 		}
 
-		if !status {
+		if !active {
+			return true, nil
+		}
+
+		currentLSN, err := r.instance.GetLastWalReceiveLSN()
+		if err != nil {
+			return true, err
+		}
+
+		now := time.Now()
+		done, lastLSN, lastProgressAt = walReceiverStallDecision(active, currentLSN, lastLSN, lastProgressAt, now)
+		if done {
+			// active is true here (the early return above handles the
+			// !active case), so reaching "done" means the stall bypass
+			// fired, not a normal wal-receiver-down completion.
+			stallDuration := now.Sub(lastProgressAt)
+			contextLogger.Warning(
+				"WAL receiver is still active but has made no progress for the stall grace "+
+					"period; bypassing the wait and proceeding with the promotion",
+				"lastLSN", lastLSN,
+				"stallDuration", stallDuration)
+			r.recorder.Eventf(cluster, "Warning", "WalReceiversStalled",
+				"WAL receiver is up but has not progressed past LSN %v for %v; proceeding with the promotion",
+				lastLSN, stallDuration)
 			return true, nil
 		}
 
 		contextLogger.Info("WAL receiver is still active, waiting")
 		return false, nil
 	})
+}
+
+// walReceiverStallDecision is the pure decision function backing
+// waitForWalReceiverDown's poll loop. Given the current observation
+// (walReceiverActive, currentLSN) and the previously tracked high-water mark
+// (lastLSN, lastProgressAt), it reports whether the wait is over and the
+// updated high-water mark to carry into the next poll.
+//
+// lastLSN is a monotonic high-water mark, not merely the previous reading:
+// done is true either when the WAL receiver has genuinely gone down
+// (walReceiverActive is false), or when it is still up but currentLSN has
+// not exceeded the high-water mark for at least
+// walReceiverStallGraceInPromotion: a stalled, keepalive-only connection is
+// receiving no WAL, so waiting longer retrieves nothing (see CNP-8534). Any
+// strict LSN advance raises the high-water mark and resets the stall clock.
+// A NULL/empty currentLSN (nothing received yet) and a currentLSN that goes
+// backward are both treated as no progress, per the monotonic received-LSN
+// assumption: neither resets the clock nor lowers the tracked high-water
+// mark (mirroring the operator-side watermark in
+// internal/controller/replicas.go).
+func walReceiverStallDecision(
+	walReceiverActive bool,
+	currentLSN cnpgTypes.LSN,
+	lastLSN cnpgTypes.LSN,
+	lastProgressAt time.Time,
+	now time.Time,
+) (done bool, newLastLSN cnpgTypes.LSN, newLastProgressAt time.Time) {
+	if !walReceiverActive {
+		return true, currentLSN, now
+	}
+
+	if lastLSN.Less(currentLSN) {
+		// Progress observed: raise the high-water mark and reset the stall clock.
+		return false, currentLSN, now
+	}
+
+	// currentLSN did not exceed the high-water mark (unchanged, NULL/empty, or
+	// a backward reading): no progress, so the high-water mark is kept as-is
+	// rather than lowered to currentLSN.
+	if now.Sub(lastProgressAt) >= walReceiverStallGraceInPromotion {
+		// Stalled past the grace period: bypass the wait. lastProgressAt is
+		// left untouched so the caller can report how long the stall lasted.
+		return true, lastLSN, lastProgressAt
+	}
+
+	return false, lastLSN, lastProgressAt
 }
 
 // refreshCredentialsFromSecret updates the PostgreSQL users credentials

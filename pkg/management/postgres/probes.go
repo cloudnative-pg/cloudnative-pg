@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -577,6 +578,25 @@ func (instance *Instance) IsWALReceiverActive() (bool, error) {
 	}
 
 	return result, nil
+}
+
+// GetLastWalReceiveLSN returns the current value of
+// pg_catalog.pg_last_wal_receive_lsn(), or an empty LSN when nothing has
+// been received yet (e.g. right after the WAL receiver started streaming).
+func (instance *Instance) GetLastWalReceiveLSN() (types.LSN, error) {
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return "", err
+	}
+
+	var lsn string
+	row := superUserDB.QueryRow(
+		"SELECT COALESCE(pg_catalog.pg_last_wal_receive_lsn()::varchar, '')")
+	if err := row.Scan(&lsn); err != nil {
+		return "", err
+	}
+
+	return types.LSN(lsn), nil
 }
 
 // PgStatWal is a representation of the pg_stat_wal table, introduced in PostgreSQL 14.
