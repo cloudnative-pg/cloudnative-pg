@@ -236,6 +236,10 @@ This gives you the flexibility — and responsibility — to manage the
 authentication process yourself. You can follow the instructions above to
 replicate similar behavior to the default setup.
 
+If PgBouncer needs to authenticate as a different user than the one derived
+from your secret, you can override it with the `auth_user` parameter (see
+[PgBouncer configuration options](#pgbouncer-configuration-options)).
+
 ## Pod templates
 
 
@@ -523,6 +527,14 @@ documentation for each parameter. Unless stated otherwise, the default values
 are the ones directly set by PgBouncer.
 
 - [`auth_type`](https://www.pgbouncer.org/config.html#auth_type)
+- [`auth_user`](https://www.pgbouncer.org/config.html#auth_user): overrides the
+  user PgBouncer connects with to run the authentication query. By default it is
+  derived from the auth query secret (the `username` key for basic-auth secrets,
+  the certificate common name for TLS secrets). Setting it is meant for setups
+  with a custom `authQuerySecret`, since the built-in integration provisions
+  everything for the default `cnpg_pooler_pgbouncer` user; with a basic-auth
+  secret only the username changes, the password still comes from the secret. An
+  empty value is ignored.
 - [`application_name_add_host`](https://www.pgbouncer.org/config.html#application_name_add_host)
 - [`autodb_idle_timeout`](https://www.pgbouncer.org/config.html#autodb_idle_timeout)
 - [`cancel_wait_timeout`](https://www.pgbouncer.org/config.html#cancel_wait_timeout)
