@@ -22,7 +22,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -300,5 +302,154 @@ var _ = Describe("Check pods not on primary node", func() {
 
 	It("first status element is primary", func() {
 		Expect(GetPodsNotOnPrimaryNode(statusList2, &statusList2.Items[0]).Items).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("maxReceivedLsnAmongUpReceivers", func() {
+	makeItem := func(name, lsn string, active bool) postgres.PostgresqlStatus {
+		return postgres.PostgresqlStatus{
+			Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}},
+			ReceivedLsn:         cnpgTypes.LSN(lsn),
+			IsWalReceiverActive: active,
+		}
+	}
+
+	It("reports not found when there are no up receivers", func() {
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "0/300", false),
+		}}
+		_, found := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		Expect(found).To(BeFalse())
+	})
+
+	It("excludes the primary even if it is (spuriously) marked as an active receiver", func() {
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("primary", "0/999", true),
+			makeItem("replica-1", "0/100", true),
+		}}
+		lsn, found := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(Equal(cnpgTypes.LSN("0/100")))
+	})
+
+	It("picks the highest LSN among multiple up receivers, ignoring down ones", func() {
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "0/100", true),
+			makeItem("replica-2", "1/0", true),
+			makeItem("replica-3", "F/FFFFFFFF", false),
+		}}
+		lsn, found := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(Equal(cnpgTypes.LSN("1/0")))
+	})
+})
+
+var _ = Describe("evaluateWalReceiversGate", func() {
+	var env *testingEnvironment
+	var namespace string
+	var cluster *apiv1.Cluster
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+		cluster = newFakeCNPGCluster(env.client, namespace)
+	})
+
+	makeStatusItem := func(name, lsn string, walReceiverActive bool, statusErr error) postgres.PostgresqlStatus {
+		return postgres.PostgresqlStatus{
+			Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}},
+			ReceivedLsn:         cnpgTypes.LSN(lsn),
+			IsWalReceiverActive: walReceiverActive,
+			Error:               statusErr,
+		}
+	}
+
+	pastTimestamp := func(age time.Duration) string {
+		return time.Now().Add(-age).Format(metav1.RFC3339Micro)
+	}
+
+	It("keeps waiting and raises the watermark when progress is observed", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = "primary"
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeStatusItem("replica-1", "0/300", true, nil),
+			makeStatusItem("replica-2", "0/100", true, nil),
+			makeStatusItem("primary", "0/0", false, fmt.Errorf("connection refused")),
+		}}
+
+		err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
+		Expect(err).To(MatchError(ErrWalReceiversRunning))
+		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
+		Expect(cluster.Status.FailoverWalReceiversWatermarkTimestamp).ToNot(BeEmpty())
+	})
+
+	It("keeps waiting when there is no progress but the grace period has not elapsed", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = "primary"
+		cluster.Status.FailoverWalReceiversWatermarkLSN = "0/300"
+		cluster.Status.FailoverWalReceiversWatermarkTimestamp = pastTimestamp(10 * time.Second)
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeStatusItem("replica-1", "0/300", true, nil),
+			makeStatusItem("primary", "0/0", false, fmt.Errorf("connection refused")),
+		}}
+
+		err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
+		Expect(err).To(MatchError(ErrWalReceiversRunning))
+		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
+	})
+
+	It("bypasses the wait once stalled past the grace period and the primary is unreachable", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = "primary"
+		cluster.Status.FailoverWalReceiversWatermarkLSN = "0/300"
+		cluster.Status.FailoverWalReceiversWatermarkTimestamp = pastTimestamp(walReceiversStalledGracePeriod + 5*time.Second)
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeStatusItem("replica-1", "0/300", true, nil),
+			makeStatusItem("primary", "0/0", false, fmt.Errorf("connection refused")),
+		}}
+
+		err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(BeEmpty())
+		Expect(cluster.Status.FailoverWalReceiversWatermarkTimestamp).To(BeEmpty())
+	})
+
+	It("never bypasses when the old primary is still reporting, no matter how stale the watermark is",
+		func(ctx SpecContext) {
+			cluster.Status.CurrentPrimary = "primary"
+			cluster.Status.FailoverWalReceiversWatermarkLSN = "0/300"
+			cluster.Status.FailoverWalReceiversWatermarkTimestamp = pastTimestamp(walReceiversStalledGracePeriod + 5*time.Second)
+			Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+			statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				makeStatusItem("replica-1", "0/300", true, nil),
+				// the old primary is alive enough to answer /pg/status, even though
+				// it is not one of the (non-primary) WAL receivers being evaluated
+				makeStatusItem("primary", "0/400", false, nil),
+			}}
+
+			err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
+			Expect(err).To(MatchError(ErrWalReceiversRunning))
+			// the watermark is left untouched: no progress was observed (so it isn't
+			// raised) and the gate never bypassed (so it isn't cleared either)
+			Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
+		})
+
+	It("clears a stale watermark once the receivers are genuinely down", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = "primary"
+		cluster.Status.FailoverWalReceiversWatermarkLSN = "0/300"
+		cluster.Status.FailoverWalReceiversWatermarkTimestamp = pastTimestamp(5 * time.Second)
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeStatusItem("replica-1", "0/300", false, nil),
+			makeStatusItem("primary", "0/0", false, fmt.Errorf("connection refused")),
+		}}
+
+		err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(BeEmpty())
+		Expect(cluster.Status.FailoverWalReceiversWatermarkTimestamp).To(BeEmpty())
 	})
 })

@@ -1069,6 +1069,19 @@ type ClusterStatus struct {
 	// +optional
 	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 
+	// The highest WAL receiver received LSN observed, among the non-primary
+	// instances, since the current failover attempt started waiting for the
+	// WAL receivers to be down. Used to detect WAL receivers that keep
+	// reporting as active without actually making progress.
+	// +optional
+	FailoverWalReceiversWatermarkLSN string `json:"failoverWalReceiversWatermarkLSN,omitempty"`
+
+	// The timestamp when `failoverWalReceiversWatermarkLSN` was last observed
+	// to advance. Cleared, together with `failoverWalReceiversWatermarkLSN`,
+	// once the failover concludes or the WAL receivers catch up.
+	// +optional
+	FailoverWalReceiversWatermarkTimestamp string `json:"failoverWalReceiversWatermarkTimestamp,omitempty"`
+
 	// The timestamp when the last request for a new primary has occurred
 	// +optional
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`

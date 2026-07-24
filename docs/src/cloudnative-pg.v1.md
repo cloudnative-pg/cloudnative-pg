@@ -729,6 +729,8 @@ _Appears in:_
 | `cloudNativePGCommitHash` _string_ | The commit hash number of which this operator running |  |  |  |
 | `currentPrimaryTimestamp` _string_ | The timestamp when the last actual promotion to primary has occurred |  |  |  |
 | `currentPrimaryFailingSinceTimestamp` _string_ | The timestamp when the primary was detected to be unhealthy<br />This field is reported when `.spec.failoverDelay` is populated or during online upgrades |  |  |  |
+| `failoverWalReceiversWatermarkLSN` _string_ | The highest WAL receiver received LSN observed, among the non-primary<br />instances, since the current failover attempt started waiting for the<br />WAL receivers to be down. Used to detect WAL receivers that keep<br />reporting as active without actually making progress. |  |  |  |
+| `failoverWalReceiversWatermarkTimestamp` _string_ | The timestamp when `failoverWalReceiversWatermarkLSN` was last observed<br />to advance. Cleared, together with `failoverWalReceiversWatermarkLSN`,<br />once the failover concludes or the WAL receivers catch up. |  |  |  |
 | `targetPrimaryTimestamp` _string_ | The timestamp when the last request for a new primary has occurred |  |  |  |
 | `poolerIntegrations` _[PoolerIntegrations](#poolerintegrations)_ | The integration needed by poolers referencing the cluster |  |  |  |
 | `cloudNativePGOperatorHash` _string_ | The hash of the binary of the operator |  |  |  |

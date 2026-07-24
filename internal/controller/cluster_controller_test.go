@@ -1104,6 +1104,145 @@ var _ = Describe("Updating target primary", func() {
 			Expect(instanceToCreate).ToNot(BeNil())
 			Expect(instanceToCreate.Name).To(Equal(instance2Name))
 		})
+
+	It("CNP-8534: bypasses the WAL-receivers-down gate once a frozen primary is unreachable "+
+		"and the WAL receivers stop making progress", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		managedResources := &managedResources{
+			instances: corev1.PodList{Items: instances},
+		}
+
+		oldPrimary := instances[0].Name
+		mostAdvanced := instances[1].Name
+
+		cluster.Status.CurrentPrimary = oldPrimary
+		cluster.Status.TargetPrimary = oldPrimary
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{ // the most advanced replica: sorts first
+					CurrentLsn:          cnpgTypes.LSN("0/300"),
+					ReceivedLsn:         cnpgTypes.LSN("0/300"),
+					ReplayLsn:           cnpgTypes.LSN("0/300"),
+					IsPodReady:          true,
+					IsWalReceiverActive: true,
+					Pod:                 &instances[1],
+				},
+				{ // a less advanced replica
+					CurrentLsn:          cnpgTypes.LSN("0/200"),
+					ReceivedLsn:         cnpgTypes.LSN("0/200"),
+					ReplayLsn:           cnpgTypes.LSN("0/200"),
+					IsPodReady:          true,
+					IsWalReceiverActive: true,
+					Pod:                 &instances[2],
+				},
+				{ // the old, frozen primary: unreportable, but its WAL receiver
+					// row (excluded from the gate) survives via keepalives
+					IsPodReady: false,
+					Pod:        &instances[0],
+					Error:      fmt.Errorf("simulated frozen primary: no response from /pg/status"),
+				},
+			},
+		}
+
+		By("initiating the failover and observing the first LSN watermark", func() {
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources)
+			Expect(err).To(Equal(ErrWalReceiversRunning))
+			Expect(selectedPrimary).To(BeEmpty())
+			Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
+			Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
+		})
+
+		By("still waiting while the grace period hasn't elapsed", func() {
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources)
+			Expect(err).To(Equal(ErrWalReceiversRunning))
+			Expect(selectedPrimary).To(BeEmpty())
+		})
+
+		By("bypassing the wait and failing over once the watermark has been stalled for the grace period", func() {
+			cluster.Status.FailoverWalReceiversWatermarkTimestamp = time.Now().
+				Add(-(walReceiversStalledGracePeriod + 5*time.Second)).
+				Format(metav1.RFC3339Micro)
+			Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(mostAdvanced))
+			Expect(cluster.Status.TargetPrimary).To(Equal(mostAdvanced))
+			Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(BeEmpty())
+			Expect(cluster.Status.FailoverWalReceiversWatermarkTimestamp).To(BeEmpty())
+		})
+	})
+
+	It("CNP-8534 adversarial: never bypasses the WAL-receivers-down gate during a healthy switchover",
+		func(ctx SpecContext) {
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+
+			instances := generateFakeClusterPods(env.client, cluster, true)
+			managedResources := &managedResources{
+				instances: corev1.PodList{Items: instances},
+			}
+
+			oldPrimary := instances[0].Name
+			switchoverTarget := instances[1].Name
+
+			cluster.Status.CurrentPrimary = oldPrimary
+			cluster.Status.TargetPrimary = switchoverTarget
+			// Simulate a stale watermark left over from an earlier, unrelated
+			// failover attempt that never actually bypassed (e.g. the primary
+			// came back before the grace period elapsed). Even with a
+			// past-grace-period watermark in place, a live, reporting primary
+			// must never let the gate bypass.
+			cluster.Status.FailoverWalReceiversWatermarkLSN = "0/300"
+			cluster.Status.FailoverWalReceiversWatermarkTimestamp = time.Now().
+				Add(-(walReceiversStalledGracePeriod + 5*time.Second)).
+				Format(metav1.RFC3339Micro)
+			Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+			statusList := postgres.PostgresqlStatusList{
+				Items: []postgres.PostgresqlStatus{
+					{ // the old primary: still fully healthy and reporting, sorts first
+						CurrentLsn:  cnpgTypes.LSN("0/300"),
+						ReceivedLsn: cnpgTypes.LSN("0/300"),
+						ReplayLsn:   cnpgTypes.LSN("0/300"),
+						IsPodReady:  true,
+						IsPrimary:   true,
+						Pod:         &instances[0],
+					},
+					{ // the switchover target: actively streaming from the still-live primary
+						CurrentLsn:          cnpgTypes.LSN("0/300"),
+						ReceivedLsn:         cnpgTypes.LSN("0/300"),
+						ReplayLsn:           cnpgTypes.LSN("0/300"),
+						IsPodReady:          true,
+						IsWalReceiverActive: true,
+						Pod:                 &instances[1],
+					},
+					{
+						CurrentLsn:          cnpgTypes.LSN("0/200"),
+						ReceivedLsn:         cnpgTypes.LSN("0/200"),
+						ReplayLsn:           cnpgTypes.LSN("0/200"),
+						IsPodReady:          true,
+						IsWalReceiverActive: true,
+						Pod:                 &instances[2],
+					},
+				},
+			}
+
+			for i := 0; i < 3; i++ {
+				selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+					ctx, cluster, statusList, managedResources)
+				Expect(err).To(Equal(ErrWalReceiversRunning))
+				Expect(selectedPrimary).To(BeEmpty())
+			}
+			Expect(cluster.Status.TargetPrimary).To(Equal(switchoverTarget))
+		})
 })
 
 var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {

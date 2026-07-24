@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -43,6 +44,173 @@ var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 // ErrWaitingOnFailOverDelay is raised when the primary server can't be elected because the .spec.failoverDelay hasn't
 // elapsed yet
 var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
+
+// walReceiversStalledGracePeriod is the amount of time the WAL-receivers-down
+// gate (see evaluateWalReceiversGate) tolerates WAL receivers that report as
+// up without making any progress, while the old primary is unreachable,
+// before bypassing the gate to let a failover proceed.
+//
+// It must comfortably exceed the primary Lease's default staleness window
+// (15s, see primary_lease.go) plus a couple of reconcile periods, so the
+// lease has time to go stale and a candidate to acquire it before this gate
+// gives up waiting. Kept as a package const rather than a `.spec` field
+// (YAGNI): revisit if a cluster raises `.spec.primaryLease.leaseDurationSeconds`
+// close to or above ~45s.
+const walReceiversStalledGracePeriod = 60 * time.Second
+
+// evaluateWalReceiversGate waits for all the WAL receivers to be down before
+// letting a failover proceed, the same way `status.AreWalReceiversDown` has
+// always worked (see CNP-8534 for the destructive alternative case this
+// escape hatch was added for).
+//
+// A postmaster that is frozen (e.g. `kill -STOP`) but whose walsender
+// children survive keeps sending replication keepalives, which reset
+// wal_receiver_timeout on the replica side. The result is a WAL receiver
+// that reports up (status='streaming') forever while receiving nothing,
+// deadlocking the plain row-existence check below with zero data-safety
+// benefit, since the primary is actually gone.
+//
+// The escape hatch only fires when, in addition to the receivers reporting
+// up:
+//   - the old primary is not reporting through /pg/status (the operator's
+//     own, pod-network-direct health check), and
+//   - the highest ReceivedLsn observed among the up, non-primary receivers
+//     has not advanced for walReceiversStalledGracePeriod.
+//
+// The watermark tracked to detect that is a monotonic high-water mark: any
+// receiver -- new or already known -- whose ReceivedLsn exceeds it resets
+// the grace-period timer. A receiver reconnecting at or below the current
+// watermark does NOT reset the timer: it can never become the promotion
+// candidate (the most advanced pod is always chosen, see the Less method in
+// pkg/postgres/status.go), and it is the primary Lease -- not this gate --
+// that prevents split-brain if the old primary is still partially alive.
+//
+// Returns nil when the failover may proceed (either because the receivers
+// are genuinely down, or because the escape hatch fired), or
+// ErrWalReceiversRunning when the caller should keep waiting.
+func (r *ClusterReconciler) evaluateWalReceiversGate(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	status postgres.PostgresqlStatusList,
+) error {
+	if status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
+		return r.clearWalReceiversWatermark(ctx, cluster)
+	}
+
+	stalled, err := r.walReceiversStalledDuringFailover(ctx, cluster, status)
+	if err != nil {
+		return err
+	}
+	if !stalled {
+		return ErrWalReceiversRunning
+	}
+
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Warning(
+		"WAL receivers are still reporting as up but have made no progress "+
+			"while the old primary is unreachable; bypassing the wait and proceeding with the failover",
+		"primary", cluster.Status.CurrentPrimary,
+		"gracePeriod", walReceiversStalledGracePeriod,
+		"watermarkLSN", cluster.Status.FailoverWalReceiversWatermarkLSN)
+	r.Recorder.Eventf(cluster, "Warning", "WalReceiversStalled",
+		"WAL receivers are up but not progressing while the old primary %v is unreachable; "+
+			"proceeding with the failover after %v",
+		cluster.Status.CurrentPrimary, walReceiversStalledGracePeriod)
+
+	return r.clearWalReceiversWatermark(ctx, cluster)
+}
+
+// walReceiversStalledDuringFailover implements the LSN-progress bookkeeping
+// described in evaluateWalReceiversGate: it persists a high-water mark of the
+// most advanced non-primary receiver and reports whether it has been frozen
+// for walReceiversStalledGracePeriod while the old primary is unreachable.
+func (r *ClusterReconciler) walReceiversStalledDuringFailover(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	status postgres.PostgresqlStatusList,
+) (bool, error) {
+	currentMax, found := maxReceivedLsnAmongUpReceivers(status, cluster.Status.CurrentPrimary)
+	if !found {
+		// No up receiver has a usable status to compare against, nothing to bypass on.
+		return false, nil
+	}
+
+	watermarkLSN := cnpgTypes.LSN(cluster.Status.FailoverWalReceiversWatermarkLSN)
+	if cluster.Status.FailoverWalReceiversWatermarkLSN == "" || watermarkLSN.Less(currentMax) {
+		// Progress observed (or this is the first observation): raise the
+		// watermark and keep waiting.
+		return false, r.setWalReceiversWatermark(ctx, cluster, currentMax)
+	}
+
+	watermarkAge, err := pgTime.DifferenceBetweenTimestamps(
+		pgTime.GetCurrentTimestamp(),
+		cluster.Status.FailoverWalReceiversWatermarkTimestamp,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	if watermarkAge < walReceiversStalledGracePeriod {
+		return false, nil
+	}
+
+	return !status.IsPodReporting(cluster.Status.CurrentPrimary), nil
+}
+
+// maxReceivedLsnAmongUpReceivers returns the highest ReceivedLsn among the
+// non-primary instances currently reporting IsWalReceiverActive, and whether
+// at least one such instance was found.
+func maxReceivedLsnAmongUpReceivers(
+	status postgres.PostgresqlStatusList,
+	primaryName string,
+) (cnpgTypes.LSN, bool) {
+	var maxLsn cnpgTypes.LSN
+	found := false
+
+	for i := range status.Items {
+		item := &status.Items[i]
+		if item.Pod.Name == primaryName || !item.IsWalReceiverActive {
+			continue
+		}
+		if !found || maxLsn.Less(item.ReceivedLsn) {
+			maxLsn = item.ReceivedLsn
+			found = true
+		}
+	}
+
+	return maxLsn, found
+}
+
+// setWalReceiversWatermark persists a newly observed high-water mark for the
+// non-primary receivers' ReceivedLsn during the current failover attempt.
+func (r *ClusterReconciler) setWalReceiversWatermark(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	lsn cnpgTypes.LSN,
+) error {
+	if cluster.Status.FailoverWalReceiversWatermarkLSN == string(lsn) {
+		return nil
+	}
+
+	origCluster := cluster.DeepCopy()
+	cluster.Status.FailoverWalReceiversWatermarkLSN = string(lsn)
+	cluster.Status.FailoverWalReceiversWatermarkTimestamp = pgTime.GetCurrentTimestamp()
+	return r.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
+}
+
+// clearWalReceiversWatermark drops the watermark tracked for the current (or
+// a past) failover attempt, so that a later, unrelated failover starts fresh.
+func (r *ClusterReconciler) clearWalReceiversWatermark(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Status.FailoverWalReceiversWatermarkLSN == "" &&
+		cluster.Status.FailoverWalReceiversWatermarkTimestamp == "" {
+		return nil
+	}
+
+	origCluster := cluster.DeepCopy()
+	cluster.Status.FailoverWalReceiversWatermarkLSN = ""
+	cluster.Status.FailoverWalReceiversWatermarkTimestamp = ""
+	return r.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
+}
 
 // reconcileTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion.
@@ -159,9 +327,10 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	}
 
 	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
-	// data that is being received (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
-		return "", ErrWalReceiversRunning
+	// data that is being received (think about a switchover). See evaluateWalReceiversGate
+	// for the passive LSN-progress bypass this wait is subject to.
+	if err := r.evaluateWalReceiversGate(ctx, cluster, status); err != nil {
+		return "", err
 	}
 
 	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
@@ -366,9 +535,10 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// The designated primary is not correctly working, and we need to elect a new one
 	// but before doing that we need to wait for all the WAL receivers to be
 	// terminated. This is needed to avoid losing the WAL data that is being received
-	// (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
-		return "", ErrWalReceiversRunning
+	// (think about a switchover). See evaluateWalReceiversGate for the passive
+	// LSN-progress bypass this wait is subject to.
+	if err := r.evaluateWalReceiversGate(ctx, cluster, status); err != nil {
+		return "", err
 	}
 
 	contextLogger.Info("Current target primary isn't healthy, failing over",
