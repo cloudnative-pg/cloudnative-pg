@@ -20,11 +20,30 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"fmt"
+	"path"
+	"strings"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -79,4 +98,288 @@ var _ = Describe("plugin-barman-cloud replica cluster from backup",
 					srcClusterName, srcDBName, replicaManifest, testTableName)
 			})
 		})
+	})
+
+// Plugin port of the "Replica switchover" scenario:
+// In this test we create a replica cluster from a backup and then promote it to a primary.
+// We expect the original primary to be demoted to a replica and be able to follow the new primary.
+// Runs on kind/k3d only, where the plugin and the shared object store are installed.
+//
+//nolint:dupl // TODO: remove once in-tree counterpart is removed
+var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
+	Label(tests.LabelPluginBarmanCloud, tests.LabelReplication, tests.LabelBackupRestore), Ordered, func() {
+		const (
+			localFixturesDir       = fixturesDir + "/replica_mode_cluster/pbc-promotion-demotion/"
+			clusterAFileRestart    = localFixturesDir + "cluster-replica-switchover-restart-1.yaml.template"
+			clusterBFileRestart    = localFixturesDir + "cluster-replica-switchover-restart-2.yaml.template"
+			clusterAFileSwitchover = localFixturesDir + "cluster-replica-switchover-switchover-1.yaml.template"
+			clusterBFileSwitchover = localFixturesDir + "cluster-replica-switchover-switchover-2.yaml.template"
+			objectStoreName        = "replica-cluster-backups"
+			level                  = tests.Medium
+		)
+
+		BeforeAll(func() {
+			if testLevelEnv.Depth < int(level) {
+				Skip("Test depth is lower than the amount requested for this test")
+			}
+			if !(IsKind() || IsK3D()) {
+				Skip("This test only runs on kind or k3d clusters")
+			}
+		})
+
+		validateReplication := func(namespace, clusterAName, clusterBName string) {
+			const replicationTable = "test_replication"
+			marker := fmt.Sprintf("replication-check-%d", time.Now().UnixNano())
+
+			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, _, err = exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+				"postgres",
+				fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (marker text); INSERT INTO %s VALUES ('%s');",
+					replicationTable, replicationTable, marker),
+			)
+			Expect(err).ToNot(HaveOccurred())
+			_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
+
+			selectMarker := fmt.Sprintf("SELECT marker FROM %s WHERE marker = '%s';", replicationTable, marker)
+			Eventually(func(g Gomega) {
+				podListA, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
+				g.Expect(err).ToNot(HaveOccurred())
+				podListB, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterBName)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				for _, pod := range append(podListA.Items, podListB.Items...) {
+					stdOut, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{Namespace: namespace, PodName: pod.Name},
+						"postgres",
+						selectMarker,
+					)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(strings.TrimSpace(stdOut)).To(Equal(marker))
+				}
+			}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
+		}
+
+		waitForExpectedTimeline := func(namespace, clusterName string, expectedTimeline int) {
+			Eventually(func(g Gomega) {
+				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+					"postgres",
+					"SELECT timeline_id FROM pg_catalog.pg_control_checkpoint()",
+				)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(strings.TrimSpace(stdout)).To(Equal(fmt.Sprintf("%d", expectedTimeline)))
+				// Check the Cluster's status is aligned
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(cluster.Status.TimelineID).To(Equal(expectedTimeline))
+			}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
+		}
+
+		DescribeTable(
+			"should demote and promote the clusters correctly",
+			func(clusterAFile string, clusterBFile string, expectedTimeline int) {
+				const namespacePrefix = "replica-cluster-switchover"
+				namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+
+				clusterAName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterAFile)
+				Expect(err).ToNot(HaveOccurred())
+				clusterBName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterBFile)
+				Expect(err).ToNot(HaveOccurred())
+
+				DeferCleanup(func() error {
+					// Since we use multiple times the same cluster names for the same object store instance, we need
+					// to clean it up between tests
+					if _, err := objectstore.CleanFiles(objectStoreEnv, path.Join(objectStoreName, clusterAName)); err != nil {
+						return err
+					}
+					_, err := objectstore.CleanFiles(objectStoreEnv, path.Join(objectStoreName, clusterBName))
+					return err
+				})
+
+				stopLoad := make(chan struct{})
+				DeferCleanup(func() { close(stopLoad) })
+
+				setupPluginObjectStore(namespace, objectStoreName, func(objectStore *unstructured.Unstructured) {
+					Expect(unstructured.SetNestedField(objectStore.Object, true,
+						"spec", "configuration", "data", "immediateCheckpoint")).To(Succeed())
+					Expect(unstructured.SetNestedField(objectStore.Object, int64(6),
+						"spec", "configuration", "wal", "maxParallel")).To(Succeed())
+				})
+
+				By("creating the A cluster", func() {
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterAName, clusterAFile)
+				})
+
+				By("creating some load on the A cluster", func() {
+					primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
+					Expect(err).ToNot(HaveOccurred())
+					_, _, err = exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+						"postgres",
+						"CREATE TABLE switchover_load (i int);",
+					)
+					Expect(err).ToNot(HaveOccurred())
+
+					go func() {
+						for {
+							_, _, _ = exec.QueryInInstancePod(
+								env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+								exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+								"postgres",
+								"INSERT INTO switchover_load SELECT generate_series(1, 10000)",
+							)
+							select {
+							case <-stopLoad:
+								GinkgoWriter.Println("Terminating load")
+								return
+							case <-time.After(100 * time.Millisecond):
+							}
+						}
+					}()
+				})
+
+				By("backing up the A cluster", func() {
+					backup, err := backups.Create(
+						env.Ctx, env.Client,
+						apiv1.Backup{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: namespace,
+								Name:      clusterAName,
+							},
+							Spec: apiv1.BackupSpec{
+								Target:  apiv1.BackupTargetPrimary,
+								Method:  apiv1.BackupMethodPlugin,
+								Cluster: apiv1.LocalObjectReference{Name: clusterAName},
+								PluginConfiguration: &apiv1.BackupPluginConfiguration{
+									Name: "barman-cloud.cloudnative-pg.io",
+								},
+							},
+						},
+					)
+					Expect(err).ToNot(HaveOccurred())
+
+					// Speed up backup finalization
+					primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
+					Expect(err).ToNot(HaveOccurred())
+					_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
+
+					Eventually(func() (apiv1.BackupPhase, error) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      clusterAName,
+						}, backup)
+						return backup.Status.Phase, err
+					}, testTimeouts[timeouts.BackupIsReady]).WithPolling(10 * time.Second).
+						Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+				})
+
+				By("creating the B cluster from the backup", func() {
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterBName, clusterBFile)
+				})
+
+				By("demoting A to a replica", func() {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterAName)
+					Expect(err).ToNot(HaveOccurred())
+					oldCluster := cluster.DeepCopy()
+					cluster.Spec.ReplicaCluster.Primary = clusterBName
+					Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
+					Expect(err).ToNot(HaveOccurred())
+					for _, pod := range podList.Items {
+						pgasserts.AssertPgRecoveryMode(env, &pod, true)
+					}
+				})
+
+				var token, invalidToken string
+				By("getting the demotion token", func() {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterAName)
+					Expect(err).ToNot(HaveOccurred())
+					token = cluster.Status.DemotionToken
+				})
+
+				By("forging an invalid token", func() {
+					tokenContent, err := utils.ParsePgControldataToken(token)
+					Expect(err).ToNot(HaveOccurred())
+					tokenContent.LatestCheckpointREDOLocation = "0/0"
+					Expect(tokenContent.IsValid()).To(Succeed())
+					invalidToken, err = tokenContent.Encode()
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				By("promoting B with the invalid token", func() {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterBName)
+					Expect(err).ToNot(HaveOccurred())
+
+					oldCluster := cluster.DeepCopy()
+					cluster.Spec.ReplicaCluster.PromotionToken = invalidToken
+					cluster.Spec.ReplicaCluster.Primary = clusterBName
+					Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				})
+
+				By("failing to promote B with the invalid token", func() {
+					// The Unrecoverable phase proves the operator has evaluated and
+					// rejected the token; only after that it makes sense to check
+					// that the designated primary keeps running in recovery.
+					Eventually(func(g Gomega) {
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterBName)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(cluster.Status.Phase).To(BeEquivalentTo(apiv1.PhaseUnrecoverable))
+					}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
+					Consistently(func(g Gomega) {
+						pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
+						g.Expect(err).ToNot(HaveOccurred())
+						stdOut, _, err := exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							exec.PodLocator{
+								Namespace: pod.Namespace,
+								PodName:   pod.Name,
+							},
+							postgres.PostgresDBName,
+							"select pg_catalog.pg_is_in_recovery()")
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(strings.Trim(stdOut, "\n")).To(Equal("t"))
+					}, 60, 10).Should(Succeed())
+				})
+
+				By("promoting B with the right token", func() {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterBName)
+					Expect(err).ToNot(HaveOccurred())
+					oldCluster := cluster.DeepCopy()
+					cluster.Spec.ReplicaCluster.PromotionToken = token
+					cluster.Spec.ReplicaCluster.Primary = clusterBName
+					Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				})
+
+				By("reaching the target timeline", func() {
+					waitForExpectedTimeline(namespace, clusterBName, expectedTimeline)
+				})
+
+				By("verifying B contains the primary", func() {
+					primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
+					Expect(err).ToNot(HaveOccurred())
+					pgasserts.AssertPgRecoveryMode(env, primary, false)
+					podList, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterBName)
+					Expect(err).ToNot(HaveOccurred())
+					for _, pod := range podList.Items {
+						pgasserts.AssertPgRecoveryMode(env, &pod, true)
+					}
+				})
+
+				By("verifying replication from new primary works everywhere", func() {
+					validateReplication(namespace, clusterAName, clusterBName)
+				})
+			},
+			Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
+			Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
+		)
 	})
