@@ -594,7 +594,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// this pass (both cases returned above), so it is safe to contain any
 	// replica confirmed diverged: fence it, unless doing so would break
 	// synchronous quorum or the kill-switch annotation disables containment.
-	if err := r.reconcileDivergedReplicaContainment(ctx, cluster, instancesStatus); err != nil {
+	if err := r.reconcileDivergedReplicaContainment(ctx, cluster, instancesStatus, resources.pvcs.Items); err != nil {
 		return ctrl.Result{}, err
 	}
 

@@ -1087,8 +1087,9 @@ type ClusterStatus struct {
 	// the `alpha.cnpg.io/divergedReplicaHandling` annotation is set to
 	// `detectOnly`), or as "Stuck" when the fork-point check could not
 	// confirm a divergence. A "Stuck" instance is always surfaced, never
-	// fenced. Entries are cleared once the instance is rebuilt (a new Pod)
-	// or, for "Stuck" instances, once they catch up.
+	// fenced. Entries are cleared once a fenced instance's data is rebuilt
+	// from a fresh clone (for example with `kubectl cnpg destroy`) or, for
+	// any instance, once it catches up.
 	// +optional
 	ReplicaWalIssues map[PodName]ReplicaWalIssueStatus `json:"replicaWalIssues,omitempty"`
 
@@ -1260,12 +1261,17 @@ type ReplicaWalIssueStatus struct {
 	// +optional
 	Parked bool `json:"parked,omitempty"`
 
-	// PodUID is the UID of the Pod that was evaluated when the issue was
-	// confirmed. Used to detect that the instance has since been rebuilt
-	// (for example with `kubectl cnpg destroy`) even though it kept the same
-	// name, so containment can be lifted and the entry cleared.
+	// PVCUID is the UID of the instance's PGDATA PersistentVolumeClaim at the
+	// moment it was fenced as containment for a confirmed divergence. Only
+	// set once Parked is true. Used to detect that the instance's data has
+	// since been rebuilt from a fresh clone (for example with
+	// `kubectl cnpg destroy`, which deletes and recreates the PVC) as
+	// opposed to the Pod merely being recreated over the same, still
+	// diverged PVC (a node failure, eviction, or rollout, none of which
+	// replace the data): only a PVC replacement makes it safe to lift
+	// containment and forget the entry.
 	// +optional
-	PodUID string `json:"podUID,omitempty"`
+	PVCUID string `json:"pvcUID,omitempty"`
 }
 
 // ClusterConditionType defines types of cluster conditions

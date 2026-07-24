@@ -359,6 +359,7 @@ PODNAME
 PPROF
 PSA
 PV
+PVCUID
 PVCs
 PascalBourdier
 PasswordState
@@ -392,7 +393,6 @@ PodTemplateSpec
 PodTemplates
 PodTopology
 PodTopologyLabels
-PodUID
 Pooler
 Pooler's
 PoolerIntegrations

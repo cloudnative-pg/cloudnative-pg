@@ -221,8 +221,8 @@ var _ = Describe("evaluateReplicaDivergence", func() {
 			Expect(issue.ForkLSN).To(Equal("0/7000110"))
 			Expect(issue.ReceivedLSN).To(Equal("0/7500000"))
 			Expect(issue.DetectedTimeLineID).To(Equal(1))
-			Expect(issue.PodUID).To(Equal("uid-1"))
 			Expect(issue.Parked).To(BeFalse())
+			Expect(issue.PVCUID).To(BeEmpty(), "PVCUID is only recorded once containment actually parks the instance")
 
 			cond := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionReplicasHealthy))
 			Expect(cond).ToNot(BeNil())
@@ -308,7 +308,7 @@ var _ = Describe("evaluateReplicaDivergence", func() {
 	It("does not re-run the fork-point check for an instance already evaluated against the current timeline",
 		func(ctx SpecContext) {
 			cluster.Status.ReplicaWalIssues = map[apiv1.PodName]apiv1.ReplicaWalIssueStatus{
-				"replica-1": {Kind: apiv1.ReplicaWalIssueStuck, DetectedTimeLineID: 2, PodUID: "uid-1"},
+				"replica-1": {Kind: apiv1.ReplicaWalIssueStuck, DetectedTimeLineID: 2},
 			}
 			statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
 				makePrimary("primary", true),
@@ -323,7 +323,7 @@ var _ = Describe("evaluateReplicaDivergence", func() {
 
 	It("self-heals a latched issue once the instance reports a fresh, caught-up timeline", func(ctx SpecContext) {
 		cluster.Status.ReplicaWalIssues = map[apiv1.PodName]apiv1.ReplicaWalIssueStatus{
-			"replica-1": {Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, PodUID: "uid-old", Parked: true},
+			"replica-1": {Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, PVCUID: "pvc-uid-old", Parked: true},
 		}
 		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
 			makePrimary("primary", true),
@@ -366,6 +366,21 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 		}
 	}
 
+	// makePgDataPVC builds the PGDATA PVC fixture for an instance, named and
+	// labeled exactly as the real pgDataCalculator does (see
+	// pkg/reconciler/persistentvolumeclaim/calculator.go), so findPgDataPVC
+	// picks it up the same way it would a real cluster's PVC.
+	makePgDataPVC := func(instanceName string, uid types.UID) corev1.PersistentVolumeClaim {
+		return corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      instanceName,
+				Namespace: namespace,
+				UID:       uid,
+				Labels:    map[string]string{utils.PvcRoleLabelName: string(utils.PVCRolePgData)},
+			},
+		}
+	}
+
 	// isFenced always re-reads the Cluster from the fake API server rather
 	// than trusting the in-memory `cluster` variable: fencing is applied by
 	// utils.FencingMetadataExecutor via its own independent Get+Patch cycle
@@ -386,22 +401,25 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 		cluster.Status.CurrentPrimary = "primary"
 		cluster.Status.TargetPrimary = "primary"
 		cluster.Status.ReplicaWalIssues = map[apiv1.PodName]apiv1.ReplicaWalIssueStatus{
-			"replica-1": {Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, PodUID: "uid-1"},
+			"replica-1": {Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1},
 		}
 		Expect(env.client.Status().Update(context.Background(), cluster)).To(Succeed())
 	})
 
-	It("fences a confirmed-diverged replica by default (auto mode)", func(ctx SpecContext) {
-		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
-			makeReplica("replica-1", "uid-1", true),
-		}}
+	It("fences a confirmed-diverged replica by default (auto mode), recording its PGDATA PVC UID",
+		func(ctx SpecContext) {
+			statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				makeReplica("replica-1", "uid-1", true),
+			}}
+			pvcs := []corev1.PersistentVolumeClaim{makePgDataPVC("replica-1", "pvc-uid-1")}
 
-		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses)
-		Expect(err).ToNot(HaveOccurred())
+			err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, pvcs)
+			Expect(err).ToNot(HaveOccurred())
 
-		Expect(isFenced("replica-1")).To(BeTrue())
-		Expect(cluster.Status.ReplicaWalIssues["replica-1"].Parked).To(BeTrue())
-	})
+			Expect(isFenced("replica-1")).To(BeTrue())
+			Expect(cluster.Status.ReplicaWalIssues["replica-1"].Parked).To(BeTrue())
+			Expect(cluster.Status.ReplicaWalIssues["replica-1"].PVCUID).To(Equal("pvc-uid-1"))
+		})
 
 	It("only surfaces, never fences, when the kill-switch annotation requests detectOnly", func(ctx SpecContext) {
 		if cluster.Annotations == nil {
@@ -411,8 +429,9 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
 			makeReplica("replica-1", "uid-1", true),
 		}}
+		pvcs := []corev1.PersistentVolumeClaim{makePgDataPVC("replica-1", "pvc-uid-1")}
 
-		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses)
+		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(isFenced("replica-1")).To(BeFalse())
@@ -421,16 +440,19 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 
 	It("is idempotent once an instance is already parked", func(ctx SpecContext) {
 		cluster.Status.ReplicaWalIssues["replica-1"] = apiv1.ReplicaWalIssueStatus{
-			Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, PodUID: "uid-1", Parked: true,
+			Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, Parked: true, PVCUID: "pvc-uid-1",
 		}
 		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
 		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
 			makeReplica("replica-1", "uid-1", false), // not ready: already fenced
 		}}
+		// Same PVC UID as recorded: no rebuild, must stay parked untouched.
+		pvcs := []corev1.PersistentVolumeClaim{makePgDataPVC("replica-1", "pvc-uid-1")}
 
-		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses)
+		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(cluster.Status.ReplicaWalIssues["replica-1"].Parked).To(BeTrue())
+		Expect(cluster.Status.ReplicaWalIssues).To(HaveKey(apiv1.PodName("replica-1")))
 	})
 
 	It("never fences when doing so would break the synchronous replication quorum", func(ctx SpecContext) {
@@ -445,8 +467,9 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 			// available even after excluding the one being considered for
 			// fencing -- fencing replica-1 would leave only replica-2 (1 < 2).
 		}}
+		pvcs := []corev1.PersistentVolumeClaim{makePgDataPVC("replica-1", "pvc-uid-1")}
 
-		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses)
+		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(isFenced("replica-1")).To(BeFalse())
@@ -455,22 +478,35 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 
 	It("refuses to fence an entry that names the current or target primary (defensive backstop)", func(ctx SpecContext) {
 		cluster.Status.ReplicaWalIssues = map[apiv1.PodName]apiv1.ReplicaWalIssueStatus{
-			"primary": {Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, PodUID: "uid-primary"},
+			"primary": {Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1},
 		}
 		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
 		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
 			{Pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "primary", Namespace: namespace, UID: "uid-primary"}}},
 		}}
+		pvcs := []corev1.PersistentVolumeClaim{makePgDataPVC("primary", "pvc-uid-primary")}
 
-		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses)
+		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(isFenced("primary")).To(BeFalse())
 	})
 
-	It("lifts containment and forgets the entry once a parked instance is rebuilt under a new Pod UID",
+	It("defers containment when the diverged instance's PGDATA PVC is not found this pass", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeReplica("replica-1", "uid-1", true),
+		}}
+
+		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, nil)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(isFenced("replica-1")).To(BeFalse())
+		Expect(cluster.Status.ReplicaWalIssues["replica-1"].Parked).To(BeFalse())
+	})
+
+	It("lifts containment and forgets the entry once a parked instance's PGDATA PVC is replaced by a fresh clone",
 		func(ctx SpecContext) {
 			cluster.Status.ReplicaWalIssues["replica-1"] = apiv1.ReplicaWalIssueStatus{
-				Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, PodUID: "uid-1", Parked: true,
+				Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, Parked: true, PVCUID: "pvc-uid-old",
 			}
 			cluster.Status.ReplicaDivergenceWatermarks = map[apiv1.PodName]apiv1.ReplicaDivergenceWatermark{
 				"replica-1": {TimeLineID: 1, ReceivedLSN: "0/7500000", Since: "some-time"},
@@ -481,11 +517,14 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 			Expect(isFenced("replica-1")).To(BeTrue())
 
 			statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
-				// same name, different Pod UID: rebuilt via `kubectl cnpg destroy`
 				makeReplica("replica-1", "uid-1-rebuilt", false),
 			}}
+			// A genuine `kubectl cnpg destroy`: the PVC was deleted and
+			// recreated from a fresh clone, so its UID differs from the one
+			// recorded at parking time.
+			pvcs := []corev1.PersistentVolumeClaim{makePgDataPVC("replica-1", "pvc-uid-new")}
 
-			err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses)
+			err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, pvcs)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(isFenced("replica-1")).To(BeFalse())
@@ -493,16 +532,49 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 			Expect(cluster.Status.ReplicaDivergenceWatermarks).ToNot(HaveKey(apiv1.PodName("replica-1")))
 		})
 
+	It("keeps a parked instance fenced when only its Pod is recreated over the SAME, still-diverged PVC",
+		func(ctx SpecContext) {
+			cluster.Status.ReplicaWalIssues["replica-1"] = apiv1.ReplicaWalIssueStatus{
+				Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, Parked: true, PVCUID: "pvc-uid-1",
+			}
+			cluster.Status.ReplicaDivergenceWatermarks = map[apiv1.PodName]apiv1.ReplicaDivergenceWatermark{
+				"replica-1": {TimeLineID: 1, ReceivedLSN: "0/7500000", Since: "some-time"},
+			}
+			Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+			Expect(env.clusterReconciler.setInstanceFencing(ctx, cluster, "replica-1", true)).To(Succeed())
+			Expect(isFenced("replica-1")).To(BeTrue())
+
+			// A new Pod identity -- e.g. a node failure, eviction, or a
+			// rollout recreated it, none of which is `kubectl cnpg destroy`
+			// -- bound to the SAME PGDATA PVC (same UID): the data is still
+			// the diverged data, so this must NOT lift containment.
+			statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				makeReplica("replica-1", "uid-1-new-pod-same-pvc", false),
+			}}
+			pvcs := []corev1.PersistentVolumeClaim{makePgDataPVC("replica-1", "pvc-uid-1")}
+
+			err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, pvcs)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(isFenced("replica-1")).To(BeTrue())
+			issue, ok := cluster.Status.ReplicaWalIssues["replica-1"]
+			Expect(ok).To(BeTrue())
+			Expect(issue.Parked).To(BeTrue())
+			Expect(issue.PVCUID).To(Equal("pvc-uid-1"))
+			Expect(cluster.Status.ReplicaDivergenceWatermarks).To(HaveKey(apiv1.PodName("replica-1")))
+		})
+
 	It("never touches a Stuck (not Diverged) entry", func(ctx SpecContext) {
 		cluster.Status.ReplicaWalIssues = map[apiv1.PodName]apiv1.ReplicaWalIssueStatus{
-			"replica-1": {Kind: apiv1.ReplicaWalIssueStuck, DetectedTimeLineID: 1, PodUID: "uid-1"},
+			"replica-1": {Kind: apiv1.ReplicaWalIssueStuck, DetectedTimeLineID: 1},
 		}
 		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
 		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
 			makeReplica("replica-1", "uid-1", true),
 		}}
+		pvcs := []corev1.PersistentVolumeClaim{makePgDataPVC("replica-1", "pvc-uid-1")}
 
-		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses)
+		err := env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, statuses, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(isFenced("replica-1")).To(BeFalse())
