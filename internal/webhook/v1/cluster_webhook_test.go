@@ -6181,6 +6181,35 @@ var _ = Describe("validateExtensions", func() {
 		Expect(v.validateExtensions(cluster)).To(BeEmpty())
 	})
 
+	It("returns an error for a path resolving to a sibling directory sharing the mount point as a string prefix", func() {
+		// "../../mount-evil" resolves to a directory named "mount-evil" next to
+		// the containment placeholder, e.g. "/mount-evil" alongside "/mount".
+		// That string shares "/mount" as a prefix, so a containment check using
+		// a bare strings.HasPrefix (without requiring a separator boundary)
+		// would wrongly accept it as contained.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../../mount-evil",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
 	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
