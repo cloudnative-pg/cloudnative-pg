@@ -533,8 +533,11 @@ are the ones directly set by PgBouncer.
   the certificate common name for TLS secrets). Setting it is meant for setups
   with a custom `authQuerySecret`, since the built-in integration provisions
   everything for the default `cnpg_pooler_pgbouncer` user; with a basic-auth
-  secret only the username changes, the password still comes from the secret. An
-  empty value is ignored. Once you customize the `auth_user`, ensure that the
+  secret only the username changes. PgBouncer still uses the secret's password
+  field to authenticate its own auth_query connection, so that field must
+  contain the actual PostgreSQL password for the overridden `auth_user` role,
+  not the password of the secret's original username. An empty value is
+  ignored. Once you customize the `auth_user`, ensure that the
   user exists in PostgreSQL and has the necessary privileges to run the
   `auth_query` (see ["Authentication"](#authentication)).
 
