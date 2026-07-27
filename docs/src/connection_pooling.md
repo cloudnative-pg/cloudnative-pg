@@ -526,7 +526,11 @@ These are the PgBouncer options you can customize, with links to the PgBouncer
 documentation for each parameter. Unless stated otherwise, the default values
 are the ones directly set by PgBouncer.
 
-- [`auth_type`](https://www.pgbouncer.org/config.html#auth_type)
+- [`auth_type`](https://www.pgbouncer.org/config.html#auth_type): the default,
+  `hba`, resolves each client's authentication method from the Pooler's own
+  `.spec.pgbouncer.pg_hba` list (not to be confused with the `Cluster`'s
+  `.spec.postgresql.pg_hba`, which governs PostgreSQL's own client
+  authentication).
 - [`auth_user`](https://www.pgbouncer.org/config.html#auth_user): overrides the
   user PgBouncer connects with to run the authentication query. By default it is
   derived from the auth query secret (the `username` key for basic-auth secrets,
@@ -562,6 +566,11 @@ are the ones directly set by PgBouncer.
   Without this mapping, the auth_query connection will fail authentication
   once `auth_user` no longer matches the certificate identity recognized by
   the fixed rules.
+
+  PgBouncer only consults `auth_query`/`auth_user` when the client-facing
+  method resolved by `auth_type` is password-based (`md5`/`scram`); with a
+  `peer`, `cert`, or `trust` rule in the Pooler's own `pg_hba`, the override
+  has no effect for that client.
 - [`application_name_add_host`](https://www.pgbouncer.org/config.html#application_name_add_host)
 - [`autodb_idle_timeout`](https://www.pgbouncer.org/config.html#autodb_idle_timeout)
 - [`cancel_wait_timeout`](https://www.pgbouncer.org/config.html#cancel_wait_timeout)
