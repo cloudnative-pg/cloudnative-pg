@@ -107,4 +107,14 @@ var _ = Describe("BuildConfigurationFiles", func() {
 		Expect(strings.Count(ini, "auth_user")).To(Equal(1))
 		Expect(ini).ToNot(ContainSubstring("auth_user = \n"))
 	})
+
+	It("escapes double quotes in the auth_user override for userlist.txt", func() {
+		files, err := BuildConfigurationFiles(
+			newPooler(map[string]string{"auth_user": `pg"bouncer`}),
+			newSecrets(),
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(string(files[userListPath])).To(ContainSubstring(`"pg""bouncer" "test-password"`))
+	})
 })

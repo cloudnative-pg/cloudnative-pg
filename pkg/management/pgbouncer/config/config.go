@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
@@ -169,7 +168,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		switch authQuerySecretType {
 		case corev1.SecretTypeBasicAuth:
 			authQueryUser = string(authQuerySecret.Data["username"])
-			authQueryPassword = strings.ReplaceAll(string(authQuerySecret.Data["password"]), "\"", "\"\"")
+			authQueryPassword = escapePgBouncerUserListValue(string(authQuerySecret.Data["password"]))
 
 		case corev1.SecretTypeTLS:
 			keyPair, err := certs.ParseServerSecret(authQuerySecret)
@@ -209,6 +208,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		authQueryUser = explicitAuthUser
 	}
 	delete(parameters, "auth_user")
+	authQueryUser = escapePgBouncerUserListValue(authQueryUser)
 
 	if secrets.ServerTLS != nil {
 		parameters["server_tls_cert_file"] = serverTLSCertPath
