@@ -112,6 +112,11 @@ metadata:
 spec:
   instances: 3
 
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   bootstrap:
     initdb:
       import:
@@ -206,6 +211,12 @@ metadata:
   name: cluster-monolith
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   bootstrap:
     initdb:
       import:
