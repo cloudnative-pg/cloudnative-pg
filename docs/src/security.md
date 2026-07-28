@@ -316,6 +316,15 @@ by the same actor who can write the Cluster, so it is not a security boundary.
 Kubernetes admission control still applies to the resulting Pods regardless of
 this annotation.
 
+A similar consideration applies to the `Pooler` resource: its `authQuery`
+field accepts arbitrary SQL that PgBouncer runs against the `postgres`
+database to authenticate client connections, and the `auth_user` parameter (see
+[Connection Pooling](connection_pooling.md#pgbouncer-configuration-options))
+selects the role that query runs as. Write access to a `Pooler` therefore
+already implies the ability to run arbitrary SQL as any role for which
+PostgreSQL authentication succeeds, and deserves the same care as write
+access to the `Cluster` resource.
+
 Treat write access to these resources as a high-privilege grant: for
 multi-tenant deployments, isolate tenants in separate namespaces and scope it
 per namespace with Kubernetes RBAC, relying on
