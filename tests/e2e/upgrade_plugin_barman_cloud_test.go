@@ -52,7 +52,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -96,8 +95,8 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 		configName              = "cnpg-controller-manager-config"
 		currentOperatorManifest = fixturesDir + "/upgrade/current-manifest.yaml"
 		primeOperatorManifest   = fixturesDir + "/upgrade/current-manifest-prime.yaml"
-		rollingUpgradeNamespace = "rolling-upgrade"
-		onlineUpgradeNamespace  = "online-upgrade"
+		rollingUpgradeNamespace = "rolling-upgrade-with-plugin-barman-cloud"
+		onlineUpgradeNamespace  = "online-upgrade-with-plugin-barman-cloud"
 
 		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml"
 
@@ -496,31 +495,16 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 		// generate random serverNames for the clusters each time
 		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
 		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
-		// Each cluster gets its own ObjectStore/bucket, named after the
+		// Both clusters share a single ObjectStore, named after the
 		// namespace (already unique) so runs never collide on the shared
-		// object store.
-		objectStoreName1 := upgradeNamespace + "-" + serverName1
-		objectStoreName2 := upgradeNamespace + "-" + serverName2
-		setupPluginObjectStore(upgradeNamespace, objectStoreName1)
-		setupPluginObjectStore(upgradeNamespace, objectStoreName2)
+		// object store. barman-cloud keys data by serverName within the
+		// bucket, so distinct serverNames are enough to keep cluster1 and
+		// cluster2 isolated without needing separate ObjectStores.
+		objectStoreName := upgradeNamespace
+		setupPluginObjectStore(upgradeNamespace, objectStoreName)
 		// Create the secrets used by the clusters and the object store
 		By("creating the postgres secrets", func() {
 			resources.CreateResourceFromFile(env, upgradeNamespace, pgSecrets)
-		})
-		By("creating the cloud storage credentials", func() {
-			_, err := secrets.CreateObjectStorageSecret(
-				env.Ctx,
-				env.Client,
-				upgradeNamespace,
-				"aws-creds",
-				objectstore.AccessKeyID,
-				objectstore.SecretAccessKey,
-			)
-			Expect(err).NotTo(HaveOccurred())
-		})
-		By("create the certificates for the object store", func() {
-			err := objectStoreEnv.CreateCaSecret(env, upgradeNamespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 		// Create the cluster. Since it will take a while, we'll do more stuff
 		// in parallel and check for it to be up later.
@@ -529,7 +513,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName1)
 			Expect(err).ToNot(HaveOccurred())
-			err = os.Setenv("OBJECT_STORE_NAME", objectStoreName1)
+			err = os.Setenv("OBJECT_STORE_NAME", objectStoreName)
 			Expect(err).ToNot(HaveOccurred())
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile)
 
@@ -712,7 +696,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName2)
 			Expect(err).ToNot(HaveOccurred())
-			err = os.Setenv("OBJECT_STORE_NAME", objectStoreName2)
+			err = os.Setenv("OBJECT_STORE_NAME", objectStoreName)
 			Expect(err).ToNot(HaveOccurred())
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile2)
 			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady])
@@ -734,7 +718,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 			// overwritten with cluster2's values above).
 			err := os.Setenv("RECOVERY_SERVER_NAME", serverName1)
 			Expect(err).ToNot(HaveOccurred())
-			err = os.Setenv("RECOVERY_OBJECT_STORE_NAME", objectStoreName1)
+			err = os.Setenv("RECOVERY_OBJECT_STORE_NAME", objectStoreName)
 			Expect(err).ToNot(HaveOccurred())
 			resources.CreateResourceFromFile(env, upgradeNamespace, restoreFile)
 			clusterasserts.AssertClusterIsReady(
