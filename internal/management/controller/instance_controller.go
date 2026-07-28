@@ -1097,12 +1097,29 @@ func (r *InstanceReconciler) reconcilePostgreSQLAutoConfFilePermissions(ctx cont
 // If `.check-empty-wal-archive` is present, the WAL archiver verifies
 // that the backup object store is empty.
 // The file is created immediately after initdb and removed after the
-// first WAL is archived
+// first WAL is archived by a configured archiver. While the cluster has
+// no WAL archiver, the file is kept in place (and re-created if needed)
+// so that an archiver enabled later still runs the empty-archive check.
 func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster) error {
 	filePath := filepath.Join(r.instance.PgData, constants.CheckEmptyWalArchiveFile)
+
+	if !cluster.HasPotentialWALArchiver() {
+		exists, err := fileutils.FileExists(filePath)
+		if err != nil || exists {
+			return err
+		}
+		return fileutils.CreateEmptyFile(filePath)
+	}
+
 	for _, condition := range cluster.Status.Conditions {
-		// If our current condition is archiving we can delete the file
-		if condition.Type == string(apiv1.ConditionContinuousArchiving) && condition.Status == metav1.ConditionTrue {
+		// Only a successful archiving performed by a real archiver consumes
+		// the file: the no-op success reported by archiver-less clusters
+		// (ConditionReasonContinuousArchivingNotConfigured) must not, or a
+		// stale condition would disarm the check right after an archiver
+		// is added, before its first archiving attempt.
+		if condition.Type == string(apiv1.ConditionContinuousArchiving) &&
+			condition.Status == metav1.ConditionTrue &&
+			condition.Reason == string(apiv1.ConditionReasonContinuousArchivingSuccess) {
 			return fileutils.RemoveFile(filePath)
 		}
 	}

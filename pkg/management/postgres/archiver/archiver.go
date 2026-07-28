@@ -302,8 +302,9 @@ func archiveWALViaPlugins(
 	}
 
 	// The marker file is ours to manage (created after bootstrap, removed
-	// once the first WAL archives), so we resolve the full decision here
-	// rather than asking the plugin to inspect it too.
+	// once a configured archiver reports its first archiving success), so we
+	// resolve the full decision here rather than asking the plugin to inspect
+	// it too.
 	checkEmptyWalArchive := shouldCheckEmptyWalArchive(ctx, cluster, pgData)
 
 	return client.ArchiveWAL(ctx, cluster, postgres.BuildWALPath(pgData, walName), checkEmptyWalArchive)
