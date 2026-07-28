@@ -421,6 +421,136 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(state2.IP).To(Equal("192.168.1.2"))
 	})
 
+	It("preserves the entry of a previously-reporting instance that goes silent", func(ctx SpecContext) {
+		statusErr := fmt.Errorf("status endpoint failing")
+
+		firstPass := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary:  false,
+					TimeLineID: 123,
+				},
+			},
+		}
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, firstPass)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+
+		// pod-1 goes silent (its probe fails) but is still present in the
+		// cluster (it appears in this pass's Items, ready and unreachable),
+		// while pod-2 keeps reporting normally.
+		secondPass := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPodReady: true,
+					Error:      statusErr,
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary:  false,
+					TimeLineID: 456,
+				},
+			},
+		}
+		err = env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, secondPass)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+
+		// pod-1's entry is untouched: still the last known good observation,
+		// not zeroed out because its current probe failed.
+		state1 := cluster.Status.InstancesReportedState["pod-1"]
+		Expect(state1.IsPrimary).To(BeTrue())
+		Expect(state1.TimeLineID).To(Equal(123))
+		Expect(state1.IP).To(Equal("192.168.1.1"))
+
+		// pod-2 keeps being refreshed normally.
+		state2 := cluster.Status.InstancesReportedState["pod-2"]
+		Expect(state2.TimeLineID).To(Equal(456))
+	})
+
+	It("removes the entry of an instance that no longer belongs to the cluster", func(ctx SpecContext) {
+		firstPass := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary:  false,
+					TimeLineID: 123,
+				},
+			},
+		}
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, firstPass)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+
+		// The cluster is scaled down: pod-2 no longer appears at all, not
+		// even as a silent entry.
+		secondPass := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+				},
+			},
+		}
+		err = env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, secondPass)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.InstancesReportedState).To(HaveLen(1))
+		Expect(cluster.Status.InstancesReportedState).To(HaveKey(apiv1.PodName("pod-1")))
+		Expect(cluster.Status.InstancesReportedState).ToNot(HaveKey(apiv1.PodName("pod-2")))
+	})
+
+	It("does not create an entry for an instance whose first-ever observation is silent", func(ctx SpecContext) {
+		statusErr := fmt.Errorf("status endpoint failing")
+
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPodReady: true,
+					Error:      statusErr,
+				},
+			},
+		}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.InstancesReportedState).ToNot(HaveKey(apiv1.PodName("pod-1")))
+	})
+
 	Context("Pod termination reason detection", func() {
 		It("should detect when a pod has no PostgreSQL container", func() {
 			pod := &corev1.Pod{
