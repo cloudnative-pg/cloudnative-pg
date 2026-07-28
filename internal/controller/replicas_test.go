@@ -277,7 +277,13 @@ var _ = Describe("markOldPrimaryAsUnhealthy", func() {
 	})
 })
 
-var _ = Describe("Check pods not on primary node", func() {
+var _ = Describe("Check schedulable pods not on primary node", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
 	item1 := postgres.PostgresqlStatus{
 		IsPrimary: false,
 		Node:      "node-1",
@@ -292,13 +298,54 @@ var _ = Describe("Check pods not on primary node", func() {
 	statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
 
 	It("if primary is nil", func() {
-		Expect(GetPodsNotOnPrimaryNode(statusList, nil).Items).To(BeEmpty())
+		ctx := context.Background()
+		Expect(env.clusterReconciler.getSchedulablePodsNotOnPrimaryNode(ctx, statusList, nil).Items).To(BeEmpty())
 	})
 
 	item1.IsPrimary = true
 	statusList2 := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
 
 	It("first status element is primary", func() {
-		Expect(GetPodsNotOnPrimaryNode(statusList2, &statusList2.Items[0]).Items).ToNot(BeEmpty())
+		ctx := context.Background()
+		Expect(env.clusterReconciler.getSchedulablePodsNotOnPrimaryNode(ctx, statusList2, &statusList2.Items[0]).Items).
+			ToNot(BeEmpty())
+	})
+
+	It("excludes pods on unschedulable nodes", func() {
+		ctx := context.Background()
+
+		primaryNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "primary-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		cordonedNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "cordoned-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
+		Expect(env.client.Create(ctx, &cordonedNode)).To(Succeed())
+
+		primary := postgres.PostgresqlStatus{
+			IsPrimary: true,
+			Node:      "primary-node",
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-primary"}},
+		}
+		onCordonedNode := postgres.PostgresqlStatus{
+			IsPrimary: false,
+			Node:      "cordoned-node",
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-cordoned"}},
+		}
+		onMissingNode := postgres.PostgresqlStatus{
+			IsPrimary: false,
+			Node:      "missing-node",
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-missing-node"}},
+		}
+		list := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{primary, onCordonedNode, onMissingNode},
+		}
+
+		result := env.clusterReconciler.getSchedulablePodsNotOnPrimaryNode(ctx, list, &primary)
+		Expect(result.Items).To(HaveLen(1))
+		Expect(result.Items[0].Pod.Name).To(Equal("pod-missing-node"))
 	})
 })

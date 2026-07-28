@@ -270,8 +270,8 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	// Checking failed pods, e.g. pending pods due to missing PVCs
 	_, hasFailedPods := cluster.Status.InstancesStatus[apiv1.PodFailed]
 
-	// Checking whether there are pods on other nodes
-	podsOnOtherNodes := GetPodsNotOnPrimaryNode(status, primaryPod)
+	// Checking whether there are pods on other, schedulable nodes
+	podsOnSchedulableNodes := r.getSchedulablePodsNotOnPrimaryNode(ctx, status, primaryPod)
 
 	// If no failed pods are found, but not all instances are ready or not all replicas have been moved to a
 	// schedulable instance, wait, because something is in progress
@@ -279,10 +279,10 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 		// e.g an instance is being joined
 		(cluster.Spec.Instances != cluster.Status.ReadyInstances ||
 			// e.g. we want all instances to be moved to a schedulable node before triggering the switchover
-			len(podsOnOtherNodes.Items) < cluster.Spec.Instances-1) {
+			len(podsOnSchedulableNodes.Items) < cluster.Spec.Instances-1) {
 		contextLogger.Info("Current primary is running on unschedulable node and something is already in progress",
 			"currentPrimary", primaryPod.Pod.Name,
-			"podsOnOtherNodes", len(podsOnOtherNodes.Items),
+			"podsOnSchedulableNodes", len(podsOnSchedulableNodes.Items),
 			"instances", cluster.Spec.Instances,
 			"readyInstances", cluster.Status.ReadyInstances,
 			"primaryNode", primaryPod.Node)
@@ -296,12 +296,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	// be moved between nodes, e.g. local-path-provisioner on Kind.
 
 	// Start looking for the next primary among the pods
-	for _, candidate := range podsOnOtherNodes.Items {
-		// If candidate on an unschedulable node too, skip it
-		if status, _ := r.isNodeUnschedulableOrBeingDrained(ctx, candidate.Node); status {
-			continue
-		}
-
+	for _, candidate := range podsOnSchedulableNodes.Items {
 		if !utils.IsPodReady(*candidate.Pod) {
 			continue
 		}
@@ -391,8 +386,10 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
 }
 
-// GetPodsNotOnPrimaryNode filters out only pods that are not on the same node as the primary one
-func GetPodsNotOnPrimaryNode(
+// getSchedulablePodsNotOnPrimaryNode filters out only pods that are not on the same node as the
+// primary one and are not themselves running on an unschedulable or draining node.
+func (r *ClusterReconciler) getSchedulablePodsNotOnPrimaryNode(
+	ctx context.Context,
 	status postgres.PostgresqlStatusList,
 	primaryPod *postgres.PostgresqlStatus,
 ) postgres.PostgresqlStatusList {
@@ -404,9 +401,13 @@ func GetPodsNotOnPrimaryNode(
 		return podsOnOtherNodes
 	}
 	for _, candidate := range status.Items {
-		if candidate.Pod.Name != primaryPod.Pod.Name && candidate.Node != primaryPod.Node {
-			podsOnOtherNodes.Items = append(podsOnOtherNodes.Items, candidate)
+		if candidate.Pod.Name == primaryPod.Pod.Name || candidate.Node == primaryPod.Node {
+			continue
 		}
+		if unschedulable, _ := r.isNodeUnschedulableOrBeingDrained(ctx, candidate.Node); unschedulable {
+			continue
+		}
+		podsOnOtherNodes.Items = append(podsOnOtherNodes.Items, candidate)
 	}
 	return podsOnOtherNodes
 }
