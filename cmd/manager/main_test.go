@@ -48,6 +48,13 @@ var _ = Describe("logging options of the manager subcommands", func() {
 		Expect(loggingOptions(runCmd)).To(HaveLen(1))
 	})
 
+	It("disables log sampling three levels below the root command", func() {
+		root := newRootCmd()
+		executeCmd, _, err := root.Find([]string{"instance", "upgrade", "execute"})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(loggingOptions(executeCmd)).To(HaveLen(1))
+	})
+
 	It("configures unsampled logging when running a pod-facing subcommand", func() {
 		// must exceed the 100 msgs/s initial-pass threshold of the sampler
 		// installed by the controller-runtime zap builder
