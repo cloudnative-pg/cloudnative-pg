@@ -37,6 +37,17 @@ controller will initiate the failover process, in two steps:
     and the replicas.
 :::
 
+To decide whether a standby's WAL receiver has actually stopped, the operator
+needs to hear back from that standby. If the operator's status probe to a
+standby fails while Kubernetes still reports its pod as `Ready`, the operator
+cannot tell whether the WAL receiver is really down or the pod is simply
+unreachable, so it conservatively assumes the WAL receiver might still be
+running and defers the election, raising a `WalReceiverStatusUnknown` event
+naming the affected pod(s). Once Kubernetes stops reporting the pod as
+`Ready` (bounded by `.spec.livenessProbeTimeout`), the standby is treated as
+down, since a genuinely dead pod cannot still be streaming and blocking on it
+would stall failover after an actual node failure.
+
 During the time the failing primary is being shut down:
 
 1. It will first try a PostgreSQL's *fast shutdown* with
