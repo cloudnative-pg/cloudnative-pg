@@ -325,20 +325,54 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	return list.Items[i].Pod.Name < list.Items[j].Pod.Name
 }
 
-// AreWalReceiversDown checks if every WAL receiver of the cluster is down
+// AreWalReceiversDown checks if every WAL receiver of the cluster is down,
 // ignoring the status of the primary, that does not matter during
-// a switchover or a failover
-func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) bool {
+// a switchover or a failover.
+//
+// A standby whose /pg/status call errored is not automatically treated as
+// "receiver down": if kubelet still reports the pod Ready, the operator has
+// no way to tell whether the WAL receiver is actually down or it simply lost
+// connectivity to the pod, so the standby is conservatively assumed to still
+// be streaming and the gate blocks (mirroring the primary-side guard in
+// evaluatePodReadinessGuards, which trusts kubelet readiness over a failing
+// probe). Only once kubelet stops reporting the pod as Ready is it treated
+// as down, since a dead standby cannot be streaming and blocking on it would
+// stall failovers triggered by an actual node failure.
+//
+// The second return value lists the names of the standbys whose WAL
+// receiver status is unknown (errored but still Ready) and are therefore
+// the reason the gate is blocked; it is empty whenever the gate is not
+// blocked for this reason.
+func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) (bool, []string) {
+	var unknownStandbys []string
+
 	for idx := range list.Items {
-		if list.Items[idx].Pod.Name == primaryName {
+		item := &list.Items[idx]
+		if item.Pod.Name == primaryName {
 			continue
 		}
-		if list.Items[idx].IsWalReceiverActive {
-			return false
+
+		if item.Error != nil {
+			if item.IsPodReady {
+				// Unreachable, not confirmed down: kubelet says the pod is
+				// alive, we just could not query it.
+				unknownStandbys = append(unknownStandbys, item.Pod.Name)
+			}
+			// Errored and not Ready: kubelet says the pod is gone, so its
+			// WAL receiver cannot possibly still be streaming.
+			continue
+		}
+
+		if item.IsWalReceiverActive {
+			return false, nil
 		}
 	}
 
-	return true
+	if len(unknownStandbys) > 0 {
+		return false, unknownStandbys
+	}
+
+	return true, nil
 }
 
 // IsPodReporting if a pod is ready
