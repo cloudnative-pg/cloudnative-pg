@@ -236,6 +236,10 @@ This gives you the flexibility — and responsibility — to manage the
 authentication process yourself. You can follow the instructions above to
 replicate similar behavior to the default setup.
 
+If PgBouncer needs to authenticate as a different user than the one derived
+from your secret, you can override it with the `auth_user` parameter (see
+[PgBouncer configuration options](#pgbouncer-configuration-options)).
+
 ## Pod templates
 
 
@@ -406,7 +410,51 @@ These are the PgBouncer options you can customize, with links to the PgBouncer
 documentation for each parameter. Unless stated otherwise, the default values
 are the ones directly set by PgBouncer.
 
-- [`auth_type`](https://www.pgbouncer.org/config.html#auth_type)
+- [`auth_type`](https://www.pgbouncer.org/config.html#auth_type): the default,
+  `hba`, resolves each client's authentication method from the Pooler's own
+  `.spec.pgbouncer.pg_hba` list (not to be confused with the `Cluster`'s
+  `.spec.postgresql.pg_hba`, which governs PostgreSQL's own client
+  authentication).
+- [`auth_user`](https://www.pgbouncer.org/config.html#auth_user): overrides the
+  user PgBouncer connects with to run the authentication query. By default it is
+  derived from the auth query secret (the `username` key for basic-auth secrets,
+  the certificate common name for TLS secrets). Setting it is meant for setups
+  with a custom `authQuerySecret`, since the built-in integration provisions
+  everything for the default `cnpg_pooler_pgbouncer` user; with a basic-auth
+  secret only the username changes. PgBouncer still uses the secret's password
+  field to authenticate its own auth_query connection, so that field must
+  contain the actual PostgreSQL password for the overridden `auth_user` role,
+  not the password of the secret's original username. An empty value is
+  ignored. Once you customize the `auth_user`, ensure that the
+  user exists in PostgreSQL and has the necessary privileges to run the
+  `auth_query` (see ["Authentication"](#authentication)).
+
+  If the auth query secret is certificate-based, overriding `auth_user` only
+  changes the role PgBouncer requests during the auth query; it does not
+  change the certificate PgBouncer presents. The operator's built-in
+  `pg_hba`/`pg_ident` rules only match the literal `cnpg_pooler_pgbouncer`
+  user, so a custom `auth_user` needs its own `pg_hba` rule and a matching
+  `pg_ident` entry on the `Cluster` to map the certificate's common name to
+  the new role (see the [`pg_hba`](postgresql_conf.md#the-pg_hba-section) and
+  [`pg_ident`](postgresql_conf.md#the-pg_ident-section) sections), for
+  example:
+
+  ```yaml
+  postgresql:
+    pg_ident:
+      - poolermap pooler-client-cn pgbouncer
+    pg_hba:
+      - hostssl all pgbouncer all cert map=poolermap
+  ```
+
+  Without this mapping, the auth_query connection will fail authentication
+  once `auth_user` no longer matches the certificate identity recognized by
+  the fixed rules.
+
+  PgBouncer only consults `auth_query`/`auth_user` when the client-facing
+  method resolved by `auth_type` is password-based (`md5`/`scram`); with a
+  `peer`, `cert`, or `trust` rule in the Pooler's own `pg_hba`, the override
+  has no effect for that client.
 - [`application_name_add_host`](https://www.pgbouncer.org/config.html#application_name_add_host)
 - [`autodb_idle_timeout`](https://www.pgbouncer.org/config.html#autodb_idle_timeout)
 - [`cancel_wait_timeout`](https://www.pgbouncer.org/config.html#cancel_wait_timeout)

@@ -138,4 +138,15 @@ var _ = Describe("Pooler validation", func() {
 		}
 		Expect(v.validatePgbouncerGenericParameters(pooler)).To(BeEmpty())
 	})
+
+	It("does not complain when overriding auth_user", func() {
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
+					Parameters: map[string]string{"auth_user": "pgbouncer"},
+				},
+			},
+		}
+		Expect(v.validatePgbouncerGenericParameters(pooler)).To(BeEmpty())
+	})
 })

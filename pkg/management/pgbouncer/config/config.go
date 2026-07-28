@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
@@ -169,7 +168,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		switch authQuerySecretType {
 		case corev1.SecretTypeBasicAuth:
 			authQueryUser = string(authQuerySecret.Data["username"])
-			authQueryPassword = strings.ReplaceAll(string(authQuerySecret.Data["password"]), "\"", "\"\"")
+			authQueryPassword = escapePgBouncerUserListValue(string(authQuerySecret.Data["password"]))
 
 		case corev1.SecretTypeTLS:
 			keyPair, err := certs.ParseServerSecret(authQuerySecret)
@@ -193,6 +192,16 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	}
 
 	parameters := buildPgBouncerParameters(pooler.Spec.PgBouncer.Parameters)
+
+	// auth_user has its own slot in the pgbouncer.ini template, so an override
+	// is applied to that value and the key is removed from the generic
+	// parameters block to avoid emitting the setting twice. An empty value is
+	// ignored so it cannot blank the user derived from the auth query secret.
+	if explicitAuthUser := parameters["auth_user"]; explicitAuthUser != "" {
+		authQueryUser = explicitAuthUser
+	}
+	delete(parameters, "auth_user")
+	authQueryUser = escapePgBouncerUserListValue(authQueryUser)
 
 	if isCertAuth {
 		parameters["server_tls_cert_file"] = authUserCrtPath
