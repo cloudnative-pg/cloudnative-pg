@@ -81,15 +81,16 @@ To check the soundness of the upgrade, on each of the four scenarios:
 
 * We test changing the configuration. That will induce a switchover.
 * A Backup created with the initial version is still there after upgrade, and
-  can be used to bootstrap a cluster.
+  can be used to bootstrap a cluster - using plugin-barman-cloud.
 * A ScheduledBackup created with the initial version is still scheduled
-  after the upgrade.
+  after the upgrade - using plugin-barman-cloud.
 * All the cluster pods should have their instance manager updated.
 
 */
 
-//nolint:dupl
-var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), Ordered, Serial, func() {
+//nolint:dupl // TODO: remove once in-tree counterpart is removed
+var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, tests.LabelPluginBarmanCloud,
+	tests.LabelNoOpenshift), Ordered, Serial, func() {
 	const (
 		operatorNamespace       = "cnpg-system"
 		configName              = "cnpg-controller-manager-config"
@@ -100,24 +101,26 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml"
 
+		pluginFixturesDir = fixturesDir + "/upgrade/plugin-barman-cloud"
+
 		// This is a cluster of the previous version, created before the operator upgrade
-		clusterName1     = "cluster1"
-		sampleFile       = fixturesDir + "/upgrade/cluster1.yaml.template"
-		objectStorePath1 = "cluster-full-backup"
+		clusterName1 = "cluster1"
+		sampleFile   = pluginFixturesDir + "/cluster1.yaml.template"
 
 		// This is a cluster of the previous version, created after the operator upgrade
-		clusterName2     = "cluster2"
-		sampleFile2      = fixturesDir + "/upgrade/cluster2.yaml.template"
-		objectStorePath2 = "cluster2-full-backup"
+		clusterName2 = "cluster2"
+		sampleFile2  = pluginFixturesDir + "/cluster2.yaml.template"
 
 		backupName          = "cluster-backup"
-		backupFile          = fixturesDir + "/upgrade/backup1.yaml"
-		restoreFile         = fixturesDir + "/upgrade/cluster-restore.yaml.template"
-		scheduledBackupFile = fixturesDir + "/upgrade/scheduled-backup.yaml"
+		backupFile          = pluginFixturesDir + "/backup-1.yaml"
+		restoreFile         = pluginFixturesDir + "/cluster-restore.yaml.template"
+		scheduledBackupFile = pluginFixturesDir + "/scheduled-backup.yaml"
 
 		pgBouncerSampleFile = fixturesDir + "/upgrade/pgbouncer.yaml"
 		pgBouncerName       = "pgbouncer"
 		level               = tests.Lowest
+
+		barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
 	)
 
 	BeforeAll(func() {
@@ -424,14 +427,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
 		}
 
-		if _, err := objectstore.CleanFiles(objectStoreEnv, objectStorePath1); err != nil {
-			return fmt.Errorf("encountered an error while cleaning up the object store: %v", err)
-		}
-
-		if _, err := objectstore.CleanFiles(objectStoreEnv, objectStorePath2); err != nil {
-			return fmt.Errorf("encountered an error while cleaning up the object store: %v", err)
-		}
-
 		GinkgoWriter.Println("cleaning up done")
 		return nil
 	}
@@ -501,6 +496,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// generate random serverNames for the clusters each time
 		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
 		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
+		// Each cluster gets its own ObjectStore/bucket, named after the
+		// namespace (already unique) so runs never collide on the shared
+		// object store.
+		objectStoreName1 := upgradeNamespace + "-" + serverName1
+		objectStoreName2 := upgradeNamespace + "-" + serverName2
+		setupPluginObjectStore(upgradeNamespace, objectStoreName1)
+		setupPluginObjectStore(upgradeNamespace, objectStoreName2)
 		// Create the secrets used by the clusters and the object store
 		By("creating the postgres secrets", func() {
 			resources.CreateResourceFromFile(env, upgradeNamespace, pgSecrets)
@@ -527,6 +529,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName1)
 			Expect(err).ToNot(HaveOccurred())
+			err = os.Setenv("OBJECT_STORE_NAME", objectStoreName1)
+			Expect(err).ToNot(HaveOccurred())
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile)
 
 			if online {
@@ -552,6 +556,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// Cluster ready happens after the object store is ready
 		By("having a Cluster with three instances ready", func() {
 			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName1, testTimeouts[timeouts.ClusterIsReady])
+		})
+
+		assertPluginLoaded := func(clusterName string) {
+			clusterasserts.AssertPluginLoaded(env, upgradeNamespace, clusterName,
+				barmanCloudPluginName, 120)
+		}
+		By("verifying the plugin is loaded before the upgrade", func() {
+			assertPluginLoaded(clusterName1)
 		})
 
 		By("creating a Pooler with two instances", func() {
@@ -662,6 +674,18 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName1, 300)
 
+		By("verifying the plugin is loaded after the upgrade", func() {
+			assertPluginLoaded(clusterName1)
+		})
+
+		By("verifying WAL archiving still works after the upgrade", func() {
+			// Switch a WAL after the upgrade and require it to reach the
+			// object store: the archiving condition on the cluster may still
+			// reflect pre-upgrade activity, so it is not enough here.
+			objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+				upgradeNamespace, clusterName1, serverName1)
+		})
+
 		// the instance pods should not restart
 		By("verifying that the instance pods are not restarted", func() {
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, upgradeNamespace, clusterName1)
@@ -688,8 +712,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName2)
 			Expect(err).ToNot(HaveOccurred())
+			err = os.Setenv("OBJECT_STORE_NAME", objectStoreName2)
+			Expect(err).ToNot(HaveOccurred())
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile2)
 			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady])
+		})
+
+		By("verifying the plugin is loaded on the second cluster", func() {
+			assertPluginLoaded(clusterName2)
 		})
 
 		AssertConfUpgrade(clusterName2, upgradeNamespace)
@@ -698,6 +728,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// create a v1 cluster
 		By("restoring the backup taken from the first Cluster in a new cluster", func() {
 			restoredClusterName := "cluster-restore"
+			// The restore fixture recovers from cluster1 specifically, so it
+			// needs cluster1's own serverName/ObjectStore, not whatever
+			// SERVER_NAME/OBJECT_STORE_NAME currently hold (they were
+			// overwritten with cluster2's values above).
+			err := os.Setenv("RECOVERY_SERVER_NAME", serverName1)
+			Expect(err).ToNot(HaveOccurred())
+			err = os.Setenv("RECOVERY_OBJECT_STORE_NAME", objectStoreName1)
+			Expect(err).ToNot(HaveOccurred())
 			resources.CreateResourceFromFile(env, upgradeNamespace, restoreFile)
 			clusterasserts.AssertClusterIsReady(
 				env,
@@ -705,6 +743,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				restoredClusterName,
 				testTimeouts[timeouts.ClusterIsReadySlow],
 			)
+
+			// The restored cluster only references the plugin through its
+			// externalClusters recovery source (no spec.plugins entry), but
+			// getPluginsNeededForReconcile loads plugins from both, so the
+			// plugin is still expected to show up in its status.
+			assertPluginLoaded(restoredClusterName)
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"
@@ -806,6 +850,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
 			DeferCleanup(cleanupOperatorAndObjectStore)
 
+			By("installing cert-manager and the Barman Cloud plugin", func() {
+				_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
+				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+			})
+
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest, false)
 		})
@@ -822,6 +871,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
 			DeferCleanup(cleanupOperatorAndObjectStore)
+
+			By("installing cert-manager and the Barman Cloud plugin", func() {
+				_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
+				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+			})
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest, true)
@@ -844,6 +898,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			deployOperator(currentOperatorManifest)
 			DeferCleanup(cleanupOperatorAndObjectStore)
 
+			By("installing cert-manager and the Barman Cloud plugin", func() {
+				_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
+				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+			})
+
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, true)
 		})
@@ -856,6 +915,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
 			DeferCleanup(cleanupOperatorAndObjectStore)
+
+			By("installing cert-manager and the Barman Cloud plugin", func() {
+				_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
+				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+			})
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, false)
