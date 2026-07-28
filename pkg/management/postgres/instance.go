@@ -51,6 +51,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -856,6 +857,15 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 		rawPipe.GetExitedCondition().Wait()
 		jsonPipe.GetExitedCondition().Wait()
 	}()
+
+	// Wait for every reader to have its FIFO created here.
+	// To avoid the archive/restore command win the race and create
+	// a regular file at the log path first.
+	concurrency.MultipleExecuted{
+		csvPipe.GetInitializedCondition(),
+		rawPipe.GetExecutedCondition(),
+		jsonPipe.GetExecutedCondition(),
+	}.Wait()
 
 	err := instance.Startup()
 	if err != nil {
