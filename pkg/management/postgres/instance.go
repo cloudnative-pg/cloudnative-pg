@@ -310,9 +310,14 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 }
 
 // SetLogPipesReadyCondition records the conditions that indicate when the log-destination
-// FIFOs are ready. PGRewind waits on this condition as pg_rewind invokes restore_command.
+// FIFOs are ready.
 func (instance *Instance) SetLogPipesReadyCondition(conditions concurrency.MultipleExecuted) {
 	instance.logPipesReady = conditions
+}
+
+// WaitForLogPipesReady waits until the log-destination FIFOs are ready.
+func (instance *Instance) WaitForLogPipesReady() {
+	instance.logPipesReady.Wait()
 }
 
 // GetClusterOrDefault returns the cached cluster, or an empty cluster if not set.
@@ -1274,10 +1279,6 @@ func pgRewindShouldRetry(ctx context.Context, _ error) bool {
 // segment that was already recycled locally
 func (instance *Instance) Rewind(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
-
-	// pg_rewind invokes restore_command, wait for the log-destination FIFOs
-	// to be ready first here.
-	instance.logPipesReady.Wait()
 
 	// Signal the liveness probe that we are running pg_rewind before starting postgres
 	instance.PgRewindIsRunning = true

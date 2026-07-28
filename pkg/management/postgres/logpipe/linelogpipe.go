@@ -99,6 +99,11 @@ func (p *LineLogPipe) Start(ctx context.Context) error {
 	defer filenameLog.Info("Exited log pipe")
 	go func() {
 		defer p.exited.Broadcast()
+		// Broadcast the initialization error if the context is canceled before
+		// the initialization is done
+		defer func() {
+			p.initialized.BroadcastError(ctx.Err())
+		}()
 		for {
 			// If the context has been cancelled, let's avoid starting reading
 			// again from the log file

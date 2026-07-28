@@ -126,6 +126,9 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 				err, "Error while changing mode of the postgresql.auto.conf file before pg_rewind, skipped")
 		}
 
+		// Ensure the FIFO is created by logpipes before calling archive_command/restore_command
+		r.instance.WaitForLogPipesReady()
+
 		// We archive every WAL that have not been archived from the latest postmaster invocation.
 		if err := archiver.ArchiveAllReadyWALs(ctx, cluster, r.instance.PgData); err != nil {
 			var missingPluginError archiver.ErrMissingWALArchiverPlugin
