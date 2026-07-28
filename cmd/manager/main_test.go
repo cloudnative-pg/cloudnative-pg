@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
+	stdlog "log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,13 +53,20 @@ var _ = Describe("logging options of the manager subcommands", func() {
 		// installed by the controller-runtime zap builder
 		const burst = 300
 
-		// ConfigureLogging points the global loggers at this spec's
-		// destination file: restore them so later specs are not affected
+		// ConfigureLogging points the global loggers, including the stdlib
+		// "log" package, at this spec's destination file: restore them all
+		// so later specs are not affected
 		previousLogger := log.GetLogger().GetLogger()
+		previousStdLogOutput := stdlog.Writer()
+		previousStdLogFlags := stdlog.Flags()
+		previousStdLogPrefix := stdlog.Prefix()
 		DeferCleanup(func() {
 			log.SetLogger(previousLogger)
 			ctrl.SetLogger(previousLogger)
 			klog.SetLogger(previousLogger)
+			stdlog.SetOutput(previousStdLogOutput)
+			stdlog.SetFlags(previousStdLogFlags)
+			stdlog.SetPrefix(previousStdLogPrefix)
 		})
 
 		dest := filepath.Join(GinkgoT().TempDir(), "log")
