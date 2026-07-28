@@ -36,6 +36,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -747,8 +748,50 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 				Wait: true,
 			},
 		)
+		if errors.As(err, &exitError) {
+			contextLogger.Error(exitError, "Immediate shutdown also failed. Killing the PostgreSQL "+
+				"process group so the instance manager can exit and release the primary lease",
+				"exitCode", exitError.ExitCode())
+			if killErr := instance.killPostgresProcessGroup(ctx); killErr != nil {
+				contextLogger.Error(killErr, "While killing the PostgreSQL process group after a failed "+
+					"immediate shutdown")
+				return killErr
+			}
+			return nil
+		}
 	}
 	return err
+}
+
+// killPostgresProcessGroup sends SIGKILL to the whole process group of the running postmaster.
+// It is the last resort escalation after both a fast and an immediate pg_ctl stop have failed
+// to bring PostgreSQL down: at that point PostgreSQL is presumed unable to shut down on its own,
+// and the instance manager must exit regardless so that the primary lease it holds is released.
+//
+// The kill targets the process group, not just the postmaster PID: SIGKILLing a postmaster while
+// its backends survive is documented by PostgreSQL as a way to corrupt shared memory. Taking down
+// the whole group is safe here because the instance manager itself shares that group and is about
+// to exit, and kubelet will restart the container, tearing down the PID namespace regardless.
+func (instance *Instance) killPostgresProcessGroup(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
+	pidFile := path.Join(instance.PgData, PostgresqlPidFile)
+	_, postmasterPid, err := instance.GetPostmasterPidFromFile(pidFile)
+	if err != nil {
+		return fmt.Errorf("while reading the postmaster PID before killing the process group: %w", err)
+	}
+
+	pgid, err := syscall.Getpgid(postmasterPid)
+	if err != nil {
+		return fmt.Errorf("while resolving the process group of postmaster pid %d: %w", postmasterPid, err)
+	}
+
+	contextLogger.Info("Sending SIGKILL to the PostgreSQL process group", "pgid", pgid)
+	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
+		return fmt.Errorf("while sending SIGKILL to process group %d: %w", pgid, err)
+	}
+
+	return nil
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status
