@@ -368,6 +368,7 @@ type ClusterSpec struct {
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
 	// (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
+	// This budget covers the checkpoint that precedes the shutdown as well as the shutdown itself.
 	// +kubebuilder:default:=180
 	// +optional
 	SmartShutdownTimeout *int32 `json:"smartShutdownTimeout,omitempty"`
@@ -375,6 +376,7 @@ type ClusterSpec struct {
 	// The time in seconds that is allowed for a primary PostgreSQL instance
 	// to gracefully shutdown during a switchover.
 	// Default value is 3600 seconds (1 hour).
+	// This budget covers the checkpoint that precedes the shutdown as well as the shutdown itself.
 	// +kubebuilder:default:=3600
 	// +optional
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`

@@ -5942,6 +5942,7 @@ spec:
                   The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
                   Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
                   (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
+                  This budget covers the checkpoint that precedes the shutdown as well as the shutdown itself.
                 format: int32
                 type: integer
               startDelay:
@@ -6194,6 +6195,7 @@ spec:
                   The time in seconds that is allowed for a primary PostgreSQL instance
                   to gracefully shutdown during a switchover.
                   Default value is 3600 seconds (1 hour).
+                  This budget covers the checkpoint that precedes the shutdown as well as the shutdown itself.
                 format: int32
                 type: integer
               tablespaces:
