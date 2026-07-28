@@ -236,6 +236,16 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, nil
 	}
 
+	// The demotion of a former primary must not depend on PostgreSQL being reachable:
+	// this is precisely the path that shuts down an unresponsive PostgreSQL, so it is
+	// evaluated before the readiness gate below. reconcileOldPrimary no-ops immediately
+	// unless this instance is both the former primary and no longer the target one, and
+	// that decision only reads the data directory, not a live connection.
+	restarted, err := r.reconcileOldPrimary(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	if err := r.instance.IsReady(); err != nil {
 		contextLogger.Info("Instance is still down, will retry in 1 second")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
@@ -257,11 +267,6 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, err
 	} else if !result.IsZero() {
 		return result, nil
-	}
-
-	restarted, err := r.reconcileOldPrimary(ctx, cluster)
-	if err != nil {
-		return reconcile.Result{}, err
 	}
 
 	if r.IsDBUp(ctx) != nil {
