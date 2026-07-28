@@ -160,7 +160,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
 	// data that is being received (think about a switchover).
-	if down, unknownStandbys := status.AreWalReceiversDown(cluster.Status.CurrentPrimary); !down {
+	if down, unknownStandbys := status.Partition().AreWalReceiversDown(cluster.Status.CurrentPrimary); !down {
 		if len(unknownStandbys) > 0 {
 			r.Recorder.Eventf(cluster, "Warning", "WalReceiverStatusUnknown",
 				"Deferring failover: cannot confirm the WAL receiver is down on Ready standby(s) %v; "+
@@ -373,7 +373,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// but before doing that we need to wait for all the WAL receivers to be
 	// terminated. This is needed to avoid losing the WAL data that is being received
 	// (think about a switchover).
-	if down, unknownStandbys := status.AreWalReceiversDown(cluster.Status.CurrentPrimary); !down {
+	if down, unknownStandbys := status.Partition().AreWalReceiversDown(cluster.Status.CurrentPrimary); !down {
 		if len(unknownStandbys) > 0 {
 			r.Recorder.Eventf(cluster, "Warning", "WalReceiverStatusUnknown",
 				"Deferring failover: cannot confirm the WAL receiver is down on Ready standby(s) %v; "+

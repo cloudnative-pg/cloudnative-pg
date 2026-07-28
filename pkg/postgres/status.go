@@ -337,34 +337,19 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 // evaluatePodReadinessGuards, which trusts kubelet readiness over a failing
 // probe). Only once kubelet stops reporting the pod as Ready is it treated
 // as down, since a dead standby cannot be streaming and blocking on it would
-// stall failovers triggered by an actual node failure.
+// stall failovers triggered by an actual node failure. This is why the
+// method partitions its input first: reading IsWalReceiverActive off an
+// instance whose probe failed would silently read the Go zero value (false)
+// as an observation, and InstanceSet is what makes that unrepresentable.
 //
 // The second return value lists the names of the standbys whose WAL
 // receiver status is unknown (errored but still Ready) and are therefore
 // the reason the gate is blocked; it is empty whenever the gate is not
 // blocked for this reason.
-func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) (bool, []string) {
-	var unknownStandbys []string
-
-	for idx := range list.Items {
-		item := &list.Items[idx]
+func (set InstanceSet) AreWalReceiversDown(primaryName string) (bool, []string) {
+	for idx := range set.Reporting.Items {
+		item := &set.Reporting.Items[idx]
 		if item.Pod.Name == primaryName {
-			continue
-		}
-
-		if item.Error != nil {
-			if item.IsPodReady {
-				// Unreachable, not confirmed down: kubelet says the pod is
-				// alive, we just could not query it.
-				unknownStandbys = append(unknownStandbys, item.Pod.Name)
-			}
-			// Errored and not Ready: kubelet says the pod is gone, so its
-			// WAL receiver cannot possibly still be streaming. This extends
-			// to standbys the same kubelet-readiness convention already
-			// applied to the primary in evaluatePodReadinessGuards
-			// (internal/controller/cluster_controller.go); a liveness-probe
-			// failure gets kubelet to flip readiness off, which is what
-			// bounds how long the errored-but-Ready case above can block.
 			continue
 		}
 
@@ -372,6 +357,24 @@ func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) (bool, 
 			return false, nil
 		}
 	}
+
+	var unknownStandbys []string
+	for _, silent := range set.ReadyButSilent {
+		if silent.Pod.Name == primaryName {
+			continue
+		}
+		// Unreachable, not confirmed down: kubelet says the pod is alive,
+		// we just could not query it.
+		unknownStandbys = append(unknownStandbys, silent.Pod.Name)
+	}
+
+	// NotReady standbys are ignored here: kubelet says the pod is gone, so
+	// its WAL receiver cannot possibly still be streaming. This extends to
+	// standbys the same kubelet-readiness convention already applied to the
+	// primary in evaluatePodReadinessGuards
+	// (internal/controller/cluster_controller.go); a liveness-probe failure
+	// gets kubelet to flip readiness off, which is what bounds how long the
+	// ReadyButSilent case above can block.
 
 	if len(unknownStandbys) > 0 {
 		return false, unknownStandbys

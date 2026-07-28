@@ -308,7 +308,7 @@ var _ = Describe("AreWalReceiversDown", func() {
 			},
 		)
 
-		down, unknown := list.AreWalReceiversDown(primary.Pod.Name)
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
 		Expect(down).To(BeTrue())
 		Expect(unknown).To(BeEmpty())
 	})
@@ -322,7 +322,7 @@ var _ = Describe("AreWalReceiversDown", func() {
 			},
 		)
 
-		down, unknown := list.AreWalReceiversDown(primary.Pod.Name)
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
 		Expect(down).To(BeFalse())
 		Expect(unknown).To(BeEmpty())
 	})
@@ -337,7 +337,7 @@ var _ = Describe("AreWalReceiversDown", func() {
 			},
 		)
 
-		down, unknown := list.AreWalReceiversDown(primary.Pod.Name)
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
 		Expect(down).To(BeFalse())
 		Expect(unknown).To(ConsistOf("standby-1"))
 	})
@@ -352,7 +352,7 @@ var _ = Describe("AreWalReceiversDown", func() {
 			},
 		)
 
-		down, unknown := list.AreWalReceiversDown(primary.Pod.Name)
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
 		Expect(down).To(BeTrue())
 		Expect(unknown).To(BeEmpty())
 	})
@@ -371,7 +371,7 @@ var _ = Describe("AreWalReceiversDown", func() {
 			},
 		)
 
-		down, unknown := list.AreWalReceiversDown(primary.Pod.Name)
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
 		Expect(down).To(BeFalse())
 		Expect(unknown).To(ConsistOf("standby-unknown"))
 	})
@@ -390,7 +390,7 @@ var _ = Describe("AreWalReceiversDown", func() {
 			},
 		)
 
-		down, unknown := list.AreWalReceiversDown(primary.Pod.Name)
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
 		Expect(down).To(BeTrue())
 		Expect(unknown).To(BeEmpty())
 	})
@@ -417,7 +417,7 @@ var _ = Describe("AreWalReceiversDown", func() {
 			},
 		)
 
-		down, unknown := list.AreWalReceiversDown(primary.Pod.Name)
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
 		Expect(down).To(BeFalse())
 		Expect(unknown).To(ConsistOf("standby-ahead-unknown"))
 	})
