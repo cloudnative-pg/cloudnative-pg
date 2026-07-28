@@ -359,7 +359,12 @@ func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) (bool, 
 				unknownStandbys = append(unknownStandbys, item.Pod.Name)
 			}
 			// Errored and not Ready: kubelet says the pod is gone, so its
-			// WAL receiver cannot possibly still be streaming.
+			// WAL receiver cannot possibly still be streaming. This extends
+			// to standbys the same kubelet-readiness convention already
+			// applied to the primary in evaluatePodReadinessGuards
+			// (internal/controller/cluster_controller.go); a liveness-probe
+			// failure gets kubelet to flip readiness off, which is what
+			// bounds how long the errored-but-Ready case above can block.
 			continue
 		}
 
