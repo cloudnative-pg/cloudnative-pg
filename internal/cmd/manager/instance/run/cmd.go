@@ -333,6 +333,14 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
 	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
 
+	// Give Rewind the same log-pipe readiness conditions, so pg_rewind
+	// never races these readers for the log-destination FIFOs.
+	instance.SetLogPipesReadyCondition(concurrency.MultipleExecuted{
+		postgresLogPipe.GetInitializedCondition(),
+		rawPipe.GetExecutedCondition(),
+		jsonPipe.GetExecutedCondition(),
+	})
+
 	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
 		contextLogger.Error(err, "unable to move `pg_wal` directory to the attached volume")
 		return err
