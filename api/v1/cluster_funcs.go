@@ -1601,6 +1601,25 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 	return ""
 }
 
+// HasPotentialWALArchiver returns true when the cluster configuration includes
+// anything that could archive WAL files: the in-tree Barman Cloud object store
+// or any enabled CNPG-i plugin. Every enabled plugin counts as a potential
+// archiver, even without `isWALArchiver`, because the WAL archiving process
+// invokes all enabled plugins for backward compatibility.
+func (cluster *Cluster) HasPotentialWALArchiver() bool {
+	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
+		return true
+	}
+
+	for _, plugin := range cluster.Spec.Plugins {
+		if plugin.IsEnabled() {
+			return true
+		}
+	}
+
+	return false
+}
+
 // IsFailoverQuorumActive check if we should enable the
 // quorum failover protection alpha-feature.
 func (cluster *Cluster) IsFailoverQuorumActive() bool {

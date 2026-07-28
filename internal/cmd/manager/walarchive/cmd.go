@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
 )
 
@@ -69,13 +70,18 @@ func NewCmd() *cobra.Command {
 				} else {
 					contextLog.Error(err, logErrorMessage)
 				}
-				if reqErr := localClient.Cluster().SetWALArchiveStatusCondition(ctx, err.Error()); reqErr != nil {
+				asr := webserver.ArchiveStatusRequest{Error: err.Error()}
+				if reqErr := localClient.Cluster().SetWALArchiveStatusCondition(ctx, asr); reqErr != nil {
 					contextLog.Error(reqErr, "while invoking the set wal archive condition endpoint")
 				}
 				return err
 			}
 
-			if err := localClient.Cluster().SetWALArchiveStatusCondition(ctx, ""); err != nil {
+			// The flag is computed from the same cached cluster the archiver
+			// ran with, so a spec change landing between the archiving attempt
+			// and this report cannot make a no-op pass as a real success.
+			asr := webserver.ArchiveStatusRequest{NotConfigured: !cluster.HasPotentialWALArchiver()}
+			if err := localClient.Cluster().SetWALArchiveStatusCondition(ctx, asr); err != nil {
 				contextLog.Error(err, "while invoking the set wal archive condition endpoint")
 			}
 			return nil
