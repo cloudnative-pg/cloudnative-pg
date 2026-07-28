@@ -74,7 +74,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryFromPods(
 		} else if isPrimaryOnUnschedulableNode {
 			contextLogger.Info("Primary is running on an unschedulable node, will try switching over",
 				"node", primary.Node, "primary", primary.Pod.Name)
-			return r.setPrimaryOnSchedulableNode(ctx, cluster, status, &primary)
+			return r.triggerSwitchoverToSchedulableNodes(ctx, cluster, status, resources, &primary)
 		}
 	}
 
@@ -257,12 +257,13 @@ func (r *ClusterReconciler) isNodeUnschedulableOrBeingDrained(
 	return isNodeUnschedulableOrBeingDrained(&node, r.drainTaints), nil
 }
 
-// Pick the next primary on a schedulable node, if the current is running on an unschedulable one,
-// e.g. in case a drain is in progress
-func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
+// triggerSwitchoverToSchedulableNodes Triggers an unschedulable node switchover if all replicas are on schedulable nodes
+// and failover quorum is satisfied
+func (r *ClusterReconciler) triggerSwitchoverToSchedulableNodes(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
+	resources *managedResources,
 	primaryPod *postgres.PostgresqlStatus,
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
@@ -295,41 +296,43 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	// and the operator would be waiting for it to be rescheduled to a different node indefinitely if the PVC used can not
 	// be moved between nodes, e.g. local-path-provisioner on Kind.
 
-	// Start looking for the next primary among the pods
-	for _, candidate := range podsOnSchedulableNodes.Items {
-		if !utils.IsPodReady(*candidate.Pod) {
-			continue
-		}
-
-		// If the candidate has not established a connection to the current primary, skip it
-		if !candidate.IsWalReceiverActive {
-			continue
-		}
-
-		// Set the current candidate as targetPrimary
-		contextLogger.Info("Current primary is running on unschedulable node, triggering a switchover",
-			"currentPrimary", primaryPod.Pod.Name, "currentPrimaryNode", primaryPod.Node,
-			"targetPrimary", candidate.Pod.Name, "targetPrimaryNode", candidate.Node)
-		status.LogStatus(ctx)
-		r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
-			"Current primary is running on unschedulable node %v, switching over from %v to %v",
-			primaryPod.Node, cluster.Status.TargetPrimary, candidate.Pod.Name)
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
-			fmt.Sprintf("Switching over to %v, because primary instance "+
-				"was running on unschedulable node %v",
-				candidate.Pod.Name,
-				primaryPod.Node)); err != nil {
+	// If quorum check is active, ensure we don't trigger a switchover if not enough replicas are available.
+	if cluster.IsFailoverQuorumActive() {
+		if status, err := r.evaluateQuorumCheck(ctx, cluster, status); err != nil {
 			return "", err
+		} else if !status {
+			// Prevent a failover from happening
+			return "", nil
 		}
-		return candidate.Pod.Name, r.setPrimaryInstance(ctx, cluster, candidate.Pod.Name)
 	}
 
-	// if we are here this means no new primary has been chosen
-	contextLogger.Info("Current primary is running on unschedulable node, but there are no valid candidates",
-		"currentPrimary", status.Items[0].Pod.Name,
-		"primaryNode", status.Items[0].Node,
-		"instances", status.Items)
+	contextLogger.Info("Current primary is running on unschedulable node, triggering a switchover",
+		"currentPrimary", primaryPod.Pod.Name, "currentPrimaryNode", primaryPod.Node)
 	status.LogStatus(ctx)
+	r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
+		"Current primary is running on unschedulable node %v, triggering a switchover",
+		primaryPod.Node)
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
+		fmt.Sprintf("Triggering switchover because primary instance %v is running on unschedulable node %v",
+			primaryPod.Pod.Name,
+			primaryPod.Node)); err != nil {
+		return "", err
+	}
+	if err := r.setPrimaryInstance(ctx, cluster, apiv1.PendingFailoverMarker); err != nil {
+		return "", err
+	}
+
+	if !status.IsReplicaCluster {
+		if err := r.markOldPrimaryAsUnhealthy(
+			ctx,
+			cluster.Status.CurrentPrimary,
+			resources.instances.Items,
+		); err != nil {
+			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
+				"oldPrimary", cluster.Status.CurrentPrimary)
+		}
+	}
+
 	return "", nil
 }
 
