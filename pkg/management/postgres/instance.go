@@ -877,8 +877,8 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	// a regular file at the log path first.
 	concurrency.MultipleExecuted{
 		csvPipe.GetInitializedCondition(),
-		rawPipe.GetExecutedCondition(),
-		jsonPipe.GetExecutedCondition(),
+		rawPipe.GetInitializedCondition(),
+		jsonPipe.GetInitializedCondition(),
 	}.Wait()
 
 	err := instance.Startup()

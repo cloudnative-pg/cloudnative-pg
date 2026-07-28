@@ -48,9 +48,9 @@ type LineLogPipe struct {
 	exited      *concurrency.Executed
 }
 
-// GetExecutedCondition returns the condition that can be checked in order to
+// GetInitializedCondition returns the condition that can be checked in order to
 // be sure initialization has been done
-func (p *LineLogPipe) GetExecutedCondition() *concurrency.Executed {
+func (p *LineLogPipe) GetInitializedCondition() *concurrency.Executed {
 	return p.initialized
 }
 

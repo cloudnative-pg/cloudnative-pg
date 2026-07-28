@@ -44,7 +44,7 @@ var _ = Describe("LineLogPipe", func() {
 			}
 
 			Expect(p.Start(ctx)).To(Succeed())
-			Expect(waitForCondition(p.GetExecutedCondition())).To(MatchError(context.Canceled))
+			Expect(waitForCondition(p.GetInitializedCondition())).To(MatchError(context.Canceled))
 			Expect(waitForCondition(p.GetExitedCondition())).ToNot(HaveOccurred())
 		})
 
@@ -67,14 +67,14 @@ var _ = Describe("LineLogPipe", func() {
 
 			// The FIFO gets created with no interference here, so initialized
 			// must resolve with a nil error before the context is cancelled.
-			Expect(waitForCondition(p.GetExecutedCondition())).ToNot(HaveOccurred())
+			Expect(waitForCondition(p.GetInitializedCondition())).ToNot(HaveOccurred())
 
 			cancel()
 			Eventually(startExited, 5*time.Second, 10*time.Millisecond).Should(BeClosed())
 
 			// The deferred BroadcastError(ctx.Err()) on exit must not clobber
 			// the success already recorded above.
-			Expect(p.GetExecutedCondition().Err()).ToNot(HaveOccurred())
+			Expect(p.GetInitializedCondition().Err()).ToNot(HaveOccurred())
 		})
 	})
 })
