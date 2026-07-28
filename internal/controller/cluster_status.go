@@ -751,20 +751,59 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	statuses postgres.PostgresqlStatusList,
 ) error {
 	existingClusterStatus := cluster.Status
-	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
-	// we extract the instances reported state
-	for _, item := range statuses.Items {
+	// InstancesReportedState is preserved across reconciliations, not rebuilt
+	// from scratch: a silent instance's entry (its status probe failed) must
+	// be left untouched rather than overwritten with zeros, because "we do
+	// not know" must not erase the last thing we did know.
+	//
+	// Membership in statuses.Items this pass is what tells apart "silent but
+	// still part of the cluster" from "no longer part of the cluster"
+	// (scaled down, or the pod was replaced under the same name). AddPod
+	// (pkg/postgres/status.go) runs unconditionally regardless of the probe
+	// outcome, and GetStatusFromInstances keeps one item per pod that
+	// survives filtering rather than dropping the ones whose probe failed,
+	// so every instance that still belongs to the cluster appears in
+	// statuses.Items this pass, silent or not. Only names absent from
+	// statuses.Items entirely are pruned below, which keeps
+	// ensureInstancesAreReachable (pkg/management/postgres/webserver/probes/pinger.go)
+	// from pinging the IP of a pod that is actually gone.
+	if cluster.Status.InstancesReportedState == nil {
+		cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
+	}
+
+	instanceSet := statuses.Partition()
+	currentNames := stringset.New()
+
+	// we extract the instances reported state from the instances actually
+	// reporting their status; a silent instance keeps whatever entry (if
+	// any) it already had.
+	for i := range instanceSet.Reporting.Items {
+		item := &instanceSet.Reporting.Items[i]
+		currentNames.Put(item.Pod.Name)
 		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = apiv1.InstanceReportedState{
 			IsPrimary:  item.IsPrimary,
 			TimeLineID: item.TimeLineID,
 			IP:         item.Pod.Status.PodIP,
 		}
 	}
+	for _, silent := range instanceSet.ReadyButSilent {
+		currentNames.Put(silent.Pod.Name)
+	}
+	for _, silent := range instanceSet.NotReady {
+		currentNames.Put(silent.Pod.Name)
+	}
+
+	for name := range cluster.Status.InstancesReportedState {
+		if !currentNames.Has(string(name)) {
+			delete(cluster.Status.InstancesReportedState, name)
+		}
+	}
 
 	// we update any relevant cluster status that depends on the primary instance
 	detectedSystemID := stringset.New()
-	for _, item := range statuses.Items {
+	for i := range instanceSet.Reporting.Items {
+		item := &instanceSet.Reporting.Items[i]
 		// we refresh the last known timeline on the status root.
 		// This avoids to have a zero timeline id in case that no primary instance is up during reconciliation.
 		if item.IsPrimary && item.TimeLineID != 0 {
