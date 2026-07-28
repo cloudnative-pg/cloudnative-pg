@@ -131,6 +131,36 @@ var defaultShutdownOptions = shutdownOptions{
 	Timeout: nil,
 }
 
+// pgCtlDefaultTimeoutSeconds is the timeout pg_ctl itself applies, per its documentation,
+// when a shutdown request omits "-t" (either because PGCTLTIMEOUT is unset, which is the
+// case in the operand image, or because no explicit timeout is not set here). It is used
+// as the fallback budget for a shutdown attempt that declares no options.Timeout, so that
+// the pre-shutdown CHECKPOINT and the pg_ctl call it precedes are bounded by the same
+// number rather than the checkpoint being unbounded and only pg_ctl being bounded.
+const pgCtlDefaultTimeoutSeconds int32 = 60
+
+// shutdownAttemptTimeoutSeconds returns the total budget, in seconds, for one shutdown
+// attempt: the caller-declared timeout when there is one, or pgCtlDefaultTimeoutSeconds
+// otherwise. This is the single deadline shared by the pre-shutdown CHECKPOINT and the
+// pg_ctl invocation that follows it.
+func shutdownAttemptTimeoutSeconds(timeout *int32) int32 {
+	if timeout != nil {
+		return *timeout
+	}
+	return pgCtlDefaultTimeoutSeconds
+}
+
+// remainingShutdownTimeoutSeconds returns how much of a shutdown attempt's budget is left
+// before deadline, floored at 1 second. It is what tryCheckpointBeforeShutdown did not
+// consume, and is what pg_ctl is given via "-t".
+func remainingShutdownTimeoutSeconds(deadline time.Time) int32 {
+	remaining := int32(time.Until(deadline).Seconds())
+	if remaining < 1 {
+		remaining = 1
+	}
+	return remaining
+}
+
 var (
 	// ErrPgRejectingConnection postgres is alive, but rejecting connections
 	ErrPgRejectingConnection = fmt.Errorf("server is alive but rejecting connections")
@@ -589,8 +619,17 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 		return fmt.Errorf("instance is not running")
 	}
 
-	instance.tryCheckpointBeforeShutdown(ctx, options.Mode)
+	// The pre-shutdown CHECKPOINT and the pg_ctl invocation that follows share a single
+	// deadline for this attempt: options.Timeout when the caller declared one, or pg_ctl's
+	// own documented default otherwise. The checkpoint consumes part of that budget and
+	// pg_ctl gets whatever remains, so the attempt as a whole can never exceed what was
+	// asked for.
+	deadline := time.Now().Add(time.Duration(shutdownAttemptTimeoutSeconds(options.Timeout)) * time.Second)
+
+	instance.tryCheckpointBeforeShutdown(ctx, options.Mode, deadline)
 	instance.ShutdownConnections()
+
+	remainingTimeout := remainingShutdownTimeoutSeconds(deadline)
 
 	pgCtlOptions := []string{
 		"-D",
@@ -606,14 +645,12 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 		pgCtlOptions = append(pgCtlOptions, "-W")
 	}
 
-	if options.Timeout != nil {
-		pgCtlOptions = append(pgCtlOptions, "-t", fmt.Sprintf("%v", *options.Timeout))
-	}
+	pgCtlOptions = append(pgCtlOptions, "-t", fmt.Sprintf("%v", remainingTimeout))
 
 	contextLogger.Info("Shutting down instance",
 		"pgdata", instance.PgData,
 		"mode", options.Mode,
-		"timeout", options.Timeout,
+		"timeout", remainingTimeout,
 		"pgCtlOptions", pgCtlOptions,
 	)
 
@@ -1634,8 +1671,11 @@ func (instance *Instance) HandleInstanceCommandRequests(
 // This is skipped if the instance is not a primary or if an immediate shutdown is requested.
 // This reduces shutdown time and subsequent promotion time for replicas, especially for systems with high
 // checkpoint_timeout.
-// All outcomes (success, failure, or skipped) are logged appropriately.
-func (instance *Instance) tryCheckpointBeforeShutdown(ctx context.Context, mode shutdownMode) {
+// The checkpoint is bounded by deadline, the same budget the shutdown attempt as a whole was
+// given. A checkpoint that does not complete by then is logged and abandoned: it is an
+// optimisation for the shutdown that follows, and must never delay or prevent it.
+// All outcomes (success, failure, timeout, or skipped) are logged appropriately.
+func (instance *Instance) tryCheckpointBeforeShutdown(ctx context.Context, mode shutdownMode, deadline time.Time) {
 	contextLogger := log.FromContext(ctx).WithName("checkpoint_before_shutdown")
 	contextLogger.Info("Attempting checkpoint before shutdown")
 
@@ -1661,8 +1701,16 @@ func (instance *Instance) tryCheckpointBeforeShutdown(ctx context.Context, mode 
 		return
 	}
 
+	checkpointCtx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+
 	contextLogger.Info("Executing CHECKPOINT command before shutdown")
-	if _, err = db.ExecContext(ctx, "CHECKPOINT"); err != nil {
+	if _, err = db.ExecContext(checkpointCtx, "CHECKPOINT"); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			contextLogger.Warning("Checkpoint before shutdown did not complete within its budget, "+
+				"proceeding with shutdown regardless", "err", err)
+			return
+		}
 		contextLogger.Error(err, "Failed to execute CHECKPOINT command")
 		return
 	}
