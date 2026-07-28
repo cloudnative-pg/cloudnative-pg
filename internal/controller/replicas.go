@@ -301,8 +301,14 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	// and the operator would be waiting for it to be rescheduled to a different node indefinitely if the PVC used can not
 	// be moved between nodes, e.g. local-path-provisioner on Kind.
 
-	// Start looking for the next primary among the pods
-	for _, candidate := range podsOnOtherNodes.Items {
+	// Start looking for the next primary among the pods that are actually
+	// reporting their status: a silent instance's IsWalReceiverActive would
+	// read as its Go zero value (false), which is indistinguishable from an
+	// observed disconnection, so it must never be considered a candidate.
+	reportingCandidates := podsOnOtherNodes.Partition().Reporting
+	for i := range reportingCandidates.Items {
+		candidate := &reportingCandidates.Items[i]
+
 		// If candidate on an unschedulable node too, skip it
 		if status, _ := r.isNodeUnschedulableOrBeingDrained(ctx, candidate.Node); status {
 			continue
