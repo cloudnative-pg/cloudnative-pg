@@ -26,6 +26,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -64,6 +65,7 @@ func newOldPrimaryTestReconciler(namespace, clusterName, podName string) (*Insta
 		nil,
 		nil,
 		nil,
+		record.NewFakeRecorder(10),
 	)
 	// Skip the first-reconcile initialization path: it is unrelated to the
 	// ordering under test and pulls in bootstrap concerns of its own.
