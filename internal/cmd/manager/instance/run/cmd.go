@@ -246,7 +246,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		contextLogger.Error(err, "unable to create instance controller")
 		return err
 	}
-	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
+	postgresStartConditions = append(postgresStartConditions, reconciler.GetInitializedCondition())
 
 	// database reconciler
 	dbReconciler := controller.NewDatabaseReconciler(mgr, instance)
@@ -285,7 +285,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		contextLogger.Error(err, "unable to add raw logs handler")
 		return err
 	}
-	postgresStartConditions = append(postgresStartConditions, rawPipe.GetExecutedCondition())
+	postgresStartConditions = append(postgresStartConditions, rawPipe.GetInitializedCondition())
 	exitedConditions = append(exitedConditions, rawPipe.GetExitedCondition())
 
 	// json logs handler
@@ -294,8 +294,17 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		contextLogger.Error(err, "unable to add JSON logs handler")
 		return err
 	}
-	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
+	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetInitializedCondition())
 	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
+
+	// Record these readiness conditions on the instance, so the reconciler can
+	// wait on them before pg_rewind's restore_command or a WAL-archive plugin
+	// invocation could race these readers for the log-destination FIFOs.
+	instance.SetLogPipesReadyCondition(concurrency.MultipleExecuted{
+		postgresLogPipe.GetInitializedCondition(),
+		rawPipe.GetInitializedCondition(),
+		jsonPipe.GetInitializedCondition(),
+	})
 
 	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
 		contextLogger.Error(err, "unable to move `pg_wal` directory to the attached volume")
