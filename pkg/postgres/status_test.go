@@ -421,6 +421,64 @@ var _ = Describe("AreWalReceiversDown", func() {
 		Expect(down).To(BeFalse())
 		Expect(unknown).To(ConsistOf("standby-ahead-unknown"))
 	})
+
+	// newSilentStandby builds a PostgresqlStatus for an instance whose
+	// /pg/status probe failed, going through AddPod so IsPodReady is derived
+	// from a real Ready condition on the Pod rather than hardcoded, which is
+	// what the production code path (partitioning by Reporting/ReadyButSilent)
+	// actually relies on.
+	newSilentStandby := func(name string, probeErr error) PostgresqlStatus {
+		status := PostgresqlStatus{Error: probeErr}
+		status.AddPod(corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+				},
+			},
+		})
+		return status
+	}
+
+	It("does not block on the primary's own silence", func() {
+		silentPrimary := newSilentStandby(primary.Pod.Name, errStatusEndpointFailing)
+		silentPrimary.IsPrimary = true
+
+		list := newList(
+			silentPrimary,
+			PostgresqlStatus{
+				Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-1"}},
+				IsWalReceiverActive: false,
+			},
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(silentPrimary.Pod.Name)
+		Expect(down).To(BeTrue())
+		Expect(unknown).ToNot(ContainElement(silentPrimary.Pod.Name))
+	})
+
+	It("blocks on the active receiver before it would even consider a silent standby", func() {
+		list := newList(
+			primary,
+			PostgresqlStatus{
+				Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-active"}},
+				IsWalReceiverActive: true,
+			},
+			newSilentStandby("standby-silent", errStatusEndpointFailing),
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeFalse())
+		Expect(unknown).To(BeEmpty())
+	})
+
+	It("does not block a primary-only, single-instance cluster", func() {
+		list := newList(primary)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeTrue())
+		Expect(unknown).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Configuration report", func() {
