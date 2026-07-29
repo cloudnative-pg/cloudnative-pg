@@ -51,6 +51,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -214,6 +215,9 @@ type Instance struct {
 	// a designatedPrimary
 	RequiresDesignatedPrimaryTransition bool
 
+	// logPipesReady becomes satisfied once the log-destination FIFOs are ready.
+	logPipesReady concurrency.MultipleExecuted
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -313,6 +317,17 @@ func (instance *Instance) SetFencing(enabled bool) {
 // SetCanCheckReadiness marks whether the instance should be checked for readiness
 func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
+}
+
+// SetLogPipesReadyCondition records the conditions that indicate when the log-destination
+// FIFOs are ready.
+func (instance *Instance) SetLogPipesReadyCondition(conditions concurrency.MultipleExecuted) {
+	instance.logPipesReady = conditions
+}
+
+// WaitForLogPipesReady waits until the log-destination FIFOs are ready.
+func (instance *Instance) WaitForLogPipesReady() {
+	instance.logPipesReady.Wait()
 }
 
 // CheckHasDiskSpaceForWAL checks if we have enough disk space to store two WAL files,
@@ -843,6 +858,15 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 		rawPipe.GetExitedCondition().Wait()
 		jsonPipe.GetExitedCondition().Wait()
 	}()
+
+	// Wait for every reader to have its FIFO created here.
+	// To avoid the archive/restore command win the race and create
+	// a regular file at the log path first.
+	concurrency.MultipleExecuted{
+		csvPipe.GetInitializedCondition(),
+		rawPipe.GetInitializedCondition(),
+		jsonPipe.GetInitializedCondition(),
+	}.Wait()
 
 	err := instance.Startup()
 	if err != nil {
