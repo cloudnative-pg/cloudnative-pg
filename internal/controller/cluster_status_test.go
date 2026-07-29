@@ -485,6 +485,55 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(state2.TimeLineID).To(Equal(456))
 	})
 
+	It("ignores the fields carried by a silent instance, not just the zeroed ones", func(ctx SpecContext) {
+		statusErr := fmt.Errorf("status endpoint failing")
+
+		firstPass := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+				},
+			},
+		}
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, firstPass)
+		Expect(err).ToNot(HaveOccurred())
+
+		// pod-1's probe fails, but this time the status it carries is not
+		// zero-valued: it disagrees with the last known observation on every
+		// field. Whether an entry is written must depend on Error alone, never
+		// on the values happening to look empty.
+		secondPass := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.99"},
+					},
+					IsPrimary:  false,
+					TimeLineID: 999,
+					IsPodReady: true,
+					Error:      statusErr,
+				},
+			},
+		}
+		err = env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, secondPass)
+		Expect(err).ToNot(HaveOccurred())
+
+		state1 := cluster.Status.InstancesReportedState["pod-1"]
+		Expect(state1.IsPrimary).To(BeTrue())
+		Expect(state1.TimeLineID).To(Equal(123))
+		Expect(state1.IP).To(Equal("192.168.1.1"))
+
+		// the timeline on the status root is fed from the same reporting set,
+		// so an unreported timeline must not reach it either.
+		Expect(cluster.Status.TimelineID).To(Equal(123))
+	})
+
 	It("removes the entry of an instance that no longer belongs to the cluster", func(ctx SpecContext) {
 		firstPass := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
