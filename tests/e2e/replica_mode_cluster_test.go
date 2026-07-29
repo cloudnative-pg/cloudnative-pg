@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -588,6 +589,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
+//
+//nolint:dupl
 var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.LabelBackupRestore), Ordered, func() {
 	const (
 		replicaSwitchoverClusterDir = "/replica_mode_cluster/"
@@ -674,8 +677,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				// Since we use multiple times the same cluster names for the same object store instance, we need to clean it up
-				// between tests
+				// The object store isn't wiped between runs, so leftover files from a
+				// previous run of this test need cleaning up here
 				_, err = objectstore.CleanFiles(objectStoreEnv, path.Join("cluster-backups", clusterAName))
 				if err != nil {
 					return err
@@ -688,7 +691,11 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			})
 
 			stopLoad := make(chan struct{})
-			DeferCleanup(func() { close(stopLoad) })
+			var loadWG sync.WaitGroup
+			DeferCleanup(func() {
+				close(stopLoad)
+				loadWG.Wait()
+			})
 
 			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
@@ -724,7 +731,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				)
 				Expect(err).ToNot(HaveOccurred())
 
+				loadWG.Add(1)
 				go func() {
+					defer GinkgoRecover()
+					defer loadWG.Done()
 					for {
 						_, _, _ = exec.QueryInInstancePod(
 							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -809,6 +819,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			By("forging an invalid token", func() {
 				tokenContent, err := utils.ParsePgControldataToken(token)
 				Expect(err).ToNot(HaveOccurred())
+				// A REDO location behind the replica's actual position is rejected outright
+				// (PhaseUnrecoverable); one ahead of it is retried instead, as "not yet caught up".
 				tokenContent.LatestCheckpointREDOLocation = "0/0"
 				Expect(tokenContent.IsValid()).To(Succeed())
 				invalidToken, err = tokenContent.Encode()
@@ -873,6 +885,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				validateReplication(namespace, clusterAName, clusterBName)
 			})
 		},
+		// B's own promotion is one timeline switch, common to both entries. Leaving
+		// replica-cluster mode then flips B's archive_mode GUC, forcing a primary restart:
+		// "restart" applies it in place (timeline 2); "switchover" instead promotes a
+		// different instance to apply it, costing a second switch (timeline 3).
 		Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
 		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
 	)
