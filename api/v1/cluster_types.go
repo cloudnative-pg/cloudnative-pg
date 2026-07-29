@@ -1197,6 +1197,7 @@ type InstanceReportedState struct {
 type ReplicaDivergenceWatermark struct {
 	// TimeLineID is the current primary's timeline this watermark was
 	// recorded against. A change in this value resets the watermark.
+	// +kubebuilder:validation:Minimum=1
 	TimeLineID int `json:"timeLineID"`
 
 	// ReceivedLSN is the highest received LSN observed for this instance
@@ -1210,6 +1211,7 @@ type ReplicaDivergenceWatermark struct {
 // ReplicaWalIssueKind classifies why a replica's WAL receiver is reported as
 // stalled behind the current primary's timeline in
 // ClusterStatus.ReplicaWalIssues.
+// +kubebuilder:validation:Enum=Stuck;Diverged
 type ReplicaWalIssueKind string
 
 const (
@@ -1238,7 +1240,13 @@ type ReplicaWalIssueStatus struct {
 
 	// DetectedTimeLineID is the timeline the instance was on when the issue
 	// was confirmed.
+	// +kubebuilder:validation:Minimum=1
 	DetectedTimeLineID int `json:"detectedTimeLineID"`
+
+	// AgainstTimeLineID is the primary's timeline the fork-point check was run
+	// against. Used to re-open the check when the primary forks again.
+	// +kubebuilder:validation:Minimum=1
+	AgainstTimeLineID int `json:"againstTimeLineID"`
 
 	// ForkLSN is the LSN at which the current primary's timeline forked away
 	// from DetectedTimeLineID, when the fork-point check was able to

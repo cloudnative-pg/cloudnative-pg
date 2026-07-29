@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -308,7 +309,7 @@ var _ = Describe("evaluateReplicaDivergence", func() {
 	It("does not re-run the fork-point check for an instance already evaluated against the current timeline",
 		func(ctx SpecContext) {
 			cluster.Status.ReplicaWalIssues = map[apiv1.PodName]apiv1.ReplicaWalIssueStatus{
-				"replica-1": {Kind: apiv1.ReplicaWalIssueStuck, DetectedTimeLineID: 2},
+				"replica-1": {Kind: apiv1.ReplicaWalIssueStuck, DetectedTimeLineID: 1, AgainstTimeLineID: 2},
 			}
 			statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
 				makePrimary("primary", true),
@@ -319,6 +320,87 @@ var _ = Describe("evaluateReplicaDivergence", func() {
 
 			Expect(fakeClient.calls).To(Equal(0))
 			Expect(cluster.Status.ReplicaWalIssues["replica-1"].Kind).To(Equal(apiv1.ReplicaWalIssueStuck))
+		})
+
+	It("confirms a Stuck verdict once, holds it across repeated reconciliations, and re-opens the check on a fresh failover",
+		func(ctx SpecContext) {
+			cluster.Status.ReplicaDivergenceWatermarks = map[apiv1.PodName]apiv1.ReplicaDivergenceWatermark{
+				"replica-1": {
+					TimeLineID:  2,
+					ReceivedLSN: "0/7000110",
+					Since:       pastTimestamp(replicaDivergenceStallGracePeriod + 5*time.Second),
+				},
+			}
+			statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				makePrimary("primary", true),
+				// received LSN == fork LSN exactly: not strictly past it, so Stuck
+				makeReplica("replica-1", "uid-1", 1, "0/7000110", nil),
+			}}
+
+			env.clusterReconciler.evaluateReplicaDivergence(ctx, cluster, statuses)
+			Expect(fakeClient.calls).To(Equal(1))
+			issue, ok := cluster.Status.ReplicaWalIssues["replica-1"]
+			Expect(ok).To(BeTrue())
+			Expect(issue.Kind).To(Equal(apiv1.ReplicaWalIssueStuck))
+			Expect(issue.AgainstTimeLineID).To(Equal(2))
+
+			// Steady state: the same, unchanged reconciliation input repeated
+			// several times must not re-run the fork-point check.
+			env.clusterReconciler.evaluateReplicaDivergence(ctx, cluster, statuses)
+			env.clusterReconciler.evaluateReplicaDivergence(ctx, cluster, statuses)
+			Expect(fakeClient.calls).To(Equal(1))
+			Expect(cluster.Status.ReplicaWalIssues["replica-1"].Kind).To(Equal(apiv1.ReplicaWalIssueStuck))
+
+			// A fresh failover moves the primary onto a new timeline. Once the
+			// replica has stalled behind it for a full grace period again,
+			// the check must run once more.
+			cluster.Status.TimelineID = 3
+			cluster.Status.ReplicaDivergenceWatermarks = map[apiv1.PodName]apiv1.ReplicaDivergenceWatermark{
+				"replica-1": {
+					TimeLineID:  3,
+					ReceivedLSN: "0/7000110",
+					Since:       pastTimestamp(replicaDivergenceStallGracePeriod + 5*time.Second),
+				},
+			}
+			fakeClient.response = remote.TimelineHistoryResponse{
+				TimelineID: 3,
+				Content:    "2\t0/7000110\tno recovery target specified\n",
+			}
+
+			env.clusterReconciler.evaluateReplicaDivergence(ctx, cluster, statuses)
+			Expect(fakeClient.calls).To(Equal(2))
+			Expect(cluster.Status.ReplicaWalIssues["replica-1"].AgainstTimeLineID).To(Equal(3))
+		})
+
+	It("confirms a Diverged verdict once, holds it across repeated reconciliations, and emits the warning event only once",
+		func(ctx SpecContext) {
+			cluster.Status.ReplicaDivergenceWatermarks = map[apiv1.PodName]apiv1.ReplicaDivergenceWatermark{
+				"replica-1": {
+					TimeLineID:  2,
+					ReceivedLSN: "0/7500000",
+					Since:       pastTimestamp(replicaDivergenceStallGracePeriod + 5*time.Second),
+				},
+			}
+			statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				makePrimary("primary", true),
+				// strictly past the fork point (0/7000110): Diverged
+				makeReplica("replica-1", "uid-1", 1, "0/7500000", nil),
+			}}
+
+			env.clusterReconciler.evaluateReplicaDivergence(ctx, cluster, statuses)
+			Expect(fakeClient.calls).To(Equal(1))
+			Expect(cluster.Status.ReplicaWalIssues["replica-1"].Kind).To(Equal(apiv1.ReplicaWalIssueDiverged))
+
+			fakeRecorder, ok := env.clusterReconciler.Recorder.(*record.FakeRecorder)
+			Expect(ok).To(BeTrue())
+			Expect(fakeRecorder.Events).To(Receive(ContainSubstring("ReplicaDiverged")))
+
+			// Steady state: repeated, unchanged reconciliations must neither
+			// re-run the fork-point check nor re-emit the warning event.
+			env.clusterReconciler.evaluateReplicaDivergence(ctx, cluster, statuses)
+			env.clusterReconciler.evaluateReplicaDivergence(ctx, cluster, statuses)
+			Expect(fakeClient.calls).To(Equal(1))
+			Expect(fakeRecorder.Events).ToNot(Receive())
 		})
 
 	It("self-heals a latched issue once the instance reports a fresh, caught-up timeline", func(ctx SpecContext) {

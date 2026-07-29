@@ -2617,7 +2617,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `timeLineID` _integer_ | TimeLineID is the current primary's timeline this watermark was<br />recorded against. A change in this value resets the watermark. | True |  |  |
+| `timeLineID` _integer_ | TimeLineID is the current primary's timeline this watermark was<br />recorded against. A change in this value resets the watermark. | True |  | Minimum: 1 <br /> |
 | `receivedLSN` _string_ | ReceivedLSN is the highest received LSN observed for this instance<br />while behind TimeLineID. | True |  |  |
 | `since` _string_ | Since is when ReceivedLSN was first observed at its current value. | True |  |  |
 
@@ -2630,7 +2630,9 @@ ReplicaWalIssueKind classifies why a replica's WAL receiver is reported as
 stalled behind the current primary's timeline in
 ClusterStatus.ReplicaWalIssues.
 
+_Validation:_
 
+- Enum: [Stuck Diverged]
 
 _Appears in:_
 
@@ -2658,8 +2660,9 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `kind` _[ReplicaWalIssueKind](#replicawalissuekind)_ | Kind classifies the issue. | True |  |  |
-| `detectedTimeLineID` _integer_ | DetectedTimeLineID is the timeline the instance was on when the issue<br />was confirmed. | True |  |  |
+| `kind` _[ReplicaWalIssueKind](#replicawalissuekind)_ | Kind classifies the issue. | True |  | Enum: [Stuck Diverged] <br /> |
+| `detectedTimeLineID` _integer_ | DetectedTimeLineID is the timeline the instance was on when the issue<br />was confirmed. | True |  | Minimum: 1 <br /> |
+| `againstTimeLineID` _integer_ | AgainstTimeLineID is the primary's timeline the fork-point check was run<br />against. Used to re-open the check when the primary forks again. | True |  | Minimum: 1 <br /> |
 | `forkLSN` _string_ | ForkLSN is the LSN at which the current primary's timeline forked away<br />from DetectedTimeLineID, when the fork-point check was able to<br />determine it. |  |  |  |
 | `receivedLSN` _string_ | ReceivedLSN is the instance's received LSN at the moment the issue was<br />confirmed. Together with ForkLSN it bounds the range of WAL<br />(ForkLSN, ReceivedLSN] the replica holds that the current primary does<br />not, for a Kind of Diverged. |  |  |  |
 | `detectedAt` _string_ | DetectedAt is when the issue was confirmed. | True |  |  |

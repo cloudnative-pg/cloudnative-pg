@@ -144,7 +144,7 @@ func (r *ClusterReconciler) evaluateInstanceDivergence(
 		return
 	}
 
-	if issue, ok := cluster.Status.ReplicaWalIssues[name]; ok && issue.DetectedTimeLineID == cluster.Status.TimelineID {
+	if issue, ok := cluster.Status.ReplicaWalIssues[name]; ok && issue.AgainstTimeLineID == cluster.Status.TimelineID {
 		// Already evaluated against the current primary timeline; wait for
 		// containment (Diverged) or a fresh failover / catch-up (Stuck)
 		// before re-running the fork-point check.
@@ -246,6 +246,7 @@ func (r *ClusterReconciler) recordReplicaWalIssue(
 	status := apiv1.ReplicaWalIssueStatus{
 		Kind:               kind,
 		DetectedTimeLineID: replica.TimeLineID,
+		AgainstTimeLineID:  cluster.Status.TimelineID,
 		ReceivedLSN:        string(replica.ReceivedLsn),
 		DetectedAt:         pgTime.GetCurrentTimestamp(),
 	}

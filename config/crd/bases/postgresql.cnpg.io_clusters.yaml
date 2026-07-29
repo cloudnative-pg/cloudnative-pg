@@ -7438,6 +7438,7 @@ spec:
                       description: |-
                         TimeLineID is the current primary's timeline this watermark was
                         recorded against. A change in this value resets the watermark.
+                      minimum: 1
                       type: integer
                   required:
                   - receivedLSN
@@ -7461,6 +7462,12 @@ spec:
                     is reported as stalled behind the current primary's timeline. See
                     ClusterStatus.ReplicaWalIssues.
                   properties:
+                    againstTimeLineID:
+                      description: |-
+                        AgainstTimeLineID is the primary's timeline the fork-point check was run
+                        against. Used to re-open the check when the primary forks again.
+                      minimum: 1
+                      type: integer
                     detectedAt:
                       description: DetectedAt is when the issue was confirmed.
                       type: string
@@ -7468,6 +7475,7 @@ spec:
                       description: |-
                         DetectedTimeLineID is the timeline the instance was on when the issue
                         was confirmed.
+                      minimum: 1
                       type: integer
                     forkLSN:
                       description: |-
@@ -7477,6 +7485,9 @@ spec:
                       type: string
                     kind:
                       description: Kind classifies the issue.
+                      enum:
+                      - Stuck
+                      - Diverged
                       type: string
                     parked:
                       description: |-
@@ -7503,6 +7514,7 @@ spec:
                         not, for a Kind of Diverged.
                       type: string
                   required:
+                  - againstTimeLineID
                   - detectedAt
                   - detectedTimeLineID
                   - kind
