@@ -766,13 +766,19 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 
 // killPostgresProcessGroup sends SIGKILL to the whole process group of the running postmaster.
 // It is the last resort escalation after both a fast and an immediate pg_ctl stop have failed
-// to bring PostgreSQL down: at that point PostgreSQL is presumed unable to shut down on its own,
-// and the instance manager must exit regardless so that the primary lease it holds is released.
+// to bring PostgreSQL down.
+//
+// This is not defensive cleanup, it is what unblocks the shutdown. The lifecycle loop is parked on
+// the postmaster's exit channel, and only that exit lets the runnable return so the deferred
+// release of the primary lease can run. An unresponsive PostgreSQL that never exits therefore
+// keeps the lease held and the failover never completes.
 //
 // The kill targets the process group, not just the postmaster PID: SIGKILLing a postmaster while
-// its backends survive is documented by PostgreSQL as a way to corrupt shared memory. Taking down
-// the whole group is safe here because the instance manager itself shares that group and is about
-// to exit, and kubelet will restart the container, tearing down the PID namespace regardless.
+// its backends survive is documented by PostgreSQL as a way to corrupt shared memory. The
+// postmaster is started with Setpgid (see compatibility.AddInstanceRunCommands), so it leads a
+// group of its own that this process is not part of: the kill reaps PostgreSQL and every backend
+// while leaving the instance manager alive to release the lease. kubelet then restarts the
+// container.
 func (instance *Instance) killPostgresProcessGroup(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
