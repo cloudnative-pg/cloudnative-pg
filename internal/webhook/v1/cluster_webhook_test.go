@@ -6174,7 +6174,7 @@ var _ = Describe("validateExtensions", func() {
 		Expect(v.validateExtensions(cluster)).To(BeEmpty())
 	})
 
-	It("returns an error for a path resolving to a sibling directory sharing the mount point as a string prefix", func() {
+	It("returns an error for a relative path that escapes via leading traversal", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -6196,6 +6196,38 @@ var _ = Describe("validateExtensions", func() {
 		err := v.validateExtensions(cluster)
 		Expect(err).To(HaveLen(1))
 		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
+	It("returns an error for a path that escapes only once joined under a deeper, realistic mount point", func() {
+		// CollectBinPaths and absolutizePaths join these paths under a
+		// multi-segment mount point at runtime (e.g. "/extensions/<name>"),
+		// not a single-segment one. A containment check resolved against a
+		// shallower placeholder base would wrongly accept these.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../mount/lib",
+							},
+							DynamicLibraryPath: []string{
+								"../../../mount/x",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+		Expect(err[1].Field).To(ContainSubstring("dynamic_library_path[0]"))
 	})
 
 	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {

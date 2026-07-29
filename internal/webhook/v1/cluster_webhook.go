@@ -2964,8 +2964,6 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		var result field.ErrorList
 		pathSet := stringset.New()
 
-		const extensionPathBasePlaceholder = "/mount"
-
 		for j, path := range paths {
 			if validateErr := ensureNotEmptyOrDuplicate(
 				fieldPath.Index(j),
@@ -2976,14 +2974,15 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				continue
 			}
 
-			// Join the path under a placeholder mount point, mirroring what the
-			// instance manager does at runtime, and verify the result stays
-			// within it. This catches embedded traversal such as
-			// "/a/../../etc". The separator boundary is required
-			// to reject paths like "/mount-evil".
-			resolvedPath := filepath.Join(extensionPathBasePlaceholder, path)
-			if resolvedPath != extensionPathBasePlaceholder &&
-				!strings.HasPrefix(resolvedPath, extensionPathBasePlaceholder+string(filepath.Separator)) {
+			// filepath.IsLocal reports whether the path, after joining it under
+			// "." and resolving "..", would stay within that base. Joining
+			// under "." first (rather than a placeholder mount point) makes
+			// this independent of the extension mount point's actual depth:
+			// CollectBinPaths and absolutizePaths join these paths under a
+			// real, multi-segment mount point at runtime, and a placeholder
+			// base shallower than that real path would wrongly accept some
+			// escaping paths (e.g. "../mount/lib").
+			if !filepath.IsLocal(filepath.Join(".", path)) {
 				result = append(result, field.Invalid(
 					fieldPath.Index(j),
 					path,
