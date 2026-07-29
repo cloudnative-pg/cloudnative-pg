@@ -1046,9 +1046,7 @@ func isPodStuckWithTerminatedPostgres(pod *corev1.Pod, now time.Time) bool {
 		}
 
 		if terminated.FinishedAt.IsZero() {
-			// A terminated container should always carry a termination
-			// timestamp; without one the grace period cannot be evaluated,
-			// so keep the conservative behavior
+			// no timestamp to evaluate the grace period against
 			return false
 		}
 
