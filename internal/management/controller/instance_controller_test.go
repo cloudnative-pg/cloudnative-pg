@@ -116,6 +116,24 @@ var _ = Describe("instance reconciler health probe certificate", func() {
 		})
 })
 
+var _ = Describe("walReceiverExactlyCaughtUp", func() {
+	It("is true when the received LSN equals the sender's reported WAL end position", func() {
+		Expect(walReceiverExactlyCaughtUp("1/100", "1/100")).To(BeTrue())
+	})
+
+	It("is false when the sender's WAL end position is empty (unavailable, e.g. older instance manager)", func() {
+		Expect(walReceiverExactlyCaughtUp("1/100", "")).To(BeFalse())
+	})
+
+	It("is false when the received LSN is empty", func() {
+		Expect(walReceiverExactlyCaughtUp("", "1/100")).To(BeFalse())
+	})
+
+	It("is false when the sender's WAL end position is ahead (bytes still in flight)", func() {
+		Expect(walReceiverExactlyCaughtUp("1/100", "1/200")).To(BeFalse())
+	})
+})
+
 var _ = Describe("walReceiverStallDecision", func() {
 	const grace = walReceiverStallGraceInPromotion
 

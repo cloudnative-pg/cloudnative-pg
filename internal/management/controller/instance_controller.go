@@ -1315,8 +1315,10 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
 
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
-		// if the cluster is not replicating it means it's doing a failover and
-		// we have to wait for wal receivers to be down
+		// cluster.Status.CurrentPrimary is only rewritten to this pod's name
+		// once this function returns, so this branch is taken on every
+		// promotion, switchover as well as failover, and we have to wait for
+		// wal receivers to be down
 		err := r.waitForWalReceiverDown(ctx, cluster)
 		if err != nil {
 			return err
@@ -1376,7 +1378,7 @@ func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context, cluster
 	// This is not really exponential backoff as RetryUntilWalReceiverDown
 	// doesn't contain any increment
 	return wait.ExponentialBackoff(RetryUntilWalReceiverDown, func() (done bool, err error) {
-		active, err := r.instance.IsWALReceiverActive()
+		active, latestEndLSN, err := r.instance.IsWALReceiverActive()
 		if err != nil {
 			return true, err
 		}
@@ -1388,6 +1390,15 @@ func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context, cluster
 		currentLSN, err := r.instance.GetLastWalReceiveLSN()
 		if err != nil {
 			return true, err
+		}
+
+		if walReceiverExactlyCaughtUp(currentLSN, latestEndLSN) {
+			contextLogger.Info(
+				"WAL receiver is active but has flushed everything the sender has reported; "+
+					"proceeding with the promotion",
+				"currentLSN", currentLSN,
+				"latestEndLSN", latestEndLSN)
+			return true, nil
 		}
 
 		now := time.Now()
@@ -1411,6 +1422,23 @@ func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context, cluster
 		contextLogger.Info("WAL receiver is still active, waiting")
 		return false, nil
 	})
+}
+
+// walReceiverExactlyCaughtUp reports whether the receiver's own view of the
+// WAL it received (currentLSN, from GetLastWalReceiveLSN) equals the
+// sender's reported WAL end position (latestEndLSN, from
+// IsWALReceiverActive). See the LatestEndLsn doc comment on
+// PostgresqlStatus for why this equality is exact rather than a heuristic:
+// a keepalive carries the sender's cached last-sent position, so once the
+// sender stops producing WAL the two converge as soon as everything already
+// sent has been flushed.
+//
+// An empty latestEndLSN means the value is unavailable (e.g. talking to an
+// older instance manager during a rolling upgrade) and must never satisfy
+// this predicate, or an unset LSN read as "equal" would bypass the wait on
+// no evidence.
+func walReceiverExactlyCaughtUp(currentLSN, latestEndLSN cnpgTypes.LSN) bool {
+	return currentLSN != "" && latestEndLSN != "" && currentLSN == latestEndLSN
 }
 
 // walReceiverStallDecision is the pure decision function backing
