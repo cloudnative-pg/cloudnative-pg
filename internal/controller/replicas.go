@@ -160,7 +160,13 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
 	// data that is being received (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
+	if down, unknownStandbys := status.Partition().AreWalReceiversDown(cluster.Status.CurrentPrimary); !down {
+		if len(unknownStandbys) > 0 {
+			r.Recorder.Eventf(cluster, "Warning", "WalReceiverStatusUnknown",
+				"Deferring failover: cannot confirm the WAL receiver is down on Ready standby(s) %v; "+
+					"the operator's /pg/status check is failing for them. See operator logs for the underlying error.",
+				unknownStandbys)
+		}
 		return "", ErrWalReceiversRunning
 	}
 
@@ -295,8 +301,14 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	// and the operator would be waiting for it to be rescheduled to a different node indefinitely if the PVC used can not
 	// be moved between nodes, e.g. local-path-provisioner on Kind.
 
-	// Start looking for the next primary among the pods
-	for _, candidate := range podsOnOtherNodes.Items {
+	// Start looking for the next primary among the pods that are actually
+	// reporting their status: a silent instance's IsWalReceiverActive would
+	// read as its Go zero value (false), which is indistinguishable from an
+	// observed disconnection, so it must never be considered a candidate.
+	reportingCandidates := podsOnOtherNodes.Partition().Reporting
+	for i := range reportingCandidates.Items {
+		candidate := &reportingCandidates.Items[i]
+
 		// If candidate on an unschedulable node too, skip it
 		if status, _ := r.isNodeUnschedulableOrBeingDrained(ctx, candidate.Node); status {
 			continue
@@ -367,7 +379,13 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// but before doing that we need to wait for all the WAL receivers to be
 	// terminated. This is needed to avoid losing the WAL data that is being received
 	// (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
+	if down, unknownStandbys := status.Partition().AreWalReceiversDown(cluster.Status.CurrentPrimary); !down {
+		if len(unknownStandbys) > 0 {
+			r.Recorder.Eventf(cluster, "Warning", "WalReceiverStatusUnknown",
+				"Deferring failover: cannot confirm the WAL receiver is down on Ready standby(s) %v; "+
+					"the operator's /pg/status check is failing for them. See operator logs for the underlying error.",
+				unknownStandbys)
+		}
 		return "", ErrWalReceiversRunning
 	}
 

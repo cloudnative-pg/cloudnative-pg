@@ -935,13 +935,18 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: goc
 		targetPod = &pod
 	}
 
-	// Get status for the elected pod
+	// Get status for the elected pod. We only accept it if it is actually
+	// reporting: a silent instance's SessionID would read as the empty
+	// string, which the caller cannot tell apart from a genuine (if
+	// unlikely) empty session ID, so a silent instance must never be handed
+	// back as the backup target.
 	statusResult := r.instanceStatusClient.GetStatusFromInstances(ctx, corev1.PodList{Items: []corev1.Pod{*targetPod}})
-	if len(statusResult.Items) == 0 {
+	reporting := statusResult.Partition().Reporting
+	if len(reporting.Items) == 0 {
 		return nil, fmt.Errorf("could not get instance status for pod %s: %w", targetPod.Name, ErrInstanceStatusUnavailable)
 	}
 
-	return &statusResult.Items[0], nil
+	return &reporting.Items[0], nil
 }
 
 // getPostgresContainerStatus returns the container status for the postgres container in a pod

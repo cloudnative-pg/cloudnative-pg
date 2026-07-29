@@ -287,6 +287,142 @@ var _ = Describe("IsPodReadyAndNotReporting", func() {
 	})
 })
 
+var _ = Describe("AreWalReceiversDown", func() {
+	errStatusEndpointFailing := fmt.Errorf("status endpoint failing")
+
+	newList := func(items ...PostgresqlStatus) PostgresqlStatusList {
+		return PostgresqlStatusList{Items: items}
+	}
+
+	primary := PostgresqlStatus{
+		Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "primary"}},
+		IsPrimary: true,
+	}
+
+	It("returns true when every standby has reported its WAL receiver as down", func() {
+		list := newList(
+			primary,
+			PostgresqlStatus{
+				Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-1"}},
+				IsWalReceiverActive: false,
+			},
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeTrue())
+		Expect(unknown).To(BeEmpty())
+	})
+
+	It("returns false when a standby is confirmed to still have an active WAL receiver", func() {
+		list := newList(
+			primary,
+			PostgresqlStatus{
+				Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-1"}},
+				IsWalReceiverActive: true,
+			},
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeFalse())
+		Expect(unknown).To(BeEmpty())
+	})
+
+	It("returns false and reports the standby when its status is unknown (errored but Ready)", func() {
+		list := newList(
+			primary,
+			PostgresqlStatus{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-1"}},
+				IsPodReady: true,
+				Error:      errStatusEndpointFailing,
+			},
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeFalse())
+		Expect(unknown).To(ConsistOf("standby-1"))
+	})
+
+	It("treats an errored and not-Ready standby as confirmed down, not unknown", func() {
+		list := newList(
+			primary,
+			PostgresqlStatus{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-1"}},
+				IsPodReady: false,
+				Error:      errStatusEndpointFailing,
+			},
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeTrue())
+		Expect(unknown).To(BeEmpty())
+	})
+
+	It("blocks on the mix of one confirmed-down standby and one Ready-but-erroring standby", func() {
+		list := newList(
+			primary,
+			PostgresqlStatus{
+				Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-confirmed-down"}},
+				IsWalReceiverActive: false,
+			},
+			PostgresqlStatus{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-unknown"}},
+				IsPodReady: true,
+				Error:      errStatusEndpointFailing,
+			},
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeFalse())
+		Expect(unknown).To(ConsistOf("standby-unknown"))
+	})
+
+	It("does not stall a genuine node-failure failover, where the dead standby is errored and not Ready", func() {
+		list := newList(
+			primary,
+			PostgresqlStatus{
+				Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-alive"}},
+				IsWalReceiverActive: false,
+			},
+			PostgresqlStatus{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-dead-node"}},
+				IsPodReady: false,
+				Error:      errStatusEndpointFailing,
+			},
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeTrue())
+		Expect(unknown).To(BeEmpty())
+	})
+
+	It("does not finalize the failover even when the unknown standby holds the highest last-seen LSN", func() {
+		// Adversarial: the errored standby is the one that would otherwise be
+		// elected first by Less() (highest ReceivedLsn/ReplayLsn), but since
+		// its status is unknown the gate must still block on it rather than
+		// letting the sort order imply it is safe to proceed.
+		list := newList(
+			primary,
+			PostgresqlStatus{
+				Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-behind"}},
+				IsWalReceiverActive: false,
+				ReceivedLsn:         "1/10",
+				ReplayLsn:           "1/10",
+			},
+			PostgresqlStatus{
+				Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standby-ahead-unknown"}},
+				IsPodReady:  true,
+				Error:       errStatusEndpointFailing,
+				ReceivedLsn: "1/99",
+				ReplayLsn:   "1/99",
+			},
+		)
+
+		down, unknown := list.Partition().AreWalReceiversDown(primary.Pod.Name)
+		Expect(down).To(BeFalse())
+		Expect(unknown).To(ConsistOf("standby-ahead-unknown"))
+	})
+})
+
 var _ = Describe("Configuration report", func() {
 	DescribeTable(
 		"Configuration report",

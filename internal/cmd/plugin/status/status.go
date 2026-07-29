@@ -627,7 +627,11 @@ func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, map[string]string
 func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby) {
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
-		status.AddLine("No Primary instance found")
+		if fullStatus.primaryIsSilent() {
+			status.AddLine("Primary instance status unknown: the operator cannot currently reach it")
+		} else {
+			status.AddLine("No Primary instance found")
+		}
 		return
 	}
 	isWalArchivingDisabled := fullStatus.Cluster != nil &&
@@ -778,7 +782,11 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbosity int) {
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
-		fmt.Println(aurora.Yellow("Primary instance not found").String())
+		if fullStatus.primaryIsSilent() {
+			fmt.Println(aurora.Yellow("Primary instance status unknown: the operator cannot currently reach it").String())
+		} else {
+			fmt.Println(aurora.Yellow("Primary instance not found").String())
+		}
 		fmt.Println()
 		return
 	}
@@ -941,15 +949,43 @@ func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
 	fmt.Println()
 }
 
+// tryGetPrimaryInstance returns the observed status of the primary instance,
+// or nil if no reporting instance matches. It only looks at instances whose
+// status probe succeeded: an errored instance's IsPrimary would read as its
+// Go zero value (false), so considering it here could either miss the real
+// primary or, worse, misidentify a standby. Use primaryIsSilent to tell
+// apart "there is no primary" from "the primary is there, but we cannot see
+// it".
 func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.PostgresqlStatus {
-	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
+	reporting := fullStatus.InstanceStatus.Partition().Reporting
+	for idx := range reporting.Items {
+		instanceStatus := &reporting.Items[idx]
 		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 ||
-			fullStatus.isReplicaClusterDesignatedPrimary(instanceStatus) {
-			return &fullStatus.InstanceStatus.Items[idx]
+			fullStatus.isReplicaClusterDesignatedPrimary(*instanceStatus) {
+			return instanceStatus
 		}
 	}
 
 	return nil
+}
+
+// primaryIsSilent reports whether tryGetPrimaryInstance returned nil because
+// the primary instance is known (by Pod name) but its status probe failed,
+// rather than because there is genuinely no primary. Callers use this to
+// print an explicit "unknown" instead of a "not found" that would otherwise
+// look identical to the case of an actually missing primary.
+func (fullStatus *PostgresqlStatus) primaryIsSilent() bool {
+	instanceSet := fullStatus.InstanceStatus.Partition()
+	silentGroups := [][]postgres.SilentInstance{instanceSet.ReadyButSilent, instanceSet.NotReady}
+	for _, group := range silentGroups {
+		for _, instance := range group {
+			if instance.Pod.Name == fullStatus.PrimaryPod.Name {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func getCurrentLSN(instance postgres.PostgresqlStatus) types.LSN {
@@ -1127,7 +1163,11 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus(verbosity int) {
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
 		fmt.Println(aurora.Red(header))
-		fmt.Println(aurora.Red("Primary instance not found").String())
+		if fullStatus.primaryIsSilent() {
+			fmt.Println(aurora.Red("Primary instance status unknown: the operator cannot currently reach it").String())
+		} else {
+			fmt.Println(aurora.Red("Primary instance not found").String())
+		}
 		fmt.Println()
 		return
 	}
