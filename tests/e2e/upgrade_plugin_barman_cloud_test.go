@@ -31,6 +31,7 @@ import (
 
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -422,7 +423,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
 		// the operator's namespace so that affects subsequent test
-		if err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 60); err != nil {
+		if err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 120); err != nil {
 			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
 		}
 
@@ -501,7 +502,14 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 		// bucket, so distinct serverNames are enough to keep cluster1 and
 		// cluster2 isolated without needing separate ObjectStores.
 		objectStoreName := upgradeNamespace
-		setupPluginObjectStore(upgradeNamespace, objectStoreName)
+		setupPluginObjectStore(upgradeNamespace, objectStoreName, func(objectStore *unstructured.Unstructured) {
+			Expect(unstructured.SetNestedField(objectStore.Object, "gzip",
+				"spec", "configuration", "data", "compression")).To(Succeed())
+			Expect(unstructured.SetNestedField(objectStore.Object, true,
+				"spec", "configuration", "data", "immediateCheckpoint")).To(Succeed())
+			Expect(unstructured.SetNestedField(objectStore.Object, int64(4),
+				"spec", "configuration", "wal", "maxParallel")).To(Succeed())
+		})
 		// Create the secrets used by the clusters and the object store
 		By("creating the postgres secrets", func() {
 			resources.CreateResourceFromFile(env, upgradeNamespace, pgSecrets)
