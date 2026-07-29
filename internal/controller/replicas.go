@@ -117,7 +117,14 @@ func (r *ClusterReconciler) evaluateWalReceiversGate(
 			"proceeding with the failover after %v",
 		cluster.Status.CurrentPrimary, walReceiversStalledGracePeriod)
 
-	return r.clearWalReceiversWatermark(ctx, cluster)
+	// Deliberately not clearing the watermark here: the election this unblocks
+	// hasn't committed yet (setPrimaryInstance is still ahead of the caller).
+	// If anything between here and that commit fails, the next reconciliation
+	// must still see the aged watermark and bypass the gate immediately,
+	// rather than mistaking it for a first observation and restarting the
+	// full grace period. The caller clears it once the election actually
+	// commits.
+	return nil
 }
 
 // walReceiversStalledDuringFailover implements the LSN-progress bookkeeping
@@ -362,7 +369,16 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	}
 
 	// Set the first pod in the sorted list as the new targetPrimary
-	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
+	if err := r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name); err != nil {
+		return "", err
+	}
+	// The election has committed: only now is it safe to drop the watermark
+	// the WAL-receivers gate may have carried past its grace period. See
+	// evaluateWalReceiversGate.
+	if err := r.clearWalReceiversWatermark(ctx, cluster); err != nil {
+		return "", err
+	}
+	return mostAdvancedInstance.Pod.Name, nil
 }
 
 // markOldPrimaryAsUnhealthy labels the old primary pod as unhealthy when failover
@@ -558,7 +574,16 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// service, so the split-brain window #10403 guards against does not
 	// apply. The retryable call in the reconcile loop's failover guard still
 	// relabels the pod on its next pass.
-	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
+	if err := r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name); err != nil {
+		return "", err
+	}
+	// The election has committed: only now is it safe to drop the watermark
+	// the WAL-receivers gate may have carried past its grace period. See
+	// evaluateWalReceiversGate.
+	if err := r.clearWalReceiversWatermark(ctx, cluster); err != nil {
+		return "", err
+	}
+	return status.Items[0].Pod.Name, nil
 }
 
 // GetPodsNotOnPrimaryNode filters out only pods that are not on the same node as the primary one

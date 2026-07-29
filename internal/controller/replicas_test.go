@@ -398,7 +398,8 @@ var _ = Describe("evaluateWalReceiversGate", func() {
 		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
 	})
 
-	It("bypasses the wait once stalled past the grace period and the primary is unreachable", func(ctx SpecContext) {
+	It("bypasses the wait once stalled past the grace period and the primary is unreachable, "+
+		"without clearing the watermark yet", func(ctx SpecContext) {
 		cluster.Status.CurrentPrimary = "primary"
 		cluster.Status.FailoverWalReceiversWatermarkLSN = "0/300"
 		cluster.Status.FailoverWalReceiversWatermarkTimestamp = pastTimestamp(walReceiversStalledGracePeriod + 5*time.Second)
@@ -411,8 +412,12 @@ var _ = Describe("evaluateWalReceiversGate", func() {
 
 		err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(BeEmpty())
-		Expect(cluster.Status.FailoverWalReceiversWatermarkTimestamp).To(BeEmpty())
+		// The watermark is left in place on purpose: the election this
+		// bypass unblocks hasn't committed yet, and clearing it here would
+		// make a failed commit restart the full grace period on the next
+		// pass. The caller clears it once setPrimaryInstance succeeds.
+		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
+		Expect(cluster.Status.FailoverWalReceiversWatermarkTimestamp).ToNot(BeEmpty())
 	})
 
 	It("never bypasses when the old primary is still reporting, no matter how stale the watermark is",
@@ -451,5 +456,48 @@ var _ = Describe("evaluateWalReceiversGate", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(BeEmpty())
 		Expect(cluster.Status.FailoverWalReceiversWatermarkTimestamp).To(BeEmpty())
+	})
+
+	It("keeps the watermark set if the election fails to commit after the gate bypasses", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = "primary"
+		cluster.Status.FailoverWalReceiversWatermarkLSN = "0/300"
+		cluster.Status.FailoverWalReceiversWatermarkTimestamp = pastTimestamp(walReceiversStalledGracePeriod + 5*time.Second)
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeStatusItem("replica-1", "0/300", true, nil),
+			makeStatusItem("primary", "0/0", false, fmt.Errorf("connection refused")),
+		}}
+
+		err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
+
+		// Simulate the status patch that commits the election failing, the
+		// same way a transient API server error would.
+		failingClient := fake.NewClientBuilder().
+			WithScheme(env.scheme).
+			WithStatusSubresource(&apiv1.Cluster{}).
+			WithObjects(cluster).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(_ context.Context, _ client.Client, subResourceName string, _ client.Object,
+					_ client.Patch, _ ...client.SubResourcePatchOption,
+				) error {
+					if subResourceName == "status" {
+						return fmt.Errorf("simulated API server error")
+					}
+					return nil
+				},
+			}).
+			Build()
+		r := &ClusterReconciler{Client: failingClient, Scheme: env.scheme}
+
+		err = r.setPrimaryInstance(ctx, cluster, "replica-1")
+		Expect(err).To(MatchError(ContainSubstring("simulated API server error")))
+
+		// The election never committed. A real reconciler retries from here
+		// on the next pass without ever calling clearWalReceiversWatermark,
+		// so the watermark set before the (failed) attempt must survive.
+		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
 	})
 })
