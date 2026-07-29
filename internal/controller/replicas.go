@@ -96,7 +96,12 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	mostAdvancedInstance := status.Items[0]
+	mostAdvancedInstance, hasPromotableCandidate := firstPromotableCandidate(cluster, status)
+	if !hasPromotableCandidate {
+		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
 	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
 		return "", nil
 	}
@@ -371,15 +376,22 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 		return "", ErrWalReceiversRunning
 	}
 
+	candidate, hasPromotableCandidate := firstPromotableCandidate(cluster, status)
+	if !hasPromotableCandidate {
+		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
+
 	contextLogger.Info("Current target primary isn't healthy, failing over",
-		"newPrimary", status.Items[0].Pod.Name)
+		"newPrimary", candidate.Pod.Name)
 	status.LogStatus(ctx)
 	contextLogger.Debug("Cluster status before failover", "instances", resources.instances)
 	r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 		"Current target primary isn't healthy, failing over from %v to %v",
-		cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
+		cluster.Status.TargetPrimary, candidate.Pod.Name)
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-		fmt.Sprintf("Failing over to %v", status.Items[0].Pod.Name)); err != nil {
+		fmt.Sprintf("Failing over to %v", candidate.Pod.Name)); err != nil {
 		return "", err
 	}
 
@@ -388,7 +400,27 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// service, so the split-brain window #10403 guards against does not
 	// apply. The retryable call in the reconcile loop's failover guard still
 	// relabels the pod on its next pass.
-	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
+	return candidate.Pod.Name, r.setPrimaryInstance(ctx, cluster, candidate.Pod.Name)
+}
+
+// firstPromotableCandidate returns the first instance in the sorted status list
+// that is not fenced. A fenced instance has PostgreSQL shut down and cannot act
+// on a promotion request, so it must never be elected as the new (or designated)
+// primary: doing so would leave the cluster retrying a promotion that can never
+// complete. The second return value is false when every instance is fenced
+// (including via the fence-all wildcard), meaning there is no candidate left
+// to elect.
+func firstPromotableCandidate(
+	cluster *apiv1.Cluster,
+	status postgres.PostgresqlStatusList,
+) (postgres.PostgresqlStatus, bool) {
+	for _, candidate := range status.Items {
+		if !cluster.IsInstanceFenced(candidate.Pod.Name) {
+			return candidate, true
+		}
+	}
+
+	return postgres.PostgresqlStatus{}, false
 }
 
 // GetPodsNotOnPrimaryNode filters out only pods that are not on the same node as the primary one
