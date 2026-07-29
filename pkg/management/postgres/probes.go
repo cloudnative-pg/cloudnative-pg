@@ -554,7 +554,7 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 		result.ReceivedLsn = result.ReplayLsn
 	}
 
-	result.IsWalReceiverActive, err = instance.IsWALReceiverActive()
+	result.IsWalReceiverActive, result.LatestEndLsn, err = instance.IsWALReceiverActive()
 	if err != nil {
 		return err
 	}
@@ -562,22 +562,29 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 }
 
 // IsWALReceiverActive check if the WAL receiver process is active by looking
-// at the number of records in the `pg_stat_wal_receiver` table
-func (instance *Instance) IsWALReceiverActive() (bool, error) {
-	var result bool
+// at the number of records in the `pg_stat_wal_receiver` table, and, when
+// active, the sender's reported WAL end position (see LatestEndLsn on
+// PostgresqlStatus for what that value means)
+func (instance *Instance) IsWALReceiverActive() (bool, types.LSN, error) {
+	var (
+		result  bool
+		lastLsn string
+	)
 
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
-	row := superUserDB.QueryRow("SELECT COUNT(*) FROM pg_catalog.pg_stat_wal_receiver")
-	err = row.Scan(&result)
+	row := superUserDB.QueryRow(
+		"SELECT COUNT(*), COALESCE(MAX(latest_end_lsn)::varchar, '') " +
+			"FROM pg_catalog.pg_stat_wal_receiver")
+	err = row.Scan(&result, &lastLsn)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
-	return result, nil
+	return result, types.LSN(lastLsn), nil
 }
 
 // GetLastWalReceiveLSN returns the current value of

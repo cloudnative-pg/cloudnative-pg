@@ -34,8 +34,17 @@ import (
 
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
-	CurrentLsn                types.LSN   `json:"currentLsn,omitempty"`
-	ReceivedLsn               types.LSN   `json:"receivedLsn,omitempty"`
+	CurrentLsn  types.LSN `json:"currentLsn,omitempty"`
+	ReceivedLsn types.LSN `json:"receivedLsn,omitempty"`
+	// LatestEndLsn is the sender's reported WAL end position
+	// (pg_stat_wal_receiver.latest_end_lsn). A keepalive message carries the
+	// sender's cached last-sent position rather than the live flush position
+	// (walsender.c:4128), so once the sender stops producing WAL this value
+	// settles back down to whatever was actually sent. Equality between
+	// LatestEndLsn and ReceivedLsn therefore means nothing is in flight
+	// between the sender and this receiver, not merely that the receiver
+	// looks caught up.
+	LatestEndLsn              types.LSN   `json:"latestEndLsn,omitempty"`
 	ReplayLsn                 types.LSN   `json:"replayLsn,omitempty"`
 	SystemID                  string      `json:"systemID"`
 	IsPrimary                 bool        `json:"isPrimary"`
