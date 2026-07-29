@@ -750,7 +750,10 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	cluster *apiv1.Cluster,
 	statuses postgres.PostgresqlStatusList,
 ) error {
-	existingClusterStatus := cluster.Status
+	// Take a deep copy: the status carries map and slice fields that the code
+	// below mutates in place, and a shallow copy would alias them, making those
+	// mutations undetectable to the DeepEqual comparison further down.
+	existingClusterStatus := *cluster.Status.DeepCopy()
 	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
 	// we extract the instances reported state
