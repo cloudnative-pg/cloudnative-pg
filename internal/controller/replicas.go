@@ -54,31 +54,12 @@ func (r *ClusterReconciler) reconcileTargetPrimaryFromPods(
 	status postgres.PostgresqlStatusList,
 	resources *managedResources,
 ) (string, error) {
-	contextLogger := log.FromContext(ctx)
-
 	if len(status.Items) == 0 {
 		// We have no status to check and we can't make a
 		// switchover under those conditions
 		return "", nil
 	}
 
-	// First step: check if the current primary is running in an unschedulable node
-	// and issue a switchover if that's the case
-	if primary := status.Items[0]; (primary.IsPrimary || (cluster.IsReplica() && primary.IsPodReady)) &&
-		primary.Pod.Name == cluster.Status.CurrentPrimary &&
-		cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
-		isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulableOrBeingDrained(ctx, primary.Node)
-		if err != nil {
-			contextLogger.Error(err, "while checking if current primary is on an unschedulable node")
-			// in case of error it's better to proceed with the normal target primary reconciliation
-		} else if isPrimaryOnUnschedulableNode {
-			contextLogger.Info("Primary is running on an unschedulable node, will try switching over",
-				"node", primary.Node, "primary", primary.Pod.Name)
-			return r.triggerSwitchoverToSchedulableNodes(ctx, cluster, status, resources, &primary)
-		}
-	}
-
-	// Second step: check if the first element of the sorted list is the primary
 	if cluster.IsReplica() {
 		return r.reconcileTargetPrimaryForReplicaCluster(ctx, cluster, status, resources)
 	}
@@ -97,8 +78,20 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	contextLogger := log.FromContext(ctx)
 
 	mostAdvancedInstance := status.Items[0]
+	var shouldMovePrimary bool
 	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
-		return "", nil
+		if cluster.Status.CurrentPrimary != mostAdvancedInstance.Pod.Name {
+			return "", nil
+		}
+		shouldMovePrimary = r.shouldSetPrimaryToSchedulableNode(ctx, cluster, status, &mostAdvancedInstance)
+		if shouldMovePrimary && len(status.Items) > 1 {
+			// mostAdvancedInstance is the current primary we want to move away from, change it to the most advanced
+			// replica. shouldSetPrimaryToSchedulableNode has already confirmed all other healthy replicas are on
+			// schedulable nodes.
+			mostAdvancedInstance = status.Items[1]
+		} else {
+			return "", nil
+		}
 	}
 
 	// If the first pod of the list has no reported status we can't evaluate the failover logic.
@@ -127,11 +120,15 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	// (if is still alive) to shut down by setting the apiv1.PendingFailoverMarker as
 	// target primary.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
-		contextLogger.Info("Current primary isn't healthy, initiating a failover")
+		failoverReason := "Current primary isn't healthy"
+		if shouldMovePrimary {
+			failoverReason = "Current primary is on an unschedulable node"
+		}
+		contextLogger.Info(failoverReason+", initiating a failover", "currentPrimary", cluster.Status.CurrentPrimary)
 		status.LogStatus(ctx)
 		contextLogger.Debug("Cluster status before initiating the failover", "instances", resources.instances)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
-			"Current primary isn't healthy, initiating a failover from %v", cluster.Status.CurrentPrimary)
+			"%s, initiating a failover from %v", failoverReason, cluster.Status.CurrentPrimary)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
 			fmt.Sprintf("Initiating a failover from %v", cluster.Status.CurrentPrimary)); err != nil {
 			return "", err
@@ -257,16 +254,25 @@ func (r *ClusterReconciler) isNodeUnschedulableOrBeingDrained(
 	return isNodeUnschedulableOrBeingDrained(&node, r.drainTaints), nil
 }
 
-// triggerSwitchoverToSchedulableNodes Triggers an unschedulable node switchover if all replicas are on schedulable nodes
-// and failover quorum is satisfied
-func (r *ClusterReconciler) triggerSwitchoverToSchedulableNodes(
+// shouldSetPrimaryToSchedulableNode checks if the current primary is running on an unschedulable node and if there are
+// other pods are running on schedulable nodes. Returns true if the primary should a switchover should be triggered
+// to move the primary to a schedulable node.
+func (r *ClusterReconciler) shouldSetPrimaryToSchedulableNode(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
-	resources *managedResources,
 	primaryPod *postgres.PostgresqlStatus,
-) (string, error) {
+) bool {
 	contextLogger := log.FromContext(ctx)
+
+	isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulableOrBeingDrained(ctx, primaryPod.Node)
+	if !isPrimaryOnUnschedulableNode {
+		if err != nil {
+			contextLogger.Error(err, "while checking if current primary is on an unschedulable node")
+		}
+		// Don't disrupt the primary if we can't get its node's status
+		return false
+	}
 
 	// Checking failed pods, e.g. pending pods due to missing PVCs
 	_, hasFailedPods := cluster.Status.InstancesStatus[apiv1.PodFailed]
@@ -287,7 +293,7 @@ func (r *ClusterReconciler) triggerSwitchoverToSchedulableNodes(
 			"instances", cluster.Spec.Instances,
 			"readyInstances", cluster.Status.ReadyInstances,
 			"primaryNode", primaryPod.Node)
-		return "", nil
+		return false
 	}
 
 	// In case we have failed pods, we try to do a switchover, because pods could be in this state
@@ -296,44 +302,7 @@ func (r *ClusterReconciler) triggerSwitchoverToSchedulableNodes(
 	// and the operator would be waiting for it to be rescheduled to a different node indefinitely if the PVC used can not
 	// be moved between nodes, e.g. local-path-provisioner on Kind.
 
-	// If quorum check is active, ensure we don't trigger a switchover if not enough replicas are available.
-	if cluster.IsFailoverQuorumActive() {
-		if status, err := r.evaluateQuorumCheck(ctx, cluster, status); err != nil {
-			return "", err
-		} else if !status {
-			// Prevent a failover from happening
-			return "", nil
-		}
-	}
-
-	contextLogger.Info("Current primary is running on unschedulable node, triggering a switchover",
-		"currentPrimary", primaryPod.Pod.Name, "currentPrimaryNode", primaryPod.Node)
-	status.LogStatus(ctx)
-	r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
-		"Current primary is running on unschedulable node %v, triggering a switchover",
-		primaryPod.Node)
-	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
-		fmt.Sprintf("Triggering switchover because primary instance %v is running on unschedulable node %v",
-			primaryPod.Pod.Name,
-			primaryPod.Node)); err != nil {
-		return "", err
-	}
-	if err := r.setPrimaryInstance(ctx, cluster, apiv1.PendingFailoverMarker); err != nil {
-		return "", err
-	}
-
-	if !status.IsReplicaCluster {
-		if err := r.markOldPrimaryAsUnhealthy(
-			ctx,
-			cluster.Status.CurrentPrimary,
-			resources.instances.Items,
-		); err != nil {
-			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
-				"oldPrimary", cluster.Status.CurrentPrimary)
-		}
-	}
-
-	return "", nil
+	return true
 }
 
 // reconcileTargetPrimaryForReplicaCluster sets the name of the target designated
@@ -350,10 +319,30 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// When replica mode is active, the designated primary may not be the first element
 	// in this list, since from the PostgreSQL point-of-view it's not the real primary.
 
+	mostAdvancedInstance := status.Items[0]
+
+	var targetPrimary postgres.PostgresqlStatus
+	targetPrimaryFound := false
 	for _, statusRecord := range status.Items {
 		if statusRecord.Pod.Name == cluster.Status.TargetPrimary {
-			// Everything fine, the current designated primary is active
+			targetPrimary = statusRecord
+			targetPrimaryFound = true
+			break
+		}
+	}
+
+	var shouldMovePrimary bool
+	if targetPrimaryFound {
+		if cluster.Status.CurrentPrimary != targetPrimary.Pod.Name {
+			// Failover in progress and target primary is already set
 			return "", nil
+		}
+		shouldMovePrimary = r.shouldSetPrimaryToSchedulableNode(ctx, cluster, status, &targetPrimary)
+		if shouldMovePrimary && len(status.Items) > 1 {
+			// mostAdvancedInstance is the current primary we want to move away from, change it to the most advanced
+			// replica. shouldSetPrimaryToSchedulableNode has already confirmed all other healthy replicas are on
+			// schedulable nodes.
+			mostAdvancedInstance = status.Items[1]
 		}
 	}
 
@@ -369,15 +358,19 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 		return "", ErrWalReceiversRunning
 	}
 
-	contextLogger.Info("Current target primary isn't healthy, failing over",
-		"newPrimary", status.Items[0].Pod.Name)
+	failoverReason := "Current primary isn't healthy"
+	if shouldMovePrimary {
+		failoverReason = "Current primary is on an unschedulable node"
+	}
+	contextLogger.Info(failoverReason+", failing over",
+		"newPrimary", mostAdvancedInstance.Pod.Name)
 	status.LogStatus(ctx)
 	contextLogger.Debug("Cluster status before failover", "instances", resources.instances)
 	r.Recorder.Eventf(cluster, "Normal", "FailingOver",
-		"Current target primary isn't healthy, failing over from %v to %v",
-		cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
+		failoverReason+", failing over from %v to %v",
+		cluster.Status.TargetPrimary, mostAdvancedInstance.Pod.Name)
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-		fmt.Sprintf("Failing over to %v", status.Items[0].Pod.Name)); err != nil {
+		fmt.Sprintf("Failing over to %v", mostAdvancedInstance.Pod.Name)); err != nil {
 		return "", err
 	}
 
@@ -386,7 +379,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// service, so the split-brain window #10403 guards against does not
 	// apply. The retryable call in the reconcile loop's failover guard still
 	// relabels the pod on its next pass.
-	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
+	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
 }
 
 // getSchedulablePodsNotOnPrimaryNode filters out only pods that are not on the same node as the
@@ -396,6 +389,8 @@ func (r *ClusterReconciler) getSchedulablePodsNotOnPrimaryNode(
 	status postgres.PostgresqlStatusList,
 	primaryPod *postgres.PostgresqlStatus,
 ) postgres.PostgresqlStatusList {
+	contextLogger := log.FromContext(ctx)
+
 	podsOnOtherNodes := postgres.PostgresqlStatusList{
 		IsReplicaCluster: status.IsReplicaCluster,
 		CurrentPrimary:   status.CurrentPrimary,
@@ -407,7 +402,13 @@ func (r *ClusterReconciler) getSchedulablePodsNotOnPrimaryNode(
 		if candidate.Pod.Name == primaryPod.Pod.Name || candidate.Node == primaryPod.Node {
 			continue
 		}
-		if unschedulable, _ := r.isNodeUnschedulableOrBeingDrained(ctx, candidate.Node); unschedulable {
+		unschedulable, err := r.isNodeUnschedulableOrBeingDrained(ctx, candidate.Node)
+		if err != nil {
+			contextLogger.Error(err, "while checking if node is unschedulable or being drained",
+				"node", candidate.Node, "pod", candidate.Pod.Name)
+			continue
+		}
+		if unschedulable {
 			continue
 		}
 		podsOnOtherNodes.Items = append(podsOnOtherNodes.Items, candidate)

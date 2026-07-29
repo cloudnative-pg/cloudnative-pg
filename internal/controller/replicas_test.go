@@ -307,6 +307,12 @@ var _ = Describe("Check schedulable pods not on primary node", func() {
 
 	It("first status element is primary", func() {
 		ctx := context.Background()
+
+		node2 := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
+		}
+		Expect(env.client.Create(ctx, &node2)).To(Succeed())
+
 		Expect(env.clusterReconciler.getSchedulablePodsNotOnPrimaryNode(ctx, statusList2, &statusList2.Items[0]).Items).
 			ToNot(BeEmpty())
 	})
@@ -322,8 +328,12 @@ var _ = Describe("Check schedulable pods not on primary node", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "cordoned-node"},
 			Spec:       corev1.NodeSpec{Unschedulable: true},
 		}
+		schedulableNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "healthy-node"},
+		}
 		Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
 		Expect(env.client.Create(ctx, &cordonedNode)).To(Succeed())
+		Expect(env.client.Create(ctx, &schedulableNode)).To(Succeed())
 
 		primary := postgres.PostgresqlStatus{
 			IsPrimary: true,
@@ -340,12 +350,17 @@ var _ = Describe("Check schedulable pods not on primary node", func() {
 			Node:      "missing-node",
 			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-missing-node"}},
 		}
+		onHealthyNode := postgres.PostgresqlStatus{
+			IsPrimary: false,
+			Node:      "healthy-node",
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-healthy"}},
+		}
 		list := postgres.PostgresqlStatusList{
-			Items: []postgres.PostgresqlStatus{primary, onCordonedNode, onMissingNode},
+			Items: []postgres.PostgresqlStatus{primary, onCordonedNode, onMissingNode, onHealthyNode},
 		}
 
 		result := env.clusterReconciler.getSchedulablePodsNotOnPrimaryNode(ctx, list, &primary)
 		Expect(result.Items).To(HaveLen(1))
-		Expect(result.Items[0].Pod.Name).To(Equal("pod-missing-node"))
+		Expect(result.Items[0].Pod.Name).To(Equal("pod-healthy"))
 	})
 })
