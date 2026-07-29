@@ -1615,7 +1615,12 @@ func (cluster *Cluster) IsFailoverQuorumActive() bool {
 // DivergedReplicaHandlingAnnotationName annotation: a replica confirmed to
 // have diverged onto a history the current primary no longer shares is
 // fenced and its replication slot on the primary is dropped, in addition to
-// being surfaced. Safe as the default because fencing is reversible.
+// being surfaced. Containment is lifted automatically only once the
+// instance's PGDATA PersistentVolumeClaim is replaced by a fresh clone (for
+// example with `kubectl cnpg destroy`): manually clearing the fence leaves
+// the verdict latched and the replication slot excluded, since neither is
+// re-evaluated until the PVC changes. Use DivergedReplicaHandlingDetectOnly
+// to opt out of automatic containment instead.
 const DivergedReplicaHandlingAuto = "auto"
 
 // DivergedReplicaHandlingDetectOnly is the value of the

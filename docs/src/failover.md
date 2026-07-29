@@ -243,7 +243,10 @@ replication:
   reports the instance as unhealthy, and fences it so it stops retrying a
   broken WAL stream and is removed from the read services. Recovering it is
   currently a manual step: see
-  [Recovering a stranded replica](failure_modes.md#recovering-a-stranded-replica).
+  [Recovering a stranded replica](failure_modes.md#recovering-a-stranded-replica),
+  which also covers the case where a replica merely stalls behind the new
+  primary's timeline without a confirmed divergence, and the annotation that
+  disables this automatic fencing.
 
 If the replicas were already caught up when the primary was lost, no data is lost
 at the cluster level and no replica is left behind.

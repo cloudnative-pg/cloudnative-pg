@@ -80,6 +80,13 @@ primary. This is reflected in the `Cluster` status and reported with a
   `requested starting point ... is not in this server's history`; and
 - the operator has fenced it and reports it as unhealthy.
 
+If the operator cannot confirm a divergence this way -- for example because it
+could not reach the primary to check, or because the replica stalled without
+ever progressing past the point where the primary's timeline diverged -- the
+instance is instead reported as `Stuck` in the `Cluster` status. A `Stuck`
+replica is surfaced but never fenced: it may still catch up once the
+underlying cause (for example a network issue) resolves.
+
 Recovery is still a manual step in this version: the operator does not yet
 rewind or re-clone the instance automatically. To recover, rebuild the
 affected instance from the current primary. The
@@ -93,6 +100,12 @@ kubectl cnpg destroy CLUSTER INSTANCE
 
 Replace `CLUSTER` with the cluster name and `INSTANCE` with the stranded Pod's
 name.
+
+To disable the automatic fencing and slot removal described above, and only
+have the divergence detected and surfaced, set the
+`alpha.cnpg.io/divergedReplicaHandling: detectOnly` annotation on the
+`Cluster`. This is useful when you want to review a divergence yourself before
+the operator acts on it.
 
 ### Disabling Reconciliation
 
