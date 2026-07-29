@@ -322,7 +322,7 @@ var _ = Describe("evaluateReplicaDivergence", func() {
 			Expect(cluster.Status.ReplicaWalIssues["replica-1"].Kind).To(Equal(apiv1.ReplicaWalIssueStuck))
 		})
 
-	It("confirms a Stuck verdict once, holds it across repeated reconciliations, and re-opens the check on a fresh failover",
+	It("confirms a Stuck verdict once, holds it across reconciliations, and re-opens the check on a fresh failover",
 		func(ctx SpecContext) {
 			cluster.Status.ReplicaDivergenceWatermarks = map[apiv1.PodName]apiv1.ReplicaDivergenceWatermark{
 				"replica-1": {
