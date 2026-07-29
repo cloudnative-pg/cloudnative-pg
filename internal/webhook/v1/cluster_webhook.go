@@ -61,18 +61,6 @@ const sharedBuffersParameter = "shared_buffers"
 // walLevelMinimal is the "minimal" wal level
 const walLevelMinimal = "minimal"
 
-// extensionPathContainmentBase is a synthetic placeholder standing in for an
-// extension's mount point, used only to check that a user-supplied path
-// stays contained once joined the same way the instance manager joins it at
-// runtime (see CollectBinPaths and absolutizePaths). The webhook validates
-// the Cluster spec at admission time, before any Pod exists, so the real
-// mount point isn't available yet, and it doesn't need to be: filepath.Join's
-// ".." resolution is purely syntactic, so whether the result stays under the
-// base depends only on the shape of the joined path, not on what the base
-// actually is. Any fixed placeholder therefore gives the same containment
-// answer the real mount point would.
-const extensionPathContainmentBase = "/mount"
-
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
@@ -2951,6 +2939,19 @@ func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) f
 }
 
 func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.ErrorList {
+	// extensionPathContainmentBase is a synthetic placeholder standing in for
+	// an extension's mount point, used only to check that a user-supplied
+	// path stays contained once joined the same way the instance manager
+	// joins it at runtime (see CollectBinPaths and absolutizePaths). The
+	// webhook validates the Cluster spec at admission time, before any Pod
+	// exists, so the real mount point isn't available yet, and it doesn't
+	// need to be: filepath.Join's ".." resolution is purely syntactic, so
+	// whether the result stays under the base depends only on the shape of
+	// the joined path, not on what the base actually is. Any fixed
+	// placeholder therefore gives the same containment answer the real mount
+	// point would.
+	const extensionPathContainmentBase = "/mount"
+
 	ensureNotEmptyOrDuplicate := func(path *field.Path, list *stringset.Data, value string) *field.Error {
 		if value == "" {
 			return field.Invalid(

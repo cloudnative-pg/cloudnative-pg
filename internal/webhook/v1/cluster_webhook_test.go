@@ -6160,6 +6160,10 @@ var _ = Describe("validateExtensions", func() {
 		// separator (see the CollectBinPaths doc comment): filepath.Join
 		// treats "/opt/custom/lib" the same as "opt/custom/lib" when joining
 		// it under the extension's mount point, so it never escapes.
+		// "a/b/../../share" is also valid for the same reason: the embedded
+		// ".." components resolve to "share" without ever climbing above the
+		// mount point, so a path is only rejected when it actually escapes,
+		// not merely because it contains "..".
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -6171,6 +6175,9 @@ var _ = Describe("validateExtensions", func() {
 							},
 							ExtensionControlPath: []string{
 								"/opt/custom/share",
+							},
+							DynamicLibraryPath: []string{
+								"a/b/../../share",
 							},
 						},
 					},
