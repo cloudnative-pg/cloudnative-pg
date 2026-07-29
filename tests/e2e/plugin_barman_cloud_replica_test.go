@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -206,7 +207,11 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				})
 
 				stopLoad := make(chan struct{})
-				DeferCleanup(func() { close(stopLoad) })
+				var loadWG sync.WaitGroup
+				DeferCleanup(func() {
+					close(stopLoad)
+					loadWG.Wait()
+				})
 
 				setupPluginObjectStore(namespace, objectStoreName, func(objectStore *unstructured.Unstructured) {
 					Expect(unstructured.SetNestedField(objectStore.Object, true,
@@ -230,7 +235,10 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 					)
 					Expect(err).ToNot(HaveOccurred())
 
+					loadWG.Add(1)
 					go func() {
+						defer GinkgoRecover()
+						defer loadWG.Done()
 						for {
 							_, _, _ = exec.QueryInInstancePod(
 								env.Ctx, env.Client, env.Interface, env.RestClientConfig,

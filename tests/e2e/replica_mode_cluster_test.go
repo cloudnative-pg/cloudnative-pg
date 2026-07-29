@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -690,7 +691,11 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			})
 
 			stopLoad := make(chan struct{})
-			DeferCleanup(func() { close(stopLoad) })
+			var loadWG sync.WaitGroup
+			DeferCleanup(func() {
+				close(stopLoad)
+				loadWG.Wait()
+			})
 
 			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
@@ -726,7 +731,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				)
 				Expect(err).ToNot(HaveOccurred())
 
+				loadWG.Add(1)
 				go func() {
+					defer GinkgoRecover()
+					defer loadWG.Done()
 					for {
 						_, _, _ = exec.QueryInInstancePod(
 							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
