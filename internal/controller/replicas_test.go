@@ -394,6 +394,58 @@ var _ = Describe("maxReceivedLsnAmongUpReceivers", func() {
 	})
 })
 
+var _ = Describe("allUpReceiversExactlyCaughtUp", func() {
+	makeItem := func(name, receivedLsn, latestEndLsn string, active bool) postgres.PostgresqlStatus {
+		return postgres.PostgresqlStatus{
+			Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}},
+			ReceivedLsn:         cnpgTypes.LSN(receivedLsn),
+			LatestEndLsn:        cnpgTypes.LSN(latestEndLsn),
+			IsWalReceiverActive: active,
+		}
+	}
+
+	It("reports caught up when every up receiver has flushed everything its sender reported", func() {
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("primary", "0/999", "0/999", true),
+			makeItem("replica-1", "0/300", "0/300", true),
+			makeItem("replica-2", "0/300", "0/300", true),
+		}}
+		Expect(allUpReceiversExactlyCaughtUp(statusList, "primary")).To(BeTrue())
+	})
+
+	It("does not fire when a standby's LatestEndLsn is empty (unavailable, e.g. older instance manager)", func() {
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "0/300", "", true),
+		}}
+		Expect(allUpReceiversExactlyCaughtUp(statusList, "primary")).To(BeFalse())
+	})
+
+	It("does not fire when a standby reported an error (unknown, not caught up)", func() {
+		unreachable := makeItem("replica-2", "0/300", "0/300", true)
+		unreachable.Error = errors.New("connection refused")
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "0/300", "0/300", true),
+			unreachable,
+		}}
+		Expect(allUpReceiversExactlyCaughtUp(statusList, "primary")).To(BeFalse())
+	})
+
+	It("does not fire when a standby still has bytes in flight (LatestEndLsn ahead of ReceivedLsn)", func() {
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "0/300", "0/300", true),
+			makeItem("replica-2", "0/100", "0/300", true),
+		}}
+		Expect(allUpReceiversExactlyCaughtUp(statusList, "primary")).To(BeFalse())
+	})
+
+	It("does not fire when no non-primary receiver is up", func() {
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "0/300", "0/300", false),
+		}}
+		Expect(allUpReceiversExactlyCaughtUp(statusList, "primary")).To(BeFalse())
+	})
+})
+
 var _ = Describe("evaluateWalReceiversGate", func() {
 	var env *testingEnvironment
 	var namespace string
@@ -417,6 +469,38 @@ var _ = Describe("evaluateWalReceiversGate", func() {
 	pastTimestamp := func(age time.Duration) string {
 		return time.Now().Add(-age).Format(metav1.RFC3339Micro)
 	}
+
+	It("proceeds immediately when every up receiver has flushed everything its sender reported, "+
+		"without touching the watermark", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = "primary"
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			{
+				Pod:                 &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-1", Namespace: namespace}},
+				ReceivedLsn:         "0/300",
+				LatestEndLsn:        "0/300",
+				IsWalReceiverActive: true,
+			},
+			makeStatusItem("primary", "0/0", false, fmt.Errorf("connection refused")),
+		}}
+
+		err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(BeEmpty())
+		Expect(cluster.Status.FailoverWalReceiversWatermarkTimestamp).To(BeEmpty())
+	})
+
+	It("falls through to the timer when a receiver's LatestEndLsn is empty even though it looks caught up",
+		func(ctx SpecContext) {
+			cluster.Status.CurrentPrimary = "primary"
+			statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				makeStatusItem("replica-1", "0/300", true, nil),
+				makeStatusItem("primary", "0/0", false, fmt.Errorf("connection refused")),
+			}}
+
+			err := env.clusterReconciler.evaluateWalReceiversGate(ctx, cluster, statusList)
+			Expect(err).To(MatchError(ErrWalReceiversRunning))
+			Expect(cluster.Status.FailoverWalReceiversWatermarkLSN).To(Equal("0/300"))
+		})
 
 	It("keeps waiting and raises the watermark when progress is observed", func(ctx SpecContext) {
 		cluster.Status.CurrentPrimary = "primary"

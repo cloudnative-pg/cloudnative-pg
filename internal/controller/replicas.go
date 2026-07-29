@@ -97,6 +97,13 @@ func (r *ClusterReconciler) evaluateWalReceiversGate(
 		return r.clearWalReceiversWatermark(ctx, cluster)
 	}
 
+	if allUpReceiversExactlyCaughtUp(status, cluster.Status.CurrentPrimary) {
+		log.FromContext(ctx).Info(
+			"WAL receivers are up but have flushed everything their sender has reported; " +
+				"proceeding with the failover without waiting for the grace period")
+		return nil
+	}
+
 	stalled, unknownStandbys, err := r.walReceiversStalledDuringFailover(ctx, cluster, status)
 	if err != nil {
 		return err
@@ -219,6 +226,42 @@ func maxReceivedLsnAmongUpReceivers(
 	}
 
 	return maxLsn, found, unknownStandbys
+}
+
+// allUpReceiversExactlyCaughtUp reports whether every non-primary instance
+// that is currently reporting and has an active WAL receiver has flushed
+// everything its sender has reported, i.e. ReceivedLsn == LatestEndLsn (see
+// the LatestEndLsn doc comment on PostgresqlStatus for why this equality is
+// exact rather than a heuristic).
+//
+// An instance with a non-nil Error is unknown, not caught up: it must never
+// satisfy this predicate, or an unreachable standby that may still be
+// streaming from the old primary would be silently treated as safe (see
+// maxReceivedLsnAmongUpReceivers and CNP-8534's commit 38ac6b4d1). An empty
+// LatestEndLsn is equally disqualifying: it means the value is unavailable
+// (e.g. an older instance manager during a rolling upgrade), and treating an
+// unset LSN as "equal" would pass the gate on no evidence.
+func allUpReceiversExactlyCaughtUp(status postgres.PostgresqlStatusList, primaryName string) bool {
+	found := false
+
+	for i := range status.Items {
+		item := &status.Items[i]
+		if item.Pod.Name == primaryName {
+			continue
+		}
+		if item.Error != nil {
+			return false
+		}
+		if !item.IsWalReceiverActive {
+			continue
+		}
+		if item.ReceivedLsn == "" || item.LatestEndLsn == "" || item.ReceivedLsn != item.LatestEndLsn {
+			return false
+		}
+		found = true
+	}
+
+	return found
 }
 
 // setWalReceiversWatermark persists a newly observed high-water mark for the
