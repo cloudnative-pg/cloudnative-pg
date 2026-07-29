@@ -43,10 +43,14 @@ standby fails while Kubernetes still reports its pod as `Ready`, the operator
 cannot tell whether the WAL receiver is really down or the pod is simply
 unreachable, so it conservatively assumes the WAL receiver might still be
 running and defers the election, raising a `WalReceiverStatusUnknown` event
-naming the affected pod(s). Once Kubernetes stops reporting the pod as
-`Ready` (bounded by `.spec.livenessProbeTimeout`), the standby is treated as
-down, since a genuinely dead pod cannot still be streaming and blocking on it
-would stall failover after an actual node failure.
+naming the affected pod(s). Kubernetes stops reporting the pod as `Ready`
+when the instance's own readiness check (a local `pg_isready`) fails or the
+node goes away, which is what covers the case of an actual node failure. A
+standby whose PostgreSQL is still answering locally while the operator's own
+status probe keeps failing (for example due to a NetworkPolicy or a TLS
+problem) stays in this deferred state for as long as that condition lasts,
+with the election blocked and the `WalReceiverStatusUnknown` event
+recurring.
 
 During the time the failing primary is being shut down:
 

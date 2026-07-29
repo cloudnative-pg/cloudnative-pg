@@ -333,14 +333,16 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 // "receiver down": if kubelet still reports the pod Ready, the operator has
 // no way to tell whether the WAL receiver is actually down or it simply lost
 // connectivity to the pod, so the standby is conservatively assumed to still
-// be streaming and the gate blocks (mirroring the primary-side guard in
-// evaluatePodReadinessGuards, which trusts kubelet readiness over a failing
-// probe). Only once kubelet stops reporting the pod as Ready is it treated
-// as down, since a dead standby cannot be streaming and blocking on it would
-// stall failovers triggered by an actual node failure. This is why the
-// method partitions its input first: reading IsWalReceiverActive off an
-// instance whose probe failed would silently read the Go zero value (false)
-// as an observation, and InstanceSet is what makes that unrepresentable.
+// be streaming and the gate blocks. This treats a failing probe on a Ready
+// pod the same way evaluatePodReadinessGuards treats one on the primary
+// (trusting kubelet readiness over the failing probe), though that guard
+// does not bound how long this wait can last either. Only once kubelet
+// stops reporting the pod as Ready is it treated as down, since a dead
+// standby cannot be streaming and blocking on it would stall failovers
+// triggered by an actual node failure. This is why the method partitions
+// its input first: reading IsWalReceiverActive off an instance whose probe
+// failed would silently read the Go zero value (false) as an observation,
+// and InstanceSet is what makes that unrepresentable.
 //
 // The second return value lists the names of the standbys whose WAL
 // receiver status is unknown (errored but still Ready) and are therefore
@@ -372,9 +374,12 @@ func (set InstanceSet) AreWalReceiversDown(primaryName string) (bool, []string) 
 	// its WAL receiver cannot possibly still be streaming. This extends to
 	// standbys the same kubelet-readiness convention already applied to the
 	// primary in evaluatePodReadinessGuards
-	// (internal/controller/cluster_controller.go); a liveness-probe failure
-	// gets kubelet to flip readiness off, which is what bounds how long the
-	// ReadyButSilent case above can block.
+	// (internal/controller/cluster_controller.go). A NotReady standby is
+	// what a real node failure looks like, and ignoring it is what lets that
+	// case fail over; the ReadyButSilent case above, by contrast, is not
+	// bounded by anything, since a standby's own PostgreSQL can keep
+	// answering pg_isready (and so stay Ready) indefinitely while the
+	// operator's status probe to it keeps failing.
 
 	if len(unknownStandbys) > 0 {
 		return false, unknownStandbys
