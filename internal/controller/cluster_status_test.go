@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -264,7 +265,9 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+		Expect(persisted.Status.InstancesReportedState).To(HaveLen(2))
 		Expect(cluster.Status.TimelineID).To(Equal(123))
 		Expect(cluster.Status.SystemID).To(BeEmpty())
 
@@ -302,7 +305,9 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+		Expect(persisted.Status.InstancesReportedState).To(HaveLen(2))
 		Expect(cluster.Status.TimelineID).To(Equal(123))
 		Expect(cluster.Status.SystemID).To(Equal(systemID))
 
@@ -339,7 +344,9 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+		Expect(persisted.Status.InstancesReportedState).To(HaveLen(2))
 		Expect(cluster.Status.TimelineID).To(Equal(123))
 		Expect(cluster.Status.SystemID).To(BeEmpty())
 
@@ -408,14 +415,16 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+		Expect(persisted.Status.InstancesReportedState).To(HaveLen(2))
 
-		state1 := cluster.Status.InstancesReportedState["pod-1"]
+		state1 := persisted.Status.InstancesReportedState["pod-1"]
 		Expect(state1.IsPrimary).To(BeTrue())
 		Expect(state1.TimeLineID).To(Equal(123))
 		Expect(state1.IP).To(Equal("192.168.1.1"))
 
-		state2 := cluster.Status.InstancesReportedState["pod-2"]
+		state2 := persisted.Status.InstancesReportedState["pod-2"]
 		Expect(state2.IsPrimary).To(BeFalse())
 		Expect(state2.TimeLineID).To(Equal(123))
 		Expect(state2.IP).To(Equal("192.168.1.2"))
@@ -471,17 +480,19 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		err = env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, secondPass)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+		Expect(persisted.Status.InstancesReportedState).To(HaveLen(2))
 
 		// pod-1's entry is untouched: still the last known good observation,
 		// not zeroed out because its current probe failed.
-		state1 := cluster.Status.InstancesReportedState["pod-1"]
+		state1 := persisted.Status.InstancesReportedState["pod-1"]
 		Expect(state1.IsPrimary).To(BeTrue())
 		Expect(state1.TimeLineID).To(Equal(123))
 		Expect(state1.IP).To(Equal("192.168.1.1"))
 
 		// pod-2 keeps being refreshed normally.
-		state2 := cluster.Status.InstancesReportedState["pod-2"]
+		state2 := persisted.Status.InstancesReportedState["pod-2"]
 		Expect(state2.TimeLineID).To(Equal(456))
 	})
 
@@ -524,14 +535,17 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		err = env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, secondPass)
 		Expect(err).ToNot(HaveOccurred())
 
-		state1 := cluster.Status.InstancesReportedState["pod-1"]
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+
+		state1 := persisted.Status.InstancesReportedState["pod-1"]
 		Expect(state1.IsPrimary).To(BeTrue())
 		Expect(state1.TimeLineID).To(Equal(123))
 		Expect(state1.IP).To(Equal("192.168.1.1"))
 
 		// the timeline on the status root is fed from the same reporting set,
 		// so an unreported timeline must not reach it either.
-		Expect(cluster.Status.TimelineID).To(Equal(123))
+		Expect(persisted.Status.TimelineID).To(Equal(123))
 	})
 
 	It("removes the entry of an instance that no longer belongs to the cluster", func(ctx SpecContext) {
@@ -576,9 +590,11 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		err = env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, secondPass)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.InstancesReportedState).To(HaveLen(1))
-		Expect(cluster.Status.InstancesReportedState).To(HaveKey(apiv1.PodName("pod-1")))
-		Expect(cluster.Status.InstancesReportedState).ToNot(HaveKey(apiv1.PodName("pod-2")))
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+		Expect(persisted.Status.InstancesReportedState).To(HaveLen(1))
+		Expect(persisted.Status.InstancesReportedState).To(HaveKey(apiv1.PodName("pod-1")))
+		Expect(persisted.Status.InstancesReportedState).ToNot(HaveKey(apiv1.PodName("pod-2")))
 	})
 
 	It("does not create an entry for an instance whose first-ever observation is silent", func(ctx SpecContext) {
@@ -597,7 +613,59 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.InstancesReportedState).ToNot(HaveKey(apiv1.PodName("pod-1")))
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+		Expect(persisted.Status.InstancesReportedState).ToNot(HaveKey(apiv1.PodName("pod-1")))
+	})
+
+	It("persists a newly-joined instance added on a later pass", func(ctx SpecContext) {
+		firstPass := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+				},
+			},
+		}
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, firstPass)
+		Expect(err).ToNot(HaveOccurred())
+
+		// pod-2 joins on the second pass, it was not present at all in the first.
+		secondPass := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary:  false,
+					TimeLineID: 123,
+				},
+			},
+		}
+		err = env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, secondPass)
+		Expect(err).ToNot(HaveOccurred())
+
+		// This is the regression check: the second pass mutates the same map
+		// in place, so it must be read back through the client to prove the
+		// change actually reached the API server rather than only the
+		// in-memory object.
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &persisted)).To(Succeed())
+		Expect(persisted.Status.InstancesReportedState).To(HaveKey(apiv1.PodName("pod-1")))
+		Expect(persisted.Status.InstancesReportedState).To(HaveKey(apiv1.PodName("pod-2")))
 	})
 
 	Context("Pod termination reason detection", func() {

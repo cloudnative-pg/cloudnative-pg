@@ -750,7 +750,10 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	cluster *apiv1.Cluster,
 	statuses postgres.PostgresqlStatusList,
 ) error {
-	existingClusterStatus := cluster.Status
+	// This must be a deep copy: InstancesReportedState is mutated in place
+	// below, and a shallow copy would share the same map, making the change
+	// undetectable to the DeepEqual comparison further down.
+	existingClusterStatus := *cluster.Status.DeepCopy()
 
 	// InstancesReportedState is preserved across reconciliations, not rebuilt
 	// from scratch: a silent instance's entry (its status probe failed) must
