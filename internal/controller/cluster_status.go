@@ -757,17 +757,22 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	// be left untouched rather than overwritten with zeros, because "we do
 	// not know" must not erase the last thing we did know.
 	//
-	// Membership in statuses.Items this pass is what tells apart "silent but
-	// still part of the cluster" from "no longer part of the cluster"
-	// (scaled down, or the pod was replaced under the same name). AddPod
-	// (pkg/postgres/status.go) runs unconditionally regardless of the probe
-	// outcome, and GetStatusFromInstances keeps one item per pod that
-	// survives filtering rather than dropping the ones whose probe failed,
-	// so every instance that still belongs to the cluster appears in
-	// statuses.Items this pass, silent or not. Only names absent from
-	// statuses.Items entirely are pruned below, which keeps
-	// ensureInstancesAreReachable (pkg/management/postgres/webserver/probes/pinger.go)
-	// from pinging the IP of a pod that is actually gone.
+	// Membership in statuses.Items this pass is what keeps a silent instance
+	// from being pruned. Every pod that gets probed lands in statuses.Items
+	// whatever the probe outcome, because AddPod (pkg/postgres/status.go)
+	// fills in the pod-derived fields regardless and extractInstancesStatus
+	// appends the item even when the probe errored, so an instance that is
+	// merely not answering right now keeps its entry.
+	//
+	// A pod is absent from statuses.Items when it is gone (scaled down) and
+	// also while it is being replaced, because GetStatusFromInstances probes
+	// only the pods accepted by utils.IsPodActive, which rules out the pending
+	// and terminating ones. Pruning in that window is what we want: the entry
+	// goes away before the replacement pod exists, so a preserved entry can
+	// never hand ensureInstancesAreReachable
+	// (pkg/management/postgres/webserver/probes/pinger.go) the IP of a pod
+	// that is gone, nor one that has since been reassigned to a different pod
+	// carrying the same name.
 	if cluster.Status.InstancesReportedState == nil {
 		cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 	}
