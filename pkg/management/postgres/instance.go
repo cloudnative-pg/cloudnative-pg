@@ -777,11 +777,16 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 // group of its own that the instance manager is not part of, which is why the instance manager
 // survives the kill and can release the lease. That group holds the postmaster alone: PostgreSQL
 // calls setsid in InitPostmasterChild, so every backend, walsenders included, is its own group
-// leader. The backends outlive this kill and are reaped when the instance manager exits and the
-// container is restarted, taking its PID namespace with them. That is safe because no postmaster is
-// started over them in between: this path reports no restart as needed, so the lifecycle loop
-// returns as soon as the postmaster exits. Even if one were, PostgreSQL refuses to start over a
-// shared memory segment that old backends still hold.
+// leader and no signal to the group reaches them.
+//
+// The backends are not left behind, but they are not killed here either: each one notices the dead
+// postmaster at its next wait point, because WL_POSTMASTER_DEATH is registered on the wait set every
+// backend blocks on, and exits itself. A walsender is prompt about it, since the same wait is what
+// its keepalive interval times out of, so the replicas lose their streams and their WAL receivers
+// report down shortly after this kill. A backend that reaches no wait point, say one spinning in a
+// CPU-bound query, outlives the postmaster; that residue goes with the container, which is restarted
+// once the instance manager exits. Nothing starts a postmaster over the survivors in between: this
+// path reports no restart as needed, so the lifecycle loop returns as soon as the postmaster exits.
 func (instance *Instance) killPostgresProcessGroup(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
