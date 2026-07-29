@@ -764,7 +764,7 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	return err
 }
 
-// killPostgresProcessGroup sends SIGKILL to the whole process group of the running postmaster.
+// killPostgresProcessGroup sends SIGKILL to the process group of the running postmaster.
 // It is the last resort escalation after both a fast and an immediate pg_ctl stop have failed
 // to bring PostgreSQL down.
 //
@@ -773,12 +773,15 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 // release of the primary lease can run. An unresponsive PostgreSQL that never exits therefore
 // keeps the lease held and the failover never completes.
 //
-// The kill targets the process group, not just the postmaster PID: SIGKILLing a postmaster while
-// its backends survive is documented by PostgreSQL as a way to corrupt shared memory. The
-// postmaster is started with Setpgid (see compatibility.AddInstanceRunCommands), so it leads a
-// group of its own that this process is not part of: the kill reaps PostgreSQL and every backend
-// while leaving the instance manager alive to release the lease. kubelet then restarts the
-// container.
+// The postmaster is started with Setpgid (see compatibility.AddInstanceRunCommands) so it leads a
+// group of its own that the instance manager is not part of, which is why the instance manager
+// survives the kill and can release the lease. That group holds the postmaster alone: PostgreSQL
+// calls setsid in InitPostmasterChild, so every backend, walsenders included, is its own group
+// leader. The backends outlive this kill and are reaped when the instance manager exits and the
+// container is restarted, taking its PID namespace with them. That is safe because no postmaster is
+// started over them in between: this path reports no restart as needed, so the lifecycle loop
+// returns as soon as the postmaster exits. Even if one were, PostgreSQL refuses to start over a
+// shared memory segment that old backends still hold.
 func (instance *Instance) killPostgresProcessGroup(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
