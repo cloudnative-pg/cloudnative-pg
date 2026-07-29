@@ -361,10 +361,13 @@ var _ = Describe("maxReceivedLsnAmongUpReceivers", func() {
 	})
 
 	It("ignores the reported LSN of a standby that failed to report, however high", func() {
-		// A failed probe leaves ReceivedLsn at whatever the struct happens to
-		// carry; it is not an observation and must never raise the watermark,
-		// or a stalled cluster would look like it is still progressing and the
-		// gate would never bypass.
+		// A failed probe can still carry populated fields: the status client
+		// decodes into the same struct it reports the error on, and its
+		// deferred body close can set that error after a successful decode
+		// (see rawInstanceStatusRequest). Whatever those fields say, an
+		// instance the operator could not probe cleanly must not raise the
+		// watermark, the same way every other consumer treats a non-nil Error
+		// as "do not trust this item".
 		unreachable := makeItem("replica-2", "F/FFFFFFFF", true)
 		unreachable.Error = errors.New("connection refused")
 		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
