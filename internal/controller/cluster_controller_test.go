@@ -775,6 +775,91 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		Expect(fakeRecorder.Events).ShouldNot(Receive(),
 			"kubelet-stale branch must stay event-less to avoid noise")
 	})
+
+	It("does not wait on the readiness probe of a fenced instance", func(ctx SpecContext) {
+		// A fenced instance reports a healthy /pg/status (instance manager is
+		// up) with PostgreSQL shut down, so the pod is permanently not Ready.
+		// This must not be mistaken for the "kubelet has not refreshed the
+		// probe yet" transient case: the guard must not fire.
+		cluster.Annotations = map[string]string{
+			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", primaryName),
+		}
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(
+			ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				kubeletStaleReporting, readyReportingReplica,
+			}},
+		)
+		Expect(result.IsZero()).To(BeTrue())
+	})
+
+	It("still waits on the readiness probe when the instance is not fenced", func(ctx SpecContext) {
+		// Same shape as the previous test, minus the fencing annotation: the
+		// original behaviour this guard exists for must survive the fix.
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(
+			ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				kubeletStaleReporting, readyReportingReplica,
+			}},
+		)
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+	})
+
+	It("does not wait on the readiness probe when the whole cluster is fenced", func(ctx SpecContext) {
+		cluster.Annotations = map[string]string{
+			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", utils.FenceAllInstances),
+		}
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(
+			ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				kubeletStaleReporting, readyReportingReplica,
+			}},
+		)
+		Expect(result.IsZero()).To(BeTrue())
+	})
+
+	It("does not wait on a fenced replica sorted first because the primary is erroring", func(ctx SpecContext) {
+		// A fenced replica has PostgreSQL down but its instance manager still
+		// answers, so Error is nil and it sorts ahead of an erroring primary
+		// (Less pushes Error != nil to the tail before primaries are
+		// preferred). This is exactly the situation where a failover is
+		// needed, so the guard must not block on it.
+		cluster.Annotations = map[string]string{
+			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", replicaName),
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
+					IsPrimary:  true,
+					IsPodReady: false,
+					Error:      errStatusFailing,
+				},
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+					IsPodReady: false,
+				},
+			},
+		}
+		sort.Sort(&statusList)
+		Expect(statusList.Items[0].Pod.Name).To(Equal(replicaName),
+			"sort must place the fenced, non-erroring replica ahead of the erroring primary")
+
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
+		Expect(result.IsZero()).To(BeTrue())
+	})
 })
 
 var _ = Describe("getPluginsNeededForReconcile", func() {
