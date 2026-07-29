@@ -1124,6 +1124,13 @@ var _ = Describe("isPodStuckWithTerminatedPostgres", func() {
 		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
 	})
 
+	It("ignores a terminated postgres container without a termination timestamp", func() {
+		pod := podWithPostgresState(corev1.PodRunning, corev1.ContainerState{
+			Terminated: &corev1.ContainerStateTerminated{ExitCode: 0},
+		})
+		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
+	})
+
 	It("ignores Pods without a postgres container", func() {
 		pod := &corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodRunning}}
 		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
