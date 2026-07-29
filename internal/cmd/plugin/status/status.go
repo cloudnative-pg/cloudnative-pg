@@ -978,7 +978,8 @@ func (fullStatus *PostgresqlStatus) primaryIsSilent() bool {
 	instanceSet := fullStatus.InstanceStatus.Partition()
 	silentGroups := [][]postgres.SilentInstance{instanceSet.ReadyButSilent, instanceSet.NotReady}
 	for _, group := range silentGroups {
-		for _, instance := range group {
+		for i := range group {
+			instance := &group[i]
 			if instance.Pod.Name == fullStatus.PrimaryPod.Name {
 				return true
 			}

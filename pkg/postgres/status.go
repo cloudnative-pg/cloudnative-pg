@@ -361,7 +361,8 @@ func (set InstanceSet) AreWalReceiversDown(primaryName string) (bool, []string) 
 	}
 
 	var unknownStandbys []string
-	for _, silent := range set.ReadyButSilent {
+	for i := range set.ReadyButSilent {
+		silent := &set.ReadyButSilent[i]
 		if silent.Pod.Name == primaryName {
 			continue
 		}
