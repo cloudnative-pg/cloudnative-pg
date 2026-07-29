@@ -511,6 +511,19 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-caught-up", Namespace: cluster.Namespace}},
 				TimeLineID: 2,
 			},
+			{
+				// still behind, but not stalled long enough yet to be
+				// confirmed: on both passes this keeps
+				// ReplicaDivergenceWatermarks non-empty with the exact same
+				// content, so that map's own nil-to-non-nil transition on an
+				// otherwise-empty map (a fake-client round-trip artifact, not
+				// related to the bug under test) can't also cause a diff and
+				// mask whether the deletion below is what actually drove the
+				// persisted update.
+				Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-lagging", Namespace: cluster.Namespace}},
+				TimeLineID:  1,
+				ReceivedLsn: cnpgTypes.LSN("0/6000000"),
+			},
 		}}
 
 		// First pass: nothing to detect, but the nil-to-map transitions on
@@ -530,7 +543,10 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 
 		// Second pass, same reporting instances: replica-caught-up is still
 		// caught up, so its stale entry must be deleted from the already
-		// non-nil ReplicaWalIssues map.
+		// non-nil ReplicaWalIssues map. replica-lagging is frozen at the same
+		// (timeline, LSN) as the first pass and hasn't stalled past the grace
+		// period, so its watermark is carried forward unchanged and nothing
+		// else about it moves.
 		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
 		Expect(err).ToNot(HaveOccurred())
 
