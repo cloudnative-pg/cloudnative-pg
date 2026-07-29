@@ -623,8 +623,9 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 	// The pre-shutdown CHECKPOINT and the pg_ctl invocation that follows share a single
 	// deadline for this attempt: options.Timeout when the caller declared one, or pg_ctl's
 	// own documented default otherwise. The checkpoint consumes part of that budget and
-	// pg_ctl gets whatever remains, so the attempt as a whole can never exceed what was
-	// asked for.
+	// pg_ctl gets whatever remains, floored at one second so it is never handed a zero
+	// timeout. That floor is the only way the attempt can overshoot the declared budget,
+	// and then by at most a second.
 	deadline := time.Now().Add(time.Duration(shutdownAttemptTimeoutSeconds(options.Timeout)) * time.Second)
 
 	instance.tryCheckpointBeforeShutdown(ctx, options.Mode, deadline)
