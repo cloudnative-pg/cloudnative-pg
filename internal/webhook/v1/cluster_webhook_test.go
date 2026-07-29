@@ -6125,13 +6125,7 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[3].Field).To(ContainSubstring("bin_path[0]"))
 	})
 
-	It("returns an error for an absolute path with embedded traversal", func() {
-		// "/a/../../../../etc" cleans to "/etc", which does not start with
-		// "..", so a check that only cleans the raw path would accept it.
-		// Both CollectBinPaths and absolutizePaths join this path under the
-		// extension's mount point with filepath.Join, which strips the
-		// leading separator and then resolves the embedded "..", so this
-		// value still escapes the mount point at runtime.
+	It("returns an error for an absolute path with embedded traversal that escapes", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -6155,15 +6149,7 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
 	})
 
-	It("returns no error for a path prefixed with a path separator that does not escape", func() {
-		// A leading "/" is intentionally accepted as equivalent to no leading
-		// separator (see the CollectBinPaths doc comment): filepath.Join
-		// treats "/opt/custom/lib" the same as "opt/custom/lib" when joining
-		// it under the extension's mount point, so it never escapes.
-		// "a/b/../../share" is also valid for the same reason: the embedded
-		// ".." components resolve to "share" without ever climbing above the
-		// mount point, so a path is only rejected when it actually escapes,
-		// not merely because it contains "..".
+	It("returns no error for a path traversal that does not escape", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -6189,11 +6175,6 @@ var _ = Describe("validateExtensions", func() {
 	})
 
 	It("returns an error for a path resolving to a sibling directory sharing the mount point as a string prefix", func() {
-		// "../../mount-evil" resolves to a directory named "mount-evil" next to
-		// the containment placeholder, e.g. "/mount-evil" alongside "/mount".
-		// That string shares "/mount" as a prefix, so a containment check using
-		// a bare strings.HasPrefix (without requiring a separator boundary)
-		// would wrongly accept it as contained.
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
