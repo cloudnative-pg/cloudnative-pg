@@ -196,8 +196,8 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					// Since we use multiple times the same cluster names for the same object store instance, we need
-					// to clean it up between tests
+					// The object store isn't wiped between runs, so leftover files from a
+					// previous run of this test need cleaning up here
 					if _, err := objectstore.CleanFiles(objectStoreEnv, path.Join(objectStoreName, clusterAName)); err != nil {
 						return err
 					}
@@ -310,6 +310,8 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 				By("forging an invalid token", func() {
 					tokenContent, err := utils.ParsePgControldataToken(token)
 					Expect(err).ToNot(HaveOccurred())
+					// A REDO location behind the replica's actual position is rejected outright
+					// (PhaseUnrecoverable); one ahead of it is retried instead, as "not yet caught up".
 					tokenContent.LatestCheckpointREDOLocation = "0/0"
 					Expect(tokenContent.IsValid()).To(Succeed())
 					invalidToken, err = tokenContent.Encode()
@@ -379,6 +381,10 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 					validateReplication(namespace, clusterAName, clusterBName)
 				})
 			},
+			// B's own promotion is one timeline switch, common to both entries. Leaving
+			// replica-cluster mode then flips B's archive_mode GUC, forcing a primary restart:
+			// "restart" applies it in place (timeline 2); "switchover" instead promotes a
+			// different instance to apply it, costing a second switch (timeline 3).
 			Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
 			Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
 		)
