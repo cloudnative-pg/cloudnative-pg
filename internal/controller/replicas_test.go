@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -318,8 +319,9 @@ var _ = Describe("maxReceivedLsnAmongUpReceivers", func() {
 		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
 			makeItem("replica-1", "0/300", false),
 		}}
-		_, found := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		_, found, unknown := maxReceivedLsnAmongUpReceivers(statusList, "primary")
 		Expect(found).To(BeFalse())
+		Expect(unknown).To(BeEmpty())
 	})
 
 	It("excludes the primary even if it is (spuriously) marked as an active receiver", func() {
@@ -327,9 +329,10 @@ var _ = Describe("maxReceivedLsnAmongUpReceivers", func() {
 			makeItem("primary", "0/999", true),
 			makeItem("replica-1", "0/100", true),
 		}}
-		lsn, found := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		lsn, found, unknown := maxReceivedLsnAmongUpReceivers(statusList, "primary")
 		Expect(found).To(BeTrue())
 		Expect(lsn).To(Equal(cnpgTypes.LSN("0/100")))
+		Expect(unknown).To(BeEmpty())
 	})
 
 	It("picks the highest LSN among multiple up receivers, ignoring down ones", func() {
@@ -338,9 +341,53 @@ var _ = Describe("maxReceivedLsnAmongUpReceivers", func() {
 			makeItem("replica-2", "1/0", true),
 			makeItem("replica-3", "F/FFFFFFFF", false),
 		}}
-		lsn, found := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		lsn, found, unknown := maxReceivedLsnAmongUpReceivers(statusList, "primary")
 		Expect(found).To(BeTrue())
 		Expect(lsn).To(Equal(cnpgTypes.LSN("1/0")))
+		Expect(unknown).To(BeEmpty())
+	})
+
+	It("reports a standby that failed to report as unknown, not as a down receiver", func() {
+		unreachable := makeItem("replica-2", "", false)
+		unreachable.Error = errors.New("connection refused")
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "0/100", true),
+			unreachable,
+		}}
+		lsn, found, unknown := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(Equal(cnpgTypes.LSN("0/100")))
+		Expect(unknown).To(ConsistOf("replica-2"))
+	})
+
+	It("ignores the reported LSN of a standby that failed to report, however high", func() {
+		// A failed probe leaves ReceivedLsn at whatever the struct happens to
+		// carry; it is not an observation and must never raise the watermark,
+		// or a stalled cluster would look like it is still progressing and the
+		// gate would never bypass.
+		unreachable := makeItem("replica-2", "F/FFFFFFFF", true)
+		unreachable.Error = errors.New("connection refused")
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "0/100", true),
+			unreachable,
+		}}
+		lsn, found, unknown := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(Equal(cnpgTypes.LSN("0/100")))
+		Expect(unknown).To(ConsistOf("replica-2"))
+	})
+
+	It("reports not found when every standby failed to report", func() {
+		// No observation to age: the gate must keep waiting rather than bypass
+		// on an absence of data.
+		first := makeItem("replica-1", "0/100", true)
+		first.Error = errors.New("connection refused")
+		second := makeItem("replica-2", "0/200", true)
+		second.Error = errors.New("timeout")
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{first, second}}
+		_, found, unknown := maxReceivedLsnAmongUpReceivers(statusList, "primary")
+		Expect(found).To(BeFalse())
+		Expect(unknown).To(ConsistOf("replica-1", "replica-2"))
 	})
 })
 

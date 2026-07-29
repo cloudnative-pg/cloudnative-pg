@@ -97,7 +97,7 @@ func (r *ClusterReconciler) evaluateWalReceiversGate(
 		return r.clearWalReceiversWatermark(ctx, cluster)
 	}
 
-	stalled, err := r.walReceiversStalledDuringFailover(ctx, cluster, status)
+	stalled, unknownStandbys, err := r.walReceiversStalledDuringFailover(ctx, cluster, status)
 	if err != nil {
 		return err
 	}
@@ -111,11 +111,23 @@ func (r *ClusterReconciler) evaluateWalReceiversGate(
 			"while the old primary is unreachable; bypassing the wait and proceeding with the failover",
 		"primary", cluster.Status.CurrentPrimary,
 		"gracePeriod", walReceiversStalledGracePeriod,
-		"watermarkLSN", cluster.Status.FailoverWalReceiversWatermarkLSN)
-	r.Recorder.Eventf(cluster, "Warning", "WalReceiversStalled",
-		"WAL receivers are up but not progressing while the old primary %v is unreachable; "+
-			"proceeding with the failover after %v",
-		cluster.Status.CurrentPrimary, walReceiversStalledGracePeriod)
+		"watermarkLSN", cluster.Status.FailoverWalReceiversWatermarkLSN,
+		"unknownStandbys", unknownStandbys)
+	if len(unknownStandbys) > 0 {
+		// Naming them matters: their WAL receiver could not be observed at
+		// all, so one of them may still be streaming from the old primary and
+		// hold WAL this election is about to strand.
+		r.Recorder.Eventf(cluster, "Warning", "WalReceiversStalled",
+			"WAL receivers are up but not progressing while the old primary %v is unreachable; "+
+				"proceeding with the failover after %v. The status of these standbys could not be "+
+				"determined and they were not considered: %v",
+			cluster.Status.CurrentPrimary, walReceiversStalledGracePeriod, unknownStandbys)
+	} else {
+		r.Recorder.Eventf(cluster, "Warning", "WalReceiversStalled",
+			"WAL receivers are up but not progressing while the old primary %v is unreachable; "+
+				"proceeding with the failover after %v",
+			cluster.Status.CurrentPrimary, walReceiversStalledGracePeriod)
+	}
 
 	// Deliberately not clearing the watermark here: the election this unblocks
 	// hasn't committed yet (setPrimaryInstance is still ahead of the caller).
@@ -135,18 +147,21 @@ func (r *ClusterReconciler) walReceiversStalledDuringFailover(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
-) (bool, error) {
-	currentMax, found := maxReceivedLsnAmongUpReceivers(status, cluster.Status.CurrentPrimary)
+) (bool, []string, error) {
+	currentMax, found, unknownStandbys := maxReceivedLsnAmongUpReceivers(status, cluster.Status.CurrentPrimary)
 	if !found {
 		// No up receiver has a usable status to compare against, nothing to bypass on.
-		return false, nil
+		// This deliberately includes the case where every standby failed to
+		// report: with no observation to age, the gate keeps waiting rather
+		// than bypassing on an absence of data.
+		return false, unknownStandbys, nil
 	}
 
 	watermarkLSN := cnpgTypes.LSN(cluster.Status.FailoverWalReceiversWatermarkLSN)
 	if cluster.Status.FailoverWalReceiversWatermarkLSN == "" || watermarkLSN.Less(currentMax) {
 		// Progress observed (or this is the first observation): raise the
 		// watermark and keep waiting.
-		return false, r.setWalReceiversWatermark(ctx, cluster, currentMax)
+		return false, unknownStandbys, r.setWalReceiversWatermark(ctx, cluster, currentMax)
 	}
 
 	watermarkAge, err := pgTime.DifferenceBetweenTimestamps(
@@ -154,29 +169,47 @@ func (r *ClusterReconciler) walReceiversStalledDuringFailover(
 		cluster.Status.FailoverWalReceiversWatermarkTimestamp,
 	)
 	if err != nil {
-		return false, err
+		return false, unknownStandbys, err
 	}
 
 	if watermarkAge < walReceiversStalledGracePeriod {
-		return false, nil
+		return false, unknownStandbys, nil
 	}
 
-	return !status.IsPodReporting(cluster.Status.CurrentPrimary), nil
+	return !status.IsPodReporting(cluster.Status.CurrentPrimary), unknownStandbys, nil
 }
 
 // maxReceivedLsnAmongUpReceivers returns the highest ReceivedLsn among the
-// non-primary instances currently reporting IsWalReceiverActive, and whether
-// at least one such instance was found.
+// non-primary instances currently reporting IsWalReceiverActive, whether at
+// least one such instance was found, and the names of the standbys the
+// operator could not probe at all.
+//
+// Standbys that failed to report are excluded explicitly rather than through
+// their IsWalReceiverActive zero value: for an instance whose /pg/status probe
+// failed, both IsWalReceiverActive and ReceivedLsn are unset defaults, not
+// observations, and reading them as "receiver down, no progress" would be
+// reading an answer the operator never got. They are returned separately so
+// the caller can name them when the escape hatch fires: an unprobeable standby
+// may still be streaming from the old primary, which is exactly the case where
+// the data-loss window of proceeding is widest.
 func maxReceivedLsnAmongUpReceivers(
 	status postgres.PostgresqlStatusList,
 	primaryName string,
-) (cnpgTypes.LSN, bool) {
+) (cnpgTypes.LSN, bool, []string) {
 	var maxLsn cnpgTypes.LSN
+	var unknownStandbys []string
 	found := false
 
 	for i := range status.Items {
 		item := &status.Items[i]
-		if item.Pod.Name == primaryName || !item.IsWalReceiverActive {
+		if item.Pod.Name == primaryName {
+			continue
+		}
+		if item.Error != nil {
+			unknownStandbys = append(unknownStandbys, item.Pod.Name)
+			continue
+		}
+		if !item.IsWalReceiverActive {
 			continue
 		}
 		if !found || maxLsn.Less(item.ReceivedLsn) {
@@ -185,7 +218,7 @@ func maxReceivedLsnAmongUpReceivers(
 		}
 	}
 
-	return maxLsn, found
+	return maxLsn, found, unknownStandbys
 }
 
 // setWalReceiversWatermark persists a newly observed high-water mark for the
