@@ -273,6 +273,50 @@ approximately three probe periods (`~30s`). Full high availability
 (recreation of the old primary on a healthy node by the operator) is still
 gated on the taint-based eviction actually deleting the pod.
 
+## Abrupt primary loss and the wait for WAL receivers
+
+Before electing a new primary, and again before the elected candidate promotes
+itself, CloudNativePG waits for every WAL receiver in the cluster to report that
+it is down. That wait protects the RPO: a receiver that is still streaming may
+yet flush WAL that the candidate would otherwise leave behind.
+
+When a primary is lost abruptly, the wait can be entered while the replication
+connections are still formally alive. If a node freezes in a way that stops
+PostgreSQL without closing its sockets, the WAL sender processes left behind keep
+emitting keepalive traffic. Any received byte resets `wal_receiver_timeout` on
+the standby before the message is even parsed, so each WAL receiver stays in the
+streaming state with a received position that never advances, and
+`pg_stat_wal_receiver` keeps returning a row. Waiting for that row to disappear
+would then wait forever.
+
+Both waits therefore resolve on an exact condition instead of on the presence of
+the row. A keepalive reports the sender's own cached position, while a message
+carrying WAL reports the live end of the stream, so the first keepalive after a
+freeze brings the reported end position back down to what the standby has already
+flushed. Once the flushed position and the reported end position are equal there
+is nothing in flight, and that state is reached within one keepalive interval.
+Continuing to wait at that point cannot recover WAL, because none is on its way.
+
+Two situations are deliberately excluded from that fast path, since both would
+otherwise clear a failover gate on no evidence at all: a standby the operator
+cannot currently reach is unknown rather than caught up, and an instance manager
+older than this feature does not report the position, leaving it empty.
+
+A grace period remains as a bound for the one case the exact comparison cannot
+settle. If the primary froze midway through sending a record, the standby flushed
+only up to the last complete record boundary while the sender's reported position
+stays permanently ahead, so the two never become equal. The grace period bounds
+that case; it is not the mechanism by which the wait normally clears.
+
+:::warning
+    Completing a failover in this situation does not recover WAL that never left
+    the lost primary. Writes acknowledged to the client but not yet replicated are
+    lost at cluster level, which is the standard trade-off of asynchronous
+    replication. Workloads that cannot accept that window should use synchronous
+    replication together with
+    [quorum-based failover](#failover-quorum-quorum-based-failover).
+:::
+
 ## Failover Quorum (Quorum-based Failover)
 
 Failover quorum is a mechanism that enhances data durability and safety during
