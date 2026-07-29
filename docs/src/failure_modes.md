@@ -78,6 +78,17 @@ the failover forever. Lowering `.spec.switchoverDelay` shortens this budget
 for clusters where a faster worst case matters more than giving a large,
 busy database the full hour to checkpoint.
 
+The expiry of the primary lease does not cover this case on its own. A lease
+that still names another holder is taken over only once its record has been
+observed unchanged for a full lease duration, because a live holder renews well
+within that window. Renewal is performed by the instance manager and does not
+depend on PostgreSQL being responsive, so an instance manager that is still
+healthy keeps the lease renewed no matter how stuck its PostgreSQL is. The
+lease therefore protects against a lost node, a deleted Pod or a crashed
+instance manager, but not against an instance manager that is still running
+while PostgreSQL is unresponsive. In that case the renewals only stop when the
+instance manager exits, which is what the bounded sequence above guarantees.
+
 ## Manual Intervention
 
 For failure scenarios not covered by automated recovery, manual intervention
