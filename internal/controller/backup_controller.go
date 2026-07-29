@@ -769,7 +769,7 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 	contextLogger := log.FromContext(ctx)
 
 	// If the backup already has a target pod assigned (on a previous reconciliation loop)
-	// it will keep it. Otherwise, will use the pod computed by r.getBackupTargetPod()
+	// it will keep it. Otherwise, will use the pod computed by r.electBackupTargetPod()
 	targetPod, err := backup.GetAssignedInstance(ctx, r.Client)
 	if err != nil {
 		return nil, err
@@ -781,15 +781,16 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 	}
 
 	// If no good running backups are found we elect a pod for the backup
-	// Note: we only need the Pod from the status for volume snapshot backups
-	// (they are managed by the operator, not instance manager)
-	podStatus, err := r.getBackupTargetPod(ctx, cluster, backup)
+	// Note: for volume snapshot backups we only need the Pod, since they are
+	// managed by the operator and not the instance manager, so we skip the
+	// reporting probe entirely and elect the pod directly.
+	targetPod, err = r.electBackupTargetPod(ctx, cluster, backup)
 	if err != nil {
 		return nil, err
 	}
-	contextLogger.Debug("Found pod for backup", "pod", podStatus.Pod.Name)
+	contextLogger.Debug("Found pod for backup", "pod", targetPod.Name)
 
-	return podStatus.Pod, nil
+	return targetPod, nil
 }
 
 // updateClusterWithSnapshotsBackupTimes updates a cluster's FirstRecoverabilityPoint
@@ -833,13 +834,13 @@ func updateClusterWithSnapshotsBackupTimes(
 	return nil
 }
 
-// getBackupTargetPod returns the PostgresqlStatus for the pod that should run the backup
-// according to the current cluster's target policy. The status includes the Pod reference
-// and the SessionID needed for tracking instance manager identity.
-func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: gocognit
+// electBackupTargetPod elects the pod that should run the backup according to
+// the current cluster's target policy, without probing it for its reported
+// status.
+func (r *BackupReconciler) electBackupTargetPod(ctx context.Context, //nolint: gocognit
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
-) (*postgresStatus.PostgresqlStatus, error) {
+) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx)
 
 	podHasLatestMajorImage := func(pod *corev1.Pod) bool {
@@ -933,6 +934,21 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: goc
 			return nil, ErrPrimaryImageNeedsUpdate
 		}
 		targetPod = &pod
+	}
+
+	return targetPod, nil
+}
+
+// getBackupTargetPod returns the PostgresqlStatus for the pod that should run the backup
+// according to the current cluster's target policy. The status includes the Pod reference
+// and the SessionID needed for tracking instance manager identity.
+func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) (*postgresStatus.PostgresqlStatus, error) {
+	targetPod, err := r.electBackupTargetPod(ctx, cluster, backup)
+	if err != nil {
+		return nil, err
 	}
 
 	// Get status for the elected pod. We only accept it if it is actually

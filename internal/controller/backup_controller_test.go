@@ -27,6 +27,7 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -260,6 +261,28 @@ func (f *fakeInstanceStatusClient) GetStatusFromInstances(
 		items = append(items, postgres.PostgresqlStatus{
 			Pod:       &pods.Items[i],
 			SessionID: f.sessionID,
+		})
+	}
+	return postgres.PostgresqlStatusList{Items: items}
+}
+
+// fakeSilentInstanceStatusClient reports every queried pod as Ready but with
+// a failed /pg/status probe, mirroring the pod-answers-but-operator-can't-reach-it
+// scenario the volume-snapshot backup path must tolerate.
+type fakeSilentInstanceStatusClient struct {
+	remote.InstanceClient
+}
+
+func (f *fakeSilentInstanceStatusClient) GetStatusFromInstances(
+	_ context.Context,
+	pods corev1.PodList,
+) postgres.PostgresqlStatusList {
+	items := make([]postgres.PostgresqlStatus, 0, len(pods.Items))
+	for i := range pods.Items {
+		items = append(items, postgres.PostgresqlStatus{
+			Pod:        &pods.Items[i],
+			IsPodReady: true,
+			Error:      errors.New("simulated /pg/status probe failure"),
 		})
 	}
 	return postgres.PostgresqlStatusList{Items: items}
@@ -829,5 +852,86 @@ var _ = Describe("backup pending state", func() {
 			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(completedBackup), &stored)).To(Succeed())
 			Expect(stored.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 		})
+	})
+})
+
+var _ = Describe("getSnapshotTargetPod", func() {
+	// Volume-snapshot backups are managed by the operator, not the instance
+	// manager, so the pod they need only has to be elected: it must not be
+	// discarded because its /pg/status probe is silent.
+	It("elects the pod even when its status probe failed", func(ctx context.Context) {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		k8sClient := fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Backup{}).
+			WithIndex(&corev1.Pod{}, podOwnerKey, func(rawObj client.Object) []string {
+				if ownerName, ok := IsOwnedByCluster(rawObj); ok {
+					return []string{ownerName}
+				}
+				return nil
+			}).
+			Build()
+
+		r := &BackupReconciler{
+			Client:               k8sClient,
+			Scheme:               scheme,
+			Recorder:             record.NewFakeRecorder(120),
+			instanceStatusClient: &fakeSilentInstanceStatusClient{},
+		}
+
+		ns := newFakeNamespace(k8sClient)
+
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: ns,
+			},
+			Status: apiv1.ClusterStatus{
+				TargetPrimary: "cluster-example-1",
+				Image:         "postgres:17",
+			},
+		}
+		Expect(r.Create(ctx, cluster)).To(Succeed())
+		// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
+		cluster.TypeMeta = metav1.TypeMeta{
+			Kind:       apiv1.ClusterKind,
+			APIVersion: apiv1.SchemeGroupVersion.String(),
+		}
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Status.TargetPrimary,
+				Namespace: ns,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "postgres", Image: cluster.Status.Image},
+				},
+			},
+		}
+		Expect(ctrl.SetControllerReference(cluster, pod, scheme)).To(Succeed())
+		Expect(r.Create(ctx, pod)).To(Succeed())
+		pod.Status = corev1.PodStatus{
+			Conditions: []corev1.PodCondition{
+				{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+			},
+		}
+		Expect(r.Status().Update(ctx, pod)).To(Succeed())
+
+		backup := &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "backup-example",
+				Namespace: ns,
+			},
+			Spec: apiv1.BackupSpec{
+				Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+				Method:  apiv1.BackupMethodVolumeSnapshot,
+			},
+		}
+		Expect(r.Create(ctx, backup)).To(Succeed())
+
+		targetPod, err := r.getSnapshotTargetPod(ctx, cluster, backup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(targetPod).ToNot(BeNil())
+		Expect(targetPod.Name).To(Equal(pod.Name))
 	})
 })
