@@ -66,6 +66,20 @@ var _ = Describe("Set relationship between maps", func() {
 	It("Two equal maps are subsets", func() {
 		Expect(IsMapSubset(map[string]string{"one": "1"}, map[string]string{"one": "1"})).To(BeTrue())
 	})
+
+	It("A key with an empty value that is missing from the superset breaks the subset relationship", func() {
+		Expect(IsMapSubset(
+			map[string]string{"one": "1", "two": "2"},
+			map[string]string{"one": "1", "missing": ""},
+		)).To(BeFalse())
+	})
+
+	It("A key with an empty value that is present in the superset keeps the subset relationship", func() {
+		Expect(IsMapSubset(
+			map[string]string{"one": "1", "empty": ""},
+			map[string]string{"empty": ""},
+		)).To(BeTrue())
+	})
 })
 
 var _ = Describe("Testing Annotations and labels subset", func() {

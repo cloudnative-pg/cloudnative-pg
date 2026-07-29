@@ -56,9 +56,9 @@ func IsMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
 	}
 
 	for subMapKey, subMapValue := range mapSubset {
-		mapValue := mapSet[subMapKey]
+		mapValue, ok := mapSet[subMapKey]
 
-		if mapValue != subMapValue {
+		if !ok || mapValue != subMapValue {
 			return false
 		}
 	}
