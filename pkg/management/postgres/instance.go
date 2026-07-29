@@ -633,6 +633,11 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 			shutdownOptions{
 				Mode: shutdownModeFast,
 				Wait: true,
+				// Without an explicit timeout pg_ctl would fall back to its own implicit 60
+				// seconds, give up, and let us exit while PostgreSQL is still shutting down.
+				// stopDelay is the Pod's termination grace period, so waiting for it leaves
+				// the decision to terminate to the kubelet.
+				Timeout: &instance.MaxStopDelay,
 			},
 		)
 	}
