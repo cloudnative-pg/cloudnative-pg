@@ -64,8 +64,20 @@ func Reconcile(
 	}
 
 	if !containsPrimaryInstance(instances) {
-		// no primary instance present means that we have no work to do
-		return nil, nil
+		// An instance that did not report its status looks exactly like one
+		// that is not a primary, so a failing probe would have us skip the
+		// demotion of a primary that is still accepting writes. Fall back on
+		// what we last knew about it: fencing goes through the API server, so
+		// stopping that primary does not require the operator to reach it.
+		if !lastKnownPrimaryIsSilent(cluster, instances) {
+			// no primary instance present means that we have no work to do
+			return nil, nil
+		}
+
+		contextLogger.Info(
+			"the instance last known as the primary is not reporting its status, "+
+				"starting the transition to replica cluster on its last known state",
+			"currentPrimary", cluster.Status.CurrentPrimary)
 	}
 
 	return startTransition(ctx, cli, cluster)
@@ -76,6 +88,48 @@ func containsPrimaryInstance(instances postgres.PostgresqlStatusList) bool {
 		if item.IsPrimary {
 			return true
 		}
+	}
+
+	return false
+}
+
+// lastKnownPrimaryIsSilent returns true when the instance the operator last
+// observed as the primary is still part of the cluster but failed to report its
+// status, leaving the absence of a reporting primary unproven.
+//
+// The verdict rests on .status.instancesReportedState, which keeps the last
+// observation of an instance that has gone silent. A designated primary never
+// qualifies: it runs with a standby.signal file, so Instance.IsPrimary
+// (pkg/management/postgres/instance.go) reports it as a replica and no
+// observation of it ever recorded a primary. A cluster that has already been
+// demoted is excluded through its stored demotion token, which is emptied only
+// when the cluster stops being a replica, so a probe failing right after a
+// completed transition cannot start a second one.
+func lastKnownPrimaryIsSilent(cluster *apiv1.Cluster, instances postgres.PostgresqlStatusList) bool {
+	if cluster.Status.DemotionToken != "" {
+		return false
+	}
+
+	primaryName := cluster.Status.CurrentPrimary
+	if primaryName == "" {
+		return false
+	}
+
+	if lastKnown, ok := cluster.Status.InstancesReportedState[apiv1.PodName(primaryName)]; !ok ||
+		!lastKnown.IsPrimary {
+		return false
+	}
+
+	// The instance must still be part of the probed ones. An instance missing
+	// from the status list has no PostgreSQL to stop: its pod is being deleted
+	// or recreated, or it is gone from the cluster altogether.
+	for i := range instances.Items {
+		item := &instances.Items[i]
+		if item.Pod == nil || item.Pod.Name != primaryName {
+			continue
+		}
+
+		return item.Error != nil
 	}
 
 	return false
