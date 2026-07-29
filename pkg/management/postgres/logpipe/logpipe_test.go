@@ -20,13 +20,29 @@ SPDX-License-Identifier: Apache-2.0
 package logpipe
 
 import (
+	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// waitForCondition waits, in a separate goroutine, for cond to resolve.
+func waitForCondition(cond *concurrency.Executed) error {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		cond.Wait()
+	}()
+	Eventually(done, 5*time.Second, 10*time.Millisecond).Should(BeClosed())
+	return cond.Err()
+}
 
 // SpyRecordWriter is an implementation of the RecordWriter interface
 // keeping track of the generated records
@@ -175,6 +191,54 @@ var _ = Describe("CSV file reader", func() {
 			}
 			Expect(p.streamLogFromCSVFile(ctx, strings.NewReader(""), &spy)).To(Succeed())
 			Expect(spy.records).To(BeEmpty())
+		})
+	})
+	When("used as a log pipe", func() {
+		It("resolves the initialized condition with the context error when cancelled ", func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			p := &LogPipe{
+				fileName:        filepath.Join(GinkgoT().TempDir(), "postgres.csv"),
+				record:          NewPgAuditLoggingDecorator(),
+				fieldsValidator: LogFieldValidator,
+				initialized:     concurrency.NewExecuted(),
+				exited:          concurrency.NewExecuted(),
+			}
+
+			Expect(p.Start(ctx)).To(Succeed())
+			Expect(waitForCondition(p.GetInitializedCondition())).To(MatchError(context.Canceled))
+			Expect(waitForCondition(p.GetExitedCondition())).ToNot(HaveOccurred())
+		})
+
+		It("keeps the recorded success once the FIFO is ready, even after the context is later cancelled", func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			p := &LogPipe{
+				fileName:        filepath.Join(GinkgoT().TempDir(), "postgres.csv"),
+				record:          NewPgAuditLoggingDecorator(),
+				fieldsValidator: LogFieldValidator,
+				initialized:     concurrency.NewExecuted(),
+				exited:          concurrency.NewExecuted(),
+			}
+
+			startExited := make(chan struct{})
+			go func() {
+				defer close(startExited)
+				_ = p.Start(ctx)
+			}()
+
+			// The FIFO gets created with no interference here, so initialized
+			// must resolve with a nil error before the context is cancelled.
+			Expect(waitForCondition(p.GetInitializedCondition())).ToNot(HaveOccurred())
+
+			cancel()
+			Eventually(startExited, 5*time.Second, 10*time.Millisecond).Should(BeClosed())
+
+			// The deferred BroadcastError(ctx.Err()) on exit must not clobber
+			// the success already recorded above.
+			Expect(p.GetInitializedCondition().Err()).ToNot(HaveOccurred())
 		})
 	})
 })
