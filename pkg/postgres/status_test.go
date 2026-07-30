@@ -137,6 +137,37 @@ var _ = Describe("PostgreSQL status", func() {
 		Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(2))
 	})
 
+	It("lets InstancesReportingStatusExcept skip instances by name", func() {
+		podList := PostgresqlStatusList{
+			Items: []PostgresqlStatus{
+				{
+					Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+					IsPrimary:          true,
+					MightBeUnavailable: true,
+				},
+				{
+					Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+					MightBeUnavailable: true,
+				},
+			},
+		}
+
+		By("counting every instance when skip is nil", func() {
+			Expect(podList.InstancesReportingStatusExcept(nil)).To(BeEquivalentTo(2))
+		})
+
+		By("not counting an instance for which skip returns true", func() {
+			skip := func(instanceName string) bool { return instanceName == "server-20" }
+			Expect(podList.InstancesReportingStatusExcept(skip)).To(BeEquivalentTo(1))
+		})
+
+		By("keeping InstancesReportingStatus unchanged for a fenced-shaped item", func() {
+			// The other three call sites of InstancesReportingStatus depend on a
+			// MightBeUnavailable item being counted regardless of fencing.
+			Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(2))
+		})
+	})
+
 	Describe("when sorted", func() {
 		sort.Sort(&list)
 
