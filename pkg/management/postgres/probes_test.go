@@ -160,75 +160,69 @@ var _ = Describe("probes", func() {
 		// A never-reset instance (or PostgreSQL 18+, where stats_reset starts as
 		// NULL) is coalesced to '-infinity' in the query, so the value always
 		// scans into the plain string field instead of failing on a NULL.
-		It("scans the coalesced stats_reset before PostgreSQL 18", func() {
-			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() {
-				_ = db.Close()
-			})
+		DescribeTable("scans the coalesced stats_reset",
+			func(isPG18OrNewer bool) {
+				db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() {
+					_ = db.Close()
+				})
 
-			const query = "SELECT pg_stat_wal"
-			rows := sqlmock.NewRows([]string{
-				"wal_records",
-				"wal_fpi",
-				"wal_bytes",
-				"wal_buffers_full",
-				"wal_write",
-				"wal_sync",
-				"wal_write_time",
-				"wal_sync_time",
-				"stats_reset",
-			}).AddRow(int64(1), int64(2), int64(3), int64(4), int64(5), int64(6), 7.5, 8.5, "-infinity")
+				const query = "SELECT pg_stat_wal"
+				var walStat PgStatWal
+				var rows *sqlmock.Rows
+				var scanArgs []any
 
-			mock.ExpectQuery(query).WillReturnRows(rows)
+				if isPG18OrNewer {
+					rows = sqlmock.NewRows([]string{
+						"wal_records",
+						"wal_fpi",
+						"wal_bytes",
+						"wal_buffers_full",
+						"stats_reset",
+					}).AddRow(int64(1), int64(2), int64(3), int64(4), "-infinity")
+					scanArgs = []any{
+						&walStat.WalRecords,
+						&walStat.WalFpi,
+						&walStat.WalBytes,
+						&walStat.WALBuffersFull,
+						&walStat.StatsReset,
+					}
+				} else {
+					rows = sqlmock.NewRows([]string{
+						"wal_records",
+						"wal_fpi",
+						"wal_bytes",
+						"wal_buffers_full",
+						"wal_write",
+						"wal_sync",
+						"wal_write_time",
+						"wal_sync_time",
+						"stats_reset",
+					}).AddRow(int64(1), int64(2), int64(3), int64(4), int64(5), int64(6), 7.5, 8.5, "-infinity")
+					scanArgs = []any{
+						&walStat.WalRecords,
+						&walStat.WalFpi,
+						&walStat.WalBytes,
+						&walStat.WALBuffersFull,
+						&walStat.WalWrite,
+						&walStat.WalSync,
+						&walStat.WalWriteTime,
+						&walStat.WalSyncTime,
+						&walStat.StatsReset,
+					}
+				}
 
-			var walStat PgStatWal
-			err = db.QueryRow(query).Scan(
-				&walStat.WalRecords,
-				&walStat.WalFpi,
-				&walStat.WalBytes,
-				&walStat.WALBuffersFull,
-				&walStat.WalWrite,
-				&walStat.WalSync,
-				&walStat.WalWriteTime,
-				&walStat.WalSyncTime,
-				&walStat.StatsReset,
-			)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(walStat.StatsReset).To(Equal("-infinity"))
-			Expect(mock.ExpectationsWereMet()).To(Succeed())
-		})
+				mock.ExpectQuery(query).WillReturnRows(rows)
 
-		It("scans the coalesced stats_reset from PostgreSQL 18", func() {
-			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() {
-				_ = db.Close()
-			})
-
-			rows := sqlmock.NewRows([]string{
-				"wal_records",
-				"wal_fpi",
-				"wal_bytes",
-				"wal_buffers_full",
-				"stats_reset",
-			}).AddRow(int64(1), int64(2), int64(3), int64(4), "-infinity")
-
-			const query = "SELECT pg_stat_wal"
-			mock.ExpectQuery(query).WillReturnRows(rows)
-
-			var walStat PgStatWal
-			err = db.QueryRow(query).Scan(
-				&walStat.WalRecords,
-				&walStat.WalFpi,
-				&walStat.WalBytes,
-				&walStat.WALBuffersFull,
-				&walStat.StatsReset,
-			)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(walStat.StatsReset).To(Equal("-infinity"))
-			Expect(mock.ExpectationsWereMet()).To(Succeed())
-		})
+				err = db.QueryRow(query).Scan(scanArgs...)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(walStat.StatsReset).To(Equal("-infinity"))
+				Expect(mock.ExpectationsWereMet()).To(Succeed())
+			},
+			Entry("before PostgreSQL 18", false),
+			Entry("from PostgreSQL 18", true),
+		)
 	})
 
 	It("fillWalStatus should properly handle errors", func() {
