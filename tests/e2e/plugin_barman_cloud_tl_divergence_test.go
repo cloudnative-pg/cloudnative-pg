@@ -40,7 +40,6 @@ import (
 // verifies a replica refuses to adopt a timeline-history file for a
 // timeline ahead of its own cluster's, from an object store shared
 // with a second, already-diverged cluster.
-// Runs on kind/k3d only, where the plugin and shared store are set up.
 var _ = Describe("plugin-barman-cloud timeline divergence protection",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelBackupRestore), func() {
 		const (
@@ -56,9 +55,6 @@ var _ = Describe("plugin-barman-cloud timeline divergence protection",
 		BeforeEach(func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
-			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
 			}
 		})
 
