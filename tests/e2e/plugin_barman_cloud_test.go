@@ -62,10 +62,10 @@ var _ = Describe("plugin-barman-cloud",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			// The plugin (and the shared object store it backs up to) is only
-			// installed on local kind/k3d engines; see hack/e2e/run-e2e.sh.
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
+			// The plugin (and the shared object store it backs up to) is installed
+			// on kind/k3d, cloud providers, and OpenShift clusters.
+			if !(IsKind() || IsK3D() || IsEKS() || IsAKS() || IsGKE() || IsOpenshift()) {
+				Skip("This test only runs on kind, k3d, EKS, AKS, GKE, or OpenShift clusters")
 			}
 		})
 
