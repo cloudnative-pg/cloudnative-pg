@@ -267,7 +267,7 @@ func (se *Reconciler) finalizeSnapshotBackupStep(
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
-	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
+	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	if res, err := exec.finalize(ctx, cluster, backup, targetPod); res != nil || err != nil {
 		return res, err

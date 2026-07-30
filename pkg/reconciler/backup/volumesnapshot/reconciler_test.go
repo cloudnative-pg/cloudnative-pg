@@ -60,6 +60,51 @@ var _ = Describe("getSnapshotName", func() {
 	})
 })
 
+// newProvisionedSnapshots builds a VolumeSnapshotList for a PG_DATA/PG_WAL pair
+// of snapshots belonging to the given backup, with the given readiness.
+func newProvisionedSnapshots(namespace, backupName string, readyToUse bool) volumesnapshotv1.VolumeSnapshotList {
+	return volumesnapshotv1.VolumeSnapshotList{
+		Items: []volumesnapshotv1.VolumeSnapshot{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      backupName,
+					Labels: map[string]string{
+						utils.BackupNameLabelName: backupName,
+					},
+					Annotations: map[string]string{
+						"avoid": "nil",
+					},
+				},
+				Status: &volumesnapshotv1.VolumeSnapshotStatus{
+					ReadyToUse:                     ptr.To(readyToUse),
+					Error:                          nil,
+					BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backupName)),
+					CreationTime:                   ptr.To(metav1.Now()),
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      backupName + "-wal",
+					Labels: map[string]string{
+						utils.BackupNameLabelName: backupName,
+					},
+					Annotations: map[string]string{
+						"avoid": "nil",
+					},
+				},
+				Status: &volumesnapshotv1.VolumeSnapshotStatus{
+					ReadyToUse:                     ptr.To(readyToUse),
+					Error:                          nil,
+					BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backupName)),
+					CreationTime:                   ptr.To(metav1.Now()),
+				},
+			},
+		},
+	}
+}
+
 var _ = Describe("Volumesnapshot reconciler", func() {
 	const (
 		namespace   = "test-namespace"
@@ -216,46 +261,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should unfence the target pod when the snapshots have been provisioned", func(ctx SpecContext) {
-		snapshots := volumesnapshotv1.VolumeSnapshotList{
-			Items: []volumesnapshotv1.VolumeSnapshot{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name,
-						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
-						},
-						Annotations: map[string]string{
-							"avoid": "nil",
-						},
-					},
-					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse:                     ptr.To(false),
-						Error:                          nil,
-						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
-						CreationTime:                   ptr.To(metav1.Now()),
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name + "-wal",
-						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
-						},
-						Annotations: map[string]string{
-							"avoid": "nil",
-						},
-					},
-					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse:                     ptr.To(false),
-						Error:                          nil,
-						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
-						CreationTime:                   ptr.To(metav1.Now()),
-					},
-				},
-			},
-		}
+		snapshots := newProvisionedSnapshots(namespace, backup.Name, false)
 
 		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
@@ -292,46 +298,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should mark the backup as completed when the snapshots are ready", func(ctx SpecContext) {
-		snapshots := volumesnapshotv1.VolumeSnapshotList{
-			Items: []volumesnapshotv1.VolumeSnapshot{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name,
-						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
-						},
-						Annotations: map[string]string{
-							"avoid": "nil",
-						},
-					},
-					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
-						ReadyToUse:                     ptr.To(true),
-						Error:                          nil,
-						CreationTime:                   ptr.To(metav1.Now()),
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name + "-wal",
-						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
-						},
-						Annotations: map[string]string{
-							"avoid": "nil",
-						},
-					},
-					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
-						ReadyToUse:                     ptr.To(true),
-						Error:                          nil,
-						CreationTime:                   ptr.To(metav1.Now()),
-					},
-				},
-			},
-		}
+		snapshots := newProvisionedSnapshots(namespace, backup.Name, true)
 
 		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
@@ -359,6 +326,39 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		data, err := utils.GetFencedInstances(latestCluster.Annotations)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(data.Len()).To(Equal(0))
+	})
+
+	It("should honor the Backup's spec.online over the cluster default when finalizing", func(ctx SpecContext) {
+		// the cluster has no explicit online setting, which defaults to true (hot backup)
+		cluster.Spec.Backup.VolumeSnapshot.Online = nil
+		// but this specific Backup requests a cold (offline) backup
+		backup.Spec.Online = ptr.To(false)
+
+		snapshots := newProvisionedSnapshots(namespace, backup.Name, false)
+
+		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, targetPod, backup).
+			WithStatusSubresource(backup).
+			WithLists(&snapshots).
+			Build()
+		fakeRecorder := record.NewFakeRecorder(3)
+
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+			Build()
+
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+
+		var latestBackup apiv1.Backup
+		err = mockClient.Get(ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &latestBackup)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(latestBackup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFinalizing))
+		Expect(latestBackup.Status.GetOnline()).To(BeFalse())
 	})
 
 	It("should properly enrich the backup with labels", func(ctx SpecContext) {
