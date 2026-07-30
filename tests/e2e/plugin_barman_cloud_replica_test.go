@@ -100,7 +100,6 @@ var _ = Describe("plugin-barman-cloud replica cluster from backup",
 // Plugin port of the "Replica switchover" scenario:
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
-// Runs on kind/k3d only, where the plugin and the shared object store are installed.
 //
 //nolint:dupl // TODO: remove once in-tree counterpart is removed
 var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
@@ -118,9 +117,6 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 		BeforeAll(func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
-			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
 			}
 		})
 
