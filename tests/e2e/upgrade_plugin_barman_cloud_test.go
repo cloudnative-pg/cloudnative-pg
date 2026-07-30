@@ -40,10 +40,12 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
@@ -111,10 +113,11 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 		clusterName2 = "cluster2"
 		sampleFile2  = pluginFixturesDir + "/cluster2.yaml.template"
 
-		backupName          = "cluster-backup"
-		backupFile          = pluginFixturesDir + "/backup-1.yaml"
-		restoreFile         = pluginFixturesDir + "/cluster-restore.yaml.template"
-		scheduledBackupFile = pluginFixturesDir + "/scheduled-backup.yaml"
+		backupName             = "cluster-backup"
+		backupFile             = pluginFixturesDir + "/backup-1.yaml"
+		restoreFile            = pluginFixturesDir + "/cluster-restore.yaml.template"
+		scheduledBackupFile    = pluginFixturesDir + "/scheduled-backup.yaml"
+		backupAfterUpgradeFile = pluginFixturesDir + "/backup-after-upgrade.yaml"
 
 		pgBouncerSampleFile = fixturesDir + "/upgrade/pgbouncer.yaml"
 		pgBouncerName       = "pgbouncer"
@@ -129,6 +132,11 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 		}
 		if IsOpenshift() {
 			Skip("This test case is not applicable on OpenShift clusters")
+		}
+		// hack/e2e/run-e2e.sh only installs plugin-barman-cloud on the local
+		// engines, so the plugin is not available anywhere else yet.
+		if !(IsKind() || IsK3D()) {
+			Skip("This test case only runs on kind or k3d clusters")
 		}
 	})
 
@@ -786,6 +794,15 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 		objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
 			upgradeNamespace, clusterName1, serverName1)
 		AssertScheduledBackupsAreScheduled(serverName1)
+
+		By("taking a backup through the plugin after the upgrade", func() {
+			// The backup is requested after the restore above, so it cannot
+			// become the base backup that restore recovers from: that block
+			// specifically verifies the backup taken before the upgrade.
+			backups.Execute(env.Ctx, env.Client, env.Scheme, upgradeNamespace, backupAfterUpgradeFile, false,
+				testTimeouts[timeouts.BackupIsReady])
+			backupasserts.AssertBackupConditionInClusterStatus(env, upgradeNamespace, clusterName1)
+		})
 
 		By("scaling down the pooler to 0", func() {
 			pgbouncerasserts.AssertPgBouncerPodsAreReady(env, upgradeNamespace, pgBouncerSampleFile, 2)
