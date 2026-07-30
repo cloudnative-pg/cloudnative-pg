@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -2968,6 +2969,17 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				result = append(result, validateErr)
 			}
 
+			// filepath.IsLocal guarantees containment against any base, so it
+			// does not depend on matching the extension mount point's actual
+			// depth at runtime (see absolutizePaths).
+			if !filepath.IsLocal(filepath.Join(".", path)) {
+				result = append(result, field.Invalid(
+					basePath.Child("extension_control_path").Index(j),
+					path,
+					"path must not escape the extension directory",
+				))
+			}
+
 			controlPaths.Put(path)
 		}
 
@@ -2979,6 +2991,17 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				path,
 			); validateErr != nil {
 				result = append(result, validateErr)
+			}
+
+			// filepath.IsLocal guarantees containment against any base, so it
+			// does not depend on matching the extension mount point's actual
+			// depth at runtime (see absolutizePaths).
+			if !filepath.IsLocal(filepath.Join(".", path)) {
+				result = append(result, field.Invalid(
+					basePath.Child("dynamic_library_path").Index(j),
+					path,
+					"path must not escape the extension directory",
+				))
 			}
 
 			libraryPaths.Put(path)
