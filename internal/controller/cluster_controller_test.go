@@ -185,6 +185,141 @@ var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminat
 	})
 })
 
+var _ = Describe("ensureInstancesAreCreated reattachment gate and fenced instances", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	readyPod := func(ctx SpecContext, cluster *apiv1.Cluster, serial int) *corev1.Pod {
+		pod, err := specs.NewInstance(ctx, *cluster, serial, true)
+		Expect(err).ToNot(HaveOccurred())
+		pod.Status = corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+		}
+		return pod
+	}
+
+	notReadyPod := func(ctx SpecContext, cluster *apiv1.Cluster, serial int) *corev1.Pod {
+		pod, err := specs.NewInstance(ctx, *cluster, serial, true)
+		Expect(err).ToNot(HaveOccurred())
+		pod.Status = corev1.PodStatus{Phase: corev1.PodRunning}
+		return pod
+	}
+
+	It("reattaches a missing pod while another instance is fenced", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 3
+		})
+		cluster.Status.ReadyInstances = 1
+
+		fencedName := specs.GetInstanceName(cluster.Name, 2)
+		cluster.Annotations = map[string]string{
+			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", fencedName),
+		}
+
+		primaryPod := readyPod(ctx, cluster, 1)
+		fencedPod := notReadyPod(ctx, cluster, 2)
+
+		// Instance 3's pod is missing: it is the candidate for reattachment.
+		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod, *fencedPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+				{Pod: fencedPod, IsPodReady: false, MightBeUnavailable: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(Equal(reconcile.Result{RequeueAfter: time.Second}))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the missing instance's Pod should have been reattached")
+	})
+
+	It("still defers reattachment for a non-fenced instance mid-restart", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 3
+		})
+		cluster.Status.ReadyInstances = 1
+
+		primaryPod := readyPod(ctx, cluster, 1)
+		restartingPod := notReadyPod(ctx, cluster, 2)
+
+		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod, *restartingPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+				{Pod: restartingPod, IsPodReady: false, MightBeUnavailable: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be reattached while a non-fenced instance is mid-restart")
+	})
+
+	It("reattaches a missing pod when the whole cluster is fenced", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 3
+		})
+		// The wildcard fences every instance, including the primary, so
+		// nothing is genuinely Ready.
+		cluster.Status.ReadyInstances = 0
+
+		cluster.Annotations = map[string]string{
+			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", utils.FenceAllInstances),
+		}
+
+		fencedPrimaryPod := notReadyPod(ctx, cluster, 1)
+		fencedReplicaPod := notReadyPod(ctx, cluster, 2)
+
+		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*fencedPrimaryPod, *fencedReplicaPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: fencedPrimaryPod, IsPodReady: false, IsPrimary: true, MightBeUnavailable: true},
+				{Pod: fencedReplicaPod, IsPodReady: false, MightBeUnavailable: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(Equal(reconcile.Result{RequeueAfter: time.Second}))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the missing instance's Pod should have been reattached")
+	})
+})
+
 var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap Job", func() {
 	var env *testingEnvironment
 	var namespace string
