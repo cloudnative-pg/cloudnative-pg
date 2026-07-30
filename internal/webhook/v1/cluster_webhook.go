@@ -2973,7 +2973,15 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				continue
 			}
 
-			if strings.HasPrefix(filepath.Clean(path), "..") {
+			// filepath.IsLocal reports whether the path, after joining it under
+			// "." and resolving "..", would stay within that base. Joining
+			// under "." first (rather than a placeholder mount point) makes
+			// this independent of the extension mount point's actual depth:
+			// CollectBinPaths and absolutizePaths join these paths under a
+			// real, multi-segment mount point at runtime, and a placeholder
+			// base shallower than that real path would wrongly accept some
+			// escaping paths (e.g. "../mount/lib").
+			if !filepath.IsLocal(filepath.Join(".", path)) {
 				result = append(result, field.Invalid(
 					fieldPath.Index(j),
 					path,
