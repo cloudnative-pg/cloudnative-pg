@@ -233,8 +233,7 @@ func NewCmd() *cobra.Command {
 	)
 
 	backupSubcommand.Flags().BoolVar(&dryRun, "dry-run", false,
-		"If specified, the Backup resource is not created, "+
-			"and its manifest is printed instead",
+		"When true prints the Backup manifest instead of creating it",
 	)
 
 	return backupSubcommand

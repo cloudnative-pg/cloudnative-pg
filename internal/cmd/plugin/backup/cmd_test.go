@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -91,7 +92,7 @@ var _ = Describe("createBackup", func() {
 			types.NamespacedName{Name: backupName, Namespace: namespace},
 			&created,
 		)
-		Expect(err).To(HaveOccurred())
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
 
 	It("should create the Backup resource when dry-run is not set", func(ctx SpecContext) {
