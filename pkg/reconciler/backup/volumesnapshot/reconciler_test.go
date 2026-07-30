@@ -60,9 +60,10 @@ var _ = Describe("getSnapshotName", func() {
 	})
 })
 
-// newProvisionedSnapshots builds a VolumeSnapshotList for a PG_DATA/PG_WAL pair
-// of snapshots belonging to the given backup, with the given readiness.
-func newProvisionedSnapshots(namespace, backupName string, readyToUse bool) volumesnapshotv1.VolumeSnapshotList {
+// newSnapshotPair builds a VolumeSnapshotList for a PG_DATA/PG_WAL pair of
+// snapshots belonging to the given backup. The snapshots have been provisioned,
+// and readyToUse tells whether they are also ready to be used.
+func newSnapshotPair(namespace, backupName string, readyToUse bool) volumesnapshotv1.VolumeSnapshotList {
 	return volumesnapshotv1.VolumeSnapshotList{
 		Items: []volumesnapshotv1.VolumeSnapshot{
 			{
@@ -261,7 +262,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should unfence the target pod when the snapshots have been provisioned", func(ctx SpecContext) {
-		snapshots := newProvisionedSnapshots(namespace, backup.Name, false)
+		snapshots := newSnapshotPair(namespace, backup.Name, false)
 
 		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
@@ -298,7 +299,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should mark the backup as completed when the snapshots are ready", func(ctx SpecContext) {
-		snapshots := newProvisionedSnapshots(namespace, backup.Name, true)
+		snapshots := newSnapshotPair(namespace, backup.Name, true)
 
 		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
@@ -334,7 +335,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		// but this specific Backup requests a cold (offline) backup
 		backup.Spec.Online = ptr.To(false)
 
-		snapshots := newProvisionedSnapshots(namespace, backup.Name, false)
+		snapshots := newSnapshotPair(namespace, backup.Name, false)
 
 		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
@@ -358,7 +359,35 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(latestBackup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFinalizing))
-		Expect(latestBackup.Status.GetOnline()).To(BeFalse())
+		Expect(latestBackup.Status.Online).To(HaveValue(BeFalse()))
+	})
+
+	It("should annotate the snapshots with the effective online setting", func(ctx SpecContext) {
+		// the cluster requests cold backups, but this specific Backup asks for a hot one
+		cluster.Spec.Backup.VolumeSnapshot.Online = ptr.To(false)
+		backup.Spec.Online = ptr.To(true)
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod).
+			Build()
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).
+			Build()
+
+		// the snapshots are created before the backup is finalized, so the backup
+		// status is still empty at this point
+		Expect(backup.Status.Online).To(BeNil())
+		Expect(executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])).To(Succeed())
+
+		var snapshotList volumesnapshotv1.VolumeSnapshotList
+		err := mockClient.List(ctx, &snapshotList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(snapshotList.Items).ToNot(BeEmpty())
+
+		for _, snapshot := range snapshotList.Items {
+			Expect(snapshot.Annotations).To(HaveKeyWithValue(utils.IsOnlineBackupLabelName, "true"))
+		}
 	})
 
 	It("should properly enrich the backup with labels", func(ctx SpecContext) {
