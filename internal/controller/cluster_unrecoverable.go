@@ -52,14 +52,12 @@ func (r *ClusterReconciler) reconcileUnrecoverableInstances(
 	podName := targetInstances[0]
 
 	logger.Info("Deleting unrecoverable instance", "podName", podName)
-	r.Recorder.Eventf(cluster, "Normal", "DeleteUnrecoverableInstance",
-		"Deleting unrecoverable instance %v (pods and PVCs)", podName)
 
 	// A graceful delete is a no-op on a Pod that is already Terminating, so a Pod
 	// stuck past its own deletion deadline would never be removed and its PVCs
 	// (blocked by the pvc-protection finalizer) could never be deleted. Force-remove
 	// such a Pod first so that ensureInstanceIsDeleted below can make progress.
-	if pod := findInstancePodByName(resources, podName); pod != nil && isPodStuckTerminating(pod) {
+	if pod := findInstancePodByName(resources, podName); pod != nil && utils.IsPodStuckTerminating(pod) {
 		logger.Info(
 			"Force-removing unrecoverable instance stuck past its deletion deadline",
 			"podName", podName,
@@ -74,6 +72,9 @@ func (r *ClusterReconciler) reconcileUnrecoverableInstances(
 		return ctrl.Result{}, err
 	}
 
+	r.Recorder.Eventf(cluster, "Normal", "DeleteUnrecoverableInstance",
+		"Deleted unrecoverable instance %v (pods and PVCs)", podName)
+
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
 
@@ -86,16 +87,6 @@ func findInstancePodByName(resources *managedResources, name string) *corev1.Pod
 		}
 	}
 	return nil
-}
-
-// isPodStuckTerminating reports whether a Pod has been asked to terminate but is
-// still present past its own deletion deadline. DeletionTimestamp is the moment
-// (deletion request time plus the termination grace period) at which the object
-// is expected to be gone. A Pod that lingers past it has already been given its
-// entire termination budget, so it will not disappear on another graceful delete
-// and has to be force-removed.
-func isPodStuckTerminating(pod *corev1.Pod) bool {
-	return pod.DeletionTimestamp != nil && time.Now().After(pod.DeletionTimestamp.Time)
 }
 
 func collectNamesOfUnrecoverableInstances(

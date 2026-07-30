@@ -432,17 +432,4 @@ var _ = Describe("Unrecoverable replicas", func() {
 		err = r.Get(ctx, client.ObjectKeyFromObject(&pendingPod), &fetched)
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
-
-	DescribeTable(
-		"isPodStuckTerminating",
-		func(deletionTime *metav1.Time, expected bool) {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: deletionTime},
-			}
-			Expect(isPodStuckTerminating(pod)).To(Equal(expected))
-		},
-		Entry("no deletion timestamp", nil, false),
-		Entry("deletion deadline in the past", &metav1.Time{Time: time.Now().Add(-time.Minute)}, true),
-		Entry("deletion deadline in the future", &metav1.Time{Time: time.Now().Add(time.Hour)}, false),
-	)
 })
