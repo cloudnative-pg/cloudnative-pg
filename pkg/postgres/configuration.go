@@ -915,6 +915,15 @@ type AdditionalExtensionConfiguration struct {
 func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for _, path := range paths {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", path)) {
+				log.Warning("Skipping extension path that escapes the extension directory",
+					"mountPath", ext.MountPath, "path", path)
+				continue
+			}
+
 			if !yield(filepath.Join(ext.MountPath, path)) {
 				break
 			}
