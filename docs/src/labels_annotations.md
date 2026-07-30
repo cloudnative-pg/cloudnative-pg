@@ -278,6 +278,13 @@ CloudNativePG manages the following predefined annotations:
     This will set `archive_mode` to `off` and require a restart of all PostgreSQL
     instances. Use at your own risk.
 
+`cnpg.io/switchoverMaxReplayLag`
+:   Applied on a `Cluster` resource, specifies the maximum WAL replay lag allowed
+    for a replica to be considered a safe target for switchover. If all replicas
+    have a replay lag exceeding this value, the switchover is delayed.
+    Format is a Kubernetes quantity (e.g. `40Mi`, `100MB`). Setting it to `disabled`
+    or `-1` disables the replay lag check. Defaults to `40Mi`.
+
 `cnpg.io/snapshotStartTime`
 :   The time a snapshot started.
 

@@ -107,6 +107,9 @@ const (
 	// PendingFailoverMarker is used as target primary to signal that a failover is required
 	PendingFailoverMarker = "pending"
 
+	// PendingSwitchoverMarker is used as target primary to signal that a switchover is required
+	PendingSwitchoverMarker = "pending-switchover"
+
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 

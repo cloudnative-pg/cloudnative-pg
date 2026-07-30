@@ -557,8 +557,26 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 	if err != nil {
 		return err
 	}
+
+	// If the instance manager has detected an unrecoverable WAL replay error
+	// (e.g. "record with incorrect prev-link" or "contrecord is requested by"),
+	// WAL replay is stuck at the current LSN and cannot make further progress.
+	// Return an error so that:
+	//   1. GetStatus propagates a non-nil error, which the operator treats as
+	//      "instance not healthy" and excludes from failover candidate selection.
+	//   2. The /pg/status HTTP endpoint returns a non-2xx response, letting the
+	//      operator detect the problem even before the readiness probe fires.
+	if instance.HasWALReplayErrorDetected() {
+		return fmt.Errorf(
+			"replica has an unrecoverable WAL replay error at LSN %s; "+
+				"instance is stuck and must be restarted to recover",
+			result.ReplayLsn,
+		)
+	}
+
 	return nil
 }
+
 
 // IsWALReceiverActive check if the WAL receiver process is active by looking
 // at the number of records in the `pg_stat_wal_receiver` table

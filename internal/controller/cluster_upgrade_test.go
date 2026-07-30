@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -1288,5 +1289,173 @@ var _ = Describe("archiverSidecarMissingOnPrimary", func() {
 		Expect(errors.Is(err, evalErr)).To(BeTrue(),
 			"the evaluation error must surface so the caller requeues instead of switching over")
 		Expect(missing).To(BeFalse())
+	})
+})
+
+var _ = Describe("Switchover WAL replay lag check", func() {
+	const namespace = "switchover-lag-test"
+
+	var (
+		reconciler *ClusterReconciler
+		k8sClient  k8client.Client
+	)
+
+	BeforeEach(func() {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		k8sClient = fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.Cluster{}).
+			Build()
+
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespace},
+		}
+		Expect(k8sClient.Create(context.Background(), ns)).To(Succeed())
+
+		reconciler = &ClusterReconciler{
+			Client:         k8sClient,
+			Scheme:         scheme,
+			Recorder:       record.NewFakeRecorder(120),
+			rolloutManager: rolloutManager.New(0, 0),
+		}
+
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	createClusterWithSwitchover := func(annotations map[string]string) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "switchover-cluster",
+				Namespace:   namespace,
+				Annotations: annotations,
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances:             2,
+				ImageName:             "postgres:16.0",
+				PrimaryUpdateStrategy: apiv1.PrimaryUpdateStrategyUnsupervised,
+				PrimaryUpdateMethod:   apiv1.PrimaryUpdateMethodSwitchover,
+				StorageConfiguration:  apiv1.StorageConfiguration{Size: "1Gi"},
+			},
+		}
+		cluster.SetDefaults()
+		cluster.Status.CurrentPrimary = "switchover-cluster-1"
+		cluster.Status.Image = "postgres:16.1"
+		cluster.Status.Instances = 2
+		Expect(k8sClient.Create(context.Background(), cluster)).To(Succeed())
+		Expect(k8sClient.Status().Update(context.Background(), cluster)).To(Succeed())
+		return cluster
+	}
+
+	buildPodListForSwitchover := func(cluster *apiv1.Cluster, receivedLsn, replayLsn string) *postgres.PostgresqlStatusList {
+		primaryPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Status.CurrentPrimary,
+				Namespace: cluster.Namespace,
+				Annotations: map[string]string{
+					utils.ClusterSerialAnnotationName: "1",
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "postgres",
+						Image: "postgres:16.0", // Needing rollout (different from 16.1)
+					},
+				},
+			},
+		}
+		replicaPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "switchover-cluster-2",
+				Namespace: cluster.Namespace,
+				Annotations: map[string]string{
+					utils.ClusterSerialAnnotationName: "2",
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "postgres",
+						Image: "postgres:16.1", // Already upgraded
+					},
+				},
+			},
+		}
+		return &postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:            primaryPod,
+					IsPodReady:     true,
+					ExecutableHash: "test_hash",
+					IsPrimary:      true,
+				},
+				{
+					Pod:                 replicaPod,
+					IsPodReady:          true,
+					ExecutableHash:      "test_hash",
+					IsPrimary:           false,
+					IsWalReceiverActive: true,
+					ReceivedLsn:         types.LSN(receivedLsn),
+					ReplayLsn:           types.LSN(replayLsn),
+				},
+			},
+		}
+	}
+
+	It("delays switchover when target replica's lag is too high", func(ctx SpecContext) {
+		cluster := createClusterWithSwitchover(nil)
+		// 50MiB lag: received is 0/3000000, replayed is 0/0
+		podList := buildPodListForSwitchover(cluster, "0/3000000", "0/0")
+
+		// Create primary pod so delete works
+		primaryPod := podList.Items[0].Pod.DeepCopy()
+		Expect(k8sClient.Create(ctx, primaryPod)).To(Succeed())
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).To(Equal(errReplayLagIsTooHigh))
+		Expect(restarted).To(BeFalse())
+	})
+
+	It("allows switchover when target replica's lag is within limit", func(ctx SpecContext) {
+		cluster := createClusterWithSwitchover(nil)
+		// 10MiB lag (less than 40MiB): received is 0/A00000, replayed is 0/0
+		podList := buildPodListForSwitchover(cluster, "0/A00000", "0/0")
+
+		primaryPod := podList.Items[0].Pod.DeepCopy()
+		Expect(k8sClient.Create(ctx, primaryPod)).To(Succeed())
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
+	})
+
+	It("allows switchover when replay check is disabled", func(ctx SpecContext) {
+		cluster := createClusterWithSwitchover(map[string]string{
+			utils.SwitchoverMaxReplayLagAnnotationName: "disabled",
+		})
+		// 50MiB lag
+		podList := buildPodListForSwitchover(cluster, "0/3000000", "0/0")
+
+		primaryPod := podList.Items[0].Pod.DeepCopy()
+		Expect(k8sClient.Create(ctx, primaryPod)).To(Succeed())
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
+	})
+
+	It("allows switchover when custom maxReplayLag allows the lag", func(ctx SpecContext) {
+		cluster := createClusterWithSwitchover(map[string]string{
+			utils.SwitchoverMaxReplayLagAnnotationName: "100Mi",
+		})
+		// 50MiB lag
+		podList := buildPodListForSwitchover(cluster, "0/3000000", "0/0")
+
+		primaryPod := podList.Items[0].Pod.DeepCopy()
+		Expect(k8sClient.Create(ctx, primaryPod)).To(Succeed())
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
 	})
 })

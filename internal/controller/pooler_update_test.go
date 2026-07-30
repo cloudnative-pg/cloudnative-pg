@@ -117,6 +117,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 			brokenPooler := pooler.DeepCopy()
 			brokenPooler.Status.Image = ""
+			brokenPooler.Status.Phase = apiv1.PoolerPhaseFailed
 			brokenPooler.Spec.Instances = ptr.To(int32(7))
 
 			err := env.poolerReconciler.updateDeployment(ctx, brokenPooler, res)
@@ -134,6 +135,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pooler := newFakePooler(env.client, cluster)
 		pooler.Status.Image = ""
+		pooler.Status.Phase = apiv1.PoolerPhaseFailed
 		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
 
 		err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
