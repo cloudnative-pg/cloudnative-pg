@@ -51,8 +51,6 @@ import (
 // archiving keeps working after a Postgres major version upgrade. Here the
 // archiver is plugin-barman-cloud rather than the in-core barmanObjectStore. The
 // in-core variant (and the other upgrade scenarios it covers) is left in place.
-// Runs on kind/k3d only, where the plugin and the shared object store are
-// installed.
 var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelPostgresMajorUpgrade, tests.LabelBackupRestore), func() {
 		const (
@@ -63,9 +61,6 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 		BeforeEach(func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
-			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
 			}
 		})
 
