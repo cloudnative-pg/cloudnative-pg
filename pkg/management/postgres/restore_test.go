@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/thoas/go-funk"
@@ -207,6 +208,50 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		Expect(enforcedParamsInPGData).To(HaveLen(1))
 		Expect(enforcedParamsInPGData[maxConnectionsParameter]).To(Equal(200))
 	})
+})
+
+var _ = Describe("buildRestoreDataDirOptions", func() {
+	baseBackup := &apiv1.Backup{
+		Status: apiv1.BackupStatus{
+			DestinationPath: "s3://bucket/path",
+			ServerName:      "server-a",
+			BackupID:        "20230101T000000",
+		},
+	}
+	info := InitInfo{PgData: "/pgdata"}
+
+	DescribeTable("building the barman-cloud-restore options",
+		func(ctx SpecContext, cluster *apiv1.Cluster, expected string) {
+			options, err := info.buildRestoreDataDirOptions(ctx, baseBackup, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(strings.Join(options, " ")).To(Equal(expected))
+		},
+		Entry("no barman object store configured",
+			&apiv1.Cluster{},
+			"s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("barman object store with no restore additional args",
+			&apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Backup: &apiv1.BackupConfiguration{
+						BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+					},
+				},
+			},
+			"s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("barman object store with restore additional args",
+			&apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Backup: &apiv1.BackupConfiguration{
+						BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+							Data: &apiv1.DataBackupConfiguration{
+								RestoreAdditionalCommandArgs: []string{"--read-timeout=60"},
+							},
+						},
+					},
+				},
+			},
+			"--read-timeout=60 s3://bucket/path server-a 20230101T000000 /pgdata"),
+	)
 })
 
 var _ = Describe("getRestoreWalConfig", func() {

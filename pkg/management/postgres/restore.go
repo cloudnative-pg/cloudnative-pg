@@ -364,24 +364,47 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 	return true, os.Symlink(info.PgWal, pgDataWal)
 }
 
-// restoreDataDir restores PGDATA from an existing backup
-func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, env []string) error {
-	contextLogger := log.FromContext(ctx)
+// buildRestoreDataDirOptions builds the command line options for barman-cloud-restore
+func (info InitInfo) buildRestoreDataDirOptions(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) ([]string, error) {
 	var options []string
 
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
 	}
+
+	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
+		options = cluster.Spec.Backup.BarmanObjectStore.Data.AppendRestoreAdditionalCommandArgs(options)
+	}
+
 	options = append(options, backup.Status.DestinationPath)
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
 
 	options, err := barmanCommand.AppendCloudProviderOptionsFromBackup(ctx, options, backup.Status.BarmanCredentials)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	options = append(options, info.PgData)
+	return append(options, info.PgData), nil
+}
+
+// restoreDataDir restores PGDATA from an existing backup
+func (info InitInfo) restoreDataDir(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	env []string,
+	cluster *apiv1.Cluster,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	options, err := info.buildRestoreDataDirOptions(ctx, backup, cluster)
+	if err != nil {
+		return err
+	}
 
 	contextLogger.Info("Starting barman-cloud-restore",
 		"options", options)
