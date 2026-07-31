@@ -171,6 +171,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Namespace: namespace,
 				Name:      backupName,
 			},
+			Spec: apiv1.BackupSpec{
+				Method: apiv1.BackupMethodVolumeSnapshot,
+			},
 			Status: apiv1.BackupStatus{
 				StartedAt:    ptr.To(startedAt),
 				StoppedAt:    ptr.To(stoppedAt),
