@@ -39,13 +39,16 @@ func captureStdout(f func()) string {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
+	DeferCleanup(func() {
+		os.Stdout = old
+		_ = r.Close()
+	})
 
 	f()
 
-	_ = w.Close()
-	os.Stdout = old
-
-	out, _ := io.ReadAll(r)
+	Expect(w.Close()).To(Succeed())
+	out, err := io.ReadAll(r)
+	Expect(err).ToNot(HaveOccurred())
 	return string(out)
 }
 
