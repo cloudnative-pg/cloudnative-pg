@@ -990,15 +990,62 @@ var _ = Describe("PodSpec drift detection", func() {
 	})
 })
 
-var _ = Describe("Compute startup probe failure threshold", func() {
-	It("should take the minimum value 1", func() {
-		Expect(getFailureThreshold(5, StartupProbePeriod)).To(BeNumerically("==", 1))
-		Expect(getFailureThreshold(5, LivenessProbePeriod)).To(BeNumerically("==", 1))
+var _ = Describe("Probe failure thresholds", func() {
+	livenessProbeOf := func(cluster apiv1.Cluster) *corev1.Probe {
+		containers := createPostgresContainers(cluster, EnvConfig{}, false)
+		return containers[0].LivenessProbe
+	}
+
+	It("derives the startup threshold from the start delay", func() {
+		cluster := apiv1.Cluster{Spec: apiv1.ClusterSpec{MaxStartDelay: 109}}
+		containers := createPostgresContainers(cluster, EnvConfig{}, false)
+		Expect(containers[0].StartupProbe.FailureThreshold).To(BeNumerically("==", 11))
 	})
 
-	It("should take the value from 'startDelay / periodSeconds'", func() {
-		Expect(getFailureThreshold(109, StartupProbePeriod)).To(BeNumerically("==", 11))
-		Expect(getFailureThreshold(31, LivenessProbePeriod)).To(BeNumerically("==", 4))
+	It("leaves the liveness threshold unset so that Kubernetes defaults it", func() {
+		Expect(livenessProbeOf(apiv1.Cluster{}).FailureThreshold).To(BeNumerically("==", 0))
+	})
+
+	It("derives the liveness threshold from the legacy livenessProbeTimeout", func() {
+		timeout := int32(31)
+		cluster := apiv1.Cluster{Spec: apiv1.ClusterSpec{LivenessProbeTimeout: &timeout}}
+		Expect(livenessProbeOf(cluster).FailureThreshold).To(BeNumerically("==", 4))
+	})
+
+	It("derives it against a custom period, and agrees with what the instance manager "+
+		"resolves for the same cluster", func() {
+		// The instance manager has to reason about the same number to know how much
+		// consecutive failure the user tolerates, so the two must not drift.
+		timeout := int32(300)
+		cluster := apiv1.Cluster{Spec: apiv1.ClusterSpec{
+			LivenessProbeTimeout: &timeout,
+			Probes: &apiv1.ProbesConfiguration{
+				Liveness: &apiv1.LivenessProbe{
+					Probe: apiv1.Probe{PeriodSeconds: 30},
+				},
+			},
+		}}
+
+		probe := livenessProbeOf(cluster)
+		Expect(probe.PeriodSeconds).To(BeNumerically("==", 30))
+		Expect(probe.FailureThreshold).To(BeNumerically("==", 10))
+		Expect(probe.FailureThreshold).To(Equal(cluster.GetLivenessProbeFailureThreshold()))
+	})
+
+	It("keeps an explicitly configured liveness threshold", func() {
+		timeout := int32(300)
+		cluster := apiv1.Cluster{Spec: apiv1.ClusterSpec{
+			LivenessProbeTimeout: &timeout,
+			Probes: &apiv1.ProbesConfiguration{
+				Liveness: &apiv1.LivenessProbe{
+					Probe: apiv1.Probe{FailureThreshold: 4},
+				},
+			},
+		}}
+
+		probe := livenessProbeOf(cluster)
+		Expect(probe.FailureThreshold).To(BeNumerically("==", 4))
+		Expect(probe.FailureThreshold).To(Equal(cluster.GetLivenessProbeFailureThreshold()))
 	})
 })
 

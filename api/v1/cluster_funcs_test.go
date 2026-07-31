@@ -2018,3 +2018,51 @@ var _ = Describe("IsInitialized", func() {
 		Expect(cluster.IsInitialized()).To(BeFalse())
 	})
 })
+
+var _ = Describe("Liveness probe failure threshold", func() {
+	It("uses the Kubernetes default when nothing is configured", func() {
+		cluster := Cluster{}
+		Expect(cluster.GetLivenessProbeFailureThreshold()).
+			To(BeNumerically("==", DefaultProbeFailureThreshold))
+	})
+
+	It("honours an explicit failureThreshold", func() {
+		cluster := Cluster{Spec: ClusterSpec{Probes: &ProbesConfiguration{
+			Liveness: &LivenessProbe{Probe: Probe{FailureThreshold: 7}},
+		}}}
+		Expect(cluster.GetLivenessProbeFailureThreshold()).To(BeNumerically("==", 7))
+	})
+
+	It("derives the threshold from the legacy livenessProbeTimeout", func() {
+		timeout := int32(300)
+		cluster := Cluster{Spec: ClusterSpec{LivenessProbeTimeout: &timeout}}
+		// 300 over the default 10s period.
+		Expect(cluster.GetLivenessProbeFailureThreshold()).To(BeNumerically("==", 30))
+	})
+
+	It("derives it against a custom period when one is set", func() {
+		timeout := int32(300)
+		cluster := Cluster{Spec: ClusterSpec{
+			LivenessProbeTimeout: &timeout,
+			Probes: &ProbesConfiguration{
+				Liveness: &LivenessProbe{Probe: Probe{PeriodSeconds: 30}},
+			},
+		}}
+		Expect(cluster.GetLivenessProbeFailureThreshold()).To(BeNumerically("==", 10))
+	})
+
+	It("prefers an explicit failureThreshold over the legacy timeout", func() {
+		timeout := int32(300)
+		cluster := Cluster{Spec: ClusterSpec{
+			LivenessProbeTimeout: &timeout,
+			Probes: &ProbesConfiguration{
+				Liveness: &LivenessProbe{Probe: Probe{FailureThreshold: 4}},
+			},
+		}}
+		Expect(cluster.GetLivenessProbeFailureThreshold()).To(BeNumerically("==", 4))
+	})
+
+	It("never derives a threshold below one", func() {
+		Expect(FailureThresholdFromDelay(5, 10)).To(BeNumerically("==", 1))
+	})
+})

@@ -388,8 +388,10 @@ type ClusterSpec struct {
 
 	// LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
 	// to successfully respond to the liveness probe (default 30).
-	// The Liveness probe failure threshold is derived from this value using the formula:
-	// ceiling(livenessProbe / 10).
+	// The liveness probe failure threshold is derived from this value using the formula:
+	// ceiling(livenessProbeTimeout / periodSeconds), where periodSeconds is the one the
+	// liveness probe runs with. It is ignored when
+	// `.spec.probes.liveness.failureThreshold` sets the threshold directly.
 	// +optional
 	LivenessProbeTimeout *int32 `json:"livenessProbeTimeout,omitempty"`
 
@@ -1473,6 +1475,15 @@ const (
 	// DefaultPrimaryLeaseReleasedDurationSeconds is the default TTL, in seconds, written when the
 	// primary explicitly releases its lease on a clean shutdown.
 	DefaultPrimaryLeaseReleasedDurationSeconds = 1
+
+	// DefaultLivenessProbePeriodSeconds is the period set for the liveness probe of an instance
+	// when `.spec.probes.liveness.periodSeconds` does not override it.
+	DefaultLivenessProbePeriodSeconds = 10
+
+	// DefaultProbeFailureThreshold is the failure threshold Kubernetes applies to a probe that
+	// leaves the field unset, which is what the operator generates unless the user asks for
+	// something else.
+	DefaultProbeFailureThreshold = 3
 )
 
 // SynchronousReplicaConfigurationMethod configures whether to use

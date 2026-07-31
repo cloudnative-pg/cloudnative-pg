@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"math"
 	"regexp"
 	"slices"
 	"strings"
@@ -790,6 +791,48 @@ func (cluster *Cluster) GetPrimaryLeaseReleasedDuration() time.Duration {
 		return time.Duration(*l.ReleasedLeaseDurationSeconds) * time.Second
 	}
 	return DefaultPrimaryLeaseReleasedDurationSeconds * time.Second
+}
+
+// FailureThresholdFromDelay derives a probe failure threshold from the total delay the probe
+// is allowed to tolerate: `ceil(delay / period)`, never less than 1.
+func FailureThresholdFromDelay(delay, period int32) int32 {
+	if delay <= period {
+		return 1
+	}
+	return int32(math.Ceil(float64(delay) / float64(period)))
+}
+
+// GetLivenessProbePeriodSeconds returns how often the liveness probe of an instance runs.
+func (cluster *Cluster) GetLivenessProbePeriodSeconds() int32 {
+	if cluster.Spec.Probes != nil &&
+		cluster.Spec.Probes.Liveness != nil &&
+		cluster.Spec.Probes.Liveness.PeriodSeconds != 0 {
+		return cluster.Spec.Probes.Liveness.PeriodSeconds
+	}
+
+	return DefaultLivenessProbePeriodSeconds
+}
+
+// GetLivenessProbeFailureThreshold returns the failure threshold that the kubelet ends up
+// applying to the liveness probe of an instance. There are two ways to set it and the legacy
+// one is not written back into `.spec.probes`, so anything that needs to reason about how much
+// consecutive failure the user is willing to tolerate has to resolve both here rather than
+// reading a single field.
+func (cluster *Cluster) GetLivenessProbeFailureThreshold() int32 {
+	if cluster.Spec.Probes != nil &&
+		cluster.Spec.Probes.Liveness != nil &&
+		cluster.Spec.Probes.Liveness.FailureThreshold != 0 {
+		return cluster.Spec.Probes.Liveness.FailureThreshold
+	}
+
+	if cluster.Spec.LivenessProbeTimeout != nil {
+		return FailureThresholdFromDelay(
+			*cluster.Spec.LivenessProbeTimeout,
+			cluster.GetLivenessProbePeriodSeconds(),
+		)
+	}
+
+	return DefaultProbeFailureThreshold
 }
 
 // GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover
