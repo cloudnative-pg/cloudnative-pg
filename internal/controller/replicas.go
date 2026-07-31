@@ -280,6 +280,11 @@ func (r *ClusterReconciler) shouldSetPrimaryToSchedulableNode(
 	// Checking whether there are pods on other, schedulable nodes
 	podsOnSchedulableNodes := r.getSchedulablePodsNotOnPrimaryNode(ctx, status, primaryPod)
 
+	if len(podsOnSchedulableNodes.Items) == 0 {
+		// No other pods to switchover to
+		return false
+	}
+
 	// If no failed pods are found, but not all instances are ready or not all replicas have been moved to a
 	// schedulable instance, wait, because something is in progress
 	if !hasFailedPods &&
