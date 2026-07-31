@@ -44,12 +44,18 @@ func captureStdout(f func()) string {
 		_ = r.Close()
 	})
 
+	// Drain concurrently so f() can't block if it writes more than the
+	// OS pipe buffer can hold.
+	outCh := make(chan string, 1)
+	go func() {
+		out, _ := io.ReadAll(r)
+		outCh <- string(out)
+	}()
+
 	f()
 
 	Expect(w.Close()).To(Succeed())
-	out, err := io.ReadAll(r)
-	Expect(err).ToNot(HaveOccurred())
-	return string(out)
+	return <-outCh
 }
 
 var _ = Describe("NewCmd", func() {
