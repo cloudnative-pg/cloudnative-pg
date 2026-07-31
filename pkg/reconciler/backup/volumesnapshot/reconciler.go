@@ -128,9 +128,9 @@ func (se *Reconciler) enrichSnapshot(
 	vs.Labels[utils.BackupDateLabelName] = now.Format("20060102")
 	vs.Labels[utils.BackupMonthLabelName] = now.Format("200601")
 	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(now.Year())
-	// the backup status is only filled in when the backup is finalized, which happens
+	// backup.Status.Online is only set once the backup is finalized, which happens
 	// after the snapshots have been created: the effective online setting has to be
-	// taken from the configuration, as the status is still empty at this point
+	// taken from the configuration, as Status.Online is still empty at this point
 	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.GetOnlineOrDefault(cluster))
 
 	rawCluster, err := json.Marshal(cluster)
