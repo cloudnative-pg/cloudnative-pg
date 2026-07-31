@@ -249,3 +249,16 @@ func Current() *Config {
 	}
 	return current
 }
+
+// UpdateStorage overwrites the storage-class fields of the current
+// configuration. It keeps every mutation of the package-level state in
+// config.go, instead of letting callers reach into the pointer Current
+// returns.
+func UpdateStorage(storage StorageConfiguration) {
+	currentMu.Lock()
+	defer currentMu.Unlock()
+	if current == nil {
+		current = NewDefault()
+	}
+	current.Storage = storage
+}

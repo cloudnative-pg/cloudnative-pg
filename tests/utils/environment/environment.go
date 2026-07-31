@@ -196,9 +196,11 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 
 	// Write the resolved values back, so that helpers reading the
 	// configuration see the detected classes too
-	cfg.Storage.StorageClass = env.DefaultStorageClass
-	cfg.Storage.CSIStorageClass = env.CSIStorageClass
-	cfg.Storage.VolumeSnapshotClass = env.DefaultVolumeSnapshotClass
+	config.UpdateStorage(config.StorageConfiguration{
+		StorageClass:        env.DefaultStorageClass,
+		CSIStorageClass:     env.CSIStorageClass,
+		VolumeSnapshotClass: env.DefaultVolumeSnapshotClass,
+	})
 
 	return &env, nil
 }
