@@ -133,11 +133,6 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 		if IsOpenshift() {
 			Skip("This test case is not applicable on OpenShift clusters")
 		}
-		// hack/e2e/run-e2e.sh only installs plugin-barman-cloud on the local
-		// engines, so the plugin is not available anywhere else yet.
-		if !(IsKind() || IsK3D()) {
-			Skip("This test case only runs on kind or k3d clusters")
-		}
 	})
 
 	BeforeEach(func() {
