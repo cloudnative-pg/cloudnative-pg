@@ -222,6 +222,18 @@ func runBootstrap(
 		return nil
 	}
 
+	// A bootstrap failure is deterministic, so the instance uses exactly one
+	// attempt: if an earlier attempt already failed, park instead of retrying.
+	failed, err := bootstrap.HasFailed(info.PgData, identity)
+	if err != nil {
+		return fmt.Errorf("while checking the bootstrap failure marker: %w", err)
+	}
+	if failed {
+		contextLogger.Error(nil, "Instance bootstrap failed on an earlier attempt; "+
+			"parking the instance instead of retrying", "mode", instruction.Mode)
+		return parkFailedBootstrap(ctx, cli, instance, info.PgData, identity)
+	}
+
 	contextLogger.Info("Starting in-process bootstrap", "mode", instruction.Mode)
 
 	// A restore-based bootstrap may reach a TLS-protected barman object store (the
@@ -271,14 +283,39 @@ func runBootstrap(
 
 	bootErr := bootstrap.Execute(ctx, cli, instance, info, instruction)
 
+	if bootErr != nil {
+		// A bootstrap failure is deterministic: record it so a container restart
+		// parks the instance instead of running the same bootstrap again. If the
+		// marker cannot be written we still park this process, but a later restart
+		// (for example a node reboot) would find no marker and retry once more.
+		if markErr := bootstrap.WriteFailedMarker(
+			info.PgData, instruction.Mode, identity, bootErr.Error(),
+		); markErr != nil {
+			contextLogger.Error(markErr, "while recording the bootstrap failure")
+		}
+		contextLogger.Error(bootErr, "In-process bootstrap failed; "+
+			"parking the instance instead of retrying", "mode", instruction.Mode)
+
+		// Report the failure on the status endpoint so the operator surfaces it
+		// as unrecoverable while the instance stays parked (not ready, 503).
+		instance.FailBootstrap(string(instruction.Mode), bootErr.Error())
+
+		// Do not exit. Exiting would let the kubelet restart the container; the
+		// failure marker would stop a second bootstrap attempt, but each restart
+		// would still re-enter this code only to park again. Keep the phase-0
+		// status server running and block until the pod is deleted, so the
+		// kubelet probes keep seeing a not-ready, 503 instance and nothing
+		// contacts the recovery source again.
+		<-ctx.Done()
+		stopServers()
+		wg.Wait()
+		return ctx.Err()
+	}
+
 	// Release the status and local ports so the manager web servers can bind
 	// them once we fall through to the normal run.
 	stopServers()
 	wg.Wait()
-
-	if bootErr != nil {
-		return bootErr
-	}
 
 	if err := bootstrap.WriteCompletedMarker(info.PgData, instruction.Mode, identity); err != nil {
 		return err
@@ -288,6 +325,59 @@ func runBootstrap(
 	contextLogger.Info("In-process bootstrap completed", "mode", instruction.Mode)
 
 	return nil
+}
+
+// parkFailedBootstrap serves the phase-0 status web server for an instance whose
+// bootstrap failed on an earlier container start and blocks until the pod is
+// deleted. It never starts PostgreSQL and never contacts the recovery source, so
+// a deterministically-failed bootstrap does not keep retrying across restarts.
+// The kubelet keeps seeing a not-ready instance whose status endpoint replies
+// 503, exactly as during an in-progress bootstrap.
+func parkFailedBootstrap(
+	ctx context.Context,
+	cli client.Client,
+	instance *postgres.Instance,
+	pgData string,
+	identity bootstrap.MarkerIdentity,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	if instance.StatusPortTLS {
+		if err := loadServerCertificate(ctx, cli, instance); err != nil {
+			return err
+		}
+	}
+
+	// Recover the mode and reason recorded at failure so the status endpoint can
+	// report why the instance parked. A missing or unreadable marker is not fatal:
+	// the instance still parks, just with an empty reason.
+	mode, reason, _, err := bootstrap.LoadFailure(pgData, identity)
+	if err != nil {
+		contextLogger.Error(err, "while loading the bootstrap failure marker for the parked instance")
+	}
+
+	// Flip the bootstrap failed flag so the status server keeps the startup probe
+	// skipped, readiness red and the status endpoint on 503, and reports the
+	// failure to the operator.
+	instance.FailBootstrap(mode, reason)
+
+	statusServer := webserver.NewBootstrapWebServer(instance)
+	serverCtx, stopServer := context.WithCancel(ctx)
+	defer stopServer()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := statusServer.Start(serverCtx); err != nil {
+			contextLogger.Error(err, "parked status web server stopped with an error")
+		}
+	}()
+
+	<-ctx.Done()
+	stopServer()
+	wg.Wait()
+	return ctx.Err()
 }
 
 // writeRecoveryBarmanEndpointCA writes the recovery-source barman endpoint CA to

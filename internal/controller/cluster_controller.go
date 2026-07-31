@@ -821,6 +821,33 @@ func (r *ClusterReconciler) setDefaults(ctx context.Context, cluster *apiv1.Clus
 	return nil
 }
 
+// reconcileFailedBootstrap looks for an instance whose in-process bootstrap has
+// failed and parked, and, when it finds one, registers the cluster as
+// unrecoverable. It returns a non-nil result when it acted, so the caller stops
+// the current reconciliation.
+func (r *ClusterReconciler) reconcileFailedBootstrap(
+	ctx context.Context, cluster *apiv1.Cluster, instancesStatus postgres.PostgresqlStatusList,
+) (*ctrl.Result, error) {
+	for idx := range instancesStatus.Items {
+		reason, failed := remote.BootstrapFailure(instancesStatus.Items[idx])
+		if !failed || instancesStatus.Items[idx].Pod == nil {
+			continue
+		}
+
+		podName := instancesStatus.Items[idx].Pod.Name
+		log.FromContext(ctx).Warning("An instance bootstrap has failed",
+			"instance", podName, "reason", reason)
+		message := fmt.Sprintf("Bootstrap of instance %s failed and will not be retried: %s",
+			podName, reason)
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, message); err != nil {
+			return nil, err
+		}
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	return nil, nil
+}
+
 // reconcileResources updates all the objects managed by the controller
 func (r *ClusterReconciler) reconcileResources(
 	ctx context.Context, cluster *apiv1.Cluster,
@@ -861,6 +888,17 @@ func (r *ClusterReconciler) reconcileResources(
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// A new-style instance bootstraps in its own Pod, with no Job. A failed
+	// bootstrap parks and reports the failure on its status endpoint: surface it
+	// as unrecoverable, mirroring the failed-Job path above. This runs before the
+	// running-jobs guard so an unrelated in-flight legacy Job during an upgrade
+	// cannot mask it.
+	if result, err := r.reconcileFailedBootstrap(ctx, cluster, instancesStatus); err != nil {
+		return ctrl.Result{}, err
+	} else if result != nil {
+		return *result, nil
 	}
 
 	runningJobs := resources.runningJobNames()

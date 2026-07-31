@@ -303,18 +303,39 @@ func (instance *Instance) MightBeUnavailable() bool {
 	return instance.mightBeUnavailable.Load()
 }
 
-// BootstrapProgress describes an in-process bootstrap that is currently running.
+// BootstrapProgress describes an in-process bootstrap that is currently running
+// or has parked after failing.
 type BootstrapProgress struct {
 	// Mode is the bootstrap method being executed.
 	Mode string
 
 	// Since is the time the bootstrap started.
 	Since time.Time
+
+	// Failed is true once the bootstrap has failed and the instance has parked.
+	// The instance stays in the bootstrap state (not ready, status 503) so it
+	// never starts PostgreSQL.
+	Failed bool
+
+	// Reason is the failure cause, set only when Failed is true.
+	Reason string
 }
 
 // StartBootstrap marks the instance as being bootstrapped with the given mode.
 func (instance *Instance) StartBootstrap(mode string) {
 	instance.bootstrapProgress.Store(&BootstrapProgress{Mode: mode, Since: time.Now()})
+}
+
+// FailBootstrap marks the in-process bootstrap as failed and parks the instance:
+// it stays in the bootstrap state (not ready, status 503) so it does not start
+// PostgreSQL, and it records the reason so the operator can surface it.
+func (instance *Instance) FailBootstrap(mode, reason string) {
+	instance.bootstrapProgress.Store(&BootstrapProgress{
+		Mode:   mode,
+		Since:  time.Now(),
+		Failed: true,
+		Reason: reason,
+	})
 }
 
 // CompleteBootstrap clears the in-process bootstrap marker.

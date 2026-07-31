@@ -20,7 +20,9 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
 	"time"
 
@@ -36,6 +38,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -1508,5 +1511,62 @@ var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 
 	It("returns nil for an object that does not reference a cluster", func(ctx SpecContext) {
 		Expect(mapClusterOwnedResourceToCluster(ctx, &corev1.Secret{})).To(BeNil())
+	})
+})
+
+var _ = Describe("reconcileFailedBootstrap", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	failedBootstrapStatus := func(pod *corev1.Pod, reason string) postgres.PostgresqlStatus {
+		body, err := json.Marshal(postgres.BootstrapStatusResponse{
+			Error:  postgres.BootstrapStatusFailed,
+			Mode:   "join",
+			Reason: reason,
+		})
+		Expect(err).ToNot(HaveOccurred())
+		return postgres.PostgresqlStatus{
+			Pod:   pod,
+			Error: &remote.StatusError{StatusCode: http.StatusServiceUnavailable, Body: string(body)},
+		}
+	}
+
+	It("registers the cluster as unrecoverable when an instance bootstrap failed", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{IsPodReady: true, Pod: &instances[1]},
+				failedBootstrapStatus(&instances[0], "primary unreachable"),
+			},
+		}
+
+		result, err := env.clusterReconciler.reconcileFailedBootstrap(ctx, cluster, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+		Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseUnrecoverable))
+		Expect(cluster.Status.PhaseReason).To(ContainSubstring("primary unreachable"))
+	})
+
+	It("does nothing when no instance bootstrap failed", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{IsPodReady: true, Pod: &instances[0]},
+				{IsPodReady: true, Pod: &instances[1]},
+			},
+		}
+
+		result, err := env.clusterReconciler.reconcileFailedBootstrap(ctx, cluster, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeNil())
+		Expect(cluster.Status.Phase).ToNot(Equal(apiv1.PhaseUnrecoverable))
 	})
 })

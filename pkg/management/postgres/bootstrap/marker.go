@@ -131,6 +131,108 @@ func WriteCompletedMarker(pgData string, mode Mode, identity MarkerIdentity) err
 	return nil
 }
 
+// failureMarker is the content of the file written beside PGDATA when an
+// in-process bootstrap fails. A bootstrap failure is deterministic (bad
+// configuration, an unreachable or wrong recovery source, a corrupt backup), so
+// re-running the same work against the same broken input does not recover: the
+// instance records the failure and parks instead of retrying. Genuinely
+// transient conditions are retried inside the bootstrap step itself, not by
+// re-running the whole bootstrap.
+type failureMarker struct {
+	// Mode is the bootstrap method that failed.
+	Mode string `json:"mode"`
+
+	// FailedAt is the time the bootstrap failed.
+	FailedAt time.Time `json:"failedAt"`
+
+	// OperatorVersion is the instance manager version that ran the bootstrap.
+	OperatorVersion string `json:"operatorVersion"`
+
+	// Identity is the instance that ran the bootstrap.
+	Identity MarkerIdentity `json:"identity"`
+
+	// Reason is the error that made the bootstrap fail, kept for diagnostics.
+	Reason string `json:"reason"`
+}
+
+// failureMarkerPath returns the path of the failure marker for the given PGDATA.
+// Like the completion marker it lives inside PGDATA: see
+// constants.BootstrapFailedFile for why that is safe.
+func failureMarkerPath(pgData string) string {
+	return filepath.Join(pgData, constants.BootstrapFailedFile)
+}
+
+// HasFailed reports whether a previous in-process bootstrap of THIS instance
+// already failed. It returns true only when the failure marker exists, parses,
+// and records exactly the given identity. A missing, unparseable, or
+// foreign-identity marker all mean not failed. Only a genuine I/O error reading
+// the marker is surfaced. Identity scoping mirrors IsCompleted.
+func HasFailed(pgData string, identity MarkerIdentity) (bool, error) {
+	data, err := os.ReadFile(failureMarkerPath(pgData)) // #nosec G304 -- path is PGDATA, controlled by the operator
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("while reading the bootstrap failure marker: %w", err)
+	}
+
+	var marker failureMarker
+	if err := json.Unmarshal(data, &marker); err != nil {
+		return false, nil
+	}
+
+	return marker.Identity == identity, nil
+}
+
+// LoadFailure returns the mode and reason recorded by a previous failed
+// bootstrap of THIS instance, so a restarted, parked instance can report why it
+// failed. ok is false when there is no matching failure marker; identity scoping
+// mirrors HasFailed.
+func LoadFailure(pgData string, identity MarkerIdentity) (mode, reason string, ok bool, err error) {
+	data, readErr := os.ReadFile(failureMarkerPath(pgData)) // #nosec G304 -- path is PGDATA, controlled by the operator
+	if readErr != nil {
+		if os.IsNotExist(readErr) {
+			return "", "", false, nil
+		}
+		return "", "", false, fmt.Errorf("while reading the bootstrap failure marker: %w", readErr)
+	}
+
+	var marker failureMarker
+	if json.Unmarshal(data, &marker) != nil || marker.Identity != identity {
+		return "", "", false, nil
+	}
+
+	return marker.Mode, marker.Reason, true, nil
+}
+
+// WriteFailedMarker records that the in-process bootstrap of this instance
+// failed, so a container restart parks the instance instead of retrying. It is
+// written durably, like the completion marker.
+func WriteFailedMarker(pgData string, mode Mode, identity MarkerIdentity, reason string) error {
+	marker := failureMarker{
+		Mode:            string(mode),
+		FailedAt:        time.Now(),
+		OperatorVersion: versions.Version,
+		Identity:        identity,
+		Reason:          reason,
+	}
+
+	data, err := json.Marshal(marker)
+	if err != nil {
+		return fmt.Errorf("while marshalling the bootstrap failure marker: %w", err)
+	}
+
+	if _, err := fileutils.WriteFileAtomic(failureMarkerPath(pgData), data, 0o600); err != nil {
+		return fmt.Errorf("while writing the bootstrap failure marker: %w", err)
+	}
+
+	if err := fsyncDirectory(pgData); err != nil {
+		return fmt.Errorf("while fsyncing PGDATA after writing the failure marker: %w", err)
+	}
+
+	return nil
+}
+
 // fsyncDirectory flushes a directory entry to stable storage so that a file
 // creation or rename inside it is durable.
 func fsyncDirectory(path string) error {

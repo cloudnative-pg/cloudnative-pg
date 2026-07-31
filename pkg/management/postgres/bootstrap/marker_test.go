@@ -131,3 +131,85 @@ var _ = Describe("bootstrap completion marker", func() {
 		Expect(completed).To(BeFalse())
 	})
 })
+
+var _ = Describe("bootstrap failure marker", func() {
+	var pgData string
+
+	// identity is the instance doing the HasFailed check in every test.
+	identity := MarkerIdentity{
+		Namespace:   "default",
+		ClusterName: "cluster-example",
+		ClusterUID:  "11111111-1111-1111-1111-111111111111",
+		PodName:     "cluster-example-1",
+	}
+
+	BeforeEach(func() {
+		pgData = GinkgoT().TempDir()
+	})
+
+	It("reports not failed on a fresh data directory", func() {
+		failed, err := HasFailed(pgData, identity)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failed).To(BeFalse())
+	})
+
+	It("writes a marker the same instance then detects, recording mode and reason", func() {
+		Expect(WriteFailedMarker(pgData, ModeJoin, identity, "primary unreachable")).To(Succeed())
+
+		failed, err := HasFailed(pgData, identity)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failed).To(BeTrue())
+
+		mode, reason, ok, err := LoadFailure(pgData, identity)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(ok).To(BeTrue())
+		Expect(mode).To(Equal(string(ModeJoin)))
+		Expect(reason).To(Equal("primary unreachable"))
+
+		// #nosec G304 -- pgData is a test-controlled temporary directory
+		content, err := os.ReadFile(filepath.Join(pgData, constants.BootstrapFailedFile))
+		Expect(err).ToNot(HaveOccurred())
+		var marker failureMarker
+		Expect(json.Unmarshal(content, &marker)).To(Succeed())
+		Expect(marker.OperatorVersion).To(Equal(versions.Version))
+		Expect(marker.FailedAt).ToNot(BeZero())
+		Expect(marker.Identity).To(Equal(identity))
+	})
+
+	DescribeTable("reports not failed when the marker belongs to another instance",
+		func(author MarkerIdentity) {
+			Expect(WriteFailedMarker(pgData, ModeRestoreSnapshot, author, "boom")).To(Succeed())
+
+			failed, err := HasFailed(pgData, identity)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(failed).To(BeFalse())
+
+			_, _, ok, err := LoadFailure(pgData, identity)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ok).To(BeFalse())
+		},
+		Entry("different pod name (snapshot-cloned scale-up replica)", MarkerIdentity{
+			Namespace:   "default",
+			ClusterName: "cluster-example",
+			ClusterUID:  "11111111-1111-1111-1111-111111111111",
+			PodName:     "cluster-example-2",
+		}),
+		Entry("different cluster UID (in-place recreation)", MarkerIdentity{
+			Namespace:   "default",
+			ClusterName: "cluster-example",
+			ClusterUID:  "22222222-2222-2222-2222-222222222222",
+			PodName:     "cluster-example-1",
+		}),
+	)
+
+	It("reports not failed, without error, for a corrupt marker", func() {
+		Expect(os.WriteFile(
+			filepath.Join(pgData, constants.BootstrapFailedFile),
+			[]byte("this is not json"), 0o600),
+		).To(Succeed())
+
+		failed, err := HasFailed(pgData, identity)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failed).To(BeFalse())
+	})
+})

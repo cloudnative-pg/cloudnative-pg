@@ -49,6 +49,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/probes"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	pgstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -329,21 +330,24 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 
 // This probe is for the instance status, including replication
 func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
-	// While an in-process bootstrap is running PostgreSQL is not up yet. We
-	// reply with a 503 carrying a recognizable body rather than a valid status
-	// payload: a valid payload would make the operator treat the pod as
-	// reporting its status and short-circuit the reconciliation guards.
+	// While an in-process bootstrap is running, or has failed and parked,
+	// PostgreSQL is not up. We reply with a 503 carrying a recognizable body
+	// rather than a valid status payload: a valid payload would make the operator
+	// treat the pod as reporting its status and short-circuit the reconciliation
+	// guards. The body distinguishes a running bootstrap (the operator keeps
+	// waiting) from a failed one (the operator surfaces it as unrecoverable).
 	if progress := ws.instance.GetBootstrapProgress(); progress != nil {
+		state := pgstatus.BootstrapStatusRunning
+		if progress.Failed {
+			state = pgstatus.BootstrapStatusFailed
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		_ = json.NewEncoder(w).Encode(struct {
-			Error string    `json:"error"`
-			Mode  string    `json:"mode"`
-			Since time.Time `json:"since"`
-		}{
-			Error: "bootstrapping",
-			Mode:  progress.Mode,
-			Since: progress.Since,
+		_ = json.NewEncoder(w).Encode(pgstatus.BootstrapStatusResponse{
+			Error:  state,
+			Mode:   progress.Mode,
+			Since:  progress.Since,
+			Reason: progress.Reason,
 		})
 		return
 	}
