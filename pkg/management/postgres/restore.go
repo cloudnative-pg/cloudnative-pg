@@ -368,16 +368,12 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 func (info InitInfo) buildRestoreDataDirOptions(
 	ctx context.Context,
 	backup *apiv1.Backup,
-	cluster *apiv1.Cluster,
+	barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
 ) ([]string, error) {
 	var options []string
 
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
-	}
-
-	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-		options = cluster.Spec.Backup.BarmanObjectStore.Data.AppendRestoreAdditionalCommandArgs(options)
 	}
 
 	options = append(options, backup.Status.DestinationPath)
@@ -389,6 +385,10 @@ func (info InitInfo) buildRestoreDataDirOptions(
 		return nil, err
 	}
 
+	if barmanConfiguration != nil {
+		options = barmanConfiguration.Data.AppendRestoreAdditionalCommandArgs(options)
+	}
+
 	return append(options, info.PgData), nil
 }
 
@@ -397,11 +397,11 @@ func (info InitInfo) restoreDataDir(
 	ctx context.Context,
 	backup *apiv1.Backup,
 	env []string,
-	cluster *apiv1.Cluster,
+	barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	options, err := info.buildRestoreDataDirOptions(ctx, backup, cluster)
+	options, err := info.buildRestoreDataDirOptions(ctx, backup, barmanConfiguration)
 	if err != nil {
 		return err
 	}
@@ -442,7 +442,7 @@ func (info InitInfo) loadBackup(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	// Recovery given an existing backup
 	if cluster.Spec.Bootstrap.Recovery.Backup != nil {
 		return info.loadBackupFromReference(ctx, typedClient, cluster)
@@ -457,23 +457,23 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	contextLogger := log.FromContext(ctx)
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
 	if sourceName == "" {
-		return nil, nil, fmt.Errorf("recovery source not specified")
+		return nil, nil, nil, fmt.Errorf("recovery source not specified")
 	}
 
 	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
-		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
+		return nil, nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
 	}
 
 	if server.BarmanObjectStore == nil {
-		return nil, nil, fmt.Errorf("missing barman object store configuration for source: %v", sourceName)
+		return nil, nil, nil, fmt.Errorf("missing barman object store configuration for source: %v", sourceName)
 	}
 
 	serverName := server.GetServerName()
@@ -485,12 +485,12 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		server.BarmanObjectStore,
 		os.Environ())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	backupCatalog, err := barmanCommand.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// We are now choosing the right backup to restore
@@ -501,13 +501,13 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 			cluster.Spec.Bootstrap.Recovery.RecoveryTarget,
 		)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	} else {
 		targetBackup = backupCatalog.LatestBackupInfo()
 	}
 	if targetBackup == nil {
-		return nil, nil, fmt.Errorf("no target backup found")
+		return nil, nil, nil, fmt.Errorf("no target backup found")
 	}
 
 	contextLogger.Info("Target backup found", "backup", targetBackup)
@@ -536,7 +536,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 			CommandOutput:     "",
 			CommandError:      "",
 		},
-	}, env, nil
+	}, env, server.BarmanObjectStore, nil
 }
 
 // loadBackupFromReference loads a backup object and the required credentials given the backup object resource
@@ -544,7 +544,7 @@ func (info InitInfo) loadBackupFromReference(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	contextLogger := log.FromContext(ctx)
 	var backup apiv1.Backup
 	err := typedClient.Get(
@@ -552,21 +552,33 @@ func (info InitInfo) loadBackupFromReference(
 		client.ObjectKey{Namespace: info.Namespace, Name: cluster.Spec.Bootstrap.Recovery.Backup.Name},
 		&backup)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	barmanConfiguration := &apiv1.BarmanObjectStoreConfiguration{
+		BarmanCredentials: backup.Status.BarmanCredentials,
+		EndpointCA:        backup.Status.EndpointCA,
+		EndpointURL:       backup.Status.EndpointURL,
+		DestinationPath:   backup.Status.DestinationPath,
+		ServerName:        backup.Status.ServerName,
 	}
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
 		typedClient,
 		cluster.Namespace,
+<<<<<<< HEAD
 		barmanObjectStoreFromBackup(&backup),
+=======
+		barmanConfiguration,
+>>>>>>> 4fc441f47 (fix: source barman-cloud-restore arguments from the recovery object store)
 		os.Environ())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	contextLogger.Info("Recovering existing backup", "backup", backup)
-	return &backup, env, nil
+	return &backup, env, barmanConfiguration, nil
 }
 
 func (info InitInfo) writeCustomRestoreWalConfig(cluster *apiv1.Cluster, conf string) error {

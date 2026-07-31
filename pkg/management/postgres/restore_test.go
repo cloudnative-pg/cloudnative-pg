@@ -25,6 +25,7 @@ import (
 	"slices"
 	"strings"
 
+	barmanApi "github.com/cloudnative-pg/barman-cloud/pkg/api"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/thoas/go-funk"
 
@@ -221,36 +222,77 @@ var _ = Describe("buildRestoreDataDirOptions", func() {
 	info := InitInfo{PgData: "/pgdata"}
 
 	DescribeTable("building the barman-cloud-restore options",
-		func(ctx SpecContext, cluster *apiv1.Cluster, expected string) {
-			options, err := info.buildRestoreDataDirOptions(ctx, baseBackup, cluster)
+		func(
+			ctx SpecContext,
+			backup *apiv1.Backup,
+			barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
+			expected string,
+		) {
+			options, err := info.buildRestoreDataDirOptions(ctx, backup, barmanConfiguration)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Join(options, " ")).To(Equal(expected))
 		},
-		Entry("no barman object store configured",
-			&apiv1.Cluster{},
+		Entry("nil barman configuration",
+			baseBackup, nil,
 			"s3://bucket/path server-a 20230101T000000 /pgdata"),
-		Entry("barman object store with no restore additional args",
-			&apiv1.Cluster{
-				Spec: apiv1.ClusterSpec{
-					Backup: &apiv1.BackupConfiguration{
-						BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+		Entry("barman configuration with nil data",
+			baseBackup, &apiv1.BarmanObjectStoreConfiguration{},
+			"s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("barman configuration with data set but no restore additional args",
+			baseBackup, &apiv1.BarmanObjectStoreConfiguration{
+				Data: &apiv1.DataBackupConfiguration{},
+			},
+			"s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("barman configuration with restore additional args, placed after the positional arguments",
+			baseBackup, &apiv1.BarmanObjectStoreConfiguration{
+				Data: &apiv1.DataBackupConfiguration{
+					RestoreAdditionalCommandArgs: []string{"--read-timeout=60"},
+				},
+			},
+			"s3://bucket/path server-a 20230101T000000 --read-timeout=60 /pgdata"),
+		Entry("endpoint URL placement is unchanged",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: "s3://bucket/path",
+					ServerName:      "server-a",
+					BackupID:        "20230101T000000",
+					EndpointURL:     "https://example.com",
+				},
+			},
+			nil,
+			"--endpoint-url https://example.com s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("a user-supplied duplicate of the endpoint URL is dropped",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: "s3://bucket/path",
+					ServerName:      "server-a",
+					BackupID:        "20230101T000000",
+					EndpointURL:     "https://example.com",
+				},
+			},
+			&apiv1.BarmanObjectStoreConfiguration{
+				Data: &apiv1.DataBackupConfiguration{
+					RestoreAdditionalCommandArgs: []string{"--endpoint-url=https://attacker.example.com", "--read-timeout=60"},
+				},
+			},
+			"--endpoint-url https://example.com s3://bucket/path server-a 20230101T000000 --read-timeout=60 /pgdata"),
+		Entry("a user-supplied duplicate of a cloud-provider option is dropped",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: "s3://bucket/path",
+					ServerName:      "server-a",
+					BackupID:        "20230101T000000",
+					BarmanCredentials: barmanApi.BarmanCredentials{
+						AWS: &barmanApi.S3Credentials{},
 					},
 				},
 			},
-			"s3://bucket/path server-a 20230101T000000 /pgdata"),
-		Entry("barman object store with restore additional args",
-			&apiv1.Cluster{
-				Spec: apiv1.ClusterSpec{
-					Backup: &apiv1.BackupConfiguration{
-						BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-							Data: &apiv1.DataBackupConfiguration{
-								RestoreAdditionalCommandArgs: []string{"--read-timeout=60"},
-							},
-						},
-					},
+			&apiv1.BarmanObjectStoreConfiguration{
+				Data: &apiv1.DataBackupConfiguration{
+					RestoreAdditionalCommandArgs: []string{"--cloud-provider=aws-s3", "--read-timeout=60"},
 				},
 			},
-			"--read-timeout=60 s3://bucket/path server-a 20230101T000000 /pgdata"),
+			"s3://bucket/path server-a 20230101T000000 --cloud-provider aws-s3 --read-timeout=60 /pgdata"),
 	)
 })
 
