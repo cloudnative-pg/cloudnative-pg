@@ -285,7 +285,9 @@ spec:
         - "--min-chunk-size=5MB"
         - "--read-timeout=60"
 ```
-For restores:
+For restores, the `restoreAdditionalCommandArgs` are taken from the `barmanObjectStore`
+of the external cluster the recovery is reading from, that is the entry named by
+`.spec.bootstrap.recovery.source`, not from `.spec.backup`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -294,11 +296,11 @@ kind: Cluster
 spec:
   externalClusters:
     - name: clusterBackup
-    barmanObjectStore:
-      [...]
-      data:
-        restoreAdditionalCommandArgs:
-        - "--read-timeout=60"
+      barmanObjectStore:
+        [...]
+        data:
+          restoreAdditionalCommandArgs:
+          - "--read-timeout=60"
 ```
 
 For WAL Archiving files:
@@ -326,11 +328,11 @@ kind: Cluster
 spec:
   externalClusters:
     - name: clusterBackup
-    barmanObjectStore:
-      [...]
-      wal:
-        restoreAdditionalCommandArgs:
-        - "--read-timeout=60"
+      barmanObjectStore:
+        [...]
+        wal:
+          restoreAdditionalCommandArgs:
+          - "--read-timeout=60"
 ```
 
 ## Recovery from an object store
