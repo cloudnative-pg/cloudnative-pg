@@ -234,6 +234,33 @@ following conditions are met:
 
 The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
 
+Once the probe has failed `failureThreshold` times in a row, the instance
+manager stops PostgreSQL itself, requesting a *fast* shutdown and escalating to
+an *immediate* one after 30 seconds. It does not wait for the kubelet to
+terminate the container, and it deliberately does not use the *smart* shutdown
+reserved for planned termination: a smart shutdown lets the sessions that are
+already open run to completion, which would leave an isolated primary
+acknowledging writes it can no longer replicate for as long as
+`.spec.smartShutdownTimeout` allows. Unlike other shutdowns, this one is not
+preceded by a `CHECKPOINT`: that checkpoint is unbounded, and it would only
+shorten the recovery this instance faces on its next start, which it pays
+anyway on the rewind that follows. The instance is not restarted in place
+afterwards; the container is recreated, and the new one waits for the API
+server to be reachable before starting PostgreSQL again.
+
+Detection is the larger part of the total: the writes stop roughly
+`failureThreshold` × `periodSeconds` after the partition, plus the shutdown
+itself, so with the defaults the primary is open for about 30 seconds before
+the 30 second shutdown budget even begins.
+
+:::warning
+    Because the isolation check is what decides this, a false positive costs an
+    unplanned failover rather than only a probe failure. Both
+    `.spec.probes.liveness.failureThreshold` and the older
+    `.spec.livenessProbeTimeout` widen the tolerance, and the instance manager
+    honors whichever of the two is in effect.
+:::
+
 It is **enabled by default** and can be disabled by adding the following:
 
 ```yaml

@@ -3227,8 +3227,10 @@ spec:
                 description: |-
                   LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
                   to successfully respond to the liveness probe (default 30).
-                  The Liveness probe failure threshold is derived from this value using the formula:
-                  ceiling(livenessProbe / 10).
+                  The liveness probe failure threshold is derived from this value using the formula:
+                  ceiling(livenessProbeTimeout / periodSeconds), where periodSeconds is the one the
+                  liveness probe runs with. It is ignored when
+                  `.spec.probes.liveness.failureThreshold` sets the threshold directly.
                 format: int32
                 type: integer
               logLevel:
