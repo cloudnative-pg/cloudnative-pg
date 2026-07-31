@@ -74,16 +74,16 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		namespacePrefix = "tablespaces"
 	)
 	var (
-		clusterName string
-		cluster     *apiv1.Cluster
+		clusterName      string
+		cluster          *apiv1.Cluster
+		storageClassName string
 	)
-
-	storageClassName := config.Current().Storage.StorageClass
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+		storageClassName = config.Current().Storage.StorageClass
 	})
 
 	clusterSetup := func(namespace, clusterManifest string) {
