@@ -1531,9 +1531,26 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 }
 
 // RequestFastImmediateShutdownForIsolation is RequestFastImmediateShutdown for an instance
-// that has been found isolated, whose fast phase is bounded far more tightly.
-func (instance *Instance) RequestFastImmediateShutdownForIsolation() {
-	instance.instanceCommandChan <- shutDownFastImmediateIsolated
+// that has been found isolated, whose fast phase is bounded far more tightly. It waits up to
+// timeout for the lifecycle manager to take the request up and reports whether it did: the
+// caller is the liveness probe handler, which must not block past the probe's own timeout,
+// and which has to know whether the shutdown it is about to report a failure for is actually
+// running.
+func (instance *Instance) RequestFastImmediateShutdownForIsolation(
+	ctx context.Context,
+	timeout time.Duration,
+) bool {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case instance.instanceCommandChan <- shutDownFastImmediateIsolated:
+		return true
+	case <-timer.C:
+		return false
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
