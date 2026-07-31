@@ -72,6 +72,30 @@ var _ = Describe("status endpoints during an in-process bootstrap", func() {
 			Expect(body.Mode).To(Equal("restore"))
 			Expect(body.Since).ToNot(BeEmpty())
 		})
+
+		It("returns a 503 reporting the failure once a bootstrap has failed", func() {
+			instance := &postgres.Instance{}
+			instance.FailBootstrap("join", "primary unreachable")
+			ws := remoteWebserverEndpoints{instance: instance}
+
+			req := httptest.NewRequest(http.MethodGet, "/pg/status", nil)
+			w := httptest.NewRecorder()
+
+			ws.pgStatus(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusServiceUnavailable))
+			Expect(w.Header().Get("Content-Type")).To(Equal("application/json"))
+
+			var body struct {
+				Error  string `json:"error"`
+				Mode   string `json:"mode"`
+				Reason string `json:"reason"`
+			}
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body.Error).To(Equal("bootstrapFailed"))
+			Expect(body.Mode).To(Equal("join"))
+			Expect(body.Reason).To(Equal("primary unreachable"))
+		})
 	})
 
 	Describe("updateInstanceManager", func() {
