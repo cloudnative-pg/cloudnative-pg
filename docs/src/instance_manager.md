@@ -241,12 +241,24 @@ terminate the container, and it deliberately does not use the *smart* shutdown
 reserved for planned termination: a smart shutdown lets the sessions that are
 already open run to completion, which would leave an isolated primary
 acknowledging writes it can no longer replicate for as long as
-`.spec.smartShutdownTimeout` allows. Unlike other shutdowns, this one is not
-preceded by a `CHECKPOINT`: that checkpoint is unbounded, and it would only
-shorten the recovery this instance faces on its next start, which it pays
-anyway on the rewind that follows. The instance is not restarted in place
-afterwards; the container is recreated, and the new one waits for the API
-server to be reachable before starting PostgreSQL again.
+`.spec.smartShutdownTimeout` allows.
+
+On a primary carrying any real load, escalating to *immediate* is the expected
+outcome of this sequence rather than an exceptional one. This shutdown
+deliberately skips the explicit `CHECKPOINT` that other shutdowns perform, on
+the reasoning that the checkpoint is unbounded and would only shorten a
+recovery this instance is going to pay for anyway once it gets rewound.
+Skipping it, though, defers all the outstanding dirty-buffer work onto the
+shutdown checkpoint that PostgreSQL always runs before a *fast* shutdown can
+complete, and that checkpoint is unbounded as well. On a busy primary with a
+large `shared_buffers`, the 30 second budget routinely runs out while this
+checkpoint is still in progress, and the *immediate* shutdown that follows
+aborts it midway. The instance then comes back up through crash recovery
+rather than a clean shutdown, which costs nothing beyond what the instance was
+already going to pay on its next start, and no acknowledged commit is lost
+either way. The instance is not restarted in place afterwards; the container
+is recreated, and the new one waits for the API server to be reachable before
+starting PostgreSQL again.
 
 Detection is the larger part of the total: the writes stop roughly
 `failureThreshold` × `periodSeconds` after the partition, plus the shutdown
