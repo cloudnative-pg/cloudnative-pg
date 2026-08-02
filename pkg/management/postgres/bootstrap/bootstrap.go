@@ -58,6 +58,17 @@ const (
 	ModeRestoreSnapshot Mode = "restoresnapshot"
 )
 
+// ClonesFromLiveServer reports whether the mode initializes PGDATA by cloning a
+// live PostgreSQL server with pg_basebackup (a replica joining its primary, or a
+// bootstrap from an external cluster). Such a source can be transiently
+// unavailable, for example while the primary is restarting or switching over, so
+// these modes warrant a bounded retry instead of parking on the first failure.
+// The other modes (initdb, restore from a backup, restore from a snapshot) fail
+// deterministically and are not retried.
+func (m Mode) ClonesFromLiveServer() bool {
+	return m == ModeJoin || m == ModePgBaseBackup
+}
+
 // Instruction describes how the instance manager must bootstrap a data directory.
 type Instruction struct {
 	// Mode is the bootstrap method to use.

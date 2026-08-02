@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/kballard/go-shellquote"
@@ -36,6 +37,19 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/bootstrap"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
+)
+
+const (
+	// bootstrapCloneMaxAttempts bounds how many times a live-server clone
+	// (join/pgbasebackup) is retried before the instance parks. It mirrors the
+	// default backoff limit the bootstrap Job used to carry, so a clone racing a
+	// primary restart or switchover keeps the same tolerance it had before.
+	bootstrapCloneMaxAttempts = 6
+
+	// bootstrapCloneRetryBackoffStep is multiplied by the attempt number, capped
+	// at bootstrapCloneRetryBackoffMax, for the wait between clone retries.
+	bootstrapCloneRetryBackoffStep = 10 * time.Second
+	bootstrapCloneRetryBackoffMax  = 30 * time.Second
 )
 
 // bootstrapOptions collects the run flags that describe how to initialize an
@@ -281,13 +295,43 @@ func runBootstrap(
 	startServer("status", statusServer)
 	startServer("local", localServer)
 
-	bootErr := bootstrap.Execute(ctx, cli, instance, info, instruction)
+	// A clone from a live server (join/pgbasebackup) can fail transiently when
+	// the source is momentarily unavailable, for example while a primary is
+	// restarting or switching over, so it gets a bounded retry; every other mode
+	// fails deterministically and is attempted once. Each Execute re-runs
+	// EnsureTargetDirectoriesDoNotExist, so a retry starts from a clean PGDATA.
+	maxAttempts := 1
+	if instruction.Mode.ClonesFromLiveServer() {
+		maxAttempts = bootstrapCloneMaxAttempts
+	}
+
+	var bootErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if bootErr = bootstrap.Execute(ctx, cli, instance, info, instruction); bootErr == nil {
+			break
+		}
+		if attempt == maxAttempts {
+			break
+		}
+		backoff := min(time.Duration(attempt)*bootstrapCloneRetryBackoffStep, bootstrapCloneRetryBackoffMax)
+		contextLogger.Warning("In-process bootstrap attempt failed, retrying",
+			"mode", instruction.Mode, "attempt", attempt, "maxAttempts", maxAttempts,
+			"backoff", backoff, "error", bootErr.Error())
+		select {
+		case <-ctx.Done():
+			stopServers()
+			wg.Wait()
+			return ctx.Err()
+		case <-time.After(backoff):
+		}
+	}
 
 	if bootErr != nil {
-		// A bootstrap failure is deterministic: record it so a container restart
-		// parks the instance instead of running the same bootstrap again. If the
-		// marker cannot be written we still park this process, but a later restart
-		// (for example a node reboot) would find no marker and retry once more.
+		// The bootstrap failed for good (a deterministic mode, or a clone that
+		// exhausted its retries): record it so a container restart parks the
+		// instance instead of running the same bootstrap again. If the marker
+		// cannot be written we still park this process, but a later restart (for
+		// example a node reboot) would find no marker and retry once more.
 		if markErr := bootstrap.WriteFailedMarker(
 			info.PgData, instruction.Mode, identity, bootErr.Error(),
 		); markErr != nil {
