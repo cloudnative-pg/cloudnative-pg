@@ -186,18 +186,20 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 
 	schemaNames := stringset.New()
 	for i, schemaSpec := range d.Spec.Schemas {
+		itemPath := field.NewPath("spec", "schemas").Index(i)
+
 		name := schemaSpec.Name
 		if schemaNames.Has(name) {
-			result = append(
-				result,
-				field.Duplicate(
-					field.NewPath("spec", "schemas").Index(i).Child("name"),
-					name,
-				),
-			)
+			result = append(result, field.Duplicate(itemPath.Child("name"), name))
 		}
 
 		schemaNames.Put(name)
+
+		if schemaSpec.Permissions != nil {
+			permissionsPath := itemPath.Child("permissions")
+			result = append(result, validateUsageNames(permissionsPath.Child("usage"), schemaSpec.Permissions.Usage)...)
+			result = append(result, validateUsageNames(permissionsPath.Child("create"), schemaSpec.Permissions.Create)...)
+		}
 	}
 
 	return result
@@ -281,10 +283,19 @@ func validateNameOptionsUsages(
 		optionNames.Put(option.Name)
 	}
 
+	errs = append(errs, validateUsageNames(itemPath.Child("usages"), usages)...)
+
+	return errs
+}
+
+// validateUsageNames validates that no role name appears more than once within a usage list.
+func validateUsageNames(usagesPath *field.Path, usages []apiv1.UsageSpec) field.ErrorList {
+	var errs field.ErrorList
+
 	usageNames := stringset.New()
 	for i, usage := range usages {
 		if usageNames.Has(usage.Name) {
-			errs = append(errs, field.Duplicate(itemPath.Child("usages").Index(i).Child("name"), usage.Name))
+			errs = append(errs, field.Duplicate(usagesPath.Index(i).Child("name"), usage.Name))
 		}
 		usageNames.Put(usage.Name)
 	}
