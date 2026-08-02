@@ -137,6 +137,63 @@ var _ = Describe("Database validation", func() {
 		expectDuplicateErrors(errs, map[string]string{"spec.schemas[2].name": "test_two"})
 	})
 
+	It("doesn't complain with distinct schema permissions usage and create names", func() {
+		db := &apiv1.Database{
+			Spec: apiv1.DatabaseSpec{
+				Schemas: []apiv1.SchemaSpec{
+					{
+						DatabaseObjectSpec: apiv1.DatabaseObjectSpec{Name: "analytics", Ensure: apiv1.EnsurePresent},
+						Permissions: &apiv1.SchemaPermissionsSpec{
+							Usage:  []apiv1.UsageSpec{{Name: "reader"}, {Name: "writer"}},
+							Create: []apiv1.UsageSpec{{Name: "app_owner"}},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validate(db)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("complains if there are duplicate names within schema permissions usage", func() {
+		db := &apiv1.Database{
+			Spec: apiv1.DatabaseSpec{
+				Schemas: []apiv1.SchemaSpec{
+					{
+						DatabaseObjectSpec: apiv1.DatabaseObjectSpec{Name: "analytics", Ensure: apiv1.EnsurePresent},
+						Permissions: &apiv1.SchemaPermissionsSpec{
+							Usage: []apiv1.UsageSpec{
+								{Name: "reader", Type: apiv1.GrantUsageSpecType},
+								{Name: "reader", Type: apiv1.RevokeUsageSpecType},
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validate(db)
+		Expect(extractErrorFields(errs)).To(ConsistOf("spec.schemas[0].permissions.usage[1].name"))
+		expectDuplicateErrors(errs, map[string]string{"spec.schemas[0].permissions.usage[1].name": "reader"})
+	})
+
+	It("complains if there are duplicate names within schema permissions create", func() {
+		db := &apiv1.Database{
+			Spec: apiv1.DatabaseSpec{
+				Schemas: []apiv1.SchemaSpec{
+					{
+						DatabaseObjectSpec: apiv1.DatabaseObjectSpec{Name: "analytics", Ensure: apiv1.EnsurePresent},
+						Permissions: &apiv1.SchemaPermissionsSpec{
+							Create: []apiv1.UsageSpec{{Name: "app_owner"}, {Name: "app_owner"}},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validate(db)
+		Expect(extractErrorFields(errs)).To(ConsistOf("spec.schemas[0].permissions.create[1].name"))
+		expectDuplicateErrors(errs, map[string]string{"spec.schemas[0].permissions.create[1].name": "app_owner"})
+	})
+
 	It("doesn't complain with distinct FDWs and usage names", func() {
 		db := &apiv1.Database{
 			Spec: apiv1.DatabaseSpec{
