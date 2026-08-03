@@ -386,3 +386,79 @@ var _ = Describe("Timeline history filename parsing", func() {
 		}
 	})
 })
+
+var _ = Describe("Timeline history filename generation", func() {
+	It("builds the expected 8-hex-digit history filename", func() {
+		Expect(TimelineHistoryFileName(1)).To(Equal("00000001.history"))
+		Expect(TimelineHistoryFileName(33)).To(Equal("00000021.history"))
+		Expect(TimelineHistoryFileName(255)).To(Equal("000000FF.history"))
+	})
+
+	It("round-trips with ParseTimelineFromHistoryFilename", func() {
+		for _, tli := range []int{1, 2, 10, 33, 255, 4096} {
+			timeline, err := ParseTimelineFromHistoryFilename(TimelineHistoryFileName(tli))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(timeline).To(Equal(tli))
+		}
+	})
+})
+
+var _ = Describe("Timeline fork point lookup", func() {
+	It("finds the fork LSN for the requested parent timeline", func() {
+		content := "1\t0/7000110\tno recovery target specified\n"
+		lsn, found := FindTimelineForkPoint(content, 1)
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(BeEquivalentTo("0/7000110"))
+	})
+
+	It("finds the right fork point among several ancestor timelines", func() {
+		// timeline 2 forked from 1 at 0/5000000, and the current timeline
+		// (3) forked from 2 at 0/8000000. A replica still on timeline 1
+		// forked away at 0/5000000, not at 0/8000000.
+		content := "1\t0/5000000\tno recovery target specified\n" +
+			"2\t0/8000000\tno recovery target specified\n"
+
+		lsn, found := FindTimelineForkPoint(content, 1)
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(BeEquivalentTo("0/5000000"))
+
+		lsn, found = FindTimelineForkPoint(content, 2)
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(BeEquivalentTo("0/8000000"))
+	})
+
+	It("tolerates comments, blank lines, and space-separated fields", func() {
+		content := "# comment\n\n1 0/7000110 no recovery target specified\n\n"
+		lsn, found := FindTimelineForkPoint(content, 1)
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(BeEquivalentTo("0/7000110"))
+	})
+
+	It("returns false when the parent timeline is not in the history", func() {
+		content := "1\t0/7000110\tno recovery target specified\n"
+		_, found := FindTimelineForkPoint(content, 5)
+		Expect(found).To(BeFalse())
+	})
+
+	It("returns false on empty content", func() {
+		_, found := FindTimelineForkPoint("", 1)
+		Expect(found).To(BeFalse())
+	})
+
+	It("ignores malformed lines instead of erroring", func() {
+		content := "not-a-number\t0/7000110\tbad line\n" +
+			"1\t0/7000110\tno recovery target specified\n"
+		lsn, found := FindTimelineForkPoint(content, 1)
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(BeEquivalentTo("0/7000110"))
+	})
+
+	It("returns the first match when a timeline appears more than once", func() {
+		// Not expected in a real PostgreSQL history file, but the parser
+		// should not depend on that assumption to behave predictably.
+		content := "1\t0/5000000\tfirst\n1\t0/9000000\tsecond\n"
+		lsn, found := FindTimelineForkPoint(content, 1)
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(BeEquivalentTo("0/5000000"))
+	})
+})

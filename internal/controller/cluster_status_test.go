@@ -22,7 +22,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -30,9 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -419,6 +423,136 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(state2.IsPrimary).To(BeFalse())
 		Expect(state2.TimeLineID).To(Equal(123))
 		Expect(state2.IP).To(Equal("192.168.1.2"))
+	})
+
+	// Both tests below drive updateClusterStatusThatRequiresInstancesState
+	// twice with an unchanged set of reporting instances, mirroring a real
+	// second reconciliation rather than the cluster's first ever pass. That
+	// matters because the persist gate at the end of the function compares
+	// the whole ClusterStatus, and on a genuine first pass several fields
+	// (InstancesReportedState, ReplicaDivergenceWatermarks) go from nil to
+	// non-nil, which is by itself a real difference that makes the update
+	// persist regardless of what else is going on. Only on a steady second
+	// pass, where those fields end up with the same content as before, does
+	// the map- and slice-aliasing bug in cluster.Status.ReplicaWalIssues and
+	// its condition become the only thing that could cause a difference --
+	// which is the scenario that must actually reach the API server.
+	It("persists a newly detected replica WAL issue alongside an already-persisted one", func(ctx SpecContext) {
+		env.clusterReconciler.InstanceClient = &fakeTimelineHistoryClient{
+			response: remote.TimelineHistoryResponse{
+				TimelineID: 2,
+				Content:    "1\t0/7000110\tno recovery target specified\n",
+			},
+		}
+		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "primary", Namespace: cluster.Namespace}},
+				IsPrimary:  true,
+				IsPodReady: true,
+				TimeLineID: 2,
+			},
+			{
+				Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-new", Namespace: cluster.Namespace}},
+				TimeLineID:  1,
+				ReceivedLsn: cnpgTypes.LSN("0/7500000"),
+			},
+		}}
+
+		// First pass: starts the watermark for replica-new. No issue exists
+		// yet for anyone, so this pass's own nil-to-map transitions cause a
+		// real diff and persist regardless of the bug.
+		Expect(env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)).To(Succeed())
+
+		// Simulate a replica that was already fenced as containment for an
+		// unrelated, earlier divergence: an entry already sitting in the
+		// non-nil map, not touched by this pass because it isn't in
+		// `statuses` (it isn't reporting).
+		cluster.Status.ReplicaWalIssues = map[apiv1.PodName]apiv1.ReplicaWalIssueStatus{
+			"replica-parked": {Kind: apiv1.ReplicaWalIssueDiverged, DetectedTimeLineID: 1, AgainstTimeLineID: 2, Parked: true},
+		}
+		// Age replica-new's watermark past the grace period, as a real
+		// clock would after enough reconciliations.
+		watermark := cluster.Status.ReplicaDivergenceWatermarks["replica-new"]
+		watermark.Since = time.Now().Add(-(replicaDivergenceStallGracePeriod + 5*time.Second)).Format(metav1.RFC3339Micro)
+		cluster.Status.ReplicaDivergenceWatermarks["replica-new"] = watermark
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+		// Refresh from the API server, exactly as a real reconcile would
+		// re-Get the object at the start of every pass: it must not carry
+		// forward any in-process-only state (e.g. a monotonic clock reading
+		// on a condition's timestamp) that a fresh Get would not have.
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+
+		// Second pass, same reporting instances: replica-new's watermark is
+		// now stale, so the fork-point check confirms it and records a new
+		// entry into the already non-nil ReplicaWalIssues map.
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Asserting on the in-memory object proves nothing here: it is the
+		// same object the persist gate compared against itself. Re-Get from
+		// the fake API server to confirm the update actually reached it.
+		var fresh apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
+		Expect(fresh.Status.ReplicaWalIssues).To(HaveKey(apiv1.PodName("replica-parked")))
+		Expect(fresh.Status.ReplicaWalIssues).To(HaveKey(apiv1.PodName("replica-new")))
+	})
+
+	It("persists the removal of a replica WAL issue once the replica catches up", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "primary", Namespace: cluster.Namespace}},
+				IsPrimary:  true,
+				IsPodReady: true,
+				TimeLineID: 2,
+			},
+			{
+				// already caught up to the current primary timeline from the
+				// very first pass
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-caught-up", Namespace: cluster.Namespace}},
+				TimeLineID: 2,
+			},
+			{
+				// still behind, but not stalled long enough yet to be
+				// confirmed: on both passes this keeps
+				// ReplicaDivergenceWatermarks non-empty with the exact same
+				// content, so that map's own nil-to-non-nil transition on an
+				// otherwise-empty map (a fake-client round-trip artifact, not
+				// related to the bug under test) can't also cause a diff and
+				// mask whether the deletion below is what actually drove the
+				// persisted update.
+				Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-lagging", Namespace: cluster.Namespace}},
+				TimeLineID:  1,
+				ReceivedLsn: cnpgTypes.LSN("0/6000000"),
+			},
+		}}
+
+		// First pass: nothing to detect, but the nil-to-map transitions on
+		// InstancesReportedState and the watermarks map are a real diff and
+		// persist regardless of the bug.
+		Expect(env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)).To(Succeed())
+
+		// Simulate a stale entry left over from before the replica caught
+		// up, still sitting on the API server.
+		cluster.Status.ReplicaWalIssues = map[apiv1.PodName]apiv1.ReplicaWalIssueStatus{
+			"replica-caught-up": {Kind: apiv1.ReplicaWalIssueStuck, DetectedTimeLineID: 1, AgainstTimeLineID: 2},
+		}
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+		// Refresh from the API server, exactly as a real reconcile would
+		// re-Get the object at the start of every pass.
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+
+		// Second pass, same reporting instances: replica-caught-up is still
+		// caught up, so its stale entry must be deleted from the already
+		// non-nil ReplicaWalIssues map. replica-lagging is frozen at the same
+		// (timeline, LSN) as the first pass and hasn't stalled past the grace
+		// period, so its watermark is carried forward unchanged and nothing
+		// else about it moves.
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		var fresh apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
+		Expect(fresh.Status.ReplicaWalIssues).ToNot(HaveKey(apiv1.PodName("replica-caught-up")))
 	})
 
 	Context("Pod termination reason detection", func() {

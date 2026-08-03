@@ -750,7 +750,10 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	cluster *apiv1.Cluster,
 	statuses postgres.PostgresqlStatusList,
 ) error {
-	existingClusterStatus := cluster.Status
+	// Take a deep copy: the status carries map and slice fields that the code
+	// below mutates in place, and a shallow copy would alias them, making those
+	// mutations undetectable to the DeepEqual comparison further down.
+	existingClusterStatus := *cluster.Status.DeepCopy()
 	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
 	// we extract the instances reported state
@@ -774,6 +777,12 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 			detectedSystemID.Put(item.SystemID)
 		}
 	}
+
+	// Detect and surface any replica whose WAL receiver has stalled behind
+	// the current primary's timeline, confirming (via a fork-point check)
+	// whether it has diverged past recovery. Always runs; containment is
+	// handled separately, see reconcileDivergedReplicaContainment.
+	r.evaluateReplicaDivergence(ctx, cluster, statuses)
 
 	// we update the system ID field in the cluster status
 	switch detectedSystemID.Len() {

@@ -58,6 +58,55 @@ may be required.
     Do not perform manual operations without [professional support](https://cloudnative-pg.io/support/).
 :::
 
+### Recovering a stranded replica
+
+After an abrupt primary loss (see
+[Abrupt primary loss: data loss window and stranded replicas](failover.md#abrupt-primary-loss-data-loss-window-and-stranded-replicas)),
+a surviving replica can be left on a divergent history: it received more data
+than the point from which the newly promoted primary continued, so it can no
+longer follow the new primary and stops replicating.
+
+CloudNativePG detects this automatically: once the replica's WAL receiver has
+stalled behind the current primary's timeline for a grace period, the
+operator confirms the divergence and marks the instance unhealthy, fences it
+(stopping PostgreSQL so it no longer retries a broken WAL stream and is
+removed from the read services), and drops its replication slot on the
+primary. This is reflected in the `Cluster` status and reported with a
+`ReplicaDiverged` event. Signs of a stranded replica are:
+
+- it stays behind the primary and never catches up;
+- it is not connected to the primary for streaming replication;
+- its PostgreSQL log repeats an error similar to
+  `requested starting point ... is not in this server's history`; and
+- the operator has fenced it and reports it as unhealthy.
+
+If the operator cannot confirm a divergence this way -- for example because it
+could not reach the primary to check, or because the replica stalled without
+ever progressing past the point where the primary's timeline diverged -- the
+instance is instead reported as `Stuck` in the `Cluster` status. A `Stuck`
+replica is surfaced but never fenced: it may still catch up once the
+underlying cause (for example a network issue) resolves.
+
+Recovery is still a manual step in this version: the operator does not yet
+rewind or re-clone the instance automatically. To recover, rebuild the
+affected instance from the current primary. The
+[`cnpg` plugin](kubectl-plugin.md#destroy) removes the instance together with its
+storage so the operator re-creates it as a fresh replica aligned with the current
+primary:
+
+```sh
+kubectl cnpg destroy CLUSTER INSTANCE
+```
+
+Replace `CLUSTER` with the cluster name and `INSTANCE` with the stranded Pod's
+name.
+
+To disable the automatic fencing and slot removal described above, and only
+have the divergence detected and surfaced, set the
+`alpha.cnpg.io/divergedReplicaHandling: detectOnly` annotation on the
+`Cluster`. This is useful when you want to review a divergence yourself before
+the operator acts on it.
+
 ### Disabling Reconciliation
 
 The `cnpg.io/reconciliationLoop` annotation allows you to temporarily disable

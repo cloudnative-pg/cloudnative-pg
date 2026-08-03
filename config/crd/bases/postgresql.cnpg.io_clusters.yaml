@@ -7417,6 +7417,122 @@ spec:
                 description: The total number of ready instances in the cluster. It
                   is equal to the number of ready instance pods.
                 type: integer
+              replicaDivergenceWatermarks:
+                additionalProperties:
+                  description: |-
+                    ReplicaDivergenceWatermark is the high-water mark tracked for a replica
+                    that is behind the current primary's timeline, used to require its
+                    received LSN to be frozen for a grace period before the fork-point check
+                    runs. See ClusterStatus.ReplicaDivergenceWatermarks.
+                  properties:
+                    receivedLSN:
+                      description: |-
+                        ReceivedLSN is the highest received LSN observed for this instance
+                        while behind TimeLineID.
+                      type: string
+                    since:
+                      description: Since is when ReceivedLSN was first observed at
+                        its current value.
+                      type: string
+                    timeLineID:
+                      description: |-
+                        TimeLineID is the current primary's timeline this watermark was
+                        recorded against. A change in this value resets the watermark.
+                      minimum: 1
+                      type: integer
+                  required:
+                  - receivedLSN
+                  - since
+                  - timeLineID
+                  type: object
+                description: |-
+                  ReplicaDivergenceWatermarks tracks, for a replica currently behind the
+                  current primary's timeline, the highest received LSN observed and since
+                  when it has been frozen at that value. Keyed by instance name and reset
+                  whenever the current primary's timeline changes, so every new failover
+                  starts this clock fresh. Used to require a grace period of no progress
+                  before the fork-point check that confirms a divergence runs. Cleared
+                  once the replica catches up, or once it graduates to
+                  `replicaWalIssues`.
+                type: object
+              replicaWalIssues:
+                additionalProperties:
+                  description: |-
+                    ReplicaWalIssueStatus describes a non-primary instance whose WAL receiver
+                    is reported as stalled behind the current primary's timeline. See
+                    ClusterStatus.ReplicaWalIssues.
+                  properties:
+                    againstTimeLineID:
+                      description: |-
+                        AgainstTimeLineID is the primary's timeline the fork-point check was run
+                        against. Used to re-open the check when the primary forks again.
+                      minimum: 1
+                      type: integer
+                    detectedAt:
+                      description: DetectedAt is when the issue was confirmed.
+                      type: string
+                    detectedTimeLineID:
+                      description: |-
+                        DetectedTimeLineID is the timeline the instance was on when the issue
+                        was confirmed.
+                      minimum: 1
+                      type: integer
+                    forkLSN:
+                      description: |-
+                        ForkLSN is the LSN at which the current primary's timeline forked away
+                        from DetectedTimeLineID, when the fork-point check was able to
+                        determine it.
+                      type: string
+                    kind:
+                      description: Kind classifies the issue.
+                      enum:
+                      - Stuck
+                      - Diverged
+                      type: string
+                    parked:
+                      description: |-
+                        Parked is true once the instance has been fenced as containment for a
+                        confirmed divergence. Only ever set for a Kind of Diverged.
+                      type: boolean
+                    pvcUID:
+                      description: |-
+                        PVCUID is the UID of the instance's PGDATA PersistentVolumeClaim at the
+                        moment it was fenced as containment for a confirmed divergence. Only
+                        set once Parked is true. Used to detect that the instance's data has
+                        since been rebuilt from a fresh clone (for example with
+                        `kubectl cnpg destroy`, which deletes and recreates the PVC) as
+                        opposed to the Pod merely being recreated over the same, still
+                        diverged PVC (a node failure, eviction, or rollout, none of which
+                        replace the data): only a PVC replacement makes it safe to lift
+                        containment and forget the entry.
+                      type: string
+                    receivedLSN:
+                      description: |-
+                        ReceivedLSN is the instance's received LSN at the moment the issue was
+                        confirmed. Together with ForkLSN it bounds the range of WAL
+                        (ForkLSN, ReceivedLSN] the replica holds that the current primary does
+                        not, for a Kind of Diverged.
+                      type: string
+                  required:
+                  - againstTimeLineID
+                  - detectedAt
+                  - detectedTimeLineID
+                  - kind
+                  type: object
+                description: |-
+                  ReplicaWalIssues reports the non-primary instances whose WAL receiver
+                  has stalled behind the current primary's timeline for longer than the
+                  detection grace period. An instance is reported as "Diverged" once a
+                  fork-point check confirms its received WAL goes past the point where
+                  the current primary's timeline forked away from it (in which case it is
+                  also fenced and excluded from the primary's replication slots, unless
+                  the `alpha.cnpg.io/divergedReplicaHandling` annotation is set to
+                  `detectOnly`), or as "Stuck" when the fork-point check could not
+                  confirm a divergence. A "Stuck" instance is always surfaced, never
+                  fenced. Entries are cleared once a fenced instance's data is rebuilt
+                  from a fresh clone (for example with `kubectl cnpg destroy`) or, for
+                  any instance, once it catches up.
+                type: object
               resizingPVC:
                 description: List of all the PVCs that have ResizingPVC condition.
                 items:

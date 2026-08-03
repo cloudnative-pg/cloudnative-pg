@@ -10,6 +10,7 @@ AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
+AgainstTimeLineID
 AllNamespaces
 Anand
 AntiAffinity
@@ -151,6 +152,8 @@ DatabaseStatus
 DefaultAzureCredential
 DemotionToken
 DeploymentStrategy
+DetectedAt
+DetectedTimeLineID
 DevOps
 DevSecOps
 DigitalOcean
@@ -197,6 +200,7 @@ FailoverQuorumStatus
 Fei
 Filesystem
 Fluentd
+ForkLSN
 Francesco
 GC
 GCE
@@ -356,6 +360,7 @@ PODNAME
 PPROF
 PSA
 PV
+PVCUID
 PVCs
 PascalBourdier
 PasswordState
@@ -451,10 +456,18 @@ RPO
 RTO
 RUNTIME
 ReadWriteOnce
+ReceivedLSN
 RedHat
 RelabelConfig
 ReplicaClusterConfiguration
+ReplicaDivergenceWatermark
+ReplicaDivergenceWatermarks
 ReplicaSet
+ReplicaWalIssueDiverged
+ReplicaWalIssueKind
+ReplicaWalIssueStatus
+ReplicaWalIssueStuck
+ReplicaWalIssues
 ReplicationSlotsConfiguration
 ReplicationSlotsHAConfiguration
 ReplicationTLSSecret
@@ -1412,11 +1425,14 @@ rehydration
 relabelings
 relatime
 replicaclusterconfiguration
+replicadivergencewatermark
 replicationSecretVersion
 replicationSlots
 replicationTLSSecret
 replicationslotsconfiguration
 replicationslotshaconfiguration
+replicawalissuekind
+replicawalissuestatus
 repmgr
 reportNonRedacted
 reportRedacted

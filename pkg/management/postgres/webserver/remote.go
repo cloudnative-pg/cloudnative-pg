@@ -178,6 +178,9 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.withOperatorAuth(endpoints.pgControlData))
 	// Authenticated: pgarchivepartial triggers WAL archival and must not be callable by arbitrary clients.
 	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.withOperatorAuth(endpoints.pgArchivePartial))
+	// Authenticated: exposes the current timeline's history file, used by the operator to
+	// locate where the current timeline forked away from an earlier one.
+	serveMux.HandleFunc(url.PathPgTimelineHistory, endpoints.withOperatorAuth(endpoints.pgTimelineHistory))
 	// Authenticated: update replaces the running instance manager binary.
 	serveMux.HandleFunc(
 		url.PathUpdate,
@@ -335,6 +338,57 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 		log.Warning(
 			"Internal error marshalling instance status",
 			"err", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(js)
+}
+
+// pgTimelineHistory serves the content of the current timeline's history
+// file. Timeline 1 never has a history file (it is the first timeline), so
+// that case returns the timeline ID with no data rather than an error. Used
+// by the operator to find the LSN at which the current timeline forked away
+// from an earlier one a surviving replica may still be on.
+func (ws *remoteWebserverEndpoints) pgTimelineHistory(w http.ResponseWriter, _ *http.Request) {
+	type Response struct {
+		TimelineID int    `json:"timelineID"`
+		Data       string `json:"data,omitempty"`
+	}
+
+	superUserDB, err := ws.instance.GetSuperUserDB()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var timelineID int
+	row := superUserDB.QueryRow("SELECT timeline_id FROM pg_catalog.pg_control_checkpoint()")
+	if err := row.Scan(&timelineID); err != nil {
+		log.Debug("Instance timeline history endpoint failing", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := Response{TimelineID: timelineID}
+	if timelineID > 1 {
+		historyFileName := fmt.Sprintf("%08X.history", timelineID)
+		historyFilePath := path.Join(os.Getenv("PGDATA"), "pg_wal", historyFileName)
+		//nolint:gosec // fixed directory, file name built from an int read from PostgreSQL
+		content, err := os.ReadFile(historyFilePath)
+		if err != nil {
+			log.Debug("Instance timeline history endpoint failing to read the history file",
+				"err", err.Error(), "path", historyFilePath)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response.Data = string(content)
+	}
+
+	js, err := json.Marshal(response)
+	if err != nil {
+		log.Warning("Internal error marshalling timeline history response", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

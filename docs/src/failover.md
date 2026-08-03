@@ -37,6 +37,11 @@ controller will initiate the failover process, in two steps:
     and the replicas.
 :::
 
+The safeguards in this section apply when the failing primary can be shut down.
+For what happens when it cannot, such as an abrupt loss where the node freezes
+or is network-partitioned, see
+[Abrupt primary loss: data loss window and stranded replicas](#abrupt-primary-loss-data-loss-window-and-stranded-replicas).
+
 During the time the failing primary is being shut down:
 
 1. It will first try a PostgreSQL's *fast shutdown* with
@@ -213,6 +218,47 @@ and/or data being lost ([RPO](before_you_start.md#postgresql-terminology)):
     data loss while leaving the cluster without an active primary for a longer time
     during the switchover.
 :::
+
+## Abrupt primary loss: data loss window and stranded replicas
+
+The safeguards above rely on the failing primary shutting down cleanly. When the
+primary is lost abruptly instead, so that it can neither shut down nor be reached
+(for example, its node freezes or is network-partitioned while its PostgreSQL
+process stays up), CloudNativePG still completes the failover: once no surviving
+replica is making further replication progress and the former primary is
+unreachable, the operator promotes a new primary, guarded by the primary lease.
+This prevents a cluster from waiting for a lost primary indefinitely.
+
+Because the new primary is chosen from the last replication state the operator
+observed, this recovery path carries the usual trade-offs of asynchronous
+replication:
+
+- **Recently written data may be lost.** Writes that the former primary had not
+  yet replicated are not present on the promoted replica. This is the expected
+  [RPO](before_you_start.md#postgresql-terminology) behavior of asynchronous
+  replication on an unclean failover.
+- **A surviving replica may be left behind.** If another replica had received
+  more data than the one that was promoted, it ends up on a divergent history
+  and can no longer follow the new primary. The operator detects this,
+  reports the instance as unhealthy, and fences it so it stops retrying a
+  broken WAL stream and is removed from the read services. Recovering it is
+  currently a manual step: see
+  [Recovering a stranded replica](failure_modes.md#recovering-a-stranded-replica),
+  which also covers the case where a replica merely stalls behind the new
+  primary's timeline without a confirmed divergence, and the annotation that
+  disables this automatic fencing.
+
+If the replicas were already caught up when the primary was lost, no data is lost
+at the cluster level and no replica is left behind.
+
+If your workload cannot accept this data-loss window, enable
+[synchronous replication](replication.md#synchronous-replication) so that a
+commit is acknowledged to the application only once its WAL is safely stored on
+the required standbys, and combine it with
+[quorum-based failover](#failover-quorum-quorum-based-failover) so the operator
+only ever promotes a replica known to hold every acknowledged commit. Together
+they prevent the loss of acknowledged writes on failover, at the cost of higher
+write latency and reduced write availability when standbys are unreachable.
 
 ## Delayed failover
 

@@ -80,6 +80,7 @@ type metrics struct {
 	FencingOn                    prometheus.Gauge
 	PgStatWalMetrics             PgStatWalMetrics
 	NodesUsed                    prometheus.Gauge
+	ReplicasDiverged             prometheus.Gauge
 }
 
 // PgStatWalMetrics is available from PG14+
@@ -213,6 +214,15 @@ func newMetrics() *metrics {
 				"implying the absence of High Availability (HA). Ideally this value " +
 				"should match the number of instances in the cluster.",
 		}),
+		ReplicasDiverged: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "replicas_diverged",
+			Help: "Number of replicas confirmed to have progressed past the point where the " +
+				"current primary's timeline forked away from theirs. Such a replica can never " +
+				"catch up and is fenced pending a manual rebuild, unless containment is disabled " +
+				"via the alpha.cnpg.io/divergedReplicaHandling annotation.",
+		}),
 		PgStatWalMetrics: PgStatWalMetrics{
 			WalRecords: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: PrometheusNamespace,
@@ -292,6 +302,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.LastFailedBackupTimestamp.Describe(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Describe(ch)
 	e.Metrics.NodesUsed.Describe(ch)
+	e.Metrics.ReplicasDiverged.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -375,6 +386,7 @@ func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.LastFailedBackupTimestamp.Collect(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
 	e.Metrics.NodesUsed.Collect(ch)
+	e.Metrics.ReplicasDiverged.Collect(ch)
 
 	if version, _ := e.instance.GetPgVersion(); version.Major() >= 14 {
 		e.Metrics.PgStatWalMetrics.WalRecords.Collect(ch)
@@ -441,6 +453,7 @@ func (e *Exporter) updateInstanceMetrics() {
 	}
 
 	e.collectNodesUsed()
+	e.collectReplicasDiverged()
 
 	// metrics collected only on primary server
 	if isPrimary {
@@ -548,6 +561,27 @@ func (e *Exporter) collectNodesUsed() {
 	}
 
 	e.Metrics.NodesUsed.Set(float64(cluster.Status.Topology.NodesUsed))
+}
+
+func (e *Exporter) collectReplicasDiverged() {
+	cluster, err := e.getCluster()
+	if errors.Is(err, cache.ErrCacheMiss) {
+		return
+	}
+	if err != nil {
+		log.Error(err, "unable to collect metrics")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.ReplicasDiverged").Inc()
+		return
+	}
+
+	var diverged float64
+	for _, issue := range cluster.Status.ReplicaWalIssues {
+		if issue.Kind == apiv1.ReplicaWalIssueDiverged {
+			diverged++
+		}
+	}
+	e.Metrics.ReplicasDiverged.Set(diverged)
 }
 
 func (e *Exporter) collectFromPrimaryLastFailedBackupTimestamp() {
