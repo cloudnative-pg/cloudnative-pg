@@ -252,6 +252,41 @@ var _ = Describe("IsHealthy", func() {
 			Eventually(received).Should(Receive(Equal(isolatedShutdownCommand)))
 		})
 
+		It("reports failure promptly when the request context is cancelled before the handover, and gives the claim back", func() {
+			// Nobody reads the command channel here either, so the handover has
+			// nothing to succeed against: the only way it can return is by seeing
+			// ctx.Done(), and it has to see it well before the 500ms timer would
+			// have fired on its own. This is the branch a kubelet's own probe
+			// timeout takes: the request context it hands the handler dies mid
+			// handover, and the shutdown must not be left dangling on the claim.
+			cancelledCtx, cancel := context.WithCancel(ctx)
+			cancel()
+
+			executor := &livenessExecutor{instance: instance, cache: unreachableCache(isolatedCluster(1))}
+
+			w := httptest.NewRecorder()
+			start := time.Now()
+			executor.IsHealthy(cancelledCtx, w)
+			elapsed := time.Since(start)
+
+			// The isolation check itself still spends up to the fixture's 200ms
+			// connection timeout dialling the unreachable peer, so the bound below
+			// leaves room for that and still lands comfortably clear of the 500ms
+			// handover timer: this margin is what tells a context cancellation
+			// apart from the timer having fired.
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			Expect(elapsed).To(BeNumerically("<", 400*time.Millisecond))
+
+			// The claim went back, so the next failing probe asks again rather than
+			// leaving the instance isolated with nothing coming for it.
+			received := drainCommands()
+			w2 := httptest.NewRecorder()
+			executor.IsHealthy(ctx, w2)
+
+			Expect(w2.Code).To(Equal(http.StatusInternalServerError))
+			Eventually(received).Should(Receive(Equal(isolatedShutdownCommand)))
+		})
+
 		It("issues no second request once one has been handed over", func() {
 			// The reader stays alive across both calls on purpose. With a reader that
 			// stops after the first command, a second request would simply time out on
