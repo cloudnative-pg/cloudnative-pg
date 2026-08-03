@@ -348,6 +348,8 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 			// replica. shouldSetPrimaryToSchedulableNode has already confirmed all other healthy replicas are on
 			// schedulable nodes.
 			mostAdvancedInstance = status.Items[1]
+		} else {
+			return "", nil
 		}
 	}
 
