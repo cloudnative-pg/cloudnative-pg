@@ -128,6 +128,29 @@ var _ = Describe("IsHealthy", func() {
 		}
 	}
 
+	// drainCommands keeps taking whatever is put on the instance's command channel for the
+	// rest of the spec, forwarding it to the returned channel. It has to outlive every call
+	// under test rather than take a single command: a handover nobody is there to receive
+	// looks the same from the outside as one the handler declined to issue.
+	drainCommands := func() <-chan postgres.InstanceCommand {
+		received := make(chan postgres.InstanceCommand, 8)
+		done := make(chan struct{})
+		DeferCleanup(func() { close(done) })
+
+		go func() {
+			for {
+				select {
+				case cmd := <-instance.GetInstanceCommandChan():
+					received <- cmd
+				case <-done:
+					return
+				}
+			}
+		}()
+
+		return received
+	}
+
 	It("returns 200 and requests no shutdown for a fenced instance", func() {
 		instance.SetFencing(true)
 		executor := &livenessExecutor{instance: instance, cache: reachableCache(isolatedCluster(1))}
@@ -194,11 +217,7 @@ var _ = Describe("IsHealthy", func() {
 
 		It("returns 500 and hands the shutdown request over once the threshold is reached", func() {
 			executor := &livenessExecutor{instance: instance, cache: unreachableCache(isolatedCluster(1))}
-
-			received := make(chan postgres.InstanceCommand, 1)
-			go func() {
-				received <- <-instance.GetInstanceCommandChan()
-			}()
+			received := drainCommands()
 
 			w := httptest.NewRecorder()
 			executor.IsHealthy(ctx, w)
@@ -207,13 +226,39 @@ var _ = Describe("IsHealthy", func() {
 			Eventually(received).Should(Receive(Equal(isolatedShutdownCommand)))
 		})
 
-		It("issues no second request once one has been handed over", func() {
+		It("spends the handover budget and gives the claim back when nobody takes the request", func() {
+			// Nothing reads the command channel here, which is what makes this the test
+			// that tells a synchronous handover from a backgrounded one: the handler has
+			// to sit on the unbuffered send until its own budget runs out. A handler that
+			// dispatched the request and returned would come back immediately and would
+			// still be holding the claim.
 			executor := &livenessExecutor{instance: instance, cache: unreachableCache(isolatedCluster(1))}
 
-			received := make(chan postgres.InstanceCommand, 1)
-			go func() {
-				received <- <-instance.GetInstanceCommandChan()
-			}()
+			w := httptest.NewRecorder()
+			start := time.Now()
+			executor.IsHealthy(ctx, w)
+			elapsed := time.Since(start)
+
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			Expect(elapsed).To(BeNumerically(">=", isolationShutdownHandoverTimeout))
+
+			// The claim went back, so the next failing probe asks again rather than
+			// leaving the instance isolated with nothing coming for it.
+			received := drainCommands()
+			w2 := httptest.NewRecorder()
+			executor.IsHealthy(ctx, w2)
+
+			Expect(w2.Code).To(Equal(http.StatusInternalServerError))
+			Eventually(received).Should(Receive(Equal(isolatedShutdownCommand)))
+		})
+
+		It("issues no second request once one has been handed over", func() {
+			// The reader stays alive across both calls on purpose. With a reader that
+			// stops after the first command, a second request would simply time out on
+			// the unbuffered channel and go unnoticed, so the assertion below would hold
+			// even without the claim that is supposed to prevent it.
+			executor := &livenessExecutor{instance: instance, cache: unreachableCache(isolatedCluster(1))}
+			received := drainCommands()
 
 			w := httptest.NewRecorder()
 			executor.IsHealthy(ctx, w)
@@ -224,7 +269,7 @@ var _ = Describe("IsHealthy", func() {
 			executor.IsHealthy(ctx, w2)
 
 			Expect(w2.Code).To(Equal(http.StatusInternalServerError))
-			expectNoShutdownRequest()
+			Consistently(received, 200*time.Millisecond).ShouldNot(Receive())
 		})
 
 		It("resets the failure count on a success in between, so the threshold needs a fresh run", func() {
@@ -243,10 +288,7 @@ var _ = Describe("IsHealthy", func() {
 			Expect(w2.Code).To(Equal(http.StatusInternalServerError))
 			expectNoShutdownRequest()
 
-			received := make(chan postgres.InstanceCommand, 1)
-			go func() {
-				received <- <-instance.GetInstanceCommandChan()
-			}()
+			received := drainCommands()
 
 			w3 := httptest.NewRecorder()
 			executor.IsHealthy(ctx, w3)
