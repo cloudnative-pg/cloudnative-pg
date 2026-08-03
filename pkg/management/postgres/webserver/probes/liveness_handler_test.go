@@ -252,7 +252,7 @@ var _ = Describe("IsHealthy", func() {
 			Eventually(received).Should(Receive(Equal(isolatedShutdownCommand)))
 		})
 
-		It("reports failure promptly when the request context is cancelled before the handover, and gives the claim back", func() {
+		It("reports failure promptly when the context is cancelled, and gives the claim back", func() {
 			// Nobody reads the command channel here either, so the handover has
 			// nothing to succeed against: the only way it can return is by seeing
 			// ctx.Done(), and it has to see it well before the 500ms timer would
