@@ -1716,14 +1716,22 @@ func (instance *Instance) HandleInstanceCommandRequests(
 	case restartSmartFast:
 		return true, instance.TryShuttingDownSmartFast(ctx)
 	case shutDownFastImmediate, shutDownFastImmediateIsolated:
-		if req == shutDownFastImmediateIsolated {
-			instance.stoppedBecauseIsolated.Store(true)
-		}
 		if err := instance.TryShuttingDownFastImmediate(
 			ctx,
 			planFastImmediateShutdown(instance, req),
 		); err != nil {
 			contextLogger.Error(err, "error shutting down instance, proceeding")
+			return false, nil
+		}
+		if req == shutDownFastImmediateIsolated {
+			// Recorded only now that PostgreSQL is known to be down. This flag is what
+			// keeps the postmaster from coming back in place and suppresses a restart
+			// request that arrives just after, so setting it for a shutdown that did not
+			// happen would leave a running instance unable to be restarted at all. The
+			// lifecycle loop reads it when it observes the postmaster's exit, which is a
+			// later pass through its select than this one, so recording it here is in
+			// time.
+			instance.stoppedBecauseIsolated.Store(true)
 		}
 		return false, nil
 	default:

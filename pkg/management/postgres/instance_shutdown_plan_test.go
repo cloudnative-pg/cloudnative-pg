@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package postgres
 
 import (
+	"context"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -58,5 +60,28 @@ var _ = Describe("planFastImmediateShutdown", func() {
 	It("defaults the switchover shutdown to the documented switchoverDelay default", func() {
 		Expect(planFastImmediateShutdown(instance, shutDownFastImmediate).fastTimeout).
 			To(BeNumerically("==", apiv1.DefaultMaxSwitchoverDelay))
+	})
+})
+
+var _ = Describe("HandleInstanceCommandRequests, isolation shutdown", func() {
+	var instance *Instance
+
+	BeforeEach(func() {
+		instance = NewInstance().WithNamespace("test").WithClusterName("cluster")
+	})
+
+	It("does not record the instance as stopped when the shutdown fails", func() {
+		// With no PGDATA there is nothing to stop, so the shutdown reports an error that
+		// is not a pg_ctl exit status and therefore never escalates. PostgreSQL may still
+		// be running in that case, and marking it stopped would suppress every later
+		// restart request for the life of the process.
+		restartNeeded, err := instance.HandleInstanceCommandRequests(
+			context.Background(),
+			shutDownFastImmediateIsolated,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restartNeeded).To(BeFalse())
+		Expect(instance.StoppedBecauseIsolated()).To(BeFalse())
 	})
 })
