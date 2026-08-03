@@ -60,7 +60,7 @@ const walReceiversStalledGracePeriod = 60 * time.Second
 
 // evaluateWalReceiversGate waits for all the WAL receivers to be down before
 // letting a failover proceed, the same way `status.AreWalReceiversDown` has
-// always worked (see CNP-8534 for the destructive alternative case this
+// always worked (see Issue #10591 for the destructive alternative case this
 // escape hatch was added for).
 //
 // A postmaster that is frozen (e.g. `kill -STOP`) but whose walsender
@@ -237,7 +237,7 @@ func maxReceivedLsnAmongUpReceivers(
 // An instance with a non-nil Error is unknown, not caught up: it must never
 // satisfy this predicate, or an unreachable standby that may still be
 // streaming from the old primary would be silently treated as safe (see
-// maxReceivedLsnAmongUpReceivers and CNP-8534's commit 38ac6b4d1). An empty
+// maxReceivedLsnAmongUpReceivers). An empty
 // LatestEndLsn is equally disqualifying: it means the value is unavailable
 // (e.g. an older instance manager during a rolling upgrade), and treating an
 // unset LSN as "equal" would pass the gate on no evidence.

@@ -134,7 +134,7 @@ var defaultShutdownOptions = shutdownOptions{
 
 // pgCtlDefaultTimeoutSeconds is the timeout pg_ctl itself applies, per its documentation,
 // when a shutdown request omits "-t" (either because PGCTLTIMEOUT is unset, which is the
-// case in the operand image, or because no explicit timeout is not set here). It is used
+// case in the operand image, or because no explicit timeout is set here). It is used
 // as the fallback budget for a shutdown attempt that declares no options.Timeout, so that
 // the pre-shutdown CHECKPOINT and the pg_ctl call it precedes are bounded by the same
 // number rather than the checkpoint being unbounded and only pg_ctl being bounded.

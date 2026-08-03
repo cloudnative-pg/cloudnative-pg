@@ -1105,7 +1105,7 @@ var _ = Describe("Updating target primary", func() {
 			Expect(instanceToCreate.Name).To(Equal(instance2Name))
 		})
 
-	It("CNP-8534: bypasses the WAL-receivers-down gate once a frozen primary is unreachable "+
+	It("Issue #10591: bypasses the WAL-receivers-down gate once a frozen primary is unreachable "+
 		"and the WAL receivers stop making progress", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
@@ -1180,7 +1180,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 	})
 
-	It("CNP-8534 adversarial: never bypasses the WAL-receivers-down gate during a healthy switchover",
+	It("Issue #10591 adversarial: never bypasses the WAL-receivers-down gate during a healthy switchover",
 		func(ctx SpecContext) {
 			namespace := newFakeNamespace(env.client)
 			cluster := newFakeCNPGCluster(env.client, namespace)

@@ -86,7 +86,7 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 // walReceiverStallGraceInPromotion is the amount of time waitForWalReceiverDown
 // tolerates its own WAL receiver reporting up without its received LSN
 // advancing, before giving up on the wait and proceeding with the promotion
-// anyway (see CNP-8534: a frozen primary keeps sending replication
+// anyway (see Issue #10591: a frozen primary keeps sending replication
 // keepalives, which keep the receiver's row alive forever while it makes no
 // actual progress).
 //
@@ -1368,7 +1368,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 // not an unconditional precondition to promote: if the WAL receiver stays
 // up but its received LSN stops advancing for walReceiverStallGraceInPromotion,
 // the wait is abandoned and the caller proceeds with the promotion anyway.
-// See CNP-8534 and walReceiverStallDecision for the rationale.
+// See Issue #10591 and walReceiverStallDecision for the rationale.
 func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -1452,8 +1452,8 @@ func walReceiverExactlyCaughtUp(currentLSN, latestEndLSN cnpgTypes.LSN) bool {
 // (walReceiverActive is false), or when it is still up but currentLSN has
 // not exceeded the high-water mark for at least
 // walReceiverStallGraceInPromotion: a stalled, keepalive-only connection is
-// receiving no WAL, so waiting longer retrieves nothing (see CNP-8534). Any
-// strict LSN advance raises the high-water mark and resets the stall clock.
+// receiving no WAL, so waiting longer retrieves nothing (see Issue #10591).
+// Any strict LSN advance raises the high-water mark and resets the stall clock.
 // A NULL/empty currentLSN (nothing received yet) and a currentLSN that goes
 // backward are both treated as no progress, per the monotonic received-LSN
 // assumption: neither resets the clock nor lowers the tracked high-water
