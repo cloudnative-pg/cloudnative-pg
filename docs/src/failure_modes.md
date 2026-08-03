@@ -68,26 +68,13 @@ Steps 1 and 2 together are bounded by `.spec.switchoverDelay` (or
 `.spec.smartShutdownTimeout` for a smart shutdown), step 3 is bounded by
 PostgreSQL's own `pg_ctl` default of 60 seconds, and step 4 follows
 immediately once step 3 reports failure. With the defaults left untouched,
-this means a cluster can still take up to about an hour in the worst case
-before a stuck failover completes, since `switchoverDelay` defaults to 3600
-seconds: this is intentional, since only the cluster owner knows how long
-their database may legitimately need to checkpoint and shut down. What
-changed is that the wait is now finite and always ends with the lease
-released, where previously an unresponsive-but-alive PostgreSQL could stall
-the failover forever. Lowering `.spec.switchoverDelay` shortens this budget
-for clusters where a faster worst case matters more than giving a large,
-busy database the full hour to checkpoint.
-
-The expiry of the primary lease does not cover this case on its own. A lease
-that still names another holder is taken over only once its record has been
-observed unchanged for a full lease duration, because a live holder renews well
-within that window. Renewal is performed by the instance manager and does not
-depend on PostgreSQL being responsive, so an instance manager that is still
-healthy keeps the lease renewed no matter how stuck its PostgreSQL is. The
-lease therefore protects against a lost node, a deleted Pod or a crashed
-instance manager, but not against an instance manager that is still running
-while PostgreSQL is unresponsive. In that case the renewals only stop when the
-instance manager exits, which is what the bounded sequence above guarantees.
+this means a cluster can take up to about an hour in the worst case before a
+stuck failover completes, since `switchoverDelay` defaults to 3600 seconds:
+this is intentional, since only the cluster owner knows how long their
+database may legitimately need to checkpoint and shut down. Lowering
+`.spec.switchoverDelay` shortens this budget for clusters where a faster
+shutdown matters more than giving a large, busy database the full hour
+to checkpoint.
 
 ## Manual Intervention
 
