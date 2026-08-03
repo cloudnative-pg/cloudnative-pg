@@ -260,6 +260,18 @@ either way. The instance is not restarted in place afterwards; the container
 is recreated, and the new one waits for the API server to be reachable before
 starting PostgreSQL again.
 
+Stopping the isolated primary shortens the window in which it and its
+replacement could both accept writes, without closing it: promotion is governed
+by the [primary lease](failover.md#safe-primary-election), whose duration runs
+independently of whether the old primary has stopped. Little usually reaches
+the isolated instance in that window, since a partition that cuts it off from
+the API server and its peers tends to cut it off from applications too, and a
+writer would have to be holding a connection opened before the partition. Where
+even that is unacceptable,
+[synchronous replication](replication.md#synchronous-replication) removes it,
+by stopping the isolated primary from acknowledging a commit its replicas have
+not received.
+
 Detection is the larger part of the total: the writes stop roughly
 `failureThreshold` × `periodSeconds` after the partition, plus the shutdown
 itself, so with the defaults the primary is open for about 30 seconds before
