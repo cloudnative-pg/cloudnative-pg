@@ -59,22 +59,20 @@ var _ = Describe("isolation check bookkeeping", func() {
 		Expect(executor.claimIsolationShutdown(cluster)).To(BeTrue())
 	})
 
-	It("asks again after another threshold of failures, so a request that did not stop "+
-		"the instance is retried", func() {
+	It("asks again on the next failure when the request was not taken up, without "+
+		"running the threshold afresh", func() {
 		cluster := clusterWithThreshold(3)
 		for range 2 {
 			Expect(executor.claimIsolationShutdown(cluster)).To(BeFalse())
 		}
 		Expect(executor.claimIsolationShutdown(cluster)).To(BeTrue())
 
-		// A claim that is not released blocks any further one, so release it here to
-		// exercise the counter reset on its own, the way a failed handover would.
+		// What a handover nobody took up does: the claim goes back, the evidence that
+		// earned it does not.
 		executor.releaseIsolationShutdownClaim()
 
-		// The count restarted rather than latching, so a persisting isolation asks again.
-		for range 2 {
-			Expect(executor.claimIsolationShutdown(cluster)).To(BeFalse())
-		}
+		// The instance is no less isolated than it was a moment ago, so the very next
+		// failing probe asks again rather than starting the count over.
 		Expect(executor.claimIsolationShutdown(cluster)).To(BeTrue())
 	})
 
@@ -111,6 +109,19 @@ var _ = Describe("isolation check bookkeeping", func() {
 		Expect(executor.claimIsolationShutdown(cluster)).To(BeFalse())
 
 		executor.releaseIsolationShutdownClaim()
+		Expect(executor.claimIsolationShutdown(cluster)).To(BeTrue())
+	})
+
+	It("gives the claim back once the instance answers for itself again", func() {
+		// A handover can succeed and the request still be discarded, by the lifecycle
+		// loop while the instance is fenced. Without this, the claim would be held for
+		// the life of the process and no later isolation would ever be acted on.
+		cluster := clusterWithThreshold(1)
+		Expect(executor.claimIsolationShutdown(cluster)).To(BeTrue())
+		Expect(executor.claimIsolationShutdown(cluster)).To(BeFalse())
+
+		executor.isolationCheckSucceeded()
+
 		Expect(executor.claimIsolationShutdown(cluster)).To(BeTrue())
 	})
 })

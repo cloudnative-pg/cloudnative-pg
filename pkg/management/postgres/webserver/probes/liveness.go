@@ -35,10 +35,12 @@ import (
 
 // isolationShutdownHandoverTimeout bounds how long the probe handler waits for the lifecycle
 // manager to take up the shutdown request. In the ordinary case that manager is idle in its
-// select and takes it immediately; it only fails to when it is already busy running another
-// command, which is a shutdown or a restart, and in both cases there is nothing this request
-// would add. The wait therefore has to be short enough to leave the probe's own
-// `timeoutSeconds` intact after the isolation verdict has already spent a second or two.
+// select and takes it immediately. It does not when it is already busy running another
+// command, a shutdown or a restart, and then there is nothing this request would add. The
+// wait can also be cut short by the caller's context, which the kubelet cancels once the
+// probe's own `timeoutSeconds` runs out, and that one says nothing about the instance: it has
+// to stay short enough to leave that budget intact after the isolation verdict has already
+// spent a second or two of it.
 const isolationShutdownHandoverTimeout = 500 * time.Millisecond
 
 type livenessExecutor struct {
@@ -67,13 +69,25 @@ func NewLivenessChecker(
 	}
 }
 
-// isolationCheckSucceeded records that this instance is not isolated right now,
-// clearing any failures accumulated so far.
+// isolationCheckSucceeded records that this instance is not isolated right now, clearing
+// the failures accumulated so far along with any outstanding claim.
+//
+// Clearing the claim here is what keeps it from outliving the episode it was taken for. The
+// send that hands the request over can succeed and the request still be discarded, because
+// the lifecycle loop drops anything but an unfencing request while the instance is fenced, so
+// a successful handover is not proof that PostgreSQL was ever asked to stop. Releasing only
+// on a failed handover would leave the claim held for the life of the process in that case,
+// and every later isolation would be met with a probe failure and nothing else.
+//
+// This cannot take the claim away from a shutdown that is genuinely in flight: while one is
+// running, the cluster fetch and the reachability check both keep failing, so no caller
+// reaches this function. Being here at all means the instance is answering for itself again.
 func (e *livenessExecutor) isolationCheckSucceeded() {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 
 	e.consecutiveIsolationFailures = 0
+	e.shutdownRequested = false
 }
 
 // claimIsolationShutdown records that this instance has been found isolated, and reports
@@ -82,13 +96,13 @@ func (e *livenessExecutor) isolationCheckSucceeded() {
 // kubelet applies before it kills the container, so that a transient failure does not stop a
 // primary that a single retry would have cleared.
 //
-// Reaching the threshold restarts the count rather than latching it, so that a request which
-// did not stop the instance is followed by another one after a further threshold of failures,
-// instead of one per failing probe from then on.
-//
-// A shutdown already claimed and not yet released blocks any further claim, whatever the
-// count: issuing the request is what stops the lifecycle loop from reading the channel again,
-// so a second one would just park a goroutine until the process exits.
+// A claim outstanding blocks any further one, whatever the count: issuing the request is what
+// stops the lifecycle loop from reading the channel again, so a second one would just park a
+// goroutine until the process exits. That is what bounds the requests, which is why the count
+// is left standing here rather than consumed: a claim that is given back because nobody took
+// the request up has to leave the evidence behind it intact, so the next failing probe asks
+// again straight away instead of starting the threshold over. The count goes back to zero
+// only when a probe finds the instance answering for itself again.
 func (e *livenessExecutor) claimIsolationShutdown(cluster *apiv1.Cluster) bool {
 	e.mux.Lock()
 	defer e.mux.Unlock()
@@ -102,13 +116,13 @@ func (e *livenessExecutor) claimIsolationShutdown(cluster *apiv1.Cluster) bool {
 		return false
 	}
 
-	e.consecutiveIsolationFailures = 0
 	e.shutdownRequested = true
 	return true
 }
 
 // releaseIsolationShutdownClaim gives back a claim that was not taken up by the lifecycle
-// manager, so that a later probe can ask again.
+// manager. The failure count is deliberately left alone: the instance is still as isolated as
+// it was, so the next failing probe should ask again rather than run the threshold afresh.
 func (e *livenessExecutor) releaseIsolationShutdownClaim() {
 	e.mux.Lock()
 	defer e.mux.Unlock()
@@ -206,8 +220,9 @@ func (e *livenessExecutor) IsHealthy(
 		if e.claimIsolationShutdown(&cluster) {
 			contextLogger.Info("Primary is isolated, requesting a fast shutdown of the PostgreSQL instance")
 			if !e.instance.RequestFastImmediateShutdownForIsolation(ctx, isolationShutdownHandoverTimeout) {
-				// The lifecycle manager did not take the request up, which means it is busy with
-				// another command. Give the claim back so that a later probe can ask again.
+				// Nobody took the request up: either the lifecycle manager is busy with
+				// another command, or the kubelet gave up on this probe. Give the claim
+				// back so that the next failing probe asks again.
 				contextLogger.Warning("Could not hand over the isolation shutdown request, will retry")
 				e.releaseIsolationShutdownClaim()
 			}
