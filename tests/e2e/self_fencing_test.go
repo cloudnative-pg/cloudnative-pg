@@ -260,10 +260,20 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 			}, testTimeouts[timeouts.NewPrimaryAfterFailover]).Should(Succeed())
 		})
 
-		verifyIsolatedPrimary(namespace, oldPrimaryPod.Name, isolatedNode, livenessPingerEnabled)
-
 		if livenessPingerEnabled {
 			By("verifying the isolated primary stopped acknowledging writes promptly", func() {
+				// While the primary still answers, the last acknowledged commit keeps pace
+				// with the clock, so reading it once tells prompt and ongoing apart only by
+				// accident of when this step is reached. Wait for the writer to fall quiet
+				// first, and only then judge when it fell quiet. Quiet means no commit for
+				// several seconds against a loop that commits every 300ms.
+				Eventually(func() time.Duration {
+					return time.Since(writer.lastAcknowledged())
+				}, isolationWriteStalenessThreshold+30*time.Second, 2*time.Second).Should(
+					BeNumerically(">", 5*time.Second),
+					"the isolated primary is still acknowledging writes from a session "+
+						"opened before the partition")
+
 				lastAcknowledged := writer.lastAcknowledged()
 				Expect(lastAcknowledged).ToNot(BeZero())
 				Expect(lastAcknowledged.Sub(partitionedAt)).To(
@@ -273,6 +283,8 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 					lastAcknowledged.Sub(partitionedAt), isolationWriteStalenessThreshold)
 			})
 		}
+
+		verifyIsolatedPrimary(namespace, oldPrimaryPod.Name, isolatedNode, livenessPingerEnabled)
 
 		By("reconnecting the isolated Node", func() {
 			_, _, err = run.Unchecked(fmt.Sprintf("docker network connect kind %v", isolatedNode))
