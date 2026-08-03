@@ -669,10 +669,10 @@ type LivenessProbe struct {
 	Probe `json:",inline"`
 
 	// Configure the feature that extends the liveness probe for a primary
-	// instance. In addition to the basic checks, this verifies whether the
+	// instance. In addition to the basic checks, this checks whether the
 	// primary is isolated from the Kubernetes API server and from its
-	// replicas, ensuring that it can be safely shut down if network
-	// partition or API unavailability is detected. Enabled by default.
+	// replicas, stopping it itself when a network partition or API
+	// unavailability is detected. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
 }
