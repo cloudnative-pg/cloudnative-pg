@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -105,6 +106,13 @@ type ClusterReconciler struct {
 	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
 	admission      *guard.Admission[*apiv1.Cluster]
+
+	// replicationLagMu guards replicationLagTracker
+	replicationLagMu sync.Mutex
+	// replicationLagTracker records, per cluster, whether each streaming replica
+	// had non-zero replay_lag on the previous reconciliation loop.
+	// Used to emit a ReplicaCaughtUp event exactly once per lag→zero transition.
+	replicationLagTracker map[types.NamespacedName]map[apiv1.PodName]bool
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
