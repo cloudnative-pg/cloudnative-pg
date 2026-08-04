@@ -282,7 +282,7 @@ streaming may yet receive WAL that the candidate would otherwise leave
 behind.
 
 If the primary's node freezes instead of shutting down cleanly, its WAL sender
-processes can keep running and emitting keepalives even though PostgreSQL
+processes can keep running and emitting keepalive signals even though PostgreSQL
 itself is no longer responsive. Each standby's WAL receiver then keeps
 reporting itself as active, since it is still receiving traffic, even though
 no new WAL is actually arriving. CloudNativePG accounts for this: it also
