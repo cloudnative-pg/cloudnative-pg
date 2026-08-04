@@ -281,6 +281,8 @@ func (r *ClusterReconciler) shouldSetPrimaryToSchedulableNode(
 	podsOnSchedulableNodes := r.getSchedulablePodsNotOnPrimaryNode(ctx, status, primaryPod)
 
 	if len(podsOnSchedulableNodes.Items) == 0 {
+		contextLogger.Info("Current primary is running on unschedulable node, but no other pods are running on schedulable nodes",
+			"currentPrimary", primaryPod.Pod.Name, "primaryNode", primaryPod.Node)
 		// No other pods to switchover to
 		return false
 	}
