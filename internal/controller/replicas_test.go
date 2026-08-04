@@ -420,6 +420,13 @@ var _ = Describe("allUpReceiversExactlyCaughtUp", func() {
 		Expect(allUpReceiversExactlyCaughtUp(statusList, "primary")).To(BeFalse())
 	})
 
+	It("does not fire when both ReceivedLsn and LatestEndLsn are empty", func() {
+		statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			makeItem("replica-1", "", "", true),
+		}}
+		Expect(allUpReceiversExactlyCaughtUp(statusList, "primary")).To(BeFalse())
+	})
+
 	It("does not fire when a standby reported an error (unknown, not caught up)", func() {
 		unreachable := makeItem("replica-2", "0/300", "0/300", true)
 		unreachable.Error = errors.New("connection refused")
