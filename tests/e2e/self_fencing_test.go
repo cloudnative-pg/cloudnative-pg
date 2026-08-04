@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -60,11 +59,18 @@ import (
 // and a tight bound here would make an already disruptive spec flaky too.
 const isolationWriteStalenessThreshold = 60 * time.Second
 
-// isolationWriter tracks the server-side commit timestamp of the last row acknowledged by a
-// single long-lived psql backend, fed by startIsolationWriter.
+// isolationWriter tracks a single long-lived psql backend, fed by startIsolationWriter: the
+// host-side arrival time of the last row it acknowledged, and the host-side arrival time of
+// the first line the backend's connection wrote to stderr, which is the positive signal that
+// the connection died rather than an inference from the writer falling silent.
 type isolationWriter struct {
-	mu   sync.Mutex
-	last time.Time
+	mu          sync.Mutex
+	last        time.Time
+	stderrAt    time.Time
+	stderrLines []string
+	stdoutErr   error
+	stderrErr   error
+	waitErr     error
 }
 
 func (w *isolationWriter) record(ts time.Time) {
@@ -81,6 +87,56 @@ func (w *isolationWriter) lastAcknowledged() time.Time {
 	return w.last
 }
 
+// recordStderr appends a line the process wrote to stderr, timestamped on host-side arrival,
+// and remembers the arrival time of the first one. A fast shutdown terminates open backends,
+// so the psql inside the container writes a diagnostic here ("terminating connection due to
+// administrator command", or "server closed the connection unexpectedly" once the shutdown
+// escalates to immediate): this is the signal the spec keys on, and it is deliberately not
+// matched on message text since the two phases word it differently.
+func (w *isolationWriter) recordStderr(line string, ts time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.stderrLines = append(w.stderrLines, line)
+	if w.stderrAt.IsZero() {
+		w.stderrAt = ts
+	}
+}
+
+func (w *isolationWriter) firstStderrArrival() time.Time {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.stderrAt
+}
+
+func (w *isolationWriter) setStdoutErr(err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.stdoutErr = err
+}
+
+func (w *isolationWriter) setStderrErr(err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.stderrErr = err
+}
+
+func (w *isolationWriter) setWaitErr(err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.waitErr = err
+}
+
+// diagnostics reports everything captured about the process, so that a channel breaking in a
+// nightly CI run leaves something readable behind: the exit error, both scanners' errors, and
+// the stderr lines themselves.
+func (w *isolationWriter) diagnostics() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return fmt.Sprintf(
+		"wait error: %v\nstdout scanner error: %v\nstderr scanner error: %v\nstderr lines: %v\n",
+		w.waitErr, w.stdoutErr, w.stderrErr, w.stderrLines)
+}
+
 // startIsolationWriter opens one psql backend inside the given container and keeps it fed
 // with one INSERT every 300ms from a loop running inside the container, so that a single
 // backend stays open across the whole spec rather than one connection per statement: a fresh
@@ -93,10 +149,10 @@ func (w *isolationWriter) lastAcknowledged() time.Time {
 // channel dies the instant the node is disconnected, and measuring through it would measure
 // when the tunnel broke rather than when PostgreSQL stopped acknowledging writes.
 //
-// Each acknowledged INSERT returns the epoch seconds of the server's own clock_timestamp(),
-// rather than a formatted timestamp, so that reading it back needs no timezone-aware parsing:
-// the container and the host share the kernel clock, so the epoch is directly comparable with
-// a host-side time.Now() taken right after the partition.
+// Everything is timestamped on the host clock at the moment a line is read from either
+// stream, rather than parsed out of the server's own clock_timestamp(): the pipe latency is
+// negligible against the thresholds this spec checks, and a single clock avoids mixing a
+// container-derived timestamp into a host-side time.Since.
 func startIsolationWriter(ctx context.Context, node, containerID string) *isolationWriter {
 	writer := &isolationWriter{}
 
@@ -104,21 +160,45 @@ func startIsolationWriter(ctx context.Context, node, containerID string) *isolat
 	cmd := exec.CommandContext(ctx, "docker", "exec", node,
 		"crictl", "exec", containerID, "bash", "-c",
 		`while true; do echo "INSERT INTO isolation_writes(ts) VALUES (clock_timestamp()) `+
-			`RETURNING extract(epoch from ts);"; sleep 0.3; done | psql -U postgres -Atq app`)
+			`RETURNING 1;"; sleep 0.3; done | psql -U postgres -Atq app`)
 
 	stdout, err := cmd.StdoutPipe()
 	Expect(err).ToNot(HaveOccurred())
+	stderr, err := cmd.StderrPipe()
+	Expect(err).ToNot(HaveOccurred())
 	Expect(cmd.Start()).To(Succeed())
 
+	var pipesDone sync.WaitGroup
+	pipesDone.Add(2)
+
 	go func() {
+		defer pipesDone.Done()
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			epochSeconds, parseErr := strconv.ParseFloat(strings.TrimSpace(scanner.Text()), 64)
-			if parseErr != nil {
+			if strings.TrimSpace(scanner.Text()) == "" {
 				continue
 			}
-			writer.record(time.Unix(0, int64(epochSeconds*float64(time.Second))))
+			writer.record(time.Now())
 		}
+		writer.setStdoutErr(scanner.Err())
+	}()
+
+	go func() {
+		defer pipesDone.Done()
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			writer.recordStderr(scanner.Text(), time.Now())
+		}
+		writer.setStderrErr(scanner.Err())
+	}()
+
+	// cmd.Wait must not run until both pipes are fully drained, so a dedicated goroutine
+	// owns the process and records its exit for the diagnostics report: the container being
+	// killed by the fast shutdown is itself expected here and must not fail the spec on its
+	// own, it is the stderr line that carries the assertion.
+	go func() {
+		pipesDone.Wait()
+		writer.setWaitErr(cmd.Wait())
 	}()
 
 	return writer
@@ -262,25 +342,36 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 
 		if livenessPingerEnabled {
 			By("verifying the isolated primary stopped acknowledging writes promptly", func() {
-				// While the primary still answers, the last acknowledged commit keeps pace
-				// with the clock, so reading it once tells prompt and ongoing apart only by
-				// accident of when this step is reached. Wait for the writer to fall quiet
-				// first, and only then judge when it fell quiet. Quiet means no commit for
-				// several seconds against a loop that commits every 300ms.
-				Eventually(func() time.Duration {
-					return time.Since(writer.lastAcknowledged())
-				}, isolationWriteStalenessThreshold+30*time.Second, 2*time.Second).Should(
-					BeNumerically(">", 5*time.Second),
-					"the isolated primary is still acknowledging writes from a session "+
-						"opened before the partition")
+				defer func() {
+					GinkgoWriter.Printf("isolation writer diagnostics:\n%s", writer.diagnostics())
+				}()
 
+				// Wait for the connection to report its own termination, rather than
+				// inferring it from the writer falling silent: silence has six unrelated
+				// causes (the host-side docker exec client dying, the crictl exec session
+				// ending, psql exiting, the in-container bash loop dying, the container
+				// being killed, or bufio.Scanner stopping on its own error), and only one
+				// of those is the behaviour under test.
+				Eventually(func() time.Time {
+					return writer.firstStderrArrival()
+				}, isolationWriteStalenessThreshold+30*time.Second, 2*time.Second).ShouldNot(BeZero())
+
+				stderrAt := writer.firstStderrArrival()
+				Expect(stderrAt.Sub(partitionedAt)).To(
+					BeNumerically("<", isolationWriteStalenessThreshold),
+					"the isolated primary's connection took %s to report its termination, "+
+						"past the %s threshold",
+					stderrAt.Sub(partitionedAt), isolationWriteStalenessThreshold)
+
+				// Kept as the secondary assertion: a channel that keeps producing commits
+				// after PostgreSQL was supposed to be down is wrong even though the
+				// connection reported termination on time.
 				lastAcknowledged := writer.lastAcknowledged()
 				Expect(lastAcknowledged).ToNot(BeZero())
-				Expect(lastAcknowledged.Sub(partitionedAt)).To(
-					BeNumerically("<", isolationWriteStalenessThreshold),
-					"the isolated primary kept acknowledging writes from a session opened "+
-						"before the partition for %s, past the %s threshold",
-					lastAcknowledged.Sub(partitionedAt), isolationWriteStalenessThreshold)
+				Expect(lastAcknowledged).To(
+					BeTemporally("<=", stderrAt),
+					"the isolated primary acknowledged a write at %s, after its connection "+
+						"reported termination at %s", lastAcknowledged, stderrAt)
 			})
 		}
 
