@@ -120,6 +120,12 @@ type PoolerSpec struct {
 	// +optional
 	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
 
+	// DeploymentMetadata specifies annotations and labels applied to the
+	// Deployment created by the Pooler, in addition to the operator-managed
+	// labels and the pooler-spec-hash annotation.
+	// +optional
+	DeploymentMetadata *Metadata `json:"deploymentMetadata,omitempty"`
+
 	// Name of an existing ServiceAccount in the same namespace to use for the pooler.
 	// When specified, the operator will not create a new ServiceAccount
 	// but will use the provided one. This is useful for sharing a single

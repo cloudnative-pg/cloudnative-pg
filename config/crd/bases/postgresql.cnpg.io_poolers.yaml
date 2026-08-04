@@ -68,6 +68,35 @@ spec:
                 x-kubernetes-validations:
                 - message: cluster reference is immutable after creation
                   rule: self == oldSelf
+              deploymentMetadata:
+                description: |-
+                  DeploymentMetadata specifies annotations and labels applied to the
+                  Deployment created by the Pooler, in addition to the operator-managed
+                  labels and the pooler-spec-hash annotation.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Annotations is an unstructured key value map stored with a resource that may be
+                      set by external tools to store and retrieve arbitrary metadata. They are not
+                      queryable and should be preserved when modifying objects.
+                      More info: http://kubernetes.io/docs/user-guide/annotations
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Map of string keys and values that can be used to organize and categorize
+                      (scope and select) objects. May match selectors of replication controllers
+                      and services.
+                      More info: http://kubernetes.io/docs/user-guide/labels
+                    type: object
+                  name:
+                    description: The name of the resource. Only supported for certain
+                      types
+                    type: string
+                type: object
               deploymentStrategy:
                 description: The deployment strategy to use for pgbouncer to replace
                   existing pods with new ones
