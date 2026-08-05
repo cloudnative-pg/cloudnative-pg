@@ -166,6 +166,29 @@ var _ = Describe("PostgreSQL status", func() {
 			// MightBeUnavailable item being counted regardless of fencing.
 			Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(2))
 		})
+
+		By("skipping an instance that is still Ready", func() {
+			// The window between fencing an instance and the kubelet flipping its
+			// probe: the pod is Ready and would be counted on both sides of the
+			// comparison in ensureInstancesAreCreated, so skipping it here makes
+			// the count dip until the kubelet catches up.
+			readyPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "server-30"},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+					},
+				},
+			}
+			withReady := PostgresqlStatusList{
+				Items: append(podList.Items, PostgresqlStatus{Pod: readyPod, IsPodReady: true}),
+			}
+			skip := func(instanceName string) bool { return instanceName == "server-30" }
+
+			Expect(withReady.InstancesReportingStatusExcept(nil)).To(BeEquivalentTo(3))
+			Expect(withReady.InstancesReportingStatusExcept(skip)).To(BeEquivalentTo(2))
+		})
 	})
 
 	Describe("when sorted", func() {
@@ -238,6 +261,97 @@ var _ = Describe("PostgreSQL status", func() {
 		Expect(podList.Items[0].Pod.Name).To(Equal("p-1"))
 		Expect(podList.Items[1].Pod.Name).To(Equal("p-2"))
 		Expect(podList.Items[2].Pod.Name).To(Equal("p-3"))
+	})
+
+	// The election path picks the first instance in this order that is not
+	// fenced, so where a fenced instance lands decides whether that walk can
+	// stop at the head of the list or has to keep going. These three cases pin
+	// the two shapes a fenced instance takes, because Less knows nothing about
+	// fencing: it only ever sees the status a fenced instance happens to report.
+	Describe("when an instance is fenced", func() {
+		It("puts a fenced instance with no reported LSN behind a healthy replica", func() {
+			// Steady state for a fenced instance: PostgreSQL is shut down, so the
+			// status query never filled the LSNs in, and an unparseable LSN counts
+			// as zero.
+			podList := PostgresqlStatusList{
+				Items: []PostgresqlStatus{
+					{
+						Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+						MightBeUnavailable: true,
+						IsPodReady:         false,
+					},
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+						ReceivedLsn: "1/21",
+						ReplayLsn:   "1/21",
+						IsPodReady:  true,
+					},
+				},
+			}
+			sort.Sort(&podList)
+
+			Expect(podList.Items[0].Pod.Name).To(Equal("server-20"))
+			Expect(podList.Items[1].Pod.Name).To(Equal("server-10"))
+		})
+
+		It("breaks a tie between equally advanced replicas on the pod name alone", func() {
+			// Nothing here is fenced, because Less cannot see fencing: the point is
+			// that an instance fenced a moment ago still carries the LSNs it
+			// reported while running, and on an idle cluster every replica shares
+			// the same LSN, so the pod name alone decides who leads. That is how a
+			// fenced instance ends up in front of an equally advanced healthy one,
+			// and why the election has to walk past it instead of giving up on the
+			// first entry.
+			podList := PostgresqlStatusList{
+				Items: []PostgresqlStatus{
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+						ReceivedLsn: "1/21",
+						ReplayLsn:   "1/21",
+						IsPodReady:  true,
+					},
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+						ReceivedLsn: "1/21",
+						ReplayLsn:   "1/21",
+						IsPodReady:  true,
+					},
+				},
+			}
+			sort.Sort(&podList)
+
+			Expect(podList.Items[0].Pod.Name).To(Equal("server-10"))
+			Expect(podList.Items[1].Pod.Name).To(Equal("server-20"))
+		})
+
+		It("keeps a fenced instance that still claims to be primary at the front", func() {
+			// GetStatus fills IsPrimary from the on-disk signal file even when it
+			// masks the connection error, so a fenced primary keeps leading the
+			// list while reporting no LSN at all. The names are picked so that both
+			// the LSN comparison and the pod-name fallback would order these the
+			// other way round, leaving IsPrimary as the only rule that can produce
+			// this result.
+			podList := PostgresqlStatusList{
+				Items: []PostgresqlStatus{
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+						ReceivedLsn: "1/21",
+						ReplayLsn:   "1/21",
+						IsPodReady:  true,
+					},
+					{
+						Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-30"}},
+						IsPrimary:          true,
+						MightBeUnavailable: true,
+						IsPodReady:         false,
+					},
+				},
+			}
+			sort.Sort(&podList)
+
+			Expect(podList.Items[0].Pod.Name).To(Equal("server-30"))
+			Expect(podList.Items[1].Pod.Name).To(Equal("server-10"))
+		})
 	})
 })
 
