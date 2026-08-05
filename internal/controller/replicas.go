@@ -96,18 +96,18 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	mostAdvancedInstance, hasPromotableCandidate := firstPromotableCandidate(cluster, status)
+	promotionCandidate, hasPromotableCandidate := firstPromotableCandidate(cluster, status)
 	if !hasPromotableCandidate {
 		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
 			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
 		return "", nil
 	}
-	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
+	if cluster.Status.TargetPrimary == promotionCandidate.Pod.Name {
 		return "", nil
 	}
 
 	// If the first pod of the list has no reported status we can't evaluate the failover logic.
-	if !mostAdvancedInstance.HasHTTPStatus() {
+	if !promotionCandidate.HasHTTPStatus() {
 		return "", nil
 	}
 
@@ -172,33 +172,33 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
 	// or change the target primary if the current one is not valid anymore.
 	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
-		contextLogger.Info("Failing over", "newPrimary", mostAdvancedInstance.Pod.Name)
+		contextLogger.Info("Failing over", "newPrimary", promotionCandidate.Pod.Name)
 		status.LogStatus(ctx)
 		contextLogger.Debug("Cluster status before failover", "instances", resources.instances)
 		r.Recorder.Eventf(cluster, "Normal", "FailoverTarget",
 			"Failing over from %v to %v",
-			cluster.Status.CurrentPrimary, mostAdvancedInstance.Pod.Name)
+			cluster.Status.CurrentPrimary, promotionCandidate.Pod.Name)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-			fmt.Sprintf("Failing over from %v to %v", cluster.Status.CurrentPrimary, mostAdvancedInstance.Pod.Name),
+			fmt.Sprintf("Failing over from %v to %v", cluster.Status.CurrentPrimary, promotionCandidate.Pod.Name),
 		); err != nil {
 			return "", err
 		}
 	} else {
 		contextLogger.Info("Target primary isn't healthy, switching target",
-			"newPrimary", mostAdvancedInstance.Pod.Name)
+			"newPrimary", promotionCandidate.Pod.Name)
 		status.LogStatus(ctx)
 		contextLogger.Debug("Cluster status before switching target", "instances", resources.instances)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Target primary isn't healthy, switching target from %v to %v",
-			cluster.Status.TargetPrimary, mostAdvancedInstance.Pod.Name)
+			cluster.Status.TargetPrimary, promotionCandidate.Pod.Name)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
-			fmt.Sprintf("Switching over to %v", mostAdvancedInstance.Pod.Name)); err != nil {
+			fmt.Sprintf("Switching over to %v", promotionCandidate.Pod.Name)); err != nil {
 			return "", err
 		}
 	}
 
 	// Set the first pod in the sorted list as the new targetPrimary
-	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
+	return promotionCandidate.Pod.Name, r.setPrimaryInstance(ctx, cluster, promotionCandidate.Pod.Name)
 }
 
 // markOldPrimaryAsUnhealthy labels the old primary pod as unhealthy when failover
@@ -410,13 +410,23 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 // complete. The second return value is false when every instance is fenced
 // (including via the fence-all wildcard), meaning there is no candidate left
 // to elect.
+//
+// The list has to be walked rather than just skipping a fenced Items[0], because
+// a fenced instance sorting to the front does not mean nothing better sits
+// behind it. An instance fenced a moment ago still carries the LSNs it reported
+// while running, and on an idle cluster every replica shares the same LSN, so
+// PostgresqlStatusList.Less falls back to the pod name: a fenced replica can
+// legitimately lead a list whose next entry is an equally advanced, healthy one.
+//
+// This is also what evaluatePodReadinessGuards calls, so that the readiness
+// guard and the election agree on which instance they are talking about.
 func firstPromotableCandidate(
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
 ) (postgres.PostgresqlStatus, bool) {
-	for _, candidate := range status.Items {
-		if !cluster.IsInstanceFenced(candidate.Pod.Name) {
-			return candidate, true
+	for i := range status.Items {
+		if !cluster.IsInstanceFenced(status.Items[i].Pod.Name) {
+			return status.Items[i], true
 		}
 	}
 

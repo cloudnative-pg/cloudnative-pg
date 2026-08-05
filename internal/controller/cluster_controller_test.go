@@ -1155,15 +1155,19 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		// The old primary is gone from the reported status: the fenced replica
-		// is the only entry left to consider.
+		// is the only entry left to consider. This is the steady-state shape of
+		// a fenced instance rather than a freshly fenced one: PostgreSQL is
+		// shut down, so the status query never filled the LSNs in, the pod is
+		// not Ready, and the connection error arrives masked, which is what
+		// makes HasHTTPStatus report true and hides the outage from the
+		// election.
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				{
-					CurrentLsn:  cnpgTypes.LSN("0/0"),
-					ReceivedLsn: cnpgTypes.LSN("0/0"),
-					ReplayLsn:   cnpgTypes.LSN("0/0"),
-					IsPodReady:  true,
-					Pod:         &instances[1],
+					IsPodReady:                    false,
+					MightBeUnavailable:            true,
+					MightBeUnavailableMaskedError: "dial tcp: connect: connection refused",
+					Pod:                           &instances[1],
 				},
 			},
 		}
@@ -1750,6 +1754,46 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 
 		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
 		Expect(result.IsZero()).To(BeTrue())
+	})
+
+	It("waits on the instance the election would pick, not on a fenced one ahead of it", func(ctx SpecContext) {
+		// Skipping a fenced instance is not the same as skipping the guard: the
+		// instance that would actually be elected is the next one in the list,
+		// and if the kubelet has not refreshed its probe yet, promoting it is
+		// still the thing this guard exists to prevent. Reading Items[0] would
+		// see the fenced entry, find nothing to wait for and let that promotion
+		// through unchecked.
+		cluster.Annotations = map[string]string{
+			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", replicaName),
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					// The candidate: reporting status, not Ready yet.
+					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: newPrimaryName}},
+					ReceivedLsn: "1/21",
+					ReplayLsn:   "1/21",
+					IsPodReady:  false,
+				},
+				{
+					// Fenced a moment ago, so it still reports the LSN it had
+					// while running and sorts ahead on the pod-name tie-break.
+					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+					ReceivedLsn: "1/21",
+					ReplayLsn:   "1/21",
+					IsPodReady:  true,
+				},
+			},
+		}
+		sort.Sort(&statusList)
+		Expect(statusList.Items[0].Pod.Name).To(Equal(replicaName),
+			"sort must place the fenced instance ahead of the candidate for this test to mean anything")
+
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 	})
 })
 
