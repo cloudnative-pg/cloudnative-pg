@@ -245,7 +245,7 @@ func ApplyBootstrapOverlay(pod *corev1.Pod, instruction BootstrapInstruction) er
 
 // applyInitDBOverlayExtras adds the environment and SQL-refs volumes that the
 // initdb Job used to receive. It mirrors the corresponding branches of
-// CreatePrimaryJob, including that the APP_USERNAME gate does not apply to the
+// CreateRoleJob, including that the APP_USERNAME gate does not apply to the
 // import variant.
 func applyInitDBOverlayExtras(pod *corev1.Pod, cluster apiv1.Cluster) {
 	isImport := cluster.Spec.Bootstrap != nil &&

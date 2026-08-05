@@ -847,7 +847,6 @@ var _ = Describe("Updating target primary", func() {
 		cluster := newFakeCNPGCluster(env.client, namespace)
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(env.client, cluster)
 		instances := generateFakeClusterPods(env.client, cluster, true)
 		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
 
@@ -855,7 +854,6 @@ var _ = Describe("Updating target primary", func() {
 			nodes:     nil,
 			instances: corev1.PodList{Items: instances},
 			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
-			jobs:      batchv1.JobList{Items: jobs},
 		}
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
@@ -907,7 +905,6 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(env.client, cluster)
 		instances := generateFakeClusterPods(env.client, cluster, true)
 		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
 
@@ -915,7 +912,6 @@ var _ = Describe("Updating target primary", func() {
 			nodes:     nil,
 			instances: corev1.PodList{Items: instances},
 			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
-			jobs:      batchv1.JobList{Items: jobs},
 		}
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
@@ -985,7 +981,6 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(env.client, cluster)
 		instances := generateFakeClusterPods(env.client, cluster, true)
 		pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
 		thirdInstancePVCGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
@@ -997,7 +992,6 @@ var _ = Describe("Updating target primary", func() {
 			nodes:     nil,
 			instances: corev1.PodList{Items: instances},
 			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcs},
-			jobs:      batchv1.JobList{Items: jobs},
 		}
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{

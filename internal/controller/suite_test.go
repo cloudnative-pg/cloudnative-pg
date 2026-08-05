@@ -362,25 +362,6 @@ func generateFakeClusterPodsWithDefaultClient(
 	return generateFakeClusterPods(k8sClient, cluster, markAsReady)
 }
 
-func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.Job {
-	var idx int
-	var jobs []batchv1.Job
-	for idx < cluster.Spec.Instances {
-		idx++
-		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
-		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
-
-		err := c.Create(context.Background(), job)
-		Expect(err).ToNot(HaveOccurred())
-		jobs = append(jobs, *job)
-	}
-	return jobs
-}
-
-func generateFakeInitDBJobsWithDefaultClient(k8sClient client.Client, cluster *apiv1.Cluster) []batchv1.Job {
-	return generateFakeInitDBJobs(k8sClient, cluster)
-}
-
 func generateClusterPVC(
 	c client.Client,
 	cluster *apiv1.Cluster,

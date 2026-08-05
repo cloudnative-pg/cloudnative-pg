@@ -55,7 +55,6 @@ var _ = Describe("scale down", func() {
 				pvcs: corev1.PersistentVolumeClaimList{
 					Items: generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady),
 				},
-				jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(env.client, cluster)},
 				instances: corev1.PodList{
 					Items: generateFakeClusterPodsWithDefaultClient(env.client, cluster, true),
 				},
@@ -106,7 +105,6 @@ var _ = Describe("scale down", func() {
 				pvcs: corev1.PersistentVolumeClaimList{
 					Items: generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady),
 				},
-				jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(env.client, cluster)},
 				instances: corev1.PodList{
 					Items: generateFakeClusterPodsWithDefaultClient(env.client, cluster, true),
 				},

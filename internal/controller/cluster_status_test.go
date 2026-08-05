@@ -161,7 +161,6 @@ var _ = Describe("cluster_status unit tests", func() {
 		var pvcs []corev1.PersistentVolumeClaim
 
 		By("creating the required resources", func() {
-			jobs = generateFakeInitDBJobs(crReconciler.Client, cluster)
 			pods = generateFakeClusterPods(crReconciler.Client, cluster, true)
 			pvcs = generateClusterPVC(crReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
 			name, isOwned := IsOwnedByCluster(&pods[0])

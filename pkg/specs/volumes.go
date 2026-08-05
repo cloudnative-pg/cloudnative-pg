@@ -44,6 +44,20 @@ const PgTablespaceVolumePath = "/var/lib/postgresql/tablespaces"
 // pgdataVolumeName is the name of the PGDATA volume
 const pgdataVolumeName = "pgdata"
 
+type postInitFolder string
+
+const (
+	// Each SQLRefsFolder entry points to the related folder containing
+	// its post init SQL files, in the primary job with initdb.
+	postInitApplicationSQLRefsFolder postInitFolder = "/etc/post-init-application-sql"
+	postInitTemplateQLRefsFolder     postInitFolder = "/etc/post-init-template-sql"
+	postInitSQLRefsFolder            postInitFolder = "/etc/post-init-sql"
+)
+
+func (p postInitFolder) toString() string {
+	return string(p)
+}
+
 // MountForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func MountForTablespace(tablespaceName string) string {

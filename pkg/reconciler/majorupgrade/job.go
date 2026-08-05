@@ -93,7 +93,7 @@ func createMajorUpgradeJobDefinition(
 	// Build the Job without any extension-managed volumes/mounts; both sets
 	// (source-version and target-version) are appended explicitly below so
 	// they can coexist under distinct mount trees.
-	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, nil)
+	job := specs.CreateRoleJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, nil)
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 	// A failed pg_upgrade will not succeed on retry.
 	job.Spec.BackoffLimit = ptr.To(int32(0))
