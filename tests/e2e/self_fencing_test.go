@@ -59,18 +59,25 @@ import (
 // and a tight bound here would make an already disruptive spec flaky too.
 const isolationWriteStalenessThreshold = 60 * time.Second
 
+// isolationWriteAckTolerance is how far after the connection's own termination line a commit
+// may still be timestamped before it counts as the primary having gone on serving. It exists
+// only to absorb the scheduling jitter between two pipes read by two goroutines, so it is a
+// couple of orders of magnitude below anything the bug this spec catches would produce.
+const isolationWriteAckTolerance = time.Second
+
 // isolationWriter tracks a single long-lived psql backend, fed by startIsolationWriter: the
 // host-side arrival time of the last row it acknowledged, and the host-side arrival time of
 // the first line the backend's connection wrote to stderr, which is the positive signal that
 // the connection died rather than an inference from the writer falling silent.
 type isolationWriter struct {
-	mu          sync.Mutex
-	last        time.Time
-	stderrAt    time.Time
-	stderrLines []string
-	stdoutErr   error
-	stderrErr   error
-	waitErr     error
+	mu            sync.Mutex
+	last          time.Time
+	partitionedAt time.Time
+	stderrAt      time.Time
+	stderrLines   []string
+	stdoutErr     error
+	stderrErr     error
+	waitErr       error
 }
 
 func (w *isolationWriter) record(ts time.Time) {
@@ -88,18 +95,33 @@ func (w *isolationWriter) lastAcknowledged() time.Time {
 }
 
 // recordStderr appends a line the process wrote to stderr, timestamped on host-side arrival,
-// and remembers the arrival time of the first one. A fast shutdown terminates open backends,
-// so the psql inside the container writes a diagnostic here ("terminating connection due to
-// administrator command", or "server closed the connection unexpectedly" once the shutdown
-// escalates to immediate): this is the signal the spec keys on, and it is deliberately not
-// matched on message text since the two phases word it differently.
+// and remembers the arrival time of the first one after the partition. A fast shutdown
+// terminates open backends, so the psql inside the container writes a diagnostic here
+// ("terminating connection due to administrator command", or "server closed the connection
+// unexpectedly" once the shutdown escalates to immediate): this is the signal the spec keys
+// on, and it is deliberately not matched on message text since the two phases word it
+// differently.
+//
+// Lines arriving before the partition are kept for the diagnostics report but must not be
+// allowed to latch stderrAt: anything at all on this stream beforehand (a psql error from a
+// loop that started badly, a docker or crictl warning) would otherwise put the arrival time
+// before partitionedAt, which trivially satisfies an assertion looking for a line that comes
+// soon after it.
 func (w *isolationWriter) recordStderr(line string, ts time.Time) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.stderrLines = append(w.stderrLines, line)
-	if w.stderrAt.IsZero() {
+	if w.stderrAt.IsZero() && !w.partitionedAt.IsZero() && ts.After(w.partitionedAt) {
 		w.stderrAt = ts
 	}
+}
+
+// markPartitioned tells the writer when the node was disconnected, so recordStderr can tell
+// lines caused by the partition apart from noise that preceded it.
+func (w *isolationWriter) markPartitioned(ts time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.partitionedAt = ts
 }
 
 func (w *isolationWriter) firstStderrArrival() time.Time {
@@ -327,6 +349,9 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 			_, _, err = run.Unchecked(fmt.Sprintf("docker network disconnect kind %v", isolatedNode))
 			Expect(err).ToNot(HaveOccurred())
 			partitionedAt = time.Now()
+			if writer != nil {
+				writer.markPartitioned(partitionedAt)
+			}
 		})
 
 		By("verifying that a new primary has been promoted", func() {
@@ -363,15 +388,24 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 						"past the %s threshold",
 					stderrAt.Sub(partitionedAt), isolationWriteStalenessThreshold)
 
-				// Kept as the secondary assertion: a channel that keeps producing commits
-				// after PostgreSQL was supposed to be down is wrong even though the
-				// connection reported termination on time.
-				lastAcknowledged := writer.lastAcknowledged()
-				Expect(lastAcknowledged).ToNot(BeZero())
-				Expect(lastAcknowledged).To(
-					BeTemporally("<=", stderrAt),
-					"the isolated primary acknowledged a write at %s, after its connection "+
-						"reported termination at %s", lastAcknowledged, stderrAt)
+				// Kept as the secondary assertion: a stderr line proves something on that
+				// stream reported trouble, not that PostgreSQL stopped serving, so this
+				// watches for commits that keep being acknowledged after it. Checked over
+				// a few seconds rather than once, since reading the counter the instant
+				// the stderr line lands says nothing about what arrives next.
+				//
+				// The tolerance is what keeps this off a knife edge: the two streams are
+				// drained by their own goroutine and stamped when a line is read, so a
+				// commit written a fraction of a millisecond before the termination line
+				// can legitimately be read after it, and a bare ordering comparison would
+				// then fail with nothing wrong.
+				Expect(writer.lastAcknowledged()).ToNot(BeZero())
+				Consistently(func() time.Duration {
+					return writer.lastAcknowledged().Sub(stderrAt)
+				}, 5*time.Second, time.Second).Should(
+					BeNumerically("<", isolationWriteAckTolerance),
+					"the isolated primary went on acknowledging writes after its connection "+
+						"reported termination at %s", stderrAt)
 			})
 		}
 
