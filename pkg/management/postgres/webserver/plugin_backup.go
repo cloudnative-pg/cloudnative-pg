@@ -64,9 +64,20 @@ func NewPluginBackupCommand(
 	}
 }
 
-// Start starts a backup using the Plugin
-func (b *PluginBackupCommand) Start(ctx context.Context) {
+// Start starts a backup using the Plugin. It records the running phase on the
+// Backup status synchronously, before spawning the goroutine that drives the
+// plugin call, so a second request for the same Backup object can tell a
+// backup is already in progress.
+func (b *PluginBackupCommand) Start(ctx context.Context) error {
+	if b.Backup.GetStatus().Phase != apiv1.BackupPhaseRunning {
+		b.Backup.GetStatus().Phase = apiv1.BackupPhaseRunning
+		if err := postgres.PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+			return fmt.Errorf("can't set backup as running: %w", err)
+		}
+	}
+
 	go b.invokeStart(ctx)
+	return nil
 }
 
 func (b *PluginBackupCommand) invokeStart(ctx context.Context) {

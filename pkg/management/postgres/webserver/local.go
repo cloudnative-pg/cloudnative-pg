@@ -159,6 +159,16 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// A backup already in the running phase is already being executed by an
+	// instance manager, barman or plugin alike. Answer as if this request had
+	// started it, and do not start a second one: retries on this endpoint are
+	// expected (see startInstanceManagerBackup), and this is the only durable
+	// signal that survives them.
+	if backup.Status.Phase == apiv1.BackupPhaseRunning {
+		_, _ = fmt.Fprint(w, "OK")
+		return
+	}
+
 	switch backup.Spec.Method {
 	case apiv1.BackupMethodBarmanObjectStore:
 		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
@@ -181,7 +191,13 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 			return
 		}
 
-		ws.startPluginBackup(ctx, cluster, &backup)
+		if err := ws.startPluginBackup(ctx, cluster, &backup); err != nil {
+			http.Error(
+				w,
+				fmt.Sprintf("error while requesting backup: %v", err.Error()),
+				http.StatusInternalServerError)
+			return
+		}
 		_, _ = fmt.Fprint(w, "OK")
 
 	default:
@@ -235,8 +251,12 @@ func (ws *localWebserverEndpoints) startPluginBackup(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
-) {
-	NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder).Start(ctx)
+) error {
+	if err := NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder).Start(ctx); err != nil {
+		return fmt.Errorf("while starting backup: %w", err)
+	}
+
+	return nil
 }
 
 // ArchiveStatusRequest is the request body for the archive status endpoint
