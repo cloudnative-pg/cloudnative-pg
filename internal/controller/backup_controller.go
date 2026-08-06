@@ -548,7 +548,11 @@ func (r *BackupReconciler) isValidBackupRunning(
 	// For instance-managed backups, check if the instance manager was restarted
 	// by comparing the SessionID stored when the backup started with the current session ID.
 	// If the session ID changed, the instance manager was restarted (e.g., during an operator
-	// upgrade or container reboot), which means any running backup goroutine was killed.
+	// upgrade or container reboot). For the barman object store method this kills the running
+	// backup goroutine, since barman-cloud-backup runs in the instance manager's own container.
+	// For the plugin method the backup runs in the plugin sidecar, a separate process the
+	// instance manager restart does not touch, so the backup itself may still be running or
+	// may have already completed.
 	instanceManagerRestarted := false
 	if backup.Spec.Method.IsManagedByInstance() {
 		instanceManagerRestarted = r.isInstanceManagerRestarted(ctx, &pod, backup.Status.InstanceID.SessionID)
@@ -565,9 +569,18 @@ func (r *BackupReconciler) isValidBackupRunning(
 	}
 
 	// Instance manager was restarted/upgraded - mark the backup as failed.
-	// When the instance manager restarts, any running backup goroutine is terminated.
+	// For the barman object store method the running backup goroutine is terminated
+	// with it. For the plugin method the backup runs in the plugin sidecar, which the
+	// instance manager restart does not affect, so the object store may already hold
+	// a valid backup even though this object is reported as failed.
 	if instanceManagerRestarted {
 		failureReason := fmt.Errorf("instance manager was restarted during backup on pod %s", pod.Name)
+		if backup.Spec.Method == apiv1.BackupMethodPlugin {
+			failureReason = fmt.Errorf(
+				"instance manager was restarted during backup on pod %s: "+
+					"the plugin may have completed the backup in the object store despite this failure, please check",
+				pod.Name)
+		}
 		contextLogger.Info("Instance manager was restarted, marking backup as failed",
 			"cluster", cluster.Name,
 			"pod", pod.Name,
