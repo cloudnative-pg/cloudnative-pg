@@ -2018,3 +2018,63 @@ var _ = Describe("IsInitialized", func() {
 		Expect(cluster.IsInitialized()).To(BeFalse())
 	})
 })
+
+var _ = Describe("HasPotentialWALArchiver", func() {
+	It("is false with neither a barman object store nor plugins", func() {
+		cluster := &Cluster{}
+		Expect(cluster.HasPotentialWALArchiver()).To(BeFalse())
+	})
+
+	It("is false when the backup section has no barman object store", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{},
+			},
+		}
+		Expect(cluster.HasPotentialWALArchiver()).To(BeFalse())
+	})
+
+	It("is true with a barman object store", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
+				},
+			},
+		}
+		Expect(cluster.HasPotentialWALArchiver()).To(BeTrue())
+	})
+
+	It("is true with an enabled plugin, even without isWALArchiver", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "some-plugin", Enabled: ptr.To(true)},
+				},
+			},
+		}
+		Expect(cluster.HasPotentialWALArchiver()).To(BeTrue())
+	})
+
+	It("is true with a plugin not declaring the enabled field", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "some-plugin"},
+				},
+			},
+		}
+		Expect(cluster.HasPotentialWALArchiver()).To(BeTrue())
+	})
+
+	It("is false when every plugin is explicitly disabled", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "some-plugin", Enabled: ptr.To(false)},
+				},
+			},
+		}
+		Expect(cluster.HasPotentialWALArchiver()).To(BeFalse())
+	})
+})

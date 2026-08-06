@@ -242,6 +242,11 @@ func (ws *localWebserverEndpoints) startPluginBackup(
 // ArchiveStatusRequest is the request body for the archive status endpoint
 type ArchiveStatusRequest struct {
 	Error string `json:"error,omitempty"`
+
+	// NotConfigured reports that the archiving attempt succeeded as a no-op
+	// because the cluster has no WAL archiver configured. It is ignored when
+	// Error is set.
+	NotConfigured bool `json:"notConfigured,omitempty"`
 }
 
 func (asr *ArchiveStatusRequest) getContinuousArchivingCondition() metav1.Condition {
@@ -251,6 +256,18 @@ func (asr *ArchiveStatusRequest) getContinuousArchivingCondition() metav1.Condit
 			Status:  metav1.ConditionFalse,
 			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: asr.Error,
+		}
+	}
+
+	// The status stays True so that consumers waiting on the condition
+	// (e.g. `kubectl wait`) behave the same on archiver-less clusters;
+	// only the reason tells the no-op apart from a real archiving success.
+	if asr.NotConfigured {
+		return metav1.Condition{
+			Type:    string(apiv1.ConditionContinuousArchiving),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingNotConfigured),
+			Message: "WAL archiving is not configured",
 		}
 	}
 

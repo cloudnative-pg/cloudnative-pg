@@ -1223,6 +1223,10 @@ const (
 	// the WAL archiving is not working correctly
 	ConditionReasonContinuousArchivingFailing ConditionReason = "ContinuousArchivingFailing"
 
+	// ConditionReasonContinuousArchivingNotConfigured means that the WAL archiving
+	// succeeded as a no-op because the cluster has no WAL archiver configured
+	ConditionReasonContinuousArchivingNotConfigured ConditionReason = "ContinuousArchivingNotConfigured"
+
 	// ClusterReady means that the condition changed because the cluster is ready and working properly
 	ClusterReady ConditionReason = "ClusterIsReady"
 

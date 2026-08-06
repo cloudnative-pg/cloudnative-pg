@@ -33,10 +33,10 @@ import (
 
 // ClusterClient is the interface to interact with the uncategorized endpoints
 type ClusterClient interface {
-	// SetWALArchiveStatusCondition sets the wal-archive status condition.
-	// An empty errMessage means that the archive process was successful.
+	// SetWALArchiveStatusCondition sets the wal-archive status condition
+	// from the outcome of an archiving attempt.
 	// Returns any error encountered during the request.
-	SetWALArchiveStatusCondition(ctx context.Context, errMessage string) error
+	SetWALArchiveStatusCondition(ctx context.Context, asr webserver.ArchiveStatusRequest) error
 }
 
 // clusterClientImpl a client to interact with the uncategorized endpoints
@@ -44,12 +44,11 @@ type clusterClientImpl struct {
 	cli *http.Client
 }
 
-func (c *clusterClientImpl) SetWALArchiveStatusCondition(ctx context.Context, errMessage string) error {
+func (c *clusterClientImpl) SetWALArchiveStatusCondition(
+	ctx context.Context,
+	asr webserver.ArchiveStatusRequest,
+) error {
 	contextLogger := log.FromContext(ctx).WithValues("endpoint", url.PathWALArchiveStatusCondition)
-
-	asr := webserver.ArchiveStatusRequest{
-		Error: errMessage,
-	}
 
 	encoded, err := json.Marshal(&asr)
 	if err != nil {
