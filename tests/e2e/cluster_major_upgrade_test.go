@@ -22,7 +22,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -69,22 +69,13 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		postgresqlSystemEntry  = "postgresql-system"
 		rollbackEntry          = "rollback"
 
-		// custom registry envs
-		customPostgresImageRegistryEnvVar       = "POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY"
-		customPostgresImageStandardSuffixEnvVar = "POSTGRES_MAJOR_UPGRADE_STANDARD_SUFFIX"
-		customPostgresImageMinimalSuffixEnvVar  = "POSTGRES_MAJOR_UPGRADE_MINIMAL_SUFFIX"
-		customPostgresImageSystemSuffixEnvVar   = "POSTGRES_MAJOR_UPGRADE_SYSTEM_SUFFIX"
-		customPostgresImagePostGISSuffixEnvVar  = "POSTGRES_MAJOR_UPGRADE_POSTGIS_SUFFIX"
-
-		// default suffixes used when overriding registry via env vars
-		// as defined by postgres-trunk-containers tests
+		// default suffixes used when overriding the registry via the
+		// majorUpgrade configuration, as defined by postgres-trunk-containers
+		// tests
 		defaultStandardSuffix = "-standard-trixie"
 		defaultMinimalSuffix  = "-minimal-trixie"
 		defaultSystemSuffix   = "-system-trixie"
 		defaultPostGISSuffix  = "-postgis-trixie"
-
-		// env vars used to skip certain scenarios
-		skipArchiveScenarioEnvVar = "POSTGRES_MAJOR_UPGRADE_SKIP_ARCHIVE_SCENARIO"
 	)
 
 	type scenario struct {
@@ -288,29 +279,31 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			postgresqlSystemEntry:  env.SystemImageName(targetTag),
 		}
 
-		// Set custom targets when detecting env variables (used by postgres-trunk-containers tests)
-		if envValue := os.Getenv(customPostgresImageRegistryEnvVar); envValue != "" {
-			standardSuffix := os.Getenv(customPostgresImageStandardSuffixEnvVar)
+		// Set custom targets when the majorUpgrade configuration overrides the
+		// registry (used by postgres-trunk-containers tests)
+		if majorUpgrade := config.Current().MajorUpgrade; majorUpgrade.ImageRegistry != "" {
+			registry := majorUpgrade.ImageRegistry
+			standardSuffix := majorUpgrade.StandardSuffix
 			if standardSuffix == "" {
 				standardSuffix = defaultStandardSuffix
 			}
-			minimalSuffix := os.Getenv(customPostgresImageMinimalSuffixEnvVar)
+			minimalSuffix := majorUpgrade.MinimalSuffix
 			if minimalSuffix == "" {
 				minimalSuffix = defaultMinimalSuffix
 			}
-			systemSuffix := os.Getenv(customPostgresImageSystemSuffixEnvVar)
+			systemSuffix := majorUpgrade.SystemSuffix
 			if systemSuffix == "" {
 				systemSuffix = defaultSystemSuffix
 			}
-			postgisSuffix := os.Getenv(customPostgresImagePostGISSuffixEnvVar)
+			postgisSuffix := majorUpgrade.PostGISSuffix
 			if postgisSuffix == "" {
 				postgisSuffix = defaultPostGISSuffix
 			}
 
-			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, standardSuffix)
-			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, minimalSuffix)
-			targetImages[postgresqlSystemEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, systemSuffix)
-			targetImages[postgisEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, postgisSuffix)
+			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v%s", registry, targetTag, standardSuffix)
+			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v%s", registry, targetTag, minimalSuffix)
+			targetImages[postgresqlSystemEntry] = fmt.Sprintf("%v:%v%s", registry, targetTag, systemSuffix)
+			targetImages[postgisEntry] = fmt.Sprintf("%v:%v%s", registry, targetTag, postgisSuffix)
 		}
 
 		return targetImages
@@ -487,7 +480,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		storageClass := env.DefaultStorageClass
 		Expect(storageClass).ToNot(BeEmpty())
 
 		By("creating the certificates for the object store", func() {
@@ -518,12 +511,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		scenario := scenarios[scenarioName]
 		startingImage := scenario.startingCluster.Spec.ImageName
 
-		// If the skipArchiveScenarioEnvVar is present, skip the archiving scenario.
-		skipArchiveScenario := false
-		if _, ok := os.LookupEnv(skipArchiveScenarioEnvVar); ok {
-			skipArchiveScenario = true
-		}
-		if scenarioName == postgresqlSystemEntry && skipArchiveScenario {
+		if scenarioName == postgresqlSystemEntry && config.Current().MajorUpgrade.SkipArchiveScenario {
 			Skip("Skipping the archiving scenario")
 		}
 
