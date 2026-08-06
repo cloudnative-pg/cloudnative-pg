@@ -35,6 +35,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -812,10 +813,54 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		})
 	}
 
+	r.detectAndEmitReplicaCaughtUpEvents(cluster, statuses)
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
 	return nil
+}
+
+// detectAndEmitReplicaCaughtUpEvents emits a ReplicaCaughtUp event when a streaming replica's
+// replay_lag drops to zero after having been non-zero in the previous reconciliation loop.
+// Lag state is tracked in-memory on the reconciler (never written to the API status) so
+// that no internal bookkeeping bleeds into the public CRD schema.
+func (r *ClusterReconciler) detectAndEmitReplicaCaughtUpEvents(
+	cluster *apiv1.Cluster,
+	statuses postgres.PostgresqlStatusList,
+) {
+	clusterKey := client.ObjectKeyFromObject(cluster)
+
+	r.replicationLagMu.Lock()
+	if r.replicationLagTracker == nil {
+		r.replicationLagTracker = make(map[types.NamespacedName]map[apiv1.PodName]bool)
+	}
+	prevLag := r.replicationLagTracker[clusterKey]
+	r.replicationLagMu.Unlock()
+
+	newLag := make(map[apiv1.PodName]bool)
+
+	for i := range statuses.Items {
+		item := &statuses.Items[i]
+		if !item.IsPrimary {
+			continue
+		}
+		for _, repl := range item.ReplicationInfo {
+			podName := apiv1.PodName(repl.ApplicationName)
+			caughtUp := repl.State == "streaming" && repl.ReplayLag == "00:00:00"
+			newLag[podName] = !caughtUp
+
+			if prevLag[podName] && caughtUp {
+				r.Recorder.Eventf(cluster, "Normal", "ReplicaCaughtUp",
+					"Replica %v has caught up to the primary", repl.ApplicationName)
+			}
+		}
+		break
+	}
+
+	r.replicationLagMu.Lock()
+	r.replicationLagTracker[clusterKey] = newLag
+	r.replicationLagMu.Unlock()
 }
 
 // getPodsTopology returns a map with all the information about the pods topology

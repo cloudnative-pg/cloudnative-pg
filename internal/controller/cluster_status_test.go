@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/tools/record"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -550,5 +551,190 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 
 			Expect(isWALSpaceAvailableOnPod(pod)).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("detectAndEmitReplicaCaughtUpEvents", func() {
+	var (
+		env          *testingEnvironment
+		cluster      *apiv1.Cluster
+		clusterKey   types.NamespacedName
+		fakeRecorder *record.FakeRecorder
+	)
+
+	// seedLag pre-populates the in-memory tracker to simulate previous reconcile state
+	seedLag := func(pods map[apiv1.PodName]bool) {
+		env.clusterReconciler.replicationLagMu.Lock()
+		defer env.clusterReconciler.replicationLagMu.Unlock()
+		if env.clusterReconciler.replicationLagTracker == nil {
+			env.clusterReconciler.replicationLagTracker = make(map[types.NamespacedName]map[apiv1.PodName]bool)
+		}
+		env.clusterReconciler.replicationLagTracker[clusterKey] = pods
+	}
+
+	// trackedLag reads the in-memory tracker after a call
+	trackedLag := func(pod apiv1.PodName) bool {
+		env.clusterReconciler.replicationLagMu.Lock()
+		defer env.clusterReconciler.replicationLagMu.Unlock()
+		return env.clusterReconciler.replicationLagTracker[clusterKey][pod]
+	}
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		cluster = newFakeCNPGCluster(env.client, newFakeNamespace(env.client))
+		clusterKey = types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name}
+		fakeRecorder = env.clusterReconciler.Recorder.(*record.FakeRecorder)
+	})
+
+	It("emits ReplicaCaughtUp when replay_lag drops to zero from non-zero", func() {
+		seedLag(map[apiv1.PodName]bool{"pod-2": true})
+
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPrimary: true,
+					ReplicationInfo: postgres.PgStatReplicationList{
+						{ApplicationName: "pod-2", State: "streaming", ReplayLag: "00:00:00"},
+					},
+				},
+			},
+		}
+
+		env.clusterReconciler.detectAndEmitReplicaCaughtUpEvents(cluster, statuses)
+
+		Expect(fakeRecorder.Events).To(Receive(And(
+			ContainSubstring("Normal"),
+			ContainSubstring("ReplicaCaughtUp"),
+			ContainSubstring("pod-2"),
+		)))
+		Expect(trackedLag("pod-2")).To(BeFalse())
+	})
+
+	It("does not emit an event when the replica was already caught up", func() {
+		seedLag(map[apiv1.PodName]bool{"pod-2": false})
+
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPrimary: true,
+					ReplicationInfo: postgres.PgStatReplicationList{
+						{ApplicationName: "pod-2", State: "streaming", ReplayLag: "00:00:00"},
+					},
+				},
+			},
+		}
+
+		env.clusterReconciler.detectAndEmitReplicaCaughtUpEvents(cluster, statuses)
+
+		Expect(fakeRecorder.Events).ShouldNot(Receive())
+		Expect(trackedLag("pod-2")).To(BeFalse())
+	})
+
+	It("does not emit an event when the replica is still lagging", func() {
+		seedLag(map[apiv1.PodName]bool{"pod-2": true})
+
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPrimary: true,
+					ReplicationInfo: postgres.PgStatReplicationList{
+						{ApplicationName: "pod-2", State: "streaming", ReplayLag: "00:00:05.123"},
+					},
+				},
+			},
+		}
+
+		env.clusterReconciler.detectAndEmitReplicaCaughtUpEvents(cluster, statuses)
+
+		Expect(fakeRecorder.Events).ShouldNot(Receive())
+		Expect(trackedLag("pod-2")).To(BeTrue())
+	})
+
+	It("does not emit an event when the replica state is not streaming", func() {
+		seedLag(map[apiv1.PodName]bool{"pod-2": true})
+
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPrimary: true,
+					ReplicationInfo: postgres.PgStatReplicationList{
+						{ApplicationName: "pod-2", State: "catchup", ReplayLag: "00:00:00"},
+					},
+				},
+			},
+		}
+
+		env.clusterReconciler.detectAndEmitReplicaCaughtUpEvents(cluster, statuses)
+
+		Expect(fakeRecorder.Events).ShouldNot(Receive())
+	})
+
+	It("does not emit an event for a newly observed replica with zero lag", func() {
+		// no seedLag call — tracker has no entry for pod-2 (first time seen)
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPrimary: true,
+					ReplicationInfo: postgres.PgStatReplicationList{
+						{ApplicationName: "pod-2", State: "streaming", ReplayLag: "00:00:00"},
+					},
+				},
+			},
+		}
+
+		env.clusterReconciler.detectAndEmitReplicaCaughtUpEvents(cluster, statuses)
+
+		Expect(fakeRecorder.Events).ShouldNot(Receive())
+		Expect(trackedLag("pod-2")).To(BeFalse())
+	})
+
+	It("emits event only for the replica that caught up when multiple replicas exist", func() {
+		seedLag(map[apiv1.PodName]bool{"pod-2": true, "pod-3": false})
+
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPrimary: true,
+					ReplicationInfo: postgres.PgStatReplicationList{
+						{ApplicationName: "pod-2", State: "streaming", ReplayLag: "00:00:00"},
+						{ApplicationName: "pod-3", State: "streaming", ReplayLag: "00:00:00"},
+					},
+				},
+			},
+		}
+
+		env.clusterReconciler.detectAndEmitReplicaCaughtUpEvents(cluster, statuses)
+
+		Expect(fakeRecorder.Events).To(Receive(And(
+			ContainSubstring("ReplicaCaughtUp"),
+			ContainSubstring("pod-2"),
+		)))
+		Expect(fakeRecorder.Events).ShouldNot(Receive())
+		Expect(trackedLag("pod-2")).To(BeFalse())
+		Expect(trackedLag("pod-3")).To(BeFalse())
+	})
+
+	It("does not emit an event when the primary has no replication info", func() {
+		seedLag(map[apiv1.PodName]bool{"pod-2": true})
+
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:             &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+					IsPrimary:       true,
+					ReplicationInfo: postgres.PgStatReplicationList{},
+				},
+			},
+		}
+
+		env.clusterReconciler.detectAndEmitReplicaCaughtUpEvents(cluster, statuses)
+
+		Expect(fakeRecorder.Events).ShouldNot(Receive())
 	})
 })
