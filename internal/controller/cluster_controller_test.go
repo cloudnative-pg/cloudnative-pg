@@ -1080,7 +1080,7 @@ var _ = Describe("Updating target primary", func() {
 					CurrentLsn:  cnpgTypes.LSN("0/0"),
 					ReceivedLsn: cnpgTypes.LSN("0/0"),
 					ReplayLsn:   cnpgTypes.LSN("0/0"),
-					IsPodReady:  false,
+					IsPodReady:  true,
 					IsPrimary:   true,
 					Pod:         &instances[1],
 				},
@@ -1094,9 +1094,11 @@ var _ = Describe("Updating target primary", func() {
 			},
 		}
 
+		sort.Sort(&statusList)
+
 		By("creating the status list from the cluster pods", func() {
-			cluster.Status.TargetPrimary = instances[1].Name
-			cluster.Status.CurrentPrimary = instances[1].Name
+			cluster.Status.TargetPrimary = instances[0].Name
+			cluster.Status.CurrentPrimary = instances[0].Name
 		})
 
 		By("returning the ErrWaitingOnFailOverDelay when first detecting the failure", func() {
@@ -1453,6 +1455,180 @@ var _ = Describe("Updating target primary", func() {
 			Expect(instanceToCreate).ToNot(BeNil())
 			Expect(instanceToCreate.Name).To(Equal(instance2Name))
 		})
+})
+
+var _ = Describe("Updating the designated primary of a replica cluster", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	newReplicaCluster := func(namespace string) *apiv1.Cluster {
+		return newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Source:  "source-cluster",
+				Enabled: ptr.To(true),
+			}
+		})
+	}
+
+	buildResources := func(cluster *apiv1.Cluster) (*managedResources, []corev1.Pod) {
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		return &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}, instances
+	}
+
+	It("skips a fenced instance and elects the healthy one behind it", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newReplicaCluster(namespace)
+		Expect(cluster.IsReplica()).To(BeTrue())
+
+		managedResources, instances := buildResources(cluster)
+
+		By("fencing the instance that comes first in the status list", func() {
+			_, err := utils.AddFencedInstance(instances[1].Name, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady: true,
+					Pod:        &instances[1], // fenced, comes first
+				},
+				{
+					IsPodReady: true,
+					Pod:        &instances[2], // healthy, comes second
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(instances[2].Name))
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
+	})
+
+	It("does not elect anyone when every remaining instance is fenced", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newReplicaCluster(namespace)
+
+		managedResources, instances := buildResources(cluster)
+
+		By("fencing the only instance left to consider", func() {
+			_, err := utils.AddFencedInstance(instances[1].Name, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		// The steady-state shape of a fenced instance: PostgreSQL is shut down,
+		// the pod is not Ready, and the connection error arrives masked, so the
+		// status carries no error at all.
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady:                    false,
+					MightBeUnavailable:            true,
+					MightBeUnavailableMaskedError: "dial tcp: connect: connection refused",
+					Pod:                           &instances[1],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(BeEmpty())
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[0].Name))
+	})
+
+	It("does not elect a candidate that is not reporting its status", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newReplicaCluster(namespace)
+
+		managedResources, instances := buildResources(cluster)
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady: true,
+					Error:      fmt.Errorf("status endpoint unreachable"),
+					Pod:        &instances[1],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(BeEmpty())
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[0].Name))
+	})
+
+	It("elects the first instance in the list when nothing is fenced", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newReplicaCluster(namespace)
+
+		managedResources, instances := buildResources(cluster)
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady: true,
+					Pod:        &instances[1],
+				},
+				{
+					IsPodReady: true,
+					Pod:        &instances[2],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(instances[1].Name))
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[1].Name))
+	})
 })
 
 var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {

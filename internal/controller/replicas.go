@@ -96,8 +96,8 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	promotionCandidate, hasPromotableCandidate := firstPromotableCandidate(cluster, status)
-	if !hasPromotableCandidate {
+	promotionCandidate, hasCandidate := firstNonFencedInstance(cluster, status)
+	if !hasCandidate {
 		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
 			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
 		return "", nil
@@ -106,8 +106,8 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		return "", nil
 	}
 
-	// If the first pod of the list has no reported status we can't evaluate the failover logic.
-	if !promotionCandidate.HasHTTPStatus() {
+	// If the promotionCandidate has no reported status we can't evaluate the failover logic.
+	if !promotionCandidate.HasHTTPStatus() || !promotionCandidate.IsPodReady {
 		return "", nil
 	}
 
@@ -376,10 +376,14 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 		return "", ErrWalReceiversRunning
 	}
 
-	candidate, hasPromotableCandidate := firstPromotableCandidate(cluster, status)
-	if !hasPromotableCandidate {
+	candidate, hasCandidate := firstNonFencedInstance(cluster, status)
+	if !hasCandidate {
 		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
 			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
+
+	if !candidate.HasHTTPStatus() || !candidate.IsPodReady {
 		return "", nil
 	}
 
@@ -403,7 +407,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	return candidate.Pod.Name, r.setPrimaryInstance(ctx, cluster, candidate.Pod.Name)
 }
 
-// firstPromotableCandidate returns the first instance in the sorted status list
+// firstNonFencedInstance returns the first instance in the sorted status list
 // that is not fenced. A fenced instance has PostgreSQL shut down and cannot act
 // on a promotion request, so it must never be elected as the new (or designated)
 // primary: doing so would leave the cluster retrying a promotion that can never
@@ -420,7 +424,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 //
 // This is also what evaluatePodReadinessGuards calls, so that the readiness
 // guard and the election agree on which instance they are talking about.
-func firstPromotableCandidate(
+func firstNonFencedInstance(
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
 ) (postgres.PostgresqlStatus, bool) {

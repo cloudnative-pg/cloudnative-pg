@@ -616,12 +616,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 //     after un-fencing an instance). Waiting here prevents electing a primary
 //     that Kubernetes will refuse to route traffic to.
 //
-//     This asks firstPromotableCandidate rather than reading Items[0], so that
-//     it judges the same instance the election path would pick. The two used to
-//     disagree: a fenced instance sorting to the front is skipped by the
-//     election, so checking readiness on it both blocked forever (a fenced pod
-//     is never Ready) and left the instance actually being promoted, the next
-//     one in the list, with its readiness never checked at all. When every
+//     This asks firstNonFencedInstance, so that
+//     it judges the same instance the election path would pick. When every
 //     instance is fenced there is no election to protect and nothing to wait
 //     for.
 //
@@ -654,7 +650,7 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 
 	contextLogger := log.FromContext(ctx)
 
-	if candidate, hasCandidate := firstPromotableCandidate(cluster, instancesStatus); hasCandidate &&
+	if candidate, hasCandidate := firstNonFencedInstance(cluster, instancesStatus); hasCandidate &&
 		candidate.HasHTTPStatus() && !candidate.IsPodReady {
 		// The readiness probe status from the kubelet has not been refreshed
 		// yet, so we wait rather than electing a primary that Kubernetes will
