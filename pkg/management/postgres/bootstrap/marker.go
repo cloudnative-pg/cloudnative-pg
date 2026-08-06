@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -186,23 +187,23 @@ func HasFailed(pgData string, identity MarkerIdentity) (bool, error) {
 
 // LoadFailure returns the mode and reason recorded by a previous failed
 // bootstrap of THIS instance, so a restarted, parked instance can report why it
-// failed. ok is false when there is no matching failure marker; identity scoping
-// mirrors HasFailed.
-func LoadFailure(pgData string, identity MarkerIdentity) (mode, reason string, ok bool, err error) {
-	data, readErr := os.ReadFile(failureMarkerPath(pgData)) // #nosec G304 -- path is PGDATA, controlled by the operator
-	if readErr != nil {
-		if os.IsNotExist(readErr) {
-			return "", "", false, nil
+// failed. It returns a nil result when there is no matching failure marker;
+// identity scoping mirrors HasFailed.
+func LoadFailure(pgData string, identity MarkerIdentity) (*postgres.BootstrapFailure, error) {
+	data, err := os.ReadFile(failureMarkerPath(pgData)) // #nosec G304 -- path is PGDATA, controlled by the operator
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
 		}
-		return "", "", false, fmt.Errorf("while reading the bootstrap failure marker: %w", readErr)
+		return nil, fmt.Errorf("while reading the bootstrap failure marker: %w", err)
 	}
 
 	var marker failureMarker
 	if json.Unmarshal(data, &marker) != nil || marker.Identity != identity {
-		return "", "", false, nil
+		return nil, nil
 	}
 
-	return marker.Mode, marker.Reason, true, nil
+	return &postgres.BootstrapFailure{Mode: marker.Mode, Reason: marker.Reason}, nil
 }
 
 // WriteFailedMarker records that the in-process bootstrap of this instance

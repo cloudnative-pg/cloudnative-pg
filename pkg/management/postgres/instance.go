@@ -326,16 +326,33 @@ func (instance *Instance) StartBootstrap(mode string) {
 	instance.bootstrapProgress.Store(&BootstrapProgress{Mode: mode, Since: time.Now()})
 }
 
+// BootstrapFailure is the mode and reason of a failed in-process bootstrap.
+type BootstrapFailure struct {
+	// Mode is the bootstrap method that failed.
+	Mode string
+
+	// Reason is the error that made the bootstrap fail.
+	Reason string
+}
+
 // FailBootstrap marks the in-process bootstrap as failed and parks the instance:
 // it stays in the bootstrap state (not ready, status 503) so it does not start
-// PostgreSQL, and it records the reason so the operator can surface it.
-func (instance *Instance) FailBootstrap(mode, reason string) {
+// PostgreSQL, and it records the reason so the operator can surface it. A nil
+// failure is a caller bug: an unrecoverable park with nothing to show the
+// operator is not useful, so it is rejected instead of silently storing an
+// empty reason.
+func (instance *Instance) FailBootstrap(failure *BootstrapFailure) error {
+	if failure == nil {
+		return fmt.Errorf("cannot fail the bootstrap without a recorded failure")
+	}
+
 	instance.bootstrapProgress.Store(&BootstrapProgress{
-		Mode:   mode,
+		Mode:   failure.Mode,
 		Since:  time.Now(),
 		Failed: true,
-		Reason: reason,
+		Reason: failure.Reason,
 	})
+	return nil
 }
 
 // CompleteBootstrap clears the in-process bootstrap marker.

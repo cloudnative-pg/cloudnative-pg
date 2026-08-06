@@ -160,11 +160,11 @@ var _ = Describe("bootstrap failure marker", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(failed).To(BeTrue())
 
-		mode, reason, ok, err := LoadFailure(pgData, identity)
+		failure, err := LoadFailure(pgData, identity)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(ok).To(BeTrue())
-		Expect(mode).To(Equal(string(ModeJoin)))
-		Expect(reason).To(Equal("primary unreachable"))
+		Expect(failure).ToNot(BeNil())
+		Expect(failure.Mode).To(Equal(string(ModeJoin)))
+		Expect(failure.Reason).To(Equal("primary unreachable"))
 
 		// #nosec G304 -- pgData is a test-controlled temporary directory
 		content, err := os.ReadFile(filepath.Join(pgData, constants.BootstrapFailedFile))
@@ -184,9 +184,9 @@ var _ = Describe("bootstrap failure marker", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(failed).To(BeFalse())
 
-			_, _, ok, err := LoadFailure(pgData, identity)
+			failure, err := LoadFailure(pgData, identity)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(ok).To(BeFalse())
+			Expect(failure).To(BeNil())
 		},
 		Entry("different pod name (snapshot-cloned scale-up replica)", MarkerIdentity{
 			Namespace:   "default",

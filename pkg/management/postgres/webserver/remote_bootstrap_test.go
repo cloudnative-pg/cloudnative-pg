@@ -75,7 +75,10 @@ var _ = Describe("status endpoints during an in-process bootstrap", func() {
 
 		It("returns a 503 reporting the failure once a bootstrap has failed", func() {
 			instance := &postgres.Instance{}
-			instance.FailBootstrap("join", "primary unreachable")
+			Expect(instance.FailBootstrap(&postgres.BootstrapFailure{
+				Mode:   "join",
+				Reason: "primary unreachable",
+			})).To(Succeed())
 			ws := remoteWebserverEndpoints{instance: instance}
 
 			req := httptest.NewRequest(http.MethodGet, "/pg/status", nil)

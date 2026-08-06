@@ -284,13 +284,11 @@ func runBootstrap(
 	serversCtx, stopServers := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	startServer := func(name string, srv *webserver.Webserver) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if serveErr := srv.Start(serversCtx); serveErr != nil {
 				contextLogger.Error(serveErr, "phase-0 web server stopped with an error", "server", name)
 			}
-		}()
+		})
 	}
 	startServer("status", statusServer)
 	startServer("local", localServer)
@@ -342,7 +340,12 @@ func runBootstrap(
 
 		// Report the failure on the status endpoint so the operator surfaces it
 		// as unrecoverable while the instance stays parked (not ready, 503).
-		instance.FailBootstrap(string(instruction.Mode), bootErr.Error())
+		if failErr := instance.FailBootstrap(&postgres.BootstrapFailure{
+			Mode:   string(instruction.Mode),
+			Reason: bootErr.Error(),
+		}); failErr != nil {
+			contextLogger.Error(failErr, "while reporting the bootstrap failure on the status endpoint")
+		}
 
 		// Do not exit. Exiting would let the kubelet restart the container; the
 		// failure marker would stop a second bootstrap attempt, but each restart
@@ -393,30 +396,35 @@ func parkFailedBootstrap(
 	}
 
 	// Recover the mode and reason recorded at failure so the status endpoint can
-	// report why the instance parked. A missing or unreadable marker is not fatal:
-	// the instance still parks, just with an empty reason.
-	mode, reason, _, err := bootstrap.LoadFailure(pgData, identity)
+	// report why the instance parked. HasFailed already confirmed this marker
+	// exists, parses, and matches identity, so a missing result here means the
+	// marker was removed or corrupted concurrently: an inconsistency worth
+	// surfacing rather than parking silently with no reason.
+	failure, err := bootstrap.LoadFailure(pgData, identity)
 	if err != nil {
-		contextLogger.Error(err, "while loading the bootstrap failure marker for the parked instance")
+		return fmt.Errorf("while loading the bootstrap failure marker for the parked instance: %w", err)
+	}
+	if failure == nil {
+		return fmt.Errorf("bootstrap failure marker for %s vanished after being detected", pgData)
 	}
 
 	// Flip the bootstrap failed flag so the status server keeps the startup probe
 	// skipped, readiness red and the status endpoint on 503, and reports the
 	// failure to the operator.
-	instance.FailBootstrap(mode, reason)
+	if err := instance.FailBootstrap(failure); err != nil {
+		return err
+	}
 
 	statusServer := webserver.NewBootstrapWebServer(instance)
 	serverCtx, stopServer := context.WithCancel(ctx)
 	defer stopServer()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if err := statusServer.Start(serverCtx); err != nil {
 			contextLogger.Error(err, "parked status web server stopped with an error")
 		}
-	}()
+	})
 
 	<-ctx.Done()
 	stopServer()
