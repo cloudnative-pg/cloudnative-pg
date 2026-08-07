@@ -41,16 +41,17 @@ import (
 )
 
 const (
-	// cloneRetryMaxAttempts bounds how many times a live-server clone
-	// (join/pgbasebackup) is retried before the instance parks. It mirrors the
-	// default backoff limit the bootstrap Job used to carry, so a clone racing a
-	// primary restart or switchover keeps the same tolerance it had before.
-	cloneRetryMaxAttempts = 6
+	// retryMaxAttempts bounds how many times a bootstrap that failed for a
+	// transient reason is attempted again before the instance parks. It mirrors
+	// the default backoff limit the bootstrap Job used to carry, so a bootstrap
+	// racing a primary restart or a network hiccup keeps the same tolerance it
+	// had before.
+	retryMaxAttempts = 6
 
-	// cloneRetryBackoffStep is the initial wait between clone retries, doubling
-	// on each subsequent attempt up to cloneRetryBackoffMax.
-	cloneRetryBackoffStep = 10 * time.Second
-	cloneRetryBackoffMax  = 30 * time.Second
+	// retryBackoffStep is the initial wait between attempts, doubling on each
+	// subsequent one up to retryBackoffMax.
+	retryBackoffStep = 10 * time.Second
+	retryBackoffMax  = 30 * time.Second
 )
 
 // Mode is the bootstrap method used to initialize a PostgreSQL data directory.
@@ -73,23 +74,38 @@ const (
 	ModeRestoreSnapshot Mode = "restoresnapshot"
 )
 
-// RetryBackoff returns the backoff Execute should be retried with when it fails
-// for this mode. A mode that clones a live PostgreSQL server with
-// pg_basebackup (a replica joining its primary, or a bootstrap from an
-// external cluster) gets a bounded retry: such a source can be transiently
-// unavailable, for example while the primary is restarting or switching over.
-// Every other mode (initdb, restore from a backup, restore from a snapshot)
-// fails deterministically and gets a single attempt.
-func (m Mode) RetryBackoff() wait.Backoff {
-	if m != ModeJoin && m != ModePgBaseBackup {
-		return wait.Backoff{Steps: 1}
-	}
+// RetryBackoff returns the backoff a failing Execute is retried with. How many
+// of those attempts are actually spent is decided by IsRetriableFailure: a
+// bootstrap that failed for good stops at the first one.
+func RetryBackoff() wait.Backoff {
 	return wait.Backoff{
-		Duration: cloneRetryBackoffStep,
+		Duration: retryBackoffStep,
 		Factor:   2,
-		Cap:      cloneRetryBackoffMax,
-		Steps:    cloneRetryMaxAttempts,
+		Cap:      retryBackoffMax,
+		Steps:    retryMaxAttempts,
 	}
+}
+
+// IsRetriableFailure tells whether a bootstrap that failed with this error is
+// worth attempting again.
+//
+// A failure reported by barman-cloud carries its own classification, and it is
+// the authority here: a restore from a backup reaches the object store over the
+// network, so a timeout or a transient server error deserves another attempt,
+// while a missing backup or a rejected credential does not and would only park
+// the instance six attempts later.
+//
+// Everything else is retried only when the mode clones a live PostgreSQL server
+// with pg_basebackup, whose source can be momentarily away, for example while a
+// primary is restarting or switching over. The remaining failures are local to
+// the instance and repeating them changes nothing.
+func (m Mode) IsRetriableFailure(err error) bool {
+	var barmanError *barmanCommand.CloudRestoreError
+	if errors.As(err, &barmanError) {
+		return barmanError.IsRetriable()
+	}
+
+	return m == ModeJoin || m == ModePgBaseBackup
 }
 
 // Instruction describes how the instance manager must bootstrap a data directory.

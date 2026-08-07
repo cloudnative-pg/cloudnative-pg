@@ -285,15 +285,15 @@ func runBootstrap(
 	startServer("status", statusServer)
 	startServer("local", localServer)
 
-	// A clone from a live server (join/pgbasebackup) can fail transiently when
-	// the source is momentarily unavailable, for example while a primary is
-	// restarting or switching over, so it gets a bounded retry; every other mode
-	// fails deterministically and is attempted once. Each Execute re-runs
+	// A bootstrap that failed for a transient reason (a clone whose source is
+	// momentarily away, an object store unreachable for a moment) is attempted
+	// again with a bounded backoff, while one that failed for good is not:
+	// IsRetriableFailure tells the two apart. Each Execute re-runs
 	// EnsureTargetDirectoriesDoNotExist, so a retry starts from a clean PGDATA.
-	bootErr := retry.OnError(instruction.Mode.RetryBackoff(), func(_ error) bool {
-		// Every attempt failure is retryable; only ctx cancellation stops the
-		// retries early, before the backoff's Steps are exhausted.
-		return ctx.Err() == nil
+	bootErr := retry.OnError(bootstrap.RetryBackoff(), func(err error) bool {
+		// A cancelled context also stops the retries early, before the backoff's
+		// Steps are exhausted.
+		return ctx.Err() == nil && instruction.Mode.IsRetriableFailure(err)
 	}, func() error {
 		err := bootstrap.Execute(ctx, cli, instance, info, instruction)
 		if err != nil {

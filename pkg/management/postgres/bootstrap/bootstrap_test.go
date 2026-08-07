@@ -21,9 +21,12 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
+	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -91,5 +94,53 @@ var _ = Describe("per-mode target directory cleanup", func() {
 			Instruction{Mode: "nonsense"},
 		)
 		Expect(err).To(MatchError(ContainSubstring("unknown bootstrap mode")))
+	})
+})
+
+var _ = Describe("retriable bootstrap failures", func() {
+	// The exit codes barman-cloud uses: 2 is a network error and 4 a general
+	// one, both transient; 1 is an operation error and 3 a CLI one, which repeat
+	// identically however many times we try.
+	networkFailure := barmanCommand.UnmarshalBarmanCloudRestoreExitCode(2)
+	credentialFailure := barmanCommand.UnmarshalBarmanCloudRestoreExitCode(1)
+
+	It("retries a restore whose object store was transiently unreachable", func() {
+		Expect(ModeRestore.IsRetriableFailure(networkFailure)).To(BeTrue())
+	})
+
+	It("does not retry a restore that failed for good", func() {
+		Expect(ModeRestore.IsRetriableFailure(credentialFailure)).To(BeFalse())
+	})
+
+	It("classifies a barman failure the caller wrapped on its way up", func() {
+		// Execute returns the error through several layers, so the concrete type
+		// is only reachable through the wrapping.
+		Expect(ModeRestore.IsRetriableFailure(
+			fmt.Errorf("while restoring the data directory: %w", networkFailure),
+		)).To(BeTrue())
+		Expect(ModeRestore.IsRetriableFailure(
+			fmt.Errorf("while restoring the data directory: %w", credentialFailure),
+		)).To(BeFalse())
+	})
+
+	It("keeps retrying a clone from a live server whatever went wrong", func() {
+		Expect(ModeJoin.IsRetriableFailure(errors.New("connection refused"))).To(BeTrue())
+		Expect(ModePgBaseBackup.IsRetriableFailure(errors.New("connection refused"))).To(BeTrue())
+	})
+
+	It("gives up on a failure local to the instance", func() {
+		Expect(ModeInitDB.IsRetriableFailure(errors.New("division by zero"))).To(BeFalse())
+		Expect(ModeRestoreSnapshot.IsRetriableFailure(errors.New("no such file"))).To(BeFalse())
+		Expect(ModeRestore.IsRetriableFailure(errors.New("cannot write the configuration"))).To(BeFalse())
+	})
+
+	It("lets the barman classification override the mode", func() {
+		// A clone mode retries anything, but a barman failure it cannot recover
+		// from stops it: the classification is the authority when present.
+		Expect(ModeJoin.IsRetriableFailure(credentialFailure)).To(BeFalse())
+	})
+
+	It("bounds the attempts", func() {
+		Expect(RetryBackoff().Steps).To(Equal(retryMaxAttempts))
 	})
 })
