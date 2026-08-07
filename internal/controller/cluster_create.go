@@ -1351,11 +1351,11 @@ func (r *ClusterReconciler) resolvePrimaryBootstrapInstruction(
 			)
 		}
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-		return specs.NewRestoreSnapshotInstruction(*cluster, metadata, backup), nil
+		return specs.NewRestoreSnapshotInstruction(*cluster, metadata), nil
 
 	case isBootstrappingFromRecovery:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		return specs.NewRecoveryInstruction(*cluster, backup), nil
+		return specs.NewRecoveryInstruction(*cluster), nil
 
 	case isBootstrappingFromBaseBackup:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
@@ -1408,28 +1408,25 @@ func inheritInstanceMetadata(cluster *apiv1.Cluster, pod *corev1.Pod) {
 }
 
 // createBootstrappingPod owns the cluster, inherits its annotations and
-// labels, and creates a bootstrapping Pod, tolerating an AlreadyExists error
-// (the informer cache may be stale). It reports whether the Pod already
-// existed so callers can pick their own retry Result.
+// labels, and creates a bootstrapping Pod. An AlreadyExists error means the
+// informer cache was stale and the Pod is there already, which is not a
+// failure: the next reconciliation loop observes it.
 func (r *ClusterReconciler) createBootstrappingPod(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	pod *corev1.Pod,
-) (alreadyExists bool, err error) {
+) error {
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
-		return false, fmt.Errorf("unable to set the owner reference for the bootstrapping Pod: %w", err)
+		return fmt.Errorf("unable to set the owner reference for the bootstrapping Pod: %w", err)
 	}
 
 	inheritInstanceMetadata(cluster, pod)
 
-	if err := r.Create(ctx, pod); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			return true, nil
-		}
-		return false, err
+	if err := r.Create(ctx, pod); err != nil && !apierrs.IsAlreadyExists(err) {
+		return err
 	}
 
-	return false, nil
+	return nil
 }
 
 // getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
@@ -1556,13 +1553,9 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		"storageSource", storageSource,
 	)
 
-	alreadyExists, err := r.createBootstrappingPod(ctx, cluster, pod)
-	if err != nil {
+	if err := r.createBootstrappingPod(ctx, cluster, pod); err != nil {
 		contextLogger.Error(err, "Unable to create Pod", "pod", pod)
 		return ctrl.Result{}, err
-	}
-	if alreadyExists {
-		contextLogger.Info("Pod already exists, maybe the cache is stale", "pod", pod.Name)
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
@@ -1625,14 +1618,9 @@ func (r *ClusterReconciler) recreateReplicaBootstrapPod(
 		return ctrl.Result{}, err
 	}
 
-	alreadyExists, err := r.createBootstrappingPod(ctx, cluster, pod)
-	if err != nil {
+	if err := r.createBootstrappingPod(ctx, cluster, pod); err != nil {
 		contextLogger.Error(err, "Unable to create the bootstrapping Pod", "pod", pod)
 		return ctrl.Result{}, err
-	}
-	if alreadyExists {
-		// The Pod was already created, maybe the cache is stale.
-		return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop
 	}
 
 	return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop
@@ -1913,14 +1901,9 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 		"pod", pod.Name,
 	)
 
-	alreadyExists, err := r.createBootstrappingPod(ctx, cluster, pod)
-	if err != nil {
+	if err := r.createBootstrappingPod(ctx, cluster, pod); err != nil {
 		contextLogger.Error(err, "Unable to create the bootstrapping Pod", "pod", pod)
 		return ctrl.Result{}, err
-	}
-	if alreadyExists {
-		// The Pod was already created, maybe the cache is stale.
-		return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop
 	}
 
 	return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop

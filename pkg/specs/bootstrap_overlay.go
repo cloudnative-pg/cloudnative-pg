@@ -178,9 +178,8 @@ func NewPgBaseBackupInstruction(cluster apiv1.Cluster) BootstrapInstruction {
 // NewRecoveryInstruction builds the overlay for a recovery from a backup. The
 // recovery endpoint CA is not mounted here: it is written to disk during the
 // in-process bootstrap (phase 0), the same way the instance manager owns the CA
-// files in steady state. The backup argument is kept for call-site symmetry with
-// the operator, which resolves it while checking the recovery source.
-func NewRecoveryInstruction(cluster apiv1.Cluster, _ *apiv1.Backup) BootstrapInstruction {
+// files in steady state.
+func NewRecoveryInstruction(cluster apiv1.Cluster) BootstrapInstruction {
 	return BootstrapInstruction{
 		cluster: cluster,
 		mode:    bootstrapModeRestore,
@@ -194,7 +193,6 @@ func NewRecoveryInstruction(cluster apiv1.Cluster, _ *apiv1.Backup) BootstrapIns
 func NewRestoreSnapshotInstruction(
 	cluster apiv1.Cluster,
 	object *metav1.ObjectMeta,
-	_ *apiv1.Backup,
 ) BootstrapInstruction {
 	return BootstrapInstruction{
 		cluster: cluster,

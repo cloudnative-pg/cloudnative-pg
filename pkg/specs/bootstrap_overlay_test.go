@@ -130,8 +130,8 @@ var _ = Describe("ApplyBootstrapOverlay", func() {
 		// The recovery endpoint CA is written to disk during the in-process
 		// bootstrap, never mounted, so the overlay adds no CA volume, mount or env.
 		for _, instruction := range []BootstrapInstruction{
-			NewRecoveryInstruction(clusterWithCA, nil),
-			NewRestoreSnapshotInstruction(clusterWithCA, &metav1.ObjectMeta{}, nil),
+			NewRecoveryInstruction(clusterWithCA),
+			NewRestoreSnapshotInstruction(clusterWithCA, &metav1.ObjectMeta{}),
 		} {
 			pod := runPod()
 			Expect(ApplyBootstrapOverlay(pod, instruction, testPVCUID)).To(Succeed())
@@ -182,8 +182,8 @@ var _ = Describe("ApplyBootstrapOverlay", func() {
 
 		for _, instruction := range []BootstrapInstruction{
 			NewInitDBInstruction(initDBCluster),
-			NewRecoveryInstruction(recoveryCluster, nil),
-			NewRestoreSnapshotInstruction(recoveryCluster, &metav1.ObjectMeta{}, nil),
+			NewRecoveryInstruction(recoveryCluster),
+			NewRestoreSnapshotInstruction(recoveryCluster, &metav1.ObjectMeta{}),
 			NewRestoreSnapshotReplicaInstruction(recoveryCluster),
 		} {
 			pod := runPod()

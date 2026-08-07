@@ -237,7 +237,7 @@ func runBootstrap(
 	if failure != nil {
 		contextLogger.Error(nil, "Instance bootstrap failed on an earlier attempt; "+
 			"parking the instance instead of retrying", "mode", instruction.Mode)
-		return parkFailedBootstrap(ctx, cli, instance, failure)
+		return parkFailedBootstrap(ctx, cli, instance, &cluster, failure)
 	}
 
 	contextLogger.Info("Starting in-process bootstrap", "mode", instruction.Mode)
@@ -255,7 +255,7 @@ func runBootstrap(
 	// against it, so we must load the server certificate before serving. On a
 	// plain-HTTP status port this is skipped entirely.
 	if instance.StatusPortTLS {
-		if err := loadServerCertificate(ctx, cli, instance); err != nil {
+		if err := loadServerCertificate(ctx, cli, instance, &cluster); err != nil {
 			return err
 		}
 	}
@@ -368,12 +368,13 @@ func parkFailedBootstrap(
 	ctx context.Context,
 	cli client.Client,
 	instance *postgres.Instance,
+	cluster *apiv1.Cluster,
 	failure *postgres.BootstrapFailure,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
 	if instance.StatusPortTLS {
-		if err := loadServerCertificate(ctx, cli, instance); err != nil {
+		if err := loadServerCertificate(ctx, cli, instance, cluster); err != nil {
 			return err
 		}
 	}
@@ -456,17 +457,14 @@ func loadRecoveryBackup(
 
 // loadServerCertificate reads the instance server certificate into memory so
 // the phase-0 status server can serve the TLS probes.
-func loadServerCertificate(ctx context.Context, cli client.Client, instance *postgres.Instance) error {
-	var cluster apiv1.Cluster
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: instance.GetNamespaceName(),
-		Name:      instance.GetClusterName(),
-	}, &cluster); err != nil {
-		return fmt.Errorf("while loading the cluster for the bootstrap status server: %w", err)
-	}
-
+func loadServerCertificate(
+	ctx context.Context,
+	cli client.Client,
+	instance *postgres.Instance,
+	cluster *apiv1.Cluster,
+) error {
 	if err := instancecertificate.NewReconciler(cli, instance).
-		EnsureServerCertificateLoaded(ctx, &cluster); err != nil {
+		EnsureServerCertificateLoaded(ctx, cluster); err != nil {
 		return fmt.Errorf("while loading the server certificate for the bootstrap status server: %w", err)
 	}
 
