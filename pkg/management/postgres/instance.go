@@ -119,6 +119,13 @@ type shutdownOptions struct {
 	// Timeout is the maximum number of seconds to wait for the shutdown to complete
 	// Used only if Wait is true. Defaulted by PostgreSQL to 60 seconds.
 	Timeout *int32
+
+	// SkipCheckpoint asks not to run the CHECKPOINT that would otherwise precede the
+	// shutdown. That checkpoint shortens the recovery the instance faces on its next
+	// start, so it is worth its cost whenever the instance is expected back as it is;
+	// it is not bounded by Timeout, so a caller that needs PostgreSQL to stop within a
+	// deadline has to give it up.
+	SkipCheckpoint bool
 }
 
 // defaultShutdownOptions are the default shutdown options. That is:
@@ -216,6 +223,12 @@ type Instance struct {
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
 
+	// stoppedBecauseIsolated records that this instance was stopped after being found
+	// isolated. The postmaster must not be started again in that case: the instance
+	// manager has to exit so that the container is recreated, and the fresh one will not
+	// get past its own wait for the API server while the isolation lasts.
+	stoppedBecauseIsolated atomic.Bool
+
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
 	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
 
@@ -294,6 +307,12 @@ func (instance *Instance) CanCheckReadiness() bool {
 // MightBeUnavailable checks whether we expect the instance to be down
 func (instance *Instance) MightBeUnavailable() bool {
 	return instance.mightBeUnavailable.Load()
+}
+
+// StoppedBecauseIsolated reports whether this instance was stopped after being found
+// isolated, in which case the postmaster must not be restarted in place.
+func (instance *Instance) StoppedBecauseIsolated() bool {
+	return instance.stoppedBecauseIsolated.Load()
 }
 
 // SetFencing marks whether the instance is fenced, if enabling, marks also any down to be tolerated
@@ -455,7 +474,19 @@ const (
 	// shutDownFastImmediate means the instance has to be shut down by first
 	// issuing a fast shut down and in case of errors an immediate one
 	shutDownFastImmediate InstanceCommand = "ShutDownFastImmediate"
+
+	// shutDownFastImmediateIsolated is shutDownFastImmediate for an instance that has been
+	// found isolated. It is a separate command only because of the budget it gets: the
+	// switchover path can afford to wait for the instance to settle, this one cannot.
+	shutDownFastImmediateIsolated InstanceCommand = "ShutDownFastImmediateIsolated"
 )
+
+// isolationShutdownFastTimeout bounds the fast phase of the shutdown requested when the
+// primary is found to be isolated. This path exists to stop the instance from acknowledging
+// writes it can no longer replicate, so it gives up well before `.spec.switchoverDelay`
+// would and escalates to an immediate shutdown, which costs the instance a crash recovery
+// on its next start and nothing else: it is about to be rewound anyway.
+const isolationShutdownFastTimeout int32 = 30
 
 // NewInstance creates a new Instance object setting the defaults
 func NewInstance() *Instance {
@@ -589,7 +620,9 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 		return fmt.Errorf("instance is not running")
 	}
 
-	instance.tryCheckpointBeforeShutdown(ctx, options.Mode)
+	if !options.SkipCheckpoint {
+		instance.tryCheckpointBeforeShutdown(ctx, options.Mode)
+	}
 	instance.ShutdownConnections()
 
 	pgCtlOptions := []string{
@@ -683,21 +716,57 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 	return nil
 }
 
+// fastImmediateShutdownPlan groups the two ways in which stopping an isolated instance
+// departs from the demotion it shares a code path with.
+type fastImmediateShutdownPlan struct {
+	// fastTimeout bounds the fast phase before the immediate one takes over.
+	fastTimeout int32
+
+	// skipCheckpoint asks to go without the CHECKPOINT that precedes the shutdown.
+	skipCheckpoint bool
+}
+
+// planFastImmediateShutdown decides how much rope to give the shutdown a command asks for.
+// Demoting a primary can afford to let it settle and benefits from the checkpoint, because
+// the same instance is coming back as a replica. Stopping an isolated primary can afford
+// neither: `.spec.switchoverDelay` is measured in hours, and the checkpoint is unbounded, so
+// both stand between the verdict and the end of the writes that verdict is about. What the
+// checkpoint would have saved is a longer recovery on the next start, which this instance
+// pays anyway on the rewind ahead of it.
+func planFastImmediateShutdown(instance *Instance, req InstanceCommand) fastImmediateShutdownPlan {
+	if req == shutDownFastImmediateIsolated {
+		return fastImmediateShutdownPlan{
+			fastTimeout:    isolationShutdownFastTimeout,
+			skipCheckpoint: true,
+		}
+	}
+
+	return fastImmediateShutdownPlan{
+		fastTimeout: instance.GetClusterOrDefault().GetMaxSwitchoverDelay(),
+	}
+}
+
 // TryShuttingDownFastImmediate first attempts to shut down the instance using the "fast" mode,
-// which is preceded by a CHECKPOINT. If this fails or the specified timeout expires,
-// it issues an "immediate" shutdown request and waits for completion.
+// which is preceded by a CHECKPOINT unless the plan gives it up. If this fails or the plan's
+// fast timeout expires, it issues an "immediate" shutdown request and waits for completion.
 // Note: an immediate shutdown may lead to data loss.
-func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) error {
+func (instance *Instance) TryShuttingDownFastImmediate(
+	ctx context.Context,
+	plan fastImmediateShutdownPlan,
+) error {
 	contextLogger := log.FromContext(ctx)
 
-	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-	maxSwitchoverDelay := instance.GetClusterOrDefault().GetMaxSwitchoverDelay()
+	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance",
+		"fastTimeout", plan.fastTimeout,
+		"skipCheckpoint", plan.skipCheckpoint,
+	)
 	err := instance.Shutdown(
 		ctx,
 		shutdownOptions{
-			Mode:    shutdownModeFast,
-			Wait:    true,
-			Timeout: &maxSwitchoverDelay,
+			Mode:           shutdownModeFast,
+			Wait:           true,
+			Timeout:        &plan.fastTimeout,
+			SkipCheckpoint: plan.skipCheckpoint,
 		},
 	)
 	var exitError *exec.ExitError
@@ -1461,6 +1530,29 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownFastImmediate
 }
 
+// RequestFastImmediateShutdownForIsolation is RequestFastImmediateShutdown for an instance
+// that has been found isolated, whose fast phase is bounded far more tightly. It waits up to
+// timeout for the lifecycle manager to take the request up and reports whether it did: the
+// caller is the liveness probe handler, which must not block past the probe's own timeout,
+// and which has to know whether the shutdown it is about to report a failure for is actually
+// running.
+func (instance *Instance) RequestFastImmediateShutdownForIsolation(
+	ctx context.Context,
+	timeout time.Duration,
+) bool {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case instance.instanceCommandChan <- shutDownFastImmediateIsolated:
+		return true
+	case <-timer.C:
+		return false
+	case <-ctx.Done():
+		return false
+	}
+}
+
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
 // restart the postmaster, and wait for the postmaster to be restarted
 func (instance *Instance) RequestAndWaitRestartSmartFast(ctx context.Context, timeout time.Duration) error {
@@ -1614,15 +1706,32 @@ func (instance *Instance) HandleInstanceCommandRequests(
 	case fenceOn:
 		contextLogger.Info("Fencing request received, will proceed shutting down the instance")
 		instance.SetFencing(true)
-		if err := instance.TryShuttingDownFastImmediate(ctx); err != nil {
+		if err := instance.TryShuttingDownFastImmediate(
+			ctx,
+			planFastImmediateShutdown(instance, req),
+		); err != nil {
 			return false, fmt.Errorf("while shutting down the instance to fence it: %w", err)
 		}
 		return false, nil
 	case restartSmartFast:
 		return true, instance.TryShuttingDownSmartFast(ctx)
-	case shutDownFastImmediate:
-		if err := instance.TryShuttingDownFastImmediate(ctx); err != nil {
+	case shutDownFastImmediate, shutDownFastImmediateIsolated:
+		if err := instance.TryShuttingDownFastImmediate(
+			ctx,
+			planFastImmediateShutdown(instance, req),
+		); err != nil {
 			contextLogger.Error(err, "error shutting down instance, proceeding")
+			return false, nil
+		}
+		if req == shutDownFastImmediateIsolated {
+			// Recorded only now that PostgreSQL is known to be down. This flag is what
+			// keeps the postmaster from coming back in place and suppresses a restart
+			// request that arrives just after, so setting it for a shutdown that did not
+			// happen would leave a running instance unable to be restarted at all. The
+			// lifecycle loop reads it when it observes the postmaster's exit, which is a
+			// later pass through its select than this one, so recording it here is in
+			// time.
+			instance.stoppedBecauseIsolated.Store(true)
 		}
 		return false, nil
 	default:

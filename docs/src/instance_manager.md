@@ -234,6 +234,57 @@ following conditions are met:
 
 The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
 
+Once the probe has failed `failureThreshold` times in a row, the instance
+manager stops PostgreSQL itself, requesting a *fast* shutdown and escalating to
+an *immediate* one after 30 seconds. It does not wait for the kubelet to
+terminate the container, and it deliberately does not use the *smart* shutdown
+reserved for planned termination: a smart shutdown lets the sessions that are
+already open run to completion, which would leave an isolated primary
+acknowledging writes it can no longer replicate for as long as
+`.spec.smartShutdownTimeout` allows.
+
+On a primary carrying any real load, escalating to *immediate* is the expected
+outcome of this sequence rather than an exceptional one. This shutdown
+deliberately skips the explicit `CHECKPOINT` that other shutdowns perform, on
+the reasoning that the checkpoint is unbounded and would only shorten a
+recovery this instance is going to pay for anyway once it gets rewound.
+Skipping it, though, defers all the outstanding dirty-buffer work onto the
+shutdown checkpoint that PostgreSQL always runs before a *fast* shutdown can
+complete, and that checkpoint is unbounded as well. On a busy primary with a
+large `shared_buffers`, the 30 second budget routinely runs out while this
+checkpoint is still in progress, and the *immediate* shutdown that follows
+aborts it midway. The instance then comes back up through crash recovery
+rather than a clean shutdown, which costs nothing beyond what the instance was
+already going to pay on its next start, and no acknowledged commit is lost
+either way. The instance is not restarted in place afterwards; the container
+is recreated, and the new one waits for the API server to be reachable before
+starting PostgreSQL again.
+
+Stopping the isolated primary shortens the window in which it and its
+replacement could both accept writes, without closing it: promotion is governed
+by the [primary lease](failover.md#safe-primary-election), whose duration runs
+independently of whether the old primary has stopped. Little usually reaches
+the isolated instance in that window, since a partition that cuts it off from
+the API server and its peers tends to cut it off from applications too, and a
+writer would have to be holding a connection opened before the partition. Where
+even that is unacceptable,
+[synchronous replication](replication.md#synchronous-replication) removes it,
+by stopping the isolated primary from acknowledging a commit its replicas have
+not received.
+
+Detection is the larger part of the total: the writes stop roughly
+`failureThreshold` × `periodSeconds` after the partition, plus the shutdown
+itself, so with the defaults the primary is open for about 30 seconds before
+the 30 second shutdown budget even begins.
+
+:::warning
+    Because the isolation check is what decides this, a false positive costs an
+    unplanned failover rather than only a probe failure. Both
+    `.spec.probes.liveness.failureThreshold` and the older
+    `.spec.livenessProbeTimeout` widen the tolerance, and the instance manager
+    honors whichever of the two is in effect.
+:::
+
 It is **enabled by default** and can be disabled by adding the following:
 
 ```yaml

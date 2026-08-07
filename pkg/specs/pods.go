@@ -25,7 +25,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"path"
 	"reflect"
 	"slices"
@@ -97,7 +96,7 @@ const (
 	StartupProbePeriod = 10
 
 	// LivenessProbePeriod is the period set for the postgres instance liveness probe
-	LivenessProbePeriod = 10
+	LivenessProbePeriod = apiv1.DefaultLivenessProbePeriodSeconds
 )
 
 // EnvConfig carries the environment configuration of a container
@@ -308,17 +307,17 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 
 	// ensure a proper threshold is set
 	if containers[0].StartupProbe.FailureThreshold == 0 {
-		containers[0].StartupProbe.FailureThreshold = getFailureThreshold(
+		containers[0].StartupProbe.FailureThreshold = apiv1.FailureThresholdFromDelay(
 			cluster.GetMaxStartDelay(),
 			containers[0].StartupProbe.PeriodSeconds,
 		)
 	}
 
 	if cluster.Spec.LivenessProbeTimeout != nil && containers[0].LivenessProbe.FailureThreshold == 0 {
-		containers[0].LivenessProbe.FailureThreshold = getFailureThreshold(
-			*cluster.Spec.LivenessProbeTimeout,
-			containers[0].LivenessProbe.PeriodSeconds,
-		)
+		// Resolved through the Cluster so that the instance manager, which has to reason about
+		// the same threshold to know how much consecutive failure the user tolerates, cannot
+		// drift from what is put on the Pod here.
+		containers[0].LivenessProbe.FailureThreshold = cluster.GetLivenessProbeFailureThreshold()
 	}
 
 	return containers
@@ -337,15 +336,6 @@ func ensureCustomProbesConfiguration(cluster *apiv1.Cluster, container *corev1.C
 	cluster.Spec.Probes.Liveness.ApplyInto(container.LivenessProbe)
 	cluster.Spec.Probes.Readiness.ApplyInto(container.ReadinessProbe)
 	cluster.Spec.Probes.Startup.ApplyInto(container.StartupProbe)
-}
-
-// getFailureThreshold get the startup probe failure threshold
-// FAILURE_THRESHOLD = ceil(startDelay / periodSeconds) and minimum value is 1
-func getFailureThreshold(startupDelay, period int32) int32 {
-	if startupDelay <= period {
-		return 1
-	}
-	return int32(math.Ceil(float64(startupDelay) / float64(period)))
 }
 
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration

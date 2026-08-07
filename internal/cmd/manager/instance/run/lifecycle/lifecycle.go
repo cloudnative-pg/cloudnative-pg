@@ -62,6 +62,20 @@ func (i *PostgresLifecycle) GetGlobalContext() context.Context {
 	return i.globalCtx
 }
 
+// postmasterMayComeBack reports whether the instance manager stays up after the postmaster
+// exited, ready to start it again, rather than returning so that the container is recreated.
+//
+// An instance stopped because it was found isolated must not come back in place, whatever
+// else expects it to be temporarily down: a fresh container waits for the API server to be
+// reachable before it starts PostgreSQL, which an isolated one is not.
+func postmasterMayComeBack(stoppedBecauseIsolated, mightBeUnavailable bool) bool {
+	if stoppedBecauseIsolated {
+		return false
+	}
+
+	return mightBeUnavailable
+}
+
 // Start starts running the PostgresLifecycle
 //
 //nolint:gocognit
@@ -115,7 +129,13 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 			select {
 			case err := <-postMasterErrChan:
 				pgStopHandler(err)
-				if !i.instance.MightBeUnavailable() {
+				if i.instance.StoppedBecauseIsolated() {
+					contextLogger.Info("PostgreSQL was stopped because this instance is isolated, exiting")
+				}
+				if !postmasterMayComeBack(
+					i.instance.StoppedBecauseIsolated(),
+					i.instance.MightBeUnavailable(),
+				) {
 					return err
 				}
 
@@ -157,6 +177,11 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				restartNeeded, err := i.instance.HandleInstanceCommandRequests(ctx, req)
 				if err != nil {
 					contextLogger.Error(err, "while handling instance command request")
+				}
+				if restartNeeded && i.instance.StoppedBecauseIsolated() {
+					contextLogger.Info(
+						"Ignoring a restart request: this instance was stopped because it is isolated")
+					restartNeeded = false
 				}
 				if restartNeeded {
 					contextLogger.Info("Instance restart requested, waiting for PostgreSQL to shut down")
