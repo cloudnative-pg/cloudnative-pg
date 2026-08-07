@@ -143,19 +143,17 @@ func buildRestoreSnapshotReplicaArgs(cluster apiv1.Cluster) []string {
 // in-process, instead of relying on a dedicated Job. It mirrors, field for
 // field, what the bootstrap Job builders used to produce.
 type BootstrapInstruction struct {
-	cluster         apiv1.Cluster
-	mode            string
-	args            []string
-	addInitDBExtras bool
+	cluster apiv1.Cluster
+	mode    string
+	args    []string
 }
 
 // NewInitDBInstruction builds the overlay for the initdb bootstrap.
 func NewInitDBInstruction(cluster apiv1.Cluster) BootstrapInstruction {
 	return BootstrapInstruction{
-		cluster:         cluster,
-		mode:            bootstrapModeInitDB,
-		args:            buildInitDBArgs(cluster),
-		addInitDBExtras: true,
+		cluster: cluster,
+		mode:    bootstrapModeInitDB,
+		args:    buildInitDBArgs(cluster),
 	}
 }
 
@@ -236,7 +234,7 @@ func ApplyBootstrapOverlay(pod *corev1.Pod, instruction BootstrapInstruction, pv
 	container.Command = append(container.Command, "--bootstrap-pvc-uid="+string(pvcUID))
 	container.Command = append(container.Command, instruction.args...)
 
-	if instruction.addInitDBExtras {
+	if instruction.mode == bootstrapModeInitDB {
 		applyInitDBOverlayExtras(pod, instruction.cluster)
 	}
 
