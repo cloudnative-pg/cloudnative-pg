@@ -55,6 +55,7 @@ var _ = Describe("bootstrap flag parsing", func() {
 		It("carries the instance identity and the mode-specific fields", func() {
 			opts := bootstrapOptions{
 				mode:                             "initdb",
+				pvcUID:                           "11111111-1111-1111-1111-111111111111",
 				pgWal:                            "/var/pgwal",
 				parentNode:                       "cluster-1",
 				appDBName:                        "app",
@@ -74,6 +75,7 @@ var _ = Describe("bootstrap flag parsing", func() {
 			Expect(info.PgData).To(Equal("/var/pgdata"))
 			Expect(info.PgWal).To(Equal("/var/pgwal"))
 			Expect(info.PodName).To(Equal("cluster-2"))
+			Expect(info.PVCUID).To(Equal("11111111-1111-1111-1111-111111111111"))
 			Expect(info.ClusterName).To(Equal("cluster"))
 			Expect(info.Namespace).To(Equal("default"))
 			Expect(info.ParentNode).To(Equal("cluster-1"))

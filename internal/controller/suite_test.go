@@ -33,12 +33,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -75,17 +77,33 @@ func buildTestEnvironment() *testingEnvironment {
 	Expect(err).ToNot(HaveOccurred())
 
 	scheme := schemeBuilder.BuildWithAllKnownScheme()
-	k8sClient := fake.NewClientBuilder().WithScheme(scheme).
-		WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &corev1.Service{},
-			&corev1.ConfigMap{}, &corev1.Secret{}).
-		WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
-		WithIndex(&apiv1.Backup{}, ".spec.cluster.name", func(rawObj client.Object) []string {
-			return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
-		}).
-		WithIndex(&apiv1.Backup{}, backupPhase, func(rawObj client.Object) []string {
-			return []string{string(rawObj.(*apiv1.Backup).Status.Phase)}
-		}).
-		Build()
+	k8sClient := interceptor.NewClient(
+		fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &corev1.Service{},
+				&corev1.ConfigMap{}, &corev1.Secret{}).
+			WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
+			WithIndex(&apiv1.Backup{}, ".spec.cluster.name", func(rawObj client.Object) []string {
+				return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
+			}).
+			WithIndex(&apiv1.Backup{}, backupPhase, func(rawObj client.Object) []string {
+				return []string{string(rawObj.(*apiv1.Backup).Status.Phase)}
+			}).
+			Build(),
+		// The fake client, unlike a real API server, never assigns a UID on
+		// Create. Code that relies on a freshly created object's UID (for
+		// example the bootstrap marker identity's PGDATA PVC UID) needs one, so
+		// stamp it here exactly as the API server would.
+		interceptor.Funcs{
+			Create: func(
+				ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption,
+			) error {
+				if obj.GetUID() == "" {
+					obj.SetUID(uuid.NewUUID())
+				}
+				return c.Create(ctx, obj, opts...)
+			},
+		},
+	)
 	Expect(err).ToNot(HaveOccurred())
 
 	discoveryClient := &fakediscovery.FakeDiscovery{

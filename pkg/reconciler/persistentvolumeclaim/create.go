@@ -32,12 +32,15 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// createIfNotExists creates the PVC described by configuration and returns the
+// resulting object, so its UID (assigned by the API server) is available to the
+// caller without an extra Get.
 func createIfNotExists(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
 	configuration *CreateConfiguration,
-) error {
+) (*corev1.PersistentVolumeClaim, error) {
 	contextLogger := log.FromContext(ctx)
 
 	pvc, err := Build(cluster, configuration)
@@ -49,9 +52,9 @@ func createIfNotExists(
 			contextLogger.Info("The size specified for the cluster is not valid",
 				"size",
 				configuration.Storage.Size)
-			return utils.ErrNextLoop
+			return nil, utils.ErrNextLoop
 		}
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"unable to create a PVC spec for node with serial %v: %w",
 			configuration.NodeSerial,
 			err,
@@ -60,10 +63,10 @@ func createIfNotExists(
 
 	err = c.Create(ctx, pvc)
 	if err == nil {
-		return nil
+		return pvc, nil
 	}
 	if !apierrs.IsAlreadyExists(err) {
-		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
+		return nil, fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
 			pvc.Name,
 			configuration.NodeSerial,
 			err,
@@ -80,23 +83,23 @@ func createIfNotExists(
 
 // waitForTerminatingPVC inspects an already-existing PVC and returns
 // utils.ErrNextLoop when it is still terminating (or has just been removed), so
-// the caller retries once the name is free again. It returns nil when the PVC
-// exists and is not terminating.
+// the caller retries once the name is free again. It returns the live PVC when
+// it exists and is not terminating.
 func waitForTerminatingPVC(
 	ctx context.Context,
 	c client.Client,
 	pvc *corev1.PersistentVolumeClaim,
 	nodeSerial int,
-) error {
+) (*corev1.PersistentVolumeClaim, error) {
 	contextLogger := log.FromContext(ctx)
 
 	var existing corev1.PersistentVolumeClaim
 	if err := c.Get(ctx, client.ObjectKeyFromObject(pvc), &existing); err != nil {
 		if apierrs.IsNotFound(err) {
 			// It finished terminating between Create and Get: retry next loop.
-			return utils.ErrNextLoop
+			return nil, utils.ErrNextLoop
 		}
-		return fmt.Errorf("unable to verify existing PVC %s (nodeSerial: %d): %w", pvc.Name, nodeSerial, err)
+		return nil, fmt.Errorf("unable to verify existing PVC %s (nodeSerial: %d): %w", pvc.Name, nodeSerial, err)
 	}
 
 	if existing.DeletionTimestamp != nil {
@@ -105,8 +108,8 @@ func waitForTerminatingPVC(
 			"pvc", pvc.Name,
 			"nodeSerial", nodeSerial,
 		)
-		return utils.ErrNextLoop
+		return nil, utils.ErrNextLoop
 	}
 
-	return nil
+	return &existing, nil
 }

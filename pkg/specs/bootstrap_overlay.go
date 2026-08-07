@@ -25,6 +25,7 @@ import (
 	"github.com/kballard/go-shellquote"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -216,19 +217,23 @@ func NewRestoreSnapshotReplicaInstruction(cluster apiv1.Cluster) BootstrapInstru
 
 // ApplyBootstrapOverlay turns a steady-state instance pod (as produced by
 // NewInstance) into a bootstrapping pod. It appends the --bootstrap-mode
-// instruction plus the mode-specific flags to the instance run command, adds the
-// volumes, mounts and environment the bootstrap needs, and stamps the bootstrap
-// annotation. It deliberately leaves the podSpec and podEnvHash annotations
-// untouched so the pod is not seen as drifted: those still describe the
-// steady-state spec, and the drift check compares against a regenerated
-// steady-state spec.
-func ApplyBootstrapOverlay(pod *corev1.Pod, instruction BootstrapInstruction) error {
+// instruction, the PGDATA PVC UID and the mode-specific flags to the instance
+// run command, adds the volumes, mounts and environment the bootstrap needs,
+// and stamps the bootstrap annotation. It deliberately leaves the podSpec and
+// podEnvHash annotations untouched so the pod is not seen as drifted: those
+// still describe the steady-state spec, and the drift check compares against a
+// regenerated steady-state spec.
+//
+// pvcUID is the UID of the PGDATA PVC this pod will bootstrap: see
+// bootstrap.MarkerIdentity.PVCUID for what it protects against.
+func ApplyBootstrapOverlay(pod *corev1.Pod, instruction BootstrapInstruction, pvcUID types.UID) error {
 	if len(pod.Spec.Containers) == 0 || pod.Spec.Containers[0].Name != PostgresContainerName {
 		return fmt.Errorf("cannot apply the bootstrap overlay: the first container is not %q", PostgresContainerName)
 	}
 
 	container := &pod.Spec.Containers[0]
 	container.Command = append(container.Command, "--bootstrap-mode="+instruction.mode)
+	container.Command = append(container.Command, "--bootstrap-pvc-uid="+string(pvcUID))
 	container.Command = append(container.Command, instruction.args...)
 
 	if instruction.addInitDBExtras {

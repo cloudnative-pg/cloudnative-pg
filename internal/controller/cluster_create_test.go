@@ -1581,3 +1581,30 @@ var _ = Describe("generateNodeSerial", func() {
 		Expect(serial).To(Equal(1))
 	})
 })
+
+var _ = Describe("buildBootstrapInstancePod", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("carries the PGDATA PVC UID onto the bootstrapping pod command", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		const pvcUID = types.UID("11111111-1111-1111-1111-111111111111")
+
+		pod, err := env.clusterReconciler.buildBootstrapInstancePod(
+			ctx, cluster, 1, pvcUID, specs.NewJoinInstruction(*cluster))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pod.Spec.Containers[0].Command).To(ContainElement("--bootstrap-pvc-uid=" + string(pvcUID)))
+	})
+
+	It("refuses to build the pod when the PGDATA PVC UID is empty", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		_, err := env.clusterReconciler.buildBootstrapInstancePod(
+			ctx, cluster, 1, "", specs.NewJoinInstruction(*cluster))
+		Expect(err).To(HaveOccurred())
+	})
+})

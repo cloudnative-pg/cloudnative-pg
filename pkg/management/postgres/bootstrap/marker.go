@@ -54,6 +54,15 @@ type MarkerIdentity struct {
 
 	// PodName is the name of the instance pod that ran the bootstrap.
 	PodName string `json:"podName"`
+
+	// PVCUID is the UID of the PGDATA PVC the marker was written on. It
+	// disambiguates two markers that otherwise share the same Namespace,
+	// ClusterName, ClusterUID and PodName but different volumes: a replica
+	// re-created with a reused node serial after a scale-down gets a new PGDATA
+	// PVC, and if that PVC is cloned from a volume snapshot of the previous
+	// same-named instance, it already carries that instance's marker. Without
+	// this field the inherited marker would wrongly match and skip bootstrap.
+	PVCUID string `json:"pvcUID"`
 }
 
 // completionMarker is the content of the file written inside PGDATA once an

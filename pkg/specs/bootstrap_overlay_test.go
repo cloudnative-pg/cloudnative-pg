@@ -22,6 +22,7 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -30,6 +31,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// testPVCUID is the PGDATA PVC UID passed to ApplyBootstrapOverlay in every test
+// that does not itself exercise the UID handling.
+const testPVCUID = types.UID("11111111-1111-1111-1111-111111111111")
 
 var _ = Describe("ApplyBootstrapOverlay", func() {
 	// runPod returns a minimal instance pod carrying just the steady-state
@@ -65,7 +70,7 @@ var _ = Describe("ApplyBootstrapOverlay", func() {
 		envHashBefore := pod.Annotations[utils.PodEnvHashAnnotationName]
 		Expect(specBefore).ToNot(BeEmpty())
 
-		Expect(ApplyBootstrapOverlay(pod, NewInitDBInstruction(cluster))).To(Succeed())
+		Expect(ApplyBootstrapOverlay(pod, NewInitDBInstruction(cluster), testPVCUID)).To(Succeed())
 
 		// The overlay must not touch the annotations the drift check reads, so a
 		// just-bootstrapped pod is not seen as outdated.
@@ -87,16 +92,22 @@ var _ = Describe("ApplyBootstrapOverlay", func() {
 			},
 		}
 		pod := runPod()
-		Expect(ApplyBootstrapOverlay(pod, NewInitDBInstruction(cluster))).To(Succeed())
+		Expect(ApplyBootstrapOverlay(pod, NewInitDBInstruction(cluster), testPVCUID)).To(Succeed())
 
 		Expect(pod.Spec.Containers[0].Env).To(ContainElement(HaveField("Name", "APP_USERNAME")))
+	})
+
+	It("appends the PGDATA PVC UID to the instance run command", func() {
+		pod := runPod()
+		Expect(ApplyBootstrapOverlay(pod, NewJoinInstruction(apiv1.Cluster{}), testPVCUID)).To(Succeed())
+		Expect(pod.Spec.Containers[0].Command).To(ContainElement("--bootstrap-pvc-uid=" + string(testPVCUID)))
 	})
 
 	It("rejects a pod whose first container is not the postgres container", func() {
 		pod := &corev1.Pod{
 			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "sidecar"}}},
 		}
-		Expect(ApplyBootstrapOverlay(pod, NewJoinInstruction(apiv1.Cluster{}))).ToNot(Succeed())
+		Expect(ApplyBootstrapOverlay(pod, NewJoinInstruction(apiv1.Cluster{}), testPVCUID)).ToNot(Succeed())
 	})
 
 	It("never mounts the barman endpoint CA on a restore or snapshot overlay", func() {
@@ -123,7 +134,7 @@ var _ = Describe("ApplyBootstrapOverlay", func() {
 			NewRestoreSnapshotInstruction(clusterWithCA, &metav1.ObjectMeta{}, nil),
 		} {
 			pod := runPod()
-			Expect(ApplyBootstrapOverlay(pod, instruction)).To(Succeed())
+			Expect(ApplyBootstrapOverlay(pod, instruction, testPVCUID)).To(Succeed())
 			Expect(pod.Spec.Volumes).ToNot(ContainElement(HaveField("Name", "barman-endpoint-ca")))
 			Expect(pod.Spec.Containers[0].VolumeMounts).ToNot(ContainElement(HaveField("Name", "barman-endpoint-ca")))
 			Expect(pod.Spec.Containers[0].Env).ToNot(ContainElement(HaveField("Name", "AWS_CA_BUNDLE")))
@@ -176,7 +187,7 @@ var _ = Describe("ApplyBootstrapOverlay", func() {
 			NewRestoreSnapshotReplicaInstruction(recoveryCluster),
 		} {
 			pod := runPod()
-			Expect(ApplyBootstrapOverlay(pod, instruction)).To(Succeed())
+			Expect(ApplyBootstrapOverlay(pod, instruction, testPVCUID)).To(Succeed())
 			for _, mount := range pod.Spec.Containers[0].VolumeMounts {
 				Expect(forbidden).ToNot(ContainElement(mount.MountPath),
 					"overlay mount %q must not shadow a writable instance directory", mount.Name)

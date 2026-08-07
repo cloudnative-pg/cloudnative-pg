@@ -1169,8 +1169,10 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	// Ensure the PVCs for the first node exist, picking the right storage
 	// source if we are bootstrapping from a backup or a volume snapshot. This
-	// blocks until the source is ready.
-	if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, nodeSerial, nil); !res.IsZero() || err != nil {
+	// blocks until the source is ready. The bootstrapping Pod is not created
+	// here (see ensureInstancesAreCreated), so the PGDATA PVC UID is not needed
+	// yet.
+	if res, _, err := r.ensurePrimaryInstancePVCs(ctx, cluster, nodeSerial, nil); !res.IsZero() || err != nil {
 		return res, err
 	}
 
@@ -1213,7 +1215,7 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 	cluster *apiv1.Cluster,
 	nodeSerial int,
 	existingDataSource *corev1.TypedLocalObjectReference,
-) (ctrl.Result, error) {
+) (ctrl.Result, types.UID, error) {
 	var recoverySnapshot *persistentvolumeclaim.StorageSource
 
 	// If the cluster is bootstrapping from recovery, it may do so from:
@@ -1223,11 +1225,11 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil {
 		backup, err := r.getOriginBackup(ctx, cluster)
 		if err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, "", err
 		}
 
 		if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
-			return res, err
+			return res, "", err
 		}
 
 		recoverySnapshot = persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
@@ -1236,22 +1238,23 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 	if err := validateStorageSourceAgreesWithExisting(
 		recoverySnapshot, existingDataSource, cluster.Name, nodeSerial,
 	); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, "", err
 	}
 
 	// Create the PVCs from the cluster definition, and if bootstrapping from
 	// recoverySnapshot, use that as the source
-	if err := persistentvolumeclaim.CreateInstancePVCs(
+	pgDataUID, err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
 		recoverySnapshot,
 		nodeSerial,
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot create primary instance PVCs: %w", err)
+	)
+	if err != nil {
+		return ctrl.Result{}, "", fmt.Errorf("cannot create primary instance PVCs: %w", err)
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, pgDataUID, nil
 }
 
 // validateStorageSourceAgreesWithExisting fails cleanly instead of recreating
@@ -1367,18 +1370,28 @@ func (r *ClusterReconciler) resolvePrimaryBootstrapInstruction(
 // buildBootstrapInstancePod builds the steady-state instance Pod and applies the
 // bootstrap overlay, producing a Pod that initializes its own data directory
 // in-process before starting PostgreSQL.
+//
+// pvcUID is the UID of the PGDATA PVC this Pod will bootstrap (see
+// bootstrap.MarkerIdentity.PVCUID). It must not be empty: every caller creates
+// or reads that PVC before building the Pod.
 func (r *ClusterReconciler) buildBootstrapInstancePod(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	nodeSerial int,
+	pvcUID types.UID,
 	instruction specs.BootstrapInstruction,
 ) (*corev1.Pod, error) {
+	if pvcUID == "" {
+		return nil, fmt.Errorf("cannot build the bootstrapping pod for instance %v: empty PGDATA PVC UID",
+			specs.GetInstanceName(cluster.Name, nodeSerial))
+	}
+
 	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial, true)
 	if err != nil {
 		return nil, fmt.Errorf("while building the instance pod: %w", err)
 	}
 
-	if err := specs.ApplyBootstrapOverlay(pod, instruction); err != nil {
+	if err := specs.ApplyBootstrapOverlay(pod, instruction, pvcUID); err != nil {
 		return nil, fmt.Errorf("while applying the bootstrap overlay: %w", err)
 	}
 
@@ -1496,17 +1509,18 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	// Create the PVCs before the Pod: the Pod always needs its volumes, and
 	// creating them first removes the need to adopt a previously created Job.
-	if err := persistentvolumeclaim.CreateInstancePVCs(
+	pgDataUID, err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
 		storageSource,
 		nodeSerial,
-	); err != nil {
+	)
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot create replica instance PVCs: %w", err)
 	}
 
-	pod, err := r.buildBootstrapInstancePod(ctx, cluster, nodeSerial, instruction)
+	pod, err := r.buildBootstrapInstancePod(ctx, cluster, nodeSerial, pgDataUID, instruction)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1554,16 +1568,19 @@ func (r *ClusterReconciler) recreateReplicaBootstrapPod(
 	cluster *apiv1.Cluster,
 	serial int,
 	pgdataDataSource *corev1.TypedLocalObjectReference,
+	pgdataPVCUID types.UID,
 	pvcGroupComplete bool,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	if !pvcGroupComplete {
 		pgdataDataSource = nil
-		if err := persistentvolumeclaim.CreateInstancePVCs(ctx, r.Client, cluster, nil, serial); err != nil {
+		uid, err := persistentvolumeclaim.CreateInstancePVCs(ctx, r.Client, cluster, nil, serial)
+		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot recreate the missing PVCs of instance %v: %w",
 				specs.GetInstanceName(cluster.Name, serial), err)
 		}
+		pgdataPVCUID = uid
 	}
 
 	instruction := specs.NewJoinInstruction(*cluster)
@@ -1571,7 +1588,7 @@ func (r *ClusterReconciler) recreateReplicaBootstrapPod(
 		instruction = specs.NewRestoreSnapshotReplicaInstruction(*cluster)
 	}
 
-	pod, err := r.buildBootstrapInstancePod(ctx, cluster, serial, instruction)
+	pod, err := r.buildBootstrapInstancePod(ctx, cluster, serial, pgdataPVCUID, instruction)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1805,10 +1822,12 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 	}
 
 	var pgdataDataSource *corev1.TypedLocalObjectReference
+	var pgdataPVCUID types.UID
 	isPrimaryPVC := false
 	for _, pvc := range persistentvolumeclaim.FilterByPodSpec(resources.pvcs.Items, instanceToCreate.Spec) {
 		if pvc.Name == instanceToCreate.Name {
 			pgdataDataSource = pvc.Spec.DataSource
+			pgdataPVCUID = pvc.UID
 			isPrimaryPVC = specs.IsPrimary(pvc.ObjectMeta)
 		}
 	}
@@ -1839,7 +1858,7 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 	// bootstrapping Pod there.
 	isPrimary := instanceToCreate.Name == cluster.Status.TargetPrimary || isPrimaryPVC
 	if !isPrimary {
-		return r.recreateReplicaBootstrapPod(ctx, cluster, serial, pgdataDataSource, pvcGroupComplete)
+		return r.recreateReplicaBootstrapPod(ctx, cluster, serial, pgdataDataSource, pgdataPVCUID, pvcGroupComplete)
 	}
 
 	// A previous attempt may have been interrupted while creating the PVC
@@ -1850,9 +1869,11 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 	// PGDATA actually holds, or the sibling PVC would be recreated from a
 	// different snapshot than the one already restored.
 	if !pvcGroupComplete {
-		if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, serial, pgdataDataSource); !res.IsZero() || err != nil {
+		res, uid, err := r.ensurePrimaryInstancePVCs(ctx, cluster, serial, pgdataDataSource)
+		if !res.IsZero() || err != nil {
 			return res, err
 		}
+		pgdataPVCUID = uid
 	}
 
 	// Set TargetPrimary defensively: if it is not set the instance manager would
@@ -1868,7 +1889,7 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 		return ctrl.Result{}, err
 	}
 
-	pod, err := r.buildBootstrapInstancePod(ctx, cluster, serial, instruction)
+	pod, err := r.buildBootstrapInstancePod(ctx, cluster, serial, pgdataPVCUID, instruction)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

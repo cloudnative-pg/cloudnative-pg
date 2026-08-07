@@ -82,6 +82,10 @@ type InitInfo struct {
 	// The current node, used to fill application_name
 	PodName string
 
+	// PVCUID is the UID of the PGDATA PVC this instance is bootstrapping,
+	// carried into the completion marker identity
+	PVCUID string
+
 	// The cluster name to assign to
 	ClusterName string
 

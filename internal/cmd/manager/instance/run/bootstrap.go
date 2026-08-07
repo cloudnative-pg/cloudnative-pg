@@ -44,7 +44,8 @@ import (
 // are the same the bootstrap Job builders used to emit, so the operator can
 // hand them over verbatim. They are inert unless --bootstrap-mode is set.
 type bootstrapOptions struct {
-	mode string
+	mode   string
+	pvcUID string
 
 	pgWal                            string
 	parentNode                       string
@@ -65,6 +66,8 @@ type bootstrapOptions struct {
 func (o *bootstrapOptions) registerFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.mode, "bootstrap-mode", "",
 		"The bootstrap method to initialize an uninitialized data directory before starting PostgreSQL")
+	cmd.Flags().StringVar(&o.pvcUID, "bootstrap-pvc-uid", "",
+		"The UID of the PGDATA PVC this instance is bootstrapping")
 	cmd.Flags().StringVar(&o.pgWal, "pg-wal", "", "The PGWAL to be created during bootstrap")
 	cmd.Flags().StringVar(&o.parentNode, "parent-node", "", "The origin node")
 	cmd.Flags().StringVar(&o.appDBName, "app-db-name", "",
@@ -149,6 +152,7 @@ func (o *bootstrapOptions) initInfo(
 		PgData:                           pgData,
 		PgWal:                            o.pgWal,
 		PodName:                          podName,
+		PVCUID:                           o.pvcUID,
 		ClusterName:                      clusterName,
 		Namespace:                        namespace,
 		ParentNode:                       o.parentNode,
@@ -212,6 +216,7 @@ func runBootstrap(
 		ClusterName: info.ClusterName,
 		ClusterUID:  string(cluster.UID),
 		PodName:     info.PodName,
+		PVCUID:      info.PVCUID,
 	}
 
 	completed, err := bootstrap.IsCompleted(info.PgData, identity)

@@ -64,7 +64,7 @@ var _ = Describe("testing create function", func() {
 
 	Context("when PVC does not exist", func() {
 		It("should create the PVC successfully", func() {
-			err := createIfNotExists(ctx, cli, cluster, cc)
+			_, err := createIfNotExists(ctx, cli, cluster, cc)
 			Expect(err).ToNot(HaveOccurred())
 
 			var expectedPVC corev1.PersistentVolumeClaim
@@ -95,7 +95,7 @@ var _ = Describe("testing create function", func() {
 				}).
 				Build()
 
-			err := createIfNotExists(ctx, cli, cluster, cc)
+			_, err := createIfNotExists(ctx, cli, cluster, cc)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -117,14 +117,14 @@ var _ = Describe("testing create function", func() {
 				Build()
 			Expect(cli.Delete(ctx, terminating)).To(Succeed())
 
-			err := createIfNotExists(ctx, cli, cluster, cc)
+			_, err := createIfNotExists(ctx, cli, cluster, cc)
 			Expect(err).To(Equal(utils.ErrNextLoop))
 		})
 	})
 
 	It("should return ErrNextLoop on invalid size", func() {
 		cc.Storage.Size = "typo"
-		err := createIfNotExists(ctx, cli, cluster, cc)
+		_, err := createIfNotExists(ctx, cli, cluster, cc)
 		Expect(err).To(Equal(utils.ErrNextLoop))
 	})
 })

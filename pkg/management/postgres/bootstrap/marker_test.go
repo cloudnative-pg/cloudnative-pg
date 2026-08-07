@@ -40,6 +40,7 @@ var _ = Describe("bootstrap completion marker", func() {
 		ClusterName: "cluster-example",
 		ClusterUID:  "11111111-1111-1111-1111-111111111111",
 		PodName:     "cluster-example-1",
+		PVCUID:      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 	}
 
 	BeforeEach(func() {
@@ -94,18 +95,30 @@ var _ = Describe("bootstrap completion marker", func() {
 			ClusterName: identity.ClusterName,
 			ClusterUID:  identity.ClusterUID,
 			PodName:     "cluster-example-2",
+			PVCUID:      identity.PVCUID,
 		}),
 		Entry("different cluster UID, same name and namespace (in-place recreation)", MarkerIdentity{
 			Namespace:   identity.Namespace,
 			ClusterName: identity.ClusterName,
 			ClusterUID:  "22222222-2222-2222-2222-222222222222",
 			PodName:     identity.PodName,
+			PVCUID:      identity.PVCUID,
 		}),
 		Entry("different namespace", MarkerIdentity{
 			Namespace:   "other",
 			ClusterName: identity.ClusterName,
 			ClusterUID:  identity.ClusterUID,
 			PodName:     identity.PodName,
+			PVCUID:      identity.PVCUID,
+		}),
+		Entry("same namespace, cluster, cluster UID and pod name, different PVC UID "+
+			"(replica re-created after a scale-down/scale-up freed and reused its serial, "+
+			"cloned from a volume snapshot of the previous same-named instance)", MarkerIdentity{
+			Namespace:   identity.Namespace,
+			ClusterName: identity.ClusterName,
+			ClusterUID:  identity.ClusterUID,
+			PodName:     identity.PodName,
+			PVCUID:      "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
 		}),
 	)
 
@@ -141,6 +154,7 @@ var _ = Describe("bootstrap failure marker", func() {
 		ClusterName: "cluster-example",
 		ClusterUID:  "11111111-1111-1111-1111-111111111111",
 		PodName:     "cluster-example-1",
+		PVCUID:      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 	}
 
 	BeforeEach(func() {
@@ -193,12 +207,23 @@ var _ = Describe("bootstrap failure marker", func() {
 			ClusterName: "cluster-example",
 			ClusterUID:  "11111111-1111-1111-1111-111111111111",
 			PodName:     "cluster-example-2",
+			PVCUID:      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 		}),
 		Entry("different cluster UID (in-place recreation)", MarkerIdentity{
 			Namespace:   "default",
 			ClusterName: "cluster-example",
 			ClusterUID:  "22222222-2222-2222-2222-222222222222",
 			PodName:     "cluster-example-1",
+			PVCUID:      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		}),
+		Entry("same namespace, cluster, cluster UID and pod name, different PVC UID "+
+			"(replica re-created after a scale-down/scale-up freed and reused its serial, "+
+			"cloned from a volume snapshot of the previous same-named instance)", MarkerIdentity{
+			Namespace:   "default",
+			ClusterName: "cluster-example",
+			ClusterUID:  "11111111-1111-1111-1111-111111111111",
+			PodName:     "cluster-example-1",
+			PVCUID:      "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
 		}),
 	)
 
