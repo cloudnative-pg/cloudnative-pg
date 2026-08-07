@@ -27,15 +27,30 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
+)
+
+const (
+	// cloneRetryMaxAttempts bounds how many times a live-server clone
+	// (join/pgbasebackup) is retried before the instance parks. It mirrors the
+	// default backoff limit the bootstrap Job used to carry, so a clone racing a
+	// primary restart or switchover keeps the same tolerance it had before.
+	cloneRetryMaxAttempts = 6
+
+	// cloneRetryBackoffStep is the initial wait between clone retries, doubling
+	// on each subsequent attempt up to cloneRetryBackoffMax.
+	cloneRetryBackoffStep = 10 * time.Second
+	cloneRetryBackoffMax  = 30 * time.Second
 )
 
 // Mode is the bootstrap method used to initialize a PostgreSQL data directory.
@@ -58,15 +73,30 @@ const (
 	ModeRestoreSnapshot Mode = "restoresnapshot"
 )
 
-// ClonesFromLiveServer reports whether the mode initializes PGDATA by cloning a
+// clonesFromLiveServer reports whether the mode initializes PGDATA by cloning a
 // live PostgreSQL server with pg_basebackup (a replica joining its primary, or a
 // bootstrap from an external cluster). Such a source can be transiently
 // unavailable, for example while the primary is restarting or switching over, so
 // these modes warrant a bounded retry instead of parking on the first failure.
 // The other modes (initdb, restore from a backup, restore from a snapshot) fail
 // deterministically and are not retried.
-func (m Mode) ClonesFromLiveServer() bool {
+func (m Mode) clonesFromLiveServer() bool {
 	return m == ModeJoin || m == ModePgBaseBackup
+}
+
+// RetryBackoff returns the backoff Execute should be retried with when it fails
+// for this mode. A live-server clone (join/pgbasebackup) gets a bounded retry;
+// every other mode fails deterministically and gets a single attempt.
+func (m Mode) RetryBackoff() wait.Backoff {
+	if !m.clonesFromLiveServer() {
+		return wait.Backoff{Steps: 1}
+	}
+	return wait.Backoff{
+		Duration: cloneRetryBackoffStep,
+		Factor:   2,
+		Cap:      cloneRetryBackoffMax,
+		Steps:    cloneRetryMaxAttempts,
+	}
 }
 
 // Instruction describes how the instance manager must bootstrap a data directory.

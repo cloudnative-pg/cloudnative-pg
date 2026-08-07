@@ -24,11 +24,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -37,19 +37,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/bootstrap"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
-)
-
-const (
-	// bootstrapCloneMaxAttempts bounds how many times a live-server clone
-	// (join/pgbasebackup) is retried before the instance parks. It mirrors the
-	// default backoff limit the bootstrap Job used to carry, so a clone racing a
-	// primary restart or switchover keeps the same tolerance it had before.
-	bootstrapCloneMaxAttempts = 6
-
-	// bootstrapCloneRetryBackoffStep is multiplied by the attempt number, capped
-	// at bootstrapCloneRetryBackoffMax, for the wait between clone retries.
-	bootstrapCloneRetryBackoffStep = 10 * time.Second
-	bootstrapCloneRetryBackoffMax  = 30 * time.Second
 )
 
 // bootstrapOptions collects the run flags that describe how to initialize an
@@ -298,30 +285,22 @@ func runBootstrap(
 	// restarting or switching over, so it gets a bounded retry; every other mode
 	// fails deterministically and is attempted once. Each Execute re-runs
 	// EnsureTargetDirectoriesDoNotExist, so a retry starts from a clean PGDATA.
-	maxAttempts := 1
-	if instruction.Mode.ClonesFromLiveServer() {
-		maxAttempts = bootstrapCloneMaxAttempts
-	}
-
-	var bootErr error
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		if bootErr = bootstrap.Execute(ctx, cli, instance, info, instruction); bootErr == nil {
-			break
+	bootErr := retry.OnError(instruction.Mode.RetryBackoff(), func(_ error) bool {
+		// Every attempt failure is retryable; only ctx cancellation stops the
+		// retries early, before the backoff's Steps are exhausted.
+		return ctx.Err() == nil
+	}, func() error {
+		err := bootstrap.Execute(ctx, cli, instance, info, instruction)
+		if err != nil {
+			contextLogger.Warning("In-process bootstrap attempt failed",
+				"mode", instruction.Mode, "error", err.Error())
 		}
-		if attempt == maxAttempts {
-			break
-		}
-		backoff := min(time.Duration(attempt)*bootstrapCloneRetryBackoffStep, bootstrapCloneRetryBackoffMax)
-		contextLogger.Warning("In-process bootstrap attempt failed, retrying",
-			"mode", instruction.Mode, "attempt", attempt, "maxAttempts", maxAttempts,
-			"backoff", backoff, "error", bootErr.Error())
-		select {
-		case <-ctx.Done():
-			stopServers()
-			wg.Wait()
-			return ctx.Err()
-		case <-time.After(backoff):
-		}
+		return err
+	})
+	if bootErr != nil && ctx.Err() != nil {
+		stopServers()
+		wg.Wait()
+		return ctx.Err()
 	}
 
 	if bootErr != nil {
