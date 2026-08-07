@@ -73,22 +73,15 @@ const (
 	ModeRestoreSnapshot Mode = "restoresnapshot"
 )
 
-// clonesFromLiveServer reports whether the mode initializes PGDATA by cloning a
-// live PostgreSQL server with pg_basebackup (a replica joining its primary, or a
-// bootstrap from an external cluster). Such a source can be transiently
-// unavailable, for example while the primary is restarting or switching over, so
-// these modes warrant a bounded retry instead of parking on the first failure.
-// The other modes (initdb, restore from a backup, restore from a snapshot) fail
-// deterministically and are not retried.
-func (m Mode) clonesFromLiveServer() bool {
-	return m == ModeJoin || m == ModePgBaseBackup
-}
-
 // RetryBackoff returns the backoff Execute should be retried with when it fails
-// for this mode. A live-server clone (join/pgbasebackup) gets a bounded retry;
-// every other mode fails deterministically and gets a single attempt.
+// for this mode. A mode that clones a live PostgreSQL server with
+// pg_basebackup (a replica joining its primary, or a bootstrap from an
+// external cluster) gets a bounded retry: such a source can be transiently
+// unavailable, for example while the primary is restarting or switching over.
+// Every other mode (initdb, restore from a backup, restore from a snapshot)
+// fails deterministically and gets a single attempt.
 func (m Mode) RetryBackoff() wait.Backoff {
-	if !m.clonesFromLiveServer() {
+	if m != ModeJoin && m != ModePgBaseBackup {
 		return wait.Backoff{Steps: 1}
 	}
 	return wait.Backoff{
