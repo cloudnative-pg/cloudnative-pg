@@ -230,14 +230,14 @@ func runBootstrap(
 
 	// A bootstrap failure is deterministic, so the instance uses exactly one
 	// attempt: if an earlier attempt already failed, park instead of retrying.
-	failed, err := bootstrap.HasFailed(info.PgData, identity)
+	failure, err := bootstrap.LoadFailure(info.PgData, identity)
 	if err != nil {
 		return fmt.Errorf("while checking the bootstrap failure marker: %w", err)
 	}
-	if failed {
+	if failure != nil {
 		contextLogger.Error(nil, "Instance bootstrap failed on an earlier attempt; "+
 			"parking the instance instead of retrying", "mode", instruction.Mode)
-		return parkFailedBootstrap(ctx, cli, instance, info.PgData, identity)
+		return parkFailedBootstrap(ctx, cli, instance, failure)
 	}
 
 	contextLogger.Info("Starting in-process bootstrap", "mode", instruction.Mode)
@@ -368,8 +368,7 @@ func parkFailedBootstrap(
 	ctx context.Context,
 	cli client.Client,
 	instance *postgres.Instance,
-	pgData string,
-	identity bootstrap.MarkerIdentity,
+	failure *postgres.BootstrapFailure,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -377,19 +376,6 @@ func parkFailedBootstrap(
 		if err := loadServerCertificate(ctx, cli, instance); err != nil {
 			return err
 		}
-	}
-
-	// Recover the mode and reason recorded at failure so the status endpoint can
-	// report why the instance parked. HasFailed already confirmed this marker
-	// exists, parses, and matches identity, so a missing result here means the
-	// marker was removed or corrupted concurrently: an inconsistency worth
-	// surfacing rather than parking silently with no reason.
-	failure, err := bootstrap.LoadFailure(pgData, identity)
-	if err != nil {
-		return fmt.Errorf("while loading the bootstrap failure marker for the parked instance: %w", err)
-	}
-	if failure == nil {
-		return fmt.Errorf("bootstrap failure marker for %s vanished after being detected", pgData)
 	}
 
 	// Flip the bootstrap failed flag so the status server keeps the startup probe

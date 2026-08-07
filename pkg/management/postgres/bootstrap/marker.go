@@ -172,32 +172,12 @@ func failureMarkerPath(pgData string) string {
 	return filepath.Join(pgData, constants.BootstrapFailedFile)
 }
 
-// HasFailed reports whether a previous in-process bootstrap of THIS instance
-// already failed. It returns true only when the failure marker exists, parses,
-// and records exactly the given identity. A missing, unparseable, or
-// foreign-identity marker all mean not failed. Only a genuine I/O error reading
-// the marker is surfaced. Identity scoping mirrors IsCompleted.
-func HasFailed(pgData string, identity MarkerIdentity) (bool, error) {
-	data, err := os.ReadFile(failureMarkerPath(pgData)) // #nosec G304 -- path is PGDATA, controlled by the operator
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("while reading the bootstrap failure marker: %w", err)
-	}
-
-	var marker failureMarker
-	if err := json.Unmarshal(data, &marker); err != nil {
-		return false, nil
-	}
-
-	return marker.Identity == identity, nil
-}
-
 // LoadFailure returns the mode and reason recorded by a previous failed
 // bootstrap of THIS instance, so a restarted, parked instance can report why it
-// failed. It returns a nil result when there is no matching failure marker;
-// identity scoping mirrors HasFailed.
+// failed. It returns a nil result when there is no matching failure marker: a
+// missing, unparseable, or foreign-identity marker all mean not failed. Only a
+// genuine I/O error reading the marker is surfaced. Identity scoping mirrors
+// IsCompleted.
 func LoadFailure(pgData string, identity MarkerIdentity) (*postgres.BootstrapFailure, error) {
 	data, err := os.ReadFile(failureMarkerPath(pgData)) // #nosec G304 -- path is PGDATA, controlled by the operator
 	if err != nil {

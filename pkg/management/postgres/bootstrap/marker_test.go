@@ -148,7 +148,7 @@ var _ = Describe("bootstrap completion marker", func() {
 var _ = Describe("bootstrap failure marker", func() {
 	var pgData string
 
-	// identity is the instance doing the HasFailed check in every test.
+	// identity is the instance doing the LoadFailure check in every test.
 	identity := MarkerIdentity{
 		Namespace:   "default",
 		ClusterName: "cluster-example",
@@ -162,17 +162,13 @@ var _ = Describe("bootstrap failure marker", func() {
 	})
 
 	It("reports not failed on a fresh data directory", func() {
-		failed, err := HasFailed(pgData, identity)
+		failure, err := LoadFailure(pgData, identity)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(failed).To(BeFalse())
+		Expect(failure).To(BeNil())
 	})
 
 	It("writes a marker the same instance then detects, recording mode and reason", func() {
 		Expect(WriteFailedMarker(pgData, ModeJoin, identity, "primary unreachable")).To(Succeed())
-
-		failed, err := HasFailed(pgData, identity)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(failed).To(BeTrue())
 
 		failure, err := LoadFailure(pgData, identity)
 		Expect(err).ToNot(HaveOccurred())
@@ -193,10 +189,6 @@ var _ = Describe("bootstrap failure marker", func() {
 	DescribeTable("reports not failed when the marker belongs to another instance",
 		func(author MarkerIdentity) {
 			Expect(WriteFailedMarker(pgData, ModeRestoreSnapshot, author, "boom")).To(Succeed())
-
-			failed, err := HasFailed(pgData, identity)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(failed).To(BeFalse())
 
 			failure, err := LoadFailure(pgData, identity)
 			Expect(err).ToNot(HaveOccurred())
@@ -233,8 +225,8 @@ var _ = Describe("bootstrap failure marker", func() {
 			[]byte("this is not json"), 0o600),
 		).To(Succeed())
 
-		failed, err := HasFailed(pgData, identity)
+		failure, err := LoadFailure(pgData, identity)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(failed).To(BeFalse())
+		Expect(failure).To(BeNil())
 	})
 })
