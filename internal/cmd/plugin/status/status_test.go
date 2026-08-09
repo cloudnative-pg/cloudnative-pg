@@ -24,6 +24,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -110,5 +111,132 @@ var _ = Describe("getWalArchivingStatus", func() {
 		// Even if archiving is working, disabled should take precedence
 		result := getWalArchivingStatus(true, "", true)
 		Expect(result).To(ContainSubstring("Disabled"))
+	})
+})
+
+var _ = Describe("hasContinuousBackupConfigured", func() {
+	It("returns false when neither backup nor WAL archiver plugin is configured", func() {
+		cluster := &apiv1.Cluster{}
+		Expect(hasContinuousBackupConfigured(cluster)).To(BeFalse())
+	})
+
+	It("returns true when native .spec.backup is set", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{},
+			},
+		}
+		Expect(hasContinuousBackupConfigured(cluster)).To(BeTrue())
+	})
+
+	It("returns true when the barman-cloud plugin is enabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{Name: "barman-cloud.cloudnative-pg.io"},
+				},
+			},
+		}
+		Expect(hasContinuousBackupConfigured(cluster)).To(BeTrue())
+	})
+
+	It("returns true when a third-party WAL archiver plugin is enabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{
+						Name:          "wal-archiver.example.com",
+						Enabled:       ptr.To(true),
+						IsWALArchiver: ptr.To(true),
+					},
+				},
+			},
+		}
+		Expect(hasContinuousBackupConfigured(cluster)).To(BeTrue())
+		Expect(cluster.GetEnabledWALArchivePluginName()).To(Equal("wal-archiver.example.com"))
+	})
+
+	It("returns false when a plugin is present but is not a WAL archiver", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{
+						Name:          "wal-archiver.example.com",
+						Enabled:       ptr.To(true),
+						IsWALArchiver: ptr.To(false),
+					},
+				},
+			},
+		}
+		Expect(hasContinuousBackupConfigured(cluster)).To(BeFalse())
+	})
+
+	It("returns false for a nil cluster", func() {
+		Expect(hasContinuousBackupConfigured(nil)).To(BeFalse())
+	})
+})
+
+var _ = Describe("getPluginStatusByName", func() {
+	It("returns the reported status for a matching plugin", func() {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				PluginStatus: []apiv1.PluginStatus{
+					{Name: "wal-archiver.example.com", Status: `{"ok":true}`},
+				},
+			},
+		}
+		Expect(getPluginStatusByName(cluster, "wal-archiver.example.com")).To(Equal(`{"ok":true}`))
+	})
+
+	It("returns an empty string when the plugin has no status", func() {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				PluginStatus: []apiv1.PluginStatus{
+					{Name: "wal-archiver.example.com"},
+				},
+			},
+		}
+		Expect(getPluginStatusByName(cluster, "wal-archiver.example.com")).To(Equal(""))
+	})
+
+	It("returns an empty string when the plugin is not present", func() {
+		cluster := &apiv1.Cluster{}
+		Expect(getPluginStatusByName(cluster, "missing")).To(Equal(""))
+	})
+})
+
+var _ = Describe("isBarmanCloudPluginEnabled", func() {
+	It("returns true and parameters when the plugin is enabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{
+						Name: "barman-cloud.cloudnative-pg.io",
+						Parameters: map[string]string{
+							"barmanObjectName": "minio-store",
+						},
+					},
+				},
+			},
+		}
+		enabled, params := isBarmanCloudPluginEnabled(cluster)
+		Expect(enabled).To(BeTrue())
+		Expect(params["barmanObjectName"]).To(Equal("minio-store"))
+	})
+
+	It("returns false when the plugin is explicitly disabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{
+					{
+						Name:    "barman-cloud.cloudnative-pg.io",
+						Enabled: ptr.To(false),
+					},
+				},
+			},
+		}
+		enabled, params := isBarmanCloudPluginEnabled(cluster)
+		Expect(enabled).To(BeFalse())
+		Expect(params).To(BeNil())
 	})
 })

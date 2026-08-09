@@ -524,18 +524,22 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	cluster := fullStatus.Cluster
 
-	// Check if Barman Cloud plugin is configured
 	isBarmanPluginEnabled, pluginParams := isBarmanCloudPluginEnabled(cluster)
+	walArchiverPluginName := cluster.GetEnabledWALArchivePluginName()
+
+	if !hasContinuousBackupConfigured(cluster) {
+		fmt.Println(aurora.Yellow("Continuous Backup not configured"))
+		fmt.Println()
+		return
+	}
 
 	switch {
 	case isBarmanPluginEnabled:
 		fmt.Println(aurora.Green("Continuous Backup status (Barman Cloud Plugin)"))
-	case cluster.Spec.Backup != nil:
-		fmt.Println(aurora.Green("Continuous Backup status"))
+	case walArchiverPluginName != "":
+		fmt.Println(aurora.Green(fmt.Sprintf("Continuous Backup status (%s)", walArchiverPluginName)))
 	default:
-		fmt.Println(aurora.Yellow("Continuous Backup not configured"))
-		fmt.Println()
-		return
+		fmt.Println(aurora.Green("Continuous Backup status"))
 	}
 
 	status := tabby.New()
@@ -560,6 +564,11 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		}
 
 		fullStatus.printBarmanObjectStoreStatus(status, objectStore, pluginParams)
+	} else if walArchiverPluginName != "" {
+		status.AddLine("WAL archiver plugin:", walArchiverPluginName)
+		if pluginStatus := getPluginStatusByName(cluster, walArchiverPluginName); pluginStatus != "" {
+			status.AddLine("Plugin status:", pluginStatus)
+		}
 	} else if cluster.Spec.Backup != nil {
 		// FirstRecoverabilityPoint is deprecated and will be removed together
 		// with native Barman Cloud support. It is only shown when the backup
@@ -621,6 +630,33 @@ func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, map[string]string
 		}
 	}
 	return false, nil
+}
+
+// getPluginStatusByName returns the status string reported by the plugin via SetStatusInCluster,
+// or an empty string when the plugin did not report any status.
+func getPluginStatusByName(cluster *apiv1.Cluster, pluginName string) string {
+	for _, plg := range cluster.Status.PluginStatus {
+		if plg.Name == pluginName {
+			return plg.Status
+		}
+	}
+	return ""
+}
+
+// hasContinuousBackupConfigured reports whether continuous backup is configured either
+// via a native .spec.backup section or via an enabled CNPG-I WAL archiver plugin.
+func hasContinuousBackupConfigured(cluster *apiv1.Cluster) bool {
+	if cluster == nil {
+		return false
+	}
+	isBarmanPluginEnabled, _ := isBarmanCloudPluginEnabled(cluster)
+	if isBarmanPluginEnabled {
+		return true
+	}
+	if cluster.GetEnabledWALArchivePluginName() != "" {
+		return true
+	}
+	return cluster.Spec.Backup != nil
 }
 
 // printWALArchivingStatus prints the WAL archiving status to the provided tabby table
