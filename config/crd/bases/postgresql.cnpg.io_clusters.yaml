@@ -2147,6 +2147,64 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              dnsConfig:
+                description: |-
+                  DNSConfig specifies the DNS parameters of every generated Pod. Parameters
+                  given here are merged with the base configuration generated from DNSPolicy.
+                  More info:
+                  https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-config
+                properties:
+                  nameservers:
+                    description: |-
+                      A list of DNS name server IP addresses.
+                      This will be appended to the base nameservers generated from DNSPolicy.
+                      Duplicated nameservers will be removed.
+                    items:
+                      type: string
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  options:
+                    description: |-
+                      A list of DNS resolver options.
+                      This will be merged with the base options generated from DNSPolicy.
+                      Duplicated entries will be removed. Resolution options given in Options
+                      will override those that appear in the base DNSPolicy.
+                    items:
+                      description: PodDNSConfigOption defines DNS resolver options
+                        of a pod.
+                      properties:
+                        name:
+                          description: |-
+                            Name is this DNS resolver option's name.
+                            Required.
+                          type: string
+                        value:
+                          description: Value is this DNS resolver option's value.
+                          type: string
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  searches:
+                    description: |-
+                      A list of DNS search domains for host-name lookup.
+                      This will be appended to the base search paths generated from DNSPolicy.
+                      Duplicated search paths will be removed.
+                    items:
+                      type: string
+                    type: array
+                    x-kubernetes-list-type: atomic
+                type: object
+              dnsPolicy:
+                description: |-
+                  DNSPolicy sets the DNS policy for every generated Pod. Defaults to the
+                  Kubernetes default ("ClusterFirst") when not specified. More info:
+                  https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
+                enum:
+                - ClusterFirstWithHostNet
+                - ClusterFirst
+                - Default
+                - None
+                type: string
               enablePDB:
                 default: true
                 description: |-
