@@ -93,6 +93,67 @@ function version_gte() {
   [[ "$(printf '%s\n' "$threshold" "$version" | sort -V | head -n1)" == "$threshold" ]]
 }
 
+# wait_for_all_nodes: waits until every expected node has registered with the
+# API server. The expected count is derived from $NODES, mirroring the
+# create_cluster_kind/create_cluster_k3d formula: worker/agent nodes join the
+# control plane asynchronously, so `kind create cluster` / `k3d cluster
+# create` returning is no guarantee that every Node object exists yet. Callers
+# that need to operate on the complete node set (e.g.
+# label_failure_domain_topology) must call this first.
+function wait_for_all_nodes() {
+    # shellcheck disable=SC2153 # NODES is set by the caller (kind/k3d setup.sh) before sourcing this file
+    local expected_nodes=$(( NODES > 1 ? NODES + 1 : 1 ))
+
+    local iter=0
+    while [[ "$(${K8S_CLI} get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')" -lt "${expected_nodes}" ]]; do
+        if [[ $iter -ge 120 ]]; then
+            # this runs on every cluster creation, so it must not be the reason
+            # a test run never starts: the tests needing every node say so
+            echo "WARNING: timed out waiting for ${expected_nodes} nodes to register, continuing" >&2
+            break
+        fi
+        sleep 1
+        ((++iter))
+    done
+}
+
+# label_failure_domain_topology: labels every node with
+# topology.kubernetes.io/region (fixed to "cnpg") and topology.kubernetes.io/zone
+# (az-<N>, where N is the trailing number in the node's name -- e.g.
+# "...-worker3" becomes az-3 -- and defaults to 1 for a node name with no
+# trailing number, such as the control-plane or the first worker), so that
+# CloudNativePG's failure domain-aware synchronous replication
+# (nodeFailureDomainKeys/podFailureDomainKeys) has real, node-distinct
+# topology labels to read on a local kind/k3d cluster -- neither engine sets
+# these by default. Only sets a label when it isn't already present, so a
+# node that genuinely carries real topology labels (e.g. a non-local engine)
+# is left untouched. Assumes every node is already registered; call
+# wait_for_all_nodes first.
+function label_failure_domain_topology() {
+    local region="cnpg"
+
+    local node
+    while IFS= read -r node; do
+        local seq=1
+        if [[ "${node}" =~ ([0-9]+)$ ]]; then
+            seq="${BASH_REMATCH[1]}"
+        fi
+        local zone="az-${seq}"
+
+        if [[ -z "$(${K8S_CLI} get node "${node}" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/region}')" ]]; then
+            ${K8S_CLI} label node "${node}" "topology.kubernetes.io/region=${region}"
+        fi
+        if [[ -z "$(${K8S_CLI} get node "${node}" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}')" ]]; then
+            ${K8S_CLI} label node "${node}" "topology.kubernetes.io/zone=${zone}"
+        fi
+    # A trailing newline after every name (rather than joining with spaces
+    # and translating) matters here: `while read` silently drops the last
+    # line of input when it isn't newline-terminated, which would otherwise
+    # skip the last node returned by the list -- deterministically, not just
+    # under a registration race.
+    done < <(${K8S_CLI} get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+}
+
 # get_default_storage_class detects the default K8s storage class
 function get_default_storage_class() {
     ${K8S_CLI} get storageclass -o json | jq -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)'
