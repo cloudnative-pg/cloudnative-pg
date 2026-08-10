@@ -192,6 +192,7 @@ main() {
   echo -e "${bright}Running Kind setup: Creating cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 
   create_cluster_kind "${K8S_VERSION}" "${CLUSTER_NAME}"
+  wait_for_all_nodes
   label_failure_domain_topology "${CLUSTER_NAME}"
 
   # Support for docker:dind service

@@ -7,7 +7,7 @@ spec:
 
   postgresql:
     synchronous:
-      nodeFailureDomainKeys:
+      podFailureDomainKeys:
       - topology.kubernetes.io/zone
       method: first
       number: 2
