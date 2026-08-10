@@ -508,11 +508,17 @@ setup. If you are on Kubernetes 1.34 or older, or the
 
 CloudNativePG applies the failure domain constraint only when there are
 enough cross-domain standbys to satisfy it completely: the full configured
-`number` with `required` data durability, or just one with `preferred`
-(which, as ["Preferred Data Durability"](#preferred-data-durability) covers,
-already caps the required count to the healthy replicas). When that holds,
-only the standbys outside the primary's failure domain populate
+`number` with `required` data durability, or just one with `preferred`. When
+that holds, only the standbys outside the primary's failure domain populate
 `synchronous_standby_names`.
+
+With `preferred` data durability this means the placement preference can lower
+the number of required acknowledgments: as ["Preferred Data
+Durability"](#preferred-data-durability) covers, that number is capped to the
+standbys in the list, so a single cross-domain standby out of two healthy
+replicas results in one required acknowledgment instead of the two a cluster
+without failure domain keys would ask for. Writes are never blocked, but the
+durability of each commit follows the failure domain distribution.
 
 If that isn't the case (too few cross-domain standbys, or the topology could
 not be extracted, for example because the node hosting a pod was deleted, or

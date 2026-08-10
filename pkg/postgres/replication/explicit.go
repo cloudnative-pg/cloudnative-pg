@@ -121,10 +121,11 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(
 // primary has no topology entry, or there are not enough cross-domain
 // instances to satisfy the configured number of synchronous standbys, the
 // original list is returned unchanged: the keys express a placement
-// preference and never degrade synchronous replication below the behavior of
-// a cluster without them. In particular, with required data durability a
-// filtered list shorter than the configured number would leave transactions
-// waiting for acknowledgments that can never arrive.
+// preference, and with required data durability a filtered list shorter than
+// the configured number would leave transactions waiting for acknowledgments
+// that can never arrive. With preferred data durability the filtering can
+// still lower the number of required acknowledgments, down to the number of
+// cross-domain standbys available.
 func filterCrossDomainInstances(cluster *apiv1.Cluster, instances []string) []string {
 	crossDomain, ok := crossDomainInstances(cluster, instances)
 	if !ok || len(crossDomain) < minimumCrossDomainStandbys(cluster) {
