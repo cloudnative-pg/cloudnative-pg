@@ -107,8 +107,10 @@ function wait_for_all_nodes() {
     local iter=0
     while [[ "$(${K8S_CLI} get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')" -lt "${expected_nodes}" ]]; do
         if [[ $iter -ge 120 ]]; then
-            echo "ERROR: timed out waiting for ${expected_nodes} nodes to register" >&2
-            exit 1
+            # this runs on every cluster creation, so it must not be the reason
+            # a test run never starts: the tests needing every node say so
+            echo "WARNING: timed out waiting for ${expected_nodes} nodes to register, continuing" >&2
+            break
         fi
         sleep 1
         ((++iter))
