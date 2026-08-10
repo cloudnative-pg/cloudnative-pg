@@ -409,7 +409,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 		return err
 	}
 
-	cleanupOperatorAndObjectStore := func() error {
+	cleanupOperatorNamespace := func() error {
 		GinkgoWriter.Println("cleaning up")
 		if CurrentSpecReport().Failed() {
 			// Dump the object store namespace when failed
@@ -852,7 +852,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
-			DeferCleanup(cleanupOperatorAndObjectStore)
+			DeferCleanup(cleanupOperatorNamespace)
 
 			By("installing cert-manager and the Barman Cloud plugin", func() {
 				_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
@@ -874,7 +874,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
-			DeferCleanup(cleanupOperatorAndObjectStore)
+			DeferCleanup(cleanupOperatorNamespace)
 
 			By("installing cert-manager and the Barman Cloud plugin", func() {
 				_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
@@ -900,7 +900,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
-			DeferCleanup(cleanupOperatorAndObjectStore)
+			DeferCleanup(cleanupOperatorNamespace)
 
 			By("installing cert-manager and the Barman Cloud plugin", func() {
 				_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
@@ -918,7 +918,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 			})
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
-			DeferCleanup(cleanupOperatorAndObjectStore)
+			DeferCleanup(cleanupOperatorNamespace)
 
 			By("installing cert-manager and the Barman Cloud plugin", func() {
 				_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
