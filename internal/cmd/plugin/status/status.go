@@ -1438,9 +1438,9 @@ func displayFailureDomainValue(value string) string {
 }
 
 // groupInstancesByFailureDomain groups topology instances into failure domain
-// entries ordered by first appearance (sorted instance names within each group).
-// Returns nil when no failure domain keys are configured or topology extraction
-// failed.
+// entries ordered by the rendered domain value (sorted instance names within
+// each group). Returns nil when no failure domain keys are configured or
+// topology extraction failed.
 func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup {
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
 	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
@@ -1508,7 +1508,7 @@ func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup 
 	for i, sig := range groupOrder {
 		result[i] = *groupMap[sig]
 	}
-	sort.Slice(result, func(i, j int) bool {
+	sort.SliceStable(result, func(i, j int) bool {
 		return result[i].display < result[j].display
 	})
 	return result
