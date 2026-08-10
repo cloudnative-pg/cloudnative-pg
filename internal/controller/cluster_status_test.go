@@ -421,6 +421,35 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(state2.IP).To(Equal("192.168.1.2"))
 	})
 
+	// a condition corrected in place has to stay visible to the comparison
+	// deciding whether the status is written
+	It("persists a condition whose text is the only status change", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{}
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionConsistentSystemID),
+			Status:  metav1.ConditionFalse,
+			Reason:  "NotFound",
+			Message: "wording written by another version of the operator",
+		})
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+		// the reported state is the only other field this update writes: an
+		// empty one keeps the condition as the single change
+		cluster.Status.InstancesReportedState = map[apiv1.PodName]apiv1.InstanceReportedState{}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		}, &persisted)).To(Succeed())
+		condition := meta.FindStatusCondition(persisted.Status.Conditions, string(apiv1.ConditionConsistentSystemID))
+		Expect(condition).ToNot(BeNil())
+		Expect(condition.Message).To(Equal("No instances are present in the cluster to report a system ID."))
+	})
+
 	Context("Pod termination reason detection", func() {
 		It("should detect when a pod has no PostgreSQL container", func() {
 			pod := &corev1.Pod{

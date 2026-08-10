@@ -230,7 +230,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 	contextLogger := log.FromContext(ctx)
 	// Retrieve the cluster key
 
-	existingClusterStatus := cluster.Status
+	// meta.SetStatusCondition edits an existing condition in place, so a shallow
+	// copy would carry that edit too and the comparison at the end of this
+	// function would find nothing to persist
+	existingClusterStatus := *cluster.Status.DeepCopy()
 
 	persistentvolumeclaim.EnrichStatus(
 		ctx,
@@ -760,7 +763,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	cluster *apiv1.Cluster,
 	statuses postgres.PostgresqlStatusList,
 ) error {
-	existingClusterStatus := cluster.Status
+	existingClusterStatus := *cluster.Status.DeepCopy()
 	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
 	// we extract the instances reported state
