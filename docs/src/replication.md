@@ -486,11 +486,11 @@ availability zone. The labels that define the failure domains are declared
 through one of the following options of the `.spec.postgresql.synchronous`
 stanza:
 
+- `podFailureDomainKeys`: a list of pod label keys, resolved from the labels of
+  each instance pod, without ever consulting the node
 - `nodeFailureDomainKeys`: a list of node label keys, resolved from the labels
   of the node hosting each instance (for example,
   `topology.kubernetes.io/zone`)
-- `podFailureDomainKeys`: a list of pod label keys, resolved from the labels of
-  each instance pod, without ever consulting the node
 
 The two options are mutually exclusive, and so are the failure domain keys and
 the `syncReplicaElectionConstraint` option of the deprecated API. Two
@@ -529,7 +529,7 @@ spec:
 
   postgresql:
     synchronous:
-      nodeFailureDomainKeys:
+      podFailureDomainKeys:
       - topology.kubernetes.io/zone
       method: first
       number: 2
@@ -541,8 +541,11 @@ spec:
 ::::note[Topology labels on pods]
 Starting from Kubernetes 1.35, the `topology.kubernetes.io/zone` and
 `topology.kubernetes.io/region` labels are automatically copied from the node
-onto each pod at scheduling time, making them natural candidates for
-`podFailureDomainKeys`.
+onto each pod at scheduling time (see
+[KEP-4742](https://github.com/kubernetes/enhancements/issues/4742)), making
+them natural candidates for `podFailureDomainKeys`. If you are on Kubernetes
+1.34 or older, or the `PodTopologyLabelsAdmission` feature is not available or
+enabled, use `nodeFailureDomainKeys` instead.
 ::::
 
 ## Synchronous Replication (Deprecated)

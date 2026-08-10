@@ -255,6 +255,7 @@ Istio's
 JSON
 JefeDavis
 Joda
+KEP
 KV
 Karpenter
 KinD
