@@ -816,6 +816,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// instance Pods, whereas the previous release left it unset. The resulting
 			// spec drift causes a one-time pod rollout when upgrading from the previous
 			// release, which is expected and accepted for this minor version bump.
+			//
+			// Skip aborts the spec immediately, so the namespace cleanup must be
+			// registered beforehand: otherwise the cnpg-system namespace (and its
+			// pull secret) created by the BeforeEach above survives into the next
+			// spec, whose BeforeEach then fails trying to recreate the same secret.
+			DeferCleanup(func() {
+				Expect(namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 60)).
+					To(Succeed())
+			})
 			Skip("one-time pod rollout expected when upgrading from the previous release " +
 				"due to automountServiceAccountToken now being hardcoded to false")
 
