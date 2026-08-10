@@ -93,6 +93,43 @@ function version_gte() {
   [[ "$(printf '%s\n' "$threshold" "$version" | sort -V | head -n1)" == "$threshold" ]]
 }
 
+# label_failure_domain_topology <cluster_name>: labels every node with
+# topology.kubernetes.io/region and topology.kubernetes.io/zone, derived from
+# the cluster name, so that CloudNativePG's failure domain-aware synchronous
+# replication (nodeFailureDomainKeys/podFailureDomainKeys) has real topology
+# labels to read on a local kind/k3d cluster -- neither engine sets these by
+# default. Only sets a label when it isn't already present, so a node that
+# genuinely carries real topology labels (e.g. a non-local engine) is left
+# untouched.
+function label_failure_domain_topology() {
+    local cluster_name="${1:?cluster_name is required}"
+    local region="${cluster_name}"
+    local zone="${region}-1"
+    # shellcheck disable=SC2153 # NODES is set by the caller (kind/k3d setup.sh) before sourcing this file
+    local expected_nodes=$(( NODES > 1 ? NODES + 1 : 1 ))
+
+    # Waits for every expected node to register first
+    local iter=0
+    while [[ "$(${K8S_CLI} get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')" -lt "${expected_nodes}" ]]; do
+        if [[ $iter -ge 120 ]]; then
+            echo "ERROR: timed out waiting for ${expected_nodes} nodes to register" >&2
+            exit 1
+        fi
+        sleep 1
+        ((++iter))
+    done
+
+    local node
+    while IFS= read -r node; do
+        if [[ -z "$(${K8S_CLI} get node "${node}" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/region}')" ]]; then
+            ${K8S_CLI} label node "${node}" "topology.kubernetes.io/region=${region}"
+        fi
+        if [[ -z "$(${K8S_CLI} get node "${node}" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}')" ]]; then
+            ${K8S_CLI} label node "${node}" "topology.kubernetes.io/zone=${zone}"
+        fi
+    done < <(${K8S_CLI} get nodes -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n')
+}
+
 # get_default_storage_class detects the default K8s storage class
 function get_default_storage_class() {
     ${K8S_CLI} get storageclass -o json | jq -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)'
