@@ -193,7 +193,7 @@ main() {
 
   create_cluster_kind "${K8S_VERSION}" "${CLUSTER_NAME}"
   wait_for_all_nodes
-  label_failure_domain_topology "${CLUSTER_NAME}"
+  label_failure_domain_topology
 
   # Support for docker:dind service
   if [ "${DOCKER_HOST:-}" == "tcp://docker:2376" ]; then
