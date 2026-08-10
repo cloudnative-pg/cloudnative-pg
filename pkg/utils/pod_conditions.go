@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package utils
 
 import (
+	"time"
+
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -102,6 +104,16 @@ func IsPodAlive(p corev1.Pod) bool {
 		}
 	}
 	return IsPodActive(p)
+}
+
+// IsPodStuckTerminating reports whether a Pod has been asked to terminate but is
+// still present past its own deletion deadline. The API server sets
+// DeletionTimestamp to the deletion request time plus the termination grace
+// period, so the grace period is already accounted for in the value. A Pod that
+// is still around after that instant has already been given its entire
+// termination budget.
+func IsPodStuckTerminating(pod *corev1.Pod) bool {
+	return pod.DeletionTimestamp != nil && time.Now().After(pod.DeletionTimestamp.Time)
 }
 
 // FilterActivePods returns pods that have not terminated.
