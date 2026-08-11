@@ -160,6 +160,27 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				}
 			})
 
+			By("verifying the schema privileges have been granted in the target database", func() {
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, schemaSpec := range database.Spec.Schemas {
+					if schemaSpec.Permissions == nil {
+						continue
+					}
+					for _, usage := range schemaSpec.Permissions.Usage {
+						Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+							pgasserts.SchemaPrivilegeQuery(usage.Name, schemaSpec.Name, "USAGE"), pgasserts.BoolPGOutput(true)),
+							30).Should(Succeed())
+					}
+					for _, create := range schemaSpec.Permissions.Create {
+						Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+							pgasserts.SchemaPrivilegeQuery(create.Name, schemaSpec.Name, "CREATE"), pgasserts.BoolPGOutput(true)),
+							30).Should(Succeed())
+					}
+				}
+			})
+
 			By("verifying the fdw presence in the target database", func() {
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
