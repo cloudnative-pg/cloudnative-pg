@@ -93,7 +93,7 @@ Use this field only in case of
 
 The `automountServiceAccountToken` field of the cluster specification
 controls the automatic mount of the `ServiceAccount` token in the instance
-Pods and in the Jobs that create them. Setting it to `false` helps comply
+Pods and in the Jobs run by the operator. Setting it to `false` helps comply
 with admission policies enforced in hardened environments; the operator then
 mounts an equivalent projected volume so that the instance manager can keep
 working. See

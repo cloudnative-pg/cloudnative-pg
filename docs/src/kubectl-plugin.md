@@ -778,8 +778,7 @@ Archive:  report_cluster_example_<TIMESTAMP>.zip
    creating: report_cluster_example_<TIMESTAMP>/logs/
   inflating: report_cluster_example_<TIMESTAMP>/logs/cluster-example-full-1.jsonl
    creating: report_cluster_example_<TIMESTAMP>/job-logs/
-  inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-1-initdb-qnnvw.jsonl
-  inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-2-join-tvj8r.jsonl
+  inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-1-major-upgrade-qnnvw.jsonl
 ```
 
 ### Logs

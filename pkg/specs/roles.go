@@ -338,6 +338,11 @@ func getInvolvedSecretNames(opts RoleOptions) []string {
 		}
 	}
 
+	if recovery := opts.Cluster.Spec.Bootstrap; recovery != nil && recovery.Recovery != nil &&
+		recovery.Recovery.Backup != nil && recovery.Recovery.Backup.EndpointCA != nil {
+		involvedSecretNames = append(involvedSecretNames, recovery.Recovery.Backup.EndpointCA.Name)
+	}
+
 	involvedSecretNames = append(involvedSecretNames, backupSecrets(opts.Cluster, opts.BackupOrigin)...)
 	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(opts.Cluster)...)
 	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(opts.Cluster)...)
@@ -443,6 +448,9 @@ func backupSecrets(cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) []string 
 		result = append(
 			result,
 			googleCredentialsSecrets(backupOrigin.Status.Google)...)
+		if backupOrigin.Status.EndpointCA != nil {
+			result = append(result, backupOrigin.Status.EndpointCA.Name)
+		}
 	}
 
 	return result
