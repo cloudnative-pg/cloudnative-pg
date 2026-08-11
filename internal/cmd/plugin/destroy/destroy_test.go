@@ -251,6 +251,29 @@ var _ = Describe("Destroy", func() {
 		Expect(callOrder).To(Equal([]string{"delete-pvc", "delete-pod"}))
 	})
 
+	It("does not wait for protected PVCs before deleting the pod", func(ctx SpecContext) {
+		cluster := newOwningCluster()
+		pod := newOwnedPod(cluster)
+		pgData := newOwnedPVC(cluster, persistentvolumeclaim.NewPgDataCalculator())
+		// The fake client does not run the PVC protection controller, but it does
+		// model API server deletion semantics for objects with finalizers: Delete
+		// returns and leaves the object terminating.
+		pgData.Finalizers = []string{"kubernetes.io/pvc-protection"}
+
+		plugin.Client = fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(pod, pgData).
+			Build()
+
+		Expect(Destroy(ctx, clusterName, instanceName, false)).To(Succeed())
+
+		var terminatingPVC corev1.PersistentVolumeClaim
+		Expect(plugin.Client.Get(ctx, client.ObjectKeyFromObject(pgData), &terminatingPVC)).To(Succeed())
+		Expect(terminatingPVC.DeletionTimestamp).ToNot(BeNil())
+		Expect(apierrs.IsNotFound(
+			plugin.Client.Get(ctx, client.ObjectKeyFromObject(pod), &corev1.Pod{}))).To(BeTrue())
+	})
+
 	It("detaches the PVCs before deleting the pod when keeping the PVC", func(ctx SpecContext) {
 		cluster := newOwningCluster()
 		pod := newOwnedPod(cluster)

@@ -43,9 +43,10 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 		return err
 	}
 
-	// PVCs are detached or deleted before the pod so the operator's reconcile loop
-	// can't see dangling PVCs and recreate the pod. This matches the deletion order
-	// in ensureInstanceIsDeleted.
+	// PVCs are detached or their deletion is requested before the pod is deleted,
+	// so the operator's reconcile loop can't see dangling PVCs and recreate the
+	// pod. A protected PVC may remain terminating until the pod goes away; the
+	// delete call does not wait for finalizers to clear.
 	if keepPVC {
 		if err := detachInstancePVCs(ctx, pvcs, clusterName, instanceName); err != nil {
 			return err
