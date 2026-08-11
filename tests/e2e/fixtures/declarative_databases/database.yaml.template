@@ -19,6 +19,17 @@ spec:
   schemas:
     - name: test_schema
       ensure: present
+      # USAGE goes to PUBLIC and CREATE to a named role on purpose: a
+      # privilege held by PUBLIC satisfies has_schema_privilege() for every
+      # role, so granting the same privilege to both would make the assertion
+      # on the named role pass even if that grant never ran.
+      permissions:
+        usage:
+          - name: public
+            type: grant
+        create:
+          - name: app
+            type: grant
   fdws:
     - name: postgres_fdw
       ensure: present
