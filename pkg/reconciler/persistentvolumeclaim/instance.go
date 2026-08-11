@@ -25,6 +25,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,16 +33,18 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-// CreateInstancePVCs creates the expected pvcs for the instance
+// CreateInstancePVCs creates the expected pvcs for the instance and returns the
+// UID of the PGDATA PVC (the one named after the instance itself), so callers
+// building the bootstrap pod can scope its completion marker to this volume.
 func CreateInstancePVCs(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
 	source *StorageSource,
 	serial int,
-) error {
-	_, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil, source)
-	return err
+) (types.UID, error) {
+	reconciled, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil, source)
+	return reconciled.pgDataUID, err
 }
 
 // reconcileMultipleInstancesMissingPVCs evaluate multiple instances that may miss some PVCs.
@@ -60,19 +63,34 @@ func reconcileMultipleInstancesMissingPVCs(
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		res, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, pvcs, nil)
+		reconciled, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, pvcs, nil)
 		if err != nil {
-			return res, err
+			return ctrl.Result{}, err
 		}
-		if !res.IsZero() {
-			result = res
+		if reconciled.created {
+			result = ctrl.Result{RequeueAfter: time.Second}
 		}
 	}
 
 	return result, nil
 }
 
-// reconcileSingleInstanceMissingPVCs reconcile an instance missing PVCs
+// missingPVCsReconciliation is the outcome of reconciling the PVCs an instance
+// is missing.
+type missingPVCsReconciliation struct {
+	// created is true when at least one PVC was created, so the caller has to
+	// requeue and let the next loop observe it.
+	created bool
+
+	// pgDataUID is the UID of the PGDATA PVC (the one named after the instance
+	// itself) when this call created it, so a fresh bootstrap path can learn the
+	// UID without a separate Get. It stays the zero UID when the PGDATA PVC was
+	// not among the ones this call touched, for example when it was already
+	// listed as present.
+	pgDataUID types.UID
+}
+
+// reconcileSingleInstanceMissingPVCs creates the PVCs an instance is missing.
 func reconcileSingleInstanceMissingPVCs(
 	ctx context.Context,
 	c client.Client,
@@ -80,8 +98,8 @@ func reconcileSingleInstanceMissingPVCs(
 	serial int,
 	pvcs []corev1.PersistentVolumeClaim,
 	source *StorageSource,
-) (ctrl.Result, error) {
-	var shouldReconcile bool
+) (missingPVCsReconciliation, error) {
+	var reconciliation missingPVCsReconciliation
 	instanceName := specs.GetInstanceName(cluster.Name, serial)
 	for _, expectedPVC := range getExpectedPVCsFromCluster(cluster, instanceName) {
 		// Continue if the expectedPVC is in present in the current PVC list
@@ -91,26 +109,26 @@ func reconcileSingleInstanceMissingPVCs(
 
 		conf, err := expectedPVC.calculator.GetStorageConfiguration(cluster)
 		if err != nil {
-			return ctrl.Result{}, err
+			return missingPVCsReconciliation{}, err
 		}
 
 		pvcSource, err := expectedPVC.calculator.GetSource(source)
 		if err != nil {
-			return ctrl.Result{}, err
+			return missingPVCsReconciliation{}, err
 		}
 
 		createConfiguration := expectedPVC.toCreateConfiguration(serial, conf, pvcSource)
 
-		if err := createIfNotExists(ctx, c, cluster, createConfiguration); err != nil {
-			return ctrl.Result{}, err
+		pvc, err := createIfNotExists(ctx, c, cluster, createConfiguration)
+		if err != nil {
+			return missingPVCsReconciliation{}, err
+		}
+		if expectedPVC.name == instanceName {
+			reconciliation.pgDataUID = pvc.UID
 		}
 
-		shouldReconcile = true
+		reconciliation.created = true
 	}
 
-	if shouldReconcile {
-		return ctrl.Result{RequeueAfter: time.Second}, nil
-	}
-
-	return ctrl.Result{}, nil
+	return reconciliation, nil
 }

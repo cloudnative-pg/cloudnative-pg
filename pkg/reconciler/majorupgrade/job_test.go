@@ -23,7 +23,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -69,7 +68,6 @@ var _ = Describe("Major upgrade Job generation", func() {
 		func(job *batchv1.Job, isMajorUpgrade bool) {
 			Expect(isMajorUpgradeJob(job)).To(Equal(isMajorUpgrade))
 		},
-		Entry("initdb jobs are not major upgrades", specs.CreatePrimaryJobViaInitdb(cluster, 1), false),
 		Entry("major-upgrade jobs are major upgrades", createMajorUpgradeJobDefinition(&cluster, 1, nil), true),
 	)
 })

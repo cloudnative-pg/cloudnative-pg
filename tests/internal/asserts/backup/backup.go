@@ -352,9 +352,12 @@ func AssertClusterRestore(
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Restoring a backup in a new cluster", func() {
-		resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
+		clusterasserts.AssertNoBootstrapJobCreatedDuring(env, namespace, func() {
+			resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
 
-		clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+		})
+		clusterasserts.AssertClusterInstancesHaveNoRestart(env, namespace, restoredClusterName)
 
 		primary := restoredClusterName + "-1"
 		tableLocator := pgasserts.TableLocator{

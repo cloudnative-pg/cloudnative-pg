@@ -17,5 +17,16 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package restore implements the "instance restore" subcommand of the operator
-package restore
+package bootstrap
+
+import (
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+func TestBootstrap(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Bootstrap test suite")
+}

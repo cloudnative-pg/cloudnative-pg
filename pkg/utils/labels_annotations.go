@@ -188,6 +188,12 @@ const (
 	// PodSpecAnnotationName is the name of the annotation with the PodSpec derived from the cluster
 	PodSpecAnnotationName = MetadataNamespace + "/podSpec"
 
+	// BootstrapInstanceAnnotationName is the name of the annotation stamped on an
+	// instance pod that must initialize its data directory in-process before
+	// starting PostgreSQL. Its value is the bootstrap mode. The operator uses it
+	// to recognize a bootstrapping pod; the pod itself never reads it.
+	BootstrapInstanceAnnotationName = MetadataNamespace + "/bootstrapInstance"
+
 	// ClusterManifestAnnotationName is the name of the annotation containing the cluster manifest
 	ClusterManifestAnnotationName = MetadataNamespace + "/clusterManifest"
 

@@ -28,12 +28,14 @@ import (
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -355,13 +357,16 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 
 					By("creating the cluster to be restored through snapshot and PITR", func() {
-						clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, restoreFile)
-						clusterasserts.AssertClusterIsReady(
-							env,
-							namespace,
-							clusterToRestoreName,
-							testTimeouts[timeouts.ClusterIsReadySlow],
-						)
+						clusterasserts.AssertNoBootstrapJobCreatedDuring(env, namespace, func() {
+							clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, restoreFile)
+							clusterasserts.AssertClusterIsReady(
+								env,
+								namespace,
+								clusterToRestoreName,
+								testTimeouts[timeouts.ClusterIsReadySlow],
+							)
+						})
+						clusterasserts.AssertClusterInstancesHaveNoRestart(env, namespace, clusterToRestoreName)
 					})
 
 					By("verifying the correct data exists in the restored cluster", func() {
@@ -1017,6 +1022,164 @@ var _ = Describe("Verify Volume Snapshot",
 				By("resetting the snapshotClass value", func() {
 					updateClusterSnapshotClass(namespace, clusterToSnapshotName, os.Getenv("E2E_CSI_STORAGE_CLASS"))
 				})
+			})
+		})
+	})
+
+// Regression test: a replica re-created after a scale-down/scale-up that frees
+// and reuses its node serial gets a PGDATA PVC cloned from the volume snapshot
+// of the previous, same-named instance. The bootstrap completion marker lives
+// inside PGDATA and therefore travels with the clone, so without scoping the
+// marker to the PGDATA PVC's own UID, the clone would wrongly be considered
+// already bootstrapped by its predecessor's "join" and skip the restoresnapshot
+// phase-0 work entirely.
+var _ = Describe("Verify Volume Snapshot marker identity across a scale-down/scale-up serial reuse",
+	Label(tests.LabelBackupRestore, tests.LabelStorage, tests.LabelSnapshot), func() {
+		const (
+			// WAL archiving must be active for GetCandidateStorageSourceForReplica
+			// to ever consider a volume snapshot as the storage source for a
+			// recreated replica (see pkg/reconciler/persistentvolumeclaim/storagesource.go),
+			// so this fixture, unlike cluster-volume-snapshot.yaml.template, also
+			// configures a barmanObjectStore.
+			sampleFile      = fixturesDir + "/volume_snapshot/cluster-volume-snapshot-marker.yaml.template"
+			namespacePrefix = "volume-snapshot-marker-scale"
+			level           = tests.High
+		)
+
+		It("re-runs the restoresnapshot bootstrap instead of inheriting the replaced instance's marker", func() {
+			if testLevelEnv.Depth < int(level) {
+				Skip("Test depth is lower than the amount requested for this test")
+			}
+
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, namespace)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			_, err = secrets.CreateObjectStorageSecret(
+				env.Ctx,
+				env.Client,
+				namespace,
+				"backup-storage-creds",
+				objectstore.AccessKeyID,
+				objectstore.SecretAccessKey,
+			)
+			Expect(err).ToNot(HaveOccurred())
+
+			// The fixture leaves backup.target unset, so it defaults to
+			// prefer-standby: on this 2-instance cluster the snapshot is taken
+			// from the standby, cluster-2, whose marker is what the recreated
+			// cluster-2 must not inherit.
+			By("creating a 2-instance cluster with volume snapshot backups and WAL archiving", func() {
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+			})
+
+			By("verify connectivity of barman to the object store", func() {
+				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() (bool, error) {
+					connectionStatus, err := objectstore.TestBarmanConnectivity(
+						namespace, clusterName, primaryPod.Name,
+						objectstore.AccessKeyID, objectstore.SecretAccessKey, objectStoreEnv.ServiceName)
+					return connectionStatus, err
+				}, 60).Should(BeTrue())
+			})
+
+			// Confirm WAL archiving is actually operative before relying on it:
+			// the restoresnapshot bootstrap needs to fetch WALs from the object
+			// store to reach a consistent state, so a broken archive would make
+			// the later scale-up hang instead of failing clearly here. A
+			// 2-instance cluster already got a free WAL switch from the
+			// replica's pg_basebackup, so this only confirms it landed.
+			By("verifying WAL archiving is working", func() {
+				objectstoreasserts.AssertArchiveWalOnObjectStore(
+					env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName,
+				)
+			})
+
+			var backupTaken *apiv1.Backup
+			By("taking a completed volume snapshot backup", func() {
+				var err error
+				backupTaken, err = backups.Create(
+					env.Ctx, env.Client,
+					apiv1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      clusterName + "-scale-marker",
+						},
+						Spec: apiv1.BackupSpec{
+							Method:  apiv1.BackupMethodVolumeSnapshot,
+							Cluster: apiv1.LocalObjectReference{Name: clusterName},
+						},
+					},
+				)
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					err = env.Client.Get(env.Ctx, types.NamespacedName{
+						Namespace: namespace,
+						Name:      backupTaken.Name,
+					}, backupTaken)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(backupTaken.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+						"Backup should be completed correctly, error message is '%s'", backupTaken.Status.Error)
+				}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
+			})
+
+			replicaName := clusterName + "-2"
+
+			By("scaling the cluster down to 1 instance", func() {
+				err := clusterutils.ScaleSize(env.Ctx, env.Client, namespace, clusterName, 1)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("waiting for the removed replica's PVCs (PGDATA and WAL) to be fully gone", func() {
+				clusterasserts.AssertPVCCount(env, namespace, clusterName, 2, 120)
+			})
+
+			By("scaling the cluster back up to 2 instances, reusing the freed serial", func() {
+				err := clusterutils.ScaleSize(env.Ctx, env.Client, namespace, clusterName, 2)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("waiting for the cluster to be ready again", func() {
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+			})
+
+			By("verifying the new instance's PGDATA PVC was provisioned from the snapshot", func() {
+				var pvc corev1.PersistentVolumeClaim
+				err := env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: replicaName}, &pvc)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(pvc.Spec.DataSource).ToNot(BeNil(),
+					"the recreated instance's PGDATA PVC should have been cloned from the volume snapshot")
+			})
+
+			// The decisive assertion: a self-healing replica configuration would
+			// make the new streaming standby look healthy even if phase-0 was
+			// wrongly skipped (see the severity analysis in the fix commit), so
+			// only the marker itself proves whether restoresnapshot actually ran
+			// on this volume. Without the fix, the inherited marker still
+			// records the previous instance's "join" bootstrap.
+			By("verifying the completion marker records a fresh restoresnapshot bootstrap, not the inherited join", func() {
+				stdout, _, err := exec.CommandInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{Namespace: namespace, PodName: replicaName},
+					nil,
+					"cat", specs.PgDataPath+"/"+constants.BootstrapCompletedFile,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(stdout).To(ContainSubstring(`"mode":"restoresnapshot"`))
+
+				var pvc corev1.PersistentVolumeClaim
+				err = env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: replicaName}, &pvc)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(stdout).To(ContainSubstring(fmt.Sprintf(`"pvcUID":"%s"`, pvc.UID)))
 			})
 		})
 	})

@@ -26,11 +26,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/initdb"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/join"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/pgbasebackup"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/restore"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/restoresnapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/status"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/upgrade"
@@ -50,13 +45,8 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(initdb.NewCmd())
-	cmd.AddCommand(join.NewCmd())
 	cmd.AddCommand(run.NewCmd())
 	cmd.AddCommand(status.NewCmd())
-	cmd.AddCommand(pgbasebackup.NewCmd())
-	cmd.AddCommand(restore.NewCmd())
-	cmd.AddCommand(restoresnapshot.NewCmd())
 	cmd.AddCommand(upgrade.NewCmd())
 
 	return cmd

@@ -63,12 +63,19 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+		// A three-instance cluster bootstraps instance 1 via initdb and
+		// instances 2/3 via join: this is the natural place to assert that
+		// neither mode ever creates a bootstrap Job (#11228).
+		clusterasserts.AssertNoBootstrapJobCreatedDuring(env, namespace, func() {
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+		})
 
 		By("having three PostgreSQL pods with status ready", func() {
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			Expect(utils.CountReadyPods(podList.Items), err).Should(BeEquivalentTo(3))
 		})
+
+		clusterasserts.AssertClusterInstancesHaveNoRestart(env, namespace, clusterName)
 
 		By("being able to restart a killed pod without losing it", func() {
 			commandTimeout := time.Second * 10

@@ -17,103 +17,55 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package pgbasebackup implement the pgbasebackup bootstrap method
-package pgbasebackup
+package bootstrap
 
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"github.com/spf13/cobra"
-	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
 
-// CloneInfo is the structure containing all the information needed
+// cloneInfo is the structure containing all the information needed
 // to clone an existing server
-type CloneInfo struct {
+type cloneInfo struct {
 	info   *postgres.InitInfo
-	client ctrl.Client
+	client client.Client
 }
 
-// NewCmd creates the "pgbasebackup" subcommand
-func NewCmd() *cobra.Command {
-	var clusterName string
-	var namespace string
-	var pgData string
-	var pgWal string
+func executePgBaseBackup(ctx context.Context, cli client.Client, info postgres.InitInfo) error {
+	contextLogger := log.FromContext(ctx)
 
-	cmd := &cobra.Command{
-		Use: "pgbasebackup",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
-				Name:      clusterName,
-				Namespace: namespace,
-			})
-		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := cmd.Context()
-			contextLogger := log.FromContext(ctx)
-
-			client, err := management.NewControllerRuntimeClient()
-			if err != nil {
-				return err
-			}
-
-			env := CloneInfo{
-				info: &postgres.InitInfo{
-					ClusterName: clusterName,
-					Namespace:   namespace,
-					PgData:      pgData,
-					PgWal:       pgWal,
-				},
-				client: client,
-			}
-
-			if err := env.info.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
-				return err
-			}
-
-			if err = env.bootstrapUsingPgbasebackup(ctx); err != nil {
-				contextLogger.Error(err, "Unable to bootstrap cluster")
-			}
-			return err
-		},
-		PostRunE: func(cmd *cobra.Command, _ []string) error {
-			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
-				return err
-			}
-
-			return linkerd.TryInvokeShutdownEndpoint(cmd.Context())
-		},
+	if err := info.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
+		return err
 	}
 
-	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
-		"current cluster in k8s, used to coordinate switchover and failover")
-	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
-		"the cluster and of the Pod in k8s")
-	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
-	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "the PGWAL to be created")
+	env := cloneInfo{
+		info:   &info,
+		client: cli,
+	}
 
-	return cmd
+	if err := env.bootstrapUsingPgbasebackup(ctx); err != nil {
+		contextLogger.Error(err, "Unable to bootstrap cluster")
+		return err
+	}
+
+	return nil
 }
 
 // bootstrapUsingPgbasebackup creates a new data dir from the configuration
-func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
+func (env *cloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 	var cluster apiv1.Cluster
-	err := env.client.Get(ctx, ctrl.ObjectKey{Namespace: env.info.Namespace, Name: env.info.ClusterName}, &cluster)
+	err := env.client.Get(ctx, client.ObjectKey{Namespace: env.info.Namespace, Name: env.info.ClusterName}, &cluster)
 	if err != nil {
 		return err
 	}
@@ -166,7 +118,7 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 
 // configureInstanceAsNewPrimary sets up this instance as a new primary server, using
 // the configuration created by the user and setting up the global objects as needed
-func (env *CloneInfo) configureInstanceAsNewPrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+func (env *cloneInfo) configureInstanceAsNewPrimary(ctx context.Context, cluster *apiv1.Cluster) error {
 	if err := env.info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}

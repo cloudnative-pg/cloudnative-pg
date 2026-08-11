@@ -22,6 +22,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
@@ -31,6 +32,37 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
+
+const (
+	// BootstrapStatusRunning is the BootstrapStatusResponse.Error value the
+	// instance status endpoint reports while an in-process bootstrap is running.
+	BootstrapStatusRunning = "bootstrapping"
+
+	// BootstrapStatusFailed is the BootstrapStatusResponse.Error value the
+	// instance status endpoint reports once an in-process bootstrap has failed
+	// and the instance has parked.
+	BootstrapStatusFailed = "bootstrapFailed"
+)
+
+// BootstrapStatusResponse is the JSON body the instance status endpoint returns,
+// with a 503, while an in-process bootstrap is running or has failed. The
+// operator receives it as the body of the status error and uses it to tell an
+// in-progress bootstrap (which it keeps waiting for) from a failed one (which it
+// surfaces as unrecoverable).
+type BootstrapStatusResponse struct {
+	// Error is the machine-readable state: BootstrapStatusRunning while the
+	// bootstrap is in progress, BootstrapStatusFailed once it has failed.
+	Error string `json:"error"`
+
+	// Mode is the bootstrap method.
+	Mode string `json:"mode"`
+
+	// Since is the time the bootstrap started.
+	Since time.Time `json:"since"`
+
+	// Reason is the failure cause, set only when Error is BootstrapStatusFailed.
+	Reason string `json:"reason,omitempty"`
+}
 
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {

@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -234,6 +235,49 @@ var _ = Describe("check atomic bool", func() {
 		instance.SetMightBeUnavailable(true)
 		unAvailable = instance.MightBeUnavailable()
 		Expect(unAvailable).To(BeTrue())
+	})
+})
+
+var _ = Describe("bootstrap progress flag", func() {
+	It("is not set on a fresh instance", func() {
+		instance := &Instance{}
+		Expect(instance.IsBootstrapInProgress()).To(BeFalse())
+		Expect(instance.GetBootstrapProgress()).To(BeNil())
+	})
+
+	It("records the mode and start time while set, and clears cleanly", func() {
+		instance := &Instance{}
+		before := time.Now()
+
+		instance.StartBootstrap("initdb")
+		Expect(instance.IsBootstrapInProgress()).To(BeTrue())
+		progress := instance.GetBootstrapProgress()
+		Expect(progress).ToNot(BeNil())
+		Expect(progress.Mode).To(Equal("initdb"))
+		Expect(progress.Since).To(BeTemporally(">=", before))
+
+		instance.CompleteBootstrap()
+		Expect(instance.IsBootstrapInProgress()).To(BeFalse())
+		Expect(instance.GetBootstrapProgress()).To(BeNil())
+	})
+
+	It("does not entail mightBeUnavailable", func() {
+		instance := &Instance{}
+		instance.StartBootstrap("restore")
+		// The bootstrap flag must stay independent from mightBeUnavailable,
+		// otherwise a bootstrapping pod would be counted as reporting status.
+		Expect(instance.MightBeUnavailable()).To(BeFalse())
+	})
+
+	It("is scoped to the instance it is set on", func() {
+		// The temporary instances that the restore paths spin up internally are
+		// distinct objects and must never flip the run instance's flag.
+		runInstance := &Instance{}
+		temporaryInstance := &Instance{}
+
+		runInstance.StartBootstrap("restore")
+		Expect(temporaryInstance.IsBootstrapInProgress()).To(BeFalse())
+		Expect(temporaryInstance.GetBootstrapProgress()).To(BeNil())
 	})
 })
 

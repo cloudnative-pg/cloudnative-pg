@@ -30,7 +30,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -1170,8 +1169,10 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	// Ensure the PVCs for the first node exist, picking the right storage
 	// source if we are bootstrapping from a backup or a volume snapshot. This
-	// blocks until the source is ready.
-	if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, nodeSerial, nil); !res.IsZero() || err != nil {
+	// blocks until the source is ready. The bootstrapping Pod is not created
+	// here (see ensureInstancesAreCreated), so the PGDATA PVC UID is not needed
+	// yet.
+	if res, _, err := r.ensurePrimaryInstancePVCs(ctx, cluster, nodeSerial, nil); !res.IsZero() || err != nil {
 		return res, err
 	}
 
@@ -1214,7 +1215,7 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 	cluster *apiv1.Cluster,
 	nodeSerial int,
 	existingDataSource *corev1.TypedLocalObjectReference,
-) (ctrl.Result, error) {
+) (ctrl.Result, types.UID, error) {
 	var recoverySnapshot *persistentvolumeclaim.StorageSource
 
 	// If the cluster is bootstrapping from recovery, it may do so from:
@@ -1224,11 +1225,11 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil {
 		backup, err := r.getOriginBackup(ctx, cluster)
 		if err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, "", err
 		}
 
 		if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
-			return res, err
+			return res, "", err
 		}
 
 		recoverySnapshot = persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
@@ -1237,22 +1238,23 @@ func (r *ClusterReconciler) ensurePrimaryInstancePVCs(
 	if err := validateStorageSourceAgreesWithExisting(
 		recoverySnapshot, existingDataSource, cluster.Name, nodeSerial,
 	); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, "", err
 	}
 
 	// Create the PVCs from the cluster definition, and if bootstrapping from
 	// recoverySnapshot, use that as the source
-	if err := persistentvolumeclaim.CreateInstancePVCs(
+	pgDataUID, err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
 		recoverySnapshot,
 		nodeSerial,
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot create primary instance PVCs: %w", err)
+	)
+	if err != nil {
+		return ctrl.Result{}, "", fmt.Errorf("cannot create primary instance PVCs: %w", err)
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, pgDataUID, nil
 }
 
 // validateStorageSourceAgreesWithExisting fails cleanly instead of recreating
@@ -1289,24 +1291,25 @@ func validateStorageSourceAgreesWithExisting(
 	)
 }
 
-// buildPrimaryInstanceJob builds the bootstrap Job for the first primary
-// instance, selecting the variant (initdb, recovery, pgBaseBackup or volume
-// snapshot restore) according to the cluster bootstrap configuration. It is
-// invoked from the unified PVC-state-driven path (ensureInstanceBootstrapJob)
-// when an initializing primary PVC has no Job advancing it.
+// resolvePrimaryBootstrapInstruction builds the bootstrap overlay instruction
+// for the first primary instance, selecting the variant (initdb, recovery,
+// pgBaseBackup or volume snapshot restore) according to the cluster bootstrap
+// configuration. It is invoked from the unified PVC-state-driven path
+// (ensureInstanceBootstrapJob) when an initializing primary PVC has no Pod
+// advancing it.
 //
 // dataSource is the PGDATA PVC's own Spec.DataSource, if any: since the PVC
 // already exists by the time this runs, its DataSource is the authoritative
 // record of whether it was actually restored from a snapshot. Using it
 // instead of recomputing the candidate source from the current Backup object
-// keeps the Job variant consistent with what is really on the PVC, even if
-// the Backup has changed or been deleted since the PVC was created.
-func (r *ClusterReconciler) buildPrimaryInstanceJob(
+// keeps the bootstrap variant consistent with what is really on the PVC, even
+// if the Backup has changed or been deleted since the PVC was created.
+func (r *ClusterReconciler) resolvePrimaryBootstrapInstruction(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	nodeSerial int,
 	dataSource *corev1.TypedLocalObjectReference,
-) (*batchv1.Job, error) {
+) (specs.BootstrapInstruction, error) {
 	isBootstrappingFromRecovery := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil
 	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
 
@@ -1315,14 +1318,14 @@ func (r *ClusterReconciler) buildPrimaryInstanceJob(
 		var err error
 		backup, err = r.getOriginBackup(ctx, cluster)
 		if err != nil {
-			return nil, err
+			return specs.BootstrapInstruction{}, err
 		}
 		// getOriginBackup tolerates a missing Backup object by returning nil:
-		// fail here rather than building a Job that points to a recovery
-		// source that no longer exists.
+		// fail here rather than building a bootstrap instruction that points to
+		// a recovery source that no longer exists.
 		if backup == nil && cluster.Spec.Bootstrap.Recovery.Backup != nil {
-			return nil, fmt.Errorf(
-				"cannot build the bootstrap Job for instance %v: the Backup %q it recovers from no longer exists",
+			return specs.BootstrapInstruction{}, fmt.Errorf(
+				"cannot build the bootstrap instruction for instance %v: the Backup %q it recovers from no longer exists",
 				specs.GetInstanceName(cluster.Name, nodeSerial),
 				cluster.Spec.Bootstrap.Recovery.Backup.Name,
 			)
@@ -1338,81 +1341,92 @@ func (r *ClusterReconciler) buildPrimaryInstanceJob(
 			*dataSource,
 		)
 		if err != nil {
-			return nil, err
+			return specs.BootstrapInstruction{}, err
 		}
 		if metadata == nil {
-			return nil, fmt.Errorf(
-				"cannot build the bootstrap Job for instance %v: the data source %q of its PGDATA PVC no longer exists",
+			return specs.BootstrapInstruction{}, fmt.Errorf(
+				"cannot build the bootstrap instruction for instance %v: the data source %q of its PGDATA PVC no longer exists",
 				specs.GetInstanceName(cluster.Name, nodeSerial),
 				dataSource.Name,
 			)
 		}
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-		return specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup), nil
+		return specs.NewRestoreSnapshotInstruction(*cluster, metadata), nil
 
 	case isBootstrappingFromRecovery:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		return specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup), nil
+		return specs.NewRecoveryInstruction(*cluster), nil
 
 	case isBootstrappingFromBaseBackup:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
-		return specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial), nil
+		return specs.NewPgBaseBackupInstruction(*cluster), nil
 
 	default:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
-		return specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial), nil
+		return specs.NewInitDBInstruction(*cluster), nil
 	}
 }
 
-// inheritJobMetadata propagates the cluster's inherited annotations and labels
-// onto an instance Job and its pod template.
-func inheritJobMetadata(cluster *apiv1.Cluster, job *batchv1.Job) {
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
-}
-
-// createInstanceJob sets the owner reference, inherits annotations and labels,
-// and creates the given bootstrap Job. If the Job already exists, it adopts
-// it (mirroring joinReplicaInstance) instead of blindly assuming it is ours.
-func (r *ClusterReconciler) createInstanceJob(
+// buildBootstrapInstancePod builds the steady-state instance Pod and applies the
+// bootstrap overlay, producing a Pod that initializes its own data directory
+// in-process before starting PostgreSQL.
+//
+// pvcUID is the UID of the PGDATA PVC this Pod will bootstrap (see
+// bootstrap.MarkerIdentity.PVCUID). It must not be empty: every caller creates
+// or reads that PVC before building the Pod.
+func (r *ClusterReconciler) buildBootstrapInstancePod(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	job *batchv1.Job,
-	primary bool,
-) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
-		contextLogger.Error(err, "Unable to set the owner reference for instance")
-		return ctrl.Result{}, err
+	nodeSerial int,
+	pvcUID types.UID,
+	instruction specs.BootstrapInstruction,
+) (*corev1.Pod, error) {
+	if pvcUID == "" {
+		return nil, fmt.Errorf("cannot build the bootstrapping pod for instance %v: empty PGDATA PVC UID",
+			specs.GetInstanceName(cluster.Name, nodeSerial))
 	}
 
-	contextLogger.Info("Creating new Job",
-		"jobName", job.Name,
-		"primary", primary)
-
-	inheritJobMetadata(cluster, job)
-
-	if err := r.Create(ctx, job); err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			contextLogger.Error(err, "Unable to create job", "job", job)
-			return ctrl.Result{}, err
-		}
-
-		if result, adoptErr := r.ensureJobAdoptable(ctx, cluster, job.Name); adoptErr != nil || !result.IsZero() {
-			return result, adoptErr
-		}
-		contextLogger.Debug("Job already existed, adopted it", "jobName", job.Name)
-		return ctrl.Result{}, nil
+	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial, true)
+	if err != nil {
+		return nil, fmt.Errorf("while building the instance pod: %w", err)
 	}
 
-	return ctrl.Result{}, nil
+	if err := specs.ApplyBootstrapOverlay(pod, instruction, pvcUID); err != nil {
+		return nil, fmt.Errorf("while applying the bootstrap overlay: %w", err)
+	}
+
+	return pod, nil
+}
+
+// inheritInstanceMetadata propagates the cluster's inherited annotations and
+// labels onto an instance Pod.
+func inheritInstanceMetadata(cluster *apiv1.Cluster, pod *corev1.Pod) {
+	utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(&pod.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
+}
+
+// createBootstrappingPod owns the cluster, inherits its annotations and
+// labels, and creates a bootstrapping Pod. An AlreadyExists error means the
+// informer cache was stale and the Pod is there already, which is not a
+// failure: the next reconciliation loop observes it.
+func (r *ClusterReconciler) createBootstrappingPod(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pod *corev1.Pod,
+) error {
+	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
+		return fmt.Errorf("unable to set the owner reference for the bootstrapping Pod: %w", err)
+	}
+
+	inheritInstanceMetadata(cluster, pod)
+
+	if err := r.Create(ctx, pod); err != nil && !apierrs.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
 }
 
 // getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
@@ -1442,31 +1456,6 @@ func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.
 	}
 
 	return &backup, nil
-}
-
-// ensureJobAdoptable verifies that an existing bootstrap Job is owned by this
-// cluster. A NotFound result means the cache lags behind the AlreadyExists
-// error just returned by Create; requeue briefly rather than proceed with
-// unverified adoption.
-func (r *ClusterReconciler) ensureJobAdoptable(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	jobName string,
-) (ctrl.Result, error) {
-	var existing batchv1.Job
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: cluster.Namespace,
-		Name:      jobName,
-	}, &existing); err != nil {
-		if apierrs.IsNotFound(err) {
-			return ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-		return ctrl.Result{}, fmt.Errorf("cannot get existing job %q for adoption: %w", jobName, err)
-	}
-	if owner, ok := IsOwnedByCluster(&existing); !ok || owner != cluster.Name {
-		return ctrl.Result{}, fmt.Errorf("refusing to adopt job %q: not owned by cluster %q", jobName, cluster.Name)
-	}
-	return ctrl.Result{}, nil
 }
 
 // reconcileMissingInstance creates the next missing instance when the cluster
@@ -1524,69 +1513,49 @@ func (r *ClusterReconciler) joinReplicaInstance(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	var backupList apiv1.BackupList
-	if err := r.List(ctx, &backupList,
-		client.MatchingFields{clusterNameField: cluster.Name},
-		client.InNamespace(cluster.Namespace),
-	); err != nil {
+	// If we can bootstrap this replica from a pre-existing source, we do it
+	storageSource, instruction, err := r.resolveReplicaBootstrap(ctx, cluster)
+	if err != nil {
 		contextLogger.Error(err, "Error while getting backup list, when bootstrapping a new replica")
 		return ctrl.Result{}, err
 	}
-
-	job := specs.JoinReplicaInstance(*cluster, nodeSerial)
-
-	// If we can bootstrap this replica from a pre-existing source, we do it
-	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, r.Client, cluster, backupList)
-	if storageSource != nil {
-		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
-	}
-
-	contextLogger.Info("Creating new Job",
-		"job", job.Name,
-		"primary", false,
-		"storageSource", storageSource,
-		"role", job.Spec.Template.Labels[utils.JobRoleLabelName],
-	)
 
 	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
 		"Creating instance %v-%v", cluster.Name, nodeSerial)
 
 	if err := r.RegisterPhase(ctx, cluster,
 		apiv1.PhaseCreatingReplica,
-		fmt.Sprintf("Creating replica %v", job.Name)); err != nil {
+		fmt.Sprintf("Creating replica %v-%v", cluster.Name, nodeSerial)); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
-		contextLogger.Error(err, "Unable to set the owner reference for joined PostgreSQL node")
-		return ctrl.Result{}, err
-	}
-
-	inheritJobMetadata(cluster, job)
-
-	if err := r.Create(ctx, job); err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			contextLogger.Error(err, "Unable to create Job", "job", job)
-			return ctrl.Result{}, err
-		}
-		// A previous reconcile created the Job but may not have finished
-		// creating the PVCs. Adopt it if owned by this cluster, then fall
-		// through to CreateInstancePVCs so any missing PVCs are created on
-		// this pass.
-		if result, adoptErr := r.ensureJobAdoptable(ctx, cluster, job.Name); adoptErr != nil || !result.IsZero() {
-			return result, adoptErr
-		}
-		contextLogger.Info("Job already exists, adopting it", "job", job.Name)
-	}
-
-	if err := persistentvolumeclaim.CreateInstancePVCs(
+	// Create the PVCs before the Pod: the Pod always needs its volumes, and
+	// creating them first removes the need to adopt a previously created Job.
+	pgDataUID, err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
 		storageSource,
 		nodeSerial,
-	); err != nil {
+	)
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot create replica instance PVCs: %w", err)
+	}
+
+	pod, err := r.buildBootstrapInstancePod(ctx, cluster, nodeSerial, pgDataUID, instruction)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	contextLogger.Info("Creating new bootstrapping Pod",
+		"pod", pod.Name,
+		"primary", false,
+		"storageSource", storageSource,
+	)
+
+	if err := r.createBootstrappingPod(ctx, cluster, pod); err != nil {
+		contextLogger.Error(err, "Unable to create Pod", "pod", pod)
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
@@ -1594,11 +1563,11 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 // recreateReplicaBootstrapJob rebuilds the bootstrap Job of a replica whose
 // PVCs exist but have no Job advancing them. Mirroring buildPrimaryInstanceJob,
-// the Job variant is decided by the PGDATA PVC's own DataSource, the
+// the bootstrap variant is decided by the PGDATA PVC's own DataSource, the
 // authoritative record of what is really on the volume: recomputing the
 // candidate storage source from the live Backup list could disagree with the
 // volume's actual content when backups or snapshots changed after the PVCs
-// were created, and a snapshot-restore Job completes successfully even against
+// were created, and a snapshot-restore Pod completes successfully even against
 // a volume that was never cloned, leaving a broken replica behind an
 // apparently successful bootstrap.
 //
@@ -1606,31 +1575,38 @@ func (r *ClusterReconciler) joinReplicaInstance(
 // volumes were meant to be cloned from cannot be reconstructed: recreate the
 // missing PVCs empty and rebuild the whole replica through a join, which
 // discards any existing content and takes a fresh copy from the primary.
-func (r *ClusterReconciler) recreateReplicaBootstrapJob(
+func (r *ClusterReconciler) recreateReplicaBootstrapPod(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	serial int,
 	pgdataDataSource *corev1.TypedLocalObjectReference,
+	pgdataPVCUID types.UID,
 	pvcGroupComplete bool,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	if !pvcGroupComplete {
 		pgdataDataSource = nil
-		if err := persistentvolumeclaim.CreateInstancePVCs(ctx, r.Client, cluster, nil, serial); err != nil {
+		uid, err := persistentvolumeclaim.CreateInstancePVCs(ctx, r.Client, cluster, nil, serial)
+		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot recreate the missing PVCs of instance %v: %w",
 				specs.GetInstanceName(cluster.Name, serial), err)
 		}
+		pgdataPVCUID = uid
 	}
 
-	job := specs.JoinReplicaInstance(*cluster, serial)
+	instruction := specs.NewJoinInstruction(*cluster)
 	if pgdataDataSource != nil {
-		job = specs.RestoreReplicaInstance(*cluster, serial)
+		instruction = specs.NewRestoreSnapshotReplicaInstruction(*cluster)
 	}
 
-	contextLogger.Info("Recreating the bootstrap Job for a replica whose PVCs are not ready",
-		"job", job.Name,
-		"role", job.Labels[utils.JobRoleLabelName],
+	pod, err := r.buildBootstrapInstancePod(ctx, cluster, serial, pgdataPVCUID, instruction)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	contextLogger.Info("Recreating the bootstrapping Pod for a replica whose PVCs are not ready",
+		"pod", pod.Name,
 	)
 
 	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
@@ -1638,12 +1614,13 @@ func (r *ClusterReconciler) recreateReplicaBootstrapJob(
 
 	if err := r.RegisterPhase(ctx, cluster,
 		apiv1.PhaseCreatingReplica,
-		fmt.Sprintf("Creating replica %v", job.Name)); err != nil {
+		fmt.Sprintf("Creating replica %v", pod.Name)); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if res, err := r.createInstanceJob(ctx, cluster, job, false); err != nil || !res.IsZero() {
-		return res, err
+	if err := r.createBootstrappingPod(ctx, cluster, pod); err != nil {
+		contextLogger.Error(err, "Unable to create the bootstrapping Pod", "pod", pod)
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop
@@ -1694,12 +1671,13 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	// The PVC is the managed state; a Job (or, once ready, a Pod) is just the
-	// means to advance it. If any PVC of this instance is not ready yet, the
-	// resource that advances it is a bootstrap Job, not a Pod. When that Job is
-	// missing we must create it here, otherwise the PVC has no way of ever
-	// becoming ready and reconciliation deadlocks (see #11036). When the Job
-	// already exists we simply wait for it to complete.
+	// The PVC is the managed state; a bootstrapping Pod is just the means to
+	// advance it. A PVC becomes ready once its owning Pod attaches to it and
+	// reports ready. If any PVC of this instance is not ready yet and has no
+	// Pod advancing it, we must (re)create it here, otherwise the PVC has no
+	// way of ever becoming ready and reconciliation deadlocks (see #11036).
+	// When a bootstrapping Pod already exists we simply wait for it to
+	// complete.
 	instancePVCs := persistentvolumeclaim.FilterByPodSpec(resources.pvcs.Items, instanceToCreate.Spec)
 	for _, instancePVC := range instancePVCs {
 		pvcStatus := instancePVC.Annotations[utils.PVCStatusAnnotationName]
@@ -1800,15 +1778,38 @@ func findInstancePodToCreate(
 	return nil, nil
 }
 
+// resolveReplicaBootstrap decides how a replica bootstraps: from a candidate
+// storage source (a volume snapshot) when one is available, or by joining the
+// primary via pg_basebackup otherwise. It returns the storage source (nil when
+// joining) and the matching bootstrap overlay instruction.
+func (r *ClusterReconciler) resolveReplicaBootstrap(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (*persistentvolumeclaim.StorageSource, specs.BootstrapInstruction, error) {
+	var backupList apiv1.BackupList
+	if err := r.List(ctx, &backupList,
+		client.MatchingFields{clusterNameField: cluster.Name},
+		client.InNamespace(cluster.Namespace),
+	); err != nil {
+		return nil, specs.BootstrapInstruction{}, err
+	}
+
+	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, r.Client, cluster, backupList)
+	if storageSource != nil {
+		return storageSource, specs.NewRestoreSnapshotReplicaInstruction(*cluster), nil
+	}
+
+	return nil, specs.NewJoinInstruction(*cluster), nil
+}
+
 // ensureInstanceBootstrapJob makes sure that an instance whose PVCs are not yet
-// ready has a bootstrap Job advancing them. If a Job already exists for the
-// instance we simply wait for it to complete; otherwise we create it, reusing
+// ready has a bootstrapping Pod advancing them, (re)creating it and reusing
 // the serial already stamped on the PVCs.
 //
-// This consolidates init-Job creation, off the PVC state, for both the first
-// primary (originally the fix for the bootstrap deadlock in #11036, now
-// carried by this unified path) and a replica whose join Job was lost,
-// self-healing the #7709 scenario.
+// This consolidates bootstrapping Pod creation, off the PVC state, for both
+// the first primary (originally the fix for the bootstrap deadlock in
+// #11036, now carried by this unified path) and a replica whose bootstrapping
+// Pod was lost, self-healing the #7709 scenario.
 func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -1822,12 +1823,14 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 		return ctrl.Result{}, err
 	}
 
-	instancePVCNames := make([]string, 0)
 	var pgdataDataSource *corev1.TypedLocalObjectReference
+	var pgdataPVCUID types.UID
+	isPrimaryPVC := false
 	for _, pvc := range persistentvolumeclaim.FilterByPodSpec(resources.pvcs.Items, instanceToCreate.Spec) {
-		instancePVCNames = append(instancePVCNames, pvc.Name)
 		if pvc.Name == instanceToCreate.Name {
 			pgdataDataSource = pvc.Spec.DataSource
+			pgdataPVCUID = pvc.UID
+			isPrimaryPVC = specs.IsPrimary(pvc.ObjectMeta)
 		}
 	}
 
@@ -1848,44 +1851,31 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 		}
 	}
 
-	// If a Job is already advancing these PVCs, wait for it to complete.
-	for i := range resources.jobs.Items {
-		job := &resources.jobs.Items[i]
-		if persistentvolumeclaim.IsUsedByPodSpec(job.Spec.Template.Spec, instancePVCNames...) {
-			contextLogger.Debug("Bootstrap Job already exists, waiting for it to complete",
-				"job", job.Name,
-				"instance", instanceToCreate.Name,
-			)
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-		}
-	}
-
-	// The first primary is the only instance whose init Job is owned by this
-	// PVC-driven path. A replica is never created before a primary exists, so
-	// while the cluster has no established primary (CurrentPrimary == "") a
-	// podless PVC needing a Job is the first primary's init Job. This holds
-	// even if the status patch that set TargetPrimary in createPrimaryInstance
-	// lost an optimistic-lock conflict, which is exactly the deadlock #11036
-	// guards against. Once a primary is running, joinReplicaInstance owns Job
-	// creation for replicas (it creates the Job and then the PVCs), so a
-	// podless replica PVC without a Job means a previous attempt did not get
-	// that far; recreate its bootstrap Job there.
-	if cluster.Status.CurrentPrimary != "" && instanceToCreate.Name != cluster.Status.TargetPrimary {
-		return r.recreateReplicaBootstrapJob(ctx, cluster, serial, pgdataDataSource, pvcGroupComplete)
+	// The intended primary is the instance the cluster targets, or the one
+	// whose PVC still carries the primary role label (the target may not be
+	// set yet on the very first bootstrap, which is exactly the deadlock
+	// #11036 guards against). Once a primary is running, joinReplicaInstance
+	// owns Pod creation for replicas, so a podless replica PVC without a Pod
+	// means a previous attempt did not get that far; recreate its
+	// bootstrapping Pod there.
+	isPrimary := instanceToCreate.Name == cluster.Status.TargetPrimary || isPrimaryPVC
+	if !isPrimary {
+		return r.recreateReplicaBootstrapPod(ctx, cluster, serial, pgdataDataSource, pgdataPVCUID, pvcGroupComplete)
 	}
 
 	// A previous attempt may have been interrupted while creating the PVC
 	// group: recreate any missing PVC, choosing the storage source from the
-	// bootstrap configuration, before creating the Job. A Job whose Pod
-	// references a PVC that does not exist stays pending forever, and its
-	// presence blocks the rest of the reconciliation behind the running-jobs
-	// guard. When the PGDATA PVC already exists, the resolved source must
-	// agree with what PGDATA actually holds, or the sibling PVC would be
-	// recreated from a different snapshot than the one already restored.
+	// bootstrap configuration, before creating the bootstrapping Pod. A Pod
+	// that references a PVC that does not exist stays pending forever. When
+	// the PGDATA PVC already exists, the resolved source must agree with what
+	// PGDATA actually holds, or the sibling PVC would be recreated from a
+	// different snapshot than the one already restored.
 	if !pvcGroupComplete {
-		if res, err := r.ensurePrimaryInstancePVCs(ctx, cluster, serial, pgdataDataSource); !res.IsZero() || err != nil {
+		res, uid, err := r.ensurePrimaryInstancePVCs(ctx, cluster, serial, pgdataDataSource)
+		if !res.IsZero() || err != nil {
 			return res, err
 		}
+		pgdataPVCUID = uid
 	}
 
 	// Set TargetPrimary defensively: if it is not set the instance manager would
@@ -1896,17 +1886,24 @@ func (r *ClusterReconciler) ensureInstanceBootstrapJob(
 		}
 	}
 
-	job, err := r.buildPrimaryInstanceJob(ctx, cluster, serial, pgdataDataSource)
+	instruction, err := r.resolvePrimaryBootstrapInstruction(ctx, cluster, serial, pgdataDataSource)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	contextLogger.Info("Creating the bootstrap Job for the primary instance",
+	pod, err := r.buildBootstrapInstancePod(ctx, cluster, serial, pgdataPVCUID, instruction)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	contextLogger.Info("Creating the bootstrapping Pod for the primary instance",
 		"instance", instanceToCreate.Name,
-		"job", job.Name,
+		"pod", pod.Name,
 	)
-	if res, err := r.createInstanceJob(ctx, cluster, job, true); err != nil || !res.IsZero() {
-		return res, err
+
+	if err := r.createBootstrappingPod(ctx, cluster, pod); err != nil {
+		contextLogger.Error(err, "Unable to create the bootstrapping Pod", "pod", pod)
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop

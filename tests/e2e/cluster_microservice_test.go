@@ -24,7 +24,6 @@ import (
 	"os"
 	"strings"
 
-	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -153,19 +152,22 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		importedClusterName = "cluster-pgdump-error"
 		importClusterNonexistentDB := fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
 		resources.CreateResourceFromFile(env, namespace, importClusterNonexistentDB)
-		By("having a imported Cluster in failed state", func() {
+		By("having the imported Cluster reach the unrecoverable phase", func() {
+			// Job-free bootstrap (#11228): the microservice import runs inside the
+			// instance Pod. A nonexistent source database makes the bootstrap fail
+			// deterministically, so the instance records the failure and parks
+			// instead of retrying, and the operator marks the cluster
+			// unrecoverable.
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      importedClusterName + "-1-import",
+				Name:      importedClusterName,
 			}
-			// Eventually the number of failed job should be greater than 1
-			// which will ensure the cluster not getting created
-			job := &batchv1.Job{}
-			Eventually(func(g Gomega) int32 {
-				err := env.Client.Get(env.Ctx, namespacedName, job)
-				g.Expect(err).ToNot(HaveOccurred())
-				return job.Status.Failed
-			}, 100).Should(BeEquivalentTo(1))
+			Eventually(func(g Gomega) string {
+				cluster := &apiv1.Cluster{}
+				g.Expect(env.Client.Get(env.Ctx, namespacedName, cluster)).To(Succeed())
+				return cluster.Status.Phase
+			}, 300).Should(Equal(apiv1.PhaseUnrecoverable),
+				"a failed import bootstrap should mark the cluster unrecoverable")
 		})
 	})
 

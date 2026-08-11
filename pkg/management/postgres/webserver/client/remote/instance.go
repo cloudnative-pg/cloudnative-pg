@@ -101,6 +101,29 @@ func (i StatusError) Error() string {
 	return fmt.Sprintf("error status code: %v, body: %v", i.StatusCode, i.Body)
 }
 
+// BootstrapFailure reports whether the given instance status is a parked,
+// in-process bootstrap that has failed, returning the recorded reason. While a
+// bootstrap runs or after it parks the instance replies 503 with a
+// BootstrapStatusResponse body; only the failed state is surfaced here, so a
+// still-running bootstrap returns false and the operator keeps waiting for it.
+func BootstrapFailure(status postgres.PostgresqlStatus) (reason string, failed bool) {
+	var statusErr *StatusError
+	if !errors.As(status.Error, &statusErr) ||
+		statusErr.StatusCode != http.StatusServiceUnavailable {
+		return "", false
+	}
+
+	var body postgres.BootstrapStatusResponse
+	if err := json.Unmarshal([]byte(statusErr.Body), &body); err != nil {
+		return "", false
+	}
+	if body.Error != postgres.BootstrapStatusFailed {
+		return "", false
+	}
+
+	return body.Reason, true
+}
+
 // IsTransientAuthError reports whether err is a transient instance manager rejection of
 // the operator's client certificate. The instance manager replies 503 while it does not
 // (yet) recognize the presented certificate — either no operator fingerprint has been
