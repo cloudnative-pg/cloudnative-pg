@@ -263,6 +263,13 @@ spec:
   schemas:
     - name: app
       owner: app
+      permissions:
+        usage:
+          - name: reader
+            type: grant
+        create:
+          - name: app_owner
+            type: grant
 # ...
 ```
 
@@ -274,12 +281,34 @@ Each schema entry supports the following properties:
   database:
     - `present`: Ensures that the schema is installed (default).
     - `absent`: Ensures that the schema is removed.
+- `permissions`: The `USAGE` and `CREATE` privileges to grant or revoke on the
+  schema, with the following fields:
+    - `usage`: The list of `USAGE` permissions on the schema, with the
+      following fields:
+        - `name`: The name of the role to which the permission should be
+          granted or from which it should be revoked **(mandatory)**.
+        - `type`: The type of the permission. Supports `grant` and `revoke`
+          (default: `grant`).
+    - `create`: The list of `CREATE` permissions on the schema, with the same
+      `name` and `type` fields as `usage` above.
+
+  `public` is accepted as a role name in `usage` and `create`, and is
+  translated to the PostgreSQL `PUBLIC` pseudo-role.
 
 :::info
     CloudNativePG manages schemas using the following PostgreSQL’s SQL commands:
     [`CREATE SCHEMA`](https://www.postgresql.org/docs/current/sql-createschema.html),
     [`DROP SCHEMA`](https://www.postgresql.org/docs/current/sql-dropschema.html),
-    [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html).
+    [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html),
+    [`GRANT`](https://www.postgresql.org/docs/current/sql-grant.html),
+    [`REVOKE`](https://www.postgresql.org/docs/current/sql-revoke.html).
+:::
+
+:::warning
+    Permissions are re-applied on every reconciliation cycle. Removing an
+    entry from `usage` or `create` does not revoke the corresponding
+    privilege: the operator only reconciles the grants and revokes it is
+    explicitly told about.
 :::
 
 ## Managing Foreign Data Wrappers (FDWs) in a Database
