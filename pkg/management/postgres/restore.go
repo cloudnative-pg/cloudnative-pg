@@ -46,6 +46,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -127,6 +128,13 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	// We've no WAL archive, so we can't proceed with a PITR
 	if cluster.Spec.Bootstrap.Recovery.Source == "" {
 		return nil
+	}
+
+	// The WAL restore below may reach a TLS-protected object store before the
+	// instance manager's certificate reconciler ever runs in this Pod, so the
+	// recovery-source CA has to be written to disk here.
+	if err := info.writeRecoveryBarmanEndpointCA(ctx, cli, cluster); err != nil {
+		return err
 	}
 
 	contextLogger.Info("Recovering from volume snapshot",
@@ -434,6 +442,73 @@ func (info InitInfo) loadCluster(ctx context.Context, typedClient client.Client)
 	}
 
 	return &cluster, nil
+}
+
+// writeRecoveryBarmanEndpointCA writes to disk the barman endpoint CA of the
+// recovery source, if any, before any barman-cloud command reaches a
+// TLS-protected object store. It mirrors the precedence the operator uses to
+// resolve the endpoint CA when building the bootstrap init container's
+// command (see specs.resolveBarmanEndpointCA): the recovery backup
+// reference's own CA, then the referenced backup's status CA, then the
+// recovery source external cluster's CA. It writes to the same location the
+// barman-cloud commands already read via AWS_CA_BUNDLE/REQUESTS_CA_BUNDLE, so
+// no extra wiring is needed once the file is on disk. It is a no-op when the
+// recovery source has no endpoint CA.
+func (info InitInfo) writeRecoveryBarmanEndpointCA(
+	ctx context.Context,
+	typedClient client.Client,
+	cluster *apiv1.Cluster,
+) error {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return nil
+	}
+	recovery := cluster.Spec.Bootstrap.Recovery
+
+	var endpointCA *apiv1.SecretKeySelector
+	switch {
+	case recovery.Backup != nil && recovery.Backup.EndpointCA != nil:
+		endpointCA = recovery.Backup.EndpointCA
+
+	case recovery.Backup != nil:
+		var backup apiv1.Backup
+		if err := typedClient.Get(
+			ctx,
+			client.ObjectKey{Namespace: info.Namespace, Name: recovery.Backup.Name},
+			&backup); err != nil {
+			return fmt.Errorf("while loading the recovery backup for the barman endpoint CA: %w", err)
+		}
+		endpointCA = backup.Status.EndpointCA
+
+	case recovery.Source != "":
+		if externalCluster, ok := cluster.ExternalCluster(recovery.Source); ok &&
+			externalCluster.BarmanObjectStore != nil {
+			endpointCA = externalCluster.BarmanObjectStore.EndpointCA
+		}
+	}
+
+	if endpointCA == nil || endpointCA.Name == "" || endpointCA.Key == "" {
+		return nil
+	}
+
+	var secret corev1.Secret
+	if err := typedClient.Get(
+		ctx,
+		client.ObjectKey{Namespace: info.Namespace, Name: endpointCA.Name},
+		&secret); err != nil {
+		return fmt.Errorf("while loading the recovery barman endpoint CA secret: %w", err)
+	}
+
+	data, ok := secret.Data[endpointCA.Key]
+	if !ok {
+		return fmt.Errorf("missing %s entry in Secret %s", endpointCA.Key, endpointCA.Name)
+	}
+
+	if _, err := fileutils.WriteFileAtomic(
+		postgresSpec.BarmanRestoreEndpointCACertificateLocation, data, 0o600); err != nil {
+		return fmt.Errorf("while writing the recovery barman endpoint CA: %w", err)
+	}
+
+	return nil
 }
 
 // loadBackup loads the backup manifest from the API server of from the object store.
@@ -1108,6 +1183,10 @@ func (info InitInfo) restoreViaBarmanObjectStore(
 	cli client.Client,
 	cluster *apiv1.Cluster,
 ) (config string, envs []string, err error) {
+	if err := info.writeRecoveryBarmanEndpointCA(ctx, cli, cluster); err != nil {
+		return "", nil, err
+	}
+
 	// Before starting the restore we check if the archive destination is safe to
 	// use, otherwise we stop creating the cluster.
 	if err := info.checkBackupDestination(ctx, cli, cluster); err != nil {

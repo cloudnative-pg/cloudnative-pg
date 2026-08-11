@@ -836,9 +836,9 @@ operator to connect cross-namespace to cluster pods.
 
 ### Error while bootstrapping the data directory
 
-If your Cluster's initialization job crashes with a "Bus error (core dumped)
-child process exited with exit code 135", you likely need to fix the Cluster
-hugepages settings.
+If your Cluster's bootstrap init container crashes with a "Bus error (core
+dumped) child process exited with exit code 135", you likely need to fix the
+Cluster hugepages settings.
 
 The reason is the incomplete support of hugepages in the cgroup v1 that should
 be fixed in v2. For more information, check the PostgreSQL [BUG #17757: Not
@@ -870,14 +870,14 @@ Please remember that you must have enough hugepages memory available to schedule
 every Pod in the Cluster (in the example above, at least 512MiB per Pod must be
 free).
 
-### Bootstrap job hangs in running status
+### Bootstrap init container hangs in running status
 
-If your Cluster's initialization job hangs while in `Running` status with the
-message:
-"error while waiting for the API server to be reachable", you probably have
-a network issue preventing communication with the Kubernetes API server.
-Initialization jobs (like most of jobs) need to access the Kubernetes
-API. Please check your networking.
+If your Cluster's instance Pod hangs while its bootstrap init container is in
+`Running` status with the message "error while waiting for the API server to
+be reachable", you probably have a network issue preventing communication
+with the Kubernetes API server. The bootstrap init container, like most of the
+operator's components, needs to access the Kubernetes API. Please check your
+networking.
 
 Another possible cause is when you have sidecar injection configured. Sidecars
 such as Istio may make the network temporarily unavailable during startup. If
