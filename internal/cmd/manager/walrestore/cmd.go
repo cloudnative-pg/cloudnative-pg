@@ -362,7 +362,8 @@ func getWALRestoreSettings(
 			// The cached recovery-source store's ServerName is always populated by
 			// loadBackup (from the Backup CR, or from the external cluster's
 			// GetServerName()), so passing it again here is not a real fallback.
-			return walRestoreSettingsFromStore(ctx, cacheClient, barmanConfiguration, barmanConfiguration.ServerName, nil, rewindMode)
+			return walRestoreSettingsFromStore(
+				ctx, cacheClient, barmanConfiguration, barmanConfiguration.ServerName, nil, rewindMode)
 		case !errors.Is(configErr, cache.ErrCacheMiss):
 			// A real failure resolving the bootstrap-cached recovery source store
 			// must not be mistaken for "nothing cached yet": falling through here
