@@ -139,7 +139,9 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   cd "${ROOT_DIR}/tests"
   ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
    --github-output --force-newlines \
-   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" \
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_plugin_barman_cloud_test.go" \
+   --output-dir "${ROOT_DIR}/tests/e2e/out" \
    --json-report  "upgrade_report.json" -v ./e2e/... || RC_GINKGO1=$?
 
   # Report if there are any tests that failed
