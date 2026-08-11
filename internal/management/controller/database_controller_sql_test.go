@@ -563,6 +563,20 @@ var _ = Describe("Managed schema SQL", func() {
 			Expect(updateDatabaseSchema(ctx, db, schema,
 				&schemaInfo{Name: schema.Name, Owner: schema.Owner})).Error().NotTo(HaveOccurred())
 		})
+
+		It("returns an error naming the schema when the CREATE grant fails", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("REVOKE CREATE ON SCHEMA \"testschema\" FROM \"writer\"").
+				WillReturnError(testError)
+
+			err := updateDatabaseSchemaGrants(ctx, db, schema)
+			Expect(err).To(MatchError(testError))
+			Expect(err.Error()).To(ContainSubstring("testschema"))
+		})
+
 	})
 
 	Context("dropDatabaseSchema", func() {
