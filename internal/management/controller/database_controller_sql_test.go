@@ -577,6 +577,22 @@ var _ = Describe("Managed schema SQL", func() {
 			Expect(err.Error()).To(ContainSubstring("testschema"))
 		})
 
+		It("issues no SQL when both permission lists are empty", func(ctx SpecContext) {
+			schema.Permissions = &apiv1.SchemaPermissionsSpec{}
+
+			Expect(updateDatabaseSchemaGrants(ctx, db, schema)).Error().NotTo(HaveOccurred())
+		})
+
+		It("grants to the PUBLIC pseudo-role unquoted", func(ctx SpecContext) {
+			schema.Permissions = &apiv1.SchemaPermissionsSpec{
+				Usage: []apiv1.UsageSpec{{Name: "public", Type: apiv1.GrantUsageSpecType}},
+			}
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO PUBLIC").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchemaGrants(ctx, db, schema)).Error().NotTo(HaveOccurred())
+		})
 	})
 
 	Context("dropDatabaseSchema", func() {
