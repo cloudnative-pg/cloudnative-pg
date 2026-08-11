@@ -37,6 +37,7 @@ import (
 type CacheClient interface {
 	GetCluster() (*apiv1.Cluster, error)
 	GetEnv(key string) ([]string, error)
+	GetBarmanObjectStore(key string) (*apiv1.BarmanObjectStoreConfiguration, error)
 }
 
 type cacheClientImpl struct {
@@ -57,6 +58,21 @@ func (c *cacheClientImpl) GetCluster() (*apiv1.Cluster, error) {
 	}
 
 	return cluster, nil
+}
+
+// GetBarmanObjectStore gets a cached barman object store configuration from cache
+func (c *cacheClientImpl) GetBarmanObjectStore(key string) (*apiv1.BarmanObjectStoreConfiguration, error) {
+	bytes, err := c.httpCacheGet(key)
+	if err != nil {
+		return nil, err
+	}
+
+	configuration := &apiv1.BarmanObjectStoreConfiguration{}
+	if err := json.Unmarshal(bytes, configuration); err != nil {
+		return nil, err
+	}
+
+	return configuration, nil
 }
 
 // GetEnv gets the environment variables from cache
