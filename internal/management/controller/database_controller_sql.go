@@ -388,10 +388,17 @@ func updateDatabaseSchemaGrants(ctx context.Context, db *sql.DB, schema apiv1.Sc
 		return nil
 	}
 	const objectTypeSchema = "SCHEMA"
-	if err := applyObjectPrivilege(ctx, db, "USAGE", objectTypeSchema, schema.Name, schema.Permissions.Usage); err != nil {
+	if err := applyObjectPrivilege(
+		ctx, db, "USAGE", objectTypeSchema, schema.Name, schema.Permissions.Usage,
+	); err != nil {
 		return fmt.Errorf("applying USAGE grants for schema %q: %w", schema.Name, err)
 	}
-	return applyObjectPrivilege(ctx, db, "CREATE", objectTypeSchema, schema.Name, schema.Permissions.Create)
+	if err := applyObjectPrivilege(
+		ctx, db, "CREATE", objectTypeSchema, schema.Name, schema.Permissions.Create,
+	); err != nil {
+		return fmt.Errorf("applying CREATE grants for schema %q: %w", schema.Name, err)
+	}
+	return nil
 }
 
 func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
