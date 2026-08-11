@@ -1,0 +1,12 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: scheduled-backup
+spec:
+  schedule: "0 */1 * * * *"
+  target: primary
+  cluster:
+    name: cluster1
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
