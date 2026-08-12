@@ -37,8 +37,12 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	ctx context.Context,
 	namespacedName types.NamespacedName,
 ) error {
+	// Databases are the only owned resources that may refer to a cluster living
+	// in another namespace, so they are listed from every namespace. The items
+	// referring to a different cluster are then skipped while notifying the
+	// deletion.
 	var dbList apiv1.DatabaseList
-	if err := r.List(ctx, &dbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+	if err := r.List(ctx, &dbList); err != nil {
 		return err
 	}
 
@@ -101,6 +105,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 type clusterOwnedResourceWithStatus interface {
 	client.Object
 	GetClusterRef() apiv1.ClusterObjectReference
+	GetClusterNamespace() string
 	GetStatusMessage() string
 	SetAsFailed(err error)
 	SetStatusObservedGeneration(obsGeneration int64)
@@ -129,7 +134,12 @@ func notifyOwnedResourceDeletion[T clusterOwnedResourceWithStatus](
 			"resourceName", obj.GetName(),
 			"finalizerName", finalizerName,
 		)
-		if obj.GetClusterRef().Name != namespacedName.Name {
+		// The resources are matched on the namespace of the referenced cluster
+		// too, and not just on its name: a cross-namespace resource may be
+		// listed from any namespace, and a resource referring to a cluster
+		// having the same name in another namespace must be left alone.
+		if obj.GetClusterRef().Name != namespacedName.Name ||
+			obj.GetClusterNamespace() != namespacedName.Namespace {
 			continue
 		}
 

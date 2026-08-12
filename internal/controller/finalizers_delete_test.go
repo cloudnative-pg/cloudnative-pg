@@ -36,6 +36,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// testDeletionClusterName is the name of the cluster whose deletion is notified
+// to the owned resources of these tests
+const testDeletionClusterName = "cluster"
+
 //nolint:dupl
 var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 	var (
@@ -51,7 +55,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 		}
 		namespacedName = types.NamespacedName{
 			Namespace: "test",
-			Name:      "cluster",
+			Name:      testDeletionClusterName,
 		}
 	})
 
@@ -69,7 +73,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					Spec: apiv1.DatabaseSpec{
 						Name: "db-test",
 						ClusterRef: apiv1.ClusterObjectReference{
-							Name: "cluster",
+							Name: testDeletionClusterName,
 						},
 					},
 					Status: apiv1.DatabaseStatus{
@@ -88,7 +92,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					Spec: apiv1.DatabaseSpec{
 						Name: "db-test-2",
 						ClusterRef: apiv1.ClusterObjectReference{
-							Name: "cluster",
+							Name: testDeletionClusterName,
 						},
 					},
 				},
@@ -160,7 +164,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					Spec: apiv1.PublicationSpec{
 						Name: "pub-test",
 						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+							Name: testDeletionClusterName,
 						},
 					},
 					Status: apiv1.PublicationStatus{
@@ -179,7 +183,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					Spec: apiv1.PublicationSpec{
 						Name: "pub-test-2",
 						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+							Name: testDeletionClusterName,
 						},
 					},
 				},
@@ -250,7 +254,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					Spec: apiv1.SubscriptionSpec{
 						Name: "sub-test",
 						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+							Name: testDeletionClusterName,
 						},
 					},
 					Status: apiv1.SubscriptionStatus{
@@ -269,7 +273,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					Spec: apiv1.SubscriptionSpec{
 						Name: "sub-test-2",
 						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+							Name: testDeletionClusterName,
 						},
 					},
 				},
@@ -324,6 +328,69 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 		Expect(subscription.Finalizers).To(BeEquivalentTo([]string{utils.SubscriptionFinalizerName}))
 		Expect(subscription.Status.Applied).To(BeNil())
 		Expect(subscription.Status.Message).ToNot(ContainSubstring("not reconciled"))
+	})
+
+	Context("with databases living outside the namespace of the cluster", func() {
+		newDatabase := func(name string, clusterRef apiv1.ClusterObjectReference) apiv1.Database {
+			return apiv1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{utils.DatabaseFinalizerName},
+					Name:       name,
+					Namespace:  "app",
+				},
+				Spec: apiv1.DatabaseSpec{
+					Name:       "db-test",
+					ClusterRef: clusterRef,
+				},
+				Status: apiv1.DatabaseStatus{
+					Applied: ptr.To(true),
+				},
+			}
+		}
+
+		It("sets them as failed and deletes their finalizers", func(ctx SpecContext) {
+			databaseList := &apiv1.DatabaseList{
+				Items: []apiv1.Database{
+					newDatabase("db-cross", apiv1.ClusterObjectReference{
+						Name:      testDeletionClusterName,
+						Namespace: "test",
+					}),
+				},
+			}
+
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).
+				WithStatusSubresource(&databaseList.Items[0]).Build()
+			r.Client = cli
+			Expect(r.notifyDeletionToOwnedResources(ctx, namespacedName)).To(Succeed())
+
+			database := &apiv1.Database{}
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(&databaseList.Items[0]), database)).To(Succeed())
+			Expect(database.Finalizers).To(BeZero())
+			Expect(database.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(database.Status.Message).To(ContainSubstring("cluster resource has been deleted"))
+		})
+
+		It("leaves alone the ones referring to a cluster of the same name in their namespace",
+			func(ctx SpecContext) {
+				// The reference has no namespace, so it resolves to "app", the
+				// namespace of the Database, and not to the deleted cluster
+				databaseList := &apiv1.DatabaseList{
+					Items: []apiv1.Database{
+						newDatabase("db-homonym", apiv1.ClusterObjectReference{Name: testDeletionClusterName}),
+					},
+				}
+
+				cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).
+					WithStatusSubresource(&databaseList.Items[0]).Build()
+				r.Client = cli
+				Expect(r.notifyDeletionToOwnedResources(ctx, namespacedName)).To(Succeed())
+
+				database := &apiv1.Database{}
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(&databaseList.Items[0]), database)).To(Succeed())
+				Expect(database.Finalizers).To(BeEquivalentTo([]string{utils.DatabaseFinalizerName}))
+				Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+				Expect(database.Status.Message).ToNot(ContainSubstring("cluster resource has been deleted"))
+			})
 	})
 })
 
