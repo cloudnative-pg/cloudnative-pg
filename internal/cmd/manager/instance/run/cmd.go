@@ -154,6 +154,44 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
+// getDatabaseCacheConfig returns the cache configuration to be used for the
+// Database objects reconciled by this instance manager.
+//
+// Databases are watched only in the namespace of the cluster, unless the
+// cluster opted into cross-namespace Database support, in which case they are
+// watched in every namespace. The scope cannot be widened unconditionally:
+// the cluster-wide permissions on Database objects are granted by the
+// ClusterRole that is created only for the clusters enabling the feature, so
+// every other instance manager would fail to start its cache.
+//
+// The cluster is read through the passed reader because the manager, and
+// therefore its cache, does not exist yet at this point.
+func getDatabaseCacheConfig(
+	ctx context.Context,
+	cli client.Reader,
+	namespace string,
+	clusterName string,
+) (cache.ByObject, error) {
+	var cluster apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      clusterName,
+	}, &cluster); err != nil {
+		return cache.ByObject{}, fmt.Errorf("while detecting cross-namespace databases support: %w", err)
+	}
+
+	if cluster.Spec.EnableCrossNamespaceDatabases {
+		// An empty configuration watches every namespace
+		return cache.ByObject{}, nil
+	}
+
+	return cache.ByObject{
+		Namespaces: map[string]cache.Config{
+			namespace: {},
+		},
+	}, nil
+}
+
 func runSubCommand( //nolint: gocyclo,gocognit
 	ctx context.Context,
 	instance *postgres.Instance,
@@ -176,6 +214,19 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		return err
 	}
 
+	preflightClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+	if err != nil {
+		contextLogger.Error(err, "unable to create the client detecting cross-namespace databases")
+		return err
+	}
+
+	databaseCacheConfig, err := getDatabaseCacheConfig(
+		ctx, preflightClient, instance.GetNamespaceName(), instance.GetClusterName())
+	if err != nil {
+		contextLogger.Error(err, "unable to detect the cross-namespace databases support")
+		return err
+	}
+
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{
@@ -186,8 +237,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 						instance.GetNamespaceName(): {},
 					},
 				},
-				// Watch all namespaces for cross-namespace Database support
-				&apiv1.Database{}: {},
+				&apiv1.Database{}: databaseCacheConfig,
 				&apiv1.Publication{}: {
 					Namespaces: map[string]cache.Config{
 						instance.GetNamespaceName(): {},
