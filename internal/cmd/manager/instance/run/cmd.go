@@ -164,32 +164,41 @@ func NewCmd() *cobra.Command {
 // ClusterRole that is created only for the clusters enabling the feature, so
 // every other instance manager would fail to start its cache.
 //
-// The cluster is read through the passed reader because the manager, and
-// therefore its cache, does not exist yet at this point.
-func getDatabaseCacheConfig(
-	ctx context.Context,
-	cli client.Reader,
-	namespace string,
-	clusterName string,
-) (cache.ByObject, error) {
-	var cluster apiv1.Cluster
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: namespace,
-		Name:      clusterName,
-	}, &cluster); err != nil {
-		return cache.ByObject{}, fmt.Errorf("while detecting cross-namespace databases support: %w", err)
-	}
-
-	if cluster.Spec.EnableCrossNamespaceDatabases {
+// A change of this setting on a running cluster is applied by the
+// databaseWatchScopeReconciler, which restarts the instance manager.
+func getDatabaseCacheConfig(crossNamespaceDatabases bool, namespace string) cache.ByObject {
+	if crossNamespaceDatabases {
 		// An empty configuration watches every namespace
-		return cache.ByObject{}, nil
+		return cache.ByObject{}
 	}
 
 	return cache.ByObject{
 		Namespaces: map[string]cache.Config{
 			namespace: {},
 		},
-	}, nil
+	}
+}
+
+// isCrossNamespaceDatabasesEnabled tells whether the cluster of this instance
+// manager opted into the cross-namespace Database support.
+//
+// The cluster is read through the passed reader because the manager, and
+// therefore its cache, does not exist yet when this is needed.
+func isCrossNamespaceDatabasesEnabled(
+	ctx context.Context,
+	cli client.Reader,
+	namespace string,
+	clusterName string,
+) (bool, error) {
+	var cluster apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      clusterName,
+	}, &cluster); err != nil {
+		return false, fmt.Errorf("while detecting cross-namespace databases support: %w", err)
+	}
+
+	return cluster.Spec.EnableCrossNamespaceDatabases, nil
 }
 
 func runSubCommand( //nolint: gocyclo,gocognit
@@ -220,12 +229,13 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		return err
 	}
 
-	databaseCacheConfig, err := getDatabaseCacheConfig(
+	crossNamespaceDatabases, err := isCrossNamespaceDatabasesEnabled(
 		ctx, preflightClient, instance.GetNamespaceName(), instance.GetClusterName())
 	if err != nil {
 		contextLogger.Error(err, "unable to detect the cross-namespace databases support")
 		return err
 	}
+	databaseCacheConfig := getDatabaseCacheConfig(crossNamespaceDatabases, instance.GetNamespaceName())
 
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
@@ -438,6 +448,18 @@ func runSubCommand( //nolint: gocyclo,gocognit
 			contextLogger.Error(releaseErr, "failed to release primary lease")
 		}
 	}()
+
+	contextLogger.Info("starting database watch scope manager")
+	if err := newDatabaseWatchScopeReconciler(
+		mgr.GetClient(),
+		instance,
+		crossNamespaceDatabases,
+		onlineUpgradeCancelFunc,
+		exitedConditions,
+	).SetupWithManager(mgr); err != nil {
+		contextLogger.Error(err, "unable to create database watch scope reconciler")
+		return err
+	}
 
 	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
 	if err != nil {
