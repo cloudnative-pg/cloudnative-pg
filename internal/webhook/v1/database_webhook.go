@@ -174,10 +174,15 @@ func (v *DatabaseCustomValidator) validateCrossNamespaceCluster(
 				),
 			}
 		}
-		// For other errors, log and allow (fail open) to avoid blocking all operations
+		// Any other error leaves the reference unverified. Rejecting it only
+		// affects the Database objects referring to a cluster in another
+		// namespace, a deliberate and infrequent operation, while admitting
+		// them would grant an authorization that could not be checked.
 		databaseLog.Error(err, "Failed to fetch cluster for cross-namespace validation",
 			"cluster", clusterKey)
-		return nil
+		return field.ErrorList{
+			field.InternalError(field.NewPath("spec", "cluster"), err),
+		}
 	}
 
 	// Check if the cluster has EnableCrossNamespaceDatabases set to true

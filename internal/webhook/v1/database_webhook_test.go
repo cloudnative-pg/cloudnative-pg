@@ -22,9 +22,12 @@ package v1
 import (
 	"context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -592,6 +595,69 @@ var _ = Describe("Database cross-namespace validation", func() {
 					Namespace: "cluster-namespace",
 				},
 				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("rejects cross-namespace Database when the cluster cannot be fetched", func() {
+		getErr := apierrors.NewServiceUnavailable("the server is currently unable to handle the request")
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(
+					_ context.Context, _ client.WithWatch, _ client.ObjectKey, _ client.Object, _ ...client.GetOption,
+				) error {
+					return getErr
+				},
+			}).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		// The reference cannot be verified, so it is not admitted
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Type).To(Equal(field.ErrorTypeInternal))
+		Expect(errs[0].Field).To(Equal("spec.cluster"))
+	})
+
+	It("keeps admitting same-namespace databases when the cluster cannot be fetched", func() {
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(
+					_ context.Context, _ client.WithWatch, _ client.ObjectKey, _ client.Object, _ ...client.GetOption,
+				) error {
+					return apierrors.NewServiceUnavailable("the server is currently unable to handle the request")
+				},
+			}).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "cluster-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{Name: "my-cluster"},
+				Name:       "mydb",
 			},
 		}
 
