@@ -324,7 +324,15 @@ func CreateRole(opts RoleOptions) rbacv1.Role {
 // GetCrossNamespaceDatabaseRoleName returns the name of the ClusterRole
 // used for cross-namespace Database access
 func GetCrossNamespaceDatabaseRoleName(cluster apiv1.Cluster) string {
-	return "cnpg-" + cluster.Namespace + "-" + cluster.Name + "-cross-ns-db"
+	return GetCrossNamespaceDatabaseRoleNameFor(cluster.Namespace, cluster.Name)
+}
+
+// GetCrossNamespaceDatabaseRoleNameFor returns the name of the ClusterRole used
+// for cross-namespace Database access by the cluster having the passed namespace
+// and name. It allows computing the name when the Cluster object is no longer
+// available, such as while reconciling its deletion.
+func GetCrossNamespaceDatabaseRoleNameFor(namespace, name string) string {
+	return "cnpg-" + namespace + "-" + name + "-cross-ns-db"
 }
 
 // CreateCrossNamespaceDatabaseRole creates a ClusterRole with the permissions
