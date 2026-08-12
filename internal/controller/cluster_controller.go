@@ -79,6 +79,11 @@ const (
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
 	databaseRoleClusterKey        = ".spec.cluster.name"
+	// databaseClusterKey indexes the Database objects by the namespaced name of
+	// the cluster they refer to. Unlike the other owned resources, a Database
+	// may refer to a cluster living in another namespace, so indexing its name
+	// alone would not identify it.
+	databaseClusterKey = ".spec.cluster.namespacedName"
 	// usedPluginsClusterKey is a synthetic index key, not a real Cluster spec field;
 	// it is populated by getPluginsNeededForReconcile.
 	usedPluginsClusterKey = ".spec.usedPlugins"
@@ -1515,6 +1520,18 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 
 			return []string{pooler.Spec.Cluster.Name}
 		}); err != nil {
+		return err
+	}
+
+	// Create a new indexed field on Databases. This field will be used to easily
+	// find all the Databases pointing to a cluster, including the ones living in
+	// another namespace.
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Database{},
+		databaseClusterKey,
+		indexDatabaseByCluster,
+	); err != nil {
 		return err
 	}
 
