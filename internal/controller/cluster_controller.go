@@ -182,34 +182,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster == nil || cluster.GetDeletionTimestamp() != nil {
-		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
-			contextLogger.Error(
-				err,
-				"error while deleting dangling monitoring configMap",
-				"configMapName", apiv1.DefaultMonitoringConfigMapName,
-				"namespace", req.Namespace,
-			)
-			return ctrl.Result{}, err
-		}
-		if err := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName); err != nil {
-			// Optimistic locking conflict is transient - requeue to retry
-			if apierrs.IsConflict(err) {
-				contextLogger.Info(
-					"Optimistic locking conflict while removing finalizers, requeueing",
-					"clusterName", req.Name,
-					"namespace", req.Namespace,
-				)
-				return ctrl.Result{RequeueAfter: time.Second}, nil
-			}
-			contextLogger.Error(
-				err,
-				"error while deleting finalizers of objects on the cluster",
-				"clusterName", req.Name,
-				"namespace", req.Namespace,
-			)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+		return r.reconcileDeletedCluster(ctx, req, cluster)
 	}
 
 	if result, err := r.admission.EnsureResourceIsAdmitted(
@@ -292,6 +265,67 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	return result, nil
+}
+
+// reconcileDeletedCluster notifies the deletion of a cluster to the resources
+// depending on it, and removes the ones that are not garbage collected together
+// with it. The cluster may already be gone, so everything is keyed on the
+// namespaced name of the request.
+func (r *ClusterReconciler) reconcileDeletedCluster(
+	ctx context.Context,
+	req ctrl.Request,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
+		contextLogger.Error(
+			err,
+			"error while deleting dangling monitoring configMap",
+			"configMapName", apiv1.DefaultMonitoringConfigMapName,
+			"namespace", req.Namespace,
+		)
+		return ctrl.Result{}, err
+	}
+
+	if err := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName); err != nil {
+		// Optimistic locking conflict is transient - requeue to retry
+		if apierrs.IsConflict(err) {
+			contextLogger.Info(
+				"Optimistic locking conflict while removing finalizers, requeueing",
+				"clusterName", req.Name,
+				"namespace", req.Namespace,
+			)
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		contextLogger.Error(
+			err,
+			"error while deleting finalizers of objects on the cluster",
+			"clusterName", req.Name,
+			"namespace", req.Namespace,
+		)
+		return ctrl.Result{}, err
+	}
+
+	// The RBAC resources supporting cross-namespace Database objects are
+	// cluster-scoped, so they are not garbage collected together with the
+	// Cluster and need to be deleted explicitly. The Cluster may already be
+	// gone at this point, in which case no event can be recorded on it.
+	var recorderObject client.Object
+	if cluster != nil {
+		recorderObject = cluster
+	}
+	if err := r.deleteCrossNamespaceDatabaseRBACByKey(ctx, req.NamespacedName, recorderObject); err != nil {
+		contextLogger.Error(
+			err,
+			"error while deleting the cross-namespace Database RBAC resources",
+			"clusterName", req.Name,
+			"namespace", req.Namespace,
+		)
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 // getPluginsNeededForReconcile returns the names of the plugins that must be

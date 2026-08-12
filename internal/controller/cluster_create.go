@@ -1192,8 +1192,30 @@ func (r *ClusterReconciler) createCrossNamespaceDatabaseRBAC(ctx context.Context
 
 // deleteCrossNamespaceDatabaseRBAC deletes the ClusterRole and ClusterRoleBinding for cross-namespace Database access
 func (r *ClusterReconciler) deleteCrossNamespaceDatabaseRBAC(ctx context.Context, cluster *apiv1.Cluster) error {
+	return r.deleteCrossNamespaceDatabaseRBACByKey(
+		ctx,
+		types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name},
+		cluster,
+	)
+}
+
+// deleteCrossNamespaceDatabaseRBACByKey deletes the ClusterRole and the
+// ClusterRoleBinding created for cross-namespace Database access by the cluster
+// having the passed namespaced name.
+//
+// Those resources are cluster-scoped, so they cannot be garbage collected
+// through the namespaced owner reference of the Cluster and must be removed
+// explicitly, including when the Cluster is being deleted.
+//
+// The recorder object is optional, as the Cluster may already be gone by the
+// time its deletion is reconciled: when nil, no event is emitted.
+func (r *ClusterReconciler) deleteCrossNamespaceDatabaseRBACByKey(
+	ctx context.Context,
+	key types.NamespacedName,
+	recorderObject client.Object,
+) error {
 	contextLogger := log.FromContext(ctx)
-	roleName := specs.GetCrossNamespaceDatabaseRoleName(*cluster)
+	roleName := specs.GetCrossNamespaceDatabaseRoleNameFor(key.Namespace, key.Name)
 
 	// Delete ClusterRoleBinding
 	var clusterRoleBinding rbacv1.ClusterRoleBinding
@@ -1203,8 +1225,10 @@ func (r *ClusterReconciler) deleteCrossNamespaceDatabaseRBAC(ctx context.Context
 		}
 	} else {
 		contextLogger.Info("Deleting ClusterRoleBinding for cross-namespace Database access", "name", roleName)
-		r.Recorder.Event(cluster, "Normal", "DeletingClusterRoleBinding",
-			fmt.Sprintf("Deleting ClusterRoleBinding %s", roleName))
+		if recorderObject != nil {
+			r.Recorder.Event(recorderObject, "Normal", "DeletingClusterRoleBinding",
+				fmt.Sprintf("Deleting ClusterRoleBinding %s", roleName))
+		}
 		if err := r.Delete(ctx, &clusterRoleBinding); err != nil && !apierrs.IsNotFound(err) {
 			return fmt.Errorf("while deleting ClusterRoleBinding: %w", err)
 		}
@@ -1218,8 +1242,10 @@ func (r *ClusterReconciler) deleteCrossNamespaceDatabaseRBAC(ctx context.Context
 		}
 	} else {
 		contextLogger.Info("Deleting ClusterRole for cross-namespace Database access", "name", roleName)
-		r.Recorder.Event(cluster, "Normal", "DeletingClusterRole",
-			fmt.Sprintf("Deleting ClusterRole %s", roleName))
+		if recorderObject != nil {
+			r.Recorder.Event(recorderObject, "Normal", "DeletingClusterRole",
+				fmt.Sprintf("Deleting ClusterRole %s", roleName))
+		}
 		if err := r.Delete(ctx, &clusterRole); err != nil && !apierrs.IsNotFound(err) {
 			return fmt.Errorf("while deleting ClusterRole: %w", err)
 		}

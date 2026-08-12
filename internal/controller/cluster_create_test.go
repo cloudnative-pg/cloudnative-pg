@@ -1783,4 +1783,36 @@ var _ = Describe("reconcileCrossNamespaceDatabaseRBAC", func() {
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
 	})
+
+	Context("when the cluster is being deleted", func() {
+		It("removes the cluster-scoped resources without a recorder object", func() {
+			cluster.Spec.EnableCrossNamespaceDatabases = true
+			Expect(reconciler.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)).To(Succeed())
+
+			roleName := types.NamespacedName{Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster)}
+			var clusterRole rbacv1.ClusterRole
+			Expect(fakeClient.Get(ctx, roleName, &clusterRole)).To(Succeed())
+
+			// The Cluster may already be gone, so the cleanup only gets its
+			// namespaced name and cannot record events on it
+			Expect(reconciler.deleteCrossNamespaceDatabaseRBACByKey(
+				ctx,
+				types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name},
+				nil,
+			)).To(Succeed())
+
+			Expect(apierrs.IsNotFound(fakeClient.Get(ctx, roleName, &clusterRole))).To(BeTrue())
+
+			var clusterRoleBinding rbacv1.ClusterRoleBinding
+			Expect(apierrs.IsNotFound(fakeClient.Get(ctx, roleName, &clusterRoleBinding))).To(BeTrue())
+		})
+
+		It("succeeds when the cluster-scoped resources were never created", func() {
+			Expect(reconciler.deleteCrossNamespaceDatabaseRBACByKey(
+				ctx,
+				types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name},
+				nil,
+			)).To(Succeed())
+		})
+	})
 })
