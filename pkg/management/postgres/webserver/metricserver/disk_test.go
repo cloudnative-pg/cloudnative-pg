@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package metricserver
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	pgpostgres "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -37,9 +36,6 @@ var _ = Describe("disk metrics", func() {
 		}
 
 		setDiskMetrics(m, usages)
-
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(m.DiskTotalBytes, m.DiskUsedBytes, m.DiskAvailableBytes, m.DiskPercentUsed)
 
 		Expect(testutil.ToFloat64(m.DiskTotalBytes.WithLabelValues("pgdata"))).To(Equal(200.0))
 		Expect(testutil.ToFloat64(m.DiskUsedBytes.WithLabelValues("pgdata"))).To(Equal(50.0))

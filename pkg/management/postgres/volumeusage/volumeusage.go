@@ -66,7 +66,11 @@ func listMounts(p BasePaths) []mount {
 	}
 
 	if exists, err := fileutils.FileExists(p.TablespacesRoot); err != nil {
-		log.Warning("could not check tablespaces root existence; skipping tablespaces", "path", p.TablespacesRoot, "error", err)
+		log.Warning(
+			"could not check tablespaces root existence; skipping tablespaces",
+			"path", p.TablespacesRoot,
+			"error", err,
+		)
 	} else if exists {
 		entries, err := fileutils.GetDirectoryContent(p.TablespacesRoot)
 		if err != nil {
