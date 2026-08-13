@@ -32,6 +32,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/volumeusage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -272,7 +273,15 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 		return err
 	}
 
+	fillVolumeUsages(result, volumeusage.DefaultBasePaths())
 	return instance.fillWalStatus(result)
+}
+
+// fillVolumeUsages measures per-volume disk usage and records it in the status.
+// It never fails: measurement problems are logged inside volumeusage.Collect and
+// simply yield fewer (or zero) reported volumes.
+func fillVolumeUsages(result *postgres.PostgresqlStatus, paths volumeusage.BasePaths) {
+	result.VolumeUsages = volumeusage.Collect(paths)
 }
 
 func (instance *Instance) fillBasebackupStats(
