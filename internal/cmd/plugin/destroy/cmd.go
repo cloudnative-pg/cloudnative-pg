@@ -25,8 +25,11 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // NewCmd create the new "destroy" subcommand
@@ -39,18 +42,82 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]
-			node := args[1]
+			instance := args[1]
 			if _, err := strconv.Atoi(args[1]); err == nil {
-				node = fmt.Sprintf("%s-%s", clusterName, node)
+				instance = fmt.Sprintf("%s-%s", clusterName, instance)
 			}
 
 			keepPVC, _ := cmd.Flags().GetBool("keep-pvc")
-			return Destroy(ctx, clusterName, node, keepPVC)
+			force, _ := cmd.Flags().GetBool("force")
+			if !force {
+				if err := ensureNotLastReadyPVC(ctx, clusterName, instance, force); err != nil {
+					return err
+				}
+			}
+			return Destroy(ctx, clusterName, instance, keepPVC)
 		},
 	}
 
 	destroyCmd.Flags().BoolP("keep-pvc", "k", false,
 		"Keep the PVC but detach it from instance")
 
+	destroyCmd.Flags().BoolP("force", "f", false,
+		"Force the deletion, even if it is the last remaining instance")
+
 	return destroyCmd
+}
+
+// ensureNotLastReadyPVC checks that removing the target PVC won't remove
+// the last "ready" PVC in the cluster. PVCs that are in the process of being
+// deleted (non-zero DeletionTimestamp) are ignored.
+func ensureNotLastReadyPVC(ctx context.Context, clusterName, pvcName string, force bool) error {
+	// 1. List all PVCs in the cluster namespace that match the cluster label.
+	var pvcList corev1.PersistentVolumeClaimList
+	if err := plugin.Client.List(
+		ctx,
+		&pvcList,
+		client.InNamespace(plugin.Namespace),
+		client.MatchingLabels{
+			utils.ClusterLabelName: clusterName,
+		},
+	); err != nil {
+		return fmt.Errorf("error listing PVCs for cluster %q: %v", clusterName, err)
+	}
+
+	// 2. Count how many PVCs are in a "ready" state and *not* being deleted.
+	//    Also check if the target PVC is among them.
+	var totalReadyPVCs int
+	var isTargetPVCReady bool
+
+	for _, pvc := range pvcList.Items {
+		// Skip PVCs that are being deleted (non-nil DeletionTimestamp).
+		if pvc.ObjectMeta.DeletionTimestamp != nil && !pvc.ObjectMeta.DeletionTimestamp.IsZero() {
+			continue
+		}
+
+		// Check the annotation for "ready" status.
+		if pvc.Annotations[utils.PVCStatusAnnotationName] == "ready" {
+			totalReadyPVCs++
+			if pvc.Name == pvcName {
+				isTargetPVCReady = true
+			}
+		}
+	}
+
+	// 3. If the target PVC isn't "ready," removing it doesn't affect the
+	//    last "ready" PVC scenario.
+	if !isTargetPVCReady {
+		return nil
+	}
+
+	// 4. If removing this PVC would remove the last "ready" PVC, we need
+	//    the 'force' flag to be true. Otherwise, return an error.
+	const lastReadyPVCError = "cannot remove the last 'ready' PVC in cluster %q: %q (use --force to override)"
+	if totalReadyPVCs == 1 && !force {
+		return fmt.Errorf(lastReadyPVCError, clusterName, pvcName)
+	}
+
+	// If totalReadyPVCs != 1 or force is true, the function continues execution
+
+	return nil
 }
