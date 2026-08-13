@@ -51,7 +51,7 @@ func Get(path string) (Usage, error) {
 		return Usage{}, err
 	}
 
-	blockSize := uint64(stat.Bsize)
+	blockSize := uint64(stat.Bsize) //nolint:gosec // statfs block size is always non-negative
 	total := stat.Blocks * blockSize
 	avail := stat.Bavail * blockSize
 	// Guard against a corrupted statfs reporting more free than total blocks,
@@ -64,7 +64,7 @@ func Get(path string) (Usage, error) {
 
 	var fsID uint64
 	for _, v := range stat.Fsid.X__val {
-		fsID = fsID<<32 | uint64(uint32(v))
+		fsID = fsID<<32 | uint64(uint32(v)) //nolint:gosec // packing fsid words; the sign bit is intentionally discarded
 	}
 
 	return Usage{
