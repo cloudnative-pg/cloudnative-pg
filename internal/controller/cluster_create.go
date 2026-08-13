@@ -1728,7 +1728,7 @@ func findInstancePodToCreate(
 		if err != nil {
 			return nil, err
 		}
-		return specs.NewInstance(ctx, *cluster, serial, true)
+		return specs.NewInstance(ctx, *cluster, serial)
 	}
 
 	return nil, nil

@@ -2871,7 +2871,6 @@ func (v *ClusterCustomValidator) validatePodPatchAnnotation(r *apiv1.Cluster) fi
 		context.Background(),
 		*r,
 		1,
-		true,
 	); err != nil {
 		return field.ErrorList{
 			field.Invalid(

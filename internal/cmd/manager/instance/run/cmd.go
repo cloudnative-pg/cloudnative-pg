@@ -81,7 +81,6 @@ func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
 	var pprofHTTPServer bool
-	var statusPortTLS bool
 	var metricsPortTLS bool
 
 	cmd := &cobra.Command{
@@ -106,7 +105,6 @@ func NewCmd() *cobra.Command {
 				WithNamespace(namespace)
 
 			instance.PgData = pgData
-			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
 
 			// Since version 0.19.0 of controller-runtime, it is not allowed to create multiple controllers with the
@@ -147,8 +145,6 @@ func NewCmd() *cobra.Command {
 		false,
 		"If true it will start a pprof debug http server on localhost:6060. Defaults to false.",
 	)
-	cmd.Flags().BoolVar(&statusPortTLS, "status-port-tls", false,
-		"Enable TLS for communicating with the operator")
 	cmd.Flags().BoolVar(&metricsPortTLS, "metrics-port-tls", false,
 		"Enable TLS for metrics scraping")
 	return cmd

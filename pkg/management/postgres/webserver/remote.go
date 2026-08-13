@@ -188,10 +188,7 @@ func NewRemoteWebServer(
 		Handler:           serveMux,
 		ReadTimeout:       DefaultReadTimeout,
 		ReadHeaderTimeout: DefaultReadHeaderTimeout,
-	}
-
-	if instance.StatusPortTLS {
-		server.TLSConfig = &tls.Config{
+		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS13,
 			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				return instance.GetServerCertificate(), nil
@@ -199,7 +196,7 @@ func NewRemoteWebServer(
 			// RequestClientCert asks the client to send a certificate but does not require it.
 			// Authentication is enforced per-endpoint by withOperatorAuth.
 			ClientAuth: tls.RequestClientCert,
-		}
+		},
 	}
 
 	srv := NewWebServer(server)
