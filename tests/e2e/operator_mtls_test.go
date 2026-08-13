@@ -22,7 +22,6 @@ package e2e
 import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	remoteClient "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -68,7 +67,7 @@ var _ = Describe("Operator mTLS authentication", Label(tests.LabelSecurity), fun
 			Expect(podList.Items).ToNot(BeEmpty())
 
 			pod := podList.Items[0]
-			tlsEnabled := remoteClient.GetStatusSchemeFromPod(&pod).IsHTTPS()
+			const tlsEnabled = true
 
 			// /pg/status is unauthenticated: proves the pod is reachable and the API
 			// server proxy credentials are valid. If this fails, the next assertion

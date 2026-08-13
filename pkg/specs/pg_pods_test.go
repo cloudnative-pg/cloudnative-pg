@@ -41,7 +41,7 @@ var _ = Describe("Extract the used image name", func() {
 			Image: configuration.Current.PostgresImageName,
 		},
 	}
-	pod, err := NewInstance(context.TODO(), cluster, 1, true)
+	pod, err := NewInstance(context.TODO(), cluster, 1)
 	Expect(err).ToNot(HaveOccurred())
 
 	It("extract the default image name", func() {

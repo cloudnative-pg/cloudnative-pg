@@ -28,7 +28,6 @@ import (
 	"net"
 	"net/http"
 	neturl "net/url"
-	"slices"
 	"sort"
 	"time"
 
@@ -40,7 +39,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 )
@@ -209,8 +207,7 @@ func (r *instanceClientImpl) GetPgControlDataFromInstance(
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	scheme := GetStatusSchemeFromPod(pod)
-	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPGControlData, url.StatusPort)
+	httpURL := url.Build("https", pod.Status.PodIP, url.PathPGControlData, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, httpURL, nil)
 	if err != nil {
 		return "", err
@@ -267,8 +264,7 @@ func (r *instanceClientImpl) UpgradeInstanceManager(
 		}
 	}()
 
-	scheme := GetStatusSchemeFromPod(pod)
-	updateURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathUpdate, url.StatusPort)
+	updateURL := url.Build("https", pod.Status.PodIP, url.PathUpdate, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, updateURL, nil)
 	if err != nil {
 		return err
@@ -316,8 +312,7 @@ func (r *instanceClientImpl) rawInstanceStatusRequest(
 	ctx context.Context,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
-	scheme := GetStatusSchemeFromPod(&pod)
-	statusURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
+	statusURL := url.Build("https", pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
 	if err != nil {
 		result.Error = err
@@ -358,48 +353,11 @@ func (r *instanceClientImpl) rawInstanceStatusRequest(
 	return result
 }
 
-// HTTPScheme identifies a valid scheme: http, https
-type HTTPScheme string
-
-const (
-	schemeHTTP  HTTPScheme = "http"
-	schemeHTTPS HTTPScheme = "https"
-)
-
-// IsHTTPS returns true if schemeHTTPS
-func (h HTTPScheme) IsHTTPS() bool {
-	return h == schemeHTTPS
-}
-
-// ToString returns the scheme as a string value
-func (h HTTPScheme) ToString() string {
-	return string(h)
-}
-
-// GetStatusSchemeFromPod detects if a Pod is exposing the status via HTTP or HTTPS
-func GetStatusSchemeFromPod(pod *corev1.Pod) HTTPScheme {
-	// Fall back to comparing the container environment configuration
-	for _, container := range pod.Spec.Containers {
-		// we go to the next array element if it isn't the postgres container
-		if container.Name != specs.PostgresContainerName {
-			continue
-		}
-
-		if slices.Contains(container.Command, "--status-port-tls") {
-			return schemeHTTPS
-		}
-
-		break
-	}
-
-	return schemeHTTP
-}
-
 func (r *instanceClientImpl) ArchivePartialWAL(ctx context.Context, pod *corev1.Pod) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
 	statusURL := url.Build(
-		GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, url.PathPgArchivePartial, url.StatusPort)
+		"https", pod.Status.PodIP, url.PathPgArchivePartial, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, statusURL, nil)
 	if err != nil {
 		return "", err
