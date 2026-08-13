@@ -54,7 +54,13 @@ func Get(path string) (Usage, error) {
 	blockSize := uint64(stat.Bsize)
 	total := stat.Blocks * blockSize
 	avail := stat.Bavail * blockSize
-	used := (stat.Blocks - stat.Bfree) * blockSize
+	// Guard against a corrupted statfs reporting more free than total blocks,
+	// which would underflow the unsigned subtraction. TotalBytes/UsedBytes are
+	// reported in bytes, so they stay within uint64 for any real-world volume.
+	var used uint64
+	if stat.Blocks > stat.Bfree {
+		used = (stat.Blocks - stat.Bfree) * blockSize
+	}
 
 	var fsID uint64
 	for _, v := range stat.Fsid.X__val {
