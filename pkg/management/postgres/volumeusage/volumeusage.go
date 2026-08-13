@@ -54,42 +54,41 @@ type mount struct {
 }
 
 // listMounts discovers the volumes that currently exist on disk.
-func listMounts(p BasePaths) ([]mount, error) {
+// Enumeration errors are logged as warnings and skipped; pgdata and any
+// groups already discovered are always included in the returned slice.
+func listMounts(p BasePaths) []mount {
 	mounts := []mount{{name: "pgdata", path: p.PGData}}
 
 	if exists, err := fileutils.FileExists(p.WALVolume); err != nil {
-		return nil, err
+		log.Warning("could not check WAL volume existence; skipping WAL volume", "path", p.WALVolume, "error", err)
 	} else if exists {
 		mounts = append(mounts, mount{name: "wal", path: p.WALVolume})
 	}
 
 	if exists, err := fileutils.FileExists(p.TablespacesRoot); err != nil {
-		return nil, err
+		log.Warning("could not check tablespaces root existence; skipping tablespaces", "path", p.TablespacesRoot, "error", err)
 	} else if exists {
 		entries, err := fileutils.GetDirectoryContent(p.TablespacesRoot)
 		if err != nil {
-			return nil, err
-		}
-		for _, entry := range entries {
-			mounts = append(mounts, mount{
-				name: "tbs-" + entry,
-				path: filepath.Join(p.TablespacesRoot, entry),
-			})
+			log.Warning("could not list tablespaces directory; skipping tablespaces", "path", p.TablespacesRoot, "error", err)
+		} else {
+			for _, entry := range entries {
+				mounts = append(mounts, mount{
+					name: "tbs-" + entry,
+					path: filepath.Join(p.TablespacesRoot, entry),
+				})
+			}
 		}
 	}
 
-	return mounts, nil
+	return mounts
 }
 
 // Collect measures each discovered volume. Volumes that cannot be measured
 // are skipped with a warning; Collect never returns an error so that a single
 // bad mount never suppresses reporting for the others.
 func Collect(p BasePaths) []pgpostgres.VolumeUsage {
-	mounts, err := listMounts(p)
-	if err != nil {
-		log.Warning("could not enumerate volumes for usage reporting", "error", err)
-		return nil
-	}
+	mounts := listMounts(p)
 
 	usages := make([]pgpostgres.VolumeUsage, 0, len(mounts))
 	for _, m := range mounts {

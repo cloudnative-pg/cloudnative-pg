@@ -60,10 +60,35 @@ var _ = Describe("Collect", func() {
 		usages := Collect(BasePaths{PGData: pgdata, WALVolume: wal, TablespacesRoot: tbsRoot})
 
 		names := make([]string, 0, len(usages))
+		mountPoints := make(map[string]string, len(usages))
 		for _, u := range usages {
 			names = append(names, u.Name)
+			mountPoints[u.Name] = u.MountPoint
 		}
 		Expect(names).To(ConsistOf("pgdata", "wal", "tbs-atlas", "tbs-titan"))
+		Expect(mountPoints["pgdata"]).To(Equal(pgdata))
+		Expect(mountPoints["wal"]).To(Equal(wal))
+		Expect(mountPoints["tbs-atlas"]).To(Equal(filepath.Join(tbsRoot, "atlas")))
+		Expect(mountPoints["tbs-titan"]).To(Equal(filepath.Join(tbsRoot, "titan")))
+	})
+
+	It("still reports pgdata when tablespaces enumeration fails", func() {
+		root := GinkgoT().TempDir()
+		pgdata := filepath.Join(root, "pgdata")
+		Expect(os.MkdirAll(pgdata, 0o750)).To(Succeed())
+		// Write a regular file where the tablespaces directory is expected, so
+		// GetDirectoryContent will fail when it tries to read it as a directory.
+		tbsFile := filepath.Join(root, "tablespaces")
+		Expect(os.WriteFile(tbsFile, []byte("x"), 0o600)).To(Succeed())
+
+		usages := Collect(BasePaths{
+			PGData:          pgdata,
+			WALVolume:       filepath.Join(root, "wal"), // absent
+			TablespacesRoot: tbsFile,
+		})
+
+		Expect(usages).To(HaveLen(1))
+		Expect(usages[0].Name).To(Equal("pgdata"))
 	})
 })
 
@@ -75,6 +100,11 @@ var _ = Describe("SharesFilesystem", func() {
 
 	It("returns false when all filesystems differ", func() {
 		in := []diskusage.Usage{{FilesystemID: 1}, {FilesystemID: 2}}
+		Expect(SharesFilesystem(in)).To(BeFalse())
+	})
+
+	It("returns false for a single-element slice", func() {
+		in := []diskusage.Usage{{FilesystemID: 1}}
 		Expect(SharesFilesystem(in)).To(BeFalse())
 	})
 })
