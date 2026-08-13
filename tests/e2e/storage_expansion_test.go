@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,7 +56,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 
 	// Gathering default storage class requires to check whether the value
 	// of 'allowVolumeExpansion' is true or false
-	defaultStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	defaultStorageClass := env.DefaultStorageClass
 
 	Context("can be expanded", func() {
 		BeforeEach(func() {
