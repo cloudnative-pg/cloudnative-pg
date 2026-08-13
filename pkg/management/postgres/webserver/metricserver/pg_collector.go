@@ -80,6 +80,10 @@ type metrics struct {
 	FencingOn                    prometheus.Gauge
 	PgStatWalMetrics             PgStatWalMetrics
 	NodesUsed                    prometheus.Gauge
+	DiskTotalBytes               *prometheus.GaugeVec
+	DiskUsedBytes                *prometheus.GaugeVec
+	DiskAvailableBytes           *prometheus.GaugeVec
+	DiskPercentUsed              *prometheus.GaugeVec
 }
 
 // PgStatWalMetrics is available from PG14+
@@ -213,6 +217,30 @@ func newMetrics() *metrics {
 				"implying the absence of High Availability (HA). Ideally this value " +
 				"should match the number of instances in the cluster.",
 		}),
+		DiskTotalBytes: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: "disk",
+			Name:      "total_bytes",
+			Help:      "Total size in bytes of the filesystem backing a volume",
+		}, []string{"volume"}),
+		DiskUsedBytes: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: "disk",
+			Name:      "used_bytes",
+			Help:      "Used space in bytes of the filesystem backing a volume",
+		}, []string{"volume"}),
+		DiskAvailableBytes: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: "disk",
+			Name:      "available_bytes",
+			Help:      "Available space in bytes of the filesystem backing a volume",
+		}, []string{"volume"}),
+		DiskPercentUsed: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: "disk",
+			Name:      "percent_used",
+			Help:      "Percentage (0-100) of the filesystem backing a volume that is in use",
+		}, []string{"volume"}),
 		PgStatWalMetrics: PgStatWalMetrics{
 			WalRecords: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: PrometheusNamespace,
@@ -292,6 +320,10 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.LastFailedBackupTimestamp.Describe(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Describe(ch)
 	e.Metrics.NodesUsed.Describe(ch)
+	e.Metrics.DiskTotalBytes.Describe(ch)
+	e.Metrics.DiskUsedBytes.Describe(ch)
+	e.Metrics.DiskAvailableBytes.Describe(ch)
+	e.Metrics.DiskPercentUsed.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -375,6 +407,10 @@ func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.LastFailedBackupTimestamp.Collect(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
 	e.Metrics.NodesUsed.Collect(ch)
+	e.Metrics.DiskTotalBytes.Collect(ch)
+	e.Metrics.DiskUsedBytes.Collect(ch)
+	e.Metrics.DiskAvailableBytes.Collect(ch)
+	e.Metrics.DiskPercentUsed.Collect(ch)
 
 	if version, _ := e.instance.GetPgVersion(); version.Major() >= 14 {
 		e.Metrics.PgStatWalMetrics.WalRecords.Collect(ch)
@@ -402,6 +438,9 @@ func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 func (e *Exporter) updateInstanceMetrics() {
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
+	// Disk metrics must be collected even when the instance is fenced or
+	// PostgreSQL is unavailable — a full disk is exactly such a moment.
+	e.collectDiskMetrics()
 	if e.instance.IsFenced() {
 		e.Metrics.FencingOn.Set(1)
 		log.Info("metrics collection skipped due to fencing")
