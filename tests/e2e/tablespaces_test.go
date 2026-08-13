@@ -34,6 +34,7 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -77,8 +78,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		clusterName string
 		cluster     *apiv1.Cluster
 	)
-
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -249,7 +248,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						},
 						Storage: apiv1.StorageConfiguration{
 							Size:         "1Gi",
-							StorageClass: &storageClassName,
+							StorageClass: ptr.To(env.DefaultStorageClass),
 						},
 					},
 				})
