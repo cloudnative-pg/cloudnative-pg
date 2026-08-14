@@ -7,8 +7,8 @@
 # it does not merge an earlier, less-specific rule into a later one.
 
 * @cloudnative-pg/cloudnative-pg-owners
-/docs/ @cloudnative-pg/cloudnative-pg-owners @jsilvela
+/docs/ @cloudnative-pg/cloudnative-pg-owners
 /config/olm-*/ @cloudnative-pg/cloudnative-pg-owners @NiccoloFei
-/.github/ @cloudnative-pg/cloudnative-pg-owners @NiccoloFei @litaocdl @jsilvela
-/hack/ @cloudnative-pg/cloudnative-pg-owners @NiccoloFei @litaocdl @jsilvela
-/tests/ @cloudnative-pg/cloudnative-pg-owners @NiccoloFei @litaocdl @jsilvela
+/.github/ @cloudnative-pg/cloudnative-pg-owners @NiccoloFei @litaocdl
+/hack/ @cloudnative-pg/cloudnative-pg-owners @NiccoloFei @litaocdl
+/tests/ @cloudnative-pg/cloudnative-pg-owners @NiccoloFei @litaocdl
