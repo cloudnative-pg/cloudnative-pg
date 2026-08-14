@@ -1,6 +1,6 @@
 module github.com/cloudnative-pg/cloudnative-pg/tests
 
-go 1.26.5
+go 1.26.6
 
 replace github.com/cloudnative-pg/cloudnative-pg => ../
 

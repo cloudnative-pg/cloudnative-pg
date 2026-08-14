@@ -501,7 +501,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var updatedImageName string
 		var pgVersion version.Data
 		BeforeEach(func() {
-			storageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+			storageClass = env.DefaultStorageClass
 			preRollingImg = os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
 			updatedImageName = os.Getenv("POSTGRES_IMG")
 			if updatedImageName == "" {
