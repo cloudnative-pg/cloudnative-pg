@@ -487,9 +487,6 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-		Expect(storageClass).ToNot(BeEmpty())
-
 		By("creating the certificates for the object store", func() {
 			err := objectStoreEnv.CreateCaSecret(env, namespace)
 			Expect(err).ToNot(HaveOccurred())
@@ -510,7 +507,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		// We cannot use generated entries in the DescribeTable, so we use the scenario key as a constant, but
 		// define the actual content here.
 		// See https://onsi.github.io/ginkgo/#mental-model-table-specs-are-just-syntactic-sugar
-		scenarios = buildScenarios(namespace, storageClass, versionInfo)
+		scenarios = buildScenarios(namespace, env.DefaultStorageClass, versionInfo)
 	})
 
 	DescribeTable("can upgrade a Cluster to a newer major version", func(scenarioName string) {
