@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -159,9 +159,6 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 
 	generateBaseCluster := func(namespace string) *apiv1.Cluster {
-		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-		Expect(storageClass).ToNot(BeEmpty())
-
 		return &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterName,
@@ -170,11 +167,11 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			Spec: apiv1.ClusterSpec{
 				Instances: 3,
 				StorageConfiguration: apiv1.StorageConfiguration{
-					StorageClass: &storageClass,
+					StorageClass: ptr.To(env.DefaultStorageClass),
 					Size:         "1Gi",
 				},
 				WalStorage: &apiv1.StorageConfiguration{
-					StorageClass: &storageClass,
+					StorageClass: ptr.To(env.DefaultStorageClass),
 					Size:         "1Gi",
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
