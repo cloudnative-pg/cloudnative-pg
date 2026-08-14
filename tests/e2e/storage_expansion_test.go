@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,17 +46,16 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		level       = tests.Lowest
 	)
 	// Initializing a global namespace variable to be used in each test case
-	var namespace, namespacePrefix string
+	var namespace, namespacePrefix, defaultStorageClass string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+		// Gathering default storage class requires to check whether the value
+		// of 'allowVolumeExpansion' is true or false
+		defaultStorageClass = env.DefaultStorageClass
 	})
-
-	// Gathering default storage class requires to check whether the value
-	// of 'allowVolumeExpansion' is true or false
-	defaultStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	Context("can be expanded", func() {
 		BeforeEach(func() {

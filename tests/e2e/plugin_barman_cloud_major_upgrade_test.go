@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -105,9 +104,6 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 
 			setupPluginObjectStore(namespace, clusterName)
 
-			storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-			Expect(storageClass).ToNot(BeEmpty())
-
 			By("creating a cluster on the starting major that archives through the plugin", func() {
 				cluster := &apiv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
@@ -125,11 +121,11 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 							},
 						},
 						StorageConfiguration: apiv1.StorageConfiguration{
-							StorageClass: &storageClass,
+							StorageClass: ptr.To(env.DefaultStorageClass),
 							Size:         "1Gi",
 						},
 						WalStorage: &apiv1.StorageConfiguration{
-							StorageClass: &storageClass,
+							StorageClass: ptr.To(env.DefaultStorageClass),
 							Size:         "1Gi",
 						},
 						PostgresConfiguration: apiv1.PostgresConfiguration{
