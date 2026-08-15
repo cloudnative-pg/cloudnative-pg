@@ -92,7 +92,7 @@ func NewCmd() *cobra.Command {
 				backupName = fmt.Sprintf(
 					"%s-%s",
 					clusterName,
-					pgTime.ToCompactISO8601(time.Now()),
+					pgTime.ToCompactISO8601(time.Now().UTC()),
 				)
 			}
 
