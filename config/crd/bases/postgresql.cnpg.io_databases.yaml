@@ -360,7 +360,9 @@ spec:
                       description: |-
                         The role name of the user who owns the schema inside PostgreSQL.
                         It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the
-                        `OWNER TO` command of `ALTER SCHEMA`.
+                        `OWNER TO` command of `ALTER SCHEMA`. If left empty, the schema is
+                        owned by `postgres`, the role CloudNativePG uses to connect to the
+                        database.
                       type: string
                     permissions:
                       description: |-
