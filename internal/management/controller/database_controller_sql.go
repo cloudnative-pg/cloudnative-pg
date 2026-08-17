@@ -544,14 +544,14 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 // based on the provided FDW specification.
 func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec) error {
 	const objectTypeForeignDataWrapper = "FOREIGN DATA WRAPPER"
-	return applyUsagePermissions(ctx, db, objectTypeForeignDataWrapper, fdw.Name, fdw.Usages)
+	return applyObjectPrivilege(ctx, db, "USAGE", objectTypeForeignDataWrapper, fdw.Name, fdw.Usages)
 }
 
 // updateDatabaseForeignServerUsage updates the usage permissions of a foreign server in the database.
 // It supports granting or revoking usage permissions for specified users.
 func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *apiv1.ServerSpec) error {
 	const objectTypeForeignServer = "FOREIGN SERVER"
-	return applyUsagePermissions(ctx, db, objectTypeForeignServer, server.Name, server.Usages)
+	return applyObjectPrivilege(ctx, db, "USAGE", objectTypeForeignServer, server.Name, server.Usages)
 }
 
 // publicRole is the special PostgreSQL grantee `PUBLIC`, which grants or
@@ -617,18 +617,6 @@ func applyObjectPrivilege(
 	}
 
 	return nil
-}
-
-// applyUsagePermissions is a generic helper to grant or revoke USAGE permissions
-// for FOREIGN DATA WRAPPER / FOREIGN SERVER objects, avoiding duplicated logic.
-func applyUsagePermissions(
-	ctx context.Context,
-	db *sql.DB,
-	objectType string,
-	objectName string,
-	usages []apiv1.UsageSpec,
-) error {
-	return applyObjectPrivilege(ctx, db, "USAGE", objectType, objectName, usages)
 }
 
 func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
