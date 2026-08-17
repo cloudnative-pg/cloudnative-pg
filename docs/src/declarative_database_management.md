@@ -79,7 +79,9 @@ role, in the `cluster-example` PostgreSQL cluster.
 
 - `metadata.name`: Unique name of the Kubernetes object within its namespace.
 - `spec.name`: Name of the database as it will appear in PostgreSQL.
-- `spec.owner`: PostgreSQL role that owns the database.
+- `spec.owner`: PostgreSQL role that owns the database. The role must
+  already exist in the cluster, since CloudNativePG does not create it as
+  part of managing the database. See [PostgreSQL Role management](declarative_role_management.md) for how to declare one.
 - `spec.cluster.name`: Name of the target PostgreSQL cluster.
 
 The `Database` object must reference a specific `Cluster`, determining where
