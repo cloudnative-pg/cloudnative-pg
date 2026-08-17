@@ -92,6 +92,7 @@ var _ = Describe("Unrecoverable pending instance", Serial,
 
 			var instanceName, cordonedNode string
 			var originalPVCUIDs map[string]string
+			var expectedInstanceCount, expectedPVCCount int
 
 			By("cordoning a replica's node and deleting the replica pod", func() {
 				replicas, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
@@ -104,6 +105,14 @@ var _ = Describe("Unrecoverable pending instance", Serial,
 
 				originalPVCUIDs = collectPVCUIDs(instanceName)
 				Expect(originalPVCUIDs).ToNot(BeEmpty(), "expected at least one PVC for the instance")
+
+				instancePods, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred(), "failed to list instance pods")
+				expectedInstanceCount = len(instancePods.Items)
+
+				allPVCs, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
+				Expect(err).ToNot(HaveOccurred(), "failed to list PVCs")
+				expectedPVCCount = len(allPVCs.Items)
 
 				// Cordoning the node makes it unschedulable. The instance's PVs are
 				// pinned to it (local-path with WaitForFirstConsumer), so the pod
@@ -165,18 +174,22 @@ var _ = Describe("Unrecoverable pending instance", Serial,
 			})
 
 			By("recreating the instance PVCs with fresh UIDs", func() {
-				// The instance keeps its name (serials are reused), so each PVC must
-				// come back under the same name with a fresh UID. Checking the full
-				// set guards against leaks of secondary PVCs (wal) that share only the
-				// instance label.
+				// The recreated instance gets a new serial, so its PVCs land
+				// under a different name: match by UID instead. The full PVC
+				// count must be restored, and none of the deleted instance's
+				// original UIDs may still exist.
 				Eventually(func(g Gomega) {
-					currentUIDs := collectPVCUIDs(instanceName)
-					g.Expect(currentUIDs).To(HaveLen(len(originalPVCUIDs)))
+					pvcs, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
+					g.Expect(err).ToNot(HaveOccurred(), "failed to list PVCs")
+					g.Expect(pvcs.Items).To(HaveLen(expectedPVCCount),
+						"expected the full PVC set to be restored after recreation")
+
+					currentUIDs := make(map[string]bool, len(pvcs.Items))
+					for i := range pvcs.Items {
+						currentUIDs[string(pvcs.Items[i].UID)] = true
+					}
 					for name, originalUID := range originalPVCUIDs {
-						currentUID, ok := currentUIDs[name]
-						g.Expect(ok).To(BeTrue(),
-							"expected PVC %q to exist after recreation", name)
-						g.Expect(currentUID).ToNot(Equal(originalUID),
+						g.Expect(currentUIDs[originalUID]).To(BeFalse(),
 							"PVC %q kept its original UID instead of being recreated", name)
 					}
 				}, 300).Should(Succeed())
@@ -184,12 +197,14 @@ var _ = Describe("Unrecoverable pending instance", Serial,
 
 			By("scheduling the recreated instance onto a schedulable node", func() {
 				Eventually(func(g Gomega) {
-					var pod corev1.Pod
-					err := env.Client.Get(env.Ctx,
-						types.NamespacedName{Namespace: namespace, Name: instanceName}, &pod)
-					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(pod.Status.Phase).To(Equal(corev1.PodRunning))
-					g.Expect(pod.Spec.NodeName).ToNot(Equal(cordonedNode))
+					instancePods, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+					g.Expect(err).ToNot(HaveOccurred(), "failed to list instance pods")
+					g.Expect(instancePods.Items).To(HaveLen(expectedInstanceCount),
+						"expected the cluster to have its full complement of instances back")
+					for i := range instancePods.Items {
+						g.Expect(instancePods.Items[i].Status.Phase).To(Equal(corev1.PodRunning))
+						g.Expect(instancePods.Items[i].Spec.NodeName).ToNot(Equal(cordonedNode))
+					}
 				}, 300).Should(Succeed())
 			})
 
