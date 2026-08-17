@@ -21,6 +21,7 @@ package v1
 
 import (
 	"context"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
@@ -289,16 +290,31 @@ func validateNameOptionsUsages(
 }
 
 // validateUsageNames validates that no role name appears more than once within a usage list.
+//
+// Role names are emitted as quoted identifiers and are therefore
+// case-sensitive, with one exception: every spelling of `public` resolves to
+// the same PostgreSQL PUBLIC pseudo-role. Those are folded together, so a list
+// naming both `public` and `PUBLIC` is reported as a duplicate instead of
+// silently emitting two statements against the same grantee.
 func validateUsageNames(usagesPath *field.Path, usages []apiv1.UsageSpec) field.ErrorList {
 	var errs field.ErrorList
 
 	usageNames := stringset.New()
 	for i, usage := range usages {
-		if usageNames.Has(usage.Name) {
+		name := usage.Name
+		if strings.EqualFold(name, publicRole) {
+			name = publicRole
+		}
+
+		if usageNames.Has(name) {
 			errs = append(errs, field.Duplicate(usagesPath.Index(i).Child("name"), usage.Name))
 		}
-		usageNames.Put(usage.Name)
+		usageNames.Put(name)
 	}
 
 	return errs
 }
+
+// publicRole is the PostgreSQL PUBLIC pseudo-role, which the instance manager
+// emits verbatim rather than as a quoted identifier when applying grants.
+const publicRole = "PUBLIC"
