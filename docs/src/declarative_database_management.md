@@ -290,19 +290,21 @@ Both `usage` and `create` items accept the following fields:
   `revoke` (default: `grant`).
 
 :::info
-CloudNativePG manages schemas using the following PostgreSQL’s SQL commands:
-[`CREATE SCHEMA`](https://www.postgresql.org/docs/current/sql-createschema.html),
-[`DROP SCHEMA`](https://www.postgresql.org/docs/current/sql-dropschema.html),
-[`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html),
-[`GRANT`](https://www.postgresql.org/docs/current/sql-grant.html),
-[`REVOKE`](https://www.postgresql.org/docs/current/sql-revoke.html).
+    CloudNativePG manages schemas using the following PostgreSQL’s SQL commands:
+    [`CREATE SCHEMA`](https://www.postgresql.org/docs/current/sql-createschema.html),
+    [`DROP SCHEMA`](https://www.postgresql.org/docs/current/sql-dropschema.html),
+    [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html),
+    [`GRANT`](https://www.postgresql.org/docs/current/sql-grant.html),
+    [`REVOKE`](https://www.postgresql.org/docs/current/sql-revoke.html).
 :::
 
 :::warning
-Permissions are reconciled on every loop based strictly on declared rules.
-Simply removing an entry from `usage` or `create` **does not** automatically
-revoke that privilege from the database. To explicitly remove a privilege, set
-its `type` field to `revoke`.
+    Privileges are applied when the `Database` spec changes, not continuously.
+    CloudNativePG never reads back the privileges currently held in PostgreSQL,
+    so one granted or revoked directly in the database is not brought back to
+    the declared state until the spec is modified. Removing an entry from
+    `usage` or `create` likewise revokes nothing: to remove a privilege, set its
+    `type` field to `revoke`.
 :::
 
 ## Managing Foreign Data Wrappers (FDWs) in a Database
