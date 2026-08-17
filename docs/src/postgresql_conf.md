@@ -767,7 +767,6 @@ Users are not allowed to set the following configuration parameters in the
 - `ssl_cert_file`
 - `ssl_crl_file`
 - `ssl_dh_params_file`
-- `ssl_ecdh_curve`
 - `ssl_key_file`
 - `ssl_passphrase_command`
 - `ssl_passphrase_command_supports_reload`
