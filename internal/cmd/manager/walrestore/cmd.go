@@ -25,6 +25,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/spf13/cobra"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -134,7 +137,7 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 
 	// Validate WAL segment timeline to prevent replicas from downloading
 	// old-timeline WAL segments from the archive after switchover/failover
-	if err := validateWALSegmentTimeline(ctx, walName, cluster, podName); err != nil {
+	if err := validateWALSegmentTimeline(ctx, pgData, walName, cluster, podName); err != nil {
 		return err
 	}
 
@@ -599,10 +602,56 @@ func validateTimelineHistoryFile(ctx context.Context, walName string, cluster *a
 	return nil
 }
 
+// timelineSwitchpoint reports the LSN at which walTimeline was left behind, reading
+// it from the history file of the cluster's current timeline. The boolean result is
+// false when walTimeline is not an ancestor of the current one.
+func timelineSwitchpoint(pgData string, clusterTimeline, walTimeline int) (types.LSN, bool, error) {
+	historyFile := filepath.Join(pgData, "pg_wal", fmt.Sprintf("%08X.history", clusterTimeline))
+
+	content, err := os.ReadFile(historyFile) //nolint:gosec
+	if err != nil {
+		return "", false, err
+	}
+
+	return parseTimelineSwitchpoint(string(content), walTimeline)
+}
+
+// parseTimelineSwitchpoint scans a timeline history file for the entry of the given
+// timeline. Each entry is "<parentTLI>\t<switchpoint LSN>\t<reason>"; anything that
+// does not start with a number is a comment or a blank line.
+func parseTimelineSwitchpoint(content string, walTimeline int) (types.LSN, bool, error) {
+	for line := range strings.SplitSeq(content, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		timeline, err := strconv.Atoi(fields[0])
+		if err != nil || timeline != walTimeline {
+			continue
+		}
+
+		lsn := types.LSN(fields[1])
+		if _, err := lsn.Parse(); err != nil {
+			return "", false, fmt.Errorf("while parsing switchpoint of timeline %v: %w", walTimeline, err)
+		}
+
+		return lsn, true, nil
+	}
+
+	return "", false, nil
+}
+
 // validateWALSegmentTimeline prevents replicas from downloading old-timeline
 // WAL segments from the archive after a switchover or failover.
 // Skipped during bootstrap/recovery (CurrentPrimary not yet set) to allow PITR.
-func validateWALSegmentTimeline(ctx context.Context, walName string, cluster *apiv1.Cluster, podName string) error {
+func validateWALSegmentTimeline(
+	ctx context.Context,
+	pgData string,
+	walName string,
+	cluster *apiv1.Cluster,
+	podName string,
+) error {
 	contextLog := log.FromContext(ctx)
 
 	if !postgres.IsWALFile(walName) {
@@ -641,8 +690,29 @@ func validateWALSegmentTimeline(ctx context.Context, walName string, cluster *ap
 		return nil
 	}
 
-	if walTimeline < clusterTimeline {
-		contextLog.Warning("Refusing to restore old-timeline WAL segment for replica",
+	if walTimeline >= clusterTimeline {
+		return nil
+	}
+
+	// A replica lagging behind replays the tail of an older timeline up to the point
+	// where that timeline diverged, so those segments are legitimate. Only the ones
+	// starting past the switchpoint would take the replica onto a dead branch.
+	switchpoint, isAncestor, err := timelineSwitchpoint(pgData, clusterTimeline, walTimeline)
+	if err != nil {
+		// Without the history file the switchpoint is unknown. Refusing here would
+		// strand a replica that cannot stream either, so let PostgreSQL decide.
+		contextLog.Warning("Could not read timeline history, allowing old-timeline WAL segment",
+			"walName", walName,
+			"walTimeline", walTimeline,
+			"clusterTimeline", clusterTimeline,
+			"podName", podName,
+			"error", err)
+
+		return nil
+	}
+
+	if !isAncestor {
+		contextLog.Warning("Refusing to restore WAL segment of a timeline absent from the cluster history",
 			"walName", walName,
 			"walTimeline", walTimeline,
 			"clusterTimeline", clusterTimeline,
@@ -652,5 +722,33 @@ func validateWALSegmentTimeline(ctx context.Context, walName string, cluster *ap
 		return barmanRestorer.ErrWALNotFound
 	}
 
-	return nil
+	segmentStart, err := types.LSNStartFromWALName(walName, uint64(postgres.DefaultWALSegmentSize))
+	if err != nil {
+		contextLog.Error(err, "Could not compute the start LSN of a WAL segment despite passing IsWALFile",
+			"walName", walName)
+
+		return nil
+	}
+
+	if segmentStart.Less(switchpoint) {
+		contextLog.Trace("Allowing pre-divergence WAL segment of an ancestor timeline",
+			"walName", walName,
+			"walTimeline", walTimeline,
+			"clusterTimeline", clusterTimeline,
+			"segmentStart", segmentStart,
+			"switchpoint", switchpoint)
+
+		return nil
+	}
+
+	contextLog.Warning("Refusing to restore post-divergence WAL segment of an ancestor timeline",
+		"walName", walName,
+		"walTimeline", walTimeline,
+		"clusterTimeline", clusterTimeline,
+		"segmentStart", segmentStart,
+		"switchpoint", switchpoint,
+		"podName", podName,
+		"currentPrimary", cluster.Status.CurrentPrimary)
+
+	return barmanRestorer.ErrWALNotFound
 }

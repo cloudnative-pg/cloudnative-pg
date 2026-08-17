@@ -22,6 +22,8 @@ package walrestore
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	"k8s.io/utils/ptr"
@@ -496,6 +498,21 @@ var _ = Describe("validateTimelineHistoryFile", func() {
 })
 
 var _ = Describe("validateWALSegmentTimeline", func() {
+	var pgData string
+
+	// Timeline 1 was left behind at 0/3000000 and timeline 2 at 0/5000000, so the
+	// segments used by the tests below sit past their respective switchpoints.
+	BeforeEach(func() {
+		pgData = GinkgoT().TempDir()
+		Expect(os.MkdirAll(filepath.Join(pgData, "pg_wal"), 0o750)).To(Succeed())
+		Expect(os.WriteFile(
+			filepath.Join(pgData, "pg_wal", "00000003.history"),
+			[]byte("1\t0/3000000\tno recovery target specified\n"+
+				"2\t0/5000000\tno recovery target specified\n"),
+			0o600,
+		)).To(Succeed())
+	})
+
 	It("should allow non-WAL files to pass through", func(ctx SpecContext) {
 		cluster := &apiv1.Cluster{
 			Status: apiv1.ClusterStatus{
@@ -504,7 +521,7 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "00000001.history", cluster, "replica-pod")
+		err := validateWALSegmentTimeline(ctx, pgData, "00000001.history", cluster, "replica-pod")
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -516,7 +533,7 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "replica-pod")
+		err := validateWALSegmentTimeline(ctx, pgData, "000000010000000000000048", cluster, "replica-pod")
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -528,7 +545,7 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "primary-pod")
+		err := validateWALSegmentTimeline(ctx, pgData, "000000010000000000000048", cluster, "primary-pod")
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -541,7 +558,7 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "new-primary")
+		err := validateWALSegmentTimeline(ctx, pgData, "000000010000000000000048", cluster, "new-primary")
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -553,7 +570,7 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "000000030000000000000048", cluster, "replica-pod")
+		err := validateWALSegmentTimeline(ctx, pgData, "000000030000000000000048", cluster, "replica-pod")
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -565,7 +582,7 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "replica-pod")
+		err := validateWALSegmentTimeline(ctx, pgData, "000000010000000000000048", cluster, "replica-pod")
 		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
 	})
 
@@ -577,7 +594,7 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "000000020000000000000010", cluster, "replica-pod")
+		err := validateWALSegmentTimeline(ctx, pgData, "000000020000000000000010", cluster, "replica-pod")
 		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
 	})
 
@@ -589,7 +606,7 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "replica-pod")
+		err := validateWALSegmentTimeline(ctx, pgData, "000000010000000000000048", cluster, "replica-pod")
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -602,7 +619,133 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 			},
 		}
 
-		err := validateWALSegmentTimeline(ctx, "000000030000000000000048", cluster, "replica-pod")
+		err := validateWALSegmentTimeline(ctx, pgData, "000000030000000000000048", cluster, "replica-pod")
 		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+	})
+
+	It("should allow an old-timeline WAL segment that precedes the switchpoint", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     3,
+			},
+		}
+
+		// Timeline 1 ends at 0/3000000, this segment starts at 0/2000000.
+		err := validateWALSegmentTimeline(ctx, pgData, "000000010000000000000002", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow the old-timeline WAL segment containing the switchpoint", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     3,
+			},
+		}
+
+		// Timeline 2 ends at 0/5000000 and this segment spans 0/5000000..0/6000000,
+		// so it still holds records the replica has to replay.
+		err := validateWALSegmentTimeline(ctx, pgData, "000000020000000000000004", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should reject a WAL segment of a timeline missing from the history", func(ctx SpecContext) {
+		// Timeline 2 is not an ancestor of timeline 3 here, so it belongs to a branch
+		// the cluster never followed.
+		Expect(os.WriteFile(
+			filepath.Join(pgData, "pg_wal", "00000003.history"),
+			[]byte("1\t0/3000000\tno recovery target specified\n"),
+			0o600,
+		)).To(Succeed())
+
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     3,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, pgData, "000000020000000000000001", cluster, "replica-pod")
+		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+	})
+
+	It("should allow an old-timeline WAL segment when the history file is missing", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     9,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, pgData, "000000010000000000000048", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	// Reproduces the extranet-psql-cluster incident: after a chain of failovers the
+	// cluster reached timeline 59 while the replica still needed 3C/D7 of timeline 58,
+	// which precedes the 3D/469D140 switchpoint recorded for it.
+	It("should allow the replica to replay the tail of the timeline it lags on", func(ctx SpecContext) {
+		Expect(os.WriteFile(
+			filepath.Join(pgData, "pg_wal", "0000003B.history"),
+			[]byte("57\t2B/F6B57538\tno recovery target specified\n"+
+				"58\t3D/469D140\tno recovery target specified\n"),
+			0o600,
+		)).To(Succeed())
+
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "extranet-psql-cluster-6",
+				TimelineID:     59,
+			},
+		}
+
+		err := validateWALSegmentTimeline(
+			ctx, pgData, "0000003A0000003C000000D7", cluster, "extranet-psql-cluster-7")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should still reject post-divergence WAL of the timeline the replica lags on", func(ctx SpecContext) {
+		Expect(os.WriteFile(
+			filepath.Join(pgData, "pg_wal", "0000003B.history"),
+			[]byte("58\t3D/469D140\tno recovery target specified\n"),
+			0o600,
+		)).To(Succeed())
+
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "extranet-psql-cluster-6",
+				TimelineID:     59,
+			},
+		}
+
+		// Starts at 3D/5000000, past the point where timeline 58 was abandoned.
+		err := validateWALSegmentTimeline(
+			ctx, pgData, "0000003A0000003D00000005", cluster, "extranet-psql-cluster-7")
+		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+	})
+})
+
+var _ = Describe("parseTimelineSwitchpoint", func() {
+	const history = "1\t0/3000000\tno recovery target specified\n" +
+		"\n" +
+		"2\t0/5000000\tno recovery target specified\n"
+
+	It("returns the switchpoint of the requested timeline", func() {
+		lsn, found, err := parseTimelineSwitchpoint(history, 2)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(lsn).To(BeEquivalentTo("0/5000000"))
+	})
+
+	It("reports timelines absent from the history", func() {
+		_, found, err := parseTimelineSwitchpoint(history, 7)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeFalse())
+	})
+
+	It("fails on a malformed switchpoint", func() {
+		_, _, err := parseTimelineSwitchpoint("1\tnot-an-lsn\tno recovery target specified\n", 1)
+		Expect(err).To(HaveOccurred())
 	})
 })
