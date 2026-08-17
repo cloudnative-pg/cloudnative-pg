@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/failsafe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
@@ -298,7 +299,10 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 
 // This is the failsafe entrypoint
 func (ws *remoteWebserverEndpoints) failSafe(w http.ResponseWriter, _ *http.Request) {
-	_, _ = fmt.Fprint(w, "OK")
+	resp := failsafe.Response{TargetPrimary: ws.instance.GetClusterOrDefault().Status.TargetPrimary}
+	if err := failsafe.Write(w, resp); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // This is the liveness probe
