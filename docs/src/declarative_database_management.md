@@ -288,7 +288,8 @@ spec:
 Each schema entry supports the following properties:
 
 - `name` *(mandatory)*: The name of the schema.
-- `owner`: The owner of the schema.
+- `owner`: The owner of the schema. If left empty, the schema is owned by
+  `postgres`, the role CloudNativePG uses to connect to the database.
 - `ensure`: Defines whether the schema should exist in the database:
     - `present`: Ensures that the schema is created (default).
     - `absent`: Ensures that the schema is dropped.
