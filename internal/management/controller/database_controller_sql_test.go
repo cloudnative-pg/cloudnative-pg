@@ -577,6 +577,16 @@ var _ = Describe("Managed schema SQL", func() {
 			Expect(err.Error()).To(ContainSubstring("testschema"))
 		})
 
+		It("reports the grant failure once, without an extra wrapping layer", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader\"").
+				WillReturnError(testError)
+
+			err := updateDatabaseSchema(ctx, db, schema, &schemaInfo{Name: schema.Name, Owner: schema.Owner})
+			Expect(err).To(MatchError(fmt.Sprintf(
+				"applying USAGE grants for schema %q: granting USAGE on SCHEMA: %v", schema.Name, testError)))
+		})
+
 		It("issues no SQL when both permission lists are empty", func(ctx SpecContext) {
 			schema.Permissions = &apiv1.SchemaPermissionsSpec{}
 
