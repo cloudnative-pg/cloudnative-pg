@@ -388,15 +388,20 @@ func updateDatabaseSchemaGrants(ctx context.Context, db *sql.DB, schema apiv1.Sc
 		return nil
 	}
 	const objectTypeSchema = "SCHEMA"
-	if err := applyObjectPrivilege(
-		ctx, db, "USAGE", objectTypeSchema, schema.Name, schema.Permissions.Usage,
-	); err != nil {
-		return fmt.Errorf("applying USAGE grants for schema %q: %w", schema.Name, err)
+	// privileges lists every schema-level privilege CNPG currently manages.
+	privileges := []struct {
+		privilege string
+		grantees  []apiv1.UsageSpec
+	}{
+		{"USAGE", schema.Permissions.Usage},
+		{"CREATE", schema.Permissions.Create},
 	}
-	if err := applyObjectPrivilege(
-		ctx, db, "CREATE", objectTypeSchema, schema.Name, schema.Permissions.Create,
-	); err != nil {
-		return fmt.Errorf("applying CREATE grants for schema %q: %w", schema.Name, err)
+	for _, p := range privileges {
+		if err := applyObjectPrivilege(
+			ctx, db, p.privilege, objectTypeSchema, schema.Name, p.grantees,
+		); err != nil {
+			return fmt.Errorf("applying %s grants for schema %q: %w", p.privilege, schema.Name, err)
+		}
 	}
 	return nil
 }
