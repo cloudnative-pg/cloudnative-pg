@@ -194,6 +194,43 @@ var _ = Describe("Database validation", func() {
 		expectDuplicateErrors(errs, map[string]string{"spec.schemas[0].permissions.create[1].name": "app_owner"})
 	})
 
+	It("complains when the PUBLIC pseudo-role is named twice with a different case", func() {
+		db := &apiv1.Database{
+			Spec: apiv1.DatabaseSpec{
+				Schemas: []apiv1.SchemaSpec{
+					{
+						DatabaseObjectSpec: apiv1.DatabaseObjectSpec{Name: "analytics", Ensure: apiv1.EnsurePresent},
+						Permissions: &apiv1.SchemaPermissionsSpec{
+							Usage: []apiv1.UsageSpec{
+								{Name: "public", Type: apiv1.GrantUsageSpecType},
+								{Name: "PUBLIC", Type: apiv1.RevokeUsageSpecType},
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validate(db)
+		Expect(extractErrorFields(errs)).To(ConsistOf("spec.schemas[0].permissions.usage[1].name"))
+		expectDuplicateErrors(errs, map[string]string{"spec.schemas[0].permissions.usage[1].name": "PUBLIC"})
+	})
+
+	It("doesn't fold role names that only differ in case", func() {
+		db := &apiv1.Database{
+			Spec: apiv1.DatabaseSpec{
+				Schemas: []apiv1.SchemaSpec{
+					{
+						DatabaseObjectSpec: apiv1.DatabaseObjectSpec{Name: "analytics", Ensure: apiv1.EnsurePresent},
+						Permissions: &apiv1.SchemaPermissionsSpec{
+							Usage: []apiv1.UsageSpec{{Name: "reader"}, {Name: "Reader"}},
+						},
+					},
+				},
+			},
+		}
+		Expect(v.validate(db)).To(BeEmpty())
+	})
+
 	It("doesn't complain with distinct FDWs and usage names", func() {
 		db := &apiv1.Database{
 			Spec: apiv1.DatabaseSpec{
