@@ -529,7 +529,6 @@ var (
 		"ssl_cert_file":                          fixedConfigurationParameter,
 		"ssl_crl_file":                           fixedConfigurationParameter,
 		"ssl_dh_params_file":                     fixedConfigurationParameter,
-		"ssl_ecdh_curve":                         fixedConfigurationParameter,
 		"ssl_key_file":                           fixedConfigurationParameter,
 		"ssl_passphrase_command":                 fixedConfigurationParameter,
 		"ssl_passphrase_command_supports_reload": fixedConfigurationParameter,
