@@ -611,8 +611,8 @@ func applyObjectPrivilege(
 				"privilege", privilege, "type", objectType, "name", objectName, "grantee", grantee.Name)
 
 		default:
-			contextLogger.Warning("unknown privilege type",
-				"type", grantee.Type, "privilege", privilege, "objectType", objectType, "name", objectName)
+			return fmt.Errorf("unknown usage spec type %q for privilege %s on %s %q",
+				grantee.Type, privilege, objectType, objectName)
 		}
 	}
 

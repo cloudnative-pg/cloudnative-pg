@@ -1206,9 +1206,9 @@ var _ = Describe("applyObjectPrivilege", func() {
 			Error().To(MatchError(testError))
 	})
 
-	It("ignores entries with an unknown type", func(ctx SpecContext) {
+	It("errors out on entries with an unknown type", func(ctx SpecContext) {
 		grantees := []apiv1.UsageSpec{{Name: "angus", Type: "bogus"}}
 		Expect(applyObjectPrivilege(ctx, db, "CONNECT", "DATABASE", "app", grantees)).
-			Error().NotTo(HaveOccurred())
+			Error().To(MatchError(ContainSubstring(`unknown usage spec type "bogus"`)))
 	})
 })
