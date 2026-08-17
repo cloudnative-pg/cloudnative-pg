@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -564,5 +565,100 @@ var _ = Describe("classifyLeaseAfterRun", func() {
 	It("treats our own identity as still held (transient blip, retry)", func() {
 		Expect(classifyLeaseAfterRun(nil, record(ourIdentity), ourIdentity)).
 			To(Equal(leaseStillHeld))
+	})
+})
+
+var _ = Describe("Runnable.evaluateStepDownOnLeaseFailure", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+	)
+
+	newRunnable := func() *Runnable {
+		instance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName)
+		return New(fake.NewClientset(), instance)
+	}
+
+	It("requests an immediate shutdown when it should step down", func(ctx context.Context) {
+		r := newRunnable()
+		r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) { return true, nil }
+
+		received := make(chan postgres.InstanceCommand, 1)
+		go func() { received <- <-r.instance.GetInstanceCommandChan() }()
+
+		r.evaluateStepDownOnLeaseFailure(ctx, errors.New("api server unreachable"))
+
+		Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownImmediate"))))
+	})
+
+	It("does not request a shutdown when it should not step down", func(ctx context.Context) {
+		r := newRunnable()
+		r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) { return false, nil }
+
+		r.evaluateStepDownOnLeaseFailure(ctx, errors.New("api server unreachable"))
+
+		Consistently(r.instance.GetInstanceCommandChan()).ShouldNot(Receive())
+	})
+
+	It("fails open (no shutdown) when the step-down check itself errors", func(ctx context.Context) {
+		r := newRunnable()
+		r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) {
+			return false, errors.New("failed to read CA certificate")
+		}
+
+		r.evaluateStepDownOnLeaseFailure(ctx, errors.New("api server unreachable"))
+
+		Consistently(r.instance.GetInstanceCommandChan()).ShouldNot(Receive())
+	})
+})
+
+var _ = Describe("shouldStepDown", func() {
+	const ourIdentity = "test-cluster-1"
+
+	newCluster := func(enabled bool, instances int) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: instances,
+				Probes: &apiv1.ProbesConfiguration{
+					Liveness: &apiv1.LivenessProbe{
+						IsolationCheck: &apiv1.IsolationCheckConfiguration{
+							Enabled:           ptr.To(enabled),
+							RequestTimeout:    1000,
+							ConnectionTimeout: 1000,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("skips the check when isolation checking is disabled", func() {
+		stepDown, err := shouldStepDown(newCluster(false, 3), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("skips the check when the cluster has a single instance", func() {
+		stepDown, err := shouldStepDown(newCluster(true, 1), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("skips the check when no probes configuration is set", func() {
+		stepDown, err := shouldStepDown(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}, ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("fails open when the reachability checker cannot be built", func() {
+		// In the test environment there is no server CA certificate on disk,
+		// so building the checker fails; this must not be reported as a step-down.
+		stepDown, err := shouldStepDown(newCluster(true, 3), ourIdentity)
+		Expect(err).To(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
 	})
 })
