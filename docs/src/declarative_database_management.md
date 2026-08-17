@@ -31,6 +31,21 @@ automated, and consistent approach to managing PostgreSQL databases.
     tools or rely on the applications themselves.
 :::
 
+### Connection and Privileges
+
+Every SQL statement described on this page is issued by the instance manager
+running on the primary, as the `postgres` superuser: database-level commands
+over a connection to the `postgres` database, and everything scoped inside a
+database over a connection to that database. Two consequences are worth keeping
+in mind:
+
+- A schema or a foreign data wrapper declared without an `owner` belongs to
+  `postgres`, and the database owner holds no privileges on it until they are
+  declared.
+- Grants and revokes never fail for lack of `GRANT OPTION`, because a superuser
+  acts as the object owner. A privilege you declare is applied even where the
+  database owner could not have granted it itself.
+
 ### Declarative `Database` Manifest
 
 The following example demonstrates how a `Database` resource interacts with a
