@@ -221,7 +221,9 @@ type SchemaSpec struct {
 
 	// The role name of the user who owns the schema inside PostgreSQL.
 	// It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the
-	// `OWNER TO` command of `ALTER SCHEMA`.
+	// `OWNER TO` command of `ALTER SCHEMA`. If left empty, the schema is
+	// owned by `postgres`, the role CloudNativePG uses to connect to the
+	// database.
 	Owner string `json:"owner,omitempty"`
 
 	// Permissions defines the privileges to grant or revoke on the schema,
