@@ -2826,7 +2826,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `name` _string_ | Name of the object (extension, schema, FDW, server) | True |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Specifies whether an object (e.g schema) should be present or absent<br />in the database. If set to `present`, the object will be created if<br />it does not exist. If set to `absent`, the extension/schema will be<br />removed if it exists. |  | present | Enum: [present absent] <br /> |
-| `owner` _string_ | The role name of the user who owns the schema inside PostgreSQL.<br />It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the<br />`OWNER TO` command of `ALTER SCHEMA`. | True |  |  |
+| `owner` _string_ | The role name of the user who owns the schema inside PostgreSQL.<br />It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the<br />`OWNER TO` command of `ALTER SCHEMA`. If left empty, the schema is<br />owned by `postgres`, the role CloudNativePG uses to connect to the<br />database. | True |  |  |
 | `permissions` _[SchemaPermissionsSpec](#schemapermissionsspec)_ | Permissions defines the privileges to grant or revoke on the schema,<br />keyed by privilege. Each entry carries a role name and a type of<br />`grant` (default) or `revoke`, mirroring the existing usage model. |  |  |  |
 
 
