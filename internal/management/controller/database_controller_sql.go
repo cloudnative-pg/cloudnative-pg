@@ -441,7 +441,7 @@ func updateDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSp
 	}
 
 	if err := updateDatabaseSchemaGrants(ctx, db, schema); err != nil {
-		return fmt.Errorf("updating schema grants: %w", err)
+		return err
 	}
 
 	return nil
