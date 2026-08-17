@@ -628,8 +628,9 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 
 	contextLogger.Info("This is the former primary instance. Shutting it down to allow it to be demoted to a replica.")
 
+	r.instance.TryCheckpointIfPrimary(ctx)
+
 	// Perform a fast shutdown on the instance and wait for the instance manager to stop.
-	// The fast shutdown process will be preceded by a CHECKPOINT.
 	// When the Pod restarts, it will be demoted to act as a replica of the new primary.
 	r.Instance().RequestFastImmediateShutdown()
 
