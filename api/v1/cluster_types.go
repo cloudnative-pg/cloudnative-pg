@@ -379,6 +379,15 @@ type ClusterSpec struct {
 	// +optional
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
+	// The time in seconds that is allowed for a PostgreSQL instance to stop
+	// after an immediate shutdown request (used, for example, when a primary
+	// must step down and cannot wait for a graceful shutdown). Once this time
+	// has passed with PostgreSQL still running, the instance is considered
+	// unresponsive. Default value is 30 seconds.
+	// +kubebuilder:default:=30
+	// +optional
+	ImmediateShutdownTimeout int32 `json:"immediateShutdownTimeout,omitempty"`
+
 	// The amount of time (in seconds) to wait before triggering a failover
 	// after the primary PostgreSQL instance in the cluster was detected
 	// to be unhealthy
@@ -1470,6 +1479,10 @@ const (
 	// DefaultMaxSwitchoverDelay is the default for the pg_ctl timeout in seconds when a primary PostgreSQL instance
 	// is gracefully shutdown during a switchover.
 	DefaultMaxSwitchoverDelay = 3600
+
+	// DefaultImmediateShutdownTimeout is the default for the pg_ctl timeout in seconds when a
+	// PostgreSQL instance is shut down with an immediate shutdown request.
+	DefaultImmediateShutdownTimeout = 30
 
 	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
 	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,

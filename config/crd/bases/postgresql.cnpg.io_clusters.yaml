@@ -3248,6 +3248,16 @@ spec:
                   - name
                   type: object
                 type: array
+              immediateShutdownTimeout:
+                default: 30
+                description: |-
+                  The time in seconds that is allowed for a PostgreSQL instance to stop
+                  after an immediate shutdown request (used, for example, when a primary
+                  must step down and cannot wait for a graceful shutdown). Once this time
+                  has passed with PostgreSQL still running, the instance is considered
+                  unresponsive. Default value is 30 seconds.
+                format: int32
+                type: integer
               inheritedMetadata:
                 description: Metadata that will be inherited by all objects related
                   to the Cluster

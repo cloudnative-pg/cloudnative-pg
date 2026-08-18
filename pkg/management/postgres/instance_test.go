@@ -178,6 +178,69 @@ var _ = Describe("testing replica instance methods", Ordered, func() {
 	})
 })
 
+var _ = Describe("checkImmediateShutdownUnresponsive", func() {
+	var origPath string
+	var binDir string
+
+	// fakePgCtl installs a fake `pg_ctl` executable ahead of the real one on PATH,
+	// whose "status" subcommand exits 0 (running) or 3 (not running, matching the
+	// real pg_ctl's exit code) depending on running.
+	fakePgCtl := func(running bool) {
+		exitCode := "3"
+		if running {
+			exitCode = "0"
+		}
+		script := fmt.Sprintf("#!/bin/sh\nexit %s\n", exitCode)
+		//nolint:gosec // executable fake pg_ctl needs the execute bit
+		Expect(os.WriteFile(filepath.Join(binDir, "pg_ctl"), []byte(script), 0o700)).To(Succeed())
+	}
+
+	BeforeEach(func() {
+		var err error
+		binDir, err = os.MkdirTemp("", "fake-pg-ctl")
+		Expect(err).ToNot(HaveOccurred())
+		origPath = os.Getenv("PATH")
+		Expect(os.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)).To(Succeed())
+	})
+
+	AfterEach(func() {
+		Expect(os.Setenv("PATH", origPath)).To(Succeed())
+		Expect(os.RemoveAll(binDir)).To(Succeed())
+	})
+
+	It("does nothing when the shutdown attempt did not error", func() {
+		fakePgCtl(true)
+		instance := &Instance{}
+		instance.checkImmediateShutdownUnresponsive(context.Background(), nil)
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeFalse())
+	})
+
+	It("does nothing when PostgreSQL is no longer running despite the error", func() {
+		fakePgCtl(false)
+		instance := &Instance{}
+		instance.checkImmediateShutdownUnresponsive(context.Background(), errors.New("pg_ctl: server did not shut down"))
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeFalse())
+	})
+
+	It("marks the instance unresponsive when PostgreSQL is still running after the error", func() {
+		fakePgCtl(true)
+		instance := &Instance{}
+		instance.checkImmediateShutdownUnresponsive(context.Background(), errors.New("pg_ctl: server did not shut down"))
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
+	})
+
+	It("never clears the flag once set", func() {
+		instance := &Instance{}
+		fakePgCtl(true)
+		instance.checkImmediateShutdownUnresponsive(context.Background(), errors.New("boom"))
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
+
+		fakePgCtl(false)
+		instance.checkImmediateShutdownUnresponsive(context.Background(), nil)
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
+	})
+})
+
 var _ = Describe("testing environment variables", func() {
 	It("should return the default Socket Directory", func() {
 		socketDir := GetSocketDir()
