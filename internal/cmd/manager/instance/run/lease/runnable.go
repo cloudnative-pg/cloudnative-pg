@@ -90,7 +90,7 @@ func defaultConfig() Config {
 // It starts idle and enters the acquisition/renewal loop only after Acquire is called.
 type Runnable struct {
 	instance *postgres.Instance
-	lock     *resourcelock.LeaseLock
+	lock     resourcelock.Interface
 
 	// config holds the lease timings. It is initialised to the defaults by New
 	// and overwritten by the first Acquire call before the runnable activates.
@@ -201,7 +201,7 @@ func (r *Runnable) Release(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if record.HolderIdentity != r.lock.LockConfig.Identity {
+	if record.HolderIdentity != r.lock.Identity() {
 		contextLogger.Debug("Primary lease held by another identity, nothing to release",
 			"holder", record.HolderIdentity)
 		return nil
@@ -293,7 +293,13 @@ func classifyLeaseAfterRun(
 // clock (the same limitation client-go's elector has); it only adds latency in
 // the rare case of a restart mid-take-over, never correctness.
 func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
-	record, _, err := r.lock.Get(ctx)
+	// Bounded so a Get against an unreachable API server fails fast and
+	// retries at RetryPeriod cadence, instead of blocking the whole
+	// take-over loop for however long the underlying transport takes to
+	// give up on its own.
+	getCtx, cancel := context.WithTimeout(ctx, r.config.RetryPeriod)
+	record, _, err := r.lock.Get(getCtx)
+	cancel()
 	if errors.IsNotFound(err) {
 		// The cluster controller owns lease creation; nothing to take over yet.
 		r.observedRecord = nil
@@ -303,7 +309,7 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	identity := r.lock.LockConfig.Identity
+	identity := r.lock.Identity()
 
 	// Already ours: nothing to do here, le.Run will refresh the RenewTime.
 	if record.HolderIdentity == identity {
@@ -348,7 +354,7 @@ func sameHolder(a, b *resourcelock.LeaderElectionRecord) bool {
 func (r *Runnable) claim(ctx context.Context, current *resourcelock.LeaderElectionRecord) (bool, error) {
 	now := metav1.NewTime(time.Now())
 	if err := r.lock.Update(ctx, resourcelock.LeaderElectionRecord{
-		HolderIdentity:       r.lock.LockConfig.Identity,
+		HolderIdentity:       r.lock.Identity(),
 		LeaseDurationSeconds: int(r.config.LeaseDuration / time.Second),
 		RenewTime:            now,
 		AcquireTime:          now,
@@ -490,7 +496,7 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 		record, _, checkErr := r.lock.Get(checkCtx)
 		checkCancel()
 
-		switch classifyLeaseAfterRun(checkErr, record, r.lock.LockConfig.Identity) {
+		switch classifyLeaseAfterRun(checkErr, record, r.lock.Identity()) {
 		case leaseMissing:
 			// The lease object is gone (e.g. someone deleted it). The cluster
 			// controller will recreate it on its next reconcile; loop and let
