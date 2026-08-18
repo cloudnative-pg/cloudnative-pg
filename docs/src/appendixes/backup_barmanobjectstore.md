@@ -285,6 +285,7 @@ spec:
         - "--min-chunk-size=5MB"
         - "--read-timeout=60"
 ```
+
 For restores, the `restoreAdditionalCommandArgs` are taken from the `barmanObjectStore`
 of the external cluster the recovery is reading from, that is the entry named by
 `.spec.bootstrap.recovery.source`, not from `.spec.backup`:

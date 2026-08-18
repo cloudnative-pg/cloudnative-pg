@@ -555,23 +555,13 @@ func (info InitInfo) loadBackupFromReference(
 		return nil, nil, nil, err
 	}
 
-	barmanConfiguration := &apiv1.BarmanObjectStoreConfiguration{
-		BarmanCredentials: backup.Status.BarmanCredentials,
-		EndpointCA:        backup.Status.EndpointCA,
-		EndpointURL:       backup.Status.EndpointURL,
-		DestinationPath:   backup.Status.DestinationPath,
-		ServerName:        backup.Status.ServerName,
-	}
+	barmanConfiguration := barmanObjectStoreFromBackup(&backup)
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
 		typedClient,
 		cluster.Namespace,
-<<<<<<< HEAD
-		barmanObjectStoreFromBackup(&backup),
-=======
 		barmanConfiguration,
->>>>>>> 4fc441f47 (fix: source barman-cloud-restore arguments from the recovery object store)
 		os.Environ())
 	if err != nil {
 		return nil, nil, nil, err
@@ -1125,7 +1115,7 @@ func (info InitInfo) restoreViaBarmanObjectStore(
 	}
 
 	// If we need to download data from a backup, we do it.
-	backup, env, err := info.loadBackup(ctx, cli, cluster)
+	backup, env, barmanConfiguration, err := info.loadBackup(ctx, cli, cluster)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1134,7 +1124,7 @@ func (info InitInfo) restoreViaBarmanObjectStore(
 		return "", nil, err
 	}
 
-	if err := info.restoreDataDir(ctx, backup, env); err != nil {
+	if err := info.restoreDataDir(ctx, backup, env, barmanConfiguration); err != nil {
 		return "", nil, err
 	}
 
