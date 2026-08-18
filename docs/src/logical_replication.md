@@ -69,7 +69,7 @@ can be defined declaratively through the `Publication` resource.
 :::
 
 Suppose you have a cluster named `freddie` and want to replicate all tables in
-the `app` database. Here's a `Publication` manifest:
+the `fredapp` database. Here's a `Publication` manifest:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -79,7 +79,7 @@ metadata:
 spec:
   cluster:
     name: freddie
-  dbname: app
+  dbname: fredapp
   name: publisher
   target:
     allTables: true
@@ -90,7 +90,7 @@ In the above example:
 - The publication object is named `freddie-publisher` (`metadata.name`).
 - The publication is created via the primary of the `freddie` cluster
   (`spec.cluster.name`) with name `publisher` (`spec.name`).
-- It includes all tables (`spec.target.allTables: true`) from the `app`
+- It includes all tables (`spec.target.allTables: true`) from the `fredapp`
   database (`spec.dbname`).
 
 ### Fine-grained control over publication tables
@@ -114,8 +114,8 @@ Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#pu
 for details on declaratively customizing replication targets.
 
 The following example defines a publication that replicates all tables in the
-`portal` schema of the `app` database, along with the `users` table from the
-`access` schema:
+`portal` schema of the `fredapp` database, along with the `users` table from
+the `access` schema:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -125,7 +125,7 @@ metadata:
 spec:
   cluster:
     name: freddie
-  dbname: app
+  dbname: fredapp
   name: publisher
   target:
     objects:
@@ -187,7 +187,7 @@ metadata:
 spec:
   cluster:
     name: freddie
-  dbname: app
+  dbname: fredapp
   name: publisher
   target:
     allTables: true
@@ -195,7 +195,7 @@ spec:
 ```
 
 In this case, deleting the `Publication` object also removes the `publisher`
-publication from the `app` database of the `freddie` cluster.
+publication from the `fredapp` database of the `freddie` cluster.
 
 On a replica cluster the database is read-only, so deleting a `Publication`
 object releases its finalizer and removes the Kubernetes object without dropping
@@ -225,9 +225,9 @@ declaratively using the `Subscription` resource.
 :::
 
 Suppose you want to replicate changes from the `publisher` publication on the
-`app` database of the `freddie` cluster (*publisher*) to the `app` database of
-the `king` cluster (*subscriber*). Here's an example of a `Subscription`
-manifest:
+`fredapp` database of the `freddie` cluster (*publisher*) to the `fredapp`
+database of the `king` cluster (*subscriber*). Here's an example of a
+`Subscription` manifest:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -237,7 +237,7 @@ metadata:
 spec:
   cluster:
     name: king
-  dbname: app
+  dbname: fredapp
   name: subscriber
   externalClusterName: freddie
   publicationName: publisher
@@ -246,7 +246,7 @@ spec:
 In the above example:
 
 - The subscription object is named `freddie-to-king-subscriber` (`metadata.name`).
-- The subscription is created in the `app` database (`spec.dbname`) of the
+- The subscription is created in the `fredapp` database (`spec.dbname`) of the
   `king` cluster (`spec.cluster.name`), with name `subscriber` (`spec.name`).
 - It connects to the `publisher` publication in the external `freddie` cluster,
   referenced by `spec.externalClusterName`.
@@ -261,7 +261,7 @@ externalClusters:
     connectionParameters:
       host: freddie-rw.default.svc
       user: postgres
-      dbname: app
+      dbname: fredapp
 ```
 
 :::info
@@ -336,7 +336,7 @@ metadata:
 spec:
   cluster:
     name: king
-  dbname: app
+  dbname: fredapp
   name: subscriber
   externalClusterName: freddie
   publicationName: publisher
@@ -344,7 +344,7 @@ spec:
 ```
 
 In this case, deleting the `Subscription` object also removes the `subscriber`
-subscription from the `app` database of the `king` cluster.
+subscription from the `fredapp` database of the `king` cluster.
 
 On a replica cluster the database is read-only, so deleting a `Subscription`
 object releases its finalizer and removes the Kubernetes object without dropping
@@ -433,6 +433,7 @@ spec:
     size: 1Gi
 
   bootstrap:
+    database: fredapp
     initdb:
       postInitApplicationSQL:
         - CREATE TABLE n (i SERIAL PRIMARY KEY, m INTEGER)
@@ -446,7 +447,7 @@ metadata:
 spec:
   cluster:
     name: freddie
-  dbname: app
+  dbname: fredapp
   name: publisher
   target:
     allTables: true
@@ -477,11 +478,14 @@ spec:
 
   bootstrap:
     initdb:
+      # NB! Value for `database` and `owner` defaults to `app`
+      database: fredapp
+      # owner: app
       import:
         type: microservice
         schemaOnly: true
         databases:
-          - app
+          - fredapp
         source:
           externalCluster: freddie
 
@@ -489,7 +493,7 @@ spec:
   - name: freddie
     connectionParameters:
       host: freddie-rw.default.svc
-      user: app
+      user: fredapp
       dbname: app
     password:
       name: freddie-app
@@ -502,19 +506,19 @@ metadata:
 spec:
   cluster:
     name: king
-  dbname: app
+  dbname: fredapp
   name: subscriber
   externalClusterName: freddie
   publicationName: publisher
 ```
 
 Once the `king` cluster is running, you can verify that the replication is
-working by connecting to the `app` database and counting the records in the `n`
-table. The following example uses the `psql` command provided by the `cnpg`
+working by connecting to the `fredapp` database and counting the records in the
+`n` table. The following example uses the `psql` command provided by the `cnpg`
 plugin for simplicity:
 
 ```console
-kubectl cnpg psql king -- app -qAt -c 'SELECT count(*) FROM n'
+kubectl cnpg psql king -- fredapp -qAt -c 'SELECT count(*) FROM n'
 10000
 ```
 
