@@ -27,7 +27,7 @@ import (
 )
 
 // Print output an object via an io.Writer in a machine-readable way
-func Print(o interface{}, format OutputFormat, writer io.Writer) error {
+func Print(o any, format OutputFormat, writer io.Writer) error {
 	switch format {
 	case OutputFormatJSON:
 		data, err := json.MarshalIndent(o, "", "  ")

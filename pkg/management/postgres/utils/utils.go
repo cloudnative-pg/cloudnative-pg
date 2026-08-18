@@ -34,7 +34,7 @@ import (
 
 // DBToFloat64 convert a dynamic value to float64s for Prometheus consumption. Null types are mapped to NaN. string
 // and []byte types are mapped as NaN and !ok
-func DBToFloat64(t interface{}) (float64, bool) {
+func DBToFloat64(t any) (float64, bool) {
 	switch v := t.(type) {
 	case int64:
 		return float64(v), true
@@ -70,7 +70,7 @@ func DBToFloat64(t interface{}) (float64, bool) {
 
 // DBToUint64 convert a dynamic type to uint64 for Prometheus consumption. Null types are mapped to 0. string and []byte
 // types are mapped as 0 and !ok
-func DBToUint64(t interface{}) (uint64, bool) {
+func DBToUint64(t any) (uint64, bool) {
 	switch v := t.(type) {
 	case uint64:
 		return v, true
@@ -107,7 +107,7 @@ func DBToUint64(t interface{}) (uint64, bool) {
 }
 
 // DBToString convert a dynamic type to string for Prometheus labels. Null types are mapped to empty strings.
-func DBToString(t interface{}) (string, bool) {
+func DBToString(t any) (string, bool) {
 	switch v := t.(type) {
 	case int64:
 		return fmt.Sprintf("%v", v), true
