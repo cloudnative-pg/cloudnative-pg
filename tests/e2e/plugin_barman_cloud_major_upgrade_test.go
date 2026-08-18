@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -51,8 +50,6 @@ import (
 // archiving keeps working after a Postgres major version upgrade. Here the
 // archiver is plugin-barman-cloud rather than the in-core barmanObjectStore. The
 // in-core variant (and the other upgrade scenarios it covers) is left in place.
-// Runs on kind/k3d only, where the plugin and the shared object store are
-// installed.
 var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelPostgresMajorUpgrade, tests.LabelBackupRestore), func() {
 		const (
@@ -63,9 +60,6 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 		BeforeEach(func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
-			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
 			}
 		})
 
@@ -110,9 +104,6 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 
 			setupPluginObjectStore(namespace, clusterName)
 
-			storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-			Expect(storageClass).ToNot(BeEmpty())
-
 			By("creating a cluster on the starting major that archives through the plugin", func() {
 				cluster := &apiv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
@@ -130,11 +121,11 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 							},
 						},
 						StorageConfiguration: apiv1.StorageConfiguration{
-							StorageClass: &storageClass,
+							StorageClass: ptr.To(env.DefaultStorageClass),
 							Size:         "1Gi",
 						},
 						WalStorage: &apiv1.StorageConfiguration{
-							StorageClass: &storageClass,
+							StorageClass: ptr.To(env.DefaultStorageClass),
 							Size:         "1Gi",
 						},
 						PostgresConfiguration: apiv1.PostgresConfiguration{

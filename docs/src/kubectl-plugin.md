@@ -1061,6 +1061,13 @@ to request an online/hot backup or an offline/cold one: additionally, you can
 also tune online backups by explicitly setting the `--immediate-checkpoint` and
 `--wait-for-archive` options.
 
+You can use the `--dry-run` option to preview the `Backup` resource that would
+be created, without actually submitting it to the API server:
+
+```sh
+kubectl cnpg backup CLUSTER --dry-run
+```
+
 The ["Backup" section](./backup.md) contains more information about
 the configuration settings.
 
@@ -1079,7 +1086,7 @@ method should be used with extreme care, by authorized personnel only.
 ```console
 $ kubectl cnpg psql cluster-example
 
-psql (18.4 (Debian 18.4-1.pgdg110+1))
+psql (18.6 (Debian 18.6-1.pgdg110+1))
 Type "help" for help.
 
 postgres=#
@@ -1091,7 +1098,7 @@ select to work against a replica by using the `--replica` option:
 ```console
 $ kubectl cnpg psql --replica cluster-example
 
-psql (18.4 (Debian 18.4-1.pgdg110+1))
+psql (18.6 (Debian 18.6-1.pgdg110+1))
 
 Type "help" for help.
 
@@ -1114,7 +1121,7 @@ specific database:
 ```console
 $ kubectl cnpg psql cluster-example -- app
 
-psql (18.4 (Debian 18.4-1.pgdg110+1))
+psql (18.6 (Debian 18.6-1.pgdg110+1))
 Type "help" for help.
 
 app=#

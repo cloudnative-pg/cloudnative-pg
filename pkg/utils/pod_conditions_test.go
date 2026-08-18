@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package utils
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -183,4 +185,17 @@ var _ = Describe("Pod conditions test suite", func() {
 		}
 		Expect(IsPodUnschedulable(pod)).To(BeFalse())
 	})
+
+	DescribeTable(
+		"IsPodStuckTerminating",
+		func(deletionTime *metav1.Time, expected bool) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: deletionTime},
+			}
+			Expect(IsPodStuckTerminating(pod)).To(Equal(expected))
+		},
+		Entry("no deletion timestamp", nil, false),
+		Entry("deletion deadline in the past", &metav1.Time{Time: time.Now().Add(-time.Minute)}, true),
+		Entry("deletion deadline in the future", &metav1.Time{Time: time.Now().Add(time.Hour)}, false),
+	)
 })

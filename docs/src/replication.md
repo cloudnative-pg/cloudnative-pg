@@ -478,6 +478,93 @@ spec:
 5. When the replicas are back, `synchronous_standby_names` will be back to
    the initial state.
 
+### Failure Domain-Aware Synchronous Replication
+
+CloudNativePG can restrict the choice of synchronous standbys to instances
+located in a failure domain different from the primary's, such as another
+availability zone. The labels that define the failure domains are declared
+through one of the following mutually exclusive options of the
+`.spec.postgresql.synchronous` stanza:
+
+- `podFailureDomainKeys`: a list of pod label keys, resolved from the labels of
+  each instance pod, without ever consulting the node (recommended)
+- `nodeFailureDomainKeys`: a list of node label keys, resolved from the labels
+  of the node hosting each instance (for example,
+  `topology.kubernetes.io/zone`)
+
+Two instances belong to the same failure domain when all the listed labels
+carry the same values.
+
+::::note[Topology labels on pods]
+Starting from Kubernetes 1.35, the `topology.kubernetes.io/zone` and
+`topology.kubernetes.io/region` labels are automatically copied from the node
+onto each pod at scheduling time. As a result, `topology.kubernetes.io/zone`
+(the most common failure domain identifier) is available on pods with no extra
+setup. If you are on Kubernetes 1.34 or older, or the
+`PodTopologyLabelsAdmission` feature is not available or enabled (see
+[KEP-4742](https://github.com/kubernetes/enhancements/issues/4742)), use
+`nodeFailureDomainKeys` instead.
+::::
+
+CloudNativePG applies the failure domain constraint only when there are
+enough cross-domain standbys to satisfy it completely: the full configured
+`number` with `required` data durability, or just one with `preferred`. When
+that holds, only the standbys outside the primary's failure domain populate
+`synchronous_standby_names`.
+
+With `preferred` data durability this means the placement preference can lower
+the number of required acknowledgments: as ["Preferred Data
+Durability"](#preferred-data-durability) covers, that number is capped to the
+standbys in the list, so a single cross-domain standby out of two healthy
+replicas results in one required acknowledgment instead of the two a cluster
+without failure domain keys would ask for. Writes are never blocked, but the
+durability of each commit follows the failure domain distribution.
+
+If that isn't the case (too few cross-domain standbys, or the topology could
+not be extracted, for example because the node hosting a pod was deleted, or
+a label listed in `podFailureDomainKeys` is missing from a pod), the
+constraint is dropped entirely and standbys are selected exactly as if the
+keys were never configured. This all-or-nothing behavior guarantees that
+write transactions never wait for acknowledgments that cannot arrive.
+
+The `SyncReplicationTopologySatisfied` condition in the cluster status reports
+whether the placement preference is currently honored. The condition's reason
+is also shown in the `SYNCTOPOLOGY` column of `kubectl get clusters -o wide`.
+The `kubectl cnpg status` command shows how the instances are spread across the
+failure domains.
+The underlying data, including the failure domain of each instance and
+whether the topology was successfully extracted, is available under the
+cluster's `.status.topology` key.
+
+:::important
+The condition only evaluates the cluster instances: standby
+names supplied through `standbyNamesPre` and `standbyNamesPost` are outside
+the operator's knowledge and are not part of the check.
+:::
+
+For example, the following cluster keeps two synchronous standbys, chosen from
+the instances running in a different availability zone than the primary
+whenever possible:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-syncreplicas
+spec:
+  instances: 5
+
+  postgresql:
+    synchronous:
+      podFailureDomainKeys:
+      - topology.kubernetes.io/zone
+      method: first
+      number: 2
+
+  storage:
+    size: 1Gi
+```
+
 ## Synchronous Replication (Deprecated)
 
 :::warning
@@ -546,6 +633,14 @@ requested number of synchronous standbys in the list*.
 :::
 
 ### Select nodes for synchronous replication
+
+:::info[Use the new failure domain API]
+Unless you specifically need the deprecated quorum-based synchronous
+replication API, prefer the current API instead. See
+["Failure Domain-Aware Synchronous Replication"](#failure-domain-aware-synchronous-replication)
+for the equivalent, more flexible `podFailureDomainKeys` and
+`nodeFailureDomainKeys` options.
+:::
 
 CloudNativePG enables you to select which PostgreSQL instances are eligible to
 participate in a quorum-based synchronous replication set through anti-affinity

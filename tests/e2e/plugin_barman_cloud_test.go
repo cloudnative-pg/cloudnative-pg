@@ -62,11 +62,6 @@ var _ = Describe("plugin-barman-cloud",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			// The plugin (and the shared object store it backs up to) is only
-			// installed on local kind/k3d engines; see hack/e2e/run-e2e.sh.
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
-			}
 		})
 
 		It("backs up and restores a cluster through the selected plugin-barman-cloud", func() {
@@ -132,7 +127,9 @@ const barmanCloudCredentialSecret = "backup-storage-creds"
 // setupPluginObjectStore prepares a namespace for plugin-barman-cloud
 // archiving against the shared object store: the CA secret, the credentials
 // secret, and an ObjectStore named after the cluster that uses them.
-func setupPluginObjectStore(namespace, name string) {
+// Optional mutators can be passed to customize the ObjectStore spec before
+// it is created (e.g. to enable immediateCheckpoint).
+func setupPluginObjectStore(namespace, name string, mutators ...func(*unstructured.Unstructured)) {
 	GinkgoHelper()
 
 	By("creating the object store CA secret", func() {
@@ -147,8 +144,7 @@ func setupPluginObjectStore(namespace, name string) {
 	})
 
 	By("creating the ObjectStore pointing at the shared object store", func() {
-		Expect(env.Client.Create(env.Ctx, newObjectStore(namespace, name))).
-			To(Succeed())
+		Expect(env.Client.Create(env.Ctx, newObjectStore(namespace, name, mutators...))).To(Succeed())
 	})
 }
 
@@ -156,7 +152,9 @@ func setupPluginObjectStore(namespace, name string) {
 // (barmancloud.cnpg.io/v1) pointing at the shared e2e object store. It is built
 // as an unstructured object because the CRD lives in the external plugin and is
 // not registered in the operator's scheme.
-func newObjectStore(namespace, name string) *unstructured.Unstructured {
+// Optional mutators are applied to the resulting object right before it is returned,
+// allowing callers to customize the spec.
+func newObjectStore(namespace, name string, mutators ...func(*unstructured.Unstructured)) *unstructured.Unstructured {
 	objectStore := &unstructured.Unstructured{}
 	objectStore.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "barmancloud.cnpg.io",
@@ -188,5 +186,10 @@ func newObjectStore(namespace, name string) *unstructured.Unstructured {
 			},
 		},
 	}
+
+	for _, mutate := range mutators {
+		mutate(objectStore)
+	}
+
 	return objectStore
 }

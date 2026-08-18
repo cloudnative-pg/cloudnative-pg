@@ -139,7 +139,9 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   cd "${ROOT_DIR}/tests"
   ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
    --github-output --force-newlines \
-   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" \
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_plugin_barman_cloud_test.go" \
+   --output-dir "${ROOT_DIR}/tests/e2e/out" \
    --json-report  "upgrade_report.json" -v ./e2e/... || RC_GINKGO1=$?
 
   # Report if there are any tests that failed
@@ -166,17 +168,8 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
     deploy_operator_from_source
   fi
 
-  # Install plugin-barman-cloud for the plugin-based backup tests. Restricted to
-  # local engines (kind/k3d) for now; cloud-vendor coverage will follow with the
-  # backup test ports.
-  case "${TEST_CLOUD_VENDOR:-}" in
-    kind | k3d)
-      install_barman_cloud_plugin
-      ;;
-    *)
-      echo "Skipping plugin-barman-cloud install on '${TEST_CLOUD_VENDOR:-}' (only kind/k3d for now)."
-      ;;
-  esac
+  # Install plugin-barman-cloud for the plugin-based backup tests.
+  install_barman_cloud_plugin
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

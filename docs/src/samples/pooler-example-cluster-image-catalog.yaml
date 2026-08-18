@@ -4,7 +4,7 @@ metadata:
   name: cluster-image-catalog-example
 spec:
   images:
-    - image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+    - image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
       major: 18
   componentImages:
     - key: pgbouncer

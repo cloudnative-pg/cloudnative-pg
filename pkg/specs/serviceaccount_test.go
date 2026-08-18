@@ -39,6 +39,12 @@ var _ = Describe("Service accounts", func() {
 		Expect(sa.Annotations[utils.OperatorManagedSecretsAnnotationName]).To(Equal("null"))
 	})
 
+	It("always disables automounting of the service account token", func() {
+		sa := &corev1.ServiceAccount{}
+		Expect(UpdateServiceAccount(nil, sa)).To(Succeed())
+		Expect(sa.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
+	})
+
 	It("correctly create the annotation storing the secret names", func() {
 		sa := &corev1.ServiceAccount{}
 		err := UpdateServiceAccount([]string{"one", "two"}, sa)
@@ -119,5 +125,10 @@ var _ = Describe("Service accounts", func() {
 			Expect(IsServiceAccountAligned(ctx, sa, nil, meta)).To(BeTrue())
 			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta)).To(BeFalse())
 		})
+	})
+
+	It("detects a ServiceAccount that has not had automount disabled yet", func(ctx SpecContext) {
+		sa := &corev1.ServiceAccount{}
+		Expect(IsServiceAccountAligned(ctx, sa, nil, emptyMeta)).To(BeFalse())
 	})
 })

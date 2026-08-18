@@ -18,6 +18,7 @@ AppArmorProfile
 Armando
 AuthQuery
 AuthQuerySecret
+AutomountServiceAccountToken
 Autoscaler
 AvailableArchitecture
 AvailableArchitectures
@@ -194,6 +195,7 @@ FQDN
 FQDNs
 FailoverQuorum
 FailoverQuorumStatus
+FailureDomainKeys
 Fei
 Filesystem
 Fluentd
@@ -254,6 +256,7 @@ Istio's
 JSON
 JefeDavis
 Joda
+KEP
 KV
 Karpenter
 KinD
@@ -317,6 +320,7 @@ Nenciarini
 NetworkPolicies
 NetworkPolicy
 NodeAffinity
+NodeFailureDomainKeys
 NodeMaintenanceWindow
 NodeSelector
 NodesUsed
@@ -377,6 +381,7 @@ PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
 PodDisruptionBudgets
+PodFailureDomainKeys
 PodMonitor
 PodName
 PodSecurityContext
@@ -516,6 +521,7 @@ ServerSpec
 ServerTLSSecret
 ServiceAccount
 ServiceAccountTemplate
+ServiceAccounts
 ServiceMonitor
 ServiceSelectorType
 ServiceSelectorTypeR
@@ -551,6 +557,7 @@ SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
+SyncReplicationTopologySatisfied
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
@@ -668,6 +675,7 @@ authQuerySecret
 authn
 authz
 autocompletion
+automounted
 autoscaler
 autoscalers
 autovacuum
@@ -1197,6 +1205,7 @@ networkpolicy
 nextScheduleTime
 nginx
 nodeAffinity
+nodeFailureDomainKeys
 nodeLabelsAntiAffinity
 nodeMaintenanceWindow
 nodeSelector
@@ -1296,6 +1305,7 @@ podAntiAffinity
 podAntiAffinityType
 podCount
 podDisruptionBudgets
+podFailureDomainKeys
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
@@ -1587,6 +1597,7 @@ synchronizereplicasconfiguration
 synchronousreplicaconfiguration
 synchronousreplicaconfigurationmethod
 syncreplicaelectionconstraints
+syncreplicas
 sys
 syslog
 systemID

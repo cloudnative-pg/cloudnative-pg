@@ -1494,7 +1494,10 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(
 	contextLogger := log.FromContext(ctx)
 
 	syncReplicaConstraint := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint
-	if !syncReplicaConstraint.Enabled {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	failureDomainsConfigured := syncReplicaConstraint.Enabled ||
+		(sync != nil && len(sync.FailureDomainKeys()) > 0)
+	if !failureDomainsConfigured {
 		return false
 	}
 	if primary, _ := r.instance.IsPrimary(); !primary {
@@ -1503,7 +1506,7 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(
 
 	topologyStatus := cluster.Status.Topology
 	if !topologyStatus.SuccessfullyExtracted || len(topologyStatus.Instances) != cluster.Spec.Instances {
-		contextLogger.Info("missing topology information while syncReplicaElectionConstraint are enabled, " +
+		contextLogger.Info("missing topology information while failure domain constraints are enabled, " +
 			"will requeue to calculate correctly the synchronous names")
 		return true
 	}
