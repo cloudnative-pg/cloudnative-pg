@@ -1184,6 +1184,25 @@ spec:
                             format: int32
                             minimum: 1
                             type: integer
+                          restoreAdditionalCommandArgs:
+                            description: |-
+                              Additional arguments that can be appended to the 'barman-cloud-restore'
+                              command-line invocation. These arguments provide flexibility to customize
+                              the data restore process further, according to specific requirements or
+                              configurations.
+
+                              Example:
+                              In a scenario where specialized restore options are required, such as setting
+                              a specific read timeout or defining custom behavior, users can use this field
+                              to specify additional command arguments.
+
+                              Note:
+                              It's essential to ensure that the provided arguments are valid and supported
+                              by the 'barman-cloud-restore' command, to avoid potential errors or unintended
+                              behavior during execution.
+                            items:
+                              type: string
+                            type: array
                         type: object
                       destinationPath:
                         description: |-
@@ -2777,6 +2796,25 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
+                            restoreAdditionalCommandArgs:
+                              description: |-
+                                Additional arguments that can be appended to the 'barman-cloud-restore'
+                                command-line invocation. These arguments provide flexibility to customize
+                                the data restore process further, according to specific requirements or
+                                configurations.
+
+                                Example:
+                                In a scenario where specialized restore options are required, such as setting
+                                a specific read timeout or defining custom behavior, users can use this field
+                                to specify additional command arguments.
+
+                                Note:
+                                It's essential to ensure that the provided arguments are valid and supported
+                                by the 'barman-cloud-restore' command, to avoid potential errors or unintended
+                                behavior during execution.
+                              items:
+                                type: string
+                              type: array
                           type: object
                         destinationPath:
                           description: |-
