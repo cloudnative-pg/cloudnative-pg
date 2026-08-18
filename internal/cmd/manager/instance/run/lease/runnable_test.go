@@ -449,7 +449,47 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(apierrors.IsConflict(err)).To(BeTrue())
 			Expect(acquired).To(BeFalse())
 		})
+
+	It("bounds the Get call so it cannot block past RetryPeriod when the API server is unreachable",
+		func(ctx context.Context) {
+			r := newRunnable(fake.NewClientset())
+			r.config.RetryPeriod = 20 * time.Millisecond
+			r.lock = &blockingLock{}
+
+			start := time.Now()
+			acquired, err := r.tryTakeOver(ctx)
+
+			// The lock never actually replies: the only way this call returns
+			// is the per-call timeout added around it, well before
+			// blockingLock's own 2s safety net would fire.
+			Expect(time.Since(start)).To(BeNumerically("<", time.Second))
+			Expect(acquired).To(BeFalse())
+			Expect(err).To(MatchError(context.DeadlineExceeded))
+		})
 })
+
+// blockingLock is a resourcelock.Interface whose Get never replies on its
+// own, simulating an API server that accepts the connection but never
+// answers. It exists to prove tryTakeOver bounds the call itself rather
+// than depending on the caller's context already having a deadline.
+type blockingLock struct{}
+
+func (*blockingLock) Get(ctx context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case <-time.After(2 * time.Second):
+		// Safety net: fails the test with a clear message instead of
+		// hanging forever if the per-call bound regresses.
+		return nil, nil, errors.New("blockingLock.Get: not bounded by a per-call timeout")
+	}
+}
+
+func (*blockingLock) Create(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*blockingLock) Update(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*blockingLock) RecordEvent(string)                                              {}
+func (*blockingLock) Identity() string                                                { return "" }
+func (*blockingLock) Describe() string                                                { return "blockingLock" }
 
 var _ = Describe("classifyLeaseAfterRun", func() {
 	const ourIdentity = "test-cluster-1"
