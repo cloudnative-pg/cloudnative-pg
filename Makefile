@@ -191,9 +191,11 @@ build-plugin-race: generate fmt vet ## Build plugin binary.
 run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config.
 	go run ./cmd/manager
 
-docker-build: go-releaser ## Build the docker image.
+build-manager-binary: go-releaser ## Build the manager binary
 	GOOS=linux GOARCH=${ARCH} GOPATH=$(go env GOPATH) DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
 	  $(GO_RELEASER) build --skip=validate --clean --single-target $(if $(VERSION),,--snapshot); \
+
+docker-build: build-manager-binary ## Build the docker image.
 	builder_name_option=""; \
 	if [ -n "${BUILDER_NAME}" ]; then \
 	  builder_name_option="--builder ${BUILDER_NAME}"; \
