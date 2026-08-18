@@ -95,26 +95,52 @@ func (z *PostgresOrphansReaper) handleSignal(contextLogger log.Logger) error {
 	if !z.instance.MightBeUnavailable() {
 		return nil
 	}
+
 	processes, err := ps.Processes()
 	if err != nil {
 		return fmt.Errorf("unable to retrieve processes: %w", err)
 	}
+
 	pidFile := path.Join(z.instance.PgData, postgres.PostgresqlPidFile)
 	_, postMasterPid, _ := z.instance.GetPostmasterPidFromFile(pidFile)
+
 	for _, p := range processes {
-		if p.PPid() == 1 && p.Executable() == postgres.GetPostgresExecutableName() {
-			pid := p.Pid()
-			if pid == postMasterPid {
-				continue
-			}
-			var ws syscall.WaitStatus
-			var ru syscall.Rusage
-			wpid, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, &ru)
-			if wpid <= 0 || err == nil || errors.Is(err, syscall.ECHILD) {
-				continue
-			}
-			contextLogger.Info("reaped orphaned child process", "pid", pid, "err", err, "wpid", wpid)
+		if p.PPid() != 1 || p.Executable() != postgres.GetPostgresExecutableName() {
+			continue
 		}
+
+		pid := p.Pid()
+		if pid == postMasterPid {
+			continue
+		}
+
+		var ws syscall.WaitStatus
+		var ru syscall.Rusage
+		wpid, werr := syscall.Wait4(pid, &ws, syscall.WNOHANG, &ru)
+
+		if wpid <= 0 {
+			// Still running (WNOHANG)
+			continue
+		}
+		if werr != nil {
+			if errors.Is(werr, syscall.ECHILD) {
+				// No such child; someone else reaped it.
+				continue
+			}
+			contextLogger.Error(werr, "error waiting on orphaned postgres child", "pid", pid)
+			continue
+		}
+
+		exitCode := ws.ExitStatus()
+		contextLogger.Info(
+			"reaped orphaned postgres child process",
+			"pid", pid,
+			"wpid", wpid,
+			"exitCode", exitCode,
+			"signaled", ws.Signaled(),
+			"signal", ws.Signal(),
+		)
 	}
+
 	return nil
 }
