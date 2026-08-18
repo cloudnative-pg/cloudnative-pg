@@ -234,6 +234,7 @@ type provided.
 | `backup-restore`                  |
 | `snapshot`                        |
 | `operator`                        |
+| `reduced-rbac-operator`           |
 | `observability`                   |
 | `replication`                     |
 | `plugin`                          |
