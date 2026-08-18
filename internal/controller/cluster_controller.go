@@ -424,7 +424,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
 
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		if cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 	}
 
 	if cluster.ShouldPromoteFromReplicaCluster() {
