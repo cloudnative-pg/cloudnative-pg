@@ -168,6 +168,25 @@ var _ = Describe("Keypair generation", func() {
 			Expect(secret.Name).To(Equal("name"))
 			Expect(secret.Data["tls.crt"]).To(Equal(pair.Certificate))
 			Expect(secret.Data["tls.key"]).To(Equal(pair.Private))
+			// GenerateCertificateSecret should NOT include the CA certificate
+			Expect(secret.Data).ToNot(HaveKey("ca.crt"))
+		})
+
+		It("should create a webhook K8s corev1/secret resource structure with CA", func() {
+			rootCA, err := CreateRootCA("test", "namespace")
+			Expect(err).ToNot(HaveOccurred())
+
+			pair, err := rootCA.CreateAndSignPair("webhook.service.namespace.svc", CertTypeServer, nil)
+			Expect(err).ToNot(HaveOccurred())
+
+			secret := pair.GenerateWebhookCertificateSecret("namespace", "name", rootCA.Certificate)
+			Expect(secret.Namespace).To(Equal("namespace"))
+			Expect(secret.Name).To(Equal("name"))
+			Expect(secret.Data["tls.crt"]).To(Equal(pair.Certificate))
+			Expect(secret.Data["tls.key"]).To(Equal(pair.Private))
+			// GenerateWebhookCertificateSecret SHOULD include the CA certificate
+			Expect(secret.Data).To(HaveKey("ca.crt"))
+			Expect(secret.Data["ca.crt"]).To(Equal(rootCA.Certificate))
 		})
 
 		It("should be able to renew an existing certificate with no DNS names provided", func() {
