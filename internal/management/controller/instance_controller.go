@@ -209,7 +209,10 @@ func (r *InstanceReconciler) Reconcile(
 	}
 	reloadNeeded = reloadNeeded || reloadConfigNeeded
 
-	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
+	// here we execute initialization tasks that need to be executed only on the first reconciliation loop.
+	// Notably, if this PGDATA is already a primary, initialize() also acquires the primary lease
+	// (see verifyPgDataCoherenceForPrimary) before returning: this blocks the Broadcast() below, and
+	// therefore PostgreSQL's start, until the lease is held.
 	if !r.firstReconcileDone.Load() {
 		if err = r.initialize(ctx, cluster); err != nil {
 			return handleErrNextLoop(err)
@@ -1196,22 +1199,22 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 	)
 }
 
-// Reconciler primary logic. DB needed.
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (reconcile.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	if cluster.Status.TargetPrimary != r.instance.GetPodName() || cluster.IsReplica() {
-		return reconcile.Result{}, nil
-	}
-
-	// Wait long enough that a candidate primary can take over a lease whose
-	// previous holder did not release cleanly, in a single Acquire call. The
-	// runnable's preAcquire loop polls jitter-free every RetryPeriod and takes
-	// over a still-held lease once it has observed the record unchanged for a
-	// full LeaseDuration, so the take-over moment lands at most one RetryPeriod
-	// past LeaseDuration (the poll granularity). Sizing acquireTimeout to
-	// LeaseDuration + 3*RetryPeriod keeps that take-over inside a single
-	// Acquire call with margin for the take-over write and scheduling overhead.
+// acquirePrimaryLease blocks until this pod holds the primary lease, or the
+// bounded wait below expires. It is the single call site backing both:
+//   - the initial start of an already-primary PGDATA, gated from
+//     verifyPgDataCoherenceForPrimary before PostgreSQL is ever started, and
+//   - promotion of a replica, gated from reconcilePrimary before pg_promote
+//     is invoked.
+//
+// Wait long enough that a candidate primary can take over a lease whose
+// previous holder did not release cleanly, in a single Acquire call. The
+// runnable's preAcquire loop polls jitter-free every RetryPeriod and takes
+// over a still-held lease once it has observed the record unchanged for a
+// full LeaseDuration, so the take-over moment lands at most one RetryPeriod
+// past LeaseDuration (the poll granularity). Sizing acquireTimeout to
+// LeaseDuration + 3*RetryPeriod keeps that take-over inside a single
+// Acquire call with margin for the take-over write and scheduling overhead.
+func (r *InstanceReconciler) acquirePrimaryLease(ctx context.Context, cluster *apiv1.Cluster) error {
 	leaseDuration := cluster.GetPrimaryLeaseDuration()
 	retryPeriod := cluster.GetPrimaryLeaseRetryPeriod()
 	acquireTimeout := leaseDuration + 3*retryPeriod
@@ -1223,13 +1226,24 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		RetryPeriod:           retryPeriod,
 		ReleasedLeaseDuration: cluster.GetPrimaryLeaseReleasedDuration(),
 	}
-	if err := r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig); err != nil {
+	return r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig)
+}
+
+// Reconciler primary logic. DB needed.
+func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (reconcile.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if cluster.Status.TargetPrimary != r.instance.GetPodName() || cluster.IsReplica() {
+		return reconcile.Result{}, nil
+	}
+
+	if err := r.acquirePrimaryLease(ctx, cluster); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			contextLogger.Warning("Primary lease not yet acquired, retrying")
 			// Retry soon: the runnable's preAcquire loop may complete the
 			// take-over in the background just after our context fired, in
 			// which case the next Acquire returns immediately via heldCh.
-			return reconcile.Result{RequeueAfter: retryPeriod}, nil
+			return reconcile.Result{RequeueAfter: cluster.GetPrimaryLeaseRetryPeriod()}, nil
 		}
 		return reconcile.Result{}, fmt.Errorf("acquiring primary lease: %w", err)
 	}
