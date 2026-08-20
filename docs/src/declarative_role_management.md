@@ -499,9 +499,11 @@ spec:
     mode: generate
 ```
 
-`password.mode` defaults to `generate` when the block is present, so
-`password: {}` is equivalent to `password: {mode: generate}`. Besides
-`generate`, `mode` accepts:
+`password.mode` is **required** whenever the `password` stanza is present: it
+has no default, so `password: {}` is rejected. Asking for a password without
+saying how it is managed is ambiguous, and neither answer is a safe guess —
+one generates a credential, another removes one. Besides `generate`, `mode`
+accepts:
 
 - `secret`, which reads the password from an existing Secret named by
   `password.secret`, instead of generating one — the operator neither owns
