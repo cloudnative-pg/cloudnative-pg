@@ -79,9 +79,9 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 		Expect(role.GetGeneratedPasswordSecretName()).To(Equal("dante-credentials"))
 	})
 
-	It("has no password secret when the password is explicitly cleared", func() {
+	It("has no password secret when the password is set to NULL", func() {
 		role := newRole()
-		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeClear, Secret: "dante-credentials"}
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeSetNull, Secret: "dante-credentials"}
 		Expect(role.IsPasswordGenerationEnabled()).To(BeFalse())
 		Expect(role.GetPasswordSecretName()).To(BeEmpty())
 	})
@@ -93,18 +93,42 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 		Expect(role.GetPasswordSecretName()).To(Equal("byo-secret"))
 	})
 
-	It("is explicitly cleared only when mode is clear", func() {
+	It("is set to NULL only when mode is setNull", func() {
 		role := newRole()
-		Expect(role.IsPasswordExplicitlyCleared()).To(BeFalse())
+		Expect(role.IsPasswordSetToNull()).To(BeFalse())
 
 		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeGenerate}
-		Expect(role.IsPasswordExplicitlyCleared()).To(BeFalse())
+		Expect(role.IsPasswordSetToNull()).To(BeFalse())
 
 		role.Spec.Password.Mode = PasswordModeExternal
-		Expect(role.IsPasswordExplicitlyCleared()).To(BeFalse())
+		Expect(role.IsPasswordSetToNull()).To(BeFalse())
 
-		role.Spec.Password.Mode = PasswordModeClear
-		Expect(role.IsPasswordExplicitlyCleared()).To(BeTrue())
+		role.Spec.Password.Mode = PasswordModeSetNull
+		Expect(role.IsPasswordSetToNull()).To(BeTrue())
+	})
+
+	It("has a revocation pending only when the specification and the status agree", func() {
+		role := newRole()
+		role.Status.Password = &GeneratedPasswordState{PendingRevocation: true}
+		// No password stanza at all, so nothing asked for the password to stop
+		// being managed.
+		Expect(role.IsPasswordRevocationPending()).To(BeFalse())
+
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeExternal}
+		Expect(role.IsPasswordRevocationPending()).To(BeTrue())
+
+		// A role that moved on to another mode has a password to apply, not one
+		// to revoke: asking for both at once is an error the instance manager
+		// reports rather than a revocation.
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeSecret, Secret: "byo-secret"}
+		Expect(role.IsPasswordRevocationPending()).To(BeFalse())
+
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeExternal}
+		role.Status.Password.PendingRevocation = false
+		Expect(role.IsPasswordRevocationPending()).To(BeFalse())
+
+		role.Status.Password = nil
+		Expect(role.IsPasswordRevocationPending()).To(BeFalse())
 	})
 
 	It("rotates only when a lifetime is requested", func() {
