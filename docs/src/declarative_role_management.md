@@ -516,10 +516,11 @@ accepts:
 
 The stanza is mutually exclusive with `passwordSecret` and with
 `disablePassword`, and it is only available on `DatabaseRole` resources, not
-on inline managed roles. `secret` and `criteria` are further restricted to
-the modes they apply to: `secret` is required under `secret`, allowed under
-`generate`, and rejected under `external`/`clear`; `criteria` is only
-allowed under `generate`.
+on inline managed roles. The other fields are restricted to the modes they
+apply to: `secret` is required under `secret`, allowed under `generate`, and
+rejected under `external`/`clear`; `criteria`, `duration` and `renewBefore`
+are allowed only under `generate`, since no other mode generates or rotates
+a password.
 
 #### Generated Secret
 
