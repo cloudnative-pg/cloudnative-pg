@@ -373,6 +373,11 @@ PVCs
 PascalBourdier
 PasswordConfiguration
 PasswordCriteria
+PasswordMode
+PasswordModeClear
+PasswordModeExternal
+PasswordModeGenerate
+PasswordModeSecret
 PasswordState
 PasswordStatus
 Patroni
@@ -1279,6 +1284,7 @@ passwordState
 passwordStatus
 passwordconfiguration
 passwordcriteria
+passwordmode
 passwordstate
 pc
 pchovelon

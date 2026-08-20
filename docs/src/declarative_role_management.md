@@ -496,13 +496,28 @@ spec:
   name: dante
   login: true
   password:
-    enabled: true
+    mode: generate
 ```
 
-`password.enabled` defaults to `true` when the block is present, so
-`password: {}` is equivalent to enabling it. The stanza is mutually exclusive
-with `passwordSecret` and with `disablePassword`, and it is only available on
-`DatabaseRole` resources, not on inline managed roles.
+`password.mode` defaults to `generate` when the block is present, so
+`password: {}` is equivalent to `password: {mode: generate}`. Besides
+`generate`, `mode` accepts:
+
+- `secret`, which reads the password from an existing Secret named by
+  `password.secret`, instead of generating one — the operator neither owns
+  nor writes to it, the same as `passwordSecret` below, but expressed inside
+  the `password` stanza;
+- `external`, which stops the operator from managing the password (see
+  [Deletion and opt-out](#deletion-and-opt-out));
+- `clear`, which sets the password of the role to `NULL` in PostgreSQL (see
+  [Disabling passwords](#disabling-passwords)).
+
+The stanza is mutually exclusive with `passwordSecret` and with
+`disablePassword`, and it is only available on `DatabaseRole` resources, not
+on inline managed roles. `secret` and `criteria` are further restricted to
+the modes they apply to: `secret` is required under `secret`, allowed under
+`generate`, and rejected under `external`/`clear`; `criteria` is only
+allowed under `generate`.
 
 #### Generated Secret
 
@@ -567,7 +582,7 @@ PostgreSQL.
 
 ```yaml
   password:
-    enabled: true
+    mode: generate
     duration: 2160h    # 90 days
     renewBefore: 168h  # 7 days
 ```
@@ -605,9 +620,11 @@ rotation and clears the recorded deadline, keeping the current password.
 
 | Scenario | Result |
 |---|---|
-| `password.enabled` set to `false`, or the `password` block removed | The Secret is deleted; `status.password` is cleared. The role keeps in PostgreSQL the password it was last given |
-| `password.secret` pointed at another name | The password is generated again into the new Secret, and the previous one is deleted |
-| `DatabaseRole` deleted | The Secret is garbage-collected via owner reference, regardless of `databaseRoleReclaimPolicy` |
+| `password.mode` set to `external`, or the `password` block removed | The generated Secret is deleted; `status.password` is cleared. The role keeps in PostgreSQL the password it was last given |
+| `password.mode` set to `clear` | The generated Secret is deleted; `status.password` is cleared. The role's password is set to `NULL` in PostgreSQL, disabling password authentication (see [Disabling passwords](#disabling-passwords)) |
+| `password.mode` set to `secret` | `status.password` is cleared. The generated Secret is deleted, unless `password.secret` names that very Secret, in which case it is left untouched and simply stops being tracked as generated: the password is now read from it instead |
+| `password.secret` pointed at another name, `mode: generate` | The password is generated again into the new Secret, and the previous one is deleted |
+| `DatabaseRole` deleted | The generated Secret, if any, is garbage-collected via owner reference, regardless of `databaseRoleReclaimPolicy` |
 
 The operator recognizes the Secret as its own through
 `status.password.secretName`, which is the name it last generated a password
@@ -634,14 +651,25 @@ generation, and rotation, start once the cluster is promoted.
 ### Disabling passwords
 
 To explicitly set a password to `NULL` in PostgreSQL (distinguished from simply
-omitting a password update), use the `disablePassword` field:
+omitting a password update), either set `password.mode` to `clear`:
+
+```yaml
+  password:
+    mode: clear
+```
+
+or, without using the `password` stanza at all, set the `disablePassword`
+field:
 
 ``` yaml
   disablePassword: true
 ```
 
 :::note
-It is an error to set both `passwordSecret` and `disablePassword` on a given role.
+It is an error to set both `passwordSecret` and `disablePassword` on a given
+role, and equally an error to set both `password` and `disablePassword`: use
+`password.mode: clear` instead of `disablePassword` once the role already has
+a `password` stanza.
 :::
 
 ### Password expiry, `VALID UNTIL`

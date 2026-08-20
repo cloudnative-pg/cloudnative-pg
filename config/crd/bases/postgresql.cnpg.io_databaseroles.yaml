@@ -162,12 +162,14 @@ spec:
                 type: string
               password:
                 description: |-
-                  Password configures the operator to generate the password of this role and
-                  store it in a Secret, instead of requiring a pre-existing one through
-                  `passwordSecret`. Mutually exclusive with `passwordSecret`.
+                  Password configures how the operator manages the password of this role,
+                  instead of requiring a pre-existing Secret through `passwordSecret` or
+                  disabling it through `disablePassword`. Mutually exclusive with both.
                 properties:
                   criteria:
-                    description: Criteria constrains the generated password.
+                    description: |-
+                      Criteria constrains the generated password. Only meaningful when `mode`
+                      is `generate`.
                     properties:
                       allowRepeat:
                         description: |-
@@ -236,27 +238,41 @@ spec:
                       Duration is the lifetime of the generated password, at least one minute:
                       once it is reached, minus `renewBefore`, the operator generates a new
                       password and applies it to the role. When unset, the password is generated
-                      once and never rotated.
+                      once and never rotated. Only meaningful when `mode` is `generate`.
                     type: string
-                  enabled:
-                    default: true
+                  mode:
+                    default: generate
                     description: |-
-                      Enabled turns on password generation for this role. Defaults to true when
-                      the block is present.
-                    type: boolean
+                      Mode governs how the operator manages the password of this role:
+                      `generate` (the default) generates and rotates a password kept in a
+                      Secret the operator owns; `secret` reads the password from an existing
+                      Secret named by `secret`, without generating or owning one; `external`
+                      stops managing it, deleting any Secret previously generated and leaving
+                      the password already set on the role in PostgreSQL untouched; `clear`
+                      sets the password of the role to NULL in PostgreSQL, disabling password
+                      authentication for it.
+                    enum:
+                    - generate
+                    - secret
+                    - external
+                    - clear
+                    type: string
                   renewBefore:
                     description: |-
                       RenewBefore is how long before the end of its lifetime the password is
                       rotated. Only meaningful together with `duration`, and it must be at most
                       half of it, so that the password is not due for rotation as soon as it is
                       generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
-                      (7 days), capped at half of the lifetime.
+                      (7 days), capped at half of the lifetime. Only meaningful when `mode` is
+                      `generate`.
                     type: string
                   secret:
                     description: |-
-                      Secret is the name of the Secret where the generated password is stored.
-                      Defaults to `<databaserole-name>-password`. The operator never overwrites
-                      a Secret it does not own.
+                      Secret is the name of the Secret holding the password of this role: the
+                      one the operator generates into and never overwrites if it does not own
+                      (when `mode` is `generate`, defaulting to `<databaserole-name>-password`),
+                      or an existing one to read the password from, required and never written
+                      to (when `mode` is `secret`). Only meaningful in those two modes.
                     type: string
                 type: object
                 x-kubernetes-validations:
@@ -266,6 +282,12 @@ spec:
                     * 2 <= duration(self.duration).getSeconds())'
                 - message: duration must be at least 1m
                   rule: '!has(self.duration) || duration(self.duration) >= duration(''1m'')'
+                - message: secret is required when mode is secret
+                  rule: self.mode != 'secret' || has(self.secret)
+                - message: secret is only meaningful when mode is generate or secret
+                  rule: self.mode == 'generate' || self.mode == 'secret' || !has(self.secret)
+                - message: criteria is only meaningful when mode is generate
+                  rule: self.mode == 'generate' || !has(self.criteria)
               passwordSecret:
                 description: |-
                   Secret containing the password of the role (if present).
@@ -329,9 +351,8 @@ spec:
                 || self.login'
             - message: password and passwordSecret are mutually exclusive
               rule: '!has(self.password) || !has(self.passwordSecret)'
-            - message: password generation and disablePassword are mutually exclusive
-              rule: '!has(self.password) || !self.password.enabled || !has(self.disablePassword)
-                || !self.disablePassword'
+            - message: password and disablePassword are mutually exclusive
+              rule: '!has(self.password) || !has(self.disablePassword) || !self.disablePassword'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up

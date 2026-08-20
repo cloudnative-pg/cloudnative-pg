@@ -636,7 +636,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(getSecret(cli, "role-dante-password")).NotTo(BeNil())
 
 			stored := getRole(cli, role)
-			stored.Spec.Password.Enabled = ptr.To(false)
+			stored.Spec.Password.Mode = apiv1.PasswordModeExternal
 			Expect(cli.Update(ctx, stored)).To(Succeed())
 
 			_, err = r.Reconcile(ctx, requestFor(role))
@@ -654,6 +654,31 @@ var _ = Describe("DatabaseRole password generation", func() {
 				updated.Status.Conditions,
 				string(apiv1.ConditionPasswordSecretChange),
 			)).To(BeNil())
+		})
+
+		It("deletes the secret it generated when the password is explicitly cleared", func() {
+			// The Secret lifecycle is identical to turning generation off: the
+			// distinction between `external` and `clear` only matters to the
+			// instance manager, which decides whether to leave the PostgreSQL
+			// password alone or set it to NULL.
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(getSecret(cli, "role-dante-password")).NotTo(BeNil())
+
+			stored := getRole(cli, role)
+			stored.Spec.Password.Mode = apiv1.PasswordModeClear
+			Expect(cli.Update(ctx, stored)).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			var secret corev1.Secret
+			err = cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: "role-dante-password"}, &secret)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			Expect(getRole(cli, role).Status.Password).To(BeNil())
 		})
 
 		It("deletes the secret it generated under a name of its own", func() {
@@ -699,7 +724,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(status.SecretName).To(Equal("dante-credentials"))
 
 			stored := getRole(cli, role)
-			stored.Spec.Password.Enabled = ptr.To(false)
+			stored.Spec.Password.Mode = apiv1.PasswordModeExternal
 			Expect(cli.Update(ctx, stored)).To(Succeed())
 
 			_, err = r.Reconcile(ctx, requestFor(role))
@@ -710,10 +735,36 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
 
+		It("keeps the secret in place when the role switches to reading from that same name", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			generated := getSecret(cli, "role-dante-password")
+
+			// Ask to read the password back from the very Secret this role
+			// just generated: deleting it would destroy the credential the
+			// new configuration wants to use.
+			stored := getRole(cli, role)
+			stored.Spec.Password = &apiv1.PasswordConfiguration{
+				Mode:   apiv1.PasswordModeSecret,
+				Secret: "role-dante-password",
+			}
+			Expect(cli.Update(ctx, stored)).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			kept := getSecret(cli, "role-dante-password")
+			Expect(kept.Data).To(Equal(generated.Data))
+			Expect(getRole(cli, role).Status.Password).To(BeNil())
+		})
+
 		It("leaves a secret it does not own in place", func() {
 			// The Secret the status points at lost its owner reference, so the
 			// operator has no claim on it any more.
-			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Enabled: ptr.To(false)})
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal})
 			role.Status.Password = &apiv1.GeneratedPasswordState{SecretName: "role-dante-password"}
 			foreign := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: "role-dante-password", Namespace: namespace},
@@ -730,7 +781,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 		})
 
 		It("does not look for a secret it never generated", func() {
-			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Enabled: ptr.To(false)})
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal})
 			foreign := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: "role-dante-password", Namespace: namespace},
 				Data:       map[string][]byte{corev1.BasicAuthPasswordKey: []byte("user-managed")},
@@ -745,6 +796,42 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(string(getSecret(cli, "role-dante-password").Data[corev1.BasicAuthPasswordKey])).
 				To(Equal("user-managed"))
 			Expect(getRole(cli, role).Status.Password).To(BeNil())
+		})
+	})
+
+	When("the password is read from an existing Secret (mode: secret)", func() {
+		It("generates nothing and tracks the named Secret's ResourceVersion", func() {
+			existing := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "byo-secret", Namespace: namespace},
+				Type:       corev1.SecretTypeBasicAuth,
+				Data: map[string][]byte{
+					corev1.BasicAuthUsernameKey: []byte(roleName),
+					corev1.BasicAuthPasswordKey: []byte("user-managed"),
+				},
+			}
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:   apiv1.PasswordModeSecret,
+				Secret: "byo-secret",
+			})
+			r, cli := buildReconciler(role, newCluster(false), existing)
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			// The Secret is untouched: no owner reference, no rewritten data.
+			untouched := getSecret(cli, "byo-secret")
+			Expect(untouched.Data[corev1.BasicAuthPasswordKey]).To(Equal([]byte("user-managed")))
+			Expect(metav1.IsControlledBy(untouched, role)).To(BeFalse())
+
+			// Nothing was generated, so there is no generated-password state to
+			// report; the condition still tracks the Secret the role uses.
+			Expect(getRole(cli, role).Status.Password).To(BeNil())
+			cond := meta.FindStatusCondition(
+				getRole(cli, role).Status.Conditions,
+				string(apiv1.ConditionPasswordSecretChange),
+			)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Message).To(Equal(untouched.ResourceVersion))
 		})
 	})
 })

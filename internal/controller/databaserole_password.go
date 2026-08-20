@@ -79,6 +79,18 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 			role.Status.Password = nil
 			return nil
 		}
+
+		// A `mode: secret` role reading from the very Secret this role used to
+		// generate into wants that Secret kept exactly as it is: deleting it
+		// here would destroy the credential the new configuration is about to
+		// read back. Stop tracking it as generated without touching it.
+		if role.Spec.Password != nil &&
+			role.Spec.Password.Mode == apiv1.PasswordModeSecret &&
+			role.Spec.Password.Secret == generatedSecretName {
+			role.Status.Password = nil
+			return nil
+		}
+
 		return r.deleteOwnedPasswordSecret(ctx, role, client.ObjectKey{
 			Namespace: role.Namespace,
 			Name:      generatedSecretName,
