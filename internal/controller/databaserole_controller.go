@@ -109,6 +109,21 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// password in its Secret and never applied to PostgreSQL.
 	certErr := r.reconcileClientCertificate(ctx, &role, cluster)
 
+	// A manual password rotation request is consumed by removing the
+	// annotation that asked for it once reconcilePassword has acted on it.
+	// Patch that separately from the status, which the instance manager also
+	// writes to and which this Patch (on the main resource, not the /status
+	// subresource) does not touch. The patch is applied to a copy: the API
+	// server answers with the stored object, whose status does not carry the
+	// changes still only held in memory here, and unmarshalling that over
+	// `role` would lose them before they are persisted below.
+	if !reflect.DeepEqual(origRole.Annotations, role.Annotations) {
+		annotated := role.DeepCopy()
+		if err := r.Patch(ctx, annotated, client.MergeFrom(origRole)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("while patching role annotations: %w", err)
+		}
+	}
+
 	// A DatabaseRole has two status writers: the instance manager owns every
 	// field except the PasswordSecretChange condition, the Password state and
 	// the ClientCertificate state, all set here. Merge-patch so we only touch
@@ -123,10 +138,59 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, certErr
 	}
 
-	if role.IsClientCertificateEnabled() || role.IsPasswordRotationEnabled() {
-		return ctrl.Result{RequeueAfter: roleSecretReconcileInterval}, nil
+	if next := nextRoleSecretReconcile(&role); next > 0 {
+		return ctrl.Result{RequeueAfter: next}, nil
 	}
 	return ctrl.Result{}, nil
+}
+
+// nextRoleSecretReconcile returns how long from now the role's client
+// certificate or password should next be checked for renewal, or zero when
+// neither is enabled. The certificate falls back to the fixed
+// roleSecretReconcileInterval; the password instead requeues right at its
+// renewal deadline, since duration/renewBefore can be far shorter than that
+// interval, and a flat hourly check would leave a short-lived password
+// overdue for most of its remaining life.
+func nextRoleSecretReconcile(role *apiv1.DatabaseRole) time.Duration {
+	var next time.Duration
+	certEnabled := role.IsClientCertificateEnabled()
+	if certEnabled {
+		next = roleSecretReconcileInterval
+	}
+
+	if role.IsPasswordRotationEnabled() {
+		untilRenewal := untilPasswordRenewal(role)
+		if !certEnabled || untilRenewal < next {
+			next = untilRenewal
+		}
+	}
+
+	return next
+}
+
+// untilPasswordRenewal returns how long from now the password of the role is
+// due for renewal, falling back to the fixed roleSecretReconcileInterval when
+// its recorded expiration cannot be read, and flooring at one second when the
+// deadline has already passed, since a zero or negative RequeueAfter would
+// mean no further requeue at all rather than a prompt retry.
+func untilPasswordRenewal(role *apiv1.DatabaseRole) time.Duration {
+	if role.Status.Password == nil || role.Status.Password.Expiration == "" {
+		return roleSecretReconcileInterval
+	}
+
+	expiration, err := time.Parse(time.RFC3339, role.Status.Password.Expiration)
+	if err != nil {
+		return roleSecretReconcileInterval
+	}
+
+	// A rotation this reconciliation just performed already moved the
+	// deadline forward; anything else means the password could not be
+	// rotated (an unowned Secret, an unsatisfiable criteria).
+	renewalDue := expiration.Add(-passwordRenewBefore(role))
+	if untilRenewal := time.Until(renewalDue); untilRenewal > 0 {
+		return untilRenewal
+	}
+	return time.Second
 }
 
 // reconcilePasswordCondition manages the ConditionPasswordSecretChange status condition.

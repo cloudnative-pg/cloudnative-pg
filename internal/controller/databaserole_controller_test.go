@@ -21,11 +21,13 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -162,5 +164,61 @@ var _ = Describe("DatabaseRole operator-side controller", func() {
 
 		got := getRolesUsingSecret(list, newPasswordSecret("shared-secret"))
 		Expect(got).To(ConsistOf(types.NamespacedName{Namespace: "default", Name: "uses-it"}))
+	})
+})
+
+var _ = Describe("nextRoleSecretReconcile", func() {
+	roleWithPassword := func(expiration string) *apiv1.DatabaseRole {
+		return &apiv1.DatabaseRole{
+			Spec: apiv1.DatabaseRoleSpec{
+				Password: &apiv1.PasswordConfiguration{
+					Duration:    &metav1.Duration{Duration: 5 * time.Minute},
+					RenewBefore: &metav1.Duration{Duration: time.Minute},
+				},
+			},
+			Status: apiv1.DatabaseRoleStatus{
+				Password: &apiv1.GeneratedPasswordState{Expiration: expiration},
+			},
+		}
+	}
+
+	It("returns zero when neither the certificate nor password rotation is enabled", func() {
+		role := &apiv1.DatabaseRole{}
+		Expect(nextRoleSecretReconcile(role)).To(BeZero())
+	})
+
+	It("falls back to the fixed interval when only the certificate is enabled", func() {
+		role := &apiv1.DatabaseRole{
+			Spec: apiv1.DatabaseRoleSpec{
+				ClientCertificate: &apiv1.ClientCertificateConfiguration{Enabled: ptr.To(true)},
+			},
+		}
+		Expect(nextRoleSecretReconcile(role)).To(Equal(roleSecretReconcileInterval))
+	})
+
+	It("targets the renewal deadline, not the fixed interval, when password rotation is enabled", func() {
+		expiration := time.Now().Add(2 * time.Minute).UTC().Format(time.RFC3339)
+		role := roleWithPassword(expiration)
+		Expect(nextRoleSecretReconcile(role)).To(BeNumerically("~", time.Minute, time.Second))
+	})
+
+	It("picks whichever of the certificate or the password deadline comes first", func() {
+		expiration := time.Now().Add(2 * time.Minute).UTC().Format(time.RFC3339)
+		role := roleWithPassword(expiration)
+		role.Spec.ClientCertificate = &apiv1.ClientCertificateConfiguration{Enabled: ptr.To(true)}
+		Expect(nextRoleSecretReconcile(role)).To(BeNumerically("~", time.Minute, time.Second))
+	})
+
+	It("retries soon, rather than never, when the deadline cannot be read", func() {
+		role := roleWithPassword("not-a-timestamp")
+		Expect(nextRoleSecretReconcile(role)).To(Equal(roleSecretReconcileInterval))
+	})
+
+	It("retries soon, rather than not at all, when the deadline has already passed", func() {
+		expiration := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+		role := roleWithPassword(expiration)
+		next := nextRoleSecretReconcile(role)
+		Expect(next).To(BeNumerically(">", 0))
+		Expect(next).To(BeNumerically("<=", time.Second))
 	})
 })
