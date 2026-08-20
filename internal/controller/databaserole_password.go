@@ -51,6 +51,16 @@ const (
 	// generator draws from ten of them, and refuses to repeat a character unless
 	// explicitly allowed to.
 	maxGeneratedDigits = 10
+
+	// passwordSecretNotOwnedMessage says what a role asking for a generated
+	// password gets when the name is taken by a Secret the operator does not
+	// own: the password that Secret holds, and no generation, which is what
+	// `mode: secret` does. Spelling it out matters because the role keeps
+	// working, so nothing else would show that the generation, and the
+	// rotation with it, is not happening.
+	passwordSecretNotOwnedMessage = "Secret %q already exists and is not owned by this DatabaseRole: " +
+		"the password it holds is applied to the role, and no password is generated or rotated for it. " +
+		"Point password.secret at a name of its own, or use mode: secret to read from this Secret"
 )
 
 // errInvalidPasswordCriteria is returned when no password can satisfy the
@@ -75,26 +85,7 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 	// When generation is disabled we only need to clean up the Secret we
 	// generated; the cluster is not required for that.
 	if !role.IsPasswordGenerationEnabled() {
-		if generatedSecretName == "" {
-			role.Status.Password = nil
-			return nil
-		}
-
-		// A `mode: secret` role reading from the very Secret this role used to
-		// generate into wants that Secret kept exactly as it is: deleting it
-		// here would destroy the credential the new configuration is about to
-		// read back. Stop tracking it as generated without touching it.
-		if role.Spec.Password != nil &&
-			role.Spec.Password.Mode == apiv1.PasswordModeSecret &&
-			role.Spec.Password.Secret == generatedSecretName {
-			role.Status.Password = nil
-			return nil
-		}
-
-		return r.deleteOwnedPasswordSecret(ctx, role, client.ObjectKey{
-			Namespace: role.Namespace,
-			Name:      generatedSecretName,
-		})
+		return r.stopGeneratingPassword(ctx, role, generatedSecretName)
 	}
 
 	secretKey := client.ObjectKey{
@@ -158,6 +149,52 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 	return nil
 }
 
+// stopGeneratingPassword cleans up after a role that does not generate its
+// password any more. The Secret the operator generated goes, and the record of
+// it with it, unless the password it held is still set on the role in
+// PostgreSQL with nothing left to read it: that one is recorded as a revocation
+// for the instance manager to apply.
+func (r *DatabaseRoleReconciler) stopGeneratingPassword(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+	generatedSecretName string,
+) error {
+	if generatedSecretName == "" {
+		// The revocation stays recorded until the instance manager
+		// acknowledges it, by clearing the flag once it has applied it:
+		// forgetting it any earlier would leave the role with a password
+		// nobody can read.
+		if role.IsPasswordRevocationPending() {
+			return nil
+		}
+		role.Status.Password = nil
+		return nil
+	}
+
+	// A Secret the operator generated into is a Secret the operator deletes,
+	// whatever the role points at now: keeping it alive but unmanaged would
+	// leave a credential nobody maintains, still carrying the owner reference
+	// that has it garbage collected with the role.
+	if err := r.deleteOwnedPasswordSecret(ctx, role, client.ObjectKey{
+		Namespace: role.Namespace,
+		Name:      generatedSecretName,
+	}); err != nil {
+		return err
+	}
+
+	// A cleared status is how deleteOwnedPasswordSecret reports the Secret
+	// really was the operator's to delete, and the password it held is still
+	// the one set on the role in PostgreSQL. Only `external` reaches this with
+	// that password left to deal with: `setNull` sets it to NULL anyway, and
+	// `secret` replaces it with the one it reads.
+	if role.Status.Password == nil &&
+		role.Spec.Password != nil &&
+		role.Spec.Password.Mode == apiv1.PasswordModeExternal {
+		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
+	}
+	return nil
+}
+
 // setPasswordMessage explains in the status why the password of the role is not
 // being generated, keeping the name of the Secret it was last generated into:
 // that name is the only record the operator has to clean the Secret up later.
@@ -193,7 +230,7 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 		if !metav1.IsControlledBy(&secret, role) {
 			contextLogger.Warning("password secret exists but is not owned by this DatabaseRole, skipping generation",
 				"secret", secretKey.Name)
-			setPasswordMessage(role, fmt.Sprintf(secretNotOwnedMessage, secretKey.Name))
+			setPasswordMessage(role, fmt.Sprintf(passwordSecretNotOwnedMessage, secretKey.Name))
 			return nil
 		}
 
