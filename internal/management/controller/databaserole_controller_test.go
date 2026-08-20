@@ -116,7 +116,7 @@ var _ = Describe("DatabaseRole roleConfigurationForPassword", func() {
 		role := newTestDatabaseRole()
 		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
 
-		role.Spec.Password = &apiv1.PasswordConfiguration{}
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate}
 		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
 
 		role.Spec.Password.Mode = apiv1.PasswordModeExternal
@@ -215,7 +215,7 @@ var _ = Describe("DatabaseRole isAlreadyReconciled", func() {
 
 		It("follows the operator-generated secret when there is no passwordSecret", func() {
 			role := newTestDatabaseRole()
-			role.Spec.Password = &apiv1.PasswordConfiguration{}
+			role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate}
 			role.Status.ObservedGeneration = role.Generation
 			setObservedSecretVersion(role, "rv-2")
 			role.Status.SecretResourceVersion = "rv-1"
