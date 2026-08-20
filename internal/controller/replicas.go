@@ -36,10 +36,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// ErrWalReceiversRunning is raised when a new primary server can't be elected
-// because there is a WAL receiver running in our Pod list
-var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
-
 // ErrWaitingOnFailOverDelay is raised when the primary server can't be elected because the .spec.failoverDelay hasn't
 // elapsed yet
 var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
@@ -156,12 +152,6 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
 				"oldPrimary", cluster.Status.CurrentPrimary)
 		}
-	}
-
-	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
-	// data that is being received (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
-		return "", ErrWalReceiversRunning
 	}
 
 	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
@@ -361,14 +351,6 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 
 	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
 		return "", err
-	}
-
-	// The designated primary is not correctly working, and we need to elect a new one
-	// but before doing that we need to wait for all the WAL receivers to be
-	// terminated. This is needed to avoid losing the WAL data that is being received
-	// (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
-		return "", ErrWalReceiversRunning
 	}
 
 	contextLogger.Info("Current target primary isn't healthy, failing over",

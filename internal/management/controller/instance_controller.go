@@ -24,7 +24,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -39,7 +38,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -72,15 +70,6 @@ const (
 	userSearchFunctionName   = "user_search"
 	userSearchFunction       = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;"
 )
-
-// RetryUntilWalReceiverDown is the default retry configuration that is used
-// to wait for the WAL receiver process to be down
-var RetryUntilWalReceiverDown = wait.Backoff{
-	Duration: 1 * time.Second,
-	// Steps is declared as an "int", so we are capping
-	// to int32 to support ARM-based 32 bit architectures
-	Steps: math.MaxInt32,
-}
 
 // shouldRequeue specifies whether a new reconciliation loop should be triggered
 type shoudRequeue bool
@@ -1295,7 +1284,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		}
 
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
-		if err := r.handlePromotion(ctx, cluster); err != nil {
+		if err := r.handlePromotion(ctx); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
@@ -1330,19 +1319,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	return reconcile.Result{}, nil
 }
 
-func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) handlePromotion(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
-
-	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
-		// if the cluster is not replicating it means it's doing a failover and
-		// we have to wait for wal receivers to be down
-		err := r.waitForWalReceiverDown(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
 	// I must promote my instance here
 	err := r.instance.PromoteAndWait(ctx)
@@ -1378,28 +1356,6 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 		conditions.SetDesignatedPrimaryTransitionCompleted(cluster)
 	}
 	return changed, r.client.Status().Update(ctx, cluster)
-}
-
-// waitForWalReceiverDown wait until the wal receiver is down, and it's used
-// to grab all the WAL files from a replica
-func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context) error {
-	contextLogger := log.FromContext(ctx)
-
-	// This is not really exponential backoff as RetryUntilWalReceiverDown
-	// doesn't contain any increment
-	return wait.ExponentialBackoff(RetryUntilWalReceiverDown, func() (done bool, err error) {
-		status, err := r.instance.IsWALReceiverActive()
-		if err != nil {
-			return true, err
-		}
-
-		if !status {
-			return true, nil
-		}
-
-		contextLogger.Info("WAL receiver is still active, waiting")
-		return false, nil
-	})
 }
 
 // refreshCredentialsFromSecret updates the PostgreSQL users credentials
