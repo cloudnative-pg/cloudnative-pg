@@ -79,6 +79,11 @@ const (
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
 	databaseRoleClusterKey        = ".spec.cluster.name"
+	// databaseClusterKey indexes the Database objects by the namespaced name of
+	// the cluster they refer to. Unlike the other owned resources, a Database
+	// may refer to a cluster living in another namespace, so indexing its name
+	// alone would not identify it.
+	databaseClusterKey = ".spec.cluster.namespacedName"
 	// usedPluginsClusterKey is a synthetic index key, not a real Cluster spec field;
 	// it is populated by getPluginsNeededForReconcile.
 	usedPluginsClusterKey = ".spec.usedPlugins"
@@ -149,6 +154,8 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters/status,verbs=get;watch;update;patch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=create;patch;update;get;list;watch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=create;patch;update;get;list;watch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=create;delete;patch;update;get;list;watch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=create;delete;patch;update;get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create
@@ -180,34 +187,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster == nil || cluster.GetDeletionTimestamp() != nil {
-		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
-			contextLogger.Error(
-				err,
-				"error while deleting dangling monitoring configMap",
-				"configMapName", apiv1.DefaultMonitoringConfigMapName,
-				"namespace", req.Namespace,
-			)
-			return ctrl.Result{}, err
-		}
-		if err := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName); err != nil {
-			// Optimistic locking conflict is transient - requeue to retry
-			if apierrs.IsConflict(err) {
-				contextLogger.Info(
-					"Optimistic locking conflict while removing finalizers, requeueing",
-					"clusterName", req.Name,
-					"namespace", req.Namespace,
-				)
-				return ctrl.Result{RequeueAfter: time.Second}, nil
-			}
-			contextLogger.Error(
-				err,
-				"error while deleting finalizers of objects on the cluster",
-				"clusterName", req.Name,
-				"namespace", req.Namespace,
-			)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+		return r.reconcileDeletedCluster(ctx, req, cluster)
 	}
 
 	if result, err := r.admission.EnsureResourceIsAdmitted(
@@ -290,6 +270,67 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	return result, nil
+}
+
+// reconcileDeletedCluster notifies the deletion of a cluster to the resources
+// depending on it, and removes the ones that are not garbage collected together
+// with it. The cluster may already be gone, so everything is keyed on the
+// namespaced name of the request.
+func (r *ClusterReconciler) reconcileDeletedCluster(
+	ctx context.Context,
+	req ctrl.Request,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
+		contextLogger.Error(
+			err,
+			"error while deleting dangling monitoring configMap",
+			"configMapName", apiv1.DefaultMonitoringConfigMapName,
+			"namespace", req.Namespace,
+		)
+		return ctrl.Result{}, err
+	}
+
+	if err := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName); err != nil {
+		// Optimistic locking conflict is transient - requeue to retry
+		if apierrs.IsConflict(err) {
+			contextLogger.Info(
+				"Optimistic locking conflict while removing finalizers, requeueing",
+				"clusterName", req.Name,
+				"namespace", req.Namespace,
+			)
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		contextLogger.Error(
+			err,
+			"error while deleting finalizers of objects on the cluster",
+			"clusterName", req.Name,
+			"namespace", req.Namespace,
+		)
+		return ctrl.Result{}, err
+	}
+
+	// The RBAC resources supporting cross-namespace Database objects are
+	// cluster-scoped, so they are not garbage collected together with the
+	// Cluster and need to be deleted explicitly. The Cluster may already be
+	// gone at this point, in which case no event can be recorded on it.
+	var recorderObject client.Object
+	if cluster != nil {
+		recorderObject = cluster
+	}
+	if err := r.deleteCrossNamespaceDatabaseRBACByKey(ctx, req.NamespacedName, recorderObject); err != nil {
+		contextLogger.Error(
+			err,
+			"error while deleting the cross-namespace Database RBAC resources",
+			"clusterName", req.Name,
+			"namespace", req.Namespace,
+		)
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 // getPluginsNeededForReconcile returns the names of the plugins that must be
@@ -1482,6 +1523,18 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
+	// Create a new indexed field on Databases. This field will be used to easily
+	// find all the Databases pointing to a cluster, including the ones living in
+	// another namespace.
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Database{},
+		databaseClusterKey,
+		indexDatabaseByCluster,
+	); err != nil {
+		return err
+	}
+
 	// Create a new indexed field on ImageCatalogs. This field will be used to easily
 	// find all the ImageCatalogs pointing to a cluster.
 	if err := mgr.GetFieldIndexer().IndexField(
@@ -1620,7 +1673,8 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 // It resolves the cluster reference by name instead of through an owner reference.
 func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []reconcile.Request {
 	owned, ok := obj.(interface {
-		GetClusterRef() corev1.LocalObjectReference
+		GetClusterRef() apiv1.ClusterObjectReference
+		GetClusterNamespace() string
 	})
 	if !ok {
 		return nil
@@ -1633,7 +1687,7 @@ func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []re
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
+				Namespace: owned.GetClusterNamespace(),
 				Name:      clusterName,
 			},
 		},

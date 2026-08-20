@@ -101,7 +101,9 @@ ClusterImageCatalog
 ClusterIsNotReady
 ClusterList
 ClusterMonitoringTLSConfiguration
+ClusterObjectReference
 ClusterRole
+ClusterRoleBinding
 ClusterServiceVersion
 ClusterSpec
 ClusterStatus
@@ -169,6 +171,7 @@ EOL
 ESO
 EdwinaZhu
 EmbeddedObjectMetadata
+EnableCrossNamespaceDatabases
 EnablePDB
 Endevir
 EndpointCA
@@ -788,6 +791,7 @@ clusterimagecatalog
 clusterimagecatalogs
 clusterlist
 clustermonitoringtlsconfiguration
+clusterobjectreference
 clusterrole
 clusterserviceversions
 clusterspec

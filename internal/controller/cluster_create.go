@@ -90,6 +90,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
+	err = r.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
 	if !cluster.Spec.Monitoring.AreDefaultQueriesDisabled() {
 		err = r.createOrPatchDefaultMetrics(ctx, cluster)
 		if err != nil {
@@ -1116,6 +1121,134 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 	if err != nil && !apierrs.IsAlreadyExists(err) {
 		log.FromContext(ctx).Error(err, "Unable to create the ServiceAccount", "object", roleBinding)
 		return err
+	}
+
+	return nil
+}
+
+// reconcileCrossNamespaceDatabaseRBAC creates or deletes the ClusterRole and ClusterRoleBinding
+// needed for cross-namespace Database support based on the cluster's configuration
+func (r *ClusterReconciler) reconcileCrossNamespaceDatabaseRBAC(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	if cluster.Spec.EnableCrossNamespaceDatabases {
+		return r.createCrossNamespaceDatabaseRBAC(ctx, cluster)
+	}
+
+	// Feature is disabled, clean up any existing resources
+	if err := r.deleteCrossNamespaceDatabaseRBAC(ctx, cluster); err != nil {
+		contextLogger.Error(err, "Failed to delete cross-namespace database RBAC resources")
+		return err
+	}
+
+	return nil
+}
+
+// createCrossNamespaceDatabaseRBAC creates the ClusterRole and ClusterRoleBinding for cross-namespace Database access
+func (r *ClusterReconciler) createCrossNamespaceDatabaseRBAC(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Create or update ClusterRole
+	clusterRole := specs.CreateCrossNamespaceDatabaseRole(*cluster)
+	var existingRole rbacv1.ClusterRole
+	if err := r.Get(ctx, client.ObjectKey{Name: clusterRole.Name}, &existingRole); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting ClusterRole: %w", err)
+		}
+
+		contextLogger.Info("Creating ClusterRole for cross-namespace Database access", "name", clusterRole.Name)
+		r.Recorder.Event(cluster, "Normal", "CreatingClusterRole",
+			fmt.Sprintf("Creating ClusterRole %s for cross-namespace Database access", clusterRole.Name))
+		if err := r.Create(ctx, &clusterRole); err != nil {
+			return fmt.Errorf("while creating ClusterRole: %w", err)
+		}
+	} else if !equality.Semantic.DeepEqual(existingRole.Rules, clusterRole.Rules) {
+		contextLogger.Info("Updating ClusterRole for cross-namespace Database access", "name", clusterRole.Name)
+		patchedRole := existingRole.DeepCopy()
+		patchedRole.Rules = clusterRole.Rules
+		if err := r.Patch(ctx, patchedRole, client.MergeFrom(&existingRole)); err != nil {
+			return fmt.Errorf("while patching ClusterRole: %w", err)
+		}
+	}
+
+	// Create ClusterRoleBinding
+	clusterRoleBinding := specs.CreateCrossNamespaceDatabaseRoleBinding(*cluster)
+	var existingBinding rbacv1.ClusterRoleBinding
+	if err := r.Get(ctx, client.ObjectKey{Name: clusterRoleBinding.Name}, &existingBinding); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting ClusterRoleBinding: %w", err)
+		}
+
+		contextLogger.Info("Creating ClusterRoleBinding for cross-namespace Database access", "name", clusterRoleBinding.Name)
+		r.Recorder.Event(cluster, "Normal", "CreatingClusterRoleBinding",
+			fmt.Sprintf("Creating ClusterRoleBinding %s for cross-namespace Database access", clusterRoleBinding.Name))
+		if err := r.Create(ctx, &clusterRoleBinding); err != nil {
+			return fmt.Errorf("while creating ClusterRoleBinding: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// deleteCrossNamespaceDatabaseRBAC deletes the ClusterRole and ClusterRoleBinding for cross-namespace Database access
+func (r *ClusterReconciler) deleteCrossNamespaceDatabaseRBAC(ctx context.Context, cluster *apiv1.Cluster) error {
+	return r.deleteCrossNamespaceDatabaseRBACByKey(
+		ctx,
+		types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name},
+		cluster,
+	)
+}
+
+// deleteCrossNamespaceDatabaseRBACByKey deletes the ClusterRole and the
+// ClusterRoleBinding created for cross-namespace Database access by the cluster
+// having the passed namespaced name.
+//
+// Those resources are cluster-scoped, so they cannot be garbage collected
+// through the namespaced owner reference of the Cluster and must be removed
+// explicitly, including when the Cluster is being deleted.
+//
+// The recorder object is optional, as the Cluster may already be gone by the
+// time its deletion is reconciled: when nil, no event is emitted.
+func (r *ClusterReconciler) deleteCrossNamespaceDatabaseRBACByKey(
+	ctx context.Context,
+	key types.NamespacedName,
+	recorderObject client.Object,
+) error {
+	contextLogger := log.FromContext(ctx)
+	roleName := specs.GetCrossNamespaceDatabaseRoleNameFor(key.Namespace, key.Name)
+
+	// Delete ClusterRoleBinding
+	var clusterRoleBinding rbacv1.ClusterRoleBinding
+	if err := r.Get(ctx, client.ObjectKey{Name: roleName}, &clusterRoleBinding); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting ClusterRoleBinding: %w", err)
+		}
+	} else {
+		contextLogger.Info("Deleting ClusterRoleBinding for cross-namespace Database access", "name", roleName)
+		if recorderObject != nil {
+			r.Recorder.Event(recorderObject, "Normal", "DeletingClusterRoleBinding",
+				fmt.Sprintf("Deleting ClusterRoleBinding %s", roleName))
+		}
+		if err := r.Delete(ctx, &clusterRoleBinding); err != nil && !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while deleting ClusterRoleBinding: %w", err)
+		}
+	}
+
+	// Delete ClusterRole
+	var clusterRole rbacv1.ClusterRole
+	if err := r.Get(ctx, client.ObjectKey{Name: roleName}, &clusterRole); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting ClusterRole: %w", err)
+		}
+	} else {
+		contextLogger.Info("Deleting ClusterRole for cross-namespace Database access", "name", roleName)
+		if recorderObject != nil {
+			r.Recorder.Event(recorderObject, "Normal", "DeletingClusterRole",
+				fmt.Sprintf("Deleting ClusterRole %s", roleName))
+		}
+		if err := r.Delete(ctx, &clusterRole); err != nil && !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while deleting ClusterRole: %w", err)
+		}
 	}
 
 	return nil

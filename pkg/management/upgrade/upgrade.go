@@ -103,6 +103,25 @@ func FromReader(
 	}
 
 	// We are ready to reload the instance manager
+	if err := RestartInstanceManager(cancelFunc, exitedCondition); err != nil {
+		return fmt.Errorf("while replacing instance manager process: %w", err)
+	}
+
+	return nil
+}
+
+// RestartInstanceManager stops every Runnable handled by the controller-runtime
+// manager and replaces this process with a new one running the same binary, so
+// that it reconfigures itself from the current definition of the cluster.
+//
+// PostgreSQL is left running, provided the caller set InstanceManagerIsUpgrading
+// on the instance before calling this function.
+//
+// This function never returns in case of success.
+func RestartInstanceManager(
+	cancelFunc context.CancelFunc,
+	exitedCondition concurrency.MultipleExecuted,
+) error {
 	// First we are going to cancel the context, this will trigger the shutdown of all
 	// the Runnables handled by the manager.
 	// Only the postgres process will not be actually killed, as the postgres lifecycle
@@ -115,12 +134,7 @@ func FromReader(
 	log.Info("All log goroutines exited, will reload the instance manager")
 
 	// Now we are actually ready to reload the instance manager
-	err = reloadInstanceManager()
-	if err != nil {
-		return fmt.Errorf("while replacing instance manager process: %w", err)
-	}
-
-	return nil
+	return reloadInstanceManager()
 }
 
 // downloadAndCloseInstanceManagerBinary updates the binary of the new version of

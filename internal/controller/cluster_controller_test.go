@@ -1485,11 +1485,12 @@ var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 		NamespacedName: types.NamespacedName{Namespace: ns, Name: referencedName},
 	}
 	clusterRef := corev1.LocalObjectReference{Name: referencedName}
+	databaseClusterRef := apiv1.ClusterObjectReference{Name: referencedName}
 
 	It("maps a Database to a reconcile request for the referenced cluster", func(ctx SpecContext) {
 		db := &apiv1.Database{
 			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "db"},
-			Spec:       apiv1.DatabaseSpec{ClusterRef: clusterRef},
+			Spec:       apiv1.DatabaseSpec{ClusterRef: databaseClusterRef},
 		}
 		Expect(mapClusterOwnedResourceToCluster(ctx, db)).To(ConsistOf(expectedRequest))
 	})
