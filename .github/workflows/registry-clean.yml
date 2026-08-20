@@ -7,6 +7,8 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions: {}
+
 env:
   IMAGE_NAME: "cloudnative-pg-testing"
 
@@ -14,6 +16,7 @@ jobs:
   clean-ghcr:
     name: delete old testing container images
     permissions:
+      contents: read
       packages: write
     runs-on: ubuntu-latest
     steps:
