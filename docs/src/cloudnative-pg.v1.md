@@ -997,7 +997,7 @@ _Appears in:_
 | `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
 | `databaseRoleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
 | `clientCertificate` _[ClientCertificateConfiguration](#clientcertificateconfiguration)_ | ClientCertificate configures the operator to generate and renew a TLS client<br />certificate for this role, signed by the cluster's client CA. The certificate<br />is stored in a Secret named `<databaserole-name>-client-cert`.<br />Requires login to be true. |  |  |  |
-| `password` _[PasswordConfiguration](#passwordconfiguration)_ | Password configures the operator to generate the password of this role and<br />store it in a Secret, instead of requiring a pre-existing one through<br />`passwordSecret`. Mutually exclusive with `passwordSecret`. |  |  |  |
+| `password` _[PasswordConfiguration](#passwordconfiguration)_ | Password configures how the operator manages the password of this role,<br />instead of requiring a pre-existing Secret through `passwordSecret` or<br />disabling it through `disablePassword`. Mutually exclusive with both. |  |  |  |
 
 
 #### DatabaseRoleStatus
@@ -1827,8 +1827,8 @@ _Appears in:_
 
 
 
-PasswordConfiguration configures operator-managed generation of the password
-of a DatabaseRole.
+PasswordConfiguration configures how the operator manages the password of a
+DatabaseRole.
 
 
 
@@ -1838,11 +1838,11 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `enabled` _boolean_ | Enabled turns on password generation for this role. Defaults to true when<br />the block is present. |  | true |  |
-| `secret` _string_ | Secret is the name of the Secret where the generated password is stored.<br />Defaults to `<databaserole-name>-password`. The operator never overwrites<br />a Secret it does not own. |  |  |  |
-| `duration` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | Duration is the lifetime of the generated password, at least one minute:<br />once it is reached, minus `renewBefore`, the operator generates a new<br />password and applies it to the role. When unset, the password is generated<br />once and never rotated. |  |  |  |
-| `renewBefore` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RenewBefore is how long before the end of its lifetime the password is<br />rotated. Only meaningful together with `duration`, and it must be at most<br />half of it, so that the password is not due for rotation as soon as it is<br />generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting<br />(7 days), capped at half of the lifetime. |  |  |  |
-| `criteria` _[PasswordCriteria](#passwordcriteria)_ | Criteria constrains the generated password. |  |  |  |
+| `mode` _[PasswordMode](#passwordmode)_ | Mode governs how the operator manages the password of this role:<br />`generate` (the default) generates and rotates a password kept in a<br />Secret the operator owns; `secret` reads the password from an existing<br />Secret named by `secret`, without generating or owning one; `external`<br />stops managing it, deleting any Secret previously generated and leaving<br />the password already set on the role in PostgreSQL untouched; `clear`<br />sets the password of the role to NULL in PostgreSQL, disabling password<br />authentication for it. |  | generate | Enum: [generate secret external clear] <br /> |
+| `secret` _string_ | Secret is the name of the Secret holding the password of this role: the<br />one the operator generates into and never overwrites if it does not own<br />(when `mode` is `generate`, defaulting to `<databaserole-name>-password`),<br />or an existing one to read the password from, required and never written<br />to (when `mode` is `secret`). Only meaningful in those two modes. |  |  |  |
+| `duration` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | Duration is the lifetime of the generated password, at least one minute:<br />once it is reached, minus `renewBefore`, the operator generates a new<br />password and applies it to the role. When unset, the password is generated<br />once and never rotated. Only meaningful when `mode` is `generate`. |  |  |  |
+| `renewBefore` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RenewBefore is how long before the end of its lifetime the password is<br />rotated. Only meaningful together with `duration`, and it must be at most<br />half of it, so that the password is not due for rotation as soon as it is<br />generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting<br />(7 days), capped at half of the lifetime. Only meaningful when `mode` is<br />`generate`. |  |  |  |
+| `criteria` _[PasswordCriteria](#passwordcriteria)_ | Criteria constrains the generated password. Only meaningful when `mode`<br />is `generate`. |  |  |  |
 
 
 #### PasswordCriteria
@@ -1870,6 +1870,26 @@ _Appears in:_
 | `symbolCharacters` _string_ | SymbolCharacters is the set of symbols the generated password can draw<br />from. Defaults to the symbols of the generator (``~!@#$%^&*()_+-=\{\}\|[]\:"<>?,./``).<br />Only ASCII punctuation is accepted: a letter or a digit here would collide<br />with the rest of the password when `allowRepeat` is not set, and whitespace<br />would be trimmed away before the password is applied to the role. |  |  | MinLength: 1 <br />Pattern: `^[\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$` <br /> |
 | `noUpper` _boolean_ | NoUpper disables uppercase characters in the generated password. |  |  |  |
 | `allowRepeat` _boolean_ | AllowRepeat allows the same character to appear more than once in the<br />generated password. |  |  |  |
+
+
+#### PasswordMode
+
+_Underlying type:_ _string_
+
+PasswordMode governs how the operator manages the password of a DatabaseRole.
+
+
+
+_Appears in:_
+
+- [PasswordConfiguration](#passwordconfiguration)
+
+| Field | Description |
+| --- | --- |
+| `generate` | PasswordModeGenerate makes the operator generate the password of the role<br />and keep it in a Secret it owns, rotating it when a lifetime is requested.<br />This is the default.<br /> |
+| `secret` | PasswordModeSecret makes the operator read the password of the role from<br />an existing Secret named by `secret`, instead of generating one: the<br />Secret is not owned by the role, and the operator never writes to it.<br /> |
+| `external` | PasswordModeExternal stops the operator from managing the password:<br />any Secret it previously generated is deleted, and the password already<br />set on the role in PostgreSQL is left untouched, as if managed by<br />something else.<br /> |
+| `clear` | PasswordModeClear makes the operator set the password of the role to<br />NULL in PostgreSQL, disabling password authentication for it.<br /> |
 
 
 #### PasswordState

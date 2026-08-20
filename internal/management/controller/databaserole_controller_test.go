@@ -111,6 +111,29 @@ func markDeleting(role *apiv1.DatabaseRole) {
 	role.Generation++
 }
 
+var _ = Describe("DatabaseRole roleConfigurationForPassword", func() {
+	It("leaves DisablePassword alone when the password is not explicitly cleared", func() {
+		role := newTestDatabaseRole()
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+
+		role.Spec.Password = &apiv1.PasswordConfiguration{}
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+
+		role.Spec.Password.Mode = apiv1.PasswordModeExternal
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+	})
+
+	It("sets DisablePassword when the password is explicitly cleared, without mutating the role", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeClear}
+
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeTrue())
+		// The role's own spec, which gets patched back to the API server, must
+		// not pick up a field the user never set.
+		Expect(role.Spec.RoleConfiguration.DisablePassword).To(BeFalse())
+	})
+})
+
 var _ = Describe("DatabaseRole shouldDropRole", func() {
 	DescribeTable("decides whether a deleted role must be dropped",
 		func(policy apiv1.DatabaseRoleReclaimPolicy, reconciled bool,

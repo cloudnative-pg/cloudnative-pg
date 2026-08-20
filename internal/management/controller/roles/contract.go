@@ -149,6 +149,11 @@ func (d *DatabaseRole) ApplyPassword(
 		d.ignorePassword = true
 		return "", nil
 	case secretName == "" && config.DisablePassword:
+		// Disabling the password is an instruction to set it, to NULL: it has
+		// to override the "leave the password alone" a role built from a
+		// configuration that did not disable it starts out with, the same way
+		// reading one from a Secret does below.
+		d.ignorePassword = false
 		d.password = sql.NullString{}
 		return "", nil
 	case secretName != "" && config.DisablePassword:
