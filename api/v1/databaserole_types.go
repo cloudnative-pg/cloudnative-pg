@@ -105,7 +105,6 @@ type PasswordMode string
 const (
 	// PasswordModeGenerate makes the operator generate the password of the role
 	// and keep it in a Secret it owns, rotating it when a lifetime is requested.
-	// This is the default.
 	PasswordModeGenerate PasswordMode = "generate"
 
 	// PasswordModeSecret makes the operator read the password of the role from
@@ -132,18 +131,19 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.mode == 'generate' || self.mode == 'secret' || !has(self.secret)",message="secret is only meaningful when mode is generate or secret"
 // +kubebuilder:validation:XValidation:rule="self.mode == 'generate' || !has(self.criteria)",message="criteria is only meaningful when mode is generate"
 type PasswordConfiguration struct {
-	// Mode governs how the operator manages the password of this role:
-	// `generate` (the default) generates and rotates a password kept in a
-	// Secret the operator owns; `secret` reads the password from an existing
-	// Secret named by `secret`, without generating or owning one; `external`
-	// stops managing it, deleting any Secret previously generated and leaving
-	// the password already set on the role in PostgreSQL untouched; `clear`
-	// sets the password of the role to NULL in PostgreSQL, disabling password
-	// authentication for it.
+	// Mode governs how the operator manages the password of this role, and is
+	// required whenever the `password` stanza is present: `generate` generates
+	// and rotates a password kept in a Secret the operator owns; `secret`
+	// reads the password from an existing Secret named by `secret`, without
+	// generating or owning one; `external` stops managing it, deleting any
+	// Secret previously generated and leaving the password already set on the
+	// role in PostgreSQL untouched; `clear` sets the password of the role to
+	// NULL in PostgreSQL, disabling password authentication for it. It has no
+	// default: asking for a password without saying how it is managed is
+	// ambiguous, and defaulting it either way would silently pick a behavior
+	// as consequential as generating a credential or removing one.
 	// +kubebuilder:validation:Enum=generate;secret;external;clear
-	// +kubebuilder:default:=generate
-	// +optional
-	Mode PasswordMode `json:"mode,omitempty"`
+	Mode PasswordMode `json:"mode"`
 
 	// Secret is the name of the Secret holding the password of this role: the
 	// one the operator generates into and never overwrites if it does not own

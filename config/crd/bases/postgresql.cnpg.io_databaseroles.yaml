@@ -241,16 +241,18 @@ spec:
                       once and never rotated. Only meaningful when `mode` is `generate`.
                     type: string
                   mode:
-                    default: generate
                     description: |-
-                      Mode governs how the operator manages the password of this role:
-                      `generate` (the default) generates and rotates a password kept in a
-                      Secret the operator owns; `secret` reads the password from an existing
-                      Secret named by `secret`, without generating or owning one; `external`
-                      stops managing it, deleting any Secret previously generated and leaving
-                      the password already set on the role in PostgreSQL untouched; `clear`
-                      sets the password of the role to NULL in PostgreSQL, disabling password
-                      authentication for it.
+                      Mode governs how the operator manages the password of this role, and is
+                      required whenever the `password` stanza is present: `generate` generates
+                      and rotates a password kept in a Secret the operator owns; `secret`
+                      reads the password from an existing Secret named by `secret`, without
+                      generating or owning one; `external` stops managing it, deleting any
+                      Secret previously generated and leaving the password already set on the
+                      role in PostgreSQL untouched; `clear` sets the password of the role to
+                      NULL in PostgreSQL, disabling password authentication for it. It has no
+                      default: asking for a password without saying how it is managed is
+                      ambiguous, and defaulting it either way would silently pick a behavior
+                      as consequential as generating a credential or removing one.
                     enum:
                     - generate
                     - secret
@@ -274,6 +276,8 @@ spec:
                       or an existing one to read the password from, required and never written
                       to (when `mode` is `secret`). Only meaningful in those two modes.
                     type: string
+                required:
+                - mode
                 type: object
                 x-kubernetes-validations:
                 - message: renewBefore requires duration, and must be at most half
