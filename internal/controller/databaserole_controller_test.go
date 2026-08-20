@@ -175,6 +175,7 @@ var _ = Describe("nextRoleSecretReconcile", func() {
 		return &apiv1.DatabaseRole{
 			Spec: apiv1.DatabaseRoleSpec{
 				Password: &apiv1.PasswordConfiguration{
+					Mode:        apiv1.PasswordModeGenerate,
 					Duration:    &metav1.Duration{Duration: 5 * time.Minute},
 					RenewBefore: &metav1.Duration{Duration: time.Minute},
 				},

@@ -329,7 +329,7 @@ var _ = Describe("Database Roles", func() {
 				RoleConfiguration: apiv1.RoleConfiguration{
 					Name: "role7",
 				},
-				Password: &apiv1.PasswordConfiguration{},
+				Password: &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate},
 			},
 		},
 		{
@@ -338,7 +338,7 @@ var _ = Describe("Database Roles", func() {
 				RoleConfiguration: apiv1.RoleConfiguration{
 					Name: "role8",
 				},
-				Password: &apiv1.PasswordConfiguration{Secret: "my_secret8"},
+				Password: &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate, Secret: "my_secret8"},
 			},
 		},
 	}
@@ -435,7 +435,7 @@ var _ = Describe("CRD database role secret name", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "role-dante"},
 			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{Name: "dante"},
-				Password:          &apiv1.PasswordConfiguration{},
+				Password:          &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate},
 			},
 		}
 		Expect(crdRoleSecretName(&role)).To(Equal("role-dante-password"))

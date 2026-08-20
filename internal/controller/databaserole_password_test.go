@@ -105,7 +105,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	}
 
 	It("generates a basic-auth secret the instance manager can consume", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(false))
 
 		result, err := r.Reconcile(ctx, requestFor(role))
@@ -128,7 +128,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("tracks the generated secret in the PasswordSecretChange condition", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(false))
 
 		_, err := r.Reconcile(ctx, requestFor(role))
@@ -144,7 +144,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("does not rotate the password when no lifetime is requested", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(false))
 
 		_, err := r.Reconcile(ctx, requestFor(role))
@@ -161,6 +161,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 	It("honors the requested name and criteria", func() {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:   apiv1.PasswordModeGenerate,
 			Secret: "dante-credentials",
 			Criteria: &apiv1.PasswordCriteria{
 				Length:           20,
@@ -187,7 +188,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("deletes the secret it generated into before, once the name changes", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(false))
 
 		_, err := r.Reconcile(ctx, requestFor(role))
@@ -213,7 +214,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("keeps the previous secret until it can generate into the new one", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		cluster := newCluster(false)
 		r, cli := buildReconciler(role, cluster)
 
@@ -246,6 +247,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 	It("reports a symbol listed twice, instead of looking for the second one forever", func(_ SpecContext) {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode: apiv1.PasswordModeGenerate,
 			Criteria: &apiv1.PasswordCriteria{
 				// The generator measures the symbols it can draw from by the length
 				// of the set, so a repeated one makes it ask for two distinct symbols
@@ -262,6 +264,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 	It("reports criteria no password can satisfy, instead of retrying forever", func() {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode: apiv1.PasswordModeGenerate,
 			Criteria: &apiv1.PasswordCriteria{
 				// The generator draws symbols from a single character and is not
 				// allowed to repeat it.
@@ -286,6 +289,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	When("a lifetime is requested", func() {
 		It("records the issue time, expiration and renewal deadline, and asks to be requeued", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:        apiv1.PasswordModeGenerate,
 				Duration:    &metav1.Duration{Duration: 90 * 24 * time.Hour},
 				RenewBefore: &metav1.Duration{Duration: 7 * 24 * time.Hour},
 			})
@@ -311,6 +315,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 		It("rotates immediately once a shortened duration is already exceeded, "+
 			"instead of honoring the deadline computed under the previous one", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:     apiv1.PasswordModeGenerate,
 				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
 			})
 			r, cli := buildReconciler(role, newCluster(false))
@@ -346,6 +351,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 		It("rotates the password once inside the renewal window", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:        apiv1.PasswordModeGenerate,
 				Duration:    &metav1.Duration{Duration: 90 * 24 * time.Hour},
 				RenewBefore: &metav1.Duration{Duration: 7 * 24 * time.Hour},
 			})
@@ -380,6 +386,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			// The operator-wide threshold is 7 days: taken literally, a password
 			// living one hour would be due for renewal the moment it is generated.
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:     apiv1.PasswordModeGenerate,
 				Duration: &metav1.Duration{Duration: time.Hour},
 			})
 			r, cli := buildReconciler(role, newCluster(false))
@@ -395,6 +402,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 		It("rotates a password older than the requested lifetime", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:     apiv1.PasswordModeGenerate,
 				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
 			})
 			// A password generated before a lifetime was requested carries no
@@ -426,6 +434,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 		It("keeps a password younger than the requested lifetime, recording its expiration", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:     apiv1.PasswordModeGenerate,
 				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
 			})
 			fresh := &corev1.Secret{
@@ -457,6 +466,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 		It("rotates the password when the recorded issue time cannot be read", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:     apiv1.PasswordModeGenerate,
 				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
 			})
 			r, cli := buildReconciler(role, newCluster(false))
@@ -481,6 +491,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 		It("forgets the expiration once the lifetime is removed", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:     apiv1.PasswordModeGenerate,
 				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
 			})
 			r, cli := buildReconciler(role, newCluster(false))
@@ -505,7 +516,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("regenerates a password that was emptied out of band", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(false))
 
 		_, err := r.Reconcile(ctx, requestFor(role))
@@ -522,7 +533,10 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("refuses the secret reserved for the client certificate of the role", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Secret: "role-dante-client-cert"})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:   apiv1.PasswordModeGenerate,
+			Secret: "role-dante-client-cert",
+		})
 		r, cli := buildReconciler(role, newCluster(false))
 
 		_, err := r.Reconcile(ctx, requestFor(role))
@@ -537,7 +551,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("puts back the username of the role without rotating the password", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(false))
 
 		_, err := r.Reconcile(ctx, requestFor(role))
@@ -564,13 +578,14 @@ var _ = Describe("DatabaseRole password generation", func() {
 		DeferCleanup(func() { configuration.Current = configuration.NewConfiguration() })
 
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
 			Duration: &metav1.Duration{Duration: 30 * 24 * time.Hour},
 		})
 		Expect(passwordRenewBefore(role)).To(Equal(7 * 24 * time.Hour))
 	})
 
 	It("records the password it generated even when the client certificate fails", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		role.Spec.ClientCertificate = &apiv1.ClientCertificateConfiguration{}
 		cluster := newCluster(false)
 
@@ -608,6 +623,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 	It("does not rotate the password of a role that is being deleted", func() {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
 			Duration: &metav1.Duration{Duration: time.Hour},
 		})
 		r, cli := buildReconciler(role, newCluster(false))
@@ -637,7 +653,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("never overwrites a secret it does not own", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		foreign := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Name: "role-dante-password", Namespace: namespace},
 			Type:       corev1.SecretTypeBasicAuth,
@@ -657,7 +673,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("skips generation on a replica cluster", func() {
-		role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(true))
 
 		_, err := r.Reconcile(ctx, requestFor(role))
@@ -671,7 +687,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 	When("generation is turned off", func() {
 		It("deletes the secret it generated", func() {
-			role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 			r, cli := buildReconciler(role, newCluster(false))
 
 			_, err := r.Reconcile(ctx, requestFor(role))
@@ -704,7 +720,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			// distinction between `external` and `clear` only matters to the
 			// instance manager, which decides whether to leave the PostgreSQL
 			// password alone or set it to NULL.
-			role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 			r, cli := buildReconciler(role, newCluster(false))
 
 			_, err := r.Reconcile(ctx, requestFor(role))
@@ -725,7 +741,10 @@ var _ = Describe("DatabaseRole password generation", func() {
 		})
 
 		It("deletes the secret it generated under a name of its own", func() {
-			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Secret: "dante-credentials"})
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:   apiv1.PasswordModeGenerate,
+				Secret: "dante-credentials",
+			})
 			r, cli := buildReconciler(role, newCluster(false))
 
 			_, err := r.Reconcile(ctx, requestFor(role))
@@ -748,7 +767,10 @@ var _ = Describe("DatabaseRole password generation", func() {
 		})
 
 		It("keeps track of its secret across a state it cannot generate in", func() {
-			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Secret: "dante-credentials"})
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:   apiv1.PasswordModeGenerate,
+				Secret: "dante-credentials",
+			})
 			cluster := newCluster(false)
 			r, cli := buildReconciler(role, cluster)
 
@@ -779,7 +801,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 		})
 
 		It("keeps the secret in place when the role switches to reading from that same name", func() {
-			role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 			r, cli := buildReconciler(role, newCluster(false))
 
 			_, err := r.Reconcile(ctx, requestFor(role))
@@ -880,6 +902,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 	It("regenerates the password once its Secret is deleted, as a manual rotation request", func() {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
 			Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
 		})
 		r, cli := buildReconciler(role, newCluster(false))
