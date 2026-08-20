@@ -511,16 +511,20 @@ accepts:
   the `password` stanza;
 - `external`, which stops the operator from managing the password (see
   [Deletion and opt-out](#deletion-and-opt-out));
-- `clear`, which sets the password of the role to `NULL` in PostgreSQL (see
+- `setNull`, which sets the password of the role to `NULL` in PostgreSQL (see
   [Disabling passwords](#disabling-passwords)).
 
 The stanza is mutually exclusive with `passwordSecret` and with
 `disablePassword`, and it is only available on `DatabaseRole` resources, not
 on inline managed roles. The other fields are restricted to the modes they
 apply to: `secret` is required under `secret`, allowed under `generate`, and
-rejected under `external`/`clear`; `criteria`, `duration` and `renewBefore`
+rejected under `external`/`setNull`; `criteria`, `duration` and `renewBefore`
 are allowed only under `generate`, since no other mode generates or rotates
 a password.
+
+Once the stanza is present it cannot be removed: `mode` is what says how the
+password is managed from now on, so a role that stops generating one has to
+say what happens to it instead, rather than leaving it to the legacy fields.
 
 #### Generated Secret
 
@@ -644,9 +648,9 @@ new password into it.
 
 | Scenario | Result |
 |---|---|
-| `password.mode` set to `external`, or the `password` block removed | The generated Secret is deleted; `status.password` is cleared. The role keeps in PostgreSQL the password it was last given |
-| `password.mode` set to `clear` | The generated Secret is deleted; `status.password` is cleared. The role's password is set to `NULL` in PostgreSQL, disabling password authentication (see [Disabling passwords](#disabling-passwords)) |
-| `password.mode` set to `secret` | `status.password` is cleared. The generated Secret is deleted, unless `password.secret` names that very Secret, in which case it is left untouched and simply stops being tracked as generated: the password is now read from it instead |
+| `password.mode` set to `external` | The generated Secret is deleted, and the password it held is set to `NULL` in PostgreSQL: nothing could read that password any more, so it is not left behind as a credential nobody knows. The operator then stops managing the password of the role |
+| `password.mode` set to `setNull` | The generated Secret is deleted, and the role's password is set to `NULL` in PostgreSQL, disabling password authentication (see [Disabling passwords](#disabling-passwords)) |
+| `password.mode` set to `secret` | The generated Secret is deleted, that one included if `password.secret` names it, and the password is read from the Secret that name refers to from now on |
 | `password.secret` pointed at another name, `mode: generate` | The password is generated again into the new Secret, and the previous one is deleted |
 | `DatabaseRole` deleted | The generated Secret, if any, is garbage-collected via owner reference, regardless of `databaseRoleReclaimPolicy` |
 
@@ -658,11 +662,11 @@ maintains.
 
 :::warning
 A Secret the operator generated is deleted as soon as it stops generating into
-it, so a `passwordSecret` pointing at it does not take the password over: copy
-the password into a Secret of your own, under a different name, before turning
-generation off. The same applies to `databaseRoleReclaimPolicy: retain`, where
-the role survives the deletion of the `DatabaseRole` but its generated Secret
-does not.
+it, and `password.secret` naming that very Secret does not take the password
+over: what the operator created, the operator deletes. Copy the password into
+a Secret of your own, under a different name, before turning generation off.
+The same applies to `databaseRoleReclaimPolicy: retain`, where the role
+survives the deletion of the `DatabaseRole` but its generated Secret does not.
 :::
 
 #### Replica clusters
@@ -675,11 +679,11 @@ generation, and rotation, start once the cluster is promoted.
 ### Disabling passwords
 
 To explicitly set a password to `NULL` in PostgreSQL (distinguished from simply
-omitting a password update), either set `password.mode` to `clear`:
+omitting a password update), either set `password.mode` to `setNull`:
 
 ```yaml
   password:
-    mode: clear
+    mode: setNull
 ```
 
 or, without using the `password` stanza at all, set the `disablePassword`
@@ -692,7 +696,7 @@ field:
 :::note
 It is an error to set both `passwordSecret` and `disablePassword` on a given
 role, and equally an error to set both `password` and `disablePassword`: use
-`password.mode: clear` instead of `disablePassword` once the role already has
+`password.mode: setNull` instead of `disablePassword` once the role already has
 a `password` stanza.
 :::
 

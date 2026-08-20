@@ -91,8 +91,7 @@ func (r *DatabaseRole) IsClientCertificateEnabled() bool {
 }
 
 // IsPasswordGenerationEnabled returns true if the operator should generate the
-// password of this role. The password block defaults its mode to `generate`
-// when present, so an unset mode means generation is enabled.
+// password of this role.
 func (r *DatabaseRole) IsPasswordGenerationEnabled() bool {
 	if r.Spec.Password == nil {
 		return false
@@ -106,11 +105,22 @@ func (r *DatabaseRole) IsPasswordGenerationEnabled() bool {
 	return r.Spec.Password.Mode == PasswordModeGenerate
 }
 
-// IsPasswordExplicitlyCleared returns true if the password block asks the
-// operator to set the password of this role to NULL in PostgreSQL, rather
-// than to generate one or leave it untouched.
-func (r *DatabaseRole) IsPasswordExplicitlyCleared() bool {
-	return r.Spec.Password != nil && r.Spec.Password.Mode == PasswordModeClear
+// IsPasswordSetToNull returns true if the password block asks the operator to
+// set the password of this role to NULL in PostgreSQL, rather than to generate
+// one or leave it untouched.
+func (r *DatabaseRole) IsPasswordSetToNull() bool {
+	return r.Spec.Password != nil && r.Spec.Password.Mode == PasswordModeSetNull
+}
+
+// IsPasswordRevocationPending returns true when the operator generated the
+// password this role still has in PostgreSQL, deleted the Secret holding it,
+// and the role asks for the password not to be managed any more: nothing can
+// read that password now, so it has to be set to NULL rather than left behind.
+// Both the specification and the status must say so: a role that moved on to
+// another mode has a password to apply, not one to revoke.
+func (r *DatabaseRole) IsPasswordRevocationPending() bool {
+	return r.Spec.Password != nil && r.Spec.Password.Mode == PasswordModeExternal &&
+		r.Status.Password != nil && r.Status.Password.PendingRevocation
 }
 
 // GetGeneratedPasswordSecretName returns the name of the Secret where the
