@@ -381,6 +381,31 @@ func getDatabaseSchemaInfo(ctx context.Context, db *sql.DB, schema apiv1.SchemaS
 	return &result, nil
 }
 
+// updateDatabaseSchemaGrants applies USAGE and CREATE privilege grants/revokes for a schema.
+// It is a no-op when no permissions are configured.
+func updateDatabaseSchemaGrants(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
+	if schema.Permissions == nil {
+		return nil
+	}
+	const objectTypeSchema = "SCHEMA"
+	// privileges lists every schema-level privilege CNPG currently manages.
+	privileges := []struct {
+		privilege string
+		grantees  []apiv1.UsageSpec
+	}{
+		{"USAGE", schema.Permissions.Usage},
+		{"CREATE", schema.Permissions.Create},
+	}
+	for _, p := range privileges {
+		if err := applyObjectPrivilege(
+			ctx, db, p.privilege, objectTypeSchema, schema.Name, p.grantees,
+		); err != nil {
+			return fmt.Errorf("applying %s grants for schema %q: %w", p.privilege, schema.Name, err)
+		}
+	}
+	return nil
+}
+
 func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -396,6 +421,10 @@ func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSp
 		return err
 	}
 	contextLogger.Info("created schema", "name", schema.Name)
+
+	if err := updateDatabaseSchemaGrants(ctx, db, schema); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -414,6 +443,10 @@ func updateDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSp
 		}
 
 		contextLogger.Info("altered schema owner", "name", schema.Name, "owner", schema.Owner)
+	}
+
+	if err := updateDatabaseSchemaGrants(ctx, db, schema); err != nil {
+		return err
 	}
 
 	return nil
@@ -516,14 +549,14 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 // based on the provided FDW specification.
 func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec) error {
 	const objectTypeForeignDataWrapper = "FOREIGN DATA WRAPPER"
-	return applyUsagePermissions(ctx, db, objectTypeForeignDataWrapper, fdw.Name, fdw.Usages)
+	return applyObjectPrivilege(ctx, db, "USAGE", objectTypeForeignDataWrapper, fdw.Name, fdw.Usages)
 }
 
 // updateDatabaseForeignServerUsage updates the usage permissions of a foreign server in the database.
 // It supports granting or revoking usage permissions for specified users.
 func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *apiv1.ServerSpec) error {
 	const objectTypeForeignServer = "FOREIGN SERVER"
-	return applyUsagePermissions(ctx, db, objectTypeForeignServer, server.Name, server.Usages)
+	return applyObjectPrivilege(ctx, db, "USAGE", objectTypeForeignServer, server.Name, server.Usages)
 }
 
 // publicRole is the special PostgreSQL grantee `PUBLIC`, which grants or
@@ -583,24 +616,12 @@ func applyObjectPrivilege(
 				"privilege", privilege, "type", objectType, "name", objectName, "grantee", grantee.Name)
 
 		default:
-			contextLogger.Warning("unknown privilege type",
-				"type", grantee.Type, "privilege", privilege, "objectType", objectType, "name", objectName)
+			return fmt.Errorf("unknown usage spec type %q for privilege %s on %s %q",
+				grantee.Type, privilege, objectType, objectName)
 		}
 	}
 
 	return nil
-}
-
-// applyUsagePermissions is a generic helper to grant or revoke USAGE permissions
-// for FOREIGN DATA WRAPPER / FOREIGN SERVER objects, avoiding duplicated logic.
-func applyUsagePermissions(
-	ctx context.Context,
-	db *sql.DB,
-	objectType string,
-	objectName string,
-	usages []apiv1.UsageSpec,
-) error {
-	return applyObjectPrivilege(ctx, db, "USAGE", objectType, objectName, usages)
 }
 
 func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
