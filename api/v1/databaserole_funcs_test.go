@@ -53,7 +53,7 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 
 	It("names the generated secret after the DatabaseRole, not after the PostgreSQL role", func() {
 		role := newRole()
-		role.Spec.Password = &PasswordConfiguration{}
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeGenerate}
 		Expect(role.IsPasswordGenerationEnabled()).To(BeTrue())
 		Expect(role.GetPasswordSecretName()).To(Equal("role-dante-password"))
 	})
@@ -66,7 +66,7 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 
 	It("honors an explicit secret name", func() {
 		role := newRole()
-		role.Spec.Password = &PasswordConfiguration{Secret: "dante-credentials"}
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeGenerate, Secret: "dante-credentials"}
 		Expect(role.GetPasswordSecretName()).To(Equal("dante-credentials"))
 	})
 
@@ -97,7 +97,7 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 		role := newRole()
 		Expect(role.IsPasswordExplicitlyCleared()).To(BeFalse())
 
-		role.Spec.Password = &PasswordConfiguration{}
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeGenerate}
 		Expect(role.IsPasswordExplicitlyCleared()).To(BeFalse())
 
 		role.Spec.Password.Mode = PasswordModeExternal
@@ -109,7 +109,7 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 
 	It("rotates only when a lifetime is requested", func() {
 		role := newRole()
-		role.Spec.Password = &PasswordConfiguration{}
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeGenerate}
 		Expect(role.IsPasswordRotationEnabled()).To(BeFalse())
 
 		role.Spec.Password.Duration = &metav1.Duration{Duration: 90 * 24 * time.Hour}
