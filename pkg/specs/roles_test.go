@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -472,8 +471,21 @@ var _ = Describe("CRD database role secret name", func() {
 		}
 		Expect(crdRoleSecretName(&role)).To(Equal("role-dante-password"))
 
-		role.Spec.Password.Enabled = ptr.To(false)
+		role.Spec.Password.Mode = apiv1.PasswordModeExternal
 		Expect(crdRoleSecretName(&role)).To(BeEmpty())
+	})
+	It("should be the named secret when the password is read from an existing one (mode: secret)", func() {
+		role := apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-dante"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{Name: "dante"},
+				Password: &apiv1.PasswordConfiguration{
+					Mode:   apiv1.PasswordModeSecret,
+					Secret: "byo-secret",
+				},
+			},
+		}
+		Expect(crdRoleSecretName(&role)).To(Equal("byo-secret"))
 	})
 	It("should work properly when the password secret name is set", func() {
 		role := apiv1.DatabaseRole{

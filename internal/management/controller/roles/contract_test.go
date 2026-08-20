@@ -92,6 +92,29 @@ var _ = Describe("ApplyPassword", func() {
 		Expect(appendPasswordOption(dbRole, &query)).To(Succeed())
 		Expect(query.String()).ToNot(ContainSubstring("PASSWORD"))
 	})
+
+	It("sets the password to NULL when disabled, whatever the role was built from", func() {
+		// A `password.mode: clear` DatabaseRole reaches this point as a role
+		// built from a configuration that does not disable the password —
+		// so it starts out ignoring it — and only the configuration handed
+		// to ApplyPassword asks for the password to be disabled. Honouring
+		// that has to override the earlier "leave it alone", or the role
+		// keeps whatever password it already had in PostgreSQL.
+		dbRole := DatabaseRoleFromConfiguration(config, false)
+		Expect(dbRole.ignorePassword).To(BeTrue())
+
+		disabled := config
+		disabled.DisablePassword = true
+
+		version, err := dbRole.ApplyPassword(
+			context.Background(), buildClient().Build(), &disabled, "", namespace)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(version).To(BeEmpty())
+
+		var query strings.Builder
+		Expect(appendPasswordOption(dbRole, &query)).To(Succeed())
+		Expect(query.String()).To(ContainSubstring("PASSWORD NULL"))
+	})
 })
 
 var _ = Describe("DatabaseRole implementation test", func() {
