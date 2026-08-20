@@ -652,7 +652,10 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				By("rotating the password once its duration has elapsed", func() {
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
-					role.Spec.Password.Duration = &metav1.Duration{Duration: time.Second}
+					// The shortest lifetime the API server accepts, whose default
+					// renewBefore is half of it: the password was issued moments
+					// ago, so it is due for rotation right away.
+					role.Spec.Password.Duration = &metav1.Duration{Duration: time.Minute}
 					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					// The instance manager applied the rotated password once the
@@ -716,12 +719,13 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						pgRoleName, renamedPassword)
 				})
 
-				// The password block is what named the Secret, so removing it leaves
-				// `status.password.secretName` as the only record of what to clean up.
-				By("deleting the generated Secret when the password block is removed", func() {
+				// The name the password was generated into is only recorded in
+				// `status.password.secretName`, since the mode that stops
+				// managing the password cannot carry `password.secret`.
+				By("revoking the generated password when the role stops managing it", func() {
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
-					role.Spec.Password = nil
+					role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
 					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					Eventually(func(g Gomega) {
@@ -730,7 +734,24 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						g.Expect(err).To(MatchError(ContainSubstring("not found")))
 
 						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						// The revocation is recorded until the instance manager
+						// applies it, and retired once it has.
 						g.Expect(role.Status.Password).To(BeNil())
+					}, 120).WithPolling(5 * time.Second).Should(Succeed())
+
+					// Nothing can read the generated password any more, so it
+					// must not be left working on the role.
+					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					query := "SELECT rolpassword IS NULL FROM pg_catalog.pg_authid WHERE rolname=" +
+						pq.QuoteLiteral(pgRoleName)
+					Eventually(func(g Gomega) {
+						stdout, _, err := exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							exec.PodLocator{Namespace: namespace, PodName: primaryPodInfo.Name},
+							postgres.PostgresDBName, query)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(strings.TrimSpace(stdout)).To(Equal("t"))
 					}, 120).WithPolling(5 * time.Second).Should(Succeed())
 				})
 			})

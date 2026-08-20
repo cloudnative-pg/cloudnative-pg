@@ -248,17 +248,19 @@ spec:
                       and rotates a password kept in a Secret the operator owns; `secret`
                       reads the password from an existing Secret named by `secret`, without
                       generating or owning one; `external` stops managing it, deleting any
-                      Secret previously generated and leaving the password already set on the
-                      role in PostgreSQL untouched; `clear` sets the password of the role to
-                      NULL in PostgreSQL, disabling password authentication for it. It has no
-                      default: asking for a password without saying how it is managed is
-                      ambiguous, and defaulting it either way would silently pick a behavior
-                      as consequential as generating a credential or removing one.
+                      Secret previously generated and setting the password it held to NULL,
+                      while leaving a password it never generated untouched; `setNull` sets the
+                      password of the role to NULL in PostgreSQL, disabling password
+                      authentication for it. It has no default: asking for a password without
+                      saying how it is managed is ambiguous, and defaulting it either way would
+                      silently pick a behavior as consequential as generating a credential or
+                      removing one. It cannot be removed once set either, for the same reason:
+                      the mode has to say what happens to the password from now on.
                     enum:
                     - generate
                     - secret
                     - external
-                    - clear
+                    - setNull
                     type: string
                   renewBefore:
                     description: |-
@@ -361,6 +363,9 @@ spec:
               rule: '!has(self.password) || !has(self.passwordSecret)'
             - message: password and disablePassword are mutually exclusive
               rule: '!has(self.password) || !has(self.disablePassword) || !self.disablePassword'
+            - message: 'password cannot be removed once set: pick the mode that describes
+                how the password is managed now, such as external'
+              rule: '!has(oldSelf.password) || has(self.password)'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up
@@ -476,6 +481,15 @@ spec:
                       status, such as why generation was skipped or why an existing Secret was
                       left untouched.
                     type: string
+                  pendingRevocation:
+                    description: |-
+                      PendingRevocation is set by the operator when it deleted the Secret
+                      holding a password it had generated, and the role stopped managing the
+                      password instead of replacing it: the password is still set on the role
+                      in PostgreSQL and nothing can read it any more, so it has to be set to
+                      NULL. The instance manager clears it once it has done so, and that is
+                      the only field of this stanza it writes.
+                    type: boolean
                   secretName:
                     description: |-
                       SecretName is the name of the Secret the password was generated into. The
