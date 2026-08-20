@@ -130,6 +130,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.mode != 'secret' || has(self.secret)",message="secret is required when mode is secret"
 // +kubebuilder:validation:XValidation:rule="self.mode == 'generate' || self.mode == 'secret' || !has(self.secret)",message="secret is only meaningful when mode is generate or secret"
 // +kubebuilder:validation:XValidation:rule="self.mode == 'generate' || !has(self.criteria)",message="criteria is only meaningful when mode is generate"
+// +kubebuilder:validation:XValidation:rule="self.mode == 'generate' || (!has(self.duration) && !has(self.renewBefore))",message="duration and renewBefore are only meaningful when mode is generate"
 type PasswordConfiguration struct {
 	// Mode governs how the operator manages the password of this role, and is
 	// required whenever the `password` stanza is present: `generate` generates
@@ -156,7 +157,8 @@ type PasswordConfiguration struct {
 	// Duration is the lifetime of the generated password, at least one minute:
 	// once it is reached, minus `renewBefore`, the operator generates a new
 	// password and applies it to the role. When unset, the password is generated
-	// once and never rotated. Only meaningful when `mode` is `generate`.
+	// once and never rotated. Only allowed when `mode` is `generate`, since
+	// nothing else here rotates a password.
 	// +optional
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
@@ -164,8 +166,8 @@ type PasswordConfiguration struct {
 	// rotated. Only meaningful together with `duration`, and it must be at most
 	// half of it, so that the password is not due for rotation as soon as it is
 	// generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
-	// (7 days), capped at half of the lifetime. Only meaningful when `mode` is
-	// `generate`.
+	// (7 days), capped at half of the lifetime. Only allowed when `mode` is
+	// `generate`, since nothing else here rotates a password.
 	// +optional
 	RenewBefore *metav1.Duration `json:"renewBefore,omitempty"`
 
