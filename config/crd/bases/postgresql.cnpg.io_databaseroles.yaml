@@ -238,7 +238,8 @@ spec:
                       Duration is the lifetime of the generated password, at least one minute:
                       once it is reached, minus `renewBefore`, the operator generates a new
                       password and applies it to the role. When unset, the password is generated
-                      once and never rotated. Only meaningful when `mode` is `generate`.
+                      once and never rotated. Only allowed when `mode` is `generate`, since
+                      nothing else here rotates a password.
                     type: string
                   mode:
                     description: |-
@@ -265,8 +266,8 @@ spec:
                       rotated. Only meaningful together with `duration`, and it must be at most
                       half of it, so that the password is not due for rotation as soon as it is
                       generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
-                      (7 days), capped at half of the lifetime. Only meaningful when `mode` is
-                      `generate`.
+                      (7 days), capped at half of the lifetime. Only allowed when `mode` is
+                      `generate`, since nothing else here rotates a password.
                     type: string
                   secret:
                     description: |-
@@ -292,6 +293,9 @@ spec:
                   rule: self.mode == 'generate' || self.mode == 'secret' || !has(self.secret)
                 - message: criteria is only meaningful when mode is generate
                   rule: self.mode == 'generate' || !has(self.criteria)
+                - message: duration and renewBefore are only meaningful when mode
+                    is generate
+                  rule: self.mode == 'generate' || (!has(self.duration) && !has(self.renewBefore))
               passwordSecret:
                 description: |-
                   Secret containing the password of the role (if present).
