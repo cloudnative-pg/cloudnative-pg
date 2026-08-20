@@ -285,23 +285,72 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	When("a lifetime is requested", func() {
-		It("records the expiration and asks to be requeued", func() {
+		It("records the issue time, expiration and renewal deadline, and asks to be requeued", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
-				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
+				Duration:    &metav1.Duration{Duration: 90 * 24 * time.Hour},
+				RenewBefore: &metav1.Duration{Duration: 7 * 24 * time.Hour},
 			})
 			r, cli := buildReconciler(role, newCluster(false))
 
 			result, err := r.Reconcile(ctx, requestFor(role))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.RequeueAfter).To(Equal(roleSecretReconcileInterval))
+			// Requeued at the renewal deadline (83 days away), not the flat
+			// hourly interval, which would leave a short-lived password
+			// overdue for most of its life.
+			Expect(result.RequeueAfter).To(BeNumerically("~", 83*24*time.Hour, time.Minute))
 
 			secret := getSecret(cli, "role-dante-password")
+			issuedAt, err := time.Parse(time.RFC3339,
+				secret.Annotations[utils.PasswordIssuedAtAnnotationName])
+			Expect(err).NotTo(HaveOccurred())
+			Expect(issuedAt).To(BeTemporally("~", time.Now(), time.Minute))
+
 			expiration, err := time.Parse(time.RFC3339,
 				secret.Annotations[utils.PasswordExpirationAnnotationName])
 			Expect(err).NotTo(HaveOccurred())
 			Expect(expiration).To(BeTemporally("~", time.Now().Add(90*24*time.Hour), time.Minute))
 			Expect(getRole(cli, role).Status.Password.Expiration).To(
 				Equal(secret.Annotations[utils.PasswordExpirationAnnotationName]))
+
+			renewalDue, err := time.Parse(time.RFC3339,
+				secret.Annotations[utils.PasswordRenewalDueAnnotationName])
+			Expect(err).NotTo(HaveOccurred())
+			Expect(renewalDue).To(BeTemporally("~", time.Now().Add(83*24*time.Hour), time.Minute))
+		})
+
+		It("rotates immediately once a shortened duration is already exceeded, "+
+			"instead of honoring the deadline computed under the previous one", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
+			})
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			first := getSecret(cli, "role-dante-password")
+
+			// Back-date the issue time to simulate a password that has already
+			// lived two days: under the original 90-day duration it is nowhere
+			// near due, which is the point of the scenario below. The Secret
+			// still carries the expiration/renewalDue computed for that 90-day
+			// duration, which the fix must not trust once the duration changes.
+			issuedAt := time.Now().Add(-48 * time.Hour)
+			first.Annotations[utils.PasswordIssuedAtAnnotationName] = issuedAt.UTC().Format(time.RFC3339)
+			Expect(cli.Update(ctx, first)).To(Succeed())
+
+			// Shorten the duration to one hour, as an operator would when
+			// rotating a leaked credential quickly: the two-day-old password is
+			// now well past its shortened deadline.
+			stored := getRole(cli, role)
+			stored.Spec.Password.Duration = &metav1.Duration{Duration: time.Hour}
+			Expect(cli.Update(ctx, stored)).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			rotated := getSecret(cli, "role-dante-password")
+			Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
+				Equal(first.Data[corev1.BasicAuthPasswordKey]))
 		})
 
 		It("rotates the password once inside the renewal window", func() {
@@ -315,9 +364,13 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(err).NotTo(HaveOccurred())
 			first := getSecret(cli, "role-dante-password")
 
-			// Move the expiration inside the renewal window.
-			renewalWindow := time.Now().Add(6 * 24 * time.Hour)
-			first.Annotations[utils.PasswordExpirationAnnotationName] = renewalWindow.UTC().Format(time.RFC3339)
+			// Move the recorded issue time back far enough that the renewal
+			// window (duration minus renewBefore) has already been entered.
+			// The deadline is always recomputed from the issue time and the
+			// role's current duration/renewBefore, so backdating the
+			// expiration directly would no longer have any effect.
+			issuedAt := time.Now().Add(-84 * 24 * time.Hour)
+			first.Annotations[utils.PasswordIssuedAtAnnotationName] = issuedAt.UTC().Format(time.RFC3339)
 			Expect(cli.Update(ctx, first)).To(Succeed())
 
 			_, err = r.Reconcile(ctx, requestFor(role))
@@ -412,7 +465,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(expiration).To(BeTemporally("~", time.Now().Add(89*24*time.Hour), time.Minute))
 		})
 
-		It("rotates the password when the recorded expiration cannot be read", func() {
+		It("rotates the password when the recorded issue time cannot be read", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
 				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
 			})
@@ -422,7 +475,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(err).NotTo(HaveOccurred())
 			first := getSecret(cli, "role-dante-password")
 
-			first.Annotations[utils.PasswordExpirationAnnotationName] = "not-a-timestamp"
+			first.Annotations[utils.PasswordIssuedAtAnnotationName] = "not-a-timestamp"
 			Expect(cli.Update(ctx, first)).To(Succeed())
 
 			_, err = r.Reconcile(ctx, requestFor(role))
@@ -431,7 +484,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			rotated := getSecret(cli, "role-dante-password")
 			Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
 				Equal(first.Data[corev1.BasicAuthPasswordKey]))
-			_, err = time.Parse(time.RFC3339, rotated.Annotations[utils.PasswordExpirationAnnotationName])
+			_, err = time.Parse(time.RFC3339, rotated.Annotations[utils.PasswordIssuedAtAnnotationName])
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -832,6 +885,103 @@ var _ = Describe("DatabaseRole password generation", func() {
 			)
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Message).To(Equal(untouched.ResourceVersion))
+		})
+
+		It("ignores a manual rotation request, since there is nothing to rotate", func() {
+			existing := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "byo-secret", Namespace: namespace},
+				Type:       corev1.SecretTypeBasicAuth,
+				Data: map[string][]byte{
+					corev1.BasicAuthUsernameKey: []byte(roleName),
+					corev1.BasicAuthPasswordKey: []byte("user-managed"),
+				},
+			}
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:   apiv1.PasswordModeSecret,
+				Secret: "byo-secret",
+			})
+			role.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			r, cli := buildReconciler(role, newCluster(false), existing)
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(string(getSecret(cli, "byo-secret").Data[corev1.BasicAuthPasswordKey])).
+				To(Equal("user-managed"))
+			Expect(getRole(cli, role).Annotations).NotTo(HaveKey(utils.RotatePasswordAnnotationName))
+		})
+	})
+
+	When("rotation is manually requested", func() {
+		It("rotates a password that would otherwise not be due yet, and clears the request", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
+			})
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			first := getSecret(cli, "role-dante-password")
+
+			stored := getRole(cli, role)
+			stored.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			Expect(cli.Update(ctx, stored)).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			rotated := getSecret(cli, "role-dante-password")
+			Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
+				Equal(first.Data[corev1.BasicAuthPasswordKey]))
+
+			// The request is one-shot: acted on, then removed.
+			stored = getRole(cli, role)
+			Expect(stored.Annotations).NotTo(HaveKey(utils.RotatePasswordAnnotationName))
+
+			// Consuming the annotation must not cost the status written in the
+			// same loop: the condition is how the instance manager learns of
+			// the new password, and losing it would leave the rotated password
+			// in its Secret and never applied.
+			Expect(stored.Status.Password).NotTo(BeNil())
+			Expect(stored.Status.Password.SecretName).To(Equal("role-dante-password"))
+			cond := meta.FindStatusCondition(
+				stored.Status.Conditions,
+				string(apiv1.ConditionPasswordSecretChange),
+			)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Message).To(Equal(rotated.ResourceVersion))
+		})
+
+		It("rotates a password with no lifetime configured at all", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{})
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			first := getSecret(cli, "role-dante-password")
+
+			stored := getRole(cli, role)
+			stored.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			Expect(cli.Update(ctx, stored)).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			rotated := getSecret(cli, "role-dante-password")
+			Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
+				Equal(first.Data[corev1.BasicAuthPasswordKey]))
+			Expect(getRole(cli, role).Annotations).NotTo(HaveKey(utils.RotatePasswordAnnotationName))
+		})
+
+		It("clears a request that has nothing to rotate", func() {
+			role := newRoleWithPassword(nil)
+			role.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(getRole(cli, role).Annotations).NotTo(HaveKey(utils.RotatePasswordAnnotationName))
 		})
 	})
 })
