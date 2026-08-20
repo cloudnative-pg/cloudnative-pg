@@ -591,9 +591,20 @@ PostgreSQL.
 (7 days), capped at half of `duration` so that a short-lived password is not
 due for renewal as soon as it is generated. For the same reason `duration` must
 be at least one minute, and an explicit `renewBefore` at most half of it. The
-deadline is visible in
-`status.password.expiration`, and recorded on the Secret itself through the
-`cnpg.io/passwordExpiration` annotation:
+deadline is visible in `status.password.expiration`, and the Secret itself
+carries three annotations the operator derives from it and from when the
+password was last issued:
+
+| Annotation | Meaning |
+|---|---|
+| `cnpg.io/passwordIssuedAt` | when the password was last (re)generated |
+| `cnpg.io/passwordExpiration` | `passwordIssuedAt` plus `duration` |
+| `cnpg.io/passwordRenewalDue` | `passwordExpiration` minus `renewBefore`: once this time passes, the password is rotated at the next reconciliation |
+
+Only `passwordIssuedAt` is load-bearing: the other two are recomputed from it
+and the role's current `duration`/`renewBefore` on every reconciliation, so
+that shortening or lengthening either takes effect immediately instead of
+being measured against a deadline computed under the previous settings.
 
 ```yaml
 status:
@@ -615,6 +626,23 @@ Adding `duration` to a role whose password was generated earlier counts the
 lifetime the password already had, from the creation of its Secret: one older
 than the requested duration is rotated at once. Removing `duration` stops
 rotation and clears the recorded deadline, keeping the current password.
+
+#### Manual rotation
+
+To rotate a generated password immediately, regardless of its renewal
+deadline or of whether `duration` is set at all, annotate the `DatabaseRole`
+with `cnpg.io/rotatePassword` (any value):
+
+```sh
+kubectl annotate databaserole role-dante cnpg.io/rotatePassword=true
+```
+
+The annotation is a one-shot request: the operator removes it as soon as the
+rotation it asked for has happened, rather than leaving it in place as a
+standing setting. A request made while password generation is off is removed
+without effect, since there is nothing to rotate; a request made while
+generation is only temporarily blocked (for instance by a replica cluster) is
+left in place and honored once the block clears.
 
 #### Deletion and opt-out
 
