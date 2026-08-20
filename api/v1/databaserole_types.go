@@ -69,6 +69,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.clientCertificate) || !self.clientCertificate.enabled || self.login",message="clientCertificate requires the role to have login enabled"
 // +kubebuilder:validation:XValidation:rule="!has(self.password) || !has(self.passwordSecret)",message="password and passwordSecret are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="!has(self.password) || !has(self.disablePassword) || !self.disablePassword",message="password and disablePassword are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.password) || has(self.password)",message="password cannot be removed once set: pick the mode that describes how the password is managed now, such as external"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
 	// in the `cluster.spec.managed.roles` definition.
@@ -112,15 +113,16 @@ const (
 	// Secret is not owned by the role, and the operator never writes to it.
 	PasswordModeSecret PasswordMode = "secret"
 
-	// PasswordModeExternal stops the operator from managing the password:
-	// any Secret it previously generated is deleted, and the password already
-	// set on the role in PostgreSQL is left untouched, as if managed by
-	// something else.
+	// PasswordModeExternal stops the operator from managing the password: the
+	// password set on the role in PostgreSQL is left untouched, as if managed
+	// by something else. A password the operator had generated is the one
+	// exception: its Secret is deleted, so nothing could read that password
+	// any more, and it is set to NULL once before the role is left alone.
 	PasswordModeExternal PasswordMode = "external"
 
-	// PasswordModeClear makes the operator set the password of the role to
+	// PasswordModeSetNull makes the operator set the password of the role to
 	// NULL in PostgreSQL, disabling password authentication for it.
-	PasswordModeClear PasswordMode = "clear"
+	PasswordModeSetNull PasswordMode = "setNull"
 )
 
 // PasswordConfiguration configures how the operator manages the password of a
@@ -137,13 +139,15 @@ type PasswordConfiguration struct {
 	// and rotates a password kept in a Secret the operator owns; `secret`
 	// reads the password from an existing Secret named by `secret`, without
 	// generating or owning one; `external` stops managing it, deleting any
-	// Secret previously generated and leaving the password already set on the
-	// role in PostgreSQL untouched; `clear` sets the password of the role to
-	// NULL in PostgreSQL, disabling password authentication for it. It has no
-	// default: asking for a password without saying how it is managed is
-	// ambiguous, and defaulting it either way would silently pick a behavior
-	// as consequential as generating a credential or removing one.
-	// +kubebuilder:validation:Enum=generate;secret;external;clear
+	// Secret previously generated and setting the password it held to NULL,
+	// while leaving a password it never generated untouched; `setNull` sets the
+	// password of the role to NULL in PostgreSQL, disabling password
+	// authentication for it. It has no default: asking for a password without
+	// saying how it is managed is ambiguous, and defaulting it either way would
+	// silently pick a behavior as consequential as generating a credential or
+	// removing one. It cannot be removed once set either, for the same reason:
+	// the mode has to say what happens to the password from now on.
+	// +kubebuilder:validation:Enum=generate;secret;external;setNull
 	Mode PasswordMode `json:"mode"`
 
 	// Secret is the name of the Secret holding the password of this role: the
@@ -250,6 +254,15 @@ type GeneratedPasswordState struct {
 	// that. It is empty when rotation is not enabled.
 	// +optional
 	Expiration string `json:"expiration,omitempty"`
+
+	// PendingRevocation is set by the operator when it deleted the Secret
+	// holding a password it had generated, and the role stopped managing the
+	// password instead of replacing it: the password is still set on the role
+	// in PostgreSQL and nothing can read it any more, so it has to be set to
+	// NULL. The instance manager clears it once it has done so, and that is
+	// the only field of this stanza it writes.
+	// +optional
+	PendingRevocation bool `json:"pendingRevocation,omitempty"`
 
 	// Message contains a human-readable explanation of the current password
 	// status, such as why generation was skipped or why an existing Secret was

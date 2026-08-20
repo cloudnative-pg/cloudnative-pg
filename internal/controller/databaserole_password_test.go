@@ -706,7 +706,12 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
 			updated := getRole(cli, role)
-			Expect(updated.Status.Password).To(BeNil())
+			// The password the Secret held is still set on the role in
+			// PostgreSQL, and nothing can read it any more: the only way out is
+			// to have the instance manager revoke it.
+			Expect(updated.Status.Password).NotTo(BeNil())
+			Expect(updated.Status.Password.PendingRevocation).To(BeTrue())
+			Expect(updated.Status.Password.SecretName).To(BeEmpty())
 			// With no password Secret left, the signal for the instance manager
 			// must go away too.
 			Expect(meta.FindStatusCondition(
@@ -715,9 +720,9 @@ var _ = Describe("DatabaseRole password generation", func() {
 			)).To(BeNil())
 		})
 
-		It("deletes the secret it generated when the password is explicitly cleared", func() {
+		It("deletes the secret it generated when the password is set to NULL", func() {
 			// The Secret lifecycle is identical to turning generation off: the
-			// distinction between `external` and `clear` only matters to the
+			// distinction between `external` and `setNull` only matters to the
 			// instance manager, which decides whether to leave the PostgreSQL
 			// password alone or set it to NULL.
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
@@ -728,7 +733,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(getSecret(cli, "role-dante-password")).NotTo(BeNil())
 
 			stored := getRole(cli, role)
-			stored.Spec.Password.Mode = apiv1.PasswordModeClear
+			stored.Spec.Password.Mode = apiv1.PasswordModeSetNull
 			Expect(cli.Update(ctx, stored)).To(Succeed())
 
 			_, err = r.Reconcile(ctx, requestFor(role))
@@ -751,10 +756,12 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(getRole(cli, role).Status.Password.SecretName).To(Equal("dante-credentials"))
 
-			// With the whole block gone the name is nowhere in the specification
-			// any more: the status is what the operator recognizes its own Secret by.
+			// The name the password was generated into is gone from the
+			// specification, since `secret` is only allowed in the two modes
+			// that name a Secret: the status is what the operator recognizes
+			// its own Secret by.
 			stored := getRole(cli, role)
-			stored.Spec.Password = nil
+			stored.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
 			Expect(cli.Update(ctx, stored)).To(Succeed())
 
 			_, err = r.Reconcile(ctx, requestFor(role))
@@ -763,7 +770,6 @@ var _ = Describe("DatabaseRole password generation", func() {
 			var secret corev1.Secret
 			err = cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: "dante-credentials"}, &secret)
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
-			Expect(getRole(cli, role).Status.Password).To(BeNil())
 		})
 
 		It("keeps track of its secret across a state it cannot generate in", func() {
@@ -800,17 +806,19 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
 
-		It("keeps the secret in place when the role switches to reading from that same name", func() {
+		It("deletes the secret it generated even when the role switches to reading from that same name", func() {
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 			r, cli := buildReconciler(role, newCluster(false))
 
 			_, err := r.Reconcile(ctx, requestFor(role))
 			Expect(err).NotTo(HaveOccurred())
-			generated := getSecret(cli, "role-dante-password")
+			Expect(getSecret(cli, "role-dante-password")).NotTo(BeNil())
 
-			// Ask to read the password back from the very Secret this role
-			// just generated: deleting it would destroy the credential the
-			// new configuration wants to use.
+			// Asking to read the password back from the very Secret the
+			// operator generated it into is not a handover: what the operator
+			// created, the operator deletes, so the role is left pointing at a
+			// Secret that no longer exists rather than at one nobody
+			// maintains.
 			stored := getRole(cli, role)
 			stored.Spec.Password = &apiv1.PasswordConfiguration{
 				Mode:   apiv1.PasswordModeSecret,
@@ -821,8 +829,39 @@ var _ = Describe("DatabaseRole password generation", func() {
 			_, err = r.Reconcile(ctx, requestFor(role))
 			Expect(err).NotTo(HaveOccurred())
 
-			kept := getSecret(cli, "role-dante-password")
-			Expect(kept.Data).To(Equal(generated.Data))
+			var secret corev1.Secret
+			err = cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: "role-dante-password"}, &secret)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			// Nothing to revoke: the role reads its password from a Secret now,
+			// even if that Secret has to be created again.
+			Expect(getRole(cli, role).Status.Password).To(BeNil())
+		})
+
+		It("keeps the revocation recorded until the instance manager acknowledges it", func() {
+			// The instance manager may well have applied this generation of the
+			// role before the operator got to record the revocation, so the
+			// record cannot be dropped on the strength of the generation alone:
+			// only the acknowledgement retires it.
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal})
+			role.Status.ObservedGeneration = role.Generation
+			role.Status.Applied = ptr.To(true)
+			role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(getRole(cli, role).Status.Password.PendingRevocation).To(BeTrue())
+		})
+
+		It("forgets the revocation once the instance manager acknowledged it", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal})
+			role.Status.Password = &apiv1.GeneratedPasswordState{}
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
 			Expect(getRole(cli, role).Status.Password).To(BeNil())
 		})
 
@@ -842,7 +881,12 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 			Expect(string(getSecret(cli, "role-dante-password").Data[corev1.BasicAuthPasswordKey])).
 				To(Equal("user-managed"))
-			Expect(getRole(cli, role).Status.Password.Message).To(ContainSubstring("not owned"))
+			status := getRole(cli, role).Status.Password
+			Expect(status.Message).To(ContainSubstring("not owned"))
+			// The password in PostgreSQL came from that Secret, which is still
+			// there to be read: revoking it would break a credential the
+			// operator never issued.
+			Expect(status.PendingRevocation).To(BeFalse())
 		})
 
 		It("does not look for a secret it never generated", func() {

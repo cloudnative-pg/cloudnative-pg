@@ -369,13 +369,14 @@ PascalBourdier
 PasswordConfiguration
 PasswordCriteria
 PasswordMode
-PasswordModeClear
 PasswordModeExternal
 PasswordModeGenerate
 PasswordModeSecret
+PasswordModeSetNull
 PasswordState
 PasswordStatus
 Patroni
+PendingRevocation
 Percona
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
@@ -1529,6 +1530,7 @@ serviceselectortype
 servicetemplatespec
 serviceupdatestrategy
 sessionToken
+setNull
 sha
 sharifmshaker
 sharma
