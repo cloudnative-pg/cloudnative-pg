@@ -68,7 +68,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword",message="passwordSecret and disablePassword are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="!has(self.clientCertificate) || !self.clientCertificate.enabled || self.login",message="clientCertificate requires the role to have login enabled"
 // +kubebuilder:validation:XValidation:rule="!has(self.password) || !has(self.passwordSecret)",message="password and passwordSecret are mutually exclusive"
-// +kubebuilder:validation:XValidation:rule="!has(self.password) || !self.password.enabled || !has(self.disablePassword) || !self.disablePassword",message="password generation and disablePassword are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.password) || !has(self.disablePassword) || !self.disablePassword",message="password and disablePassword are mutually exclusive"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
 	// in the `cluster.spec.managed.roles` definition.
@@ -91,34 +91,72 @@ type DatabaseRoleSpec struct {
 	// +optional
 	ClientCertificate *ClientCertificateConfiguration `json:"clientCertificate,omitempty"`
 
-	// Password configures the operator to generate the password of this role and
-	// store it in a Secret, instead of requiring a pre-existing one through
-	// `passwordSecret`. Mutually exclusive with `passwordSecret`.
+	// Password configures how the operator manages the password of this role,
+	// instead of requiring a pre-existing Secret through `passwordSecret` or
+	// disabling it through `disablePassword`. Mutually exclusive with both.
 	// +optional
 	Password *PasswordConfiguration `json:"password,omitempty"`
 }
 
-// PasswordConfiguration configures operator-managed generation of the password
-// of a DatabaseRole.
+// PasswordMode governs how the operator manages the password of a DatabaseRole.
+// +enum
+type PasswordMode string
+
+const (
+	// PasswordModeGenerate makes the operator generate the password of the role
+	// and keep it in a Secret it owns, rotating it when a lifetime is requested.
+	// This is the default.
+	PasswordModeGenerate PasswordMode = "generate"
+
+	// PasswordModeSecret makes the operator read the password of the role from
+	// an existing Secret named by `secret`, instead of generating one: the
+	// Secret is not owned by the role, and the operator never writes to it.
+	PasswordModeSecret PasswordMode = "secret"
+
+	// PasswordModeExternal stops the operator from managing the password:
+	// any Secret it previously generated is deleted, and the password already
+	// set on the role in PostgreSQL is left untouched, as if managed by
+	// something else.
+	PasswordModeExternal PasswordMode = "external"
+
+	// PasswordModeClear makes the operator set the password of the role to
+	// NULL in PostgreSQL, disabling password authentication for it.
+	PasswordModeClear PasswordMode = "clear"
+)
+
+// PasswordConfiguration configures how the operator manages the password of a
+// DatabaseRole.
 // +kubebuilder:validation:XValidation:rule="!has(self.renewBefore) || (has(self.duration) && duration(self.renewBefore).getSeconds() * 2 <= duration(self.duration).getSeconds())",message="renewBefore requires duration, and must be at most half of it"
 // +kubebuilder:validation:XValidation:rule="!has(self.duration) || duration(self.duration) >= duration('1m')",message="duration must be at least 1m"
+// +kubebuilder:validation:XValidation:rule="self.mode != 'secret' || has(self.secret)",message="secret is required when mode is secret"
+// +kubebuilder:validation:XValidation:rule="self.mode == 'generate' || self.mode == 'secret' || !has(self.secret)",message="secret is only meaningful when mode is generate or secret"
+// +kubebuilder:validation:XValidation:rule="self.mode == 'generate' || !has(self.criteria)",message="criteria is only meaningful when mode is generate"
 type PasswordConfiguration struct {
-	// Enabled turns on password generation for this role. Defaults to true when
-	// the block is present.
-	// +kubebuilder:default:=true
+	// Mode governs how the operator manages the password of this role:
+	// `generate` (the default) generates and rotates a password kept in a
+	// Secret the operator owns; `secret` reads the password from an existing
+	// Secret named by `secret`, without generating or owning one; `external`
+	// stops managing it, deleting any Secret previously generated and leaving
+	// the password already set on the role in PostgreSQL untouched; `clear`
+	// sets the password of the role to NULL in PostgreSQL, disabling password
+	// authentication for it.
+	// +kubebuilder:validation:Enum=generate;secret;external;clear
+	// +kubebuilder:default:=generate
 	// +optional
-	Enabled *bool `json:"enabled,omitempty"`
+	Mode PasswordMode `json:"mode,omitempty"`
 
-	// Secret is the name of the Secret where the generated password is stored.
-	// Defaults to `<databaserole-name>-password`. The operator never overwrites
-	// a Secret it does not own.
+	// Secret is the name of the Secret holding the password of this role: the
+	// one the operator generates into and never overwrites if it does not own
+	// (when `mode` is `generate`, defaulting to `<databaserole-name>-password`),
+	// or an existing one to read the password from, required and never written
+	// to (when `mode` is `secret`). Only meaningful in those two modes.
 	// +optional
 	Secret string `json:"secret,omitempty"`
 
 	// Duration is the lifetime of the generated password, at least one minute:
 	// once it is reached, minus `renewBefore`, the operator generates a new
 	// password and applies it to the role. When unset, the password is generated
-	// once and never rotated.
+	// once and never rotated. Only meaningful when `mode` is `generate`.
 	// +optional
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
@@ -126,11 +164,13 @@ type PasswordConfiguration struct {
 	// rotated. Only meaningful together with `duration`, and it must be at most
 	// half of it, so that the password is not due for rotation as soon as it is
 	// generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
-	// (7 days), capped at half of the lifetime.
+	// (7 days), capped at half of the lifetime. Only meaningful when `mode` is
+	// `generate`.
 	// +optional
 	RenewBefore *metav1.Duration `json:"renewBefore,omitempty"`
 
-	// Criteria constrains the generated password.
+	// Criteria constrains the generated password. Only meaningful when `mode`
+	// is `generate`.
 	// +optional
 	Criteria *PasswordCriteria `json:"criteria,omitempty"`
 }
