@@ -597,7 +597,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 								Name: clusterName,
 							},
 							ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
-							Password:      &apiv1.PasswordConfiguration{},
+							Password:      &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate},
 						},
 					}
 					Expect(env.Client.Create(env.Ctx, role)).To(Succeed())
