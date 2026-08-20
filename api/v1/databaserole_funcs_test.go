@@ -23,7 +23,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -67,11 +66,39 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 
 	It("has no password secret when generation is turned off", func() {
 		role := newRole()
-		role.Spec.Password = &PasswordConfiguration{Enabled: ptr.To(false), Secret: "dante-credentials"}
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeExternal, Secret: "dante-credentials"}
 		Expect(role.IsPasswordGenerationEnabled()).To(BeFalse())
 		Expect(role.GetPasswordSecretName()).To(BeEmpty())
 		// The name is still needed, to clean up what was generated before.
 		Expect(role.GetGeneratedPasswordSecretName()).To(Equal("dante-credentials"))
+	})
+
+	It("has no password secret when the password is explicitly cleared", func() {
+		role := newRole()
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeClear, Secret: "dante-credentials"}
+		Expect(role.IsPasswordGenerationEnabled()).To(BeFalse())
+		Expect(role.GetPasswordSecretName()).To(BeEmpty())
+	})
+
+	It("reads the password from the named Secret when mode is secret, generating nothing", func() {
+		role := newRole()
+		role.Spec.Password = &PasswordConfiguration{Mode: PasswordModeSecret, Secret: "byo-secret"}
+		Expect(role.IsPasswordGenerationEnabled()).To(BeFalse())
+		Expect(role.GetPasswordSecretName()).To(Equal("byo-secret"))
+	})
+
+	It("is explicitly cleared only when mode is clear", func() {
+		role := newRole()
+		Expect(role.IsPasswordExplicitlyCleared()).To(BeFalse())
+
+		role.Spec.Password = &PasswordConfiguration{}
+		Expect(role.IsPasswordExplicitlyCleared()).To(BeFalse())
+
+		role.Spec.Password.Mode = PasswordModeExternal
+		Expect(role.IsPasswordExplicitlyCleared()).To(BeFalse())
+
+		role.Spec.Password.Mode = PasswordModeClear
+		Expect(role.IsPasswordExplicitlyCleared()).To(BeTrue())
 	})
 
 	It("rotates only when a lifetime is requested", func() {
@@ -82,7 +109,7 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 		role.Spec.Password.Duration = &metav1.Duration{Duration: 90 * 24 * time.Hour}
 		Expect(role.IsPasswordRotationEnabled()).To(BeTrue())
 
-		role.Spec.Password.Enabled = ptr.To(false)
+		role.Spec.Password.Mode = PasswordModeExternal
 		Expect(role.IsPasswordRotationEnabled()).To(BeFalse())
 	})
 })

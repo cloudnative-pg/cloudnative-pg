@@ -197,6 +197,19 @@ func shouldDropRole(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) bool {
 		!isClusterManagingRole(cluster, role.Spec.Name) && !cluster.IsReplica()
 }
 
+// roleConfigurationForPassword returns the RoleConfiguration to pass to
+// ApplyPassword. A `password.mode: clear` role asks for the same
+// PostgreSQL-side behavior as `disablePassword`, without using that field:
+// this folds it into a copy of the role's configuration, rather than
+// teaching ApplyPassword about a field it does not otherwise need to know.
+func roleConfigurationForPassword(role *apiv1.DatabaseRole) apiv1.RoleConfiguration {
+	roleConfig := role.Spec.RoleConfiguration
+	if role.IsPasswordExplicitlyCleared() {
+		roleConfig.DisablePassword = true
+	}
+	return roleConfig
+}
+
 func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
@@ -547,8 +560,9 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	validUntilNullIsInfinity := existingDBRole != nil && existingDBRole.ValidUntil.Valid
 	dbRole := roles.DatabaseRoleFromConfiguration(role.Spec.RoleConfiguration, validUntilNullIsInfinity)
 
+	roleConfig := roleConfigurationForPassword(role)
 	passwordVersion, err := dbRole.ApplyPassword(
-		ctx, r.Client, &role.Spec.RoleConfiguration, role.GetPasswordSecretName(), r.instance.GetNamespaceName(),
+		ctx, r.Client, &roleConfig, role.GetPasswordSecretName(), r.instance.GetNamespaceName(),
 	)
 	if err != nil {
 		return "", fmt.Errorf("while getting the role password: %w", err)
