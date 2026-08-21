@@ -120,6 +120,8 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 		if err := r.Create(ctx, newSecret); err != nil {
 			return fmt.Errorf("while creating cert secret %q: %w", secretKey.Name, err)
 		}
+		r.Recorder.Eventf(role, "Normal", "ClientCertificateIssued",
+			"Issued a client certificate for role %q into Secret %q", role.Spec.Name, secretKey.Name)
 
 		certSecret = *newSecret
 
@@ -170,12 +172,18 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 	// corrupt; treat it as a re-issue trigger rather than error-looping.
 	certInvalid := false
 
+	// What the event recorded at the end of this function says happened, since
+	// the same patch carries a renewal, a re-issue after a CA rotation, and a
+	// replacement of a certificate that could not be read.
+	reason := "it was approaching its expiration"
+
 	signedByCurrentCA, err := clientCertSignedByCurrentCA(ctx, caSecret, certSecret)
 	if err != nil {
 		contextLogger.Warning("client cert is unreadable, re-issuing",
 			"secret", secretKey.Name, "err", err)
 		signedByCurrentCA = false
 		certInvalid = true
+		reason = "it could not be read"
 	}
 
 	if signedByCurrentCA {
@@ -188,12 +196,14 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 				"secret", secretKey.Name, "err", err)
 			signedByCurrentCA = false
 			certInvalid = true
+			reason = "it could not be renewed"
 		}
 	}
 
 	if !signedByCurrentCA {
 		if !certInvalid {
 			contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
+			reason = "the client CA of the cluster was rotated"
 		}
 		newSecret, err := generateCertificateFromCA(caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey)
 		if err != nil {
@@ -205,7 +215,23 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 	if err := r.Patch(ctx, certSecret, client.MergeFrom(origSecret)); err != nil {
 		return false, fmt.Errorf("while patching cert secret %q: %w", secretKey.Name, err)
 	}
+
+	// Recorded once the new certificate has reached its Secret: the previous one
+	// stops being the credential of the role at that point, and a client that
+	// mounted it has to read the Secret again.
+	r.Recorder.Eventf(role, "Normal", "ClientCertificateRenewed",
+		"Renewed the client certificate of role %q in Secret %q, since %s",
+		role.Spec.Name, secretKey.Name, reason)
 	return true, nil
+}
+
+// certificateMessage returns the explanation the operator recorded about the
+// client certificate of the role, if it recorded one.
+func certificateMessage(role *apiv1.DatabaseRole) string {
+	if role.Status.ClientCertificate == nil {
+		return ""
+	}
+	return role.Status.ClientCertificate.Message
 }
 
 // deleteOwnedCertSecret deletes the cert Secret if it exists and is owned by
