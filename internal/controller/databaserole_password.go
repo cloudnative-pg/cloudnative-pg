@@ -38,6 +38,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -46,6 +47,10 @@ const (
 	// does not constrain it, and matches the default of the external-secrets
 	// password generator this stanza is modeled on.
 	defaultPasswordLength = 24
+
+	// passwordSecretPgpassKey is the key of the generated password Secret
+	// carrying a ready-made `.pgpass` line for the role.
+	passwordSecretPgpassKey = "pgpass"
 
 	// maxGeneratedDigits caps how many digits are asked for by default: the
 	// generator draws from ten of them, and refuses to repeat a character unless
@@ -338,6 +343,13 @@ func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 	// whether or not the password itself is rotated.
 	secret.Data[corev1.BasicAuthUsernameKey] = []byte(role.Spec.Name)
 
+	// The pgpass line is derived from what the Secret already holds, so it is
+	// rebuilt here rather than only when a password is generated: a Secret that
+	// predates this key, or lost it, gets it back without waiting for a
+	// rotation it may never be due for.
+	secret.Data[passwordSecretPgpassKey] = pgpassLine(
+		role.Spec.Name, string(secret.Data[corev1.BasicAuthPasswordKey]))
+
 	// Patch only on a real change: an unconditional patch would bump the
 	// resourceVersion of the Secret on every loop, and that is exactly the signal
 	// that makes the instance manager re-apply the password.
@@ -479,7 +491,27 @@ func passwordSecretData(role *apiv1.DatabaseRole, generated string) map[string][
 	return map[string][]byte{
 		corev1.BasicAuthUsernameKey: []byte(role.Spec.Name),
 		corev1.BasicAuthPasswordKey: []byte(generated),
+		passwordSecretPgpassKey:     pgpassLine(role.Spec.Name, generated),
 	}
+}
+
+// pgpassFieldEscaper escapes what a `.pgpass` line cannot carry literally: the
+// field separator, and the escape character itself. A generated password can
+// contain both, since the symbols it may draw from include `:` and `\`.
+// Ref: https://www.postgresql.org/docs/current/libpq-pgpass.html
+var pgpassFieldEscaper = strings.NewReplacer(`\`, `\\`, `:`, `\:`)
+
+// pgpassLine builds the `.pgpass` line for the password of a role, ready to be
+// appended to a `~/.pgpass` file. The host and the database are wildcards: the
+// credential belongs to the role, and says nothing about which endpoint of the
+// cluster it connects to, or which database it connects to. The trailing
+// newline makes the value usable as a file on its own.
+func pgpassLine(username, password string) []byte {
+	return []byte(fmt.Sprintf("*:%d:*:%s:%s\n",
+		postgres.ServerPort,
+		pgpassFieldEscaper.Replace(username),
+		pgpassFieldEscaper.Replace(password),
+	))
 }
 
 // generatePassword generates a password matching the criteria of the role.
