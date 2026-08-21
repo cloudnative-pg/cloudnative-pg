@@ -52,6 +52,17 @@ func ComparePodSpecs(
 						// ignore the bootstrap controller init container. We handle it inside checkPodSpecIsOutdated.
 						continue
 					}
+					if container.Name == BootstrapWorkContainerName {
+						// The bootstrap-instance init container is only ever present on an
+						// already-created Pod (added at creation time by NewInstanceWithBootstrap
+						// while its PVCs were not yet ready) and is never reproduced by a
+						// freshly-computed target built via plain NewInstance, since by
+						// definition the PVCs are ready by the time a rollout is evaluated.
+						// Kubernetes never removes a completed init container from a running
+						// Pod's spec, so without this exclusion every already-bootstrapped
+						// instance would be flagged as needing a rollout forever.
+						continue
+					}
 					containers = append(containers, container)
 				}
 				return containers

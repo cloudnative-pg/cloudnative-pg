@@ -48,8 +48,16 @@ func (p postInitFolder) toString() string {
 	return string(p)
 }
 
-// CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
-func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+// InstanceBootstrapCommand describes how an instance's PGDATA should be
+// bootstrapped (init/restore/restoresnapshot/pgbasebackup/join), for use as
+// the instance Pod's bootstrap init container.
+type InstanceBootstrapCommand struct {
+	Role    jobRole
+	Command []string
+}
+
+// BuildPrimaryBootstrapCommandViaInitdb builds the bootstrap command for a new primary instance
+func BuildPrimaryBootstrapCommandViaInitdb(cluster apiv1.Cluster) *InstanceBootstrapCommand {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -90,7 +98,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
-		return CreatePrimaryJob(cluster, nodeSerial, jobRoleImport, initCommand, getExtensions(&cluster))
+		return &InstanceBootstrapCommand{Role: jobRoleImport, Command: initCommand}
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
@@ -108,7 +116,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--post-init-sql-refs-folder", postInitSQLRefsFolder.toString())
 	}
 
-	return CreatePrimaryJob(cluster, nodeSerial, jobRoleInitDB, initCommand, getExtensions(&cluster))
+	return &InstanceBootstrapCommand{Role: jobRoleInitDB, Command: initCommand}
 }
 
 func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
@@ -173,13 +181,12 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 	return initCommand
 }
 
-// CreatePrimaryJobViaRestoreSnapshot creates a new primary instance in a Pod, restoring from a volumeSnapshot
-func CreatePrimaryJobViaRestoreSnapshot(
+// BuildPrimaryBootstrapCommandViaRestoreSnapshot builds the bootstrap command
+// for a new primary instance, restoring from a volumeSnapshot
+func BuildPrimaryBootstrapCommandViaRestoreSnapshot(
 	cluster apiv1.Cluster,
-	nodeSerial int,
 	object *metav1.ObjectMeta,
-	backup *apiv1.Backup,
-) *batchv1.Job {
+) *InstanceBootstrapCommand {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -198,15 +205,12 @@ func CreatePrimaryJobViaRestoreSnapshot(
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand, getExtensions(&cluster))
-
-	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
-
-	return job
+	return &InstanceBootstrapCommand{Role: jobRoleSnapshotRecovery, Command: initCommand}
 }
 
-// CreatePrimaryJobViaRecovery creates a new primary instance in a Pod, restoring from a Backup
-func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
+// BuildPrimaryBootstrapCommandViaRecovery builds the bootstrap command for a
+// new primary instance, restoring from a Backup
+func BuildPrimaryBootstrapCommandViaRecovery(cluster apiv1.Cluster) *InstanceBootstrapCommand {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 3+len(commonFlags))
 	initCommand = append(initCommand,
@@ -217,39 +221,11 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 
 	initCommand = append(initCommand, commonFlags...)
 
-	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand, getExtensions(&cluster))
-
-	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
-
-	return job
+	return &InstanceBootstrapCommand{Role: jobRoleFullRecovery, Command: initCommand}
 }
 
-func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Backup, job *batchv1.Job) {
-	var credentials apiv1.BarmanCredentials
-	var endpointCA *apiv1.SecretKeySelector
-	switch {
-	case cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA != nil:
-		endpointCA = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA
-
-	case backup != nil && backup.Status.EndpointCA != nil:
-		endpointCA = backup.Status.EndpointCA
-		credentials = backup.Status.BarmanCredentials
-
-	case cluster.Spec.Bootstrap.Recovery.Source != "":
-		externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
-		if ok && externalCluster.BarmanObjectStore != nil && externalCluster.BarmanObjectStore.EndpointCA != nil {
-			endpointCA = externalCluster.BarmanObjectStore.EndpointCA
-			credentials = externalCluster.BarmanObjectStore.BarmanCredentials
-		}
-	}
-
-	if endpointCA != nil && endpointCA.Name != "" && endpointCA.Key != "" {
-		AddBarmanEndpointCAToPodSpec(&job.Spec.Template.Spec, endpointCA, credentials)
-	}
-}
-
-// CreatePrimaryJobViaPgBaseBackup creates a new primary instance in a Pod
-func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+// BuildPrimaryBootstrapCommandViaPgBaseBackup builds the bootstrap command for a new primary instance
+func BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster apiv1.Cluster) *InstanceBootstrapCommand {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 3+len(commonFlags))
 	initCommand = append(initCommand,
@@ -260,11 +236,12 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 
 	initCommand = append(initCommand, commonFlags...)
 
-	return CreatePrimaryJob(cluster, nodeSerial, jobRolePGBaseBackup, initCommand, getExtensions(&cluster))
+	return &InstanceBootstrapCommand{Role: jobRolePGBaseBackup, Command: initCommand}
 }
 
-// JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
-func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+// BuildReplicaBootstrapCommandViaJoin builds the bootstrap command for a new
+// replica instance, copying the contents from another Pod
+func BuildReplicaBootstrapCommandViaJoin(cluster apiv1.Cluster) *InstanceBootstrapCommand {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 5+len(commonFlags))
 	initCommand = append(initCommand,
@@ -276,11 +253,12 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 
 	initCommand = append(initCommand, commonFlags...)
 
-	return CreatePrimaryJob(cluster, nodeSerial, jobRoleJoin, initCommand, getExtensions(&cluster))
+	return &InstanceBootstrapCommand{Role: jobRoleJoin, Command: initCommand}
 }
 
-// RestoreReplicaInstance creates a new PostgreSQL replica starting from a volume snapshot backup
-func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+// BuildReplicaBootstrapCommandViaRestoreSnapshot builds the bootstrap command
+// for a new replica instance, starting from a volume snapshot backup
+func BuildReplicaBootstrapCommandViaRestoreSnapshot(cluster apiv1.Cluster) *InstanceBootstrapCommand {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 4+len(commonFlags))
 	initCommand = append(initCommand,
@@ -292,8 +270,7 @@ func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job 
 
 	initCommand = append(initCommand, commonFlags...)
 
-	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand, getExtensions(&cluster))
-	return job
+	return &InstanceBootstrapCommand{Role: jobRoleSnapshotRecovery, Command: initCommand}
 }
 
 func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
@@ -323,6 +300,97 @@ func (role jobRole) getJobName(instanceName string) string {
 	return fmt.Sprintf("%s-%s", instanceName, role)
 }
 
+// InstanceInitContainerConfig describes the container that runs a given
+// instance-bootstrap command (init/join/restore/restoresnapshot/pgbasebackup)
+type InstanceInitContainerConfig struct {
+	Cluster     apiv1.Cluster
+	Name        string
+	Role        jobRole
+	EnvConfig   EnvConfig
+	InitCommand []string
+	Extensions  []apiv1.ExtensionConfiguration
+}
+
+// InstanceInitContainer is the container built from an
+// InstanceInitContainerConfig, together with any extra Pod-level volumes it
+// requires (e.g. for post-init SQL refs)
+type InstanceInitContainer struct {
+	Container corev1.Container
+	Volumes   []corev1.Volume
+}
+
+// createInstanceInitContainer builds the container that runs the given
+// instance-bootstrap command. It is shared between CreatePrimaryJob (Job
+// path) and the instance Pod's bootstrap init container.
+func createInstanceInitContainer(config InstanceInitContainerConfig) InstanceInitContainer {
+	cluster := config.Cluster
+	role := config.Role
+
+	container := corev1.Container{
+		Name:            config.Name,
+		Image:           cluster.Status.Image,
+		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
+		Env:             config.EnvConfig.EnvVars,
+		EnvFrom:         config.EnvConfig.EnvFrom,
+		Command:         config.InitCommand,
+		VolumeMounts: CreatePostgresVolumeMounts(VolumeMountsConfig{
+			Cluster:            cluster,
+			Extensions:         config.Extensions,
+			NeedsKubeAPIAccess: true,
+		}),
+		Resources:       cluster.Spec.Resources,
+		SecurityContext: GetSecurityContext(&cluster),
+	}
+	addManagerLoggingOptions(cluster, &container)
+
+	if role == jobRoleInitDB && cluster.ShouldInitDBCreateApplicationDatabase() &&
+		cluster.GetApplicationSecretName() != "" {
+		// The secret is not needed by the initdb job. We do this to ensure that the secret is available
+		// before proceeding with the cluster initialization
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name: "APP_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cluster.GetApplicationSecretName()},
+					Key:                  "username",
+					Optional:             ptr.To(false),
+				},
+			},
+		})
+	}
+
+	result := InstanceInitContainer{Container: container}
+
+	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
+			postInitApplicationSQLRefsFolder,
+			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs,
+		)
+		result.Volumes = append(result.Volumes, volumes...)
+		result.Container.VolumeMounts = append(result.Container.VolumeMounts, volumeMounts...)
+	}
+
+	if cluster.ShouldInitDBRunPostInitTemplateSQLRefs() {
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
+			postInitTemplateQLRefsFolder,
+			cluster.Spec.Bootstrap.InitDB.PostInitTemplateSQLRefs,
+		)
+		result.Volumes = append(result.Volumes, volumes...)
+		result.Container.VolumeMounts = append(result.Container.VolumeMounts, volumeMounts...)
+	}
+
+	if cluster.ShouldInitDBRunPostInitSQLRefs() {
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
+			postInitSQLRefsFolder,
+			cluster.Spec.Bootstrap.InitDB.PostInitSQLRefs,
+		)
+		result.Volumes = append(result.Volumes, volumes...)
+		result.Container.VolumeMounts = append(result.Container.VolumeMounts, volumeMounts...)
+	}
+
+	return result
+}
+
 // CreatePrimaryJob create a job that executes the provided command.
 // The role should describe the purpose of the executed job
 func CreatePrimaryJob(
@@ -337,6 +405,14 @@ func CreatePrimaryJob(
 	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	envConfig := CreatePodEnvConfig(cluster, jobName)
+	initContainer := createInstanceInitContainer(InstanceInitContainerConfig{
+		Cluster:     cluster,
+		Name:        string(role),
+		Role:        role,
+		EnvConfig:   envConfig,
+		InitCommand: initCommand,
+		Extensions:  extList,
+	})
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -374,23 +450,12 @@ func CreatePrimaryJob(
 					},
 					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
-						{
-							Name:            string(role),
-							Image:           cluster.Status.Image,
-							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             envConfig.EnvVars,
-							EnvFrom:         envConfig.EnvFrom,
-							Command:         initCommand,
-							VolumeMounts: CreatePostgresVolumeMounts(VolumeMountsConfig{
-								Cluster:            cluster,
-								Extensions:         extList,
-								NeedsKubeAPIAccess: true,
-							}),
-							Resources:       cluster.Spec.Resources,
-							SecurityContext: GetSecurityContext(&cluster),
-						},
+						initContainer.Container,
 					},
-					Volumes:                      createPostgresVolumes(&cluster, instanceName, extList),
+					Volumes: append(
+						createPostgresVolumes(&cluster, instanceName, extList),
+						initContainer.Volumes...,
+					),
 					SecurityContext:              GetPodSecurityContext(&cluster),
 					Affinity:                     CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:                  cluster.Spec.Affinity.Tolerations,
@@ -409,55 +474,8 @@ func CreatePrimaryJob(
 	}
 
 	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
-	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(&job.Spec.Template.Spec, cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, &job.Spec.Template.Spec, cluster.Annotations)
-	}
-
-	if role == jobRoleInitDB && cluster.ShouldInitDBCreateApplicationDatabase() &&
-		cluster.GetApplicationSecretName() != "" {
-		// The secret is not needed by the initdb job. We do this to ensure that the secret is available
-		// before proceeding with the cluster initialization
-		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-			Name: "APP_USERNAME",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: cluster.GetApplicationSecretName()},
-					Key:                  "username",
-					Optional:             ptr.To(false),
-				},
-			},
-		})
-	}
-
-	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
-		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
-			postInitApplicationSQLRefsFolder,
-			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs,
-		)
-		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
-		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
-	}
-
-	if cluster.ShouldInitDBRunPostInitTemplateSQLRefs() {
-		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
-			postInitTemplateQLRefsFolder,
-			cluster.Spec.Bootstrap.InitDB.PostInitTemplateSQLRefs,
-		)
-		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
-		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
-	}
-
-	if cluster.ShouldInitDBRunPostInitSQLRefs() {
-		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
-			postInitSQLRefsFolder,
-			cluster.Spec.Bootstrap.InitDB.PostInitSQLRefs,
-		)
-		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
-		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
 	}
 
 	if cluster.Spec.PriorityClassName != "" {
