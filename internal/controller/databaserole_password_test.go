@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -572,6 +573,45 @@ var _ = Describe("DatabaseRole password generation", func() {
 		Expect(string(repaired.Data[corev1.BasicAuthPasswordKey])).To(Equal(generated))
 	})
 
+	It("carries a pgpass line for the generated password", func() {
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
+		r, cli := buildReconciler(role, newCluster(false))
+
+		_, err := r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+
+		secret := getSecret(cli, "role-dante-password")
+		generated := string(secret.Data[corev1.BasicAuthPasswordKey])
+		// Wildcards for host and database: the credential belongs to the role,
+		// not to one endpoint of the cluster or one database in it.
+		Expect(string(secret.Data[passwordSecretPgpassKey])).To(Equal(
+			fmt.Sprintf("*:5432:*:%s:%s\n", roleName, generated)))
+	})
+
+	It("puts back a pgpass line the Secret is missing, without rotating the password", func() {
+		// A Secret generated before this key existed, or one that lost it, gets
+		// it back from the password it already holds: waiting for a rotation
+		// would leave a role that never rotates without one forever.
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
+		r, cli := buildReconciler(role, newCluster(false))
+
+		_, err := r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+		generated := string(getSecret(cli, "role-dante-password").Data[corev1.BasicAuthPasswordKey])
+
+		secret := getSecret(cli, "role-dante-password")
+		delete(secret.Data, passwordSecretPgpassKey)
+		Expect(cli.Update(ctx, secret)).To(Succeed())
+
+		_, err = r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+
+		repaired := getSecret(cli, "role-dante-password")
+		Expect(string(repaired.Data[corev1.BasicAuthPasswordKey])).To(Equal(generated))
+		Expect(string(repaired.Data[passwordSecretPgpassKey])).To(Equal(
+			fmt.Sprintf("*:5432:*:%s:%s\n", roleName, generated)))
+	})
+
 	It("keeps rotating ahead of the deadline when the expiry check threshold is disabled", func() {
 		configuration.Current = configuration.NewConfiguration()
 		configuration.Current.ExpiringCheckThreshold = 0
@@ -1111,5 +1151,25 @@ var _ = Describe("DatabaseRole password generation", func() {
 		rotated := getSecret(cli, "role-dante-password")
 		Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
 			Equal(first.Data[corev1.BasicAuthPasswordKey]))
+	})
+})
+
+var _ = Describe("pgpassLine", func() {
+	It("builds a line PostgreSQL can read, with host and database wildcarded", func() {
+		Expect(string(pgpassLine("dante", "0mA3nCe0f6THe1dIvIne"))).To(
+			Equal("*:5432:*:dante:0mA3nCe0f6THe1dIvIne\n"))
+	})
+
+	It("escapes the field separator and the escape character in the password", func() {
+		// The symbols a generated password may draw from include both, and an
+		// unescaped one would shift every field after it, handing PostgreSQL a
+		// different password, or a different role.
+		Expect(string(pgpassLine("dante", `pa:ss`))).To(Equal(`*:5432:*:dante:pa\:ss` + "\n"))
+		Expect(string(pgpassLine("dante", `pa\ss`))).To(Equal(`*:5432:*:dante:pa\\ss` + "\n"))
+		Expect(string(pgpassLine("dante", `a:b\c`))).To(Equal(`*:5432:*:dante:a\:b\\c` + "\n"))
+	})
+
+	It("escapes the role name too", func() {
+		Expect(string(pgpassLine(`da:nte`, "secret"))).To(Equal(`*:5432:*:da\:nte:secret` + "\n"))
 	})
 })
