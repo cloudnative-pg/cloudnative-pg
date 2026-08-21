@@ -966,6 +966,14 @@ func (r *ClusterReconciler) reconcileResources(
 	return ctrl.Result{}, nil
 }
 
+// terminatedPostgresGracePeriod is how long deleteTerminatedPods waits, after
+// the postgres container of a running Pod terminated, before considering the
+// Pod stuck and deleting it. In the normal case the kubelet restarts the
+// terminated container within seconds (the container-level restart backoff is
+// capped at 5 minutes), so a container that stays terminated longer than this
+// period is not going to come back on its own.
+const terminatedPostgresGracePeriod = 5 * time.Minute
+
 // deleteTerminatedPods will delete the Pods that are terminated
 func (r *ClusterReconciler) deleteTerminatedPods(
 	ctx context.Context,
@@ -982,7 +990,8 @@ func (r *ClusterReconciler) deleteTerminatedPods(
 			continue
 		}
 
-		if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed {
+		isTerminated := pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
+		if !isTerminated && !isPodStuckWithTerminatedPostgres(pod, time.Now()) {
 			continue
 		}
 
@@ -1008,6 +1017,53 @@ func (r *ClusterReconciler) deleteTerminatedPods(
 	}
 
 	return nil, nil
+}
+
+// isPodStuckWithTerminatedPostgres detects an instance Pod whose postgres
+// container terminated and was never restarted by the kubelet, while another
+// container (typically a CNPG-I plugin sidecar, injected as a restartable
+// init container) keeps the Pod phase Running.
+//
+// In this state the Pod is beyond recovery without being recreated: the
+// instance manager is gone, so the operator cannot extract the instance
+// status, and the rollout logic skips non-ready Pods. At the same time the
+// Pod never reaches the Succeeded or Failed phase, so the phase-based branch
+// of deleteTerminatedPods does not catch it either, and the cluster remains
+// in "Waiting for the instances to become active" indefinitely (see #9770).
+// The kubelet is expected to restart such a container, but that can fail to
+// happen, for instance after a kubelet restart on Kubernetes versions
+// affected by kubernetes/kubernetes#137146.
+//
+// The grace period leaves the kubelet every opportunity to restart the
+// container on its own: a restart decision would move the container to a
+// Waiting state, which makes this predicate return false.
+func isPodStuckWithTerminatedPostgres(pod *corev1.Pod, now time.Time) bool {
+	if pod.Status.Phase != corev1.PodRunning {
+		return false
+	}
+
+	for i := range pod.Status.ContainerStatuses {
+		status := &pod.Status.ContainerStatuses[i]
+		if status.Name != specs.PostgresContainerName {
+			continue
+		}
+
+		terminated := status.State.Terminated
+		if terminated == nil {
+			// The container is running, or the kubelet already planned a
+			// restart (waiting state, e.g. CrashLoopBackOff)
+			return false
+		}
+
+		if terminated.FinishedAt.IsZero() {
+			// no timestamp to evaluate the grace period against
+			return false
+		}
+
+		return now.Sub(terminated.FinishedAt.Time) > terminatedPostgresGracePeriod
+	}
+
+	return false
 }
 
 // processUnschedulableInstances will delete the Pods that cannot schedule
