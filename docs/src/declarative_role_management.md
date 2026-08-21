@@ -210,13 +210,32 @@ and applies it to PostgreSQL:
 ##### Generated password Secret
 
 The operator creates a Secret of type `kubernetes.io/basic-auth`, named
-`<databaserole-name>-password` unless `password.secret` says otherwise, holding
-the two keys the instance manager applies to PostgreSQL:
+`<databaserole-name>-password` unless `password.secret` says otherwise. The
+first two keys are the ones the instance manager applies to PostgreSQL; the
+third is there for whoever consumes the credential:
 
 | Key | Contents |
 |---|---|
 | `username` | the name of the PostgreSQL role, `spec.name` |
 | `password` | the generated password |
+| `pgpass` | a ready-made [`.pgpass`](https://www.postgresql.org/docs/current/libpq-pgpass.html) line for the role |
+
+The `pgpass` line wildcards the host and the database, since the credential
+belongs to the role and says nothing about which endpoint of the cluster, or
+which database, it is used against:
+
+```
+*:5432:*:dante:<the generated password>
+```
+
+It can be mounted or copied straight into a `~/.pgpass` file, so a client
+authenticates without the password appearing in a connection string or in the
+shell history:
+
+```sh
+kubectl get secret role-dante-password -o jsonpath='{.data.pgpass}' \
+  | base64 -d > ~/.pgpass && chmod 0600 ~/.pgpass
+```
 
 The Secret does not need the `cnpg.io/reload` label: the operator owns it, and
 reacts to any change to it.
