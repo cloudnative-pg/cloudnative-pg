@@ -69,6 +69,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.clientCertificate) || !self.clientCertificate.enabled || self.login",message="clientCertificate requires the role to have login enabled"
 // +kubebuilder:validation:XValidation:rule="!has(self.password) || !has(self.passwordSecret)",message="password and passwordSecret are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="!has(self.password) || !has(self.disablePassword) || !self.disablePassword",message="password and disablePassword are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.validUntil) || !has(self.password) || self.password.mode != 'generate' || !has(self.password.duration)",message="validUntil cannot be set when the operator generates a password with a duration: the expiration of the generated password is what the role is valid until"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.password) || has(self.password)",message="password cannot be removed once set: pick the mode that describes how the password is managed now, such as external"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
