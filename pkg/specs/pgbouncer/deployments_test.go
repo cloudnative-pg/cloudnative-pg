@@ -251,4 +251,49 @@ var _ = Describe("Deployment", func() {
 		Expect(found.Resources.Limits.Cpu().String()).To(Equal("1"))
 		Expect(found.Resources.Limits.Memory().String()).To(Equal("100Mi"))
 	})
+
+	It("merges Spec.DeploymentMetadata onto the generated Deployment", func() {
+		pooler.Spec.DeploymentMetadata = &apiv1.Metadata{
+			Annotations: map[string]string{
+				"onebrief.com/owning-team": "platform infrastructure engineering",
+				"example.com/team":         "sre",
+			},
+			Labels: map[string]string{
+				"example.com/tier": "database",
+			},
+		}
+
+		deployment, err := Deployment(pooler, cluster)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		// User annotations land alongside the built-in spec-hash annotation.
+		Expect(deployment.ObjectMeta.Annotations).To(HaveKey(utils.PoolerSpecHashAnnotationName))
+		Expect(deployment.ObjectMeta.Annotations).To(HaveKeyWithValue(
+			"onebrief.com/owning-team", "platform infrastructure engineering"))
+		Expect(deployment.ObjectMeta.Annotations).To(HaveKeyWithValue(
+			"example.com/team", "sre"))
+
+		// User labels land alongside the built-in labels.
+		Expect(deployment.ObjectMeta.Labels).To(HaveKeyWithValue(utils.PgbouncerNameLabel, pooler.Name))
+		Expect(deployment.ObjectMeta.Labels).To(HaveKeyWithValue("example.com/tier", "database"))
+	})
+
+	It("does not let user metadata override operator-managed keys", func() {
+		pooler.Spec.DeploymentMetadata = &apiv1.Metadata{
+			Annotations: map[string]string{
+				utils.PoolerSpecHashAnnotationName: "user-tampered-hash",
+			},
+			Labels: map[string]string{
+				utils.PgbouncerNameLabel: "user-tampered-name",
+			},
+		}
+
+		deployment, err := Deployment(pooler, cluster)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		// Operator-managed values are preserved.
+		Expect(deployment.ObjectMeta.Annotations[utils.PoolerSpecHashAnnotationName]).
+			ToNot(Equal("user-tampered-hash"))
+		Expect(deployment.ObjectMeta.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
+	})
 })
