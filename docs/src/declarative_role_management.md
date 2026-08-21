@@ -588,30 +588,27 @@ PostgreSQL.
 ```
 
 `renewBefore` defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
-(7 days), capped at half of `duration` so that a short-lived password is not
-due for renewal as soon as it is generated. For the same reason `duration` must
-be at least one minute, and an explicit `renewBefore` at most half of it. The
-deadline is visible in `status.password.expiration`, and the Secret itself
-carries three annotations the operator derives from it and from when the
-password was last issued:
+(7 days) capped at half of `duration`, so that a short-lived password is not
+due for renewal as soon as it is generated. This is the same setting that
+governs certificate expiration checks, so changing it shifts password
+rotation timing too. For the same reason `duration` must be at least one
+minute, and an explicit `renewBefore` at most half of it.
 
-| Annotation | Meaning |
-|---|---|
-| `cnpg.io/passwordIssuedAt` | when the password was last (re)generated |
-| `cnpg.io/passwordExpiration` | `passwordIssuedAt` plus `duration` |
-| `cnpg.io/passwordRenewalDue` | `passwordExpiration` minus `renewBefore`: once this time passes, the password is rotated at the next reconciliation |
-
-Only `passwordIssuedAt` is load-bearing: the other two are recomputed from it
-and the role's current `duration`/`renewBefore` on every reconciliation, so
-that shortening or lengthening either takes effect immediately instead of
-being measured against a deadline computed under the previous settings.
+`status.password` records when the current password was issued and when it
+expires:
 
 ```yaml
 status:
   password:
     secretName: role-dante-password
+    issuedAt: "2026-08-16T09:12:44Z"
     expiration: "2026-11-16T09:12:44Z"
 ```
+
+Only `issuedAt` is load-bearing: `expiration` is recomputed from it and the
+role's current `duration`/`renewBefore` on every reconciliation, so that
+shortening or lengthening either takes effect immediately instead of being
+measured against a deadline computed under the previous settings.
 
 :::warning
 PostgreSQL stores a single password per role, so a rotation invalidates the
@@ -630,19 +627,15 @@ rotation and clears the recorded deadline, keeping the current password.
 #### Manual rotation
 
 To rotate a generated password immediately, regardless of its renewal
-deadline or of whether `duration` is set at all, annotate the `DatabaseRole`
-with `cnpg.io/rotatePassword` (any value):
+deadline or of whether `duration` is set at all, delete the Secret the
+operator generated it into:
 
 ```sh
-kubectl annotate databaserole role-dante cnpg.io/rotatePassword=true
+kubectl delete secret role-dante-password
 ```
 
-The annotation is a one-shot request: the operator removes it as soon as the
-rotation it asked for has happened, rather than leaving it in place as a
-standing setting. A request made while password generation is off is removed
-without effect, since there is nothing to rotate; a request made while
-generation is only temporarily blocked (for instance by a replica cluster) is
-left in place and honored once the block clears.
+The operator finds the Secret gone at the next reconciliation and generates a
+new password into it.
 
 #### Deletion and opt-out
 

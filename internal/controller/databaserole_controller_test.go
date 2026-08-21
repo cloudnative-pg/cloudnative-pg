@@ -21,9 +21,11 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -220,5 +223,153 @@ var _ = Describe("nextRoleSecretReconcile", func() {
 		next := nextRoleSecretReconcile(role)
 		Expect(next).To(BeNumerically(">", 0))
 		Expect(next).To(BeNumerically("<=", time.Second))
+	})
+})
+
+var _ = Describe("DatabaseRole status patch retry", func() {
+	ctx := context.Background()
+
+	newRole := func() *apiv1.DatabaseRole {
+		return &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-a", Namespace: "default"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{Name: "role-a"},
+				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+			},
+		}
+	}
+
+	buildReconciler := func(
+		role *apiv1.DatabaseRole,
+		funcs interceptor.Funcs,
+	) (*DatabaseRoleReconciler, client.Client) {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		cli := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			WithObjects(role).
+			WithInterceptorFuncs(funcs).
+			Build()
+		return &DatabaseRoleReconciler{Client: cli, Scheme: scheme}, cli
+	}
+
+	It("keeps trying until the patch lands", func() {
+		stored := newRole()
+		attempts := 0
+		r, cli := buildReconciler(stored, interceptor.Funcs{
+			SubResourcePatch: func(
+				ctx context.Context,
+				c client.Client,
+				subResource string,
+				obj client.Object,
+				patch client.Patch,
+				opts ...client.SubResourcePatchOption,
+			) error {
+				attempts++
+				if attempts < 3 {
+					return apierrs.NewInternalError(errors.New("apiserver is having a moment"))
+				}
+				return c.SubResource(subResource).Patch(ctx, obj, patch, opts...)
+			},
+		})
+
+		role := newRole()
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName: "role-a-password",
+			IssuedAt:   "2026-08-20T10:00:00Z",
+		}
+		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(attempts).To(Equal(3))
+
+		got := &apiv1.DatabaseRole{}
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Status.Password).NotTo(BeNil())
+		Expect(got.Status.Password.IssuedAt).To(Equal("2026-08-20T10:00:00Z"))
+	})
+
+	It("gives up within its deadline, reporting the error the API server returned", func() {
+		apiErr := apierrs.NewInternalError(errors.New("apiserver is down"))
+		r, _ := buildReconciler(newRole(), interceptor.Funcs{
+			SubResourcePatch: func(
+				_ context.Context,
+				_ client.Client,
+				_ string,
+				_ client.Object,
+				_ client.Patch,
+				_ ...client.SubResourcePatchOption,
+			) error {
+				return apiErr
+			},
+		})
+
+		role := newRole()
+		role.Status.Password = &apiv1.GeneratedPasswordState{SecretName: "role-a-password"}
+
+		start := time.Now()
+		err := r.patchRoleStatus(ctx, role)
+		elapsed := time.Since(start)
+
+		Expect(err).To(MatchError(ContainSubstring("apiserver is down")))
+		// The reconciliation holds a worker while this runs, so the whole
+		// retry has to fit inside its own ceiling.
+		Expect(elapsed).To(BeNumerically("<=", roleStatusPatchTimeout))
+		// And it has to have actually waited, rather than failed straight away.
+		Expect(elapsed).To(BeNumerically(">", time.Second))
+	})
+
+	It("stops without an error when the role is deleted while being reconciled", func() {
+		stored := newRole()
+		r, cli := buildReconciler(stored, interceptor.Funcs{})
+		Expect(cli.Delete(ctx, stored)).To(Succeed())
+
+		role := newRole()
+		role.Status.Password = &apiv1.GeneratedPasswordState{SecretName: "role-a-password"}
+		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+	})
+})
+
+var _ = Describe("DatabaseRole status patch condition ownership", func() {
+	ctx := context.Background()
+
+	It("leaves conditions it does not own alone", func() {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		stored := &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-a", Namespace: "default"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{Name: "role-a"},
+				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+			},
+		}
+		// A condition written by somebody else, which this reconciliation
+		// never saw because it was added after the role was read.
+		meta.SetStatusCondition(&stored.Status.Conditions, metav1.Condition{
+			Type:    "SomebodyElsesCondition",
+			Status:  metav1.ConditionTrue,
+			Reason:  "Whatever",
+			Message: "owned by another writer",
+		})
+		cli := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			WithObjects(stored).
+			Build()
+		r := &DatabaseRoleReconciler{Client: cli, Scheme: scheme}
+
+		role := stored.DeepCopy()
+		role.Status.Conditions = nil
+		meta.SetStatusCondition(&role.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionPasswordSecretChange),
+			Status:  metav1.ConditionTrue,
+			Reason:  "SecretChanged",
+			Message: "42",
+		})
+		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+
+		got := &apiv1.DatabaseRole{}
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(meta.FindStatusCondition(got.Status.Conditions, "SomebodyElsesCondition")).NotTo(BeNil())
+		ours := meta.FindStatusCondition(got.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
+		Expect(ours).NotTo(BeNil())
+		Expect(ours.Message).To(Equal("42"))
 	})
 })
