@@ -258,6 +258,7 @@ InstanceID
 InstanceReportedState
 IsolationCheckConfiguration
 Isovalent
+IssuedAt
 Istio
 Istio's
 JSON
@@ -1456,6 +1457,7 @@ rehydrated
 rehydration
 relabelings
 relatime
+renewBefore
 replicaclusterconfiguration
 replicationSecretVersion
 replicationSlots

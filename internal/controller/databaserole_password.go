@@ -75,15 +75,6 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 	// When generation is disabled we only need to clean up the Secret we
 	// generated; the cluster is not required for that.
 	if !role.IsPasswordGenerationEnabled() {
-		// There is no generated password to rotate: the request is consumed
-		// without effect, rather than left pending forever.
-		if _, requested := role.Annotations[utils.RotatePasswordAnnotationName]; requested {
-			log.FromContext(ctx).Warning(
-				"password rotation requested, but this DatabaseRole is not generating a password",
-				"role", role.Spec.Name)
-			delete(role.Annotations, utils.RotatePasswordAnnotationName)
-		}
-
 		if generatedSecretName == "" {
 			role.Status.Password = nil
 			return nil
@@ -192,6 +183,7 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 	contextLogger := log.FromContext(ctx)
 
 	var secret corev1.Secret
+	var issuedAt time.Time
 	err := r.Get(ctx, secretKey, &secret)
 	switch {
 	case err == nil:
@@ -205,7 +197,8 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 			return nil
 		}
 
-		if err := r.ensureOwnedPasswordSecretUpToDate(ctx, role, &secret); err != nil {
+		issuedAt, err = r.ensureOwnedPasswordSecretUpToDate(ctx, role, &secret)
+		if err != nil {
 			return err
 		}
 
@@ -222,52 +215,66 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 		}
 
 		secret = *newSecret
-		// A brand new password satisfies any pending manual rotation request.
-		delete(role.Annotations, utils.RotatePasswordAnnotationName)
+		issuedAt = time.Now()
 
 	default:
 		return fmt.Errorf("while getting password secret %q: %w", secretKey.Name, err)
 	}
 
+	var issuedAtString, expiration string
+	if !issuedAt.IsZero() {
+		issuedAtString = issuedAt.UTC().Format(time.RFC3339)
+		// Rotation may still be disabled for this role even though a password
+		// was just issued: there is nothing to expire in that case.
+		if role.Spec.Password.Duration != nil {
+			expiration = issuedAt.Add(role.Spec.Password.Duration.Duration).UTC().Format(time.RFC3339)
+		}
+	}
+
 	role.Status.Password = &apiv1.GeneratedPasswordState{
 		SecretName: secretKey.Name,
-		Expiration: secret.Annotations[utils.PasswordExpirationAnnotationName],
+		IssuedAt:   issuedAtString,
+		Expiration: expiration,
 	}
 	return nil
 }
 
 // ensureOwnedPasswordSecretUpToDate generates a new password when the current
-// one is gone or due for rotation, and keeps the lifetime annotations and the
-// username in sync with the role.
+// one is gone or due for rotation, and keeps the username in sync with the
+// role. It returns the time the password currently held by the Secret was
+// issued, which the caller needs to record in the role's status; it is the
+// zero time when rotation is not enabled for the role.
 func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	secret *corev1.Secret,
-) error {
+) (time.Time, error) {
 	origSecret := secret.DeepCopy()
 
+	var issuedAt time.Time
 	switch {
 	case passwordNeedsRotation(ctx, role, secret):
 		generated, err := generatePassword(role)
 		if err != nil {
-			return err
+			return time.Time{}, err
 		}
 		secret.Data = passwordSecretData(role, generated)
-		setPasswordAnnotations(role, secret, time.Now())
-		// The rotation this reconciliation just performed satisfies any
-		// pending manual request: it is a one-shot ask, not a standing one.
-		delete(role.Annotations, utils.RotatePasswordAnnotationName)
+		issuedAt = time.Now()
 
 	case !role.IsPasswordRotationEnabled():
-		// Drop a deadline left over from a lifetime that is no longer requested,
-		// so that the status stops advertising one the operator does not honor.
-		clearPasswordAnnotations(secret)
+		// Nothing to expire: the status must carry an empty IssuedAt and
+		// Expiration, matching what clearing the lifetime annotations used to do.
+		issuedAt = time.Time{}
 
-	case secret.Annotations[utils.PasswordIssuedAtAnnotationName] == "":
-		// Record the deadline of a password that was generated before rotation
-		// was enabled, or before this annotation existed, counting the lifetime
-		// it already had from the creation of its Secret.
-		setPasswordAnnotations(role, secret, secret.CreationTimestamp.Time)
+	default:
+		// The password was not rotated this loop and rotation is enabled: carry
+		// its recorded issue time forward, so the deadline is not recomputed
+		// from nothing on every reconciliation.
+		var err error
+		issuedAt, err = passwordIssuedAt(role, secret.CreationTimestamp.Time)
+		if err != nil {
+			issuedAt = secret.CreationTimestamp.Time
+		}
 	}
 
 	// The instance manager refuses to apply a password whose Secret names a role
@@ -278,15 +285,14 @@ func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 	// Patch only on a real change: an unconditional patch would bump the
 	// resourceVersion of the Secret on every loop, and that is exactly the signal
 	// that makes the instance manager re-apply the password.
-	if reflect.DeepEqual(origSecret.Data, secret.Data) &&
-		reflect.DeepEqual(origSecret.Annotations, secret.Annotations) {
-		return nil
+	if reflect.DeepEqual(origSecret.Data, secret.Data) {
+		return issuedAt, nil
 	}
 
 	if err := r.Patch(ctx, secret, client.MergeFrom(origSecret)); err != nil {
-		return fmt.Errorf("while patching password secret %q: %w", secret.Name, err)
+		return time.Time{}, fmt.Errorf("while patching password secret %q: %w", secret.Name, err)
 	}
-	return nil
+	return issuedAt, nil
 }
 
 // deleteOwnedPasswordSecret deletes the password Secret if it exists and is
@@ -311,21 +317,14 @@ func (r *DatabaseRoleReconciler) deleteOwnedPasswordSecret(
 }
 
 // passwordNeedsRotation reports whether a new password must be generated,
-// either because the Secret no longer carries one, because the current one
-// reached its renewal window, or because rotation was explicitly requested
-// through the RotatePasswordAnnotationName annotation. The renewal window is
-// always computed fresh from the recorded issue time and the role's current
-// duration/renewBefore, rather than trusting a previously recorded deadline,
-// so that a change to either takes effect on this reconciliation instead of
-// being overridden by a deadline computed under settings that no longer
-// apply.
+// either because the Secret no longer carries one or because the current one
+// reached its renewal window. The renewal window is always computed fresh
+// from the recorded issue time and the role's current duration/renewBefore,
+// rather than trusting a previously recorded deadline, so that a change to
+// either takes effect on this reconciliation instead of being overridden by
+// a deadline computed under settings that no longer apply.
 func passwordNeedsRotation(ctx context.Context, role *apiv1.DatabaseRole, secret *corev1.Secret) bool {
 	if len(secret.Data[corev1.BasicAuthPasswordKey]) == 0 {
-		return true
-	}
-
-	// A manual request overrides even a role that never rotates on its own.
-	if _, requested := role.Annotations[utils.RotatePasswordAnnotationName]; requested {
 		return true
 	}
 
@@ -333,23 +332,32 @@ func passwordNeedsRotation(ctx context.Context, role *apiv1.DatabaseRole, secret
 		return false
 	}
 
-	// A password generated before rotation was enabled, or before this
-	// annotation existed, has no issue time recorded: account for the
-	// lifetime it already had, so that one older than the requested duration
-	// is rotated right away.
-	issuedAt := secret.CreationTimestamp.Time
-	if value, ok := secret.Annotations[utils.PasswordIssuedAtAnnotationName]; ok {
-		parsed, err := time.Parse(time.RFC3339, value)
-		if err != nil {
-			log.FromContext(ctx).Warning("unreadable password issue time, rotating the password",
-				"secret", secret.Name, "issuedAt", value, "err", err.Error())
-			return true
+	issuedAt, err := passwordIssuedAt(role, secret.CreationTimestamp.Time)
+	if err != nil {
+		rawIssuedAt := ""
+		if role.Status.Password != nil {
+			rawIssuedAt = role.Status.Password.IssuedAt
 		}
-		issuedAt = parsed
+		log.FromContext(ctx).Warning("unreadable password issue time, rotating the password",
+			"secret", secret.Name, "issuedAt", rawIssuedAt, "err", err.Error())
+		return true
 	}
 
 	renewalDue := issuedAt.Add(role.Spec.Password.Duration.Duration).Add(-passwordRenewBefore(role))
 	return !time.Now().Before(renewalDue)
+}
+
+// passwordIssuedAt returns the time recorded in the role's status as when its
+// current generated password was issued, parsed from RFC3339. When it is
+// absent or empty, indicating rotation was enabled only after the password
+// had already been generated, it falls back to the given time, so that the
+// lifetime the password already had is counted from the creation of its
+// Secret.
+func passwordIssuedAt(role *apiv1.DatabaseRole, fallback time.Time) (time.Time, error) {
+	if role.Status.Password == nil || role.Status.Password.IssuedAt == "" {
+		return fallback, nil
+	}
+	return time.Parse(time.RFC3339, role.Status.Password.IssuedAt)
 }
 
 // passwordRenewBefore returns how long before its expiration the password of
@@ -378,38 +386,6 @@ func passwordRenewBefore(role *apiv1.DatabaseRole) time.Duration {
 	return renewBefore
 }
 
-// setPasswordAnnotations records that a password was issued at the given
-// time, when it expires, and when it becomes due for renewal, deriving the
-// latter two from issuedAt and the role's current duration/renewBefore: only
-// the issue time itself needs to persist across reconciliations, so that the
-// deadlines stay in step with the role's current specification instead of
-// freezing the settings in effect when the password was last generated.
-// Removes all three when the role does not rotate its password.
-func setPasswordAnnotations(role *apiv1.DatabaseRole, secret *corev1.Secret, issuedAt time.Time) {
-	if !role.IsPasswordRotationEnabled() {
-		clearPasswordAnnotations(secret)
-		return
-	}
-
-	if secret.Annotations == nil {
-		secret.Annotations = map[string]string{}
-	}
-	expiration := issuedAt.Add(role.Spec.Password.Duration.Duration)
-	renewalDue := expiration.Add(-passwordRenewBefore(role))
-	secret.Annotations[utils.PasswordIssuedAtAnnotationName] = issuedAt.UTC().Format(time.RFC3339)
-	secret.Annotations[utils.PasswordExpirationAnnotationName] = expiration.UTC().Format(time.RFC3339)
-	secret.Annotations[utils.PasswordRenewalDueAnnotationName] = renewalDue.UTC().Format(time.RFC3339)
-}
-
-// clearPasswordAnnotations removes the recorded issue time, expiration and
-// renewal deadline of a password, so that the status stops advertising a
-// lifetime the operator no longer honors.
-func clearPasswordAnnotations(secret *corev1.Secret) {
-	delete(secret.Annotations, utils.PasswordIssuedAtAnnotationName)
-	delete(secret.Annotations, utils.PasswordExpirationAnnotationName)
-	delete(secret.Annotations, utils.PasswordRenewalDueAnnotationName)
-}
-
 // generatePasswordSecret builds the basic-auth Secret holding a freshly
 // generated password for the role.
 func generatePasswordSecret(role *apiv1.DatabaseRole, secretKey client.ObjectKey) (*corev1.Secret, error) {
@@ -429,7 +405,6 @@ func generatePasswordSecret(role *apiv1.DatabaseRole, secretKey client.ObjectKey
 		Type: corev1.SecretTypeBasicAuth,
 		Data: passwordSecretData(role, generated),
 	}
-	setPasswordAnnotations(role, secret, time.Now())
 
 	return secret, nil
 }
