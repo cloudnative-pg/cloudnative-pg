@@ -646,19 +646,14 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 						g.Expect(role.Status.Password).ShouldNot(BeNil())
 						g.Expect(role.Status.Password.Expiration).ShouldNot(BeEmpty())
-
-						var secret corev1.Secret
-						g.Expect(env.Client.Get(env.Ctx, secretKey, &secret)).To(Succeed())
-						g.Expect(secret.Annotations).To(HaveKey(utils.PasswordExpirationAnnotationName))
 					}, 120).WithPolling(5 * time.Second).Should(Succeed())
 				})
 
-				By("rotating the password once its expiration is reached", func() {
-					var secret corev1.Secret
-					Expect(env.Client.Get(env.Ctx, secretKey, &secret)).To(Succeed())
-					oldSecret := secret.DeepCopy()
-					secret.Annotations[utils.PasswordExpirationAnnotationName] = "2020-01-01T00:00:00Z"
-					Expect(objects.Patch(env.Ctx, env.Client, &secret, client.MergeFrom(oldSecret))).To(Succeed())
+				By("rotating the password once its duration has elapsed", func() {
+					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.Password.Duration = &metav1.Duration{Duration: time.Second}
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					// The instance manager applied the rotated password once the
 					// resource version it recorded is the one of the rotated Secret.
