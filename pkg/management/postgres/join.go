@@ -74,8 +74,8 @@ func ClonePgData(ctx context.Context, connectionString, targetPgData, walDir str
 }
 
 // Join creates a new instance joined to an existing PostgreSQL cluster
-func (info InitInfo) Join(ctx context.Context, cluster *apiv1.Cluster) error {
-	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
+func (info *InitInfo) Join(ctx context.Context, cluster *apiv1.Cluster) error {
+	primaryConnInfo := info.GetPrimaryConnInfo() + " connect_timeout=5"
 
 	// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.
 	// A short timeout could not be enough in case the instance is slow to send data,
