@@ -21,7 +21,7 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package tools is used to track dependencies of tools we use in our
-// developement process. DO NOT REMOVE
+// development process. DO NOT REMOVE
 package tools
 
 import (

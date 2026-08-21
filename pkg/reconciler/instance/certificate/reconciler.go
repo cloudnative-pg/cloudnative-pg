@@ -272,7 +272,7 @@ func (r *Reconciler) refreshServerCA(ctx context.Context, cluster *apiv1.Cluster
 // in the plugin-barman-cloud project
 func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	// refreshFileFromSecret receive a secret and rewrite the file corresponding to
-	// the key to the provided location. Implementated with an inner function to discourage
+	// the key to the provided location. Implemented with an inner function to discourage
 	// reuse.
 	refreshFileFromSecret := func(
 		secret *corev1.Secret,

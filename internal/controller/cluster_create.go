@@ -263,7 +263,7 @@ func createOrPatchClusterCredentialSecret(
 	patchedSecret := currentSecret.DeepCopy()
 	utils.MergeObjectsMetadata(patchedSecret, proposed)
 
-	// we cannot compare the data due to the password being randomly generated everytime
+	// we cannot compare the data due to the password being randomly generated every time
 	if reflect.DeepEqual(patchedSecret.Labels, currentSecret.Labels) &&
 		reflect.DeepEqual(patchedSecret.Annotations, currentSecret.Annotations) {
 		return nil
