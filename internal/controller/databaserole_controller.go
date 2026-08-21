@@ -75,6 +75,11 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("cannot get the role resource: %w", err)
 	}
 
+	if !role.DeletionTimestamp.IsZero() {
+		contextLogger.Info("DatabaseRole is being deleted, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+
 	if err := r.reconcilePasswordCondition(ctx, &role); err != nil {
 		return ctrl.Result{}, err
 	}
