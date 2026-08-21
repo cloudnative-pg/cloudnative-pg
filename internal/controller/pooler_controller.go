@@ -82,6 +82,11 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("cannot get the pooler resource: %w", err)
 	}
 
+	if !pooler.DeletionTimestamp.IsZero() {
+		contextLogger.Info("Pooler is being deleted, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+
 	// We make sure that there isn't a cluster with the same name as the pooler
 	conflictingCluster, err := getClusterOrNil(ctx, r.Client, req.NamespacedName)
 	if err != nil {
