@@ -1104,6 +1104,142 @@ var _ = Describe("Updating target primary", func() {
 			Expect(instanceToCreate).ToNot(BeNil())
 			Expect(instanceToCreate.Name).To(Equal(instance2Name))
 		})
+
+	It("does not select a new primary until the old one on the unschedulable node has shut down", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Status.Instances = 3
+			c.Status.ReadyInstances = 3
+			primaryName := specs.GetInstanceName(c.Name, 1)
+			c.Status.CurrentPrimary = primaryName
+			c.Status.TargetPrimary = primaryName
+		})
+
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		managedResources := &managedResources{
+			instances: corev1.PodList{Items: instances},
+		}
+
+		By("placing the primary on an unschedulable node and the replicas on schedulable ones", func() {
+			primaryNode := corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "primary-node"},
+				Spec:       corev1.NodeSpec{Unschedulable: true},
+			}
+			replicaNode1 := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "replica-node-1"}}
+			replicaNode2 := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "replica-node-2"}}
+			Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
+			Expect(env.client.Create(ctx, &replicaNode1)).To(Succeed())
+			Expect(env.client.Create(ctx, &replicaNode2)).To(Succeed())
+		})
+
+		primaryStatus := postgres.PostgresqlStatus{
+			IsPrimary: true,
+			Node:      "primary-node",
+			Pod:       &instances[0],
+		}
+		replica1Status := postgres.PostgresqlStatus{
+			Node:                "replica-node-1",
+			Pod:                 &instances[1],
+			IsWalReceiverActive: true,
+		}
+		replica2Status := postgres.PostgresqlStatus{
+			Node:                "replica-node-2",
+			Pod:                 &instances[2],
+			IsWalReceiverActive: true,
+		}
+
+		By("reconciling while the old primary is still up and its replicas are connected to it", func() {
+			statusList := postgres.PostgresqlStatusList{
+				Items: []postgres.PostgresqlStatus{primaryStatus, replica1Status, replica2Status},
+			}
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources,
+			)
+
+			Expect(err).To(MatchError(ErrWalReceiversRunning))
+			Expect(selectedPrimary).To(BeEmpty())
+			Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
+			Expect(cluster.Status.CurrentPrimary).To(Equal(instances[0].Name))
+		})
+
+		By("reconciling again once the old primary's WAL receivers have stopped", func() {
+			replica1Status.IsWalReceiverActive = false
+			replica2Status.IsWalReceiverActive = false
+			statusList := postgres.PostgresqlStatusList{
+				Items: []postgres.PostgresqlStatus{replica1Status, replica2Status},
+			}
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources,
+			)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(instances[1].Name))
+			Expect(cluster.Status.TargetPrimary).To(Equal(instances[1].Name))
+		})
+	})
+
+	It("switches over a designated primary that is running on an unschedulable node", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Source:  "external-cluster",
+				Enabled: new(true),
+			}
+			c.Status.Instances = 3
+			c.Status.ReadyInstances = 3
+			designatedPrimaryName := specs.GetInstanceName(c.Name, 1)
+			c.Status.CurrentPrimary = designatedPrimaryName
+			c.Status.TargetPrimary = designatedPrimaryName
+		})
+		Expect(cluster.IsReplica()).To(BeTrue())
+
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		managedResources := &managedResources{
+			instances: corev1.PodList{Items: instances},
+		}
+
+		By("placing the designated primary on an unschedulable node and the replicas on schedulable ones", func() {
+			primaryNode := corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "primary-node"},
+				Spec:       corev1.NodeSpec{Unschedulable: true},
+			}
+			replicaNode1 := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "replica-node-1"}}
+			replicaNode2 := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "replica-node-2"}}
+			Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
+			Expect(env.client.Create(ctx, &replicaNode1)).To(Succeed())
+			Expect(env.client.Create(ctx, &replicaNode2)).To(Succeed())
+		})
+
+		designatedPrimaryStatus := postgres.PostgresqlStatus{
+			Node: "primary-node",
+			Pod:  &instances[0],
+		}
+		replica1Status := postgres.PostgresqlStatus{
+			Node: "replica-node-1",
+			Pod:  &instances[1],
+		}
+		replica2Status := postgres.PostgresqlStatus{
+			Node: "replica-node-2",
+			Pod:  &instances[2],
+		}
+		statusList := postgres.PostgresqlStatusList{
+			IsReplicaCluster: true,
+			Items:            []postgres.PostgresqlStatus{designatedPrimaryStatus, replica1Status, replica2Status},
+		}
+
+		By("reconciling while the designated primary is still healthy and reachable", func() {
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+				ctx, cluster, statusList, managedResources,
+			)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(instances[1].Name))
+			Expect(cluster.Status.TargetPrimary).To(Equal(instances[1].Name))
+			Expect(cluster.Status.CurrentPrimary).To(Equal(instances[0].Name))
+		})
+	})
 })
 
 var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
