@@ -51,6 +51,10 @@ const (
 	// clientCertSecretSuffix is the suffix appended to a DatabaseRole name to form
 	// the name of the Secret holding its generated TLS client certificate.
 	clientCertSecretSuffix = "-client-cert"
+
+	// passwordSecretSuffix is the suffix appended to a DatabaseRole name to form
+	// the default name of the Secret holding its generated password.
+	passwordSecretSuffix = "-password"
 )
 
 // DatabaseRoleSpec represents a role in Postgres
@@ -63,6 +67,8 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.name.size() != 0",message="role name must not be empty"
 // +kubebuilder:validation:XValidation:rule="!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword",message="passwordSecret and disablePassword are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="!has(self.clientCertificate) || !self.clientCertificate.enabled || self.login",message="clientCertificate requires the role to have login enabled"
+// +kubebuilder:validation:XValidation:rule="!has(self.password) || !has(self.passwordSecret)",message="password and passwordSecret are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.password) || !self.password.enabled || !has(self.disablePassword) || !self.disablePassword",message="password generation and disablePassword are mutually exclusive"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
 	// in the `cluster.spec.managed.roles` definition.
@@ -84,6 +90,122 @@ type DatabaseRoleSpec struct {
 	// Requires login to be true.
 	// +optional
 	ClientCertificate *ClientCertificateConfiguration `json:"clientCertificate,omitempty"`
+
+	// Password configures the operator to generate the password of this role and
+	// store it in a Secret, instead of requiring a pre-existing one through
+	// `passwordSecret`. Mutually exclusive with `passwordSecret`.
+	// +optional
+	Password *PasswordConfiguration `json:"password,omitempty"`
+}
+
+// PasswordConfiguration configures operator-managed generation of the password
+// of a DatabaseRole.
+// +kubebuilder:validation:XValidation:rule="!has(self.renewBefore) || (has(self.duration) && duration(self.renewBefore).getSeconds() * 2 <= duration(self.duration).getSeconds())",message="renewBefore requires duration, and must be at most half of it"
+// +kubebuilder:validation:XValidation:rule="!has(self.duration) || duration(self.duration) >= duration('1m')",message="duration must be at least 1m"
+type PasswordConfiguration struct {
+	// Enabled turns on password generation for this role. Defaults to true when
+	// the block is present.
+	// +kubebuilder:default:=true
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Secret is the name of the Secret where the generated password is stored.
+	// Defaults to `<databaserole-name>-password`. The operator never overwrites
+	// a Secret it does not own.
+	// +optional
+	Secret string `json:"secret,omitempty"`
+
+	// Duration is the lifetime of the generated password, at least one minute:
+	// once it is reached, minus `renewBefore`, the operator generates a new
+	// password and applies it to the role. When unset, the password is generated
+	// once and never rotated.
+	// +optional
+	Duration *metav1.Duration `json:"duration,omitempty"`
+
+	// RenewBefore is how long before the end of its lifetime the password is
+	// rotated. Only meaningful together with `duration`, and it must be at most
+	// half of it, so that the password is not due for rotation as soon as it is
+	// generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
+	// (7 days), capped at half of the lifetime.
+	// +optional
+	RenewBefore *metav1.Duration `json:"renewBefore,omitempty"`
+
+	// Criteria constrains the generated password.
+	// +optional
+	Criteria *PasswordCriteria `json:"criteria,omitempty"`
+}
+
+// PasswordCriteria describes the shape of a generated password.
+//
+// Unless `allowRepeat` is set, every character of the password is drawn from a
+// different one of the 52 letters, 10 digits and (by default) 30 symbols the
+// generator knows: criteria asking for more than are available can never be
+// satisfied, and are rejected here rather than failing at generation time.
+// +kubebuilder:validation:XValidation:rule="(has(self.digits) ? self.digits : (self.length / 4 > 10 ? 10 : self.length / 4)) + (has(self.symbols) ? self.symbols : 0) <= self.length",message="the number of digits and symbols must not exceed the password length"
+// +kubebuilder:validation:XValidation:rule="(has(self.allowRepeat) && self.allowRepeat) || self.length - (has(self.digits) ? self.digits : (self.length / 4 > 10 ? 10 : self.length / 4)) - (has(self.symbols) ? self.symbols : 0) <= ((has(self.noUpper) && self.noUpper) ? 26 : 52)",message="without allowRepeat the password cannot contain more letters than are available: 52, or 26 with noUpper. Shorten the length, or ask for more digits and symbols"
+// +kubebuilder:validation:XValidation:rule="(has(self.allowRepeat) && self.allowRepeat) || !has(self.digits) || self.digits <= 10",message="without allowRepeat the password cannot contain more than 10 digits"
+// +kubebuilder:validation:XValidation:rule="(has(self.allowRepeat) && self.allowRepeat) || !has(self.symbols) || self.symbols <= (has(self.symbolCharacters) ? size(self.symbolCharacters) : 30)",message="without allowRepeat the password cannot contain more symbols than the distinct characters of symbolCharacters (30 by default)"
+type PasswordCriteria struct {
+	// Length of the generated password.
+	// +kubebuilder:default:=24
+	// +kubebuilder:validation:Minimum=8
+	// +kubebuilder:validation:Maximum=1024
+	// +optional
+	Length int `json:"length,omitempty"`
+
+	// Digits is the number of digits in the generated password. Defaults to 25%
+	// of its length, and never to more than 10: unless `allowRepeat` is set, the
+	// generator cannot use the same digit twice.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Digits *int `json:"digits,omitempty"`
+
+	// Symbols is the number of symbol characters in the generated password.
+	// Defaults to 0.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Symbols *int `json:"symbols,omitempty"`
+
+	// SymbolCharacters is the set of symbols the generated password can draw
+	// from. Defaults to the symbols of the generator (``~!@#$%^&*()_+-={}|[]\:"<>?,./``).
+	// Only ASCII punctuation is accepted: a letter or a digit here would collide
+	// with the rest of the password when `allowRepeat` is not set, and whitespace
+	// would be trimmed away before the password is applied to the role.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$`
+	// +optional
+	SymbolCharacters *string `json:"symbolCharacters,omitempty"`
+
+	// NoUpper disables uppercase characters in the generated password.
+	// +optional
+	NoUpper bool `json:"noUpper,omitempty"`
+
+	// AllowRepeat allows the same character to appear more than once in the
+	// generated password.
+	// +optional
+	AllowRepeat bool `json:"allowRepeat,omitempty"`
+}
+
+// GeneratedPasswordState holds the observed state of the generated password.
+type GeneratedPasswordState struct {
+	// SecretName is the name of the Secret the password was generated into. The
+	// operator records it to recognize the Secret as its own once the role stops
+	// generating a password, or starts generating it somewhere else, and delete
+	// what it left behind.
+	// +optional
+	SecretName string `json:"secretName,omitempty"`
+
+	// Expiration is the time at which the generated password is considered
+	// expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of
+	// that. It is empty when rotation is not enabled.
+	// +optional
+	Expiration string `json:"expiration,omitempty"`
+
+	// Message contains a human-readable explanation of the current password
+	// status, such as why generation was skipped or why an existing Secret was
+	// left untouched.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // ClientCertificateConfiguration configures operator-managed issuance of a TLS
@@ -132,6 +254,11 @@ type DatabaseRoleStatus struct {
 	// certificate, when client certificate issuance is enabled.
 	// +optional
 	ClientCertificate *ClientCertificateState `json:"clientCertificate,omitempty"`
+
+	// Password holds the observed state of the generated password, when password
+	// generation is enabled.
+	// +optional
+	Password *GeneratedPasswordState `json:"password,omitempty"`
 
 	// Conditions for the DatabaseRole object
 	// +optional
