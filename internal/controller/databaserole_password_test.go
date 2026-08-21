@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,6 +46,26 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// eventBufferSize sizes the channel of the fake recorder these tests give the
+// reconciler: record.FakeRecorder blocks on a full channel, so it has to hold
+// more events than any single spec emits.
+const eventBufferSize = 100
+
+// recordedEvents returns the events the reconciler emitted so far, draining
+// them so that a spec can tell a new event from one it has already seen.
+func recordedEvents(r *DatabaseRoleReconciler) []string {
+	recorder := r.Recorder.(*record.FakeRecorder)
+	var events []string
+	for {
+		select {
+		case event := <-recorder.Events:
+			events = append(events, event)
+		default:
+			return events
+		}
+	}
+}
 
 var _ = Describe("DatabaseRole password generation", func() {
 	ctx := context.Background()
@@ -86,7 +107,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			WithObjects(objs...).
 			Build()
-		return &DatabaseRoleReconciler{Client: cli, Scheme: scheme}, cli
+		return &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}, cli
 	}
 
 	requestFor := func(role *apiv1.DatabaseRole) ctrl.Request {
@@ -646,7 +667,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 				},
 			}).
 			Build()
-		r := &DatabaseRoleReconciler{Client: cli, Scheme: scheme}
+		r := &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}
 
 		_, err := r.Reconcile(ctx, requestFor(role))
 		Expect(err).To(HaveOccurred())
@@ -1129,6 +1150,80 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(getRole(cli, role).Annotations).To(HaveKey(utils.RotatePasswordAnnotationName))
+		})
+	})
+
+	When("recording what it did", func() {
+		It("records the generation of a password, and its rotation", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(recordedEvents(r)).To(ContainElement(
+				ContainSubstring("Normal PasswordGenerated")))
+
+			stored := getRole(cli, role)
+			stored.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			Expect(cli.Update(ctx, stored)).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			// A rotation invalidates the password every consumer still holds,
+			// so it is the one thing about this feature that has to leave a
+			// trace outside the operator's own log.
+			Expect(recordedEvents(r)).To(ContainElement(SatisfyAll(
+				ContainSubstring("Normal PasswordRotated"),
+				ContainSubstring("role-dante-password"),
+			)))
+		})
+
+		It("explains a password it will not generate once, not on every loop", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
+			r, cli := buildReconciler(role, newCluster(true))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(recordedEvents(r)).To(ConsistOf(SatisfyAll(
+				ContainSubstring("Warning PasswordGenerationSkipped"),
+				ContainSubstring("replica cluster"),
+			)))
+
+			// The reason has not changed, and it lasts as long as the cluster is
+			// a replica: repeating it every loop would bury everything else.
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(recordedEvents(r)).To(BeEmpty())
+
+			// It is recorded again once the explanation itself changes: the
+			// cluster is promoted, and a Secret the operator does not own now
+			// stands in the way of the password it would generate.
+			cluster := &apiv1.Cluster{}
+			Expect(cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)).To(Succeed())
+			cluster.Spec.ReplicaCluster = nil
+			Expect(cli.Update(ctx, cluster)).To(Succeed())
+			Expect(cli.Create(ctx, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "role-dante-password"},
+			})).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(recordedEvents(r)).To(ConsistOf(SatisfyAll(
+				ContainSubstring("Warning PasswordGenerationSkipped"),
+				ContainSubstring("not owned"),
+			)))
+		})
+
+		It("records a rotation request that has nothing to rotate", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal})
+			role.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			r, _ := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(recordedEvents(r)).To(ContainElement(
+				ContainSubstring("Warning PasswordRotationIgnored")))
 		})
 	})
 

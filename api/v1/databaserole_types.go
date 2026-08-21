@@ -214,7 +214,7 @@ type PasswordCriteria struct {
 	Symbols *int `json:"symbols,omitempty"`
 
 	// SymbolCharacters is the set of symbols the generated password can draw
-	// from. Defaults to the symbols of the generator (``~!@#$%^&*()_+-={}|[]\:"<>?,./``).
+	// from. Defaults to the symbols of the generator (``~!@#$%^&*()_+`-={}|[]\:"<>?,./``).
 	// Only ASCII punctuation is accepted: a letter or a digit here would collide
 	// with the rest of the password when `allowRepeat` is not set, and whitespace
 	// would be trimmed away before the password is applied to the role.
@@ -338,6 +338,8 @@ type DatabaseRoleStatus struct {
 // +kubebuilder:printcolumn:name="PG Name",type="string",JSONPath=".spec.name"
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest reconciliation message"
+// +kubebuilder:printcolumn:name="Password Expiration",type="string",JSONPath=".status.password.expiration",description="When the generated password expires"
+// +kubebuilder:printcolumn:name="Certificate Expiration",type="string",JSONPath=".status.clientCertificate.expiration",description="When the generated client certificate expires"
 
 // DatabaseRole is the Schema for the databaseroles API
 type DatabaseRole struct {
