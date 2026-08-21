@@ -2510,6 +2510,27 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `allTables` _boolean_ | Marks the publication as one that replicates changes for all tables<br />in the database, including tables created in the future.<br />Corresponding to `FOR ALL TABLES` in PostgreSQL. |  |  |  |
 | `objects` _[PublicationTargetObject](#publicationtargetobject) array_ | Just the following schema objects |  |  | MaxItems: 100000 <br /> |
+| `except` _[PublicationTargetExceptTable](#publicationtargetexcepttable) array_ | The list of tables to exclude from the publication when AllTables is<br />set to true. Corresponding to the `EXCEPT` clause of `FOR ALL TABLES`<br />in PostgreSQL. Requires PostgreSQL 19 or higher. |  |  | MaxItems: 100000 <br /> |
+
+
+#### PublicationTargetExceptTable
+
+
+
+PublicationTargetExceptTable is a table to exclude from a
+"FOR ALL TABLES" publication. Requires PostgreSQL 19 or higher.
+
+
+
+_Appears in:_
+
+- [PublicationTarget](#publicationtarget)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `only` _boolean_ | Whether to limit the exclusion to the table only or include all its<br />descendants |  |  |  |
+| `name` _string_ | The table name | True |  |  |
+| `schema` _string_ | The schema name |  |  |  |
 
 
 #### PublicationTargetObject

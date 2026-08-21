@@ -70,6 +70,7 @@ type PublicationSpec struct {
 
 // PublicationTarget is what this publication should publish
 // +kubebuilder:validation:XValidation:rule="(has(self.allTables) && !has(self.objects)) || (!has(self.allTables) && has(self.objects))",message="allTables and objects are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.except) || self.allTables",message="except requires allTables to be set to true"
 type PublicationTarget struct {
 	// Marks the publication as one that replicates changes for all tables
 	// in the database, including tables created in the future.
@@ -83,6 +84,13 @@ type PublicationTarget struct {
 	// +kubebuilder:validation:MaxItems=100000
 	// +optional
 	Objects []PublicationTargetObject `json:"objects,omitempty"`
+
+	// The list of tables to exclude from the publication when AllTables is
+	// set to true. Corresponding to the `EXCEPT` clause of `FOR ALL TABLES`
+	// in PostgreSQL. Requires PostgreSQL 19 or higher.
+	// +kubebuilder:validation:MaxItems=100000
+	// +optional
+	Except []PublicationTargetExceptTable `json:"except,omitempty"`
 }
 
 // PublicationTargetObject is an object to publish
@@ -116,6 +124,22 @@ type PublicationTargetTable struct {
 	// The columns to publish
 	// +optional
 	Columns []string `json:"columns,omitempty"`
+}
+
+// PublicationTargetExceptTable is a table to exclude from a
+// "FOR ALL TABLES" publication. Requires PostgreSQL 19 or higher.
+type PublicationTargetExceptTable struct {
+	// Whether to limit the exclusion to the table only or include all its
+	// descendants
+	// +optional
+	Only bool `json:"only,omitempty"`
+
+	// The table name
+	Name string `json:"name"`
+
+	// The schema name
+	// +optional
+	Schema string `json:"schema,omitempty"`
 }
 
 // PublicationStatus defines the observed state of Publication

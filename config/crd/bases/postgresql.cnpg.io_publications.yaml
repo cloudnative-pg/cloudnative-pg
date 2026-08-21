@@ -115,6 +115,32 @@ spec:
                     x-kubernetes-validations:
                     - message: allTables is immutable
                       rule: self == oldSelf
+                  except:
+                    description: |-
+                      The list of tables to exclude from the publication when AllTables is
+                      set to true. Corresponding to the `EXCEPT` clause of `FOR ALL TABLES`
+                      in PostgreSQL. Requires PostgreSQL 19 or higher.
+                    items:
+                      description: |-
+                        PublicationTargetExceptTable is a table to exclude from a
+                        "FOR ALL TABLES" publication. Requires PostgreSQL 19 or higher.
+                      properties:
+                        name:
+                          description: The table name
+                          type: string
+                        only:
+                          description: |-
+                            Whether to limit the exclusion to the table only or include all its
+                            descendants
+                          type: boolean
+                        schema:
+                          description: The schema name
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    maxItems: 100000
+                    type: array
                   objects:
                     description: Just the following schema objects
                     items:
@@ -166,6 +192,8 @@ spec:
                 - message: allTables and objects are mutually exclusive
                   rule: (has(self.allTables) && !has(self.objects)) || (!has(self.allTables)
                     && has(self.objects))
+                - message: except requires allTables to be set to true
+                  rule: '!has(self.except) || self.allTables'
             required:
             - cluster
             - dbname
