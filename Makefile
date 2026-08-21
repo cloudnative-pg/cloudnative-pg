@@ -23,7 +23,7 @@ IMAGE_NAME ?= ghcr.io/cloudnative-pg/cloudnative-pg-testing
 # Prevent e2e tests to proceed with empty tag which
 # will be considered as "latest".
 ifeq (,$(CONTROLLER_IMG))
-IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
+IMAGE_TAG ?= $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
 CONTROLLER_IMG = ${IMAGE_NAME}:${IMAGE_TAG}
 endif
@@ -191,15 +191,17 @@ build-plugin-race: generate fmt vet ## Build plugin binary.
 run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config.
 	go run ./cmd/manager
 
-docker-build: go-releaser ## Build the docker image.
+build-manager-binary: go-releaser ## Build the manager binary
 	GOOS=linux GOARCH=${ARCH} GOPATH=$(go env GOPATH) DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
 	  $(GO_RELEASER) build --skip=validate --clean --single-target $(if $(VERSION),,--snapshot); \
+
+docker-build: build-manager-binary ## Build the docker image.
 	builder_name_option=""; \
 	if [ -n "${BUILDER_NAME}" ]; then \
 	  builder_name_option="--builder ${BUILDER_NAME}"; \
 	fi; \
 	DOCKER_BUILDKIT=1 buildVersion=${VERSION} revision=${COMMIT} \
-	  docker buildx bake $${builder_name_option} --set=*.platform="linux/${ARCH}" \
+	  docker buildx bake $(ADDITIONAL_BUILDER_OPTIONS) $${builder_name_option} --set=*.platform="linux/${ARCH}" \
 	  --set distroless.tags="$${CONTROLLER_IMG}" \
 	  --push distroless
 
