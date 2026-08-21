@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -323,6 +324,24 @@ var _ = Describe("Database Roles", func() {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "role7"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{
+					Name: "role7",
+				},
+				Password: &apiv1.PasswordConfiguration{},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "role8"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{
+					Name: "role8",
+				},
+				Password: &apiv1.PasswordConfiguration{Secret: "my_secret8"},
+			},
+		},
 	}
 	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -374,7 +393,10 @@ var _ = Describe("Database Roles", func() {
 				secretsPolicy = policy
 			}
 		}
-		Expect(secretsPolicy.ResourceNames).To(ContainElements("my_secret1", "my_secret3", "my_secret5"))
+		// The instance manager needs to read the Secrets the operator generates
+		// too, or it cannot apply the password it did not choose.
+		Expect(secretsPolicy.ResourceNames).To(ContainElements(
+			"my_secret1", "my_secret3", "my_secret5", "role7-password", "my_secret8"))
 	})
 })
 
@@ -408,6 +430,19 @@ var _ = Describe("CRD database role secret name", func() {
 		}
 		secrets := crdRoleSecretName(&role)
 		Expect(secrets).To(BeEmpty())
+	})
+	It("should be the generated secret when the operator generates the password", func() {
+		role := apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-dante"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{Name: "dante"},
+				Password:          &apiv1.PasswordConfiguration{},
+			},
+		}
+		Expect(crdRoleSecretName(&role)).To(Equal("role-dante-password"))
+
+		role.Spec.Password.Enabled = ptr.To(false)
+		Expect(crdRoleSecretName(&role)).To(BeEmpty())
 	})
 	It("should work properly when the password secret name is set", func() {
 		role := apiv1.DatabaseRole{
