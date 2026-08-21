@@ -634,15 +634,24 @@ rotation and clears the recorded deadline, keeping the current password.
 #### Manual rotation
 
 To rotate a generated password immediately, regardless of its renewal
-deadline or of whether `duration` is set at all, delete the Secret the
-operator generated it into:
+deadline or of whether `duration` is set at all, annotate the `DatabaseRole`
+with `cnpg.io/rotatePassword` (any value):
 
 ```sh
-kubectl delete secret role-dante-password
+kubectl annotate databaserole role-dante cnpg.io/rotatePassword=true
 ```
 
-The operator finds the Secret gone at the next reconciliation and generates a
-new password into it.
+The annotation is a one-shot request: the operator removes it as soon as the
+rotation it asked for has happened, rather than leaving it in place as a
+standing setting. A request made while password generation is off is removed
+without effect, since there is nothing to rotate; a request made while
+generation is only temporarily blocked (for instance by a replica cluster) is
+left in place and honored once the block clears.
+
+On a role with a `duration`, the rotation restarts its lifetime: the
+expiration is recomputed from the moment the new password is issued, and with
+it the `VALID UNTIL` of the role (see
+[Generated passwords with a lifetime](#generated-passwords-with-a-lifetime)).
 
 #### Deletion and opt-out
 

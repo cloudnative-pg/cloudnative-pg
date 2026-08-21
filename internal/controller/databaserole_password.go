@@ -85,6 +85,15 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 	// When generation is disabled we only need to clean up the Secret we
 	// generated; the cluster is not required for that.
 	if !role.IsPasswordGenerationEnabled() {
+		// There is no generated password to rotate: the request is consumed
+		// without effect, rather than left pending forever.
+		if _, requested := role.Annotations[utils.RotatePasswordAnnotationName]; requested {
+			log.FromContext(ctx).Warning(
+				"password rotation requested, but this DatabaseRole is not generating a password",
+				"role", role.Spec.Name)
+			delete(role.Annotations, utils.RotatePasswordAnnotationName)
+		}
+
 		return r.stopGeneratingPassword(ctx, role, generatedSecretName)
 	}
 
@@ -196,17 +205,22 @@ func (r *DatabaseRoleReconciler) stopGeneratingPassword(
 }
 
 // setPasswordMessage explains in the status why the password of the role is not
-// being generated, keeping the name of the Secret it was last generated into:
-// that name is the only record the operator has to clean the Secret up later.
+// being generated, keeping what the operator already recorded about the
+// password it generated last: the name of its Secret, which is the only record
+// it has to clean that Secret up later, and when the password was issued and
+// expires. Those two are what the role's VALID UNTIL follows, so forgetting
+// them while the password cannot be rotated would lift the expiration
+// PostgreSQL enforces, turning a stalled rotation into a credential that works
+// forever, and would take the deadline out of the status an operator watches
+// exactly when it is needed.
 func setPasswordMessage(role *apiv1.DatabaseRole, message string) {
-	generatedSecretName := ""
+	state := apiv1.GeneratedPasswordState{Message: message}
 	if role.Status.Password != nil {
-		generatedSecretName = role.Status.Password.SecretName
+		state.SecretName = role.Status.Password.SecretName
+		state.IssuedAt = role.Status.Password.IssuedAt
+		state.Expiration = role.Status.Password.Expiration
 	}
-	role.Status.Password = &apiv1.GeneratedPasswordState{
-		SecretName: generatedSecretName,
-		Message:    message,
-	}
+	role.Status.Password = &state
 }
 
 // ensurePasswordSecret makes sure the Secret holding the generated password
@@ -253,6 +267,8 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 
 		secret = *newSecret
 		issuedAt = time.Now()
+		// A brand new password satisfies any pending manual rotation request.
+		delete(role.Annotations, utils.RotatePasswordAnnotationName)
 
 	default:
 		return fmt.Errorf("while getting password secret %q: %w", secretKey.Name, err)
@@ -297,6 +313,9 @@ func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 		}
 		secret.Data = passwordSecretData(role, generated)
 		issuedAt = time.Now()
+		// The rotation this reconciliation just performed satisfies any
+		// pending manual request: it is a one-shot ask, not a standing one.
+		delete(role.Annotations, utils.RotatePasswordAnnotationName)
 
 	case !role.IsPasswordRotationEnabled():
 		// Nothing to expire: the status must carry an empty IssuedAt and
@@ -354,14 +373,21 @@ func (r *DatabaseRoleReconciler) deleteOwnedPasswordSecret(
 }
 
 // passwordNeedsRotation reports whether a new password must be generated,
-// either because the Secret no longer carries one or because the current one
-// reached its renewal window. The renewal window is always computed fresh
-// from the recorded issue time and the role's current duration/renewBefore,
-// rather than trusting a previously recorded deadline, so that a change to
-// either takes effect on this reconciliation instead of being overridden by
-// a deadline computed under settings that no longer apply.
+// either because the Secret no longer carries one, because the current one
+// reached its renewal window, or because rotation was explicitly requested
+// through the RotatePasswordAnnotationName annotation. The renewal window is
+// always computed fresh from the recorded issue time and the role's current
+// duration/renewBefore, rather than trusting a previously recorded deadline,
+// so that a change to either takes effect on this reconciliation instead of
+// being overridden by a deadline computed under settings that no longer
+// apply.
 func passwordNeedsRotation(ctx context.Context, role *apiv1.DatabaseRole, secret *corev1.Secret) bool {
 	if len(secret.Data[corev1.BasicAuthPasswordKey]) == 0 {
+		return true
+	}
+
+	// A manual request overrides even a role that never rotates on its own.
+	if _, requested := role.Annotations[utils.RotatePasswordAnnotationName]; requested {
 		return true
 	}
 

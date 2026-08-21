@@ -125,6 +125,21 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// password in its Secret and never applied to PostgreSQL.
 	certErr := r.reconcileClientCertificate(ctx, &role, cluster)
 
+	// A manual password rotation request is consumed by removing the
+	// annotation that asked for it once reconcilePassword has acted on it.
+	// Patch that separately from the status, which the instance manager also
+	// writes to and which this Patch (on the main resource, not the /status
+	// subresource) does not touch. The patch is applied to a copy: the API
+	// server answers with the stored object, whose status does not carry the
+	// changes still only held in memory here, and unmarshalling that over
+	// `role` would lose them before they are persisted below.
+	if !reflect.DeepEqual(origRole.Annotations, role.Annotations) {
+		annotated := role.DeepCopy()
+		if err := r.Patch(ctx, annotated, client.MergeFrom(origRole)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("while patching role annotations: %w", err)
+		}
+	}
+
 	if !reflect.DeepEqual(origRole.Status, role.Status) {
 		if err := r.patchRoleStatus(ctx, &role); err != nil {
 			return ctrl.Result{}, err
@@ -262,13 +277,20 @@ func untilPasswordRenewal(role *apiv1.DatabaseRole) time.Duration {
 		return roleSecretReconcileInterval
 	}
 
-	// A rotation this reconciliation just performed already moved the
-	// deadline forward; anything else means the password could not be
-	// rotated (an unowned Secret, an unsatisfiable criteria).
 	renewalDue := expiration.Add(-passwordRenewBefore(role))
 	if untilRenewal := time.Until(renewalDue); untilRenewal > 0 {
 		return untilRenewal
 	}
+
+	// The deadline is in the past and the status says why the operator cannot
+	// act on it: a Secret it does not own, an unsatisfiable criteria, a replica
+	// cluster. None of those clears on its own, so retrying every second would
+	// spin for as long as the condition lasts, while resolving it changes the
+	// role or its Secret and reconciles it at once anyway.
+	if role.Status.Password.Message != "" {
+		return roleSecretReconcileInterval
+	}
+
 	return time.Second
 }
 

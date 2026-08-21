@@ -225,6 +225,16 @@ var _ = Describe("nextRoleSecretReconcile", func() {
 		Expect(next).To(BeNumerically(">", 0))
 		Expect(next).To(BeNumerically("<=", time.Second))
 	})
+
+	It("backs off from a deadline the operator has explained it cannot honor", func() {
+		// The message says the password cannot be rotated at all, and nothing
+		// about that clears with time: retrying every second would spin until
+		// somebody fixes the role or its Secret, which reconciles it anyway.
+		expiration := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+		role := roleWithPassword(expiration)
+		role.Status.Password.Message = "Secret \"role-dante-password\" already exists and is not owned"
+		Expect(nextRoleSecretReconcile(role)).To(Equal(roleSecretReconcileInterval))
+	})
 })
 
 var _ = Describe("DatabaseRole status patch retry", func() {
