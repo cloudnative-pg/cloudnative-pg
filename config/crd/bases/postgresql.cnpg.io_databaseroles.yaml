@@ -160,6 +160,112 @@ spec:
               name:
                 description: Name of the role
                 type: string
+              password:
+                description: |-
+                  Password configures the operator to generate the password of this role and
+                  store it in a Secret, instead of requiring a pre-existing one through
+                  `passwordSecret`. Mutually exclusive with `passwordSecret`.
+                properties:
+                  criteria:
+                    description: Criteria constrains the generated password.
+                    properties:
+                      allowRepeat:
+                        description: |-
+                          AllowRepeat allows the same character to appear more than once in the
+                          generated password.
+                        type: boolean
+                      digits:
+                        description: |-
+                          Digits is the number of digits in the generated password. Defaults to 25%
+                          of its length, and never to more than 10: unless `allowRepeat` is set, the
+                          generator cannot use the same digit twice.
+                        minimum: 0
+                        type: integer
+                      length:
+                        default: 24
+                        description: Length of the generated password.
+                        maximum: 1024
+                        minimum: 8
+                        type: integer
+                      noUpper:
+                        description: NoUpper disables uppercase characters in the
+                          generated password.
+                        type: boolean
+                      symbolCharacters:
+                        description: |-
+                          SymbolCharacters is the set of symbols the generated password can draw
+                          from. Defaults to the symbols of the generator (``~!@#$%^&*()_+-={}|[]\:"<>?,./``).
+                          Only ASCII punctuation is accepted: a letter or a digit here would collide
+                          with the rest of the password when `allowRepeat` is not set, and whitespace
+                          would be trimmed away before the password is applied to the role.
+                        minLength: 1
+                        pattern: ^[\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$
+                        type: string
+                      symbols:
+                        description: |-
+                          Symbols is the number of symbol characters in the generated password.
+                          Defaults to 0.
+                        minimum: 0
+                        type: integer
+                    type: object
+                    x-kubernetes-validations:
+                    - message: the number of digits and symbols must not exceed the
+                        password length
+                      rule: '(has(self.digits) ? self.digits : (self.length / 4 >
+                        10 ? 10 : self.length / 4)) + (has(self.symbols) ? self.symbols
+                        : 0) <= self.length'
+                    - message: 'without allowRepeat the password cannot contain more
+                        letters than are available: 52, or 26 with noUpper. Shorten
+                        the length, or ask for more digits and symbols'
+                      rule: '(has(self.allowRepeat) && self.allowRepeat) || self.length
+                        - (has(self.digits) ? self.digits : (self.length / 4 > 10
+                        ? 10 : self.length / 4)) - (has(self.symbols) ? self.symbols
+                        : 0) <= ((has(self.noUpper) && self.noUpper) ? 26 : 52)'
+                    - message: without allowRepeat the password cannot contain more
+                        than 10 digits
+                      rule: (has(self.allowRepeat) && self.allowRepeat) || !has(self.digits)
+                        || self.digits <= 10
+                    - message: without allowRepeat the password cannot contain more
+                        symbols than the distinct characters of symbolCharacters (30
+                        by default)
+                      rule: '(has(self.allowRepeat) && self.allowRepeat) || !has(self.symbols)
+                        || self.symbols <= (has(self.symbolCharacters) ? size(self.symbolCharacters)
+                        : 30)'
+                  duration:
+                    description: |-
+                      Duration is the lifetime of the generated password, at least one minute:
+                      once it is reached, minus `renewBefore`, the operator generates a new
+                      password and applies it to the role. When unset, the password is generated
+                      once and never rotated.
+                    type: string
+                  enabled:
+                    default: true
+                    description: |-
+                      Enabled turns on password generation for this role. Defaults to true when
+                      the block is present.
+                    type: boolean
+                  renewBefore:
+                    description: |-
+                      RenewBefore is how long before the end of its lifetime the password is
+                      rotated. Only meaningful together with `duration`, and it must be at most
+                      half of it, so that the password is not due for rotation as soon as it is
+                      generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
+                      (7 days), capped at half of the lifetime.
+                    type: string
+                  secret:
+                    description: |-
+                      Secret is the name of the Secret where the generated password is stored.
+                      Defaults to `<databaserole-name>-password`. The operator never overwrites
+                      a Secret it does not own.
+                    type: string
+                type: object
+                x-kubernetes-validations:
+                - message: renewBefore requires duration, and must be at most half
+                    of it
+                  rule: '!has(self.renewBefore) || (has(self.duration) && duration(self.renewBefore).getSeconds()
+                    * 2 <= duration(self.duration).getSeconds())'
+                - message: duration must be at least 1m
+                  rule: '!has(self.duration) || duration(self.duration) >= duration(''1m'')'
               passwordSecret:
                 description: |-
                   Secret containing the password of the role (if present).
@@ -221,6 +327,11 @@ spec:
             - message: clientCertificate requires the role to have login enabled
               rule: '!has(self.clientCertificate) || !self.clientCertificate.enabled
                 || self.login'
+            - message: password and passwordSecret are mutually exclusive
+              rule: '!has(self.password) || !has(self.passwordSecret)'
+            - message: password generation and disablePassword are mutually exclusive
+              rule: '!has(self.password) || !self.password.enabled || !has(self.disablePassword)
+                || !self.disablePassword'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up
@@ -311,6 +422,31 @@ spec:
                   desired state that was synchronized
                 format: int64
                 type: integer
+              password:
+                description: |-
+                  Password holds the observed state of the generated password, when password
+                  generation is enabled.
+                properties:
+                  expiration:
+                    description: |-
+                      Expiration is the time at which the generated password is considered
+                      expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of
+                      that. It is empty when rotation is not enabled.
+                    type: string
+                  message:
+                    description: |-
+                      Message contains a human-readable explanation of the current password
+                      status, such as why generation was skipped or why an existing Secret was
+                      left untouched.
+                    type: string
+                  secretName:
+                    description: |-
+                      SecretName is the name of the Secret the password was generated into. The
+                      operator records it to recognize the Secret as its own once the role stops
+                      generating a password, or starts generating it somewhere else, and delete
+                      what it left behind.
+                    type: string
+                type: object
               secretResourceVersion:
                 description: |-
                   SecretResourceVersion is the resource version of the password secret

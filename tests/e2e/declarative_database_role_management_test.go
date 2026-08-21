@@ -567,6 +567,179 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				})
 			})
 		})
+
+		When("the operator generates the password of the PostgreSQL role", func() {
+			It("applies the generated password, rotates it, follows a rename, and cleans up on opt-out", func() {
+				var (
+					role              *apiv1.DatabaseRole
+					roleKey           types.NamespacedName
+					secretKey         types.NamespacedName
+					pgRoleName        string
+					generatedPassword string
+					rotatedPassword   string
+					renamedPassword   string
+				)
+
+				By("creating a Role CR with password generation enabled", func() {
+					pgRoleName = fmt.Sprintf("generated-password-role-%d", funk.RandomInt(0, 9999))
+					role = &apiv1.DatabaseRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      pgRoleName,
+							Namespace: namespace,
+						},
+						Spec: apiv1.DatabaseRoleSpec{
+							RoleConfiguration: apiv1.RoleConfiguration{
+								Name:   pgRoleName,
+								Ensure: apiv1.EnsurePresent,
+								Login:  true,
+							},
+							ClusterRef: corev1.LocalObjectReference{
+								Name: clusterName,
+							},
+							ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
+							Password:      &apiv1.PasswordConfiguration{},
+						},
+					}
+					Expect(env.Client.Create(env.Ctx, role)).To(Succeed())
+
+					roleKey = types.NamespacedName{Namespace: namespace, Name: role.Name}
+					secretKey = types.NamespacedName{
+						Namespace: namespace,
+						Name:      role.GetGeneratedPasswordSecretName(),
+					}
+				})
+
+				By("waiting for the generated password to be applied to PostgreSQL", func() {
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.Applied).Should(HaveValue(BeTrue()))
+						g.Expect(role.Status.Message).Should(BeEmpty())
+						g.Expect(role.Status.SecretResourceVersion).ShouldNot(BeEmpty())
+						g.Expect(role.Status.Password).ShouldNot(BeNil())
+						g.Expect(role.Status.Password.Message).Should(BeEmpty())
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
+				})
+
+				By("checking the generated Secret is shaped for the instance manager", func() {
+					var secret corev1.Secret
+					Expect(env.Client.Get(env.Ctx, secretKey, &secret)).To(Succeed())
+					Expect(secret.Type).To(Equal(corev1.SecretTypeBasicAuth))
+					Expect(string(secret.Data[corev1.BasicAuthUsernameKey])).To(Equal(pgRoleName))
+
+					generatedPassword = string(secret.Data[corev1.BasicAuthPasswordKey])
+					Expect(generatedPassword).ToNot(BeEmpty())
+				})
+
+				By("checking if we can connect to PostgreSQL using the generated password", func() {
+					rwService := services.GetReadWriteServiceName(clusterName)
+					pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName,
+						pgRoleName, generatedPassword)
+				})
+
+				By("requesting a lifetime for the generated password", func() {
+					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.Password.Duration = &metav1.Duration{Duration: 90 * 24 * time.Hour}
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
+
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.Password).ShouldNot(BeNil())
+						g.Expect(role.Status.Password.Expiration).ShouldNot(BeEmpty())
+
+						var secret corev1.Secret
+						g.Expect(env.Client.Get(env.Ctx, secretKey, &secret)).To(Succeed())
+						g.Expect(secret.Annotations).To(HaveKey(utils.PasswordExpirationAnnotationName))
+					}, 120).WithPolling(5 * time.Second).Should(Succeed())
+				})
+
+				By("rotating the password once its expiration is reached", func() {
+					var secret corev1.Secret
+					Expect(env.Client.Get(env.Ctx, secretKey, &secret)).To(Succeed())
+					oldSecret := secret.DeepCopy()
+					secret.Annotations[utils.PasswordExpirationAnnotationName] = "2020-01-01T00:00:00Z"
+					Expect(objects.Patch(env.Ctx, env.Client, &secret, client.MergeFrom(oldSecret))).To(Succeed())
+
+					// The instance manager applied the rotated password once the
+					// resource version it recorded is the one of the rotated Secret.
+					Eventually(func(g Gomega) {
+						var rotated corev1.Secret
+						g.Expect(env.Client.Get(env.Ctx, secretKey, &rotated)).To(Succeed())
+						current := string(rotated.Data[corev1.BasicAuthPasswordKey])
+						g.Expect(current).ToNot(Equal(generatedPassword))
+
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.SecretResourceVersion).To(Equal(rotated.ResourceVersion))
+						rotatedPassword = current
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
+				})
+
+				By("checking if we can connect to PostgreSQL using the rotated password", func() {
+					rwService := services.GetReadWriteServiceName(clusterName)
+					pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName,
+						pgRoleName, rotatedPassword)
+				})
+
+				By("regenerating the password into a renamed Secret", func() {
+					renamedSecretKey := types.NamespacedName{
+						Namespace: namespace,
+						Name:      pgRoleName + "-renamed",
+					}
+
+					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.Password.Secret = renamedSecretKey.Name
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
+
+					// The password is generated afresh into the renamed Secret, the one
+					// it was generated into before is removed instead of being left
+					// behind with a credential nobody rotates any more, and the instance
+					// manager applies the new password to PostgreSQL.
+					Eventually(func(g Gomega) {
+						var renamed corev1.Secret
+						g.Expect(env.Client.Get(env.Ctx, renamedSecretKey, &renamed)).To(Succeed())
+						current := string(renamed.Data[corev1.BasicAuthPasswordKey])
+						g.Expect(current).ToNot(Equal(rotatedPassword))
+
+						var superseded corev1.Secret
+						err := env.Client.Get(env.Ctx, secretKey, &superseded)
+						g.Expect(err).To(MatchError(ContainSubstring("not found")))
+
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.Password).ShouldNot(BeNil())
+						g.Expect(role.Status.Password.SecretName).To(Equal(renamedSecretKey.Name))
+						g.Expect(role.Status.SecretResourceVersion).To(Equal(renamed.ResourceVersion))
+						renamedPassword = current
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
+
+					secretKey = renamedSecretKey
+				})
+
+				By("checking if we can connect to PostgreSQL using the renamed Secret", func() {
+					rwService := services.GetReadWriteServiceName(clusterName)
+					pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName,
+						pgRoleName, renamedPassword)
+				})
+
+				// The password block is what named the Secret, so removing it leaves
+				// `status.password.secretName` as the only record of what to clean up.
+				By("deleting the generated Secret when the password block is removed", func() {
+					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.Password = nil
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
+
+					Eventually(func(g Gomega) {
+						var secret corev1.Secret
+						err := env.Client.Get(env.Ctx, secretKey, &secret)
+						g.Expect(err).To(MatchError(ContainSubstring("not found")))
+
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.Password).To(BeNil())
+					}, 120).WithPolling(5 * time.Second).Should(Succeed())
+				})
+			})
+		})
 	})
 
 	Context("in a cluster with managed roles", Ordered, func() {

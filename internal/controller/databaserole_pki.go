@@ -42,6 +42,7 @@ import (
 func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
+	cluster *apiv1.Cluster,
 ) error {
 	secretKey := client.ObjectKey{
 		Namespace: role.Namespace,
@@ -54,19 +55,11 @@ func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 		return r.deleteOwnedCertSecret(ctx, role, secretKey)
 	}
 
-	var cluster apiv1.Cluster
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: role.Namespace,
-		Name:      role.Spec.ClusterRef.Name,
-	}, &cluster); apierrs.IsNotFound(err) {
-		log.FromContext(ctx).Info("cluster not found, will retry when it appears",
-			"cluster", role.Spec.ClusterRef.Name)
+	if cluster == nil {
 		return nil
-	} else if err != nil {
-		return fmt.Errorf("while getting cluster %q: %w", role.Spec.ClusterRef.Name, err)
 	}
 
-	return r.issueClientCertificate(ctx, role, &cluster)
+	return r.issueClientCertificate(ctx, role, cluster)
 }
 
 // issueClientCertificate ensures the TLS client certificate Secret for the
@@ -165,7 +158,7 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 		contextLogger.Warning("cert secret exists but is not owned by this DatabaseRole, skipping issuance",
 			"secret", secretKey.Name)
 		role.Status.ClientCertificate = &apiv1.ClientCertificateState{
-			Message: fmt.Sprintf("Secret %q already exists and is not owned by this DatabaseRole", secretKey.Name),
+			Message: fmt.Sprintf(secretNotOwnedMessage, secretKey.Name),
 		}
 		return false, nil
 	}
@@ -222,26 +215,13 @@ func (r *DatabaseRoleReconciler) deleteOwnedCertSecret(
 	role *apiv1.DatabaseRole,
 	secretKey client.ObjectKey,
 ) error {
-	var secret corev1.Secret
-	if err := r.Get(ctx, secretKey, &secret); apierrs.IsNotFound(err) {
-		role.Status.ClientCertificate = nil
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("while getting cert secret %q: %w", secretKey.Name, err)
+	deleted, err := r.deleteOwnedSecret(ctx, role, secretKey)
+	if err != nil {
+		return err
 	}
-
-	if metav1.IsControlledBy(&secret, role) {
-		if err := r.Delete(ctx, &secret); err != nil && !apierrs.IsNotFound(err) {
-			return fmt.Errorf("while deleting cert secret %q: %w", secretKey.Name, err)
-		}
-	} else {
-		log.FromContext(ctx).Warning("cert secret exists but is not owned by this DatabaseRole, skipping deletion",
-			"secret", secretKey.Name)
+	if !deleted {
 		role.Status.ClientCertificate = &apiv1.ClientCertificateState{
-			Message: fmt.Sprintf(
-				"Secret %q is not owned by this DatabaseRole and will not be deleted automatically",
-				secretKey.Name,
-			),
+			Message: fmt.Sprintf(secretNotDeletableMessage, secretKey.Name),
 		}
 		return nil
 	}

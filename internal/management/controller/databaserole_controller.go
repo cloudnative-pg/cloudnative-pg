@@ -202,13 +202,14 @@ func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(
 	role *apiv1.DatabaseRole,
 ) (ctrl.Result, error) {
 	// No password secret is configured, we can continue the reconciliation loop
-	if role.Spec.GetRoleSecretName() == "" {
+	secretName := role.GetPasswordSecretName()
+	if secretName == "" {
 		return ctrl.Result{}, nil
 	}
 
 	secretObjectKey := types.NamespacedName{
 		Namespace: role.Namespace,
-		Name:      role.Spec.GetRoleSecretName(),
+		Name:      secretName,
 	}
 	var secret corev1.Secret
 	if err := r.Get(ctx, secretObjectKey, &secret); err != nil {
@@ -272,7 +273,7 @@ func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) b
 	// If no password secret is configured, the condition comparison is
 	// irrelevant — a stale condition from a previously-configured secret
 	// must not cause a perpetual reconciliation loop.
-	if role.Spec.GetRoleSecretName() == "" {
+	if role.GetPasswordSecretName() == "" {
 		return role.Generation == role.Status.ObservedGeneration
 	}
 
@@ -547,7 +548,7 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	dbRole := roles.DatabaseRoleFromConfiguration(role.Spec.RoleConfiguration, validUntilNullIsInfinity)
 
 	passwordVersion, err := dbRole.ApplyPassword(
-		ctx, r.Client, &role.Spec.RoleConfiguration, r.instance.GetNamespaceName(),
+		ctx, r.Client, &role.Spec.RoleConfiguration, role.GetPasswordSecretName(), r.instance.GetNamespaceName(),
 	)
 	if err != nil {
 		return "", fmt.Errorf("while getting the role password: %w", err)
