@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"slices"
 	"strings"
@@ -35,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
@@ -829,6 +832,138 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					}, 60).WithPolling(5 * time.Second).Should(Succeed())
 				})
 			})
+
+		It("issues a short-lived certificate and renews it before it expires",
+			Label(tests.LabelDeclarativeDatabaseRoles), func() {
+				const (
+					roleCRName = "role-shortcert"
+					// The shortest configuration the API accepts, so a renewal is
+					// observable within the test rather than hours later. A one
+					// minute lifetime is backdated six seconds for clock skew, so
+					// renewing thirty seconds early puts the certificate inside its
+					// renewal window twenty four seconds after issuance, and the
+					// operator acts on it at its next reconcile of the role, which
+					// for this renewal window falls every fifteen seconds. Measured
+					// against a real cluster, certificates are therefore re-issued
+					// on a steady thirty second cadence.
+					lifetime    = time.Minute
+					renewBefore = 30 * time.Second
+				)
+
+				role := &apiv1.DatabaseRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      roleCRName,
+						Namespace: namespace,
+					},
+					Spec: apiv1.DatabaseRoleSpec{
+						RoleConfiguration: apiv1.RoleConfiguration{
+							Name:  "shortcert",
+							Login: true,
+						},
+						ClusterRef:    corev1.LocalObjectReference{Name: clusterName},
+						ReclaimPolicy: apiv1.DatabaseRoleReclaimRetain,
+						ClientCertificate: &apiv1.ClientCertificateConfiguration{
+							Enabled:     ptr.To(true),
+							Duration:    &metav1.Duration{Duration: lifetime},
+							RenewBefore: &metav1.Duration{Duration: renewBefore},
+						},
+					},
+				}
+				Expect(env.Client.Create(env.Ctx, role)).To(Succeed())
+
+				certSecretName := role.GetClientCertSecretName()
+				roleKey := types.NamespacedName{Namespace: namespace, Name: roleCRName}
+
+				var firstLeaf *x509.Certificate
+				var firstKey []byte
+				var firstExpiration string
+				By("issuing a certificate with the requested lifetime, still valid", func() {
+					// The certificate rotates every thirty seconds, so the private key
+					// is taken from the same read as the certificate it belongs to:
+					// reading it afterwards could pick up the next generation, and the
+					// renewal would then be compared against a key that never
+					// accompanied firstLeaf.
+					Eventually(func(g Gomega) {
+						var certSecret corev1.Secret
+						g.Expect(env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace, Name: certSecretName,
+						}, &certSecret)).To(Succeed())
+						leaf, err := certs.KeyPair{
+							Certificate: certSecret.Data[corev1.TLSCertKey],
+						}.ParseCertificate()
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(leaf.NotAfter.Sub(leaf.NotBefore)).To(Equal(lifetime))
+						// The clock skew allowance is subtracted from notBefore, so
+						// a lifetime shorter than the allowance would produce a
+						// certificate that had already expired when it was signed.
+						g.Expect(leaf.NotAfter).To(BeTemporally(">", time.Now()))
+						g.Expect(leaf.Subject.CommonName).To(Equal("shortcert"))
+						firstLeaf = leaf
+						firstKey = certSecret.Data[corev1.TLSPrivateKeyKey]
+					}, 120).WithPolling(2 * time.Second).Should(Succeed())
+
+					// The status patch lands in a separate write from the Secret
+					// create, so give it a moment to catch up rather than reading
+					// role.Status.ClientCertificate the instant the Secret appears.
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.ClientCertificate).NotTo(BeNil())
+						g.Expect(role.Status.ClientCertificate.Expiration).NotTo(BeEmpty())
+						firstExpiration = role.Status.ClientCertificate.Expiration
+					}, 30).WithPolling(2 * time.Second).Should(Succeed())
+				})
+
+				By("renewing the certificate once it enters its renewal window", func() {
+					var renewedLeaf *x509.Certificate
+					Eventually(func(g Gomega) {
+						leaf, err := clientCertLeaf(namespace, certSecretName)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(leaf.NotBefore).To(BeTemporally(">", firstLeaf.NotBefore))
+						g.Expect(leaf.NotAfter.Sub(leaf.NotBefore)).To(Equal(lifetime))
+						g.Expect(leaf.NotAfter).To(BeTemporally(">", time.Now()))
+						// The renewed certificate must already be valid while the
+						// old one still is, so a client relying on either one
+						// during the rotation never sees a coverage gap.
+						g.Expect(leaf.NotBefore).To(BeTemporally("<", firstLeaf.NotAfter))
+						g.Expect(leaf.Subject.CommonName).To(Equal("shortcert"))
+
+						var certSecret corev1.Secret
+						g.Expect(env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace, Name: certSecretName,
+						}, &certSecret)).To(Succeed())
+						// Re-issuing generates a fresh private key alongside the
+						// certificate, and the stored pair must stay internally
+						// consistent rather than a new certificate over a stale key.
+						g.Expect(certSecret.Data[corev1.TLSPrivateKeyKey]).NotTo(Equal(firstKey))
+						_, err = tls.X509KeyPair(certSecret.Data[corev1.TLSCertKey], certSecret.Data[corev1.TLSPrivateKeyKey])
+						g.Expect(err).ToNot(HaveOccurred())
+
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.ClientCertificate).NotTo(BeNil())
+						g.Expect(role.Status.ClientCertificate.Expiration).NotTo(BeEmpty())
+						g.Expect(role.Status.ClientCertificate.Expiration).NotTo(Equal(firstExpiration))
+						expiration, err := time.Parse(time.RFC3339, role.Status.ClientCertificate.Expiration)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(expiration).To(BeTemporally("==", leaf.NotAfter))
+
+						renewedLeaf = leaf
+					}, 120).WithPolling(2 * time.Second).Should(Succeed())
+
+					// Certificates are backdated for clock skew, so a renewal window
+					// covering most of the lifetime leaves every freshly issued
+					// certificate already inside its own renewal window. Since the
+					// reconciler watches the Secret it owns, that would trigger the
+					// next re-issue immediately instead of holding steady. Ten
+					// seconds is deliberately shorter than the thirty seconds at
+					// which this certificate is honestly re-issued again, so this
+					// catches a re-issue loop without racing the next renewal.
+					Consistently(func(g Gomega) {
+						leaf, err := clientCertLeaf(namespace, certSecretName)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(leaf.NotBefore).To(BeTemporally("==", renewedLeaf.NotBefore))
+					}, 10*time.Second).WithPolling(1 * time.Second).Should(Succeed())
+				})
+			})
 	})
 
 	Context("in a Namespace to be deleted manually", func() {
@@ -882,6 +1017,17 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 		})
 	})
 })
+
+// clientCertLeaf returns the client certificate stored in the given Secret.
+func clientCertLeaf(namespace, secretName string) (*x509.Certificate, error) {
+	var secret corev1.Secret
+	if err := env.Client.Get(env.Ctx, types.NamespacedName{
+		Namespace: namespace, Name: secretName,
+	}, &secret); err != nil {
+		return nil, err
+	}
+	return certs.KeyPair{Certificate: secret.Data[corev1.TLSCertKey]}.ParseCertificate()
+}
 
 func roleExistsQuery(roleName string) string {
 	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='%v')", roleName)

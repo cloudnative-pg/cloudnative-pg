@@ -24,6 +24,8 @@ spec:
   inherit: false
   clientCertificate:
     enabled: true
+    duration: 2160h
+    renewBefore: 168h
   replication: false
   bypassrls: false
   connectionLimit: 4

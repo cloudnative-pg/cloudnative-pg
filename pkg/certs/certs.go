@@ -146,10 +146,36 @@ func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
 
 // CreateAndSignPair given a CA keypair, generate and sign a leaf keypair
 func (pair KeyPair) CreateAndSignPair(host string, usage CertType, altDNSNames []string) (*KeyPair, error) {
-	certificateDuration := getCertificateDuration()
-	notBefore := time.Now().Add(time.Minute * -5)
-	notAfter := notBefore.Add(certificateDuration)
-	return pair.createAndSignPairWithValidity(host, notBefore, notAfter, usage, altDNSNames)
+	return pair.CreateAndSignPairWithDuration(host, usage, altDNSNames, 0)
+}
+
+// CreateAndSignPairWithDuration given a CA keypair, generate and sign a leaf keypair whose
+// lifetime is the given duration. A non-positive duration means the operator-wide default.
+func (pair KeyPair) CreateAndSignPairWithDuration(
+	host string, usage CertType, altDNSNames []string, duration time.Duration,
+) (*KeyPair, error) {
+	if duration <= 0 {
+		duration = CertificateDuration()
+	}
+	// x509 encodes validity at whole-second granularity, so an un-truncated
+	// notBefore lets the fractional part of the requested duration carry into
+	// an extra encoded second. Truncating notBefore first keeps the encoded
+	// lifetime exactly equal to the requested one.
+	notBefore := time.Now().Add(-clockSkewAllowance(duration)).Truncate(time.Second)
+	return pair.createAndSignPairWithValidity(host, notBefore, notBefore.Add(duration), usage, altDNSNames)
+}
+
+// clockSkewAllowance returns how far back a certificate's notBefore is set, so
+// that a verifier whose clock runs behind still accepts a freshly issued
+// certificate. It is a tenth of the lifetime, capped at five minutes: a fixed
+// five minutes would consume the whole validity period of a short-lived
+// certificate, and for a duration below ten minutes it would push notAfter
+// into the past, making the certificate expire before it was ever used. Every
+// path that signs a certificate goes through it, CAs and renewals included, so
+// that no configured lifetime can produce a certificate that is born expired.
+func clockSkewAllowance(duration time.Duration) time.Duration {
+	const maxSkew = 5 * time.Minute
+	return min(duration/10, maxSkew)
 }
 
 func (pair KeyPair) createAndSignPairWithValidity(
@@ -283,8 +309,8 @@ func (pair *KeyPair) RenewCertificate(
 		return err
 	}
 
-	certificateDuration := getCertificateDuration()
-	notBefore := time.Now().Add(time.Minute * -5)
+	certificateDuration := CertificateDuration()
+	notBefore := time.Now().Add(-clockSkewAllowance(certificateDuration))
 	notAfter := notBefore.Add(certificateDuration)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -332,7 +358,7 @@ func (pair *KeyPair) IsExpiring() (bool, *time.Time, error) {
 	if time.Now().Before(cert.NotBefore) {
 		return true, &cert.NotAfter, nil
 	}
-	expiringCheckThreshold := getCheckThreshold()
+	expiringCheckThreshold := CheckThreshold()
 	if time.Now().Add(expiringCheckThreshold).After(cert.NotAfter) {
 		return true, &cert.NotAfter, nil
 	}
@@ -366,8 +392,8 @@ func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit strin
 		return nil, err
 	}
 
-	certificateDuration := getCertificateDuration()
-	notBefore := time.Now().Add(time.Minute * -5)
+	certificateDuration := CertificateDuration()
+	notBefore := time.Now().Add(-clockSkewAllowance(certificateDuration))
 	notAfter := notBefore.Add(certificateDuration)
 
 	return createCAWithValidity(notBefore, notAfter, certificate, key, commonName, organizationalUnit)
@@ -375,8 +401,8 @@ func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit strin
 
 // CreateRootCA generates a CA returning its keys
 func CreateRootCA(commonName string, organizationalUnit string) (*KeyPair, error) {
-	certificateDuration := getCertificateDuration()
-	notBefore := time.Now().Add(time.Minute * -5)
+	certificateDuration := CertificateDuration()
+	notBefore := time.Now().Add(-clockSkewAllowance(certificateDuration))
 	notAfter := notBefore.Add(certificateDuration)
 	return createCAWithValidity(notBefore, notAfter, nil, nil, commonName, organizationalUnit)
 }
@@ -501,7 +527,10 @@ func encodePrivateKey(derBytes []byte) []byte {
 	return pem.EncodeToMemory(&pem.Block{Type: ecPrivateKeyPEMBlockType, Bytes: derBytes})
 }
 
-func getCertificateDuration() time.Duration {
+// CertificateDuration returns the operator-wide lifetime of a generated leaf
+// certificate, resolving a non-positive `CERTIFICATE_DURATION` setting to the
+// built-in default.
+func CertificateDuration() time.Duration {
 	duration := configuration.Current.CertificateDuration
 	if duration <= 0 {
 		return configuration.CertificateDuration * 24 * time.Hour
@@ -509,7 +538,10 @@ func getCertificateDuration() time.Duration {
 	return time.Duration(duration) * 24 * time.Hour
 }
 
-func getCheckThreshold() time.Duration {
+// CheckThreshold returns how long before expiry the operator considers a
+// certificate to be expiring, resolving a non-positive
+// `EXPIRING_CHECK_THRESHOLD` setting to the built-in default.
+func CheckThreshold() time.Duration {
 	threshold := configuration.Current.ExpiringCheckThreshold
 	if threshold <= 0 {
 		return configuration.ExpiringCheckThreshold * 24 * time.Hour

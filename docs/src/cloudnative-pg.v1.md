@@ -528,6 +528,8 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `enabled` _boolean_ | Enabled turns on client certificate issuance for this role. When true,<br />the role must have login enabled. Defaults to true when the block is present. |  | true |  |
+| `duration` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | Duration is the lifetime of the generated client certificate, at least one<br />minute. Expressed in Go duration units, so a day has to be written as<br />hours: 90 days is `2160h`. Defaults to the operator's<br />`CERTIFICATE_DURATION` setting (90 days). |  |  |  |
+| `renewBefore` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RenewBefore is how long before expiry the certificate is renewed, in Go<br />duration units. It must be at most half of `duration`, because<br />certificates are backdated to tolerate clock skew and a renewal window<br />covering most of the lifetime would leave every freshly issued<br />certificate already due for renewal. Setting it without `duration` is<br />rejected: the API server cannot read the operator-wide default lifetime,<br />so it has nothing to check that bound against. Defaults to the operator's<br />`EXPIRING_CHECK_THRESHOLD` setting (7 days), capped at half the lifetime.<br />Renewal generates a new private key along with the new certificate. |  |  |  |
 
 
 #### ClientCertificateState

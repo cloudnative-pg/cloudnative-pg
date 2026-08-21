@@ -27,6 +27,10 @@ spec:
     - jsonPath: .status.applied
       name: Applied
       type: boolean
+    - description: Expiration of the generated client certificate
+      jsonPath: .status.clientCertificate.expiration
+      name: Cert Expiration
+      type: string
     - description: Latest reconciliation message
       jsonPath: .status.message
       name: Message
@@ -70,13 +74,42 @@ spec:
                   is stored in a Secret named `<databaserole-name>-client-cert`.
                   Requires login to be true.
                 properties:
+                  duration:
+                    description: |-
+                      Duration is the lifetime of the generated client certificate, at least one
+                      minute. Expressed in Go duration units, so a day has to be written as
+                      hours: 90 days is `2160h`. Defaults to the operator's
+                      `CERTIFICATE_DURATION` setting (90 days).
+                    type: string
                   enabled:
                     default: true
                     description: |-
                       Enabled turns on client certificate issuance for this role. When true,
                       the role must have login enabled. Defaults to true when the block is present.
                     type: boolean
+                  renewBefore:
+                    description: |-
+                      RenewBefore is how long before expiry the certificate is renewed, in Go
+                      duration units. It must be at most half of `duration`, because
+                      certificates are backdated to tolerate clock skew and a renewal window
+                      covering most of the lifetime would leave every freshly issued
+                      certificate already due for renewal. Setting it without `duration` is
+                      rejected: the API server cannot read the operator-wide default lifetime,
+                      so it has nothing to check that bound against. Defaults to the operator's
+                      `EXPIRING_CHECK_THRESHOLD` setting (7 days), capped at half the lifetime.
+                      Renewal generates a new private key along with the new certificate.
+                    type: string
                 type: object
+                x-kubernetes-validations:
+                - message: renewBefore requires duration to be set
+                  rule: '!has(self.renewBefore) || has(self.duration)'
+                - message: renewBefore must be at most half of duration
+                  rule: '!has(self.renewBefore) || !has(self.duration) || duration(self.renewBefore)
+                    + duration(self.renewBefore) <= duration(self.duration)'
+                - message: duration must be at least 1m
+                  rule: '!has(self.duration) || duration(self.duration) >= duration(''1m'')'
+                - message: renewBefore must be at least 30s
+                  rule: '!has(self.renewBefore) || duration(self.renewBefore) >= duration(''30s'')'
               cluster:
                 description: The corresponding cluster
                 properties:
