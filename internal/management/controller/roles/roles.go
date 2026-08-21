@@ -78,6 +78,9 @@ func DatabaseRoleFromConfiguration(config apiv1.RoleConfiguration, validUntilNul
 		ConnectionLimit: config.ConnectionLimit,
 		InRoles:         config.InRoles,
 	}
+	for _, roleGrant := range config.RoleGrants {
+		dbRole.RoleGrants = append(dbRole.RoleGrants, NewDatabaseRoleGrantFromRoleGrant(roleGrant))
+	}
 	switch {
 	case config.ValidUntil != nil:
 		dbRole.ValidUntil = pgtype.Timestamp{
@@ -184,7 +187,7 @@ func evaluateNextRoleActions(
 				RoleConfiguration: inSpec,
 			}
 			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], internalRole)
-		case isInSpec && !role.isInSameRolesAs(inSpec):
+		case isInSpec && !role.hasMatchingRoleGrants(inSpec):
 			internalRole := roleConfigurationAdapter{
 				RoleConfiguration: inSpec,
 			}
