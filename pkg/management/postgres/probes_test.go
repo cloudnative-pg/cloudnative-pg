@@ -21,6 +21,8 @@ package postgres
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/volumeusage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -282,6 +285,24 @@ var _ = Describe("probes", func() {
 		Expect(status.LastFailedWAL).To(Equal(""))
 		Expect(status.LastFailedWALTime).To(Equal("2021-05-05 12:00:00"))
 		Expect(status.IsArchivingWAL).To(BeFalse())
+	})
+
+	Context("Fill volume usages", func() {
+		It("populates VolumeUsages from the given base paths", func() {
+			root := GinkgoT().TempDir()
+			pgdata := filepath.Join(root, "pgdata")
+			Expect(os.MkdirAll(pgdata, 0o750)).To(Succeed())
+
+			result := &postgres.PostgresqlStatus{}
+			fillVolumeUsages(result, volumeusage.BasePaths{
+				PGData:          pgdata,
+				WALVolume:       filepath.Join(root, "wal"),
+				TablespacesRoot: filepath.Join(root, "tablespaces"),
+			})
+
+			Expect(result.VolumeUsages).To(HaveLen(1))
+			Expect(result.VolumeUsages[0].Name).To(Equal("pgdata"))
+		})
 	})
 
 	Context("Fill basebackup stats", func() {
