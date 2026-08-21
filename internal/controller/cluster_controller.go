@@ -610,11 +610,16 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 //
 // Two branches are checked in order:
 //
-//   - Kubelet has not refreshed the readiness probe yet. The first element of
-//     the (post-sort) instance list is reporting a healthy /pg/status but the
-//     kubelet has not yet flipped the readiness probe to True (typical for a
-//     short window after un-fencing an instance). Waiting here prevents
-//     electing a primary that Kubernetes will refuse to route traffic to.
+//   - Kubelet has not refreshed the readiness probe yet. The instance that
+//     would be elected is reporting a healthy /pg/status but the kubelet has
+//     not yet flipped the readiness probe to True (typical for a short window
+//     after un-fencing an instance). Waiting here prevents electing a primary
+//     that Kubernetes will refuse to route traffic to.
+//
+//     This asks firstNonFencedInstance, so that
+//     it judges the same instance the election path would pick. When every
+//     instance is fenced there is no election to protect and nothing to wait
+//     for.
 //
 //   - Primary pod is Ready but its /pg/status endpoint is failing. A failing
 //     /pg/status on an otherwise Ready pod usually indicates an
@@ -645,19 +650,16 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 
 	contextLogger := log.FromContext(ctx)
 
-	firstInstance := instancesStatus.Items[0]
-	hasHTTPStatus := firstInstance.HasHTTPStatus()
-	isPodReady := firstInstance.IsPodReady
-
-	if hasHTTPStatus && !isPodReady {
+	if candidate, hasCandidate := firstNonFencedInstance(cluster, instancesStatus); hasCandidate &&
+		candidate.HasHTTPStatus() && !candidate.IsPodReady {
 		// The readiness probe status from the kubelet has not been refreshed
 		// yet, so we wait rather than electing a primary that Kubernetes will
 		// refuse to route traffic to.
 		contextLogger.Info(
 			"Waiting for the Kubelet to refresh the readiness probe",
-			"instanceName", firstInstance.Pod.Name,
-			"hasHTTPStatus", hasHTTPStatus,
-			"isPodReady", isPodReady)
+			"instanceName", candidate.Pod.Name,
+			"hasHTTPStatus", candidate.HasHTTPStatus(),
+			"isPodReady", candidate.IsPodReady)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}
 	}
 

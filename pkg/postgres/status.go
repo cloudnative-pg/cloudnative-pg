@@ -443,8 +443,18 @@ func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
 
 // InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable
 func (list PostgresqlStatusList) InstancesReportingStatus() int {
+	return list.InstancesReportingStatusExcept(nil)
+}
+
+// InstancesReportingStatusExcept returns the number of instances that are Ready
+// or MightBeUnavailable, skipping every instance for which skip returns true.
+// A nil skip function counts every instance.
+func (list PostgresqlStatusList) InstancesReportingStatusExcept(skip func(instanceName string) bool) int {
 	var n int
 	for _, item := range list.Items {
+		if skip != nil && skip(item.Pod.Name) {
+			continue
+		}
 		if utils.IsPodActive(*item.Pod) && utils.IsPodReady(*item.Pod) || item.MightBeUnavailable {
 			n++
 		}

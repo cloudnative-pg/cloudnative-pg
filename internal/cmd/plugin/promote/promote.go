@@ -51,6 +51,10 @@ func Promote(ctx context.Context, cli client.Client,
 		return nil
 	}
 
+	if cluster.IsInstanceFenced(serverName) {
+		fmt.Printf("%s is fenced and cannot be promoted\n", serverName)
+		return nil
+	}
 	// Check if the Pod exist
 	var pod corev1.Pod
 	err = cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: serverName}, &pod)
