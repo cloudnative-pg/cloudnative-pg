@@ -678,6 +678,55 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						pgRoleName, rotatedPassword)
 				})
 
+				By("rotating the password on request, with no lifetime configured", func() {
+					// Rotation is turned off first, so that the new password can
+					// only come from the request: with a lifetime as short as the
+					// one above the operator would rotate it on its own anyway.
+					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.Password.Duration = nil
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
+
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.Password).ShouldNot(BeNil())
+						g.Expect(role.Status.Password.Expiration).Should(BeEmpty())
+					}, 120).WithPolling(5 * time.Second).Should(Succeed())
+
+					var settled corev1.Secret
+					Expect(env.Client.Get(env.Ctx, secretKey, &settled)).To(Succeed())
+					settledPassword := string(settled.Data[corev1.BasicAuthPasswordKey])
+
+					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+					oldRole = role.DeepCopy()
+					if role.Annotations == nil {
+						role.Annotations = map[string]string{}
+					}
+					role.Annotations[utils.RotatePasswordAnnotationName] = "true"
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
+
+					// The request is honored even though the password is not due
+					// for renewal, and consumed once it has been: the operator
+					// removes the annotation rather than rotating on every loop.
+					Eventually(func(g Gomega) {
+						var rotated corev1.Secret
+						g.Expect(env.Client.Get(env.Ctx, secretKey, &rotated)).To(Succeed())
+						current := string(rotated.Data[corev1.BasicAuthPasswordKey])
+						g.Expect(current).ToNot(Equal(settledPassword))
+
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Annotations).ShouldNot(HaveKey(utils.RotatePasswordAnnotationName))
+						g.Expect(role.Status.SecretResourceVersion).To(Equal(rotated.ResourceVersion))
+						rotatedPassword = current
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
+				})
+
+				By("checking if we can connect to PostgreSQL using the password rotated on request", func() {
+					rwService := services.GetReadWriteServiceName(clusterName)
+					pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName,
+						pgRoleName, rotatedPassword)
+				})
+
 				By("regenerating the password into a renamed Secret", func() {
 					renamedSecretKey := types.NamespacedName{
 						Namespace: namespace,

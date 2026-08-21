@@ -672,6 +672,37 @@ var _ = Describe("DatabaseRole password generation", func() {
 		Expect(getRole(cli, role).Status.Password.Message).To(ContainSubstring("not owned"))
 	})
 
+	It("keeps the deadline of a password it can no longer rotate", func() {
+		// The lifetime of a generated password is also the VALID UNTIL of the
+		// role, so forgetting the deadline while the operator cannot rotate the
+		// password lifts the expiration PostgreSQL enforces, turning a stalled
+		// rotation into a credential that works forever.
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
+		})
+		r, cli := buildReconciler(role, newCluster(false))
+
+		_, err := r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+		expiration := getRole(cli, role).Status.Password.Expiration
+		Expect(expiration).NotTo(BeEmpty())
+
+		// The user takes the generated Secret over, so the operator stops
+		// rotating the password it holds.
+		taken := getSecret(cli, "role-dante-password")
+		taken.OwnerReferences = nil
+		Expect(cli.Update(ctx, taken)).To(Succeed())
+
+		_, err = r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+
+		status := getRole(cli, role).Status.Password
+		Expect(status.Message).To(ContainSubstring("not owned"))
+		Expect(status.Expiration).To(Equal(expiration))
+		Expect(status.IssuedAt).NotTo(BeEmpty())
+	})
+
 	It("skips generation on a replica cluster", func() {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(true))
@@ -942,9 +973,126 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Message).To(Equal(untouched.ResourceVersion))
 		})
+
+		It("ignores a manual rotation request, since there is nothing to rotate", func() {
+			existing := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "byo-secret", Namespace: namespace},
+				Type:       corev1.SecretTypeBasicAuth,
+				Data: map[string][]byte{
+					corev1.BasicAuthUsernameKey: []byte(roleName),
+					corev1.BasicAuthPasswordKey: []byte("user-managed"),
+				},
+			}
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:   apiv1.PasswordModeSecret,
+				Secret: "byo-secret",
+			})
+			role.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			r, cli := buildReconciler(role, newCluster(false), existing)
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(string(getSecret(cli, "byo-secret").Data[corev1.BasicAuthPasswordKey])).
+				To(Equal("user-managed"))
+			Expect(getRole(cli, role).Annotations).NotTo(HaveKey(utils.RotatePasswordAnnotationName))
+		})
 	})
 
-	It("regenerates the password once its Secret is deleted, as a manual rotation request", func() {
+	When("rotation is manually requested", func() {
+		It("rotates a password that would otherwise not be due yet, and clears the request", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+				Mode:     apiv1.PasswordModeGenerate,
+				Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
+			})
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			first := getSecret(cli, "role-dante-password")
+
+			stored := getRole(cli, role)
+			stored.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			Expect(cli.Update(ctx, stored)).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			rotated := getSecret(cli, "role-dante-password")
+			Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
+				Equal(first.Data[corev1.BasicAuthPasswordKey]))
+
+			// The request is one-shot: acted on, then removed.
+			stored = getRole(cli, role)
+			Expect(stored.Annotations).NotTo(HaveKey(utils.RotatePasswordAnnotationName))
+
+			// Consuming the annotation must not cost the status written in the
+			// same loop: the condition is how the instance manager learns of
+			// the new password, and losing it would leave the rotated password
+			// in its Secret and never applied. The issue time is what the next
+			// deadline is computed from, so it must survive too.
+			Expect(stored.Status.Password).NotTo(BeNil())
+			Expect(stored.Status.Password.SecretName).To(Equal("role-dante-password"))
+			Expect(stored.Status.Password.IssuedAt).NotTo(BeEmpty())
+			cond := meta.FindStatusCondition(
+				stored.Status.Conditions,
+				string(apiv1.ConditionPasswordSecretChange),
+			)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Message).To(Equal(rotated.ResourceVersion))
+		})
+
+		It("rotates a password with no lifetime configured at all", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+			first := getSecret(cli, "role-dante-password")
+
+			stored := getRole(cli, role)
+			stored.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			Expect(cli.Update(ctx, stored)).To(Succeed())
+
+			_, err = r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			rotated := getSecret(cli, "role-dante-password")
+			Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
+				Equal(first.Data[corev1.BasicAuthPasswordKey]))
+			Expect(getRole(cli, role).Annotations).NotTo(HaveKey(utils.RotatePasswordAnnotationName))
+			// Nothing expires: the role asked for no lifetime, so the request
+			// must not invent a deadline for the password it just issued.
+			Expect(getRole(cli, role).Status.Password.Expiration).To(BeEmpty())
+		})
+
+		It("clears a request that has nothing to rotate", func() {
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal})
+			role.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			r, cli := buildReconciler(role, newCluster(false))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(getRole(cli, role).Annotations).NotTo(HaveKey(utils.RotatePasswordAnnotationName))
+		})
+
+		It("keeps a request generation is only temporarily blocked from honoring", func() {
+			// A replica cluster owns the password of its roles: the rotation
+			// cannot happen here, and the request must wait rather than be
+			// consumed without effect.
+			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
+			role.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+			r, cli := buildReconciler(role, newCluster(true))
+
+			_, err := r.Reconcile(ctx, requestFor(role))
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(getRole(cli, role).Annotations).To(HaveKey(utils.RotatePasswordAnnotationName))
+		})
+	})
+
+	It("regenerates the password once its Secret is deleted", func() {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
 			Mode:     apiv1.PasswordModeGenerate,
 			Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
@@ -955,9 +1103,6 @@ var _ = Describe("DatabaseRole password generation", func() {
 		Expect(err).NotTo(HaveOccurred())
 		first := getSecret(cli, "role-dante-password")
 
-		// There is no annotation to ask for a rotation any more: deleting the
-		// Secret the operator generated is the manual way to get a new password,
-		// since the next reconciliation finds it gone and regenerates it.
 		Expect(cli.Delete(ctx, first)).To(Succeed())
 
 		_, err = r.Reconcile(ctx, requestFor(role))
