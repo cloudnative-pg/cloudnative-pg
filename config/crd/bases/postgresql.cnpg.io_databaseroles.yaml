@@ -454,6 +454,14 @@ spec:
                       expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of
                       that. It is empty when rotation is not enabled.
                     type: string
+                  issuedAt:
+                    description: |-
+                      IssuedAt is the time the current generated password was issued, in RFC3339
+                      format. The expiration and the rotation deadline are derived from it and the
+                      role's current duration/renewBefore, so that a change to either takes effect
+                      on the next reconciliation instead of being trumped by a deadline computed
+                      under the previous settings.
+                    type: string
                   message:
                     description: |-
                       Message contains a human-readable explanation of the current password

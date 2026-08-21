@@ -97,9 +97,11 @@ func (r *DatabaseRole) IsPasswordGenerationEnabled() bool {
 	if r.Spec.Password == nil {
 		return false
 	}
-	return r.Spec.Password.Mode != PasswordModeSecret &&
-		r.Spec.Password.Mode != PasswordModeExternal &&
-		r.Spec.Password.Mode != PasswordModeClear
+	// Asked for positively, so that a mode added later has to opt into
+	// generation rather than fall into it by not being listed here. The empty
+	// mode is the default the API server fills in, which objects built in Go
+	// never go through.
+	return r.Spec.Password.Mode == "" || r.Spec.Password.Mode == PasswordModeGenerate
 }
 
 // IsPasswordExplicitlyCleared returns true if the password block asks the

@@ -1321,6 +1321,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `secretName` _string_ | SecretName is the name of the Secret the password was generated into. The<br />operator records it to recognize the Secret as its own once the role stops<br />generating a password, or starts generating it somewhere else, and delete<br />what it left behind. |  |  |  |
+| `issuedAt` _string_ | IssuedAt is the time the current generated password was issued, in RFC3339<br />format. The expiration and the rotation deadline are derived from it and the<br />role's current duration/renewBefore, so that a change to either takes effect<br />on the next reconciliation instead of being trumped by a deadline computed<br />under the previous settings. |  |  |  |
 | `expiration` _string_ | Expiration is the time at which the generated password is considered<br />expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of<br />that. It is empty when rotation is not enabled. |  |  |  |
 | `message` _string_ | Message contains a human-readable explanation of the current password<br />status, such as why generation was skipped or why an existing Secret was<br />left untouched. |  |  |  |
 

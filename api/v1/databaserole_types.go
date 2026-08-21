@@ -235,6 +235,14 @@ type GeneratedPasswordState struct {
 	// +optional
 	SecretName string `json:"secretName,omitempty"`
 
+	// IssuedAt is the time the current generated password was issued, in RFC3339
+	// format. The expiration and the rotation deadline are derived from it and the
+	// role's current duration/renewBefore, so that a change to either takes effect
+	// on the next reconciliation instead of being trumped by a deadline computed
+	// under the previous settings.
+	// +optional
+	IssuedAt string `json:"issuedAt,omitempty"`
+
 	// Expiration is the time at which the generated password is considered
 	// expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of
 	// that. It is empty when rotation is not enabled.

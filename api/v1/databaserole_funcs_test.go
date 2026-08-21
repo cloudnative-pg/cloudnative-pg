@@ -58,6 +58,12 @@ var _ = Describe("DatabaseRole password secret resolution", func() {
 		Expect(role.GetPasswordSecretName()).To(Equal("role-dante-password"))
 	})
 
+	It("does not enable generation for a mode outside the known ones", func() {
+		role := newRole()
+		role.Spec.Password = &PasswordConfiguration{Mode: "bogus"}
+		Expect(role.IsPasswordGenerationEnabled()).To(BeFalse())
+	})
+
 	It("honors an explicit secret name", func() {
 		role := newRole()
 		role.Spec.Password = &PasswordConfiguration{Secret: "dante-credentials"}
