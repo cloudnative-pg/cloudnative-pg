@@ -15,6 +15,12 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
     kind: ImageCatalog
