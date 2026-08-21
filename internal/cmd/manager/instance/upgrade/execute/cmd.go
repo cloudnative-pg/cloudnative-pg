@@ -632,17 +632,24 @@ func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 			"error", err.Error())
 	}
 
+	// Put the TARGET (new) extension paths FIRST. pg_upgrade drives both the old and new
+	// servers under a single LD_LIBRARY_PATH (it cannot be scoped per invoked server), and a
+	// newer dependency is an ABI-superset of the older within its soname (e.g. libgeos_c.so.1
+	// across the GEOS 3.x series), so preferring the newer copy satisfies both servers. With
+	// source-first ordering the older library shadowed the newer one, breaking the new
+	// server's extension load with "undefined symbol" during a major upgrade that also changes
+	// the extension version. See https://github.com/cloudnative-pg/cloudnative-pg/issues/11285.
 	libPaths := slices.Concat(
-		extensions.CollectLibraryPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
 		extensions.CollectLibraryPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
+		extensions.CollectLibraryPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
 	)
 	if len(libPaths) > 0 {
 		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], libPaths)
 	}
 
 	binPaths := slices.Concat(
-		extensions.CollectBinPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
 		extensions.CollectBinPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
+		extensions.CollectBinPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
 	)
 	if len(binPaths) > 0 {
 		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], binPaths)
