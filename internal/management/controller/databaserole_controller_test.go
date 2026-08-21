@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
@@ -111,6 +112,125 @@ func markDeleting(role *apiv1.DatabaseRole) {
 	role.Generation++
 }
 
+var _ = Describe("DatabaseRole roleConfigurationForPassword", func() {
+	It("leaves DisablePassword alone when the password is not set to NULL", func() {
+		role := newTestDatabaseRole()
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate}
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+
+		role.Spec.Password.Mode = apiv1.PasswordModeExternal
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+	})
+
+	It("sets DisablePassword when the password is set to NULL, without mutating the role", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeSetNull}
+
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeTrue())
+		// The role's own spec, which gets patched back to the API server, must
+		// not pick up a field the user never set.
+		Expect(role.Spec.RoleConfiguration.DisablePassword).To(BeFalse())
+	})
+
+	It("sets DisablePassword to revoke a generated password nothing can read any more", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
+		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
+
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeTrue())
+		Expect(role.Spec.RoleConfiguration.DisablePassword).To(BeFalse())
+	})
+
+	It("leaves the password alone once the revocation was acknowledged", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
+		role.Status.Password = &apiv1.GeneratedPasswordState{}
+
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+	})
+
+	It("does not revoke a password the role is about to read from a secret", func() {
+		// The status can still carry the revocation the operator recorded a
+		// moment ago, while the specification has already moved on to a mode
+		// that names a Secret: applying both would ask ApplyPassword to set and
+		// disable the password at once, which is an error.
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{
+			Mode:   apiv1.PasswordModeSecret,
+			Secret: "role-secret",
+		}
+		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
+
+		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+	})
+})
+
+var _ = Describe("DatabaseRole generatedPasswordValidUntil", func() {
+	rotatingRole := func(expiration string) *apiv1.DatabaseRole {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
+		}
+		role.Status.Password = &apiv1.GeneratedPasswordState{Expiration: expiration}
+		return role
+	}
+
+	It("has nothing to say about a role that does not generate a password", func() {
+		role := newTestDatabaseRole()
+		_, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+	})
+
+	It("has nothing to say about a generated password with no lifetime", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate}
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			Expiration: time.Now().UTC().Format(time.RFC3339),
+		}
+
+		// Without a duration the password never expires, so neither does the
+		// role: an expiration recorded from an earlier specification must not
+		// start expiring it.
+		_, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+	})
+
+	It("waits for an expiration to be recorded before expiring the role", func() {
+		role := rotatingRole("")
+		_, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+
+		role.Status.Password = nil
+		_, ok, err = generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+	})
+
+	It("follows the expiration of the generated password", func() {
+		expiration := time.Now().Add(90 * 24 * time.Hour).UTC().Truncate(time.Second)
+		role := rotatingRole(expiration.Format(time.RFC3339))
+
+		validUntil, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeTrue())
+		Expect(validUntil.Valid).To(BeTrue())
+		Expect(validUntil.Time).To(BeTemporally("==", expiration))
+	})
+
+	It("reports an expiration it cannot read instead of leaving the role unexpiring", func() {
+		role := rotatingRole("not-a-timestamp")
+		_, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).To(HaveOccurred())
+		Expect(ok).To(BeFalse())
+	})
+})
+
 var _ = Describe("DatabaseRole shouldDropRole", func() {
 	DescribeTable("decides whether a deleted role must be dropped",
 		func(policy apiv1.DatabaseRoleReclaimPolicy, reconciled bool,
@@ -159,6 +279,21 @@ var _ = Describe("DatabaseRole isAlreadyReconciled", func() {
 		Expect(r.isAlreadyReconciled(role)).To(BeFalse())
 	})
 
+	It("is false while a generated password is left to revoke", func() {
+		// The operator records the revocation after the role stopped generating
+		// a password, which can be after that same generation was applied:
+		// going by the generation alone would leave the password in place for
+		// good.
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
+		role.Status.ObservedGeneration = role.Generation
+		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
+		Expect(r.isAlreadyReconciled(role)).To(BeFalse())
+
+		role.Status.Password.PendingRevocation = false
+		Expect(r.isAlreadyReconciled(role)).To(BeTrue())
+	})
+
 	When("a password secret is configured", func() {
 		newRoleWithSecret := func() *apiv1.DatabaseRole {
 			role := newTestDatabaseRole()
@@ -189,6 +324,43 @@ var _ = Describe("DatabaseRole isAlreadyReconciled", func() {
 			role.Status.SecretResourceVersion = "rv-1"
 			Expect(r.isAlreadyReconciled(role)).To(BeFalse())
 		})
+
+		It("follows the operator-generated secret when there is no passwordSecret", func() {
+			role := newTestDatabaseRole()
+			role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate}
+			role.Status.ObservedGeneration = role.Generation
+			setObservedSecretVersion(role, "rv-2")
+			role.Status.SecretResourceVersion = "rv-1"
+			Expect(r.isAlreadyReconciled(role)).To(BeFalse())
+
+			role.Status.SecretResourceVersion = "rv-2"
+			Expect(r.isAlreadyReconciled(role)).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("DatabaseRole succeededReconciliation", func() {
+	It("acknowledges the revocation the apply it reports has just carried out", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
+		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(role).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			Build()
+		r := &DatabaseRoleReconciler{Client: fakeClient, instance: &fakeRoleInstance{}}
+
+		_, err := r.succeededReconciliation(context.Background(), role, "")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Without this the password would be set to NULL again on every loop,
+		// and the operator would never retire the record of the revocation.
+		var updated apiv1.DatabaseRole
+		Expect(fakeClient.Get(context.Background(), client.ObjectKeyFromObject(role), &updated)).To(Succeed())
+		Expect(updated.Status.Password).NotTo(BeNil())
+		Expect(updated.Status.Password.PendingRevocation).To(BeFalse())
+		Expect(updated.Status.Applied).To(HaveValue(BeTrue()))
 	})
 })
 

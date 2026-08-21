@@ -133,33 +133,45 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
 }
 
-// ApplyPassword updates a database role with the password located in the Secret,
-// and it returns the resource version of the Secret
+// ApplyPassword updates a database role with the password located in the given
+// Secret, and it returns the resource version of the Secret. The Secret is the
+// one the role refers to through `passwordSecret`, or the one the operator
+// generated for it.
 func (d *DatabaseRole) ApplyPassword(
 	ctx context.Context,
 	cl client.Client,
 	config *apiv1.RoleConfiguration,
+	secretName string,
 	namespace string,
 ) (string, error) {
 	switch {
-	case config.GetRoleSecretName() == "" && !config.DisablePassword:
+	case secretName == "" && !config.DisablePassword:
 		d.ignorePassword = true
 		return "", nil
-	case config.GetRoleSecretName() == "" && config.DisablePassword:
+	case secretName == "" && config.DisablePassword:
+		// Disabling the password is an instruction to set it, to NULL: it has
+		// to override the "leave the password alone" a role built from a
+		// configuration that did not disable it starts out with, the same way
+		// reading one from a Secret does below.
+		d.ignorePassword = false
 		d.password = sql.NullString{}
 		return "", nil
-	case config.GetRoleSecretName() != "" && config.DisablePassword:
+	case secretName != "" && config.DisablePassword:
 		// For DatabaseRole CRDs this is prevented by CEL validation.
 		// For inline managed roles this is a runtime error.
 		return "",
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
-				config.GetRoleSecretName())
+				secretName)
 	default:
-		passwordSecret, err := getPassword(ctx, cl, config, namespace)
+		passwordSecret, err := getPassword(ctx, cl, config.Name, secretName, namespace)
 		if err != nil {
 			return "", err
 		}
 
+		// A role built from a RoleConfiguration carrying no `passwordSecret`
+		// defaults to ignoring the password, which is what a generated password
+		// looks like: now that one has been read, it must be applied.
+		d.ignorePassword = false
 		d.password = sql.NullString{Valid: true, String: passwordSecret.password}
 		d.passwordPassthrough = passwordSecret.passthrough
 		return passwordSecret.version, nil

@@ -31,6 +31,14 @@ spec:
       jsonPath: .status.message
       name: Message
       type: string
+    - description: When the generated password expires
+      jsonPath: .status.password.expiration
+      name: Password Expiration
+      type: string
+    - description: When the generated client certificate expires
+      jsonPath: .status.clientCertificate.expiration
+      name: Certificate Expiration
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
@@ -160,6 +168,144 @@ spec:
               name:
                 description: Name of the role
                 type: string
+              password:
+                description: |-
+                  Password configures how the operator manages the password of this role,
+                  instead of requiring a pre-existing Secret through `passwordSecret` or
+                  disabling it through `disablePassword`. Mutually exclusive with both.
+                properties:
+                  criteria:
+                    description: |-
+                      Criteria constrains the generated password. Only meaningful when `mode`
+                      is `generate`.
+                    properties:
+                      allowRepeat:
+                        description: |-
+                          AllowRepeat allows the same character to appear more than once in the
+                          generated password.
+                        type: boolean
+                      digits:
+                        description: |-
+                          Digits is the number of digits in the generated password. Defaults to 25%
+                          of its length, and never to more than 10: unless `allowRepeat` is set, the
+                          generator cannot use the same digit twice.
+                        minimum: 0
+                        type: integer
+                      length:
+                        default: 24
+                        description: Length of the generated password.
+                        maximum: 1024
+                        minimum: 8
+                        type: integer
+                      noUpper:
+                        description: NoUpper disables uppercase characters in the
+                          generated password.
+                        type: boolean
+                      symbolCharacters:
+                        description: |-
+                          SymbolCharacters is the set of symbols the generated password can draw
+                          from. Defaults to the symbols of the generator (``~!@#$%^&*()_+`-={}|[]\:"<>?,./``).
+                          Only ASCII punctuation is accepted: a letter or a digit here would collide
+                          with the rest of the password when `allowRepeat` is not set, and whitespace
+                          would be trimmed away before the password is applied to the role.
+                        minLength: 1
+                        pattern: ^[\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$
+                        type: string
+                      symbols:
+                        description: |-
+                          Symbols is the number of symbol characters in the generated password.
+                          Defaults to 0.
+                        minimum: 0
+                        type: integer
+                    type: object
+                    x-kubernetes-validations:
+                    - message: the number of digits and symbols must not exceed the
+                        password length
+                      rule: '(has(self.digits) ? self.digits : (self.length / 4 >
+                        10 ? 10 : self.length / 4)) + (has(self.symbols) ? self.symbols
+                        : 0) <= self.length'
+                    - message: 'without allowRepeat the password cannot contain more
+                        letters than are available: 52, or 26 with noUpper. Shorten
+                        the length, or ask for more digits and symbols'
+                      rule: '(has(self.allowRepeat) && self.allowRepeat) || self.length
+                        - (has(self.digits) ? self.digits : (self.length / 4 > 10
+                        ? 10 : self.length / 4)) - (has(self.symbols) ? self.symbols
+                        : 0) <= ((has(self.noUpper) && self.noUpper) ? 26 : 52)'
+                    - message: without allowRepeat the password cannot contain more
+                        than 10 digits
+                      rule: (has(self.allowRepeat) && self.allowRepeat) || !has(self.digits)
+                        || self.digits <= 10
+                    - message: without allowRepeat the password cannot contain more
+                        symbols than the distinct characters of symbolCharacters (30
+                        by default)
+                      rule: '(has(self.allowRepeat) && self.allowRepeat) || !has(self.symbols)
+                        || self.symbols <= (has(self.symbolCharacters) ? size(self.symbolCharacters)
+                        : 30)'
+                  duration:
+                    description: |-
+                      Duration is the lifetime of the generated password, at least one minute:
+                      once it is reached, minus `renewBefore`, the operator generates a new
+                      password and applies it to the role. When unset, the password is generated
+                      once and never rotated. Only allowed when `mode` is `generate`, since
+                      nothing else here rotates a password.
+                    type: string
+                  mode:
+                    description: |-
+                      Mode governs how the operator manages the password of this role, and is
+                      required whenever the `password` stanza is present: `generate` generates
+                      and rotates a password kept in a Secret the operator owns; `secret`
+                      reads the password from an existing Secret named by `secret`, without
+                      generating or owning one; `external` stops managing it, deleting any
+                      Secret previously generated and setting the password it held to NULL,
+                      while leaving a password it never generated untouched; `setNull` sets the
+                      password of the role to NULL in PostgreSQL, disabling password
+                      authentication for it. It has no default: asking for a password without
+                      saying how it is managed is ambiguous, and defaulting it either way would
+                      silently pick a behavior as consequential as generating a credential or
+                      removing one. It cannot be removed once set either, for the same reason:
+                      the mode has to say what happens to the password from now on.
+                    enum:
+                    - generate
+                    - secret
+                    - external
+                    - setNull
+                    type: string
+                  renewBefore:
+                    description: |-
+                      RenewBefore is how long before the end of its lifetime the password is
+                      rotated. Only meaningful together with `duration`, and it must be at most
+                      half of it, so that the password is not due for rotation as soon as it is
+                      generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
+                      (7 days), capped at half of the lifetime. Only allowed when `mode` is
+                      `generate`, since nothing else here rotates a password.
+                    type: string
+                  secret:
+                    description: |-
+                      Secret is the name of the Secret holding the password of this role: the
+                      one the operator generates into and never overwrites if it does not own
+                      (when `mode` is `generate`, defaulting to `<databaserole-name>-password`),
+                      or an existing one to read the password from, required and never written
+                      to (when `mode` is `secret`). Only meaningful in those two modes.
+                    type: string
+                required:
+                - mode
+                type: object
+                x-kubernetes-validations:
+                - message: renewBefore requires duration, and must be at most half
+                    of it
+                  rule: '!has(self.renewBefore) || (has(self.duration) && duration(self.renewBefore).getSeconds()
+                    * 2 <= duration(self.duration).getSeconds())'
+                - message: duration must be at least 1m
+                  rule: '!has(self.duration) || duration(self.duration) >= duration(''1m'')'
+                - message: secret is required when mode is secret
+                  rule: self.mode != 'secret' || has(self.secret)
+                - message: secret is only meaningful when mode is generate or secret
+                  rule: self.mode == 'generate' || self.mode == 'secret' || !has(self.secret)
+                - message: criteria is only meaningful when mode is generate
+                  rule: self.mode == 'generate' || !has(self.criteria)
+                - message: duration and renewBefore are only meaningful when mode
+                    is generate
+                  rule: self.mode == 'generate' || (!has(self.duration) && !has(self.renewBefore))
               passwordSecret:
                 description: |-
                   Secret containing the password of the role (if present).
@@ -221,6 +367,18 @@ spec:
             - message: clientCertificate requires the role to have login enabled
               rule: '!has(self.clientCertificate) || !self.clientCertificate.enabled
                 || self.login'
+            - message: password and passwordSecret are mutually exclusive
+              rule: '!has(self.password) || !has(self.passwordSecret)'
+            - message: password and disablePassword are mutually exclusive
+              rule: '!has(self.password) || !has(self.disablePassword) || !self.disablePassword'
+            - message: 'validUntil cannot be set when the operator generates a password
+                with a duration: the expiration of the generated password is what
+                the role is valid until'
+              rule: '!has(self.validUntil) || !has(self.password) || self.password.mode
+                != ''generate'' || !has(self.password.duration)'
+            - message: 'password cannot be removed once set: pick the mode that describes
+                how the password is managed now, such as external'
+              rule: '!has(oldSelf.password) || has(self.password)'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up
@@ -311,6 +469,48 @@ spec:
                   desired state that was synchronized
                 format: int64
                 type: integer
+              password:
+                description: |-
+                  Password holds the observed state of the generated password, when password
+                  generation is enabled.
+                properties:
+                  expiration:
+                    description: |-
+                      Expiration is the time at which the generated password is considered
+                      expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of
+                      that. It is empty when rotation is not enabled.
+                    type: string
+                  issuedAt:
+                    description: |-
+                      IssuedAt is the time the current generated password was issued, in RFC3339
+                      format. The expiration and the rotation deadline are derived from it and the
+                      role's current duration/renewBefore, so that a change to either takes effect
+                      on the next reconciliation instead of being trumped by a deadline computed
+                      under the previous settings.
+                    type: string
+                  message:
+                    description: |-
+                      Message contains a human-readable explanation of the current password
+                      status, such as why generation was skipped or why an existing Secret was
+                      left untouched.
+                    type: string
+                  pendingRevocation:
+                    description: |-
+                      PendingRevocation is set by the operator when it deleted the Secret
+                      holding a password it had generated, and the role stopped managing the
+                      password instead of replacing it: the password is still set on the role
+                      in PostgreSQL and nothing can read it any more, so it has to be set to
+                      NULL. The instance manager clears it once it has done so, and that is
+                      the only field of this stanza it writes.
+                    type: boolean
+                  secretName:
+                    description: |-
+                      SecretName is the name of the Secret the password was generated into. The
+                      operator records it to recognize the Secret as its own once the role stops
+                      generating a password, or starts generating it somewhere else, and delete
+                      what it left behind.
+                    type: string
+                type: object
               secretResourceVersion:
                 description: |-
                   SecretResourceVersion is the resource version of the password secret

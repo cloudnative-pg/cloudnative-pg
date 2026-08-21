@@ -11,6 +11,7 @@ AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
 AllNamespaces
+AllowRepeat
 Anand
 AntiAffinity
 AppArmor
@@ -212,6 +213,7 @@ GUCs
 GabriFedi
 Gabriele
 GaugeVec
+GeneratedPasswordState
 GeoSpatial
 Gi
 GitOps
@@ -251,6 +253,7 @@ InstanceID
 InstanceReportedState
 IsolationCheckConfiguration
 Isovalent
+IssuedAt
 Istio
 Istio's
 JSON
@@ -319,6 +322,7 @@ Namespaces
 Nenciarini
 NetworkPolicies
 NetworkPolicy
+NoUpper
 NodeAffinity
 NodeFailureDomainKeys
 NodeMaintenanceWindow
@@ -362,9 +366,17 @@ PSA
 PV
 PVCs
 PascalBourdier
+PasswordConfiguration
+PasswordCriteria
+PasswordMode
+PasswordModeExternal
+PasswordModeGenerate
+PasswordModeSecret
+PasswordModeSetNull
 PasswordState
 PasswordStatus
 Patroni
+PendingRevocation
 Percona
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
@@ -458,6 +470,7 @@ RUNTIME
 ReadWriteOnce
 RedHat
 RelabelConfig
+RenewBefore
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationSlotsConfiguration
@@ -556,6 +569,7 @@ SubscriptionStatus
 SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
+SymbolCharacters
 SyncReplicaElectionConstraints
 SyncReplicationTopologySatisfied
 SynchronizeReplicas
@@ -987,6 +1001,7 @@ gce
 gcp
 gcs
 gcsCredentials
+generatedpasswordstate
 geocoder
 ghcr
 github
@@ -1253,6 +1268,9 @@ passwd
 passwordSecret
 passwordState
 passwordStatus
+passwordconfiguration
+passwordcriteria
+passwordmode
 passwordstate
 pc
 pchovelon
@@ -1421,6 +1439,7 @@ rehydrated
 rehydration
 relabelings
 relatime
+renewBefore
 replicaclusterconfiguration
 replicationSecretVersion
 replicationSlots
@@ -1511,6 +1530,8 @@ serviceselectortype
 servicetemplatespec
 serviceupdatestrategy
 sessionToken
+setNull
+setnull
 sha
 sharifmshaker
 sharma
