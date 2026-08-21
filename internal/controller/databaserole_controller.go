@@ -51,9 +51,10 @@ type DatabaseRoleReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// clientCertReconcileInterval is the requeue period for roles with client
-// certificate issuance enabled, ensuring the certificate is renewed before
-// expiry even in the absence of a triggering event.
+// clientCertReconcileInterval is the longest a role with client certificate
+// issuance enabled goes unchecked, ensuring the certificate is renewed before
+// expiry even in the absence of a triggering event. A role whose renewal window
+// is shorter than this is checked more often, see clientCertRequeueAfter.
 const clientCertReconcileInterval = time.Hour
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles,verbs=get;list;watch;create;update;patch;delete
@@ -96,7 +97,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if role.IsClientCertificateEnabled() {
-		return ctrl.Result{RequeueAfter: clientCertReconcileInterval}, nil
+		return ctrl.Result{RequeueAfter: clientCertRequeueAfter(&role)}, nil
 	}
 	return ctrl.Result{}, nil
 }

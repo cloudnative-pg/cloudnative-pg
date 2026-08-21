@@ -223,12 +223,18 @@ spec:
   login: true
   clientCertificate:
     enabled: true
+    duration: 2160h
+    renewBefore: 168h
   databaseRoleReclaimPolicy: retain
 ```
 
 `clientCertificate.enabled` defaults to `true` when the block is present, so
 `clientCertificate: {}` is equivalent to enabling it. Set `enabled: false` to
 turn issuance off while keeping the block in place.
+
+`duration` and `renewBefore` are optional and let a role opt out of the
+operator-wide certificate policy; see [Renewal](#renewal) below for their
+defaults and how they interact.
 
 :::important
 `login: true` is required when `clientCertificate` issuance is enabled. The
@@ -254,6 +260,12 @@ status:
     expiration: "2026-07-01T12:00:00Z"
 ```
 
+`kubectl get databaserole` reports the same value in its `Cert Expiration`
+column. When no certificate could be issued, that field stays empty and the
+reason is in `status.clientCertificate.message`: a cluster that does not exist,
+a client CA Secret that does not exist yet, a CA without a private key, or a
+Secret of the same name that the operator does not own.
+
 #### Configuring `pg_hba.conf`
 
 The operator generates the certificate but does **not** modify `pg_hba.conf`
@@ -275,19 +287,79 @@ psql "host=<cluster>-rw.<namespace>.svc port=5432 dbname=<db> user=dante \
   sslrootcert=/path/to/ca.crt sslmode=verify-full"
 ```
 
+`tls.crt` and `tls.key` are the two keys of the role's `<databaserole-name>-client-cert`
+Secret. `ca.crt` is not: `sslmode=verify-full` makes the client verify the
+*server* certificate, so that file is the `ca.crt` key of the cluster's server
+CA Secret, `<cluster>-ca`.
+
 #### Renewal
 
-Client certificates inherit the operator's global certificate settings: they
-are issued with a **90-day** lifetime by default and renewed automatically once
-they fall within **7 days** of expiry. Both values are operator-wide and
-configurable via the `CERTIFICATE_DURATION` and `EXPIRING_CHECK_THRESHOLD`
-operator settings; they are not configurable per `DatabaseRole`.
+By default, client certificates inherit the operator's global certificate
+settings: a **90-day** lifetime, renewed automatically once they fall within
+**7 days** of expiry. These defaults are controlled by the operator-wide
+`CERTIFICATE_DURATION` and `EXPIRING_CHECK_THRESHOLD` settings.
+
+A role can override both on a per-`DatabaseRole` basis:
+
+```yaml
+clientCertificate:
+  enabled: true
+  duration: 2160h    # lifetime; defaults to CERTIFICATE_DURATION
+  renewBefore: 168h  # renewal lead time; defaults to EXPIRING_CHECK_THRESHOLD
+```
+
+Both fields take Go duration units, so a day has to be written as hours: `90d`
+is not a valid value, `2160h` is.
+
+`renewBefore` is only meaningful together with `duration`, and it must be at
+most half of it. A `renewBefore` alone is rejected because the API server has no
+way to read the operator-wide `CERTIFICATE_DURATION`, so it cannot check the
+half-lifetime bound; set `duration` explicitly, even to the same value as the
+operator-wide default, to go along with it. When `duration` is set but
+`renewBefore` is not, the effective renewal lead time is the operator's default
+threshold, subject to that same half-lifetime cap. The cap exists because
+certificates are backdated to tolerate clock skew (see below), which makes the
+usable life slightly shorter than the requested `duration`: a renewal window
+allowed to cover most of the lifetime would leave every freshly issued
+certificate already due for renewal, and the operator would re-issue it on
+every reconcile.
+
+`duration` must be at least 1 minute and `renewBefore` at least 30 seconds. The
+API server rejects shorter values through the validation rules carried by the
+CRD, so the request never reaches the operator.
+
+Changing `duration` on an existing role re-issues its certificate on the next
+reconcile to match the new lifetime, and re-issuing generates a new private
+key along with the new certificate. The same applies to the operator-wide
+`CERTIFICATE_DURATION`: changing it re-issues the certificate of every role
+that does not set its own `duration`.
+
+:::important
+Every renewal replaces both `tls.crt` and `tls.key` in the Secret. The Secret
+only ever holds one key pair, so there is no window in which the old and the new
+certificate are both usable. Sessions that are already established are not
+affected, but every new connection has to use the new files, and a client that
+reads them once at startup (as connection pools and most drivers do) keeps
+presenting the old ones until it restarts or reloads them: authentication then
+starts failing as soon as the old certificate expires. Keep `duration` no
+shorter than the interval at which your clients reload their credentials, and
+bear in mind that a Secret projected into a pod is itself refreshed on the
+schedule the kubelet uses, not instantly.
+:::
 
 Renewal is driven by the reconcile loop: the operator checks whether the
-certificate is approaching expiry and re-signs it if needed. Reconciles are
-scheduled at least once per hour when `clientCertificate` issuance is enabled,
-so renewal happens well before expiry even without a triggering event. The
-current expiration is always reflected in `status.clientCertificate.expiration`.
+certificate is approaching expiry and re-signs it if needed. A role with
+`clientCertificate` issuance enabled is checked twice per renewal window, and
+at least once per hour, so renewal happens well before expiry even without a
+triggering event. A role using the default 90-day lifetime is therefore checked
+hourly, while one with a short `duration` is checked as often as its own
+renewal window requires. The current expiration is always reflected in
+`status.clientCertificate.expiration`.
+
+Certificates are backdated slightly to tolerate clock skew between the operator
+and whoever verifies them. That allowance is a tenth of the lifetime, up to a
+maximum of five minutes, so a short-lived certificate is not spent before it is
+ever used.
 
 #### Deletion and opt-out
 
