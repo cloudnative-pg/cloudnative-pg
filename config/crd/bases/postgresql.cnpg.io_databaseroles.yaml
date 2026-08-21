@@ -363,6 +363,11 @@ spec:
               rule: '!has(self.password) || !has(self.passwordSecret)'
             - message: password and disablePassword are mutually exclusive
               rule: '!has(self.password) || !has(self.disablePassword) || !self.disablePassword'
+            - message: 'validUntil cannot be set when the operator generates a password
+                with a duration: the expiration of the generated password is what
+                the role is valid until'
+              rule: '!has(self.validUntil) || !has(self.password) || self.password.mode
+                != ''generate'' || !has(self.password.duration)'
             - message: 'password cannot be removed once set: pick the mode that describes
                 how the password is managed now, such as external'
               rule: '!has(oldSelf.password) || has(self.password)'

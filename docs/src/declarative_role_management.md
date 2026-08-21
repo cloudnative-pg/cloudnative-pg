@@ -729,6 +729,31 @@ never expires, mirroring the behavior of PostgreSQL. Specifically:
   UNTIL` was not set to `NULL` in the database (this is due to PostgreSQL not
   allowing `VALID UNTIL NULL` in the `ALTER ROLE` SQL statement)
 
+#### Generated passwords with a lifetime
+
+A `DatabaseRole` that has the operator
+[generate its password](#generating-passwords) with a `duration` owns the
+expiry of the role: `VALID UNTIL` follows the expiration of the generated
+password, so PostgreSQL stops accepting that password at the same moment the
+operator considers it expired. `validUntil` cannot be set on such a role —
+there would be two competing answers to when the password stops working — and
+is rejected at admission.
+
+This makes the lifetime a real deadline rather than a convention. The operator
+rotates the password `renewBefore` ahead of it, so under normal operation the
+password is replaced before `VALID UNTIL` is ever reached.
+
+:::warning
+Because `VALID UNTIL` is a hard deadline in PostgreSQL, a rotation that does
+not happen costs the role its access: if generation is blocked for longer than
+`renewBefore` — an unsatisfiable `criteria`, a Secret the operator does not
+own, a demotion to a
+[replica cluster](#replica-clusters), or an operator that is
+down — the password expires and the role can no longer authenticate with it.
+Watch `status.password` and pick a `renewBefore` that leaves room to notice
+and fix a stalled rotation.
+:::
+
 ### Pre-hashed passwords
 
 You can also provide pre-encrypted passwords by specifying the password
