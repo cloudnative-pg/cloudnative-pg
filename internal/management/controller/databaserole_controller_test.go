@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
@@ -163,6 +164,70 @@ var _ = Describe("DatabaseRole roleConfigurationForPassword", func() {
 		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
 
 		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+	})
+})
+
+var _ = Describe("DatabaseRole generatedPasswordValidUntil", func() {
+	rotatingRole := func(expiration string) *apiv1.DatabaseRole {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
+		}
+		role.Status.Password = &apiv1.GeneratedPasswordState{Expiration: expiration}
+		return role
+	}
+
+	It("has nothing to say about a role that does not generate a password", func() {
+		role := newTestDatabaseRole()
+		_, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+	})
+
+	It("has nothing to say about a generated password with no lifetime", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate}
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			Expiration: time.Now().UTC().Format(time.RFC3339),
+		}
+
+		// Without a duration the password never expires, so neither does the
+		// role: an expiration recorded from an earlier specification must not
+		// start expiring it.
+		_, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+	})
+
+	It("waits for an expiration to be recorded before expiring the role", func() {
+		role := rotatingRole("")
+		_, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+
+		role.Status.Password = nil
+		_, ok, err = generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+	})
+
+	It("follows the expiration of the generated password", func() {
+		expiration := time.Now().Add(90 * 24 * time.Hour).UTC().Truncate(time.Second)
+		role := rotatingRole(expiration.Format(time.RFC3339))
+
+		validUntil, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeTrue())
+		Expect(validUntil.Valid).To(BeTrue())
+		Expect(validUntil.Time).To(BeTemporally("==", expiration))
+	})
+
+	It("reports an expiration it cannot read instead of leaving the role unexpiring", func() {
+		role := rotatingRole("not-a-timestamp")
+		_, ok, err := generatedPasswordValidUntil(role)
+		Expect(err).To(HaveOccurred())
+		Expect(ok).To(BeFalse())
 	})
 })
 
