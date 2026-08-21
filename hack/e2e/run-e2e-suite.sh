@@ -90,7 +90,8 @@ else
     *)
       # Reserve ~25% of the available cores for the control plane and system
       # pods, and use the rest as ginkgo workers.
-      AVAILABLE_CORES=$(nproc)
+      # nproc is Linux-only; getconf _NPROCESSORS_ONLN works on both Linux and macOS.
+      AVAILABLE_CORES=$(getconf _NPROCESSORS_ONLN)
       RESERVED_CORES=$(( (AVAILABLE_CORES + 3) / 4 ))
       GINKGO_NODES=$(( AVAILABLE_CORES - RESERVED_CORES ))
       if [ "${GINKGO_NODES}" -lt 1 ]; then
