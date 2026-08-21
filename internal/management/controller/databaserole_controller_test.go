@@ -189,6 +189,18 @@ var _ = Describe("DatabaseRole isAlreadyReconciled", func() {
 			role.Status.SecretResourceVersion = "rv-1"
 			Expect(r.isAlreadyReconciled(role)).To(BeFalse())
 		})
+
+		It("follows the operator-generated secret when there is no passwordSecret", func() {
+			role := newTestDatabaseRole()
+			role.Spec.Password = &apiv1.PasswordConfiguration{}
+			role.Status.ObservedGeneration = role.Generation
+			setObservedSecretVersion(role, "rv-2")
+			role.Status.SecretResourceVersion = "rv-1"
+			Expect(r.isAlreadyReconciled(role)).To(BeFalse())
+
+			role.Status.SecretResourceVersion = "rv-2"
+			Expect(r.isAlreadyReconciled(role)).To(BeTrue())
+		})
 	})
 })
 

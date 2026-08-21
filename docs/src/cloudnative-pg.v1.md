@@ -997,6 +997,7 @@ _Appears in:_
 | `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
 | `databaseRoleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
 | `clientCertificate` _[ClientCertificateConfiguration](#clientcertificateconfiguration)_ | ClientCertificate configures the operator to generate and renew a TLS client<br />certificate for this role, signed by the cluster's client CA. The certificate<br />is stored in a Secret named `<databaserole-name>-client-cert`.<br />Requires login to be true. |  |  |  |
+| `password` _[PasswordConfiguration](#passwordconfiguration)_ | Password configures the operator to generate the password of this role and<br />store it in a Secret, instead of requiring a pre-existing one through<br />`passwordSecret`. Mutually exclusive with `passwordSecret`. |  |  |  |
 
 
 #### DatabaseRoleStatus
@@ -1018,6 +1019,7 @@ _Appears in:_
 | `message` _string_ | Message is the reconciliation error message |  |  |  |
 | `secretResourceVersion` _string_ | SecretResourceVersion is the resource version of the password secret<br />last applied to the role; a change to it triggers reconciliation. |  |  |  |
 | `clientCertificate` _[ClientCertificateState](#clientcertificatestate)_ | ClientCertificate holds the observed state of the generated TLS client<br />certificate, when client certificate issuance is enabled. |  |  |  |
+| `password` _[GeneratedPasswordState](#generatedpasswordstate)_ | Password holds the observed state of the generated password, when password<br />generation is enabled. |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for the DatabaseRole object |  |  |  |
 
 
@@ -1302,6 +1304,25 @@ _Appears in:_
 | `standbyNames` _string array_ | StandbyNames is the list of potentially synchronous<br />instance names. |  |  |  |
 | `standbyNumber` _integer_ | StandbyNumber is the number of synchronous standbys that transactions<br />need to wait for replies from. |  |  |  |
 | `primary` _string_ | Primary is the name of the primary instance that updated<br />this object the latest time. |  |  |  |
+
+
+#### GeneratedPasswordState
+
+
+
+GeneratedPasswordState holds the observed state of the generated password.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleStatus](#databaserolestatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `secretName` _string_ | SecretName is the name of the Secret the password was generated into. The<br />operator records it to recognize the Secret as its own once the role stops<br />generating a password, or starts generating it somewhere else, and delete<br />what it left behind. |  |  |  |
+| `expiration` _string_ | Expiration is the time at which the generated password is considered<br />expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of<br />that. It is empty when rotation is not enabled. |  |  |  |
+| `message` _string_ | Message contains a human-readable explanation of the current password<br />status, such as why generation was skipped or why an existing Secret was<br />left untouched. |  |  |  |
 
 
 
@@ -1800,6 +1821,55 @@ _Appears in:_
 | `name` _string_ | Name of the option | True |  |  |
 | `value` _string_ | Value of the option | True |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Specifies whether an option should be present or absent in<br />the database. If set to `present`, the option will be<br />created if it does not exist. If set to `absent`, the<br />option will be removed if it exists. |  | present | Enum: [present absent] <br /> |
+
+
+#### PasswordConfiguration
+
+
+
+PasswordConfiguration configures operator-managed generation of the password
+of a DatabaseRole.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleSpec](#databaserolespec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `enabled` _boolean_ | Enabled turns on password generation for this role. Defaults to true when<br />the block is present. |  | true |  |
+| `secret` _string_ | Secret is the name of the Secret where the generated password is stored.<br />Defaults to `<databaserole-name>-password`. The operator never overwrites<br />a Secret it does not own. |  |  |  |
+| `duration` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | Duration is the lifetime of the generated password, at least one minute:<br />once it is reached, minus `renewBefore`, the operator generates a new<br />password and applies it to the role. When unset, the password is generated<br />once and never rotated. |  |  |  |
+| `renewBefore` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RenewBefore is how long before the end of its lifetime the password is<br />rotated. Only meaningful together with `duration`, and it must be at most<br />half of it, so that the password is not due for rotation as soon as it is<br />generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting<br />(7 days), capped at half of the lifetime. |  |  |  |
+| `criteria` _[PasswordCriteria](#passwordcriteria)_ | Criteria constrains the generated password. |  |  |  |
+
+
+#### PasswordCriteria
+
+
+
+PasswordCriteria describes the shape of a generated password.
+
+Unless `allowRepeat` is set, every character of the password is drawn from a
+different one of the 52 letters, 10 digits and (by default) 30 symbols the
+generator knows: criteria asking for more than are available can never be
+satisfied, and are rejected here rather than failing at generation time.
+
+
+
+_Appears in:_
+
+- [PasswordConfiguration](#passwordconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `length` _integer_ | Length of the generated password. |  | 24 | Maximum: 1024 <br />Minimum: 8 <br /> |
+| `digits` _integer_ | Digits is the number of digits in the generated password. Defaults to 25%<br />of its length, and never to more than 10: unless `allowRepeat` is set, the<br />generator cannot use the same digit twice. |  |  | Minimum: 0 <br /> |
+| `symbols` _integer_ | Symbols is the number of symbol characters in the generated password.<br />Defaults to 0. |  |  | Minimum: 0 <br /> |
+| `symbolCharacters` _string_ | SymbolCharacters is the set of symbols the generated password can draw<br />from. Defaults to the symbols of the generator (``~!@#$%^&*()_+-=\{\}\|[]\:"<>?,./``).<br />Only ASCII punctuation is accepted: a letter or a digit here would collide<br />with the rest of the password when `allowRepeat` is not set, and whitespace<br />would be trimmed away before the password is applied to the role. |  |  | MinLength: 1 <br />Pattern: `^[\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$` <br /> |
+| `noUpper` _boolean_ | NoUpper disables uppercase characters in the generated password. |  |  |  |
+| `allowRepeat` _boolean_ | AllowRepeat allows the same character to appear more than once in the<br />generated password. |  |  |  |
 
 
 #### PasswordState

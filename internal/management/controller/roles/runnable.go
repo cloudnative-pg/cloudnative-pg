@@ -303,7 +303,7 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 ) (apiv1.PasswordState, error) {
 	databaseRole := role.toDatabaseRole()
 	passVersion, err := databaseRole.ApplyPassword(ctx, sr.client,
-		&role.RoleConfiguration, sr.instance.GetNamespaceName())
+		&role.RoleConfiguration, role.GetRoleSecretName(), sr.instance.GetNamespaceName())
 	if err != nil {
 		return apiv1.PasswordState{}, err
 	}
@@ -342,10 +342,10 @@ type passwordSecret struct {
 func getPassword(
 	ctx context.Context,
 	cl client.Client,
-	config *apiv1.RoleConfiguration,
+	roleName string,
+	secretName string,
 	namespace string,
 ) (passwordSecret, error) {
-	secretName := config.GetRoleSecretName()
 	// no secrets defined, will keep the role password nil
 	if secretName == "" {
 		return passwordSecret{}, nil
@@ -363,9 +363,9 @@ func getPassword(
 	if err != nil {
 		return passwordSecret{}, err
 	}
-	if strings.TrimSpace(config.Name) != strings.TrimSpace(usernameFromSecret) {
+	if strings.TrimSpace(roleName) != strings.TrimSpace(usernameFromSecret) {
 		return passwordSecret{},
-			fmt.Errorf("the username in secret %q does not match role %q", secretName, config.Name)
+			fmt.Errorf("the username in secret %q does not match role %q", secretName, roleName)
 	}
 	return passwordSecret{
 			username:    strings.TrimSpace(usernameFromSecret),
@@ -392,7 +392,7 @@ func getPasswordSecretResourceVersion(
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
-		passwordSecret, err := getPassword(ctx, cl, &role, namespace)
+		passwordSecret, err := getPassword(ctx, cl, role.Name, role.GetRoleSecretName(), namespace)
 		if err != nil {
 			contextLog.Debug("could not fetch password secret for role; will be flagged for reconciliation",
 				"role", role.Name, "secret", role.PasswordSecret.Name, "err", err.Error())
