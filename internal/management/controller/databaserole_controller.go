@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/jackc/pgx/v5/pgtype"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -209,6 +210,34 @@ func roleConfigurationForPassword(role *apiv1.DatabaseRole) apiv1.RoleConfigurat
 		roleConfig.DisablePassword = true
 	}
 	return roleConfig
+}
+
+// generatedPasswordValidUntil returns the VALID UNTIL a role whose password the
+// operator generates with a lifetime must carry: the expiration of that
+// password. PostgreSQL then stops accepting the password at the moment the
+// operator considers it expired, so a rotation that never happens costs the
+// role its access instead of leaving a credential valid forever. `validUntil`
+// cannot be set on such a role, so nothing of the user's is overwritten here.
+//
+// The second return value is false when the role does not generate a password
+// with a lifetime, or when the operator has not recorded an expiration for it
+// yet: the role is then left with whatever VALID UNTIL its specification asks
+// for, until an expiration is known.
+func generatedPasswordValidUntil(role *apiv1.DatabaseRole) (pgtype.Timestamp, bool, error) {
+	if !role.IsPasswordRotationEnabled() {
+		return pgtype.Timestamp{}, false, nil
+	}
+	if role.Status.Password == nil || role.Status.Password.Expiration == "" {
+		return pgtype.Timestamp{}, false, nil
+	}
+
+	expiration, err := time.Parse(time.RFC3339, role.Status.Password.Expiration)
+	if err != nil {
+		return pgtype.Timestamp{}, false, fmt.Errorf(
+			"while reading the expiration of the generated password of role %q: %w", role.Spec.Name, err)
+	}
+
+	return pgtype.Timestamp{Valid: true, Time: expiration}, true, nil
 }
 
 func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(
@@ -577,6 +606,16 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	// VALID UNTIL 'infinity' (PostgreSQL cannot restore a NULL ValidUntil).
 	validUntilNullIsInfinity := existingDBRole != nil && existingDBRole.ValidUntil.Valid
 	dbRole := roles.DatabaseRoleFromConfiguration(role.Spec.RoleConfiguration, validUntilNullIsInfinity)
+
+	// A generated password with a lifetime owns the expiry of the role: PostgreSQL
+	// must stop accepting it when the operator considers it expired.
+	validUntil, ok, err := generatedPasswordValidUntil(role)
+	if err != nil {
+		return "", err
+	}
+	if ok {
+		dbRole.ValidUntil = validUntil
+	}
 
 	roleConfig := roleConfigurationForPassword(role)
 	passwordVersion, err := dbRole.ApplyPassword(
