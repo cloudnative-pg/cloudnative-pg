@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,7 +50,8 @@ import (
 // DatabaseRoleReconciler reconciles a DatabaseRole object
 type DatabaseRoleReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // roleSecretReconcileInterval is the requeue period for roles whose client
@@ -77,6 +79,7 @@ const roleStatusPatchTimeout = 5 * time.Second
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/finalizers,verbs=update
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile implements the main reconciliation loop for Role objects
 func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -115,6 +118,15 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
+	// A password the operator will not generate, or a Secret it will not touch,
+	// is otherwise recorded only in a nested status field, which nothing shows
+	// by default: an event puts the reason in `kubectl describe`. It is emitted
+	// on a change of the explanation, not on every loop, so a condition that
+	// lasts does not fill the event stream with copies of itself.
+	if message := passwordMessage(&role); message != "" && message != passwordMessage(origRole) {
+		r.Recorder.Event(&role, "Warning", "PasswordGenerationSkipped", message)
+	}
+
 	if err := r.reconcilePasswordCondition(ctx, &role); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -124,6 +136,12 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// password has just been rotated, and dropping it would leave the new
 	// password in its Secret and never applied to PostgreSQL.
 	certErr := r.reconcileClientCertificate(ctx, &role, cluster)
+
+	// A certificate the operator will not issue is recorded the same way, and
+	// for the same reason, as a password it will not generate.
+	if message := certificateMessage(&role); message != "" && message != certificateMessage(origRole) {
+		r.Recorder.Event(&role, "Warning", "ClientCertificateIssuanceSkipped", message)
+	}
 
 	// A manual password rotation request is consumed by removing the
 	// annotation that asked for it once reconcilePassword has acted on it.

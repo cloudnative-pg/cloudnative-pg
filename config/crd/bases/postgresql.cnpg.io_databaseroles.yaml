@@ -31,6 +31,14 @@ spec:
       jsonPath: .status.message
       name: Message
       type: string
+    - description: When the generated password expires
+      jsonPath: .status.password.expiration
+      name: Password Expiration
+      type: string
+    - description: When the generated client certificate expires
+      jsonPath: .status.clientCertificate.expiration
+      name: Certificate Expiration
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
@@ -196,7 +204,7 @@ spec:
                       symbolCharacters:
                         description: |-
                           SymbolCharacters is the set of symbols the generated password can draw
-                          from. Defaults to the symbols of the generator (``~!@#$%^&*()_+-={}|[]\:"<>?,./``).
+                          from. Defaults to the symbols of the generator (``~!@#$%^&*()_+`-={}|[]\:"<>?,./``).
                           Only ASCII punctuation is accepted: a letter or a digit here would collide
                           with the rest of the password when `allowRepeat` is not set, and whitespace
                           would be trimmed away before the password is applied to the role.

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,7 +53,7 @@ var _ = Describe("DatabaseRole operator-side controller", func() {
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			WithObjects(objs...).
 			Build()
-		return &DatabaseRoleReconciler{Client: cli, Scheme: scheme}, cli
+		return &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}, cli
 	}
 
 	newRole := func(name, secretName string) *apiv1.DatabaseRole {
@@ -261,7 +262,7 @@ var _ = Describe("DatabaseRole status patch retry", func() {
 			WithObjects(role).
 			WithInterceptorFuncs(funcs).
 			Build()
-		return &DatabaseRoleReconciler{Client: cli, Scheme: scheme}, cli
+		return &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}, cli
 	}
 
 	It("keeps trying until the patch lands", func() {
@@ -364,7 +365,7 @@ var _ = Describe("DatabaseRole status patch condition ownership", func() {
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			WithObjects(stored).
 			Build()
-		r := &DatabaseRoleReconciler{Client: cli, Scheme: scheme}
+		r := &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}
 
 		role := stored.DeepCopy()
 		role.Status.Conditions = nil
