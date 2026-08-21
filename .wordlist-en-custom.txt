@@ -11,6 +11,7 @@ AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
 AllNamespaces
+AllowRepeat
 Anand
 AntiAffinity
 AppArmor
@@ -212,6 +213,7 @@ GUCs
 GabriFedi
 Gabriele
 GaugeVec
+GeneratedPasswordState
 GeoSpatial
 Gi
 GitOps
@@ -319,6 +321,7 @@ Namespaces
 Nenciarini
 NetworkPolicies
 NetworkPolicy
+NoUpper
 NodeAffinity
 NodeFailureDomainKeys
 NodeMaintenanceWindow
@@ -362,6 +365,8 @@ PSA
 PV
 PVCs
 PascalBourdier
+PasswordConfiguration
+PasswordCriteria
 PasswordState
 PasswordStatus
 Patroni
@@ -458,6 +463,7 @@ RUNTIME
 ReadWriteOnce
 RedHat
 RelabelConfig
+RenewBefore
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationSlotsConfiguration
@@ -556,6 +562,7 @@ SubscriptionStatus
 SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
+SymbolCharacters
 SyncReplicaElectionConstraints
 SyncReplicationTopologySatisfied
 SynchronizeReplicas
@@ -987,6 +994,7 @@ gce
 gcp
 gcs
 gcsCredentials
+generatedpasswordstate
 geocoder
 ghcr
 github
@@ -1253,6 +1261,8 @@ passwd
 passwordSecret
 passwordState
 passwordStatus
+passwordconfiguration
+passwordcriteria
 passwordstate
 pc
 pchovelon
