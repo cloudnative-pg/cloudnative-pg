@@ -23,6 +23,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,7 +62,7 @@ func (r *ClusterReconciler) reconcileOperatorCertificateFingerprint(
 		return ctrl.Result{}, fmt.Errorf("patching operator certificate fingerprint: %w", err)
 	}
 
-	return ctrl.Result{Requeue: true}, nil
+	return ctrl.Result{RequeueAfter: time.Second}, nil
 }
 
 // operatorCertificateFingerprint returns the SHA-256 public key fingerprint of

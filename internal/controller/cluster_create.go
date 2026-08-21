@@ -1930,19 +1930,13 @@ func (r *ClusterReconciler) checkReadyForRecovery(
 		if backup == nil {
 			contextLogger.Info("Missing backup object, can't continue full recovery",
 				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: time.Minute,
-			}, nil
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
 		if backup.Status.Phase != apiv1.BackupPhaseCompleted {
 			contextLogger.Info("The source backup object is not completed, can't continue full recovery",
 				"backup", cluster.Spec.Bootstrap.Recovery.Backup,
 				"backupPhase", backup.Status.Phase)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: time.Minute,
-			}, nil
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
 	}
 
@@ -1957,10 +1951,7 @@ func (r *ClusterReconciler) checkReadyForRecovery(
 			contextLogger.Warning(
 				"Volume snapshots verification failed, retrying",
 				"status", status)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: 5 * time.Second,
-			}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		if status.ContainsWarnings() {
 			contextLogger.Warning("Volume snapshots verification warnings",
