@@ -281,7 +281,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			expectedLogin := false
 			expectedCreateDB := false
 			expectedCreateRole := true
-			expectedConnLmt := int64(10)
+			expectedConnLmt := int32(10)
 			rwService := services.GetReadWriteServiceName(clusterName)
 
 			By("updating role attribute in spec", func() {
