@@ -268,6 +268,13 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/reloadedAt`
 :   Contains the latest cluster `reload` time. `reload` is triggered by the user through a plugin.
 
+`cnpg.io/rotatePassword`
+:   When set to any value on a `DatabaseRole` whose password the operator
+    generates, it asks for that password to be rotated immediately, regardless
+    of its renewal deadline. The operator removes the annotation once the
+    rotation has happened, so it is a one-shot request. See
+    [Manual rotation](declarative_role_management.md#manual-rotation).
+
 `cnpg.io/skipEmptyWalArchiveCheck`
 :   When set to `enabled` on a `Cluster` resource, the operator disables the check
     that ensures that the WAL archive is empty before writing data. Use at your own
