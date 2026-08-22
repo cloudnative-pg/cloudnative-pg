@@ -121,13 +121,10 @@ spec:
   name: dante
   comment: "Dante Alighieri"
   login: true
-  superuser: false
-  createdb: true
-  databaseRoleReclaimPolicy: delete
-  inRoles:
-    - pg_monitor
   password:
     mode: generate
+    duration: 1008h    # 6 weeks
+    renewBefore: 96h   # 4 days
 ```
 
 An example manifest for a role definition can be found in the file
@@ -153,21 +150,8 @@ connection has to present.
 
 #### Choosing a mode
 
-The `password` stanza states how the operator manages the password of the role:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: DatabaseRole
-metadata:
-  name: role-dante
-spec:
-  cluster:
-    name: cluster-example
-  name: dante
-  login: true
-  password:
-    mode: generate
-```
+The `password` stanza states how the operator manages the password of the role,
+as the [example manifest](#example-manifest) above does.
 
 `password.mode` is **required** whenever the stanza is present: it has no
 default, so `password: {}` is rejected. Asking for a password without saying
@@ -188,14 +172,18 @@ The remaining fields of the stanza are restricted to the modes that use them:
 | `secret` | `generate` (optional), `secret` (**required**) |
 | `criteria`, `duration`, `renewBefore` | `generate` only |
 
+:::important
 The stanza is mutually exclusive with the
 [deprecated `passwordSecret` and `disablePassword` fields](#deprecated-password-fields),
 and it is only available on `DatabaseRole` resources, not on inline managed
 roles.
+:::
 
+:::warning
 Once present, the stanza cannot be removed: `mode` is what says how the
 password is managed from now on, so a role that stops generating one has to
 state what happens to it instead. See [Changing the mode](#changing-the-mode).
+:::
 
 #### `mode: generate`
 
@@ -206,6 +194,10 @@ and applies it to PostgreSQL:
   password:
     mode: generate
 ```
+
+On its own, as above, the password has no lifetime: it is generated once and
+never expires or gets replaced. Adding a `duration` is recommended, and is what
+makes the operator rotate it. See [Rotation](#rotation).
 
 ##### Generated password Secret
 
@@ -286,16 +278,19 @@ rather than retrying.
 
 ##### Rotation
 
-A generated password is created once and, by default, never changes. Set
-`duration` to give it a lifetime: the operator then generates a new password,
-`renewBefore` ahead of its expiration, and the instance manager applies it to
-PostgreSQL.
+Without `duration`, a generated password is created once and never changes:
+it has no expiration, and the operator never replaces it. Setting `duration`
+gives it a lifetime, and is **recommended**: the operator then generates a new
+password `renewBefore` ahead of the expiration, the instance manager applies it
+to PostgreSQL, and the role stops accepting the previous one. A credential that
+is never replaced is one that stays valid for as long as the role exists,
+however widely it has been copied in the meantime.
 
 ```yaml
   password:
     mode: generate
-    duration: 2160h    # 90 days
-    renewBefore: 168h  # 7 days
+    duration: 1008h    # 6 weeks
+    renewBefore: 96h   # 4 days
 ```
 
 `renewBefore` defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
@@ -487,7 +482,6 @@ spec:
   login: true
   clientCertificate:
     enabled: true
-  databaseRoleReclaimPolicy: retain
 ```
 
 `clientCertificate.enabled` defaults to `true` when the block is present, so
