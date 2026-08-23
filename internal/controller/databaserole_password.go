@@ -237,6 +237,19 @@ func setPasswordMessage(role *apiv1.DatabaseRole, message string) {
 		state.IssuedAt = role.Status.Password.IssuedAt
 		state.Expiration = role.Status.Password.Expiration
 	}
+	setGeneratedPasswordState(role, state)
+}
+
+// setGeneratedPasswordState records what the operator knows about the password
+// it generated, carrying forward what the instance manager recorded about what
+// it did with it. The operator describes the password; the instance manager
+// answers with the expiration it applied to the role, in the same struct, so
+// replacing that struct wholesale here would drop the answer and have the role
+// applied again for an expiration that already reached PostgreSQL.
+func setGeneratedPasswordState(role *apiv1.DatabaseRole, state apiv1.GeneratedPasswordState) {
+	if current := role.Status.Password; current != nil {
+		state.AppliedExpiration = current.AppliedExpiration
+	}
 	role.Status.Password = &state
 }
 
@@ -303,11 +316,11 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 		}
 	}
 
-	role.Status.Password = &apiv1.GeneratedPasswordState{
+	setGeneratedPasswordState(role, apiv1.GeneratedPasswordState{
 		SecretName: secretKey.Name,
 		IssuedAt:   issuedAtString,
 		Expiration: expiration,
-	}
+	})
 	return nil
 }
 
