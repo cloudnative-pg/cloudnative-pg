@@ -29,6 +29,7 @@ import (
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -531,6 +532,80 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		got := &apiv1.DatabaseRole{}
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
 		Expect(got.Status.Applied).To(BeNil())
+	})
+})
+
+var _ = Describe("DatabaseRole isAlreadyReconciled", func() {
+	// settled builds a role the instance manager has already applied: the
+	// generation it observed, and the resource version of the password Secret
+	// the condition announces.
+	settled := func() *apiv1.DatabaseRole {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 1008 * time.Hour},
+		}
+		role.Status.ObservedGeneration = role.Generation
+		role.Status.SecretResourceVersion = "100"
+		meta.SetStatusCondition(&role.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionPasswordSecretChange),
+			Status:  metav1.ConditionTrue,
+			Reason:  "ChangeDetected",
+			Message: "100",
+		})
+		return role
+	}
+
+	It("is reconciled once the applied expiration matches the recorded one", func() {
+		role := settled()
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName:        "role-cr-password",
+			Expiration:        "2026-11-16T09:12:44Z",
+			AppliedExpiration: "2026-11-16T09:12:44Z",
+		}
+
+		r := &DatabaseRoleReconciler{}
+		Expect(r.isAlreadyReconciled(role)).To(BeTrue())
+	})
+
+	It("is not reconciled while an expiration has not been applied yet", func() {
+		// Adding a duration to a password that is not due for rotation changes
+		// the expiration without touching the Secret, so neither the generation
+		// nor the Secret's resource version says anything changed. The role's
+		// VALID UNTIL follows that expiration, so it still has to be applied.
+		role := settled()
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName: "role-cr-password",
+			Expiration: "2026-11-16T09:12:44Z",
+		}
+
+		r := &DatabaseRoleReconciler{}
+		Expect(r.isAlreadyReconciled(role)).To(BeFalse())
+	})
+
+	It("is not reconciled while a changed expiration has not been applied", func() {
+		role := settled()
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName:        "role-cr-password",
+			Expiration:        "2026-12-25T09:12:44Z",
+			AppliedExpiration: "2026-11-16T09:12:44Z",
+		}
+
+		r := &DatabaseRoleReconciler{}
+		Expect(r.isAlreadyReconciled(role)).To(BeFalse())
+	})
+
+	It("has no expiration to apply for a password with no lifetime", func() {
+		role := settled()
+		role.Spec.Password.Duration = nil
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName: "role-cr-password",
+			// Left over from a lifetime that is no longer requested.
+			Expiration: "2026-11-16T09:12:44Z",
+		}
+
+		r := &DatabaseRoleReconciler{}
+		Expect(r.isAlreadyReconciled(role)).To(BeTrue())
 	})
 })
 

@@ -594,6 +594,61 @@ var _ = Describe("DatabaseRole password generation", func() {
 		Expect(string(repaired.Data[corev1.BasicAuthPasswordKey])).To(Equal(generated))
 	})
 
+	It("keeps the expiration the instance manager applied across its own writes", func() {
+		// The instance manager records what it applied inside the password
+		// state the operator otherwise owns: rebuilding that state here would
+		// drop the record and have the role applied again for an expiration
+		// that already reached PostgreSQL.
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 1008 * time.Hour},
+		})
+		r, cli := buildReconciler(role, newCluster(false))
+
+		_, err := r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+
+		stored := getRole(cli, role)
+		Expect(stored.Status.Password).NotTo(BeNil())
+		applied := stored.Status.Password.Expiration
+		Expect(applied).NotTo(BeEmpty())
+
+		// Stand in for the instance manager having applied it.
+		stored.Status.Password.AppliedExpiration = applied
+		Expect(cli.Status().Update(ctx, stored)).To(Succeed())
+
+		_, err = r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(getRole(cli, role).Status.Password.AppliedExpiration).To(Equal(applied))
+	})
+
+	It("keeps the applied expiration while it explains why generation is blocked", func() {
+		// setPasswordMessage rebuilds the password state to add its message,
+		// and runs on every loop for as long as the cause lasts.
+		existing := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-dante-password", Namespace: namespace},
+			Type:       corev1.SecretTypeBasicAuth,
+			Data:       map[string][]byte{corev1.BasicAuthPasswordKey: []byte("user-managed")},
+		}
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 1008 * time.Hour},
+		})
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName:        "role-dante-password",
+			Expiration:        "2026-11-16T09:12:44Z",
+			AppliedExpiration: "2026-11-16T09:12:44Z",
+		}
+		r, cli := buildReconciler(role, newCluster(false), existing)
+
+		_, err := r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+
+		stored := getRole(cli, role)
+		Expect(stored.Status.Password.Message).To(ContainSubstring("not owned"))
+		Expect(stored.Status.Password.AppliedExpiration).To(Equal("2026-11-16T09:12:44Z"))
+	})
+
 	It("carries a pgpass line for the generated password", func() {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(false))
