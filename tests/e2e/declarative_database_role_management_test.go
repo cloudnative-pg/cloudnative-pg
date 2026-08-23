@@ -579,6 +579,9 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					rotatedPassword   string
 					renamedPassword   string
 				)
+				// The lifetime asked for below, and the bound the role's
+				// VALID UNTIL is checked against in PostgreSQL.
+				passwordLifetime := 90 * 24 * time.Hour
 
 				By("creating a Role CR with password generation enabled", func() {
 					pgRoleName = fmt.Sprintf("generated-password-role-%d", funk.RandomInt(0, 9999))
@@ -639,7 +642,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				By("requesting a lifetime for the generated password", func() {
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
-					role.Spec.Password.Duration = &metav1.Duration{Duration: 90 * 24 * time.Hour}
+					role.Spec.Password.Duration = &metav1.Duration{Duration: passwordLifetime}
 					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					Eventually(func(g Gomega) {
@@ -647,6 +650,35 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						g.Expect(role.Status.Password).ShouldNot(BeNil())
 						g.Expect(role.Status.Password.Expiration).ShouldNot(BeEmpty())
 					}, 120).WithPolling(5 * time.Second).Should(Succeed())
+				})
+
+				By("checking the role expires with its generated password in PostgreSQL", func() {
+					// VALID UNTIL follows the expiration of the generated
+					// password, so the role stops being accepted when the
+					// operator considers that password expired. The password was
+					// issued moments ago: the deadline is therefore in the
+					// future, and no further away than the lifetime just asked
+					// for. Reading it back from pg_authid is what says the clause
+					// reached PostgreSQL, rather than only the status.
+					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+
+					validUntilQuery := fmt.Sprintf(
+						"SELECT rolvaliduntil IS NOT NULL "+
+							"AND rolvaliduntil > now() "+
+							"AND rolvaliduntil < now() + interval '%d seconds' "+
+							"FROM pg_catalog.pg_authid WHERE rolname=%s",
+						int(passwordLifetime.Seconds()), pq.QuoteLiteral(pgRoleName))
+
+					Eventually(func(g Gomega) {
+						stdout, _, err := exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							exec.PodLocator{Namespace: namespace, PodName: primaryPodInfo.Name},
+							"postgres", validUntilQuery)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(strings.TrimSpace(stdout)).Should(Equal("t"),
+							"VALID UNTIL does not follow the expiration of the generated password")
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
 				})
 
 				By("rotating the password once its duration has elapsed", func() {
