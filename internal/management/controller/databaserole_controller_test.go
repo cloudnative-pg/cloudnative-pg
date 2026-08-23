@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -530,6 +531,117 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		got := &apiv1.DatabaseRole{}
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
 		Expect(got.Status.Applied).To(BeNil())
+	})
+})
+
+var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
+	var (
+		db         *sql.DB
+		dbMock     sqlmock.Sqlmock
+		statements []string
+	)
+
+	// The columns pg_authid is listed with, so that List can return no rows and
+	// reconcileRole takes the create path.
+	listColumns := []string{
+		"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+		"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword",
+		"rolvaliduntil", "rolbypassrls", "comment", "xmin", "inroles",
+	}
+
+	BeforeEach(func() {
+		// Every statement is recorded and matched, so the assertions can be made
+		// on the SQL itself: what matters here is a clause being absent as much
+		// as being present, and RE2 has no way to say "does not contain".
+		statements = nil
+		recorder := sqlmock.QueryMatcherFunc(func(_, actualSQL string) error {
+			statements = append(statements, actualSQL)
+			return nil
+		})
+
+		var err error
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(recorder))
+		Expect(err).NotTo(HaveOccurred())
+
+		dbMock.ExpectQuery("").WillReturnRows(sqlmock.NewRows(listColumns))
+		dbMock.ExpectBegin()
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+		dbMock.ExpectCommit()
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	// createRoleStatement returns the CREATE ROLE the reconciliation issued.
+	createRoleStatement := func() string {
+		for _, statement := range statements {
+			if strings.HasPrefix(statement, "CREATE ROLE") {
+				return statement
+			}
+		}
+		Fail("no CREATE ROLE statement was issued")
+		return ""
+	}
+
+	run := func(role *apiv1.DatabaseRole) {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-cr-password", Namespace: testNamespace},
+			Type:       corev1.SecretTypeBasicAuth,
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte(testRoleName),
+				corev1.BasicAuthPasswordKey: []byte("0mA3nCe0f6THe1dIvIne"),
+			},
+		}
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(role, secret).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			Build()
+		r := &DatabaseRoleReconciler{Client: cli, instance: &fakeRoleInstance{db: db}}
+
+		_, err := r.reconcileRole(context.Background(), role)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	generatingRole := func(duration *metav1.Duration, expiration string) *apiv1.DatabaseRole {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: duration,
+		}
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName: "role-cr-password",
+			Expiration: expiration,
+		}
+		return role
+	}
+
+	It("sets VALID UNTIL from the expiration of the generated password", func() {
+		expiration := time.Now().Add(1008 * time.Hour).UTC().Truncate(time.Second)
+		run(generatingRole(&metav1.Duration{Duration: 1008 * time.Hour}, expiration.Format(time.RFC3339)))
+
+		// The clause has to reach PostgreSQL, not just the DatabaseRole the
+		// reconciler builds: the lifetime is only a deadline if the database
+		// enforces it.
+		Expect(createRoleStatement()).To(ContainSubstring(
+			"VALID UNTIL '" + expiration.Format("2006-01-02 15:04:05")))
+	})
+
+	It("leaves the role unexpiring when the generated password has no lifetime", func() {
+		// No duration means no expiration to follow, so nothing should be said
+		// about VALID UNTIL even if the status still carries one.
+		run(generatingRole(nil, time.Now().UTC().Format(time.RFC3339)))
+
+		Expect(createRoleStatement()).NotTo(ContainSubstring("VALID UNTIL"))
+	})
+
+	It("leaves the role unexpiring until an expiration has been recorded", func() {
+		run(generatingRole(&metav1.Duration{Duration: 1008 * time.Hour}, ""))
+
+		Expect(createRoleStatement()).NotTo(ContainSubstring("VALID UNTIL"))
 	})
 })
 
