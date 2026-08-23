@@ -212,6 +212,27 @@ func roleConfigurationForPassword(role *apiv1.DatabaseRole) apiv1.RoleConfigurat
 	return roleConfig
 }
 
+// desiredPasswordExpiration returns the expiration the role's VALID UNTIL has
+// to follow, and the empty string when the role has none to follow: it does
+// not generate its password, or generates one with no lifetime, or the
+// operator has not recorded an expiration for it yet.
+func desiredPasswordExpiration(role *apiv1.DatabaseRole) string {
+	if !role.IsPasswordRotationEnabled() || role.Status.Password == nil {
+		return ""
+	}
+	return role.Status.Password.Expiration
+}
+
+// appliedPasswordExpiration returns the expiration the instance manager last
+// applied to the role as its VALID UNTIL, and the empty string when it has
+// applied none: a role with no generated password state has nothing recorded.
+func appliedPasswordExpiration(role *apiv1.DatabaseRole) string {
+	if role.Status.Password == nil {
+		return ""
+	}
+	return role.Status.Password.AppliedExpiration
+}
+
 // generatedPasswordValidUntil returns the VALID UNTIL a role whose password the
 // operator generates with a lifetime must carry: the expiration of that
 // password. PostgreSQL then stops accepting the password at the moment the
@@ -224,14 +245,12 @@ func roleConfigurationForPassword(role *apiv1.DatabaseRole) apiv1.RoleConfigurat
 // yet: the role is then left with whatever VALID UNTIL its specification asks
 // for, until an expiration is known.
 func generatedPasswordValidUntil(role *apiv1.DatabaseRole) (pgtype.Timestamp, bool, error) {
-	if !role.IsPasswordRotationEnabled() {
-		return pgtype.Timestamp{}, false, nil
-	}
-	if role.Status.Password == nil || role.Status.Password.Expiration == "" {
+	recorded := desiredPasswordExpiration(role)
+	if recorded == "" {
 		return pgtype.Timestamp{}, false, nil
 	}
 
-	expiration, err := time.Parse(time.RFC3339, role.Status.Password.Expiration)
+	expiration, err := time.Parse(time.RFC3339, recorded)
 	if err != nil {
 		return pgtype.Timestamp{}, false, fmt.Errorf(
 			"while reading the expiration of the generated password of role %q: %w", role.Spec.Name, err)
@@ -337,7 +356,8 @@ func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) b
 	}
 
 	return role.Generation == role.Status.ObservedGeneration &&
-		role.Status.SecretResourceVersion == latestObservedSecretPasswordResourceVersion
+		role.Status.SecretResourceVersion == latestObservedSecretPasswordResourceVersion &&
+		appliedPasswordExpiration(role) == desiredPasswordExpiration(role)
 }
 
 // The status helpers below intentionally bypass the shared markAsReady /
@@ -454,6 +474,12 @@ func (r *DatabaseRoleReconciler) succeededReconciliation(
 	oldRole := role.DeepCopy()
 	role.SetAsReady()
 	role.Status.SecretResourceVersion = passVersion
+	// Recorded next to the rest of the password state, and only when there is
+	// state to record it in: a role that generates no password has no
+	// expiration to apply either.
+	if role.Status.Password != nil {
+		role.Status.Password.AppliedExpiration = desiredPasswordExpiration(role)
+	}
 
 	// The revocation the operator asked for was part of the apply that just
 	// succeeded, since both read the same object: acknowledging it here is what

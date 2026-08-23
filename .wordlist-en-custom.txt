@@ -17,6 +17,7 @@ Anand
 AntiAffinity
 AppArmor
 AppArmorProfile
+AppliedExpiration
 ArgoCD
 Armando
 AuthQuery

@@ -474,6 +474,15 @@ spec:
                   Password holds the observed state of the generated password, when password
                   generation is enabled.
                 properties:
+                  appliedExpiration:
+                    description: |-
+                      AppliedExpiration is the expiration last applied to the role as its
+                      VALID UNTIL, in RFC3339 format. Unlike the rest of this state it is
+                      written by the instance manager, not by the operator: adding or changing
+                      a `duration` moves `expiration` without touching the Secret holding the
+                      password, so this is what says whether the role still has to be applied
+                      for it.
+                    type: string
                   expiration:
                     description: |-
                       Expiration is the time at which the generated password is considered

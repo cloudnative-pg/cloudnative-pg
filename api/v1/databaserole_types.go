@@ -265,6 +265,15 @@ type GeneratedPasswordState struct {
 	// +optional
 	PendingRevocation bool `json:"pendingRevocation,omitempty"`
 
+	// AppliedExpiration is the expiration last applied to the role as its
+	// VALID UNTIL, in RFC3339 format. Unlike the rest of this state it is
+	// written by the instance manager, not by the operator: adding or changing
+	// a `duration` moves `expiration` without touching the Secret holding the
+	// password, so this is what says whether the role still has to be applied
+	// for it.
+	// +optional
+	AppliedExpiration string `json:"appliedExpiration,omitempty"`
+
 	// Message contains a human-readable explanation of the current password
 	// status, such as why generation was skipped or why an existing Secret was
 	// left untouched.
