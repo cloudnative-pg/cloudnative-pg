@@ -223,7 +223,13 @@ func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv
 			}
 
 			base := latest.DeepCopy()
-			latest.Status.Password = password
+			// `status.password` carries one field the instance manager writes,
+			// and a merge patch replaces the struct holding it wholesale: the
+			// expiration it applied is read off the role this attempt just
+			// re-read, rather than off the copy this reconciliation started
+			// from, or an apply that landed in between would be forgotten and
+			// the role applied again for an expiration PostgreSQL already has.
+			latest.Status.Password = passwordWithAppliedExpiration(password, latest.Status.Password)
 			latest.Status.ClientCertificate = clientCertificate
 			if condition != nil {
 				meta.SetStatusCondition(&latest.Status.Conditions, *condition)
