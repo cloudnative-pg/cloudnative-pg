@@ -89,7 +89,7 @@ Beyond what [inline managed roles](#inline-managed-roles) offer, a
   [certificate authentication](#client-certificate-authentication) instead of
   passwords;
 - say **how the password is managed** through a single
-  [`password.mode`](#choosing-a-mode) field, instead of the combination of
+  [`password.mode`](#password-authentication) field, instead of the combination of
   `passwordSecret` and `disablePassword` that inline roles rely on;
 - express role removal through a [reclaim policy](#role-reclaim-policy).
 
@@ -114,7 +114,7 @@ the same namespace.
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: role-dante
+  name: cluster-example-dante
 spec:
   cluster:
     name: cluster-example
@@ -147,8 +147,6 @@ generated client certificate, with `pg_hba.conf` deciding which one a given
 connection has to present.
 
 ### Password authentication
-
-#### Choosing a mode
 
 The `password` stanza states how the operator manages the password of the role,
 as the [example manifest](#example-manifest) above does.
@@ -225,7 +223,7 @@ authenticates without the password appearing in a connection string or in the
 shell history:
 
 ```sh
-kubectl get secret role-dante-password -o jsonpath='{.data.pgpass}' \
+kubectl get secret cluster-example-dante-password -o jsonpath='{.data.pgpass}' \
   | base64 -d >> ~/.pgpass && chmod 0600 ~/.pgpass
 ```
 
@@ -306,7 +304,7 @@ expires, and the expiration is also a column of `kubectl get databaserole`:
 ```yaml
 status:
   password:
-    secretName: role-dante-password
+    secretName: cluster-example-dante-password
     issuedAt: "2026-08-16T09:12:44Z"
     expiration: "2026-11-16T09:12:44Z"
 ```
@@ -342,7 +340,7 @@ deadline or of whether `duration` is set at all, annotate the `DatabaseRole`
 with `cnpg.io/rotatePassword` (any value):
 
 ```sh
-kubectl annotate databaserole role-dante cnpg.io/rotatePassword=true
+kubectl annotate databaserole cluster-example-dante cnpg.io/rotatePassword=true
 ```
 
 The annotation is a one-shot request: the operator removes it as soon as the
@@ -474,7 +472,7 @@ To enable it, add a `clientCertificate` block to the spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: role-dante
+  name: cluster-example-dante
 spec:
   cluster:
     name: cluster-example
@@ -594,7 +592,7 @@ A `DatabaseRole` inherits `passwordSecret` and `disablePassword` from the
 shared role configuration it has in common with
 [inline managed roles](#inline-managed-roles). Both still work, and neither is
 going away in the short term, but on a `DatabaseRole` they are **deprecated**
-in favor of the [`password` stanza](#choosing-a-mode), which covers what they
+in favor of the [`password` stanza](#password-authentication), which covers what they
 do and more:
 
 | Deprecated field | Equivalent | What you also gain |
@@ -691,7 +689,7 @@ events, so that a rotation is visible without reading the logs of the operator
 Pod:
 
 ```sh
-kubectl describe databaserole role-dante
+kubectl describe databaserole cluster-example-dante
 ```
 
 | Reason | Type | When |
@@ -794,7 +792,7 @@ role.
 
 These two fields are the only password controls available inline. On a
 `DatabaseRole` they are [deprecated](#deprecated-password-fields) in favor of
-the richer [`password` stanza](#choosing-a-mode).
+the richer [`password` stanza](#password-authentication).
 
 ### Status of inline managed roles
 
@@ -872,7 +870,7 @@ Copying the inline stanza as-is carries `passwordSecret` and
 `disablePassword` with it, and that keeps working. On a `DatabaseRole` those
 fields are [deprecated](#deprecated-password-fields) though, so the migration
 is a good moment to state the password through the
-[`password` stanza](#choosing-a-mode) instead:
+[`password` stanza](#password-authentication) instead:
 
 | Inline | On the `DatabaseRole` |
 |---|---|
