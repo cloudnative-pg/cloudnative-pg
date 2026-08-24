@@ -622,6 +622,33 @@ var _ = Describe("DatabaseRole password generation", func() {
 		Expect(getRole(cli, role).Status.Password.AppliedExpiration).To(Equal(applied))
 	})
 
+	It("keeps an expiration the instance manager applies while the operator reconciles", func() {
+		// The operator reads the role, reconciles it, then patches its status:
+		// an apply landing inside that window records an expiration the
+		// operator never saw, and writing back the password state it built
+		// from what it did read would drop it.
+		const expiration = "2026-10-05T09:12:44Z"
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 1008 * time.Hour},
+		})
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName: "role-dante-password",
+			IssuedAt:   "2026-08-24T09:12:44Z",
+			Expiration: expiration,
+		}
+		r, cli := buildReconciler(role, newCluster(false))
+
+		// Stand in for the instance manager having applied the expiration
+		// after the operator read the role it is about to patch.
+		landed := getRole(cli, role)
+		landed.Status.Password.AppliedExpiration = expiration
+		Expect(cli.Status().Update(ctx, landed)).To(Succeed())
+
+		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(getRole(cli, role).Status.Password.AppliedExpiration).To(Equal(expiration))
+	})
+
 	It("keeps the applied expiration while it explains why generation is blocked", func() {
 		// setPasswordMessage rebuilds the password state to add its message,
 		// and runs on every loop for as long as the cause lasts.
