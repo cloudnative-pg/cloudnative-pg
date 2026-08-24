@@ -92,9 +92,9 @@ func (r *ShowStatsMetrics) Reset() {
 	r.TotalQueryTime.Reset()
 	r.TotalWaitTime.Reset()
 	r.AvgBindCount.Reset()
-	r.TotalClientParseCount.Reset()
+	r.AvgClientParseCount.Reset()
 	r.AvgServerAssignCount.Reset()
-	r.TotalServerParseCount.Reset()
+	r.AvgServerParseCount.Reset()
 	r.AvgXactCount.Reset()
 	r.AvgQueryCount.Reset()
 	r.AvgRecv.Reset()
@@ -248,6 +248,40 @@ func NewShowStatsMetrics(subsystem string) *ShowStatsMetrics {
 	}
 }
 
+func (r *ShowStatsMetrics) byColumn() map[string]*prometheus.GaugeVec {
+	return map[string]*prometheus.GaugeVec{
+		"total_bind_count":              r.TotalBindCount,
+		"total_client_parse_count":      r.TotalClientParseCount,
+		"total_server_assignment_count": r.TotalServerAssignCount,
+		"total_server_parse_count":      r.TotalServerParseCount,
+		"total_xact_count":              r.TotalXactCount,
+		"total_query_count":             r.TotalQueryCount,
+		"total_received":                r.TotalReceived,
+		"total_sent":                    r.TotalSent,
+		"total_xact_time":               r.TotalXactTime,
+		"total_query_time":              r.TotalQueryTime,
+		"total_wait_time":               r.TotalWaitTime,
+		"avg_bind_count":                r.AvgBindCount,
+		"avg_client_parse_count":        r.AvgClientParseCount,
+		"avg_server_assignment_count":   r.AvgServerAssignCount,
+		"avg_server_parse_count":        r.AvgServerParseCount,
+		"avg_xact_count":                r.AvgXactCount,
+		"avg_query_count":               r.AvgQueryCount,
+		"avg_recv":                      r.AvgRecv,
+		"avg_sent":                      r.AvgSent,
+		"avg_xact_time":                 r.AvgXactTime,
+		"avg_query_time":                r.AvgQueryTime,
+		"avg_wait_time":                 r.AvgWaitTime,
+	}
+}
+
+// Collect produces the values for all the contained Metrics
+func (r *ShowStatsMetrics) Collect(ch chan<- prometheus.Metric) {
+	for _, gauge := range r.byColumn() {
+		gauge.Collect(ch)
+	}
+}
+
 func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 	contextLogger := log.FromContext(e.ctx)
 
@@ -269,180 +303,45 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 			contextLogger.Error(err, "while closing rows for SHOW STATS")
 		}
 	}()
-	var (
-		database string
-		totalXactCount,
-		totalQueryCount,
-		totalReceived,
-		totalSent,
-		totalXactTime,
-		totalQueryTime,
-		totalWaitTime,
-		avgXactCount,
-		avgQueryCount,
-		avgRecv,
-		avgSent,
-		avgXactTime,
-		avgQueryTime,
-		avgWaitTime int
-	)
 
-	// PGBouncer >= 1.23.0
-	var (
-		totalServerAssignCount,
-		avgServerAssignCount int
-	)
-
-	// PGBouncer >= 1.24.0
-	var (
-		totalClientParseCount,
-		totalServerParseCount,
-		totalBindCount,
-		avgClientParseCount,
-		avgServerParseCount,
-		avgBindCount int
-	)
-	statCols, err := rows.Columns()
+	columns, err := rows.Columns()
 	if err != nil {
 		contextLogger.Error(err, "Error while reading SHOW STATS")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
 		return
 	}
 
-	statColsCount := len(statCols)
+	gauges := e.Metrics.ShowStats.byColumn()
+	var database string
+	values := make([]int, len(columns))
+	targets := make([]any, len(columns))
+	for i, column := range columns {
+		switch {
+		case column == databaseLabel:
+			targets[i] = &database
+		case gauges[column] != nil:
+			targets[i] = &values[i]
+		default:
+			targets[i] = new(any)
+		}
+	}
 
 	for rows.Next() {
-		var err error
-		switch {
-		case statColsCount < 16:
-			err = rows.Scan(&database,
-				&totalXactCount,
-				&totalQueryCount,
-				&totalReceived,
-				&totalSent,
-				&totalXactTime,
-				&totalQueryTime,
-				&totalWaitTime,
-				&avgXactCount,
-				&avgQueryCount,
-				&avgRecv,
-				&avgSent,
-				&avgXactTime,
-				&avgQueryTime,
-				&avgWaitTime,
-			)
-		case statColsCount == 17:
-			err = rows.Scan(&database,
-				&totalServerAssignCount,
-				&totalXactCount,
-				&totalQueryCount,
-				&totalReceived,
-				&totalSent,
-				&totalXactTime,
-				&totalQueryTime,
-				&totalWaitTime,
-				&avgServerAssignCount,
-				&avgXactCount,
-				&avgQueryCount,
-				&avgRecv,
-				&avgSent,
-				&avgXactTime,
-				&avgQueryTime,
-				&avgWaitTime,
-			)
-		default:
-			err = rows.Scan(&database,
-				&totalServerAssignCount,
-				&totalXactCount,
-				&totalQueryCount,
-				&totalReceived,
-				&totalSent,
-				&totalXactTime,
-				&totalQueryTime,
-				&totalWaitTime,
-				&totalClientParseCount,
-				&totalServerParseCount,
-				&totalBindCount,
-				&avgServerAssignCount,
-				&avgXactCount,
-				&avgQueryCount,
-				&avgRecv,
-				&avgSent,
-				&avgXactTime,
-				&avgQueryTime,
-				&avgWaitTime,
-				&avgClientParseCount,
-				&avgServerParseCount,
-				&avgBindCount,
-			)
-		}
-		if err != nil {
+		if err := rows.Scan(targets...); err != nil {
 			contextLogger.Error(err, "Error while executing SHOW STATS")
 			e.Metrics.Error.Set(1)
 			e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
+			continue
 		}
-
-		e.Metrics.ShowStats.TotalXactCount.WithLabelValues(database).Set(float64(totalXactCount))
-		e.Metrics.ShowStats.TotalQueryCount.WithLabelValues(database).Set(float64(totalQueryCount))
-		e.Metrics.ShowStats.TotalReceived.WithLabelValues(database).Set(float64(totalReceived))
-		e.Metrics.ShowStats.TotalSent.WithLabelValues(database).Set(float64(totalSent))
-		e.Metrics.ShowStats.TotalXactTime.WithLabelValues(database).Set(float64(totalXactTime))
-		e.Metrics.ShowStats.TotalQueryTime.WithLabelValues(database).Set(float64(totalQueryTime))
-		e.Metrics.ShowStats.TotalWaitTime.WithLabelValues(database).Set(float64(totalWaitTime))
-		e.Metrics.ShowStats.AvgXactCount.WithLabelValues(database).Set(float64(avgXactCount))
-		e.Metrics.ShowStats.AvgQueryCount.WithLabelValues(database).Set(float64(avgQueryCount))
-		e.Metrics.ShowStats.AvgRecv.WithLabelValues(database).Set(float64(avgRecv))
-		e.Metrics.ShowStats.AvgSent.WithLabelValues(database).Set(float64(avgSent))
-		e.Metrics.ShowStats.AvgXactTime.WithLabelValues(database).Set(float64(avgXactTime))
-		e.Metrics.ShowStats.AvgQueryTime.WithLabelValues(database).Set(float64(avgQueryTime))
-		e.Metrics.ShowStats.AvgWaitTime.WithLabelValues(database).Set(float64(avgWaitTime))
-
-		if statColsCount == 16 {
-			e.Metrics.ShowStats.TotalServerAssignCount.WithLabelValues(database).Set(
-				float64(totalServerAssignCount))
-			e.Metrics.ShowStats.AvgServerAssignCount.WithLabelValues(database).Set(
-				float64(avgServerAssignCount))
-		} else {
-			e.Metrics.ShowStats.TotalClientParseCount.WithLabelValues(database).Set(
-				float64(totalClientParseCount))
-			e.Metrics.ShowStats.TotalServerParseCount.WithLabelValues(database).Set(
-				float64(totalServerParseCount))
-			e.Metrics.ShowStats.TotalBindCount.WithLabelValues(database).Set(
-				float64(totalBindCount))
-			e.Metrics.ShowStats.AvgClientParseCount.WithLabelValues(database).Set(
-				float64(avgClientParseCount))
-			e.Metrics.ShowStats.AvgServerParseCount.WithLabelValues(database).Set(
-				float64(avgServerParseCount))
-			e.Metrics.ShowStats.AvgBindCount.WithLabelValues(database).Set(
-				float64(avgBindCount))
+		for i, column := range columns {
+			if gauge := gauges[column]; gauge != nil {
+				gauge.WithLabelValues(database).Set(float64(values[i]))
+			}
 		}
 	}
 
-	e.Metrics.ShowStats.TotalXactCount.Collect(ch)
-	e.Metrics.ShowStats.TotalQueryCount.Collect(ch)
-	e.Metrics.ShowStats.TotalReceived.Collect(ch)
-	e.Metrics.ShowStats.TotalSent.Collect(ch)
-	e.Metrics.ShowStats.TotalXactTime.Collect(ch)
-	e.Metrics.ShowStats.TotalQueryTime.Collect(ch)
-	e.Metrics.ShowStats.TotalWaitTime.Collect(ch)
-	e.Metrics.ShowStats.AvgXactCount.Collect(ch)
-	e.Metrics.ShowStats.AvgQueryCount.Collect(ch)
-	e.Metrics.ShowStats.AvgRecv.Collect(ch)
-	e.Metrics.ShowStats.AvgSent.Collect(ch)
-	e.Metrics.ShowStats.AvgXactTime.Collect(ch)
-	e.Metrics.ShowStats.AvgQueryTime.Collect(ch)
-	e.Metrics.ShowStats.AvgWaitTime.Collect(ch)
-
-	if statColsCount == 16 {
-		e.Metrics.ShowStats.TotalServerAssignCount.Collect(ch)
-		e.Metrics.ShowStats.AvgServerAssignCount.Collect(ch)
-	} else {
-		e.Metrics.ShowStats.TotalClientParseCount.Collect(ch)
-		e.Metrics.ShowStats.TotalServerParseCount.Collect(ch)
-		e.Metrics.ShowStats.TotalBindCount.Collect(ch)
-		e.Metrics.ShowStats.AvgClientParseCount.Collect(ch)
-		e.Metrics.ShowStats.AvgServerParseCount.Collect(ch)
-		e.Metrics.ShowStats.AvgBindCount.Collect(ch)
-	}
+	e.Metrics.ShowStats.Collect(ch)
 
 	if err = rows.Err(); err != nil {
 		e.Metrics.Error.Set(1)
