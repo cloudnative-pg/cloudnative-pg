@@ -19,28 +19,60 @@ This process is described in the ["Bootstrap"](bootstrap.md) section.
 :::
 
 CloudNativePG provides full lifecycle management for PostgreSQL database roles.
-You can define roles either:
+This page is about doing it with the **`DatabaseRole` custom resource**, which
+is the recommended way: it is a dedicated, Kubernetes-native resource that
+decouples the role lifecycle from the cluster infrastructure, which suits
+GitOps workflows, and it manages more of the role than the alternative can.
 
-1. as [standalone `DatabaseRole` resources](#the-databaserole-resource) (recommended), or
-2. via [the `managed` stanza within the `Cluster` spec](#inline-managed-roles).
+Only a `DatabaseRole` can:
 
-## Coexistence and precedence
+- **generate the password** of the role and keep it in a Secret it owns,
+  shaped by [criteria](#criteria) you choose and
+  [rotated](#rotation) on a schedule;
+- **issue a TLS client certificate** for the role, signed by the cluster's
+  client CA, enabling
+  [certificate authentication](#client-certificate-authentication) instead of
+  passwords;
+- say **how the password is managed** through a single
+  [`password.mode`](#password-authentication) field, instead of a combination
+  of `passwordSecret` and `disablePassword`;
+- express role removal through a [reclaim policy](#role-reclaim-policy).
 
-The two methods are not mutually exclusive: you can manage different roles with
-each one at the same time, which is what makes a gradual migration from the
-inline stanza to `DatabaseRole` resources possible. They only need a rule for
-the case where the same role name is defined in both places.
+Roles can also be declared inline, in the `managed` stanza of the `Cluster`
+spec. That method is **not deprecated** and keeps working, but it is no longer
+where the feature grows: new capabilities land on `DatabaseRole`, and it may be
+deprecated one day. See [Inline managed roles](#inline-managed-roles) for what
+it covers, and
+[Migrating from inline managed roles to a `DatabaseRole`](#migrating-from-inline-managed-roles-to-a-databaserole)
+for moving across.
 
-In that case, **the Cluster specification (`managed.roles`) always takes
-precedence**: the `DatabaseRole` is not reconciled and reports the conflict in
-its status (see [Status of `DatabaseRole` resources](#status-of-databaserole-resources)).
+:::important
+The two methods can be used at the same time, on different roles, which is what
+makes a gradual migration possible. When the **same** role name is defined in
+both places, **the Cluster specification (`managed.roles`) always takes
+precedence**: the `DatabaseRole` is not reconciled, and reports the conflict in
+its status.
+:::
 
 :::important
 Declarative role management ignores roles that exist in the database but are
 not included in either the Cluster spec or a `DatabaseRole`. The lifecycle of
 those roles continues to be managed within PostgreSQL, allowing you to adopt
 this feature at your convenience.
+
+A `DatabaseRole` is applied when its specification or its password Secret
+changes. Changes made directly in the database, such as a manual
+`ALTER ROLE`, are not detected or reverted until the next time the resource
+is applied. Inline managed roles, by contrast, are periodically compared
+with the database catalog and brought back to their specification.
 :::
+
+See [Security](security.md#rbac-on-custom-resources) for the RBAC
+implications of granting access to `DatabaseRole` resources.
+
+A `DatabaseRole` is namespace-scoped: the resource, the `Cluster` it references
+through `spec.cluster`, and any Secret it reads a password from must all live in
+the same namespace.
 
 -----
 
@@ -68,47 +100,7 @@ A few points are worth noting:
     conventions.
 4.  Role membership with `inRoles` defaults to no memberships.
 
------
-
-## The `DatabaseRole` resource
-
-The `DatabaseRole` custom resource provides a dedicated, Kubernetes-native way
-to manage PostgreSQL database roles. This is the **recommended** approach for
-modern environments and GitOps workflows, as it decouples the role lifecycle
-from the cluster infrastructure, and it manages more of the role than the
-inline stanza can.
-
-Beyond what [inline managed roles](#inline-managed-roles) offer, a
-`DatabaseRole` can:
-
-- **generate the password** of the role and keep it in a Secret it owns,
-  shaped by [criteria](#criteria) you choose and
-  [rotated](#rotation) on a schedule;
-- **issue a TLS client certificate** for the role, signed by the cluster's
-  client CA, enabling
-  [certificate authentication](#client-certificate-authentication) instead of
-  passwords;
-- say **how the password is managed** through a single
-  [`password.mode`](#password-authentication) field, instead of the combination of
-  `passwordSecret` and `disablePassword` that inline roles rely on;
-- express role removal through a [reclaim policy](#role-reclaim-policy).
-
-:::note
-A `DatabaseRole` is applied when its specification or its password Secret
-changes. Changes made directly in the database, such as a manual
-`ALTER ROLE`, are not detected or reverted until the next time the resource
-is applied. Inline managed roles, by contrast, are periodically compared
-with the database catalog and brought back to their specification.
-:::
-
-See [Security](security.md#rbac-on-custom-resources) for the RBAC
-implications of granting access to `DatabaseRole` resources.
-
-A `DatabaseRole` is namespace-scoped: the resource, the `Cluster` it references
-through `spec.cluster`, and any Secret it reads a password from must all live in
-the same namespace.
-
-### Example manifest
+## Example manifest
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -130,23 +122,16 @@ spec:
 An example manifest for a role definition can be found in the file
 [`role-examples.yaml`](samples/role-examples.yaml).
 
-### Authentication
-
 A role authenticates to PostgreSQL with a password, with a TLS client
-certificate, or with both. A `DatabaseRole` can manage either:
+certificate, or with both:
+[password authentication](#password-authentication) through the `password`
+stanza, and
+[client certificate authentication](#client-certificate-authentication)
+through the `clientCertificate` stanza. The two are not exclusive: a role can
+carry a generated password *and* a generated client certificate, with
+`pg_hba.conf` deciding which one a given connection has to present.
 
-- [password authentication](#password-authentication), through the `password`
-  stanza, which states whether the operator generates the password, reads it
-  from a Secret you supply, leaves it to something else, or removes it;
-- [client certificate authentication](#client-certificate-authentication),
-  through the `clientCertificate` stanza, which has the operator issue and
-  renew a certificate signed by the cluster's client CA.
-
-The two are not exclusive: a role can carry a generated password *and* a
-generated client certificate, with `pg_hba.conf` deciding which one a given
-connection has to present.
-
-### Password authentication
+## Password authentication
 
 The `password` stanza states how the operator manages the password of the role,
 as the [example manifest](#example-manifest) above does.
@@ -183,7 +168,7 @@ password is managed from now on, so a role that stops generating one has to
 state what happens to it instead. See [Changing the mode](#changing-the-mode).
 :::
 
-#### `mode: generate`
+### `mode: generate`
 
 The operator generates the password of the role, stores it in a Secret it owns,
 and applies it to PostgreSQL:
@@ -197,7 +182,7 @@ On its own, as above, the password has no lifetime: it is generated once and
 never expires or gets replaced. Adding a `duration` is recommended, and is what
 makes the operator rotate it. See [Rotation](#rotation).
 
-##### Generated password Secret
+#### Generated password Secret
 
 The operator creates a Secret of type `kubernetes.io/basic-auth`, named
 `<databaserole-name>-password` unless `password.secret` says otherwise. The
@@ -238,7 +223,7 @@ A Secret with that name that the operator does not own is never overwritten,
 nor deleted: the conflict is reported in `status.password.message` and no
 password is generated until it is resolved.
 
-##### Criteria
+#### Criteria
 
 The shape of the generated password follows the `criteria` block, modeled on
 the [external-secrets password generator](https://external-secrets.io/main/api/generator/password/):
@@ -274,7 +259,7 @@ check turn out to be unsatisfiable anyway, the operator explains it in
 `status.password.message` and waits for the specification to be corrected,
 rather than retrying.
 
-##### Rotation
+#### Rotation
 
 Without `duration`, a generated password is created once and never changes:
 it has no expiration, and the operator never replaces it. Setting `duration`
@@ -333,7 +318,7 @@ lifetime the password already had, from the creation of its Secret: one older
 than the requested duration is rotated at once. Removing `duration` stops
 rotation and clears the recorded deadline, keeping the current password.
 
-##### Manual rotation
+#### Manual rotation
 
 To rotate a generated password immediately, regardless of its renewal
 deadline or of whether `duration` is set at all, annotate the `DatabaseRole`
@@ -360,14 +345,14 @@ expiration is recomputed from the moment the new password is issued, and with
 it the `VALID UNTIL` of the role (see
 [Generated passwords with a lifetime](#generated-passwords-with-a-lifetime)).
 
-##### Replica clusters
+#### Replica clusters
 
 On a [replica cluster](replica_cluster.md) the role, and therefore its
 password, is owned by the primary cluster and replicated from it. The operator
 does not generate a password there, and says so in `status.password.message`:
 generation, and rotation, start once the cluster is promoted.
 
-#### `mode: secret`
+### `mode: secret`
 
 The operator reads the password of the role from an existing Secret that you
 create and maintain, named by `password.secret`:
@@ -390,7 +375,7 @@ This is the `password`-stanza equivalent of the deprecated `passwordSecret`
 field, and the mode to use when the password is produced by something else:
 an external secret manager, a CI pipeline, or a human.
 
-#### `mode: external`
+### `mode: external`
 
 The operator stops managing the password of the role, leaving whatever is set
 in PostgreSQL to whatever produced it:
@@ -411,7 +396,7 @@ and the operator sets it to `NULL` once before leaving the role alone. A
 password it never generated is never touched.
 :::
 
-#### `mode: setNull`
+### `mode: setNull`
 
 The operator sets the password of the role to `NULL` in PostgreSQL, disabling
 password authentication for it:
@@ -430,7 +415,7 @@ for a role whose password you want positively removed.
 This is the `password`-stanza equivalent of the deprecated `disablePassword`
 field.
 
-#### Changing the mode
+### Changing the mode
 
 Switching mode is how a role stops doing one thing and starts doing another;
 what happens to a Secret the operator generated depends on where it is going:
@@ -458,7 +443,7 @@ The same applies to `databaseRoleReclaimPolicy: retain`, where the role
 survives the deletion of the `DatabaseRole` but its generated Secret does not.
 :::
 
-### Client certificate authentication
+## Client certificate authentication
 
 The `DatabaseRole` resource supports opt-in generation of TLS client
 certificates, signed by the cluster's client CA and stored in a Kubernetes
@@ -491,7 +476,7 @@ turn issuance off while keeping the block in place.
 operator enforces this via validation and will reject the resource otherwise.
 :::
 
-#### Generated certificate Secret
+### Generated certificate Secret
 
 The operator creates a Secret named `<databaserole-name>-client-cert` in the
 same namespace. It contains two keys:
@@ -510,7 +495,7 @@ status:
     expiration: "2026-07-01T12:00:00Z"
 ```
 
-#### Configuring `pg_hba.conf`
+### Configuring `pg_hba.conf`
 
 The operator generates the certificate but does **not** modify `pg_hba.conf`
 automatically. You must add a `hostssl` rule with the `cert` method to the
@@ -531,7 +516,7 @@ psql "host=<cluster>-rw.<namespace>.svc port=5432 dbname=<db> user=dante \
   sslrootcert=/path/to/ca.crt sslmode=verify-full"
 ```
 
-#### Certificate renewal
+### Certificate renewal
 
 Client certificates inherit the operator's global certificate settings: they
 are issued with a **90-day** lifetime by default and renewed automatically once
@@ -548,7 +533,7 @@ and in the `Certificate Expiration` column of `kubectl get databaserole`; each
 renewal is recorded as a `ClientCertificateRenewed` event on the role, saying
 what triggered it.
 
-#### Turning certificate issuance off
+### Turning certificate issuance off
 
 | Scenario | Result |
 |---|---|
@@ -561,7 +546,7 @@ Secret. The Secret is only meaningful while the operator is managing the role,
 so it is always cleaned up on deletion.
 :::
 
-#### Bring-your-own-CA limitation
+### Bring-your-own-CA limitation
 
 If the cluster's client CA Secret does not contain a private key (i.e. you
 supplied your own CA via `spec.certificates.clientCASecret`), the operator
@@ -586,35 +571,7 @@ Alternatively, delete the certificate's Secret to have the operator issue a
 fresh one signed by the current CA.
 :::
 
-### Deprecated password fields
-
-A `DatabaseRole` inherits `passwordSecret` and `disablePassword` from the
-shared role configuration it has in common with
-[inline managed roles](#inline-managed-roles). Both still work, and neither is
-going away in the short term, but on a `DatabaseRole` they are **deprecated**
-in favor of the [`password` stanza](#password-authentication), which covers what they
-do and more:
-
-| Deprecated field | Equivalent | What you also gain |
-|---|---|---|
-| `passwordSecret: {name: foo}` | `password: {mode: secret, secret: foo}` | the same Secret, read the same way, but stated in one place with the rest of the password configuration |
-| `disablePassword: true` | `password: {mode: setNull}` | no separate flag whose interaction with `passwordSecret` has to be validated |
-| *(neither set)* | `password: {mode: external}` | says explicitly that something else manages the password, instead of leaving it implied |
-| *(no equivalent)* | `password: {mode: generate}` | the operator generates the password, with [criteria](#criteria) and [rotation](#rotation) |
-
-The stanza and the deprecated fields are mutually exclusive: a role uses either
-the stanza or the older fields, not both. See
-[Migrating from inline managed roles to a `DatabaseRole`](#migrating-from-inline-managed-roles-to-a-databaserole)
-for moving an existing role across.
-
-:::important
-There is no automatic migration. A role keeps using whichever form its
-manifest specifies, so existing `DatabaseRole` resources continue to work
-untouched. Adopting the stanza is an explicit edit, and one worth making
-deliberately, because the stanza cannot be removed once set.
-:::
-
-### Role reclaim policy
+## Role reclaim policy
 
 The `databaseRoleReclaimPolicy` field defines the "final act" of the operator when a
 `DatabaseRole` Custom Resource is removed from the Kubernetes API.
@@ -635,7 +592,7 @@ behalf: reassign or drop them in PostgreSQL, or switch to `retain`, to let the
 deletion complete.
 :::
 
-### Removing a role
+## Removing a role
 
 How you remove a role depends on how it was created:
 
@@ -658,7 +615,7 @@ not point a `DatabaseRole` at a role you only want to drop, since it will be
 modified before it can be removed.
 :::
 
-### Status of `DatabaseRole` resources
+## Status of `DatabaseRole` resources
 
 The `DatabaseRole` resource includes a dedicated `status` section for per-role
 observability:
@@ -707,9 +664,8 @@ reconciliation: a cause that lasts, such as a replica cluster, is stated once
 rather than repeated. The same explanation is always available in
 `status.password.message` and `status.clientCertificate.message`.
 
-If a `DatabaseRole` targets a name already managed in the Cluster spec
-(see [Coexistence and precedence](#coexistence-and-precedence)), the `applied`
-field will be `false` with the message:
+If a `DatabaseRole` targets a name already managed in the Cluster spec, which
+takes precedence over it, the `applied` field will be `false` with the message:
 
 ```
 database role is already managed by the CNPG cluster
@@ -721,182 +677,41 @@ role as *unknown* rather than failed: the `applied` field is left unset (`nil`)
 with an explanatory message. The role is reconciled normally once the cluster
 is promoted to primary.
 
----
+## Deprecated password fields
 
-## Inline managed roles
+A `DatabaseRole` inherits `passwordSecret` and `disablePassword` from the
+shared role configuration it has in common with
+[inline managed roles](#inline-managed-roles). Both still work, and neither is
+going away in the short term, but on a `DatabaseRole` they are **deprecated**
+in favor of the [`password` stanza](#password-authentication), which covers what they
+do and more:
 
-With the `managed` stanza in the cluster spec, CloudNativePG provides
-management for roles specified in `.spec.managed.roles`.
-This feature enables declarative management of existing roles, as well as the
-creation of new roles if they are not already present.
+| Deprecated field | Equivalent | What you also gain |
+|---|---|---|
+| `passwordSecret: {name: foo}` | `password: {mode: secret, secret: foo}` | the same Secret, read the same way, but stated in one place with the rest of the password configuration |
+| `disablePassword: true` | `password: {mode: setNull}` | no separate flag whose interaction with `passwordSecret` has to be validated |
+| *(neither set)* | `password: {mode: external}` | says explicitly that something else manages the password, instead of leaving it implied |
+| *(no equivalent)* | `password: {mode: generate}` | the operator generates the password, with [criteria](#criteria) and [rotation](#rotation) |
 
-Inline managed roles cover the role attributes and their passwords. Password
-generation, rotation and client certificate issuance are only available with
-[`DatabaseRole` resources](#the-databaserole-resource).
-
-### Example manifest
-
-An example manifest for a cluster with declarative role management can be found
-in the file [`cluster-example-with-roles.yaml`](samples/cluster-example-with-roles.yaml).
-
-Here is an excerpt from that file:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-spec:
-  managed:
-    roles:
-    - name: dante
-      ensure: present
-      comment: Dante Alighieri
-      login: true
-      superuser: false
-      inRoles:
-        - pg_monitor
-        - pg_signal_backend
-```
-
-### Passwords in inline managed roles
-
-An inline managed role takes its password from a Secret you supply, through
-`passwordSecret`:
-
-```yaml
-  passwordSecret:
-    name: cluster-example-dante
-```
-
-The Secret follows the [basic-auth format](#supplying-a-password-in-a-secret)
-described below.
-
-If no `passwordSecret` is specified, the instance manager will not try to
-`CREATE/ALTER` the role with a password, keeping with PostgreSQL conventions.
+The stanza and the deprecated fields are mutually exclusive: a role uses either
+the stanza or the older fields, not both. See
+[Migrating from inline managed roles to a `DatabaseRole`](#migrating-from-inline-managed-roles-to-a-databaserole)
+for moving an existing role across.
 
 :::important
-New roles created without `passwordSecret` will have a `NULL` password inside
-PostgreSQL.
+There is no automatic migration. A role keeps using whichever form its
+manifest specifies, so existing `DatabaseRole` resources continue to work
+untouched. Adopting the stanza is an explicit edit, and one worth making
+deliberately, because the stanza cannot be removed once set.
 :::
 
-To set a password to `NULL` explicitly, as opposed to simply not managing one,
-use `disablePassword`:
+-----
 
-``` yaml
-  disablePassword: true
-```
+## Password reference
 
-:::note
-It is an error to set both `passwordSecret` and `disablePassword` on a given
-role.
-:::
-
-These two fields are the only password controls available inline. On a
-`DatabaseRole` they are [deprecated](#deprecated-password-fields) in favor of
-the richer [`password` stanza](#password-authentication).
-
-### Status of inline managed roles
-
-When using the inline method, the `Cluster` status includes a comprehensive
-summary:
-
-```yaml
-status:
-  managedRolesStatus:
-    byStatus:
-      reconciled:
-      - dante
-      reserved:
-      - postgres
-      - streaming_replica
-    cannotReconcile:
-      petrarca:
-      - 'could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist'
-```
-
-Note the special sub-section `cannotReconcile` for operations the database (and
-CloudNativePG) cannot honor, and which require human intervention.
-
-This section covers roles reserved for operator use and those that are **not**
-under declarative management, providing a comprehensive view of the roles in
-the database instances.
-
-The [kubectl plugin](kubectl-plugin.md) also shows the status of managed roles
-in its `status` sub-command:
-
-``` txt
-Managed roles status
-Status                  Roles
-------                  -----
-pending-reconciliation  petrarca
-reconciled              app,dante
-reserved                postgres,streaming_replica
-
-Irreconcilable roles
-Role      Errors
-----      ------
-petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist
-```
-
----
-
-## Migrating from inline managed roles to a `DatabaseRole`
-
-You can move a role from the inline `managed.roles` stanza to a standalone
-`DatabaseRole` without disruption:
-
-1.  Create the `DatabaseRole` with the desired specification. Both methods
-    share the same [`RoleConfiguration`](cloudnative-pg.v1.md#roleconfiguration)
-    structure, so the stanza can be copied across as-is.
-2.  Remove the matching entry from `.spec.managed.roles` in the `Cluster`
-    manifest.
-3.  The operator detects the change and hands management over to the
-    `DatabaseRole`.
-
-Because the Cluster spec takes precedence while both exist (see
-[Coexistence and precedence](#coexistence-and-precedence)), the handover
-happens only once the inline entry is gone, so there is no window in which the
-role is left unmanaged.
-
-When converting a role that the inline stanza removed with `ensure: absent`,
-note that a `DatabaseRole` does not support `ensure: absent`. Express removal
-through the [reclaim policy](#role-reclaim-policy) instead: delete the resource
-with `databaseRoleReclaimPolicy: delete` to drop the role, or keep the default
-`retain` to leave it in place. See [Removing a role](#removing-a-role) for the
-full behavior.
-
-### Moving the password across
-
-Copying the inline stanza as-is carries `passwordSecret` and
-`disablePassword` with it, and that keeps working. On a `DatabaseRole` those
-fields are [deprecated](#deprecated-password-fields) though, so the migration
-is a good moment to state the password through the
-[`password` stanza](#password-authentication) instead:
-
-| Inline | On the `DatabaseRole` |
-|---|---|
-| `passwordSecret: {name: foo}` | `password: {mode: secret, secret: foo}` |
-| `disablePassword: true` | `password: {mode: setNull}` |
-| neither set | `password: {mode: external}`, which says outright that the password is managed elsewhere |
-
-Moving to the stanza also opens up what inline roles cannot do at all: having
-the operator [generate the password](#mode-generate), shape it with
-[criteria](#criteria), and [rotate](#rotation) it on a schedule. Switching an
-existing role to `mode: generate` replaces the password it currently has with
-a generated one, so plan it like any other credential change: the consumers
-of that role have to read the new password from the generated Secret.
-
-:::important
-Do the swap in one step: the `password` stanza is mutually exclusive with
-`passwordSecret` and `disablePassword`, so a manifest that carries both is
-rejected. Replace the old fields with the stanza in the same edit.
-:::
-
----
-
-## Password topics common to both methods
-
-The sections below apply to roles managed either way. Where behavior differs
-between a `DatabaseRole` and an inline managed role, it is called out.
+The sections below apply to roles managed either way, through a `DatabaseRole`
+or through the inline stanza. Where behavior differs between the two, it is
+called out.
 
 ### Supplying a password in a Secret
 
@@ -1074,6 +889,174 @@ suppression layer described above still applies in both modes.
     common case on a `password_encryption = md5` cluster), extensions such
     as `pg_stat_statements` or `pgaudit` will observe it. This is the
     expected trade-off for letting PostgreSQL choose the hash format.
+:::
+
+-----
+
+## Inline managed roles
+
+With the `managed` stanza in the cluster spec, CloudNativePG provides
+management for roles specified in `.spec.managed.roles`.
+This feature enables declarative management of existing roles, as well as the
+creation of new roles if they are not already present.
+
+Inline managed roles cover the role attributes and their passwords. Password
+generation, rotation and client certificate issuance are only available with a
+`DatabaseRole`, which is the recommended method and the one this page otherwise
+describes.
+
+### Example cluster manifest
+
+An example manifest for a cluster with declarative role management can be found
+in the file [`cluster-example-with-roles.yaml`](samples/cluster-example-with-roles.yaml).
+
+Here is an excerpt from that file:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+spec:
+  managed:
+    roles:
+    - name: dante
+      ensure: present
+      comment: Dante Alighieri
+      login: true
+      superuser: false
+      inRoles:
+        - pg_monitor
+        - pg_signal_backend
+```
+
+### Passwords in inline managed roles
+
+An inline managed role takes its password from a Secret you supply, through
+`passwordSecret`:
+
+```yaml
+  passwordSecret:
+    name: cluster-example-dante
+```
+
+The Secret follows the [basic-auth format](#supplying-a-password-in-a-secret)
+described above.
+
+If no `passwordSecret` is specified, the instance manager will not try to
+`CREATE/ALTER` the role with a password, keeping with PostgreSQL conventions.
+
+:::important
+New roles created without `passwordSecret` will have a `NULL` password inside
+PostgreSQL.
+:::
+
+To set a password to `NULL` explicitly, as opposed to simply not managing one,
+use `disablePassword`:
+
+``` yaml
+  disablePassword: true
+```
+
+:::note
+It is an error to set both `passwordSecret` and `disablePassword` on a given
+role.
+:::
+
+These two fields are the only password controls available inline. On a
+`DatabaseRole` they are [deprecated](#deprecated-password-fields) in favor of
+the richer [`password` stanza](#password-authentication).
+
+### Status of inline managed roles
+
+When using the inline method, the `Cluster` status includes a comprehensive
+summary:
+
+```yaml
+status:
+  managedRolesStatus:
+    byStatus:
+      reconciled:
+      - dante
+      reserved:
+      - postgres
+      - streaming_replica
+    cannotReconcile:
+      petrarca:
+      - 'could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist'
+```
+
+Note the special sub-section `cannotReconcile` for operations the database (and
+CloudNativePG) cannot honor, and which require human intervention.
+
+This section covers roles reserved for operator use and those that are **not**
+under declarative management, providing a comprehensive view of the roles in
+the database instances.
+
+The [kubectl plugin](kubectl-plugin.md) also shows the status of managed roles
+in its `status` sub-command:
+
+``` txt
+Managed roles status
+Status                  Roles
+------                  -----
+pending-reconciliation  petrarca
+reconciled              app,dante
+reserved                postgres,streaming_replica
+
+Irreconcilable roles
+Role      Errors
+----      ------
+petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist
+```
+
+## Migrating from inline managed roles to a `DatabaseRole`
+
+You can move a role from the inline `managed.roles` stanza to a standalone
+`DatabaseRole` without disruption:
+
+1.  Create the `DatabaseRole` with the desired specification. Both methods
+    share the same [`RoleConfiguration`](cloudnative-pg.v1.md#roleconfiguration)
+    structure, so the stanza can be copied across as-is.
+2.  Remove the matching entry from `.spec.managed.roles` in the `Cluster`
+    manifest.
+3.  The operator detects the change and hands management over to the
+    `DatabaseRole`.
+
+Because the Cluster spec takes precedence while both exist, the handover
+happens only once the inline entry is gone, so there is no window in which the
+role is left unmanaged.
+
+When converting a role that the inline stanza removed with `ensure: absent`,
+note that a `DatabaseRole` does not support `ensure: absent`. Express removal
+through the [reclaim policy](#role-reclaim-policy) instead: delete the resource
+with `databaseRoleReclaimPolicy: delete` to drop the role, or keep the default
+`retain` to leave it in place. See [Removing a role](#removing-a-role) for the
+full behavior.
+
+### Moving the password across
+
+Copying the inline stanza as-is carries `passwordSecret` and
+`disablePassword` with it, and that keeps working. On a `DatabaseRole` those
+fields are [deprecated](#deprecated-password-fields) though, so the migration
+is a good moment to state the password through the
+[`password` stanza](#password-authentication) instead:
+
+| Inline | On the `DatabaseRole` |
+|---|---|
+| `passwordSecret: {name: foo}` | `password: {mode: secret, secret: foo}` |
+| `disablePassword: true` | `password: {mode: setNull}` |
+| neither set | `password: {mode: external}`, which says outright that the password is managed elsewhere |
+
+Moving to the stanza also opens up what inline roles cannot do at all: having
+the operator [generate the password](#mode-generate), shape it with
+[criteria](#criteria), and [rotate](#rotation) it on a schedule. Switching an
+existing role to `mode: generate` replaces the password it currently has with
+a generated one, so plan it like any other credential change: the consumers
+of that role have to read the new password from the generated Secret.
+
+:::important
+Do the swap in one step: the `password` stanza is mutually exclusive with
+`passwordSecret` and `disablePassword`, so a manifest that carries both is
+rejected. Replace the old fields with the stanza in the same edit.
 :::
 
 ## Unrealizable role configurations
