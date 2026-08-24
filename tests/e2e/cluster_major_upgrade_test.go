@@ -254,7 +254,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 
 		// If same version, choose a previous one for testing
 		if currentMajor == targetMajor {
-			currentMajor = targetMajor - (uint64(rand.Int() % 4)) - 1
+			currentMajor = targetMajor - uint64(rand.Int()%4) - 1
 			GinkgoWriter.Printf("Using %v as the current major version instead.\n", currentMajor)
 		}
 

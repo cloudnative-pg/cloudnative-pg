@@ -211,16 +211,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		var errUnknownPlugin *repository.ErrUnknownPlugin
 		if errors.As(err, &errUnknownPlugin) {
-			return ctrl.Result{
-					RequeueAfter: 10 * time.Second,
-				}, r.RegisterPhase(
-					ctx,
-					cluster,
-					apiv1.PhaseUnknownPlugin,
-					fmt.Sprintf("Unknown plugin: '%s'. "+
-						"This may be caused by the plugin not being loaded correctly by the operator. "+
-						"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
-				)
+			regErr := r.RegisterPhase(
+				ctx,
+				cluster,
+				apiv1.PhaseUnknownPlugin,
+				fmt.Sprintf("Unknown plugin: '%s'. "+
+					"This may be caused by the plugin not being loaded correctly by the operator. "+
+					"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
+			)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, regErr
 		}
 
 		if regErr := r.RegisterPhase(
@@ -360,7 +359,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
 			contextLogger.Debug("Conflict error while reconciling resource status", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
@@ -426,7 +425,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		if apierrs.IsConflict(err) {
 			contextLogger.Debug("Conflict error while reconciling cluster status and instance state",
 				"error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
@@ -543,7 +542,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
 			contextLogger.Debug("Conflict error while reconciling online update", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
@@ -729,7 +728,7 @@ func (r *ClusterReconciler) handleSwitchover(
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
 			"error", err)
-		return &ctrl.Result{Requeue: true}, nil
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 	if selectedPrimary != "" {
 		// If we selected a new primary, stop the reconciliation loop here

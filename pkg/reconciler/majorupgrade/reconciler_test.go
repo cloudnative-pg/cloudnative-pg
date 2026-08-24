@@ -80,7 +80,7 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 		result, err := majorVersionUpgradeHandleCompletion(ctx, fakeClient, cluster, job, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).ToNot(BeNil())
-		Expect(*result).To(Equal(ctrl.Result{Requeue: true}))
+		Expect(*result).To(Equal(ctrl.Result{RequeueAfter: time.Second}))
 
 		// the replica PVCs have been deleted
 		for i := range pvcs {

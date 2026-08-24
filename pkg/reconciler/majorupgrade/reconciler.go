@@ -274,7 +274,7 @@ func majorVersionUpgradeHandleCompletion(
 		return nil, err
 	}
 
-	return &ctrl.Result{Requeue: true}, nil
+	return &ctrl.Result{RequeueAfter: time.Second}, nil
 }
 
 // handleRollbackIfNeeded checks whether the user rolled back the image
