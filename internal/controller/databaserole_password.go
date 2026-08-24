@@ -247,10 +247,27 @@ func setPasswordMessage(role *apiv1.DatabaseRole, message string) {
 // replacing that struct wholesale here would drop the answer and have the role
 // applied again for an expiration that already reached PostgreSQL.
 func setGeneratedPasswordState(role *apiv1.DatabaseRole, state apiv1.GeneratedPasswordState) {
-	if current := role.Status.Password; current != nil {
-		state.AppliedExpiration = current.AppliedExpiration
+	role.Status.Password = passwordWithAppliedExpiration(&state, role.Status.Password)
+}
+
+// passwordWithAppliedExpiration returns the password state to record, carrying
+// the expiration the instance manager applied over from the state already
+// recorded on the role. It is a copy, so the state the caller computed is left
+// alone, and nil when there is no state to record: a role that generates no
+// password has no expiration applied to it either.
+func passwordWithAppliedExpiration(
+	state *apiv1.GeneratedPasswordState,
+	recorded *apiv1.GeneratedPasswordState,
+) *apiv1.GeneratedPasswordState {
+	if state == nil {
+		return nil
 	}
-	role.Status.Password = &state
+
+	carried := *state
+	if recorded != nil {
+		carried.AppliedExpiration = recorded.AppliedExpiration
+	}
+	return &carried
 }
 
 // ensurePasswordSecret makes sure the Secret holding the generated password
