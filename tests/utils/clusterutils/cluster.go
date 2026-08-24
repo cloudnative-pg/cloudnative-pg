@@ -181,7 +181,7 @@ func GetPrimary(
 			}
 		}
 		err = fmt.Errorf("all pod with primary role has deletion timestamp")
-		return &(podList.Items[0]), err
+		return &podList.Items[0], err
 	}
 	err = fmt.Errorf("no primary found")
 	return &corev1.Pod{}, err

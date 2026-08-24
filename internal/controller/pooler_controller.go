@@ -129,7 +129,7 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			// Requeue a reconciliation loop since the resource
 			// changed while we were synchronizing it
 			contextLogger.Debug("Conflict while reconciling pooler status", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 	}
 

@@ -136,7 +136,7 @@ var _ = Describe("PodMonitor test", func() {
 			Spec: apiv1.ClusterSpec{
 				ImageName: "postgres:18.0",
 				Monitoring: &apiv1.MonitoringConfiguration{
-					EnablePodMonitor: true,
+					EnablePodMonitor: true, //nolint:staticcheck
 				},
 			},
 		}
@@ -154,7 +154,7 @@ var _ = Describe("PodMonitor test", func() {
 			Spec: apiv1.ClusterSpec{
 				ImageName: "postgres:18.0",
 				Monitoring: &apiv1.MonitoringConfiguration{
-					EnablePodMonitor: true,
+					EnablePodMonitor: true, //nolint:staticcheck
 					TLSConfig: &apiv1.ClusterMonitoringTLSConfiguration{
 						Enabled: true,
 					},
