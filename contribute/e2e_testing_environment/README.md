@@ -174,9 +174,21 @@ a hand-written file.
 The script can be configured through the following environment variables:
 
 - `CONTROLLER_IMG`: the controller image to deploy on K8s
-- `POSTGRES_IMG`: the PostgreSQL image used by default in the clusters
+- `POSTGRES_IMG`: the PostgreSQL image used by default in the clusters, i.e.
+  the image actually under test
 - `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
   latest minor
+- `POSTGRES_IMG_REPOSITORY`: repository used to build the PostgreSQL images
+  the suite needs but is not testing — currently only the major upgrade
+  tests' starting-version images (see `env.OfficialStandardImageName` and
+  siblings in
+  [`tests/utils/environment/environment.go`](../../tests/utils/environment/environment.go)).
+  Defaults to the operator's official repository. Downstream consumers that
+  run these tests against a PostgreSQL distribution other than the default
+  (where that distribution's own images live in a different repository than
+  `POSTGRES_IMG`) are expected to set this alongside `POSTGRES_IMG`
+- `POSTGIS_IMG_REPOSITORY`: same as `POSTGRES_IMG_REPOSITORY`, for the PostGIS
+  images
 - `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
 - `E2E_CSI_STORAGE_CLASS`: csi storage class to be used together with volume
   snapshots, depending on the provider, must be set if
@@ -187,11 +199,21 @@ The script can be configured through the following environment variables:
   using Barman Cloud on Azure blob storage
 - `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using
   Barman Cloud on Azure blob storage
+- `AZURE_BLOB_CONTAINER`: Azure blob container to test backup and restore,
+  using Barman Cloud on Azure blob storage
+- `TEST_CLOUD_VENDOR`: the cloud vendor the cluster runs on (`kind`, `k3d`,
+  `aks`, `eks`, `gke`, `ocp`); selects vendor-specific behaviour in the suite
+  (e.g. specs that don't apply to a given vendor). Defaults to `kind`
 - `TEST_DEPTH`: maximum test level included in the run.
    From `0` (only critical tests) to `4` (all the tests), default `2`
+- `TEST_TIMEOUTS`: a JSON object partially overriding the default timeout, in
+  seconds, of the named suite events (e.g. `{"failover": 240}`)
 - `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex:
   smoke, basic, security... details can be fetched from labels file
   [`tests/labels.go`](../../tests/labels.go)
+- `BRANCH_NAME`: the git branch the suite is running from, used to detect
+  release branches (e.g. to pick the correct "previous release" for the
+  operator upgrade tests). When unset, it is detected via git
 - `CNPG_DEPLOYMENT_METHOD`: the deployment method to choose between `manifest`
   and `helm`; default `manifest`, helm to be used only for kind and k3d
   clusters; other environments will ignore it and use manifest.
@@ -204,6 +226,11 @@ The script can be configured through the following environment variables:
   as `v0.12.0`, `pr-<number>` to install the testing images its CI publishes
   for a pull request, or the name of a `plugin-barman-cloud` branch to install
   the testing images its CI publishes for that branch.
+- `BARMAN_PLUGIN_VERSION_RESOLVED`: the `plugin-barman-cloud` version that was
+  actually installed once `BARMAN_PLUGIN_VERSION` has been resolved to a
+  concrete tag (e.g. `release`/`main`/`pr-<number>` resolve to a version
+  number). Purely informational, shown in the suite banner; normally set by
+  the `hack/e2e` scripts themselves rather than by the caller
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:
@@ -216,6 +243,29 @@ Additionally, you can specify a DockerHub mirror to be used by
 specifying the following variable
 
 - `DOCKER_REGISTRY_MIRROR`: DockerHub mirror URL (i.e. https://mirror.gcr.io)
+
+The following variables let the major upgrade tests target images from a
+registry other than the official one, keeping the same tags but overriding
+the suffix of each image flavor. They are consumed by
+[`tests/e2e/cluster_major_upgrade_test.go`](../../tests/e2e/cluster_major_upgrade_test.go)
+and are meant to be set by an external, downstream workflow driving these
+tests against custom-built images (e.g. PostgreSQL trunk snapshots), not by
+anything in this repository's own CI:
+
+- `POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY`: registry the major upgrade target
+  images are pulled from. When unset, the official images are used and the
+  rest of this group is ignored
+- `POSTGRES_MAJOR_UPGRADE_STANDARD_SUFFIX`: tag suffix of the standard image
+  flavor. Default `-standard-trixie`
+- `POSTGRES_MAJOR_UPGRADE_MINIMAL_SUFFIX`: tag suffix of the minimal image
+  flavor. Default `-minimal-trixie`
+- `POSTGRES_MAJOR_UPGRADE_SYSTEM_SUFFIX`: tag suffix of the system image
+  flavor (includes barman-cloud tools). Default `-system-trixie`
+- `POSTGRES_MAJOR_UPGRADE_POSTGIS_SUFFIX`: tag suffix of the PostGIS image
+  flavor. Default `-postgis-trixie`
+- `POSTGRES_MAJOR_UPGRADE_SKIP_ARCHIVE_SCENARIO`: when set to any non-empty
+  value, skips the "system" (barman-cloud-archive) scenario in the major
+  upgrade suite
 
 To run E2E testing you can also use `TEST_UPGRADE_TO_V1=false make e2e-test-kind`.
 Replace `-kind` with `-k3d` to run it on `k3d`.
@@ -261,6 +311,7 @@ timeouts:                       # partial override of the default timeouts
 deployment:
   method: manifest
   barmanPluginVersion: release
+  barmanPluginVersionResolved: v0.7.0   # informational; the version actually installed
 registryPullSecret:             # pull secret for a private registry
   server: registry.example.com
   username: user
@@ -271,8 +322,13 @@ azure:                          # Azure Blob Storage backup tests only
   blobContainer: container
 preserveNamespaces:
   - my-namespace
+branchName: main                # used to detect release branches
 majorUpgrade:                   # postgres-trunk-containers variants only
   imageRegistry: registry.example.com/trunk
+  standardSuffix: -standard-trixie
+  minimalSuffix: -minimal-trixie
+  systemSuffix: -system-trixie
+  postgisSuffix: -postgis-trixie
   skipArchiveScenario: false
 ```
 
