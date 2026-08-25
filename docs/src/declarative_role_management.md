@@ -230,6 +230,9 @@ spec:
 `clientCertificate: {}` is equivalent to enabling it. Set `enabled: false` to
 turn issuance off while keeping the block in place.
 
+The optional `duration` and `renewBefore` fields override the operator-wide
+certificate lifetime for this role; see [Renewal](#renewal).
+
 :::important
 `login: true` is required when `clientCertificate` issuance is enabled. The
 operator enforces this via validation and will reject the resource otherwise.
@@ -254,6 +257,9 @@ status:
     expiration: "2026-07-01T12:00:00Z"
 ```
 
+When no certificate could be issued, `expiration` stays empty and
+`status.clientCertificate.message` explains why.
+
 #### Configuring `pg_hba.conf`
 
 The operator generates the certificate but does **not** modify `pg_hba.conf`
@@ -275,19 +281,61 @@ psql "host=<cluster>-rw.<namespace>.svc port=5432 dbname=<db> user=dante \
   sslrootcert=/path/to/ca.crt sslmode=verify-full"
 ```
 
+`tls.crt` and `tls.key` are the two keys of the role's `<databaserole-name>-client-cert`
+Secret. `ca.crt` is not: `sslmode=verify-full` makes the client verify the
+*server* certificate, so that file is the `ca.crt` key of the cluster's server
+CA Secret, `<cluster>-ca`.
+
+Set the `umask` before writing the files out: libpq rejects a private key that
+is group- or world-readable, with an error that reads like a problem with the
+certificate rather than with its permissions.
+
+```sh
+umask 077
+kubectl get secret role-dante-client-cert \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d > tls.crt
+kubectl get secret role-dante-client-cert \
+  -o jsonpath='{.data.tls\.key}' | base64 -d > tls.key
+kubectl get secret cluster-example-ca \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
+```
+
+The same applies to a Secret mounted into a pod. See
+[Client TLS/SSL connections](ssl_connections.md) for a complete example.
+
 #### Renewal
 
-Client certificates inherit the operator's global certificate settings: they
-are issued with a **90-day** lifetime by default and renewed automatically once
-they fall within **7 days** of expiry. Both values are operator-wide and
-configurable via the `CERTIFICATE_DURATION` and `EXPIRING_CHECK_THRESHOLD`
-operator settings; they are not configurable per `DatabaseRole`.
+By default, client certificates inherit the operator's global certificate
+settings: a **90-day** lifetime, renewed automatically once they fall within
+**7 days** of expiry. These defaults are controlled by the operator-wide
+`CERTIFICATE_DURATION` and `EXPIRING_CHECK_THRESHOLD` settings.
 
-Renewal is driven by the reconcile loop: the operator checks whether the
-certificate is approaching expiry and re-signs it if needed. Reconciles are
-scheduled at least once per hour when `clientCertificate` issuance is enabled,
-so renewal happens well before expiry even without a triggering event. The
-current expiration is always reflected in `status.clientCertificate.expiration`.
+A role can set its own lifetime and renewal lead time instead:
+
+```yaml
+clientCertificate:
+  enabled: true
+  duration: 720h    # 30 days
+  renewBefore: 24h  # renew one day before expiry
+```
+
+Both fields take Go duration units, so a day has to be written as hours: `90d`
+is not a valid value, `2160h` is. `duration` must be at least 1 minute, and
+`renewBefore` at least 30 seconds and at most half of `duration`. Setting
+`renewBefore` requires `duration`; leaving it out keeps the operator-wide
+threshold, capped at half the lifetime.
+
+Changing `duration`, or the operator-wide `CERTIFICATE_DURATION` for the roles
+that do not set their own, re-issues the certificate.
+
+:::important
+Every renewal replaces `tls.key` as well as `tls.crt`, and the Secret only ever
+holds one key pair. Established sessions are unaffected, but a client that reads
+the files once at startup, as connection pools and most drivers do, keeps
+presenting the old certificate until it reloads them, and authentication starts
+failing once that certificate expires. Set `duration` no shorter than the
+interval at which your clients reload their credentials.
+:::
 
 #### Deletion and opt-out
 

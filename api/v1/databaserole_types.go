@@ -88,12 +88,33 @@ type DatabaseRoleSpec struct {
 
 // ClientCertificateConfiguration configures operator-managed issuance of a TLS
 // client certificate for a DatabaseRole.
+// +kubebuilder:validation:XValidation:rule="!has(self.duration) || self.duration.matches('^([0-9]+([.][0-9]+)?(ns|us|ms|s|m|h))+$')",message="duration must be expressed in Go duration units, where a day is not a unit: 90 days is 2160h"
+// +kubebuilder:validation:XValidation:rule="!has(self.renewBefore) || self.renewBefore.matches('^([0-9]+([.][0-9]+)?(ns|us|ms|s|m|h))+$')",message="renewBefore must be expressed in Go duration units, where a day is not a unit: 7 days is 168h"
+// +kubebuilder:validation:XValidation:rule="!has(self.renewBefore) || has(self.duration)",message="renewBefore requires duration to be set"
+// +kubebuilder:validation:XValidation:rule="!has(self.renewBefore) || !has(self.duration) || !self.renewBefore.matches('^([0-9]+([.][0-9]+)?(ns|us|ms|s|m|h))+$') || !self.duration.matches('^([0-9]+([.][0-9]+)?(ns|us|ms|s|m|h))+$') || duration(self.renewBefore) + duration(self.renewBefore) <= duration(self.duration)",message="renewBefore must be at most half of duration"
+// +kubebuilder:validation:XValidation:rule="!has(self.duration) || !self.duration.matches('^([0-9]+([.][0-9]+)?(ns|us|ms|s|m|h))+$') || duration(self.duration) >= duration('1m')",message="duration must be at least 1m"
+// +kubebuilder:validation:XValidation:rule="!has(self.renewBefore) || !self.renewBefore.matches('^([0-9]+([.][0-9]+)?(ns|us|ms|s|m|h))+$') || duration(self.renewBefore) >= duration('30s')",message="renewBefore must be at least 30s"
 type ClientCertificateConfiguration struct {
 	// Enabled turns on client certificate issuance for this role. When true,
 	// the role must have login enabled. Defaults to true when the block is present.
 	// +kubebuilder:default:=true
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
+
+	// Duration is the lifetime of the generated client certificate, at least one
+	// minute. Expressed in Go duration units, so a day has to be written as
+	// hours: 90 days is `2160h`. Defaults to the operator's
+	// `CERTIFICATE_DURATION` setting (90 days).
+	// +optional
+	Duration *metav1.Duration `json:"duration,omitempty"`
+
+	// RenewBefore is how long before expiry the certificate is renewed, in Go
+	// duration units, at most half of `duration` and only accepted together with
+	// it. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting (7 days),
+	// capped at half the lifetime. Renewal generates a new private key along with
+	// the new certificate.
+	// +optional
+	RenewBefore *metav1.Duration `json:"renewBefore,omitempty"`
 }
 
 // ClientCertificateState holds the observed state of the generated TLS client certificate.
@@ -146,6 +167,7 @@ type DatabaseRoleStatus struct {
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 // +kubebuilder:printcolumn:name="PG Name",type="string",JSONPath=".spec.name"
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
+// +kubebuilder:printcolumn:name="Cert Expiration",type="string",JSONPath=".status.clientCertificate.expiration",description="Expiration of the generated client certificate"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest reconciliation message"
 
 // DatabaseRole is the Schema for the databaseroles API
