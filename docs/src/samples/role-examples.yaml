@@ -33,3 +33,5 @@ spec:
     renewBefore: 96h   # 4 days
   clientCertificate:
     enabled: true
+    duration: 720h
+    renewBefore: 24h
