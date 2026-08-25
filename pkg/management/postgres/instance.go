@@ -599,7 +599,7 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 	contextLogger := log.FromContext(ctx)
 
 	// check instance status
-	if !instance.isStatusRunning() {
+	if !instance.IsStatusRunning() {
 		return fmt.Errorf("instance is not running")
 	}
 
@@ -770,7 +770,7 @@ func (instance *Instance) checkImmediateShutdownUnresponsive(ctx context.Context
 	if shutdownErr == nil {
 		return
 	}
-	if instance.isStatusRunning() {
+	if instance.IsStatusRunning() {
 		log.FromContext(ctx).Error(shutdownErr,
 			"PostgreSQL did not honor the immediate shutdown request within its timeout, "+
 				"marking the instance as unresponsive")
@@ -785,8 +785,8 @@ func (instance *Instance) IsImmediateShutdownUnresponsive() bool {
 	return instance.immediateShutdownUnresponsive.Load()
 }
 
-// isStatusRunning checks the status of a running server using pg_ctl status
-func (instance *Instance) isStatusRunning() bool {
+// IsStatusRunning checks the status of a running server using pg_ctl status
+func (instance *Instance) IsStatusRunning() bool {
 	options := []string{
 		"-D",
 		instance.PgData,

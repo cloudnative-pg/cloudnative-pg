@@ -656,6 +656,16 @@ func (r *InstanceReconciler) shutdownUnreachableOldPrimary(
 		return false, err
 	}
 
+	if !r.instance.IsStatusRunning() {
+		// PostgreSQL isn't just unreachable: there is no postmaster to signal at all,
+		// most likely because it already completed a shutdown requested elsewhere
+		// (e.g. the instance manager reacting to SIGTERM). Requesting a shutdown here
+		// would have nothing to act on it: the lifecycle manager that would normally
+		// receive the request may have already exited, and the request would block
+		// forever on the unbuffered command channel.
+		return false, nil
+	}
+
 	contextLogger.Info("This is an unreachable former primary instance. " +
 		"Demoting it by shutting it down immediately.")
 
