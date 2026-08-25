@@ -156,6 +156,56 @@ var _ = Describe("Keypair generation", func() {
 			Expect(cert.CheckSignatureFrom(caCert)).ToNot(HaveOccurred())
 		})
 
+		It("keeps the certificate's encoded lifetime equal to the requested duration "+
+			"even when the duration has a sub-second remainder", func() {
+			rootCA, err := CreateRootCA("test", "namespace")
+			Expect(err).ToNot(HaveOccurred())
+
+			// x509 validity fields have no sub-second precision, so notBefore is
+			// truncated to a whole second before notAfter is computed from it.
+			// Without that truncation, whether the encoded lifetime gains an
+			// extra second depends on the wall clock's fractional second at
+			// signing time. Aligning past the 600ms mark right before signing,
+			// with a 500ms request, guarantees that carry would happen if the
+			// truncation were missing, making this deterministic rather than
+			// depending on when the test happens to run.
+			for time.Now().Nanosecond() < 600_000_000 {
+				time.Sleep(time.Millisecond)
+			}
+
+			requested := 2*time.Hour + 500*time.Millisecond
+			pair, err := rootCA.CreateAndSignPairWithDuration("this.host.name.com", CertTypeServer, nil, requested)
+			Expect(err).ToNot(HaveOccurred())
+
+			cert, err := pair.ParseCertificate()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cert.NotAfter.Sub(cert.NotBefore)).To(Equal(requested.Truncate(time.Second)))
+		})
+
+		It("issues a short-lived certificate that is still valid when signed", func() {
+			rootCA, err := CreateRootCA("test", "namespace")
+			Expect(err).ToNot(HaveOccurred())
+
+			// notBefore is backdated to tolerate clock skew. That allowance
+			// scales with the lifetime, because a fixed five minutes would put
+			// notAfter in the past for any duration below five minutes and the
+			// certificate would be expired the moment it was signed.
+			requested := time.Minute
+			pair, err := rootCA.CreateAndSignPairWithDuration("this.host.name.com", CertTypeServer, nil, requested)
+			Expect(err).ToNot(HaveOccurred())
+
+			cert, err := pair.ParseCertificate()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cert.NotAfter.Sub(cert.NotBefore)).To(Equal(requested))
+			Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
+			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
+		})
+
+		It("caps the clock skew allowance at five minutes for a long-lived certificate", func() {
+			Expect(clockSkewAllowance(90 * 24 * time.Hour)).To(Equal(5 * time.Minute))
+			Expect(clockSkewAllowance(time.Minute)).To(Equal(6 * time.Second))
+		})
+
 		It("should create a CA K8s corev1/secret resource structure", func() {
 			rootCA, err := CreateRootCA("test", "namespace")
 			Expect(err).ToNot(HaveOccurred())
@@ -351,36 +401,36 @@ var _ = Describe("Certicate duration and expiration threshold", func() {
 	})
 
 	It("returns the default duration", func() {
-		duration := getCertificateDuration()
+		duration := CertificateDuration()
 		Expect(duration).To(BeEquivalentTo(defaultCertificateDuration))
 	})
 
 	It("returns the default duration if the configuration is a negative value", func() {
 		configuration.Current.CertificateDuration = -1
-		duration := getCertificateDuration()
+		duration := CertificateDuration()
 		Expect(duration).To(BeEquivalentTo(defaultCertificateDuration))
 	})
 
 	It("returns a valid duration of 10 days", func() {
 		configuration.Current.CertificateDuration = 10
-		duration := getCertificateDuration()
+		duration := CertificateDuration()
 		Expect(duration).To(BeEquivalentTo(tenDays))
 	})
 
 	It("returns the default check threshold", func() {
-		threshold := getCheckThreshold()
+		threshold := CheckThreshold()
 		Expect(threshold).To(BeEquivalentTo(defaultExpiringThreshold))
 	})
 
 	It("returns the default check threshold if the configuration is a negative value", func() {
 		configuration.Current.ExpiringCheckThreshold = -1
-		threshold := getCheckThreshold()
+		threshold := CheckThreshold()
 		Expect(threshold).To(BeEquivalentTo(defaultExpiringThreshold))
 	})
 
 	It("returns a valid threshold of 10 days", func() {
 		configuration.Current.ExpiringCheckThreshold = 10
-		threshold := getCheckThreshold()
+		threshold := CheckThreshold()
 		Expect(threshold).To(BeEquivalentTo(tenDays))
 	})
 })

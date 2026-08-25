@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -50,11 +49,6 @@ type DatabaseRoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
-
-// clientCertReconcileInterval is the requeue period for roles with client
-// certificate issuance enabled, ensuring the certificate is renewed before
-// expiry even in the absence of a triggering event.
-const clientCertReconcileInterval = time.Hour
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/status,verbs=get;update;patch;watch
@@ -96,7 +90,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if role.IsClientCertificateEnabled() {
-		return ctrl.Result{RequeueAfter: clientCertReconcileInterval}, nil
+		return ctrl.Result{RequeueAfter: clientCertRequeueAfter(&role)}, nil
 	}
 	return ctrl.Result{}, nil
 }
