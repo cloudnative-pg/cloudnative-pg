@@ -7,17 +7,6 @@ title: PostgreSQL Role management
 # PostgreSQL Role management
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-:::info
-From its inception, CloudNativePG has managed the creation of specific roles
-required in PostgreSQL instances:
-
-- some reserved users, such as the `postgres` superuser, `streaming_replica`
-  and `cnpg_pooler_pgbouncer` (when the PgBouncer `Pooler` is used)
-- The application user, set as the low-privilege owner of the application database
-
-This process is described in the ["Bootstrap"](bootstrap.md) section.
-:::
-
 CloudNativePG provides full lifecycle management for PostgreSQL database roles.
 This page is about doing it with the **`DatabaseRole` custom resource**, which
 is the recommended way: it is a dedicated, Kubernetes-native resource that
@@ -54,12 +43,7 @@ precedence**: the `DatabaseRole` is not reconciled, and reports the conflict in
 its status.
 :::
 
-:::important
-Declarative role management ignores roles that exist in the database but are
-not included in either the Cluster spec or a `DatabaseRole`. The lifecycle of
-those roles continues to be managed within PostgreSQL, allowing you to adopt
-this feature at your convenience.
-
+:::note
 A `DatabaseRole` is applied when its specification or its password Secret
 changes. Changes made directly in the database, such as a manual
 `ALTER ROLE`, are not detected or reverted until the next time the resource
@@ -75,6 +59,35 @@ through `spec.cluster`, and any Secret it reads a password from must all live in
 the same namespace.
 
 -----
+
+## Roles you can manage
+
+Declarative role management acts only on the roles you name. A role that exists
+in the database but appears in neither the `Cluster` specification nor a
+`DatabaseRole` is left alone, and its lifecycle continues to be managed within
+PostgreSQL. You can adopt this feature one role at a time, at your convenience.
+
+Some names are reserved, and both methods refuse them:
+
+| Reserved name | Belongs to |
+|---|---|
+| `postgres` | The superuser, managed by the operator |
+| `streaming_replica` | The operator, for streaming replication |
+| `pg_*` | PostgreSQL |
+| `cnpg_*` | The operator, including `cnpg_pooler_pgbouncer` when a PgBouncer [`Pooler`](connection_pooling.md) is used |
+
+A `DatabaseRole` naming one of these is rejected by the API server as soon as
+you apply it, whether or not the operator's webhooks are enabled. The same name
+in `managed.roles` is rejected by the `Cluster` webhook.
+
+Reserved roles are created when the cluster is initialized, as described in
+[Bootstrap](bootstrap.md), along with the owner of the application database
+(`app`, unless your bootstrap configuration names it otherwise). That owner is
+provided by CloudNativePG but is not reserved, so a `DatabaseRole` can manage
+it. Leave the `password` stanza out when it does: the operator keeps that
+password aligned with the `<cluster-name>-app` Secret, and a `DatabaseRole`
+carrying no `password` stanza manages the other attributes of the role while
+leaving its password alone.
 
 ## General role configuration notes
 
