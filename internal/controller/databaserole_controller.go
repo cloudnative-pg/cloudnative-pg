@@ -207,20 +207,22 @@ func nextRoleSecretReconcile(role *apiv1.DatabaseRole) time.Duration {
 
 // untilPasswordRenewal returns how long from now the password of the role is
 // due for renewal, falling back to the fixed roleSecretReconcileInterval when
-// its recorded expiration cannot be read, and flooring at one second when the
+// its recorded issue time cannot be read, and flooring at one second when the
 // deadline has already passed, since a non-positive RequeueAfter would mean no
 // further requeue at all rather than a prompt retry.
 func untilPasswordRenewal(role *apiv1.DatabaseRole) time.Duration {
-	if role.Status.Password == nil || role.Status.Password.Expiration == "" {
+	if role.Status.Password == nil || role.Status.Password.IssuedAt == "" {
 		return roleSecretReconcileInterval
 	}
 
-	expiration, err := time.Parse(time.RFC3339, role.Status.Password.Expiration)
+	// The same deadline the rotation aims at, recomputed from the issue time so
+	// that shortening the lifetime brings the requeue forward with it. The issue
+	// time is recorded, so no fallback is needed here.
+	renewalDue, err := passwordRenewalDue(role, time.Time{})
 	if err != nil {
 		return roleSecretReconcileInterval
 	}
 
-	renewalDue := expiration.Add(-passwordRenewBefore(role))
 	if untilRenewal := time.Until(renewalDue); untilRenewal > 0 {
 		return untilRenewal
 	}
