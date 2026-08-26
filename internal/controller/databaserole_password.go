@@ -240,34 +240,27 @@ func setPasswordMessage(role *apiv1.DatabaseRole, message string) {
 	role.Status.Password = &state
 }
 
-// setGeneratedPasswordState records what the operator knows about the password
-// it generated, carrying forward what the instance manager recorded about what
-// it did with it. The operator describes the password; the instance manager
-// answers with the expiration it applied to the role, in the same struct, so
-// replacing that struct wholesale here would drop the answer and have the role
-// applied again for an expiration that already reached PostgreSQL.
-func setGeneratedPasswordState(role *apiv1.DatabaseRole, state apiv1.GeneratedPasswordState) {
-	role.Status.Password = passwordWithAppliedExpiration(&state, role.Status.Password)
-}
-
-// passwordWithAppliedExpiration returns the password state to record, carrying
-// the expiration the instance manager applied over from the state already
-// recorded on the role. It is a copy, so the state the caller computed is left
-// alone, and nil when there is no state to record: a role that generates no
-// password has no expiration applied to it either.
-func passwordWithAppliedExpiration(
-	state *apiv1.GeneratedPasswordState,
-	recorded *apiv1.GeneratedPasswordState,
-) *apiv1.GeneratedPasswordState {
+// setGeneratedPasswordState records on the role what the operator knows about
+// the password it generated, field by field: the operator describes the
+// password, and the instance manager answers in the same struct with the
+// expiration it applied to the role, which assigning that struct wholesale
+// would drop, having the role applied again for an expiration that already
+// reached PostgreSQL. A nil state is a role that generates no password, which
+// has no applied expiration either.
+func setGeneratedPasswordState(role *apiv1.DatabaseRole, state *apiv1.GeneratedPasswordState) {
 	if state == nil {
-		return nil
+		role.Status.Password = nil
+		return
 	}
 
-	carried := *state
-	if recorded != nil {
-		carried.AppliedExpiration = recorded.AppliedExpiration
+	if role.Status.Password == nil {
+		role.Status.Password = &apiv1.GeneratedPasswordState{}
 	}
-	return &carried
+	role.Status.Password.SecretName = state.SecretName
+	role.Status.Password.IssuedAt = state.IssuedAt
+	role.Status.Password.Expiration = state.Expiration
+	role.Status.Password.Message = state.Message
+	role.Status.Password.PendingRevocation = state.PendingRevocation
 }
 
 // ensurePasswordSecret makes sure the Secret holding the generated password
@@ -333,7 +326,7 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 		}
 	}
 
-	setGeneratedPasswordState(role, apiv1.GeneratedPasswordState{
+	setGeneratedPasswordState(role, &apiv1.GeneratedPasswordState{
 		SecretName: secretKey.Name,
 		IssuedAt:   issuedAtString,
 		Expiration: expiration,
