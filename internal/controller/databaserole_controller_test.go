@@ -173,7 +173,10 @@ var _ = Describe("DatabaseRole operator-side controller", func() {
 })
 
 var _ = Describe("nextRoleSecretReconcile", func() {
-	roleWithPassword := func(expiration string) *apiv1.DatabaseRole {
+	// The renewal deadline is the issue time plus the five minute lifetime,
+	// minus the one minute renewal window, so it falls four minutes after the
+	// password was issued.
+	roleWithPassword := func(issuedAt string) *apiv1.DatabaseRole {
 		return &apiv1.DatabaseRole{
 			Spec: apiv1.DatabaseRoleSpec{
 				Password: &apiv1.PasswordConfiguration{
@@ -183,7 +186,7 @@ var _ = Describe("nextRoleSecretReconcile", func() {
 				},
 			},
 			Status: apiv1.DatabaseRoleStatus{
-				Password: &apiv1.GeneratedPasswordState{Expiration: expiration},
+				Password: &apiv1.GeneratedPasswordState{IssuedAt: issuedAt},
 			},
 		}
 	}
@@ -203,14 +206,22 @@ var _ = Describe("nextRoleSecretReconcile", func() {
 	})
 
 	It("targets the renewal deadline, not the fixed interval, when password rotation is enabled", func() {
-		expiration := time.Now().Add(2 * time.Minute).UTC().Format(time.RFC3339)
-		role := roleWithPassword(expiration)
+		issuedAt := time.Now().Add(-3 * time.Minute).UTC().Format(time.RFC3339)
+		role := roleWithPassword(issuedAt)
 		Expect(nextRoleSecretReconcile(role)).To(BeNumerically("~", time.Minute, time.Second))
 	})
 
+	It("brings the deadline forward as soon as the requested lifetime is shortened", func() {
+		issuedAt := time.Now().Add(-3 * time.Minute).UTC().Format(time.RFC3339)
+		role := roleWithPassword(issuedAt)
+		role.Spec.Password.Duration = &metav1.Duration{Duration: time.Minute}
+		role.Spec.Password.RenewBefore = &metav1.Duration{Duration: 30 * time.Second}
+		Expect(nextRoleSecretReconcile(role)).To(Equal(time.Second))
+	})
+
 	It("picks whichever of the certificate or the password deadline comes first", func() {
-		expiration := time.Now().Add(2 * time.Minute).UTC().Format(time.RFC3339)
-		role := roleWithPassword(expiration)
+		issuedAt := time.Now().Add(-3 * time.Minute).UTC().Format(time.RFC3339)
+		role := roleWithPassword(issuedAt)
 		role.Spec.ClientCertificate = &apiv1.ClientCertificateConfiguration{Enabled: ptr.To(true)}
 		Expect(nextRoleSecretReconcile(role)).To(BeNumerically("~", time.Minute, time.Second))
 	})
@@ -221,19 +232,17 @@ var _ = Describe("nextRoleSecretReconcile", func() {
 	})
 
 	It("retries soon, rather than not at all, when the deadline has already passed", func() {
-		expiration := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
-		role := roleWithPassword(expiration)
+		issuedAt := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+		role := roleWithPassword(issuedAt)
 		next := nextRoleSecretReconcile(role)
 		Expect(next).To(BeNumerically(">", 0))
 		Expect(next).To(BeNumerically("<=", time.Second))
 	})
 
 	It("backs off from a deadline the operator has explained it cannot honor", func() {
-		// The message says the password cannot be rotated at all, and nothing
-		// about that clears with time: retrying every second would spin until
-		// somebody fixes the role or its Secret, which reconciles it anyway.
-		expiration := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
-		role := roleWithPassword(expiration)
+		// The message means the password can't be rotated, and won't clear on its own.
+		issuedAt := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+		role := roleWithPassword(issuedAt)
 		role.Status.Password.Message = "Secret \"role-dante-password\" already exists and is not owned"
 		Expect(nextRoleSecretReconcile(role)).To(Equal(roleSecretReconcileInterval))
 	})
