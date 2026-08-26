@@ -819,6 +819,7 @@ clusterspec
 clusterstatus
 cmd
 cn
+cncf
 cnp
 cnpg
 codebase
