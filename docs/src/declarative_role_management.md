@@ -388,6 +388,11 @@ This is the `password`-stanza equivalent of the deprecated `passwordSecret`
 field, and the mode to use when the password is produced by something else:
 an external secret manager, a CI pipeline, or a human.
 
+For a worked example, see
+[managing the password of a `DatabaseRole`](cncf-projects/external-secrets.md#managing-the-password-of-a-databaserole)
+with the External Secrets Operator, which generates and rotates the password
+while CloudNativePG applies it.
+
 ### `mode: external`
 
 The operator stops managing the password of the role, leaving whatever is set
