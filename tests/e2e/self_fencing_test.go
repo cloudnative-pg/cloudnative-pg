@@ -132,10 +132,27 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseFailOver}, 120)
 
+			// The isolated primary can't reach the apiserver to release its
+			// primary lease gracefully, so the controller has to wait out the
+			// full lease duration (GetPrimaryLeaseDuration, 15s by default)
+			// before it is willing to elect a new target primary. Give that
+			// its own, more generous budget, separate from the timeout for
+			// the actual promotion below.
+			var targetPrimary string
 			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(cluster.Status.CurrentPrimary).ToNot(BeEquivalentTo(oldPrimaryPod.Name))
+				g.Expect(cluster.Status.TargetPrimary).ToNot(Or(
+					BeEquivalentTo(oldPrimaryPod.Name),
+					BeEquivalentTo(apiv1.PendingFailoverMarker),
+				))
+				targetPrimary = cluster.Status.TargetPrimary
+			}, testTimeouts[timeouts.NewTargetOnFailover]).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(cluster.Status.CurrentPrimary).To(BeEquivalentTo(targetPrimary))
 			}, testTimeouts[timeouts.NewPrimaryAfterFailover]).Should(Succeed())
 		})
 
