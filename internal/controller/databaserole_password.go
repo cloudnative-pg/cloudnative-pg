@@ -57,12 +57,10 @@ const (
 	// explicitly allowed to.
 	maxGeneratedDigits = 10
 
-	// passwordSecretNotOwnedMessage says what a role asking for a generated
-	// password gets when the name is taken by a Secret the operator does not
-	// own: the password that Secret holds, and no generation, which is what
-	// `mode: secret` does. Spelling it out matters because the role keeps
-	// working, so nothing else would show that the generation, and the
-	// rotation with it, is not happening.
+	// passwordSecretNotOwnedMessage is shown when the generated password's Secret
+	// name is taken by a Secret the operator doesn't own: the role keeps working
+	// off that Secret's password, so nothing else would surface that generation
+	// stopped.
 	passwordSecretNotOwnedMessage = "Secret %q already exists and is not owned by this DatabaseRole: " +
 		"the password it holds is applied to the role, and no password is generated or rotated for it. " +
 		"Point password.secret at a name of its own, or use mode: secret to read from this Secret"
@@ -124,11 +122,9 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 		return nil
 	}
 
-	// On a replica cluster the role, and therefore its password, is owned by the
-	// primary cluster and replicated from it: a password generated here would
-	// never be applied, and publishing it would hand out a credential that does
-	// not work. An already generated Secret is left in place, since it still
-	// holds the password the role had when this cluster was a primary.
+	// On a replica cluster the role's password is owned by the primary and
+	// replicated from it, so one generated here would never be applied. Leave
+	// an already-generated Secret in place.
 	if cluster.IsReplica() {
 		setPasswordMessage(role, fmt.Sprintf(
 			"cluster %q is a replica cluster: the password of this role is owned by the primary cluster, "+
@@ -137,12 +133,9 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 		return nil
 	}
 
-	// The password is generated somewhere else now: the Secret it used to be
-	// generated into keeps a credential the operator no longer maintains, and
-	// nothing else is going to remove it while the role lives on. This waits
-	// until a password can actually be generated again, so that a cluster that
-	// is missing, or not a primary, does not cost the role the only Secret it
-	// has.
+	// The password moved to a different Secret name: clean up the old one only
+	// once a new one can actually be generated, so a missing or non-primary
+	// cluster doesn't cost the role its only Secret in the meantime.
 	if generatedSecretName != "" && generatedSecretName != secretKey.Name {
 		if err := r.deleteOwnedPasswordSecret(ctx, role, client.ObjectKey{
 			Namespace: role.Namespace,
@@ -166,11 +159,10 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 	return nil
 }
 
-// stopGeneratingPassword cleans up after a role that does not generate its
-// password any more. The Secret the operator generated goes, and the record of
-// it with it, unless the password it held is still set on the role in
-// PostgreSQL with nothing left to read it: that one is recorded as a revocation
-// for the instance manager to apply.
+// stopGeneratingPassword cleans up after a role that no longer generates its
+// password: the generated Secret and its status record are removed, unless the
+// last password is still set in PostgreSQL, in which case a revocation is
+// recorded for the instance manager to apply.
 func (r *DatabaseRoleReconciler) stopGeneratingPassword(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
@@ -199,11 +191,9 @@ func (r *DatabaseRoleReconciler) stopGeneratingPassword(
 		return err
 	}
 
-	// A cleared status is how deleteOwnedPasswordSecret reports the Secret
-	// really was the operator's to delete, and the password it held is still
-	// the one set on the role in PostgreSQL. Only `external` reaches this with
-	// that password left to deal with: `setNull` sets it to NULL anyway, and
-	// `secret` replaces it with the one it reads.
+	// A cleared status means the Secret really was deleted, and its password is
+	// still set on the role in PostgreSQL. Only mode `external` reaches this
+	// still needing revocation: `setNull` and `secret` replace the password.
 	if role.Status.Password == nil &&
 		role.Spec.Password != nil &&
 		role.Spec.Password.Mode == apiv1.PasswordModeExternal {
@@ -221,12 +211,10 @@ func passwordMessage(role *apiv1.DatabaseRole) string {
 	return role.Status.Password.Message
 }
 
-// setPasswordMessage explains in the status why the password of the role is not
-// being generated, keeping what the operator recorded about the password it
-// generated last: the Secret name, its only record to clean that Secret up
-// later, and the issue and expiration times the role's VALID UNTIL follows.
-// Dropping those while rotation is stalled would lift the expiration
-// PostgreSQL enforces, and hide the deadline exactly when it matters.
+// setPasswordMessage explains in the status why the password is not being
+// generated, without dropping the Secret name and issue/expiration times
+// already recorded: losing those while rotation is stalled would lift the
+// VALID UNTIL PostgreSQL enforces.
 func setPasswordMessage(role *apiv1.DatabaseRole, message string) {
 	var state apiv1.GeneratedPasswordState
 	if role.Status.Password != nil {
@@ -240,13 +228,10 @@ func setPasswordMessage(role *apiv1.DatabaseRole, message string) {
 	role.Status.Password = &state
 }
 
-// setGeneratedPasswordState records on the role what the operator knows about
-// the password it generated, field by field: the operator describes the
-// password, and the instance manager answers in the same struct with the
-// expiration it applied to the role, which assigning that struct wholesale
-// would drop, having the role applied again for an expiration that already
-// reached PostgreSQL. A nil state is a role that generates no password, which
-// has no applied expiration either.
+// setGeneratedPasswordState records what the operator knows about the
+// generated password, field by field rather than by whole-struct assignment,
+// so the applied-expiration field the instance manager writes into the same
+// struct isn't dropped. A nil state means the role generates no password.
 func setGeneratedPasswordState(role *apiv1.DatabaseRole, state *apiv1.GeneratedPasswordState) {
 	if state == nil {
 		role.Status.Password = nil
@@ -336,9 +321,8 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 
 // ensureOwnedPasswordSecretUpToDate generates a new password when the current
 // one is gone or due for rotation, and keeps the username in sync with the
-// role. It returns the time the password currently held by the Secret was
-// issued, which the caller needs to record in the role's status; it is the
-// zero time when rotation is not enabled for the role.
+// role. It returns the current password's issue time (zero when rotation is
+// disabled), for the caller to record in the role's status.
 func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
@@ -430,12 +414,7 @@ func (r *DatabaseRoleReconciler) deleteOwnedPasswordSecret(
 // passwordNeedsRotation reports whether a new password must be generated,
 // either because the Secret no longer carries one, because the current one
 // reached its renewal window, or because rotation was explicitly requested
-// through the RotatePasswordAnnotationName annotation. The renewal window is
-// always computed fresh from the recorded issue time and the role's current
-// duration/renewBefore, rather than trusting a previously recorded deadline,
-// so that a change to either takes effect on this reconciliation instead of
-// being overridden by a deadline computed under settings that no longer
-// apply.
+// through the RotatePasswordAnnotationName annotation.
 func passwordNeedsRotation(ctx context.Context, role *apiv1.DatabaseRole, secret *corev1.Secret) bool {
 	if len(secret.Data[corev1.BasicAuthPasswordKey]) == 0 {
 		return true
@@ -450,7 +429,7 @@ func passwordNeedsRotation(ctx context.Context, role *apiv1.DatabaseRole, secret
 		return false
 	}
 
-	issuedAt, err := passwordIssuedAt(role, secret.CreationTimestamp.Time)
+	renewalDue, err := passwordRenewalDue(role, secret.CreationTimestamp.Time)
 	if err != nil {
 		rawIssuedAt := ""
 		if role.Status.Password != nil {
@@ -461,16 +440,27 @@ func passwordNeedsRotation(ctx context.Context, role *apiv1.DatabaseRole, secret
 		return true
 	}
 
-	renewalDue := issuedAt.Add(role.Spec.Password.Duration.Duration).Add(-passwordRenewBefore(role))
 	return !time.Now().Before(renewalDue)
 }
 
-// passwordIssuedAt returns the time recorded in the role's status as when its
-// current generated password was issued, parsed from RFC3339. When it is
-// absent or empty, indicating rotation was enabled only after the password
-// had already been generated, it falls back to the given time, so that the
-// lifetime the password already had is counted from the creation of its
-// Secret.
+// passwordRenewalDue returns when the current password is due for renewal:
+// issue time plus duration, minus renewBefore. It always recomputes from the
+// current spec rather than a stored deadline, so a config change takes effect
+// immediately. Meaningful only when password rotation is enabled. fallbackIssuedAt
+// stands in for the issue time when rotation was enabled after the password
+// was already generated.
+func passwordRenewalDue(role *apiv1.DatabaseRole, fallbackIssuedAt time.Time) (time.Time, error) {
+	issuedAt, err := passwordIssuedAt(role, fallbackIssuedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return issuedAt.Add(role.Spec.Password.Duration.Duration).Add(-passwordRenewBefore(role)), nil
+}
+
+// passwordIssuedAt returns the recorded issue time of the current password,
+// parsed from RFC3339, falling back to the given time when it's absent (which
+// happens when rotation was enabled after the password was already generated).
 func passwordIssuedAt(role *apiv1.DatabaseRole, fallback time.Time) (time.Time, error) {
 	if role.Status.Password == nil || role.Status.Password.IssuedAt == "" {
 		return fallback, nil

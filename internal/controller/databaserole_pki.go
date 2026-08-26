@@ -167,10 +167,9 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 
 	origSecret := certSecret.DeepCopy()
 
-	// Set to why the certificate has to be re-issued from scratch rather than
-	// renewed in place. A CA rotation is looked for explicitly, since
-	// RenewLeafCertificate only re-signs on expiry or altDNSName changes, and a
-	// certificate that cannot be read or renewed is replaced, not looped on.
+	// Set to why the certificate must be re-issued rather than renewed in
+	// place: RenewLeafCertificate alone doesn't handle a CA rotation, or a
+	// certificate that can't be read or renewed.
 	var reissueReason string
 
 	signedByCurrentCA, readErr := clientCertSignedByCurrentCA(ctx, caSecret, certSecret)
@@ -199,9 +198,8 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 		return true, nil
 	}
 
-	// What the event at the end of this function says happened: the same patch
-	// carries a renewal, a re-issue after a CA rotation, and the replacement of
-	// a certificate that could not be read.
+	// The reason recorded on the event below: a renewal, a re-issue after a CA
+	// rotation, or a replacement of an unreadable certificate.
 	reason := "it was approaching its expiration"
 	if reissueReason != "" {
 		reason = reissueReason
