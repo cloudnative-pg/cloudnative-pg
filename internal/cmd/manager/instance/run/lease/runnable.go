@@ -193,6 +193,12 @@ func (r *Runnable) Release(ctx context.Context) error {
 		return nil
 	}
 
+	// Unlike tryTakeOver/runLeaderElection, this Get is deliberately not
+	// bounded by RetryPeriod: Release makes no retry of its own, so any
+	// deadline here could return before the Update below ever runs. The
+	// caller in cmd.go avoids a timeout on the whole call for the same
+	// reason: giving up early would abandon the release and force replicas
+	// onto the slow TTL-expiry path instead of the fast empty-holder hand-over.
 	record, _, err := r.lock.Get(ctx)
 	if errors.IsNotFound(err) {
 		contextLogger.Debug("Primary lease does not exist, nothing to release")
