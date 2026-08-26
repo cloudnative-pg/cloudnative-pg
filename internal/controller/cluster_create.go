@@ -1567,6 +1567,15 @@ func (r *ClusterReconciler) attachReplicaBootstrapInitContainer(
 		"role", string(cmd.Role),
 	)
 
+	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
+		"Recreating instance %v-%v", cluster.Name, serial)
+
+	if err := r.RegisterPhase(ctx, cluster,
+		apiv1.PhaseCreatingReplica,
+		fmt.Sprintf("Creating replica %v", instanceToCreate.Name)); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	specs.AddBootstrapInitContainer(instanceToCreate, *cluster, cmd)
 
 	return ctrl.Result{}, nil
