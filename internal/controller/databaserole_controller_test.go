@@ -384,4 +384,122 @@ var _ = Describe("DatabaseRole status patch condition ownership", func() {
 		Expect(ours).NotTo(BeNil())
 		Expect(ours.Message).To(Equal("42"))
 	})
+
+	It("keeps a condition another writer added while the patch was in flight", func() {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		stored := &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-a", Namespace: "default"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{Name: "role-a"},
+				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+			},
+		}
+
+		var cli client.Client
+		concurrentWrites := 0
+		cli = fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			WithObjects(stored).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(
+					ctx context.Context,
+					c client.Client,
+					subResource string,
+					obj client.Object,
+					patch client.Patch,
+					opts ...client.SubResourcePatchOption,
+				) error {
+					// Another writer lands between the read this patch is based
+					// on and the patch itself. `status.conditions` is a plain
+					// list, which a merge patch replaces wholesale, so without
+					// the optimistic lock this condition would be gone.
+					if concurrentWrites == 0 {
+						concurrentWrites++
+						other := &apiv1.DatabaseRole{}
+						Expect(cli.Get(ctx, client.ObjectKeyFromObject(obj), other)).To(Succeed())
+						meta.SetStatusCondition(&other.Status.Conditions, metav1.Condition{
+							Type:    "SomebodyElsesCondition",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Whatever",
+							Message: "written while we were patching",
+						})
+						Expect(cli.Status().Update(ctx, other)).To(Succeed())
+					}
+					return c.SubResource(subResource).Patch(ctx, obj, patch, opts...)
+				},
+			}).
+			Build()
+		r := &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}
+
+		role := stored.DeepCopy()
+		meta.SetStatusCondition(&role.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionPasswordSecretChange),
+			Status:  metav1.ConditionTrue,
+			Reason:  "SecretChanged",
+			Message: "42",
+		})
+		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(concurrentWrites).To(Equal(1))
+
+		got := &apiv1.DatabaseRole{}
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(meta.FindStatusCondition(got.Status.Conditions, "SomebodyElsesCondition")).NotTo(BeNil())
+		Expect(meta.FindStatusCondition(got.Status.Conditions,
+			string(apiv1.ConditionPasswordSecretChange))).NotTo(BeNil())
+	})
+
+	It("keeps the expiration the instance manager applied while the patch was in flight", func() {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		stored := &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-a", Namespace: "default"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{Name: "role-a"},
+				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+			},
+			Status: apiv1.DatabaseRoleStatus{
+				Password: &apiv1.GeneratedPasswordState{SecretName: "role-a-password"},
+			},
+		}
+
+		var cli client.Client
+		concurrentWrites := 0
+		cli = fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			WithObjects(stored).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(
+					ctx context.Context,
+					c client.Client,
+					subResource string,
+					obj client.Object,
+					patch client.Patch,
+					opts ...client.SubResourcePatchOption,
+				) error {
+					// The instance manager answers with the expiration it
+					// applied to the role while this patch is in flight.
+					if concurrentWrites == 0 {
+						concurrentWrites++
+						other := &apiv1.DatabaseRole{}
+						Expect(cli.Get(ctx, client.ObjectKeyFromObject(obj), other)).To(Succeed())
+						other.Status.Password.AppliedExpiration = "2026-09-01T10:00:00Z"
+						Expect(cli.Status().Update(ctx, other)).To(Succeed())
+					}
+					return c.SubResource(subResource).Patch(ctx, obj, patch, opts...)
+				},
+			}).
+			Build()
+		r := &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}
+
+		role := stored.DeepCopy()
+		role.Status.Password.IssuedAt = "2026-08-20T10:00:00Z"
+		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(concurrentWrites).To(Equal(1))
+
+		got := &apiv1.DatabaseRole{}
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Status.Password.IssuedAt).To(Equal("2026-08-20T10:00:00Z"))
+		Expect(got.Status.Password.AppliedExpiration).To(Equal("2026-09-01T10:00:00Z"))
+	})
 })
