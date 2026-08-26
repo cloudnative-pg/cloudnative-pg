@@ -303,7 +303,7 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 ) (apiv1.PasswordState, error) {
 	databaseRole := role.toDatabaseRole()
 	passVersion, err := databaseRole.ApplyPassword(ctx, sr.client,
-		&role.RoleConfiguration, role.GetRoleSecretName(), sr.instance.GetNamespaceName())
+		role.GetRoleSecretName(), role.DisablePassword, sr.instance.GetNamespaceName())
 	if err != nil {
 		return apiv1.PasswordState{}, err
 	}

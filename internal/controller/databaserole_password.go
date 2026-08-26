@@ -212,15 +212,6 @@ func (r *DatabaseRoleReconciler) stopGeneratingPassword(
 	return nil
 }
 
-// setPasswordMessage explains in the status why the password of the role is not
-// being generated, keeping what the operator already recorded about the
-// password it generated last: the name of its Secret, which is the only record
-// it has to clean that Secret up later, and when the password was issued and
-// expires. Those two are what the role's VALID UNTIL follows, so forgetting
-// them while the password cannot be rotated would lift the expiration
-// PostgreSQL enforces, turning a stalled rotation into a credential that works
-// forever, and would take the deadline out of the status an operator watches
-// exactly when it is needed.
 // passwordMessage returns the explanation the operator recorded about the
 // password of the role, if it recorded one.
 func passwordMessage(role *apiv1.DatabaseRole) string {
@@ -230,14 +221,23 @@ func passwordMessage(role *apiv1.DatabaseRole) string {
 	return role.Status.Password.Message
 }
 
+// setPasswordMessage explains in the status why the password of the role is not
+// being generated, keeping what the operator recorded about the password it
+// generated last: the Secret name, its only record to clean that Secret up
+// later, and the issue and expiration times the role's VALID UNTIL follows.
+// Dropping those while rotation is stalled would lift the expiration
+// PostgreSQL enforces, and hide the deadline exactly when it matters.
 func setPasswordMessage(role *apiv1.DatabaseRole, message string) {
-	state := apiv1.GeneratedPasswordState{Message: message}
+	var state apiv1.GeneratedPasswordState
 	if role.Status.Password != nil {
-		state.SecretName = role.Status.Password.SecretName
-		state.IssuedAt = role.Status.Password.IssuedAt
-		state.Expiration = role.Status.Password.Expiration
+		state = *role.Status.Password
 	}
-	setGeneratedPasswordState(role, state)
+
+	// The revocation is the one thing not kept: it belongs to a role that
+	// stopped generating its password, and this one is still asking for it.
+	state.PendingRevocation = false
+	state.Message = message
+	role.Status.Password = &state
 }
 
 // setGeneratedPasswordState records what the operator knows about the password
@@ -369,19 +369,15 @@ func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 		delete(role.Annotations, utils.RotatePasswordAnnotationName)
 
 	case !role.IsPasswordRotationEnabled():
-		// Nothing to expire: the status must carry an empty IssuedAt and
-		// Expiration, matching what clearing the lifetime annotations used to do.
-		issuedAt = time.Time{}
+		// Nothing to expire: issuedAt is left at the zero time, so the status
+		// carries an empty IssuedAt and Expiration.
 
 	default:
-		// The password was not rotated this loop and rotation is enabled: carry
-		// its recorded issue time forward, so the deadline is not recomputed
-		// from nothing on every reconciliation.
-		var err error
-		issuedAt, err = passwordIssuedAt(role, secret.CreationTimestamp.Time)
-		if err != nil {
-			issuedAt = secret.CreationTimestamp.Time
-		}
+		// Rotation is enabled and the password was not rotated this loop: carry
+		// its recorded issue time forward, instead of recomputing the deadline
+		// from nothing. An unreadable issue time makes passwordNeedsRotation
+		// rotate, so getting here means it parses.
+		issuedAt, _ = passwordIssuedAt(role, secret.CreationTimestamp.Time)
 	}
 
 	// The instance manager refuses to apply a password whose Secret names a role

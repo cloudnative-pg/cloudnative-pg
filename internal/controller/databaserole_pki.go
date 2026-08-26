@@ -59,7 +59,7 @@ func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 		return nil
 	}
 
-	return r.issueClientCertificate(ctx, role, cluster)
+	return r.issueClientCertificate(ctx, role, cluster, secretKey)
 }
 
 // issueClientCertificate ensures the TLS client certificate Secret for the
@@ -70,9 +70,9 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	cluster *apiv1.Cluster,
+	secretKey client.ObjectKey,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	secretKey := client.ObjectKey{Namespace: role.Namespace, Name: role.GetClientCertSecretName()}
 
 	var caSecret corev1.Secret
 	if err := r.Get(ctx, client.ObjectKey{
@@ -167,44 +167,44 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 
 	origSecret := certSecret.DeepCopy()
 
-	// Detect a CA rotation explicitly: RenewLeafCertificate only re-signs on
-	// expiry or altDNSName changes. A parse or renewal error means the cert is
-	// corrupt; treat it as a re-issue trigger rather than error-looping.
-	certInvalid := false
+	// Set to why the certificate has to be re-issued from scratch rather than
+	// renewed in place. A CA rotation is looked for explicitly, since
+	// RenewLeafCertificate only re-signs on expiry or altDNSName changes, and a
+	// certificate that cannot be read or renewed is replaced, not looped on.
+	var reissueReason string
 
-	// What the event recorded at the end of this function says happened, since
-	// the same patch carries a renewal, a re-issue after a CA rotation, and a
-	// replacement of a certificate that could not be read.
-	reason := "it was approaching its expiration"
+	signedByCurrentCA, readErr := clientCertSignedByCurrentCA(ctx, caSecret, certSecret)
+	renewed, renewErr := false, error(nil)
+	if readErr == nil && signedByCurrentCA {
+		renewed, renewErr = certs.RenewLeafCertificate(caSecret, certSecret, nil)
+	}
 
-	signedByCurrentCA, err := clientCertSignedByCurrentCA(ctx, caSecret, certSecret)
-	if err != nil {
+	switch {
+	case readErr != nil:
 		contextLogger.Warning("client cert is unreadable, re-issuing",
-			"secret", secretKey.Name, "err", err)
-		signedByCurrentCA = false
-		certInvalid = true
-		reason = "it could not be read"
+			"secret", secretKey.Name, "err", readErr)
+		reissueReason = "it could not be read"
+
+	case !signedByCurrentCA:
+		contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
+		reissueReason = "the client CA of the cluster was rotated"
+
+	case renewErr != nil:
+		contextLogger.Warning("client cert renewal failed, re-issuing",
+			"secret", secretKey.Name, "err", renewErr)
+		reissueReason = "it could not be renewed"
+
+	case !renewed:
+		// The certificate is still the one the role should present.
+		return true, nil
 	}
 
-	if signedByCurrentCA {
-		renewed, err := certs.RenewLeafCertificate(caSecret, certSecret, nil)
-		if err == nil && !renewed {
-			return true, nil
-		}
-		if err != nil {
-			contextLogger.Warning("client cert renewal failed, re-issuing",
-				"secret", secretKey.Name, "err", err)
-			signedByCurrentCA = false
-			certInvalid = true
-			reason = "it could not be renewed"
-		}
-	}
-
-	if !signedByCurrentCA {
-		if !certInvalid {
-			contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
-			reason = "the client CA of the cluster was rotated"
-		}
+	// What the event at the end of this function says happened: the same patch
+	// carries a renewal, a re-issue after a CA rotation, and the replacement of
+	// a certificate that could not be read.
+	reason := "it was approaching its expiration"
+	if reissueReason != "" {
+		reason = reissueReason
 		newSecret, err := generateCertificateFromCA(caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey)
 		if err != nil {
 			return false, fmt.Errorf("while re-signing client cert for role %q: %w", role.Spec.Name, err)

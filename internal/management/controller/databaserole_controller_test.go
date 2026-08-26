@@ -114,35 +114,38 @@ func markDeleting(role *apiv1.DatabaseRole) {
 	role.Generation++
 }
 
-var _ = Describe("DatabaseRole roleConfigurationForPassword", func() {
-	It("leaves DisablePassword alone when the password is not set to NULL", func() {
+var _ = Describe("DatabaseRole passwordSetToNull", func() {
+	It("leaves the password alone when nothing asks for it to be set to NULL", func() {
 		role := newTestDatabaseRole()
-		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+		Expect(passwordSetToNull(role)).To(BeFalse())
 
 		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate}
-		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+		Expect(passwordSetToNull(role)).To(BeFalse())
 
 		role.Spec.Password.Mode = apiv1.PasswordModeExternal
-		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+		Expect(passwordSetToNull(role)).To(BeFalse())
 	})
 
-	It("sets DisablePassword when the password is set to NULL, without mutating the role", func() {
+	It("sets the password to NULL when the role asks for it", func() {
 		role := newTestDatabaseRole()
 		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeSetNull}
 
-		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeTrue())
-		// The role's own spec, which gets patched back to the API server, must
-		// not pick up a field the user never set.
-		Expect(role.Spec.RoleConfiguration.DisablePassword).To(BeFalse())
+		Expect(passwordSetToNull(role)).To(BeTrue())
 	})
 
-	It("sets DisablePassword to revoke a generated password nothing can read any more", func() {
+	It("sets the password to NULL when disablePassword asks for it", func() {
+		role := newTestDatabaseRole()
+		role.Spec.DisablePassword = true
+
+		Expect(passwordSetToNull(role)).To(BeTrue())
+	})
+
+	It("revokes a generated password nothing can read any more", func() {
 		role := newTestDatabaseRole()
 		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
 		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
 
-		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeTrue())
-		Expect(role.Spec.RoleConfiguration.DisablePassword).To(BeFalse())
+		Expect(passwordSetToNull(role)).To(BeTrue())
 	})
 
 	It("leaves the password alone once the revocation was acknowledged", func() {
@@ -150,7 +153,7 @@ var _ = Describe("DatabaseRole roleConfigurationForPassword", func() {
 		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
 		role.Status.Password = &apiv1.GeneratedPasswordState{}
 
-		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+		Expect(passwordSetToNull(role)).To(BeFalse())
 	})
 
 	It("does not revoke a password the role is about to read from a secret", func() {
@@ -165,7 +168,7 @@ var _ = Describe("DatabaseRole roleConfigurationForPassword", func() {
 		}
 		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
 
-		Expect(roleConfigurationForPassword(role).DisablePassword).To(BeFalse())
+		Expect(passwordSetToNull(role)).To(BeFalse())
 	})
 })
 
@@ -182,9 +185,9 @@ var _ = Describe("DatabaseRole generatedPasswordValidUntil", func() {
 
 	It("has nothing to say about a role that does not generate a password", func() {
 		role := newTestDatabaseRole()
-		_, ok, err := generatedPasswordValidUntil(role)
+		validUntil, err := generatedPasswordValidUntil(role)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeFalse())
+		Expect(validUntil.Valid).To(BeFalse())
 	})
 
 	It("has nothing to say about a generated password with no lifetime", func() {
@@ -197,39 +200,38 @@ var _ = Describe("DatabaseRole generatedPasswordValidUntil", func() {
 		// Without a duration the password never expires, so neither does the
 		// role: an expiration recorded from an earlier specification must not
 		// start expiring it.
-		_, ok, err := generatedPasswordValidUntil(role)
+		validUntil, err := generatedPasswordValidUntil(role)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeFalse())
+		Expect(validUntil.Valid).To(BeFalse())
 	})
 
 	It("waits for an expiration to be recorded before expiring the role", func() {
 		role := rotatingRole("")
-		_, ok, err := generatedPasswordValidUntil(role)
+		validUntil, err := generatedPasswordValidUntil(role)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeFalse())
+		Expect(validUntil.Valid).To(BeFalse())
 
 		role.Status.Password = nil
-		_, ok, err = generatedPasswordValidUntil(role)
+		validUntil, err = generatedPasswordValidUntil(role)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeFalse())
+		Expect(validUntil.Valid).To(BeFalse())
 	})
 
 	It("follows the expiration of the generated password", func() {
 		expiration := time.Now().Add(90 * 24 * time.Hour).UTC().Truncate(time.Second)
 		role := rotatingRole(expiration.Format(time.RFC3339))
 
-		validUntil, ok, err := generatedPasswordValidUntil(role)
+		validUntil, err := generatedPasswordValidUntil(role)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeTrue())
 		Expect(validUntil.Valid).To(BeTrue())
 		Expect(validUntil.Time).To(BeTemporally("==", expiration))
 	})
 
 	It("reports an expiration it cannot read instead of leaving the role unexpiring", func() {
 		role := rotatingRole("not-a-timestamp")
-		_, ok, err := generatedPasswordValidUntil(role)
+		validUntil, err := generatedPasswordValidUntil(role)
 		Expect(err).To(HaveOccurred())
-		Expect(ok).To(BeFalse())
+		Expect(validUntil.Valid).To(BeFalse())
 	})
 })
 
