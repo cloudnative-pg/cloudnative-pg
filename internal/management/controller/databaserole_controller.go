@@ -231,14 +231,10 @@ func appliedPasswordExpiration(role *apiv1.DatabaseRole) string {
 
 // generatedPasswordValidUntil returns the VALID UNTIL a role whose password the
 // operator generates with a lifetime must carry: the expiration of that
-// password. PostgreSQL then stops accepting the password at the moment the
-// operator considers it expired, so a rotation that never happens costs the
-// role its access instead of leaving a credential valid forever. `validUntil`
-// cannot be set on such a role, so nothing of the user's is overwritten here.
-//
-// The timestamp is invalid when the role generates no password with a lifetime,
-// or when no expiration has been recorded for it yet: the role then keeps
-// whatever VALID UNTIL its specification asks for.
+// password, so a rotation that never happens costs the role its access rather
+// than leaving a valid-forever credential. `validUntil` cannot be set on such
+// a role, so nothing of the user's is overwritten here. The timestamp is
+// invalid when there's no such password, or no expiration recorded yet.
 func generatedPasswordValidUntil(role *apiv1.DatabaseRole) (pgtype.Timestamp, error) {
 	recorded := desiredPasswordExpiration(role)
 	if recorded == "" {
@@ -476,10 +472,8 @@ func (r *DatabaseRoleReconciler) succeededReconciliation(
 		role.Status.Password.AppliedExpiration = desiredPasswordExpiration(role)
 	}
 
-	// The revocation the operator asked for was part of the apply that just
-	// succeeded, since both read the same object: acknowledging it here is what
-	// stops the password from being set to NULL on every following loop. The
-	// merge patch carries nothing else of the password status along.
+	// Acknowledge a revocation that was part of this successful apply, or it
+	// would keep setting the password to NULL on every following loop.
 	if role.IsPasswordRevocationPending() {
 		role.Status.Password.PendingRevocation = false
 	}

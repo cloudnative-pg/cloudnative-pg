@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -60,21 +59,6 @@ type DatabaseRoleReconciler struct {
 // renewed before expiry even in the absence of a triggering event.
 const roleSecretReconcileInterval = time.Hour
 
-// roleStatusPatchBackoff paces the retry of a role status patch: five attempts
-// spaced 250ms and doubling, so at most about 4.1s of waiting once the jitter
-// is counted in.
-var roleStatusPatchBackoff = wait.Backoff{
-	Duration: 250 * time.Millisecond,
-	Factor:   2,
-	Steps:    5,
-	Jitter:   0.1,
-}
-
-// roleStatusPatchTimeout caps the whole retry, the waits and the round trips
-// together: a reconciliation holds one of the controller's workers for as long
-// as it runs, so it must not sit on the API server for longer than this.
-const roleStatusPatchTimeout = 5 * time.Second
-
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/status,verbs=get;update;patch;watch
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/finalizers,verbs=update
@@ -96,9 +80,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// A deleted role is waiting for the instance manager to resolve its
-	// finalizer: generating a secret for it is pointless, and rotating the
-	// password of a role that is about to be retained would leave it with a
-	// credential nobody ever got to read.
+	// finalizer, so generating a secret or rotating a password for it is pointless.
 	if !role.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
@@ -119,11 +101,9 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	// A password the operator will not generate, or a Secret it will not touch,
-	// is otherwise recorded only in a nested status field, which nothing shows
-	// by default: an event puts the reason in `kubectl describe`. It is emitted
-	// on a change of the explanation, not on every loop, so a condition that
-	// lasts does not fill the event stream with copies of itself.
+	// The reason is otherwise only in a nested status field; emit an event so
+	// it shows in `kubectl describe`, but only when it changes, so a lasting
+	// condition doesn't fill the event stream with copies of itself.
 	if message := passwordMessage(&role); message != "" && message != passwordMessage(origRole) {
 		r.Recorder.Event(&role, "Warning", "PasswordGenerationSkipped", message)
 	}
@@ -132,10 +112,8 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	// A failure here must not cost us the status of the password: the
-	// PasswordSecretChange condition is how the instance manager learns that a
-	// password has just been rotated, and dropping it would leave the new
-	// password in its Secret and never applied to PostgreSQL.
+	// Errors here are returned only after the password status is patched below,
+	// so a certificate failure never costs us a just-rotated password.
 	certErr := r.reconcileClientCertificate(ctx, &role, cluster)
 
 	// A certificate the operator will not issue is recorded the same way, and
@@ -144,14 +122,10 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.Recorder.Event(&role, "Warning", "ClientCertificateIssuanceSkipped", message)
 	}
 
-	// A manual password rotation request is consumed by removing the
-	// annotation that asked for it once reconcilePassword has acted on it.
-	// Patch that separately from the status, which the instance manager also
-	// writes to and which this Patch (on the main resource, not the /status
-	// subresource) does not touch. The patch is applied to a copy: the API
-	// server answers with the stored object, whose status does not carry the
-	// changes still only held in memory here, and unmarshalling that over
-	// `role` would lose them before they are persisted below.
+	// The rotation-request annotation is patched separately from the status
+	// (a different subresource, and one the instance manager also writes to).
+	// Patch a copy: the API server response would otherwise overwrite the
+	// in-memory status changes still pending below.
 	if !reflect.DeepEqual(origRole.Annotations, role.Annotations) {
 		annotated := role.DeepCopy()
 		if err := r.Patch(ctx, annotated, client.MergeFrom(origRole)); err != nil {
@@ -175,59 +149,28 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-// operatorRoleStatus is the part of a DatabaseRole status this controller owns.
-// The instance manager owns the rest, so this is what a status patch of the
-// operator carries, and the only place a new field of its own has to be added.
-type operatorRoleStatus struct {
-	password          *apiv1.GeneratedPasswordState
-	clientCertificate *apiv1.ClientCertificateState
-	secretChange      *metav1.Condition
-}
-
-// operatorRoleStatusOf reads off the role what this reconciliation computed for
-// the fields the operator owns.
-func operatorRoleStatusOf(role *apiv1.DatabaseRole) operatorRoleStatus {
-	return operatorRoleStatus{
-		password:          role.Status.Password,
-		clientCertificate: role.Status.ClientCertificate,
-		secretChange: meta.FindStatusCondition(role.Status.Conditions,
-			string(apiv1.ConditionPasswordSecretChange)),
-	}
-}
-
-// applyTo writes those fields onto the given role, leaving everything the
-// instance manager owns as it found it, down to the fields of `status.password`
-// and to the other entries of `status.conditions`.
-func (o operatorRoleStatus) applyTo(role *apiv1.DatabaseRole) {
-	setGeneratedPasswordState(role, o.password)
-	role.Status.ClientCertificate = o.clientCertificate
-
-	if o.secretChange != nil {
-		meta.SetStatusCondition(&role.Status.Conditions, *o.secretChange)
-		return
-	}
-	// reconcilePasswordCondition removes the condition when the role has no
-	// password Secret, and that removal has to be applied too.
-	meta.RemoveStatusCondition(&role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
-}
-
-// patchRoleStatus persists the part of the role status this controller owns.
-// The optimistic lock of the patch is what keeps the two writers apart where a
-// merge patch cannot: `status.conditions` is a plain list a merge patch
-// replaces wholesale.
-//
-// The patch is retried because losing it costs more than a delay.
-// `status.password.issuedAt` is what the rotation deadline is computed from, so
-// a password written to its Secret whose issue time never reaches the status is
-// rotated again on the next loop; and a PasswordSecretChange condition that
-// never lands leaves the new password sitting in its Secret, never applied to
-// PostgreSQL.
+// patchRoleStatus persists the part of the role status this controller owns:
+// `status.password`, `status.clientCertificate` and the PasswordSecretChange
+// condition. It uses an optimistic-lock patch rather than a merge patch, since
+// a merge patch would replace `status.conditions` wholesale instead of merging it.
 func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv1.DatabaseRole) error {
-	ctx, cancel := context.WithTimeout(ctx, roleStatusPatchTimeout)
-	defer cancel()
+	password := role.Status.Password
+	clientCertificate := role.Status.ClientCertificate
+	secretChange := meta.FindStatusCondition(role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
 
-	_, err := status.PatchStatusWithOptimisticLock(
-		ctx, r.Client, role, roleStatusPatchBackoff, operatorRoleStatusOf(role).applyTo)
+	transaction := func(latest *apiv1.DatabaseRole) {
+		setGeneratedPasswordState(latest, password)
+		latest.Status.ClientCertificate = clientCertificate
+
+		if secretChange != nil {
+			meta.SetStatusCondition(&latest.Status.Conditions, *secretChange)
+			return
+		}
+		// reconcilePasswordCondition removes the condition when the role has no
+		// password Secret, and that removal has to be applied too.
+		meta.RemoveStatusCondition(&latest.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
+	}
+	_, err := status.PatchStatusWithOptimisticLock(ctx, r.Client, role, transaction)
 	// The role was deleted while we were reconciling it: there is no status
 	// left to write.
 	if apierrs.IsNotFound(err) {
@@ -243,9 +186,8 @@ func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv
 // certificate or password should next be checked for renewal, or zero when
 // neither is enabled. The certificate falls back to the fixed
 // roleSecretReconcileInterval; the password instead requeues right at its
-// renewal deadline, since duration/renewBefore can be far shorter than that
-// interval, and a flat hourly check would leave a short-lived password
-// overdue for most of its remaining life.
+// renewal deadline, which duration and renewBefore can put far sooner than
+// that interval.
 func nextRoleSecretReconcile(role *apiv1.DatabaseRole) time.Duration {
 	var next time.Duration
 	certEnabled := role.IsClientCertificateEnabled()
@@ -266,8 +208,8 @@ func nextRoleSecretReconcile(role *apiv1.DatabaseRole) time.Duration {
 // untilPasswordRenewal returns how long from now the password of the role is
 // due for renewal, falling back to the fixed roleSecretReconcileInterval when
 // its recorded expiration cannot be read, and flooring at one second when the
-// deadline has already passed, since a zero or negative RequeueAfter would
-// mean no further requeue at all rather than a prompt retry.
+// deadline has already passed, since a non-positive RequeueAfter would mean no
+// further requeue at all rather than a prompt retry.
 func untilPasswordRenewal(role *apiv1.DatabaseRole) time.Duration {
 	if role.Status.Password == nil || role.Status.Password.Expiration == "" {
 		return roleSecretReconcileInterval
@@ -284,10 +226,10 @@ func untilPasswordRenewal(role *apiv1.DatabaseRole) time.Duration {
 	}
 
 	// The deadline is in the past and the status says why the operator cannot
-	// act on it: a Secret it does not own, an unsatisfiable criteria, a replica
-	// cluster. None of those clears on its own, so retrying every second would
-	// spin for as long as the condition lasts, while resolving it changes the
-	// role or its Secret and reconciles it at once anyway.
+	// act on it: an unowned Secret, unsatisfiable criteria, a replica cluster.
+	// None of those clears on its own, so retrying every second would spin for
+	// as long as the condition lasts, while resolving it reconciles the role at
+	// once anyway.
 	if role.Status.Password.Message != "" {
 		return roleSecretReconcileInterval
 	}
