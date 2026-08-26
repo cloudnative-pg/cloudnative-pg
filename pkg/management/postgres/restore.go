@@ -446,9 +446,7 @@ func (info InitInfo) loadCluster(ctx context.Context, typedClient client.Client)
 
 // writeRecoveryBarmanEndpointCA writes to disk the barman endpoint CA of the
 // recovery source, if any, before any barman-cloud command reaches a
-// TLS-protected object store. It mirrors the precedence the operator uses to
-// resolve the endpoint CA when building the bootstrap init container's
-// command (see specs.resolveBarmanEndpointCA): the recovery backup
+// TLS-protected object store. The precedence is: the recovery backup
 // reference's own CA, then the referenced backup's status CA, then the
 // recovery source external cluster's CA. It writes to the same location the
 // barman-cloud commands already read via AWS_CA_BUNDLE/REQUESTS_CA_BUNDLE, so
