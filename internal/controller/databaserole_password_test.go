@@ -346,19 +346,15 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(err).NotTo(HaveOccurred())
 			first := getSecret(cli, "role-dante-password")
 
-			// Back-date the issue time to simulate a password that has already
-			// lived two days: under the original 90-day duration it is nowhere
-			// near due, which is the point of the scenario below. The status
-			// still carries the expiration computed for that 90-day duration,
-			// which the fix must not trust once the duration changes.
+			// Back-date the issue time to two days ago, well within the original
+			// 90-day duration, then shorten the duration below to make it overdue.
 			stored := getRole(cli, role)
 			issuedAt := time.Now().Add(-48 * time.Hour)
 			stored.Status.Password.IssuedAt = issuedAt.UTC().Format(time.RFC3339)
 			Expect(cli.Status().Update(ctx, stored)).To(Succeed())
 
-			// Shorten the duration to one hour, as an operator would when
-			// rotating a leaked credential quickly: the two-day-old password is
-			// now well past its shortened deadline.
+			// Shorten the duration to one hour: the two-day-old password is now
+			// well past its shortened deadline.
 			stored = getRole(cli, role)
 			stored.Spec.Password.Duration = &metav1.Duration{Duration: time.Hour}
 			Expect(cli.Update(ctx, stored)).To(Succeed())
@@ -383,11 +379,8 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(err).NotTo(HaveOccurred())
 			first := getSecret(cli, "role-dante-password")
 
-			// Move the recorded issue time back far enough that the renewal
-			// window (duration minus renewBefore) has already been entered.
-			// The deadline is always recomputed from the issue time and the
-			// role's current duration/renewBefore, so backdating the
-			// expiration directly would no longer have any effect.
+			// Move the issue time back into the renewal window (duration minus
+			// renewBefore); the deadline is recomputed from it, not stored.
 			stored := getRole(cli, role)
 			issuedAt := time.Now().Add(-84 * 24 * time.Hour)
 			stored.Status.Password.IssuedAt = issuedAt.UTC().Format(time.RFC3339)
@@ -595,10 +588,8 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("keeps the expiration the instance manager applied across its own writes", func() {
-		// The instance manager records what it applied inside the password
-		// state the operator otherwise owns: rebuilding that state here would
-		// drop the record and have the role applied again for an expiration
-		// that already reached PostgreSQL.
+		// Rebuilding the password state wholesale would drop the applied
+		// expiration the instance manager records inside it.
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
 			Mode:     apiv1.PasswordModeGenerate,
 			Duration: &metav1.Duration{Duration: 1008 * time.Hour},
@@ -623,10 +614,8 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("keeps an expiration the instance manager applies while the operator reconciles", func() {
-		// The operator reads the role, reconciles it, then patches its status:
-		// an apply landing inside that window records an expiration the
-		// operator never saw, and writing back the password state it built
-		// from what it did read would drop it.
+		// An apply landing between the operator's read and its status patch must
+		// not be dropped by the password state built from the stale read.
 		const expiration = "2026-10-05T09:12:44Z"
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
 			Mode:     apiv1.PasswordModeGenerate,
@@ -816,10 +805,8 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("keeps the deadline of a password it can no longer rotate", func() {
-		// The lifetime of a generated password is also the VALID UNTIL of the
-		// role, so forgetting the deadline while the operator cannot rotate the
-		// password lifts the expiration PostgreSQL enforces, turning a stalled
-		// rotation into a credential that works forever.
+		// Forgetting the deadline while the operator can't rotate would lift the
+		// VALID UNTIL PostgreSQL enforces, into a credential that works forever.
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{
 			Mode:     apiv1.PasswordModeGenerate,
 			Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
@@ -895,10 +882,8 @@ var _ = Describe("DatabaseRole password generation", func() {
 		})
 
 		It("deletes the secret it generated when the password is set to NULL", func() {
-			// The Secret lifecycle is identical to turning generation off: the
-			// distinction between `external` and `setNull` only matters to the
-			// instance manager, which decides whether to leave the PostgreSQL
-			// password alone or set it to NULL.
+			// Same Secret lifecycle as turning generation off; `external` vs
+			// `setNull` only matters to the instance manager applying it.
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 			r, cli := buildReconciler(role, newCluster(false))
 
@@ -930,10 +915,8 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(getRole(cli, role).Status.Password.SecretName).To(Equal("dante-credentials"))
 
-			// The name the password was generated into is gone from the
-			// specification, since `secret` is only allowed in the two modes
-			// that name a Secret: the status is what the operator recognizes
-			// its own Secret by.
+			// The Secret name is gone from the spec (`secret` is only valid in
+			// the two modes that name one); the status is what recognizes it.
 			stored := getRole(cli, role)
 			stored.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
 			Expect(cli.Update(ctx, stored)).To(Succeed())
@@ -988,11 +971,8 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(getSecret(cli, "role-dante-password")).NotTo(BeNil())
 
-			// Asking to read the password back from the very Secret the
-			// operator generated it into is not a handover: what the operator
-			// created, the operator deletes, so the role is left pointing at a
-			// Secret that no longer exists rather than at one nobody
-			// maintains.
+			// Reading from the very Secret the operator generated is not a
+			// handover: what the operator created, the operator deletes.
 			stored := getRole(cli, role)
 			stored.Spec.Password = &apiv1.PasswordConfiguration{
 				Mode:   apiv1.PasswordModeSecret,
@@ -1012,10 +992,8 @@ var _ = Describe("DatabaseRole password generation", func() {
 		})
 
 		It("keeps the revocation recorded until the instance manager acknowledges it", func() {
-			// The instance manager may well have applied this generation of the
-			// role before the operator got to record the revocation, so the
-			// record cannot be dropped on the strength of the generation alone:
-			// only the acknowledgement retires it.
+			// Only the instance manager's acknowledgement retires a revocation,
+			// not the generation it was recorded against.
 			role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal})
 			role.Status.ObservedGeneration = role.Generation
 			role.Status.Applied = ptr.To(true)
@@ -1328,6 +1306,43 @@ var _ = Describe("DatabaseRole password generation", func() {
 		rotated := getSecret(cli, "role-dante-password")
 		Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
 			Equal(first.Data[corev1.BasicAuthPasswordKey]))
+	})
+})
+
+var _ = Describe("passwordRenewalDue", func() {
+	ctx := context.Background()
+
+	newRole := func(issuedAt time.Time, duration, renewBefore time.Duration) *apiv1.DatabaseRole {
+		return &apiv1.DatabaseRole{
+			Spec: apiv1.DatabaseRoleSpec{
+				Password: &apiv1.PasswordConfiguration{
+					Mode:        apiv1.PasswordModeGenerate,
+					Duration:    &metav1.Duration{Duration: duration},
+					RenewBefore: &metav1.Duration{Duration: renewBefore},
+				},
+			},
+			Status: apiv1.DatabaseRoleStatus{
+				Password: &apiv1.GeneratedPasswordState{
+					IssuedAt: issuedAt.UTC().Format(time.RFC3339),
+				},
+			},
+		}
+	}
+
+	secret := &corev1.Secret{
+		Data: map[string][]byte{corev1.BasicAuthPasswordKey: []byte("a-password")},
+	}
+
+	It("holds the password until its renewal window opens", func() {
+		role := newRole(time.Now().Add(-3*time.Minute), 5*time.Minute, time.Minute)
+		Expect(passwordNeedsRotation(ctx, role, secret)).To(BeFalse())
+	})
+
+	It("rotates on the lifetime the role carries now, not the one it was issued under", func() {
+		// The password was issued three minutes ago for a lifetime of one, so a
+		// shortened duration makes it overdue at once.
+		role := newRole(time.Now().Add(-3*time.Minute), time.Minute, 30*time.Second)
+		Expect(passwordNeedsRotation(ctx, role, secret)).To(BeTrue())
 	})
 })
 

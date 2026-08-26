@@ -157,10 +157,8 @@ var _ = Describe("DatabaseRole passwordSetToNull", func() {
 	})
 
 	It("does not revoke a password the role is about to read from a secret", func() {
-		// The status can still carry the revocation the operator recorded a
-		// moment ago, while the specification has already moved on to a mode
-		// that names a Secret: applying both would ask ApplyPassword to set and
-		// disable the password at once, which is an error.
+		// The status can still carry a revocation while the spec has already
+		// moved to a mode naming a Secret; applying both is an error.
 		role := newTestDatabaseRole()
 		role.Spec.Password = &apiv1.PasswordConfiguration{
 			Mode:   apiv1.PasswordModeSecret,
