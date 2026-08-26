@@ -1520,7 +1520,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			contextLogger.Error(err, "Unable to create Pod", "pod", pod)
 			return ctrl.Result{}, err
 		}
-		contextLogger.Info("Pod already exists", "pod", pod.Name)
+		contextLogger.Info("Pod already exists, requeuing", "pod", pod.Name)
+		return ctrl.Result{RequeueAfter: time.Second}, ErrNextLoop
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
