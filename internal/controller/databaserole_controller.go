@@ -45,6 +45,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 )
 
 // DatabaseRoleReconciler reconciles a DatabaseRole object
@@ -174,10 +175,46 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-// patchRoleStatus persists the part of the role status this controller owns:
-// the Password state, the ClientCertificate state and the PasswordSecretChange
-// condition. The instance manager owns every other field, so the write is a
-// merge patch.
+// operatorRoleStatus is the part of a DatabaseRole status this controller owns.
+// The instance manager owns the rest, so this is what a status patch of the
+// operator carries, and the only place a new field of its own has to be added.
+type operatorRoleStatus struct {
+	password          *apiv1.GeneratedPasswordState
+	clientCertificate *apiv1.ClientCertificateState
+	secretChange      *metav1.Condition
+}
+
+// operatorRoleStatusOf reads off the role what this reconciliation computed for
+// the fields the operator owns.
+func operatorRoleStatusOf(role *apiv1.DatabaseRole) operatorRoleStatus {
+	return operatorRoleStatus{
+		password:          role.Status.Password,
+		clientCertificate: role.Status.ClientCertificate,
+		secretChange: meta.FindStatusCondition(role.Status.Conditions,
+			string(apiv1.ConditionPasswordSecretChange)),
+	}
+}
+
+// applyTo writes those fields onto the given role, leaving everything the
+// instance manager owns as it found it, down to the fields of `status.password`
+// and to the other entries of `status.conditions`.
+func (o operatorRoleStatus) applyTo(role *apiv1.DatabaseRole) {
+	setGeneratedPasswordState(role, o.password)
+	role.Status.ClientCertificate = o.clientCertificate
+
+	if o.secretChange != nil {
+		meta.SetStatusCondition(&role.Status.Conditions, *o.secretChange)
+		return
+	}
+	// reconcilePasswordCondition removes the condition when the role has no
+	// password Secret, and that removal has to be applied too.
+	meta.RemoveStatusCondition(&role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
+}
+
+// patchRoleStatus persists the part of the role status this controller owns.
+// The optimistic lock of the patch is what keeps the two writers apart where a
+// merge patch cannot: `status.conditions` is a plain list a merge patch
+// replaces wholesale.
 //
 // The patch is retried because losing it costs more than a delay.
 // `status.password.issuedAt` is what the rotation deadline is computed from, so
@@ -185,84 +222,21 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 // rotated again on the next loop; and a PasswordSecretChange condition that
 // never lands leaves the new password sitting in its Secret, never applied to
 // PostgreSQL.
-//
-// Every attempt re-reads the role and replays those fields onto it, in the
-// shape of resources.RetryWithRefreshedResource, which cannot be reused here
-// because its backoff is a fixed few hundred milliseconds. The condition is
-// replayed one by one rather than by assigning the whole list, because
-// `status.conditions` is a plain list that a merge patch replaces wholesale:
-// writing our copy of it back would silently take ownership of every condition
-// on the role, which is the opposite of what the two writers of this status
-// agreed to do.
 func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv1.DatabaseRole) error {
 	ctx, cancel := context.WithTimeout(ctx, roleStatusPatchTimeout)
 	defer cancel()
 
-	key := client.ObjectKeyFromObject(role)
-	password := role.Status.Password
-	clientCertificate := role.Status.ClientCertificate
-	condition := meta.FindStatusCondition(role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
-
-	// The condition function reports failure as `(false, nil)` so that the
-	// backoff keeps going: returning the error would abort the loop on the
-	// first attempt. The error itself is kept aside to be reported once the
-	// attempts run out.
-	var lastErr error
-	err := wait.ExponentialBackoffWithContext(ctx, roleStatusPatchBackoff,
-		func(ctx context.Context) (bool, error) {
-			var latest apiv1.DatabaseRole
-			if err := r.Get(ctx, key, &latest); err != nil {
-				// The role was deleted while we were reconciling it: there is
-				// no status left to write, and no point spending the remaining
-				// attempts discovering that again.
-				if apierrs.IsNotFound(err) {
-					return true, nil
-				}
-				lastErr = err
-				return false, nil
-			}
-
-			base := latest.DeepCopy()
-			// `status.password` carries one field the instance manager writes,
-			// and a merge patch replaces the struct holding it wholesale: the
-			// expiration it applied is read off the role this attempt just
-			// re-read, rather than off the copy this reconciliation started
-			// from, or an apply that landed in between would be forgotten and
-			// the role applied again for an expiration PostgreSQL already has.
-			// `pendingRevocation` is not carried over: it is the operator asking
-			// for the password to be set to NULL, and a clearance landing in
-			// between costs one more ALTER ROLE ... PASSWORD NULL.
-			latest.Status.Password = passwordWithAppliedExpiration(password, latest.Status.Password)
-			latest.Status.ClientCertificate = clientCertificate
-			if condition != nil {
-				meta.SetStatusCondition(&latest.Status.Conditions, *condition)
-			} else {
-				// reconcilePasswordCondition removes the condition when the
-				// role has no password Secret, and that removal has to be
-				// replayed too.
-				meta.RemoveStatusCondition(&latest.Status.Conditions,
-					string(apiv1.ConditionPasswordSecretChange))
-			}
-
-			// A previous attempt may have landed after all, or the fields may
-			// already hold what we computed.
-			if reflect.DeepEqual(base.Status, latest.Status) {
-				return true, nil
-			}
-
-			if err := r.Status().Patch(ctx, &latest, client.MergeFrom(base)); err != nil {
-				lastErr = err
-				return false, nil
-			}
-			return true, nil
-		})
-	if err == nil {
+	_, err := status.PatchStatusWithOptimisticLock(
+		ctx, r.Client, role, roleStatusPatchBackoff, operatorRoleStatusOf(role).applyTo)
+	// The role was deleted while we were reconciling it: there is no status
+	// left to write.
+	if apierrs.IsNotFound(err) {
 		return nil
 	}
-	if lastErr != nil {
-		return fmt.Errorf("while patching role status: %w", lastErr)
+	if err != nil {
+		return fmt.Errorf("while patching role status: %w", err)
 	}
-	return fmt.Errorf("while patching role status: %w", err)
+	return nil
 }
 
 // nextRoleSecretReconcile returns how long from now the role's client
