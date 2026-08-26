@@ -177,6 +177,36 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(cert.Subject.CommonName).To(Equal("ada"))
 		})
 
+		It("re-issues a certificate it cannot read", func(ctx SpecContext) {
+			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+			role := newRole("grace", true)
+
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+			// An unparseable certificate cannot be renewed either, so without a
+			// re-issue the role stays without its credential until somebody
+			// deletes the Secret by hand.
+			var certSecret corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
+			certSecret.Data[certs.TLSCertKey] = []byte("not a certificate")
+			Expect(r.Update(ctx, &certSecret)).To(Succeed())
+
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+			var caSecret corev1.Secret
+			Expect(r.Get(ctx, types.NamespacedName{
+				Name: cluster.GetClientCASecretName(), Namespace: namespace,
+			}, &caSecret)).To(Succeed())
+			Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
+			signed, err := clientCertSignedByCurrentCA(ctx, &caSecret, &certSecret)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(signed).To(BeTrue())
+			Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
+				ContainSubstring("Normal ClientCertificateRenewed"),
+				ContainSubstring("it could not be read"),
+			)))
+		})
+
 		It("sets status.clientCertificate.message and returns nil when CA has no private key", func(ctx SpecContext) {
 			// Create a CA secret with only the certificate, no private key.
 			_, caPair := generateFakeCASecret(r.Client, "tmp-ca", namespace, "test.example.com")

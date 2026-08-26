@@ -236,8 +236,8 @@ spec:
                       rule: (has(self.allowRepeat) && self.allowRepeat) || !has(self.digits)
                         || self.digits <= 10
                     - message: without allowRepeat the password cannot contain more
-                        symbols than the distinct characters of symbolCharacters (30
-                        by default)
+                        symbols than the length of symbolCharacters (30 symbols by
+                        default)
                       rule: '(has(self.allowRepeat) && self.allowRepeat) || !has(self.symbols)
                         || self.symbols <= (has(self.symbolCharacters) ? size(self.symbolCharacters)
                         : 30)'
@@ -513,8 +513,7 @@ spec:
                       holding a password it had generated, and the role stopped managing the
                       password instead of replacing it: the password is still set on the role
                       in PostgreSQL and nothing can read it any more, so it has to be set to
-                      NULL. The instance manager clears it once it has done so, and that is
-                      the only field of this stanza it writes.
+                      NULL. The instance manager clears it once it has done so.
                     type: boolean
                   secretName:
                     description: |-

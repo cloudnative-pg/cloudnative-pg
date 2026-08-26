@@ -66,7 +66,7 @@ var _ = Describe("ApplyPassword", func() {
 		Expect(dbRole.ignorePassword).To(BeTrue())
 
 		version, err := dbRole.ApplyPassword(
-			context.Background(), buildClient().Build(), &config, secretName, namespace)
+			context.Background(), buildClient().Build(), secretName, false, namespace)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(version).ToNot(BeEmpty())
 
@@ -84,7 +84,7 @@ var _ = Describe("ApplyPassword", func() {
 		dbRole := DatabaseRoleFromConfiguration(config, false)
 
 		version, err := dbRole.ApplyPassword(
-			context.Background(), buildClient().Build(), &config, "", namespace)
+			context.Background(), buildClient().Build(), "", false, namespace)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(version).To(BeEmpty())
 
@@ -94,20 +94,16 @@ var _ = Describe("ApplyPassword", func() {
 	})
 
 	It("sets the password to NULL when disabled, whatever the role was built from", func() {
-		// A `password.mode: clear` DatabaseRole reaches this point as a role
-		// built from a configuration that does not disable the password —
-		// so it starts out ignoring it — and only the configuration handed
-		// to ApplyPassword asks for the password to be disabled. Honouring
-		// that has to override the earlier "leave it alone", or the role
-		// keeps whatever password it already had in PostgreSQL.
+		// A `password.mode: setNull` DatabaseRole is built from a configuration
+		// that does not disable the password, so it starts out ignoring it, and
+		// only ApplyPassword asks for the password to be disabled. That has to
+		// override the earlier "leave it alone", or the role keeps whatever
+		// password it already had in PostgreSQL.
 		dbRole := DatabaseRoleFromConfiguration(config, false)
 		Expect(dbRole.ignorePassword).To(BeTrue())
 
-		disabled := config
-		disabled.DisablePassword = true
-
 		version, err := dbRole.ApplyPassword(
-			context.Background(), buildClient().Build(), &disabled, "", namespace)
+			context.Background(), buildClient().Build(), "", true, namespace)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(version).To(BeEmpty())
 

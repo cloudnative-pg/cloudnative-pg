@@ -133,22 +133,23 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
 }
 
-// ApplyPassword updates a database role with the password located in the given
-// Secret, and it returns the resource version of the Secret. The Secret is the
-// one the role refers to through `passwordSecret`, or the one the operator
-// generated for it.
+// ApplyPassword updates a database role with the password held by the named
+// Secret, the one the role refers to through `passwordSecret` or the one the
+// operator generated for it, and returns that Secret's resource version.
+// Without a Secret the password is set to NULL when disablePassword says so,
+// and left untouched otherwise.
 func (d *DatabaseRole) ApplyPassword(
 	ctx context.Context,
 	cl client.Client,
-	config *apiv1.RoleConfiguration,
 	secretName string,
+	disablePassword bool,
 	namespace string,
 ) (string, error) {
 	switch {
-	case secretName == "" && !config.DisablePassword:
+	case secretName == "" && !disablePassword:
 		d.ignorePassword = true
 		return "", nil
-	case secretName == "" && config.DisablePassword:
+	case secretName == "" && disablePassword:
 		// Disabling the password is an instruction to set it, to NULL: it has
 		// to override the "leave the password alone" a role built from a
 		// configuration that did not disable it starts out with, the same way
@@ -156,14 +157,14 @@ func (d *DatabaseRole) ApplyPassword(
 		d.ignorePassword = false
 		d.password = sql.NullString{}
 		return "", nil
-	case secretName != "" && config.DisablePassword:
+	case secretName != "" && disablePassword:
 		// For DatabaseRole CRDs this is prevented by CEL validation.
 		// For inline managed roles this is a runtime error.
 		return "",
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
 				secretName)
 	default:
-		passwordSecret, err := getPassword(ctx, cl, config.Name, secretName, namespace)
+		passwordSecret, err := getPassword(ctx, cl, d.Name, secretName, namespace)
 		if err != nil {
 			return "", err
 		}

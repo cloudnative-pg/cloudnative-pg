@@ -191,7 +191,7 @@ type PasswordConfiguration struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.digits) ? self.digits : (self.length / 4 > 10 ? 10 : self.length / 4)) + (has(self.symbols) ? self.symbols : 0) <= self.length",message="the number of digits and symbols must not exceed the password length"
 // +kubebuilder:validation:XValidation:rule="(has(self.allowRepeat) && self.allowRepeat) || self.length - (has(self.digits) ? self.digits : (self.length / 4 > 10 ? 10 : self.length / 4)) - (has(self.symbols) ? self.symbols : 0) <= ((has(self.noUpper) && self.noUpper) ? 26 : 52)",message="without allowRepeat the password cannot contain more letters than are available: 52, or 26 with noUpper. Shorten the length, or ask for more digits and symbols"
 // +kubebuilder:validation:XValidation:rule="(has(self.allowRepeat) && self.allowRepeat) || !has(self.digits) || self.digits <= 10",message="without allowRepeat the password cannot contain more than 10 digits"
-// +kubebuilder:validation:XValidation:rule="(has(self.allowRepeat) && self.allowRepeat) || !has(self.symbols) || self.symbols <= (has(self.symbolCharacters) ? size(self.symbolCharacters) : 30)",message="without allowRepeat the password cannot contain more symbols than the distinct characters of symbolCharacters (30 by default)"
+// +kubebuilder:validation:XValidation:rule="(has(self.allowRepeat) && self.allowRepeat) || !has(self.symbols) || self.symbols <= (has(self.symbolCharacters) ? size(self.symbolCharacters) : 30)",message="without allowRepeat the password cannot contain more symbols than the length of symbolCharacters (30 symbols by default)"
 type PasswordCriteria struct {
 	// Length of the generated password.
 	// +kubebuilder:default:=24
@@ -260,8 +260,7 @@ type GeneratedPasswordState struct {
 	// holding a password it had generated, and the role stopped managing the
 	// password instead of replacing it: the password is still set on the role
 	// in PostgreSQL and nothing can read it any more, so it has to be set to
-	// NULL. The instance manager clears it once it has done so, and that is
-	// the only field of this stanza it writes.
+	// NULL. The instance manager clears it once it has done so.
 	// +optional
 	PendingRevocation bool `json:"pendingRevocation,omitempty"`
 
