@@ -96,12 +96,8 @@ func (r *DatabaseRole) IsPasswordGenerationEnabled() bool {
 	if r.Spec.Password == nil {
 		return false
 	}
-	// Asked for positively, so that a mode added later has to opt into
-	// generation rather than fall into it by not being listed here. `mode` is
-	// required whenever the password stanza is present, so an empty one is not
-	// a shorthand for anything: it cannot come from the API server, and
-	// generating and owning a credential is not what a half-built object
-	// should be read as asking for.
+	// Asked for positively, so a mode added later must opt into generation
+	// rather than fall into it by not being listed here.
 	return r.Spec.Password.Mode == PasswordModeGenerate
 }
 

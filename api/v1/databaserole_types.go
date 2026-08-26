@@ -143,11 +143,9 @@ type PasswordConfiguration struct {
 	// Secret previously generated and setting the password it held to NULL,
 	// while leaving a password it never generated untouched; `setNull` sets the
 	// password of the role to NULL in PostgreSQL, disabling password
-	// authentication for it. It has no default: asking for a password without
-	// saying how it is managed is ambiguous, and defaulting it either way would
-	// silently pick a behavior as consequential as generating a credential or
-	// removing one. It cannot be removed once set either, for the same reason:
-	// the mode has to say what happens to the password from now on.
+	// authentication for it. It has no default, since asking for a password
+	// without saying how it is managed is ambiguous, and cannot be removed
+	// once set: the mode always has to say what happens to the password.
 	// +kubebuilder:validation:Enum=generate;secret;external;setNull
 	Mode PasswordMode `json:"mode"`
 
@@ -243,10 +241,8 @@ type GeneratedPasswordState struct {
 	SecretName string `json:"secretName,omitempty"`
 
 	// IssuedAt is the time the current generated password was issued, in RFC3339
-	// format. The expiration and the rotation deadline are derived from it and the
-	// role's current duration/renewBefore, so that a change to either takes effect
-	// on the next reconciliation instead of being trumped by a deadline computed
-	// under the previous settings.
+	// format. The expiration and rotation deadline are derived from it and the
+	// role's current duration/renewBefore, recomputed on every reconciliation.
 	// +optional
 	IssuedAt string `json:"issuedAt,omitempty"`
 
@@ -265,11 +261,9 @@ type GeneratedPasswordState struct {
 	PendingRevocation bool `json:"pendingRevocation,omitempty"`
 
 	// AppliedExpiration is the expiration last applied to the role as its
-	// VALID UNTIL, in RFC3339 format. Unlike the rest of this state it is
-	// written by the instance manager, not by the operator: adding or changing
-	// a `duration` moves `expiration` without touching the Secret holding the
-	// password, so this is what says whether the role still has to be applied
-	// for it.
+	// VALID UNTIL, in RFC3339 format. Written by the instance manager, not the
+	// operator, and used to tell whether the role still needs to be applied
+	// after `expiration` moved without the password Secret changing.
 	// +optional
 	AppliedExpiration string `json:"appliedExpiration,omitempty"`
 
