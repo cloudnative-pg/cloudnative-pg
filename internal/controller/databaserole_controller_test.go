@@ -28,6 +28,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -265,7 +266,7 @@ var _ = Describe("DatabaseRole status patch retry", func() {
 		return &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}, cli
 	}
 
-	It("keeps trying until the patch lands", func() {
+	It("keeps trying while the role is being written by somebody else", func() {
 		stored := newRole()
 		attempts := 0
 		r, cli := buildReconciler(stored, interceptor.Funcs{
@@ -279,7 +280,8 @@ var _ = Describe("DatabaseRole status patch retry", func() {
 			) error {
 				attempts++
 				if attempts < 3 {
-					return apierrs.NewInternalError(errors.New("apiserver is having a moment"))
+					return apierrs.NewConflict(schema.GroupResource{Resource: "databaseroles"},
+						obj.GetName(), errors.New("the object has been modified"))
 				}
 				return c.SubResource(subResource).Patch(ctx, obj, patch, opts...)
 			},
@@ -299,7 +301,7 @@ var _ = Describe("DatabaseRole status patch retry", func() {
 		Expect(got.Status.Password.IssuedAt).To(Equal("2026-08-20T10:00:00Z"))
 	})
 
-	It("gives up within its deadline, reporting the error the API server returned", func() {
+	It("reports the error the API server returned, for the reconciliation to retry", func() {
 		apiErr := apierrs.NewInternalError(errors.New("apiserver is down"))
 		r, _ := buildReconciler(newRole(), interceptor.Funcs{
 			SubResourcePatch: func(
@@ -317,16 +319,7 @@ var _ = Describe("DatabaseRole status patch retry", func() {
 		role := newRole()
 		role.Status.Password = &apiv1.GeneratedPasswordState{SecretName: "role-a-password"}
 
-		start := time.Now()
-		err := r.patchRoleStatus(ctx, role)
-		elapsed := time.Since(start)
-
-		Expect(err).To(MatchError(ContainSubstring("apiserver is down")))
-		// The reconciliation holds a worker while this runs, so the whole
-		// retry has to fit inside its own ceiling.
-		Expect(elapsed).To(BeNumerically("<=", roleStatusPatchTimeout))
-		// And it has to have actually waited, rather than failed straight away.
-		Expect(elapsed).To(BeNumerically(">", time.Second))
+		Expect(r.patchRoleStatus(ctx, role)).To(MatchError(ContainSubstring("apiserver is down")))
 	})
 
 	It("stops without an error when the role is deleted while being reconciled", func() {
@@ -410,10 +403,9 @@ var _ = Describe("DatabaseRole status patch condition ownership", func() {
 					patch client.Patch,
 					opts ...client.SubResourcePatchOption,
 				) error {
-					// Another writer lands between the read this patch is based
-					// on and the patch itself. `status.conditions` is a plain
-					// list, which a merge patch replaces wholesale, so without
-					// the optimistic lock this condition would be gone.
+					// Another writer lands between the read this patch is based on and
+					// the patch itself; the optimistic lock keeps its condition from
+					// being wiped out by a merge patch.
 					if concurrentWrites == 0 {
 						concurrentWrites++
 						other := &apiv1.DatabaseRole{}
