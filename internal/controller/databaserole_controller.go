@@ -229,6 +229,9 @@ func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv
 			// re-read, rather than off the copy this reconciliation started
 			// from, or an apply that landed in between would be forgotten and
 			// the role applied again for an expiration PostgreSQL already has.
+			// `pendingRevocation` is not carried over: it is the operator asking
+			// for the password to be set to NULL, and a clearance landing in
+			// between costs one more ALTER ROLE ... PASSWORD NULL.
 			latest.Status.Password = passwordWithAppliedExpiration(password, latest.Status.Password)
 			latest.Status.ClientCertificate = clientCertificate
 			if condition != nil {
