@@ -338,9 +338,9 @@ func getInvolvedSecretNames(opts RoleOptions) []string {
 		}
 	}
 
-	if recovery := opts.Cluster.Spec.Bootstrap; recovery != nil && recovery.Recovery != nil &&
-		recovery.Recovery.Backup != nil && recovery.Recovery.Backup.EndpointCA != nil {
-		involvedSecretNames = append(involvedSecretNames, recovery.Recovery.Backup.EndpointCA.Name)
+	if bootstrap := opts.Cluster.Spec.Bootstrap; bootstrap != nil && bootstrap.Recovery != nil &&
+		bootstrap.Recovery.Backup != nil && bootstrap.Recovery.Backup.EndpointCA != nil {
+		involvedSecretNames = append(involvedSecretNames, bootstrap.Recovery.Backup.EndpointCA.Name)
 	}
 
 	involvedSecretNames = append(involvedSecretNames, backupSecrets(opts.Cluster, opts.BackupOrigin)...)
