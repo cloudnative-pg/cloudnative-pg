@@ -109,6 +109,10 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	// We're creating a new replica of an existing cluster, and the PVCs
 	// have been initialized by a set of VolumeSnapshots.
 	if immediate {
+		if err := info.writeBackupMetadata(); err != nil {
+			return err
+		}
+
 		// If the instance starts as a primary, we will enter in the
 		// same logic attaching an old primary back after a failover.
 		// We don't need that as this instance has never diverged.
@@ -132,18 +136,8 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	contextLogger.Info("Recovering from volume snapshot",
 		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
 
-	if len(info.BackupLabelFile) > 0 {
-		filePath := filepath.Join(info.PgData, constants.BackupLabelFile)
-		if _, err := fileutils.WriteFileAtomic(filePath, info.BackupLabelFile, 0o666); err != nil {
-			return err
-		}
-	}
-
-	if len(info.TablespaceMapFile) > 0 {
-		filePath := filepath.Join(info.PgData, constants.TablespaceMapFile)
-		if _, err := fileutils.WriteFileAtomic(filePath, info.TablespaceMapFile, 0o666); err != nil {
-			return err
-		}
+	if err := info.writeBackupMetadata(); err != nil {
+		return err
 	}
 
 	var envs []string
@@ -159,6 +153,31 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	}
 
 	return info.concludeRestore(ctx, cli, cluster, getRestoreWalConfig(), envs)
+}
+
+func (info InitInfo) writeBackupMetadata() error {
+	if len(info.BackupLabelFile) > 0 {
+		filePath := filepath.Join(info.PgData, constants.BackupLabelFile)
+		if _, err := fileutils.WriteFileAtomic(filePath, info.BackupLabelFile, 0o666); err != nil {
+			return err
+		}
+	}
+
+	if len(info.TablespaceMapFile) > 0 {
+		filePath := filepath.Join(info.PgData, constants.TablespaceMapFile)
+		if _, err := fileutils.WriteFileAtomic(filePath, info.TablespaceMapFile, 0o666); err != nil {
+			return err
+		}
+	}
+
+	if len(info.PgControlFile) > 0 {
+		filePath := filepath.Join(info.PgData, "global", constants.PgControlFile)
+		if _, err := fileutils.WriteFileAtomic(filePath, info.PgControlFile, 0o600); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (info InitInfo) concludeRestore(

@@ -125,6 +125,9 @@ type InitInfo struct {
 
 	// TablespaceMapFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
 	TablespaceMapFile []byte
+
+	// PgControlFile holds the PostgreSQL control file captured after taking an online snapshot backup
+	PgControlFile []byte
 }
 
 // EnsureTargetDirectoriesDoNotExist ensures that the target data and WAL directories do not exist.

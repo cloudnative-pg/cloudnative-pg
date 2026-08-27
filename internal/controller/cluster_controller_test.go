@@ -185,6 +185,67 @@ var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminat
 	})
 })
 
+var _ = Describe("joinReplicaInstance from a VolumeSnapshot", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	It("passes the source backup metadata to the restore Job", func(ctx SpecContext) {
+		const snapshotName = "replica-snapshot"
+
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 2
+			c.Spec.Plugins = []apiv1.PluginConfiguration{{
+				Name:          "wal-archiver.example.com",
+				Enabled:       ptr.To(true),
+				IsWALArchiver: ptr.To(true),
+			}}
+			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					VolumeSnapshots: &apiv1.DataSource{
+						Storage: corev1.TypedLocalObjectReference{
+							APIGroup: ptr.To(volumesnapshotv1.GroupName),
+							Kind:     apiv1.VolumeSnapshotKind,
+							Name:     snapshotName,
+						},
+					},
+				},
+			}
+		})
+
+		snapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      snapshotName,
+				Namespace: namespace,
+				Annotations: map[string]string{
+					utils.BackupLabelFileAnnotationName:         "encoded-backup-label",
+					utils.BackupTablespaceMapFileAnnotationName: "encoded-tablespace-map",
+					utils.BackupPgControlFileAnnotationName:     "encoded-pg-control",
+				},
+			},
+		}
+		Expect(env.client.Create(ctx, snapshot)).To(Succeed())
+
+		res, err := env.clusterReconciler.joinReplicaInstance(ctx, 2, cluster)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(30 * time.Second))
+
+		var jobs batchv1.JobList
+		Expect(env.client.List(ctx, &jobs)).To(Succeed())
+		Expect(jobs.Items).To(HaveLen(1))
+		Expect(jobs.Items[0].Spec.Template.Spec.Containers[0].Command).To(ContainElements(
+			"--immediate",
+			"--backuplabel=encoded-backup-label",
+			"--tablespacemap=encoded-tablespace-map",
+			"--pgcontrol=encoded-pg-control",
+		))
+	})
+})
+
 var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap Job", func() {
 	var env *testingEnvironment
 	var namespace string

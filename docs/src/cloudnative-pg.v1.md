@@ -290,6 +290,7 @@ _Appears in:_
 | `commandError` _string_ | The backup command output in case of error |  |  |  |
 | `backupLabelFile` _integer array_ | Backup label file content as returned by Postgres in case of online (hot) backups |  |  |  |
 | `tablespaceMapFile` _integer array_ | Tablespace map file content as returned by Postgres in case of online (hot) backups |  |  |  |
+| `pgControlFile` _integer array_ | PostgreSQL control file content captured after the volume snapshots were taken<br />and before the online backup was stopped |  |  |  |
 | `instanceID` _[InstanceID](#instanceid)_ | Information to identify the instance where the backup has been taken from |  |  |  |
 | `snapshotBackupStatus` _[BackupSnapshotStatus](#backupsnapshotstatus)_ | Status of the volumeSnapshot backup |  |  |  |
 | `method` _[BackupMethod](#backupmethod)_ | The backup method being used |  |  |  |

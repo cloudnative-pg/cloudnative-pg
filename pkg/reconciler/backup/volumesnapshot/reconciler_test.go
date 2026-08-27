@@ -21,6 +21,7 @@ package volumesnapshot
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -598,8 +599,11 @@ var _ = Describe("annotateSnapshotsWithBackupData", func() {
 		startedAt = metav1.Now()
 		stoppedAt = metav1.NewTime(time.Now().Add(time.Hour))
 		backupStatus = &apiv1.BackupStatus{
-			StartedAt: ptr.To(startedAt),
-			StoppedAt: ptr.To(stoppedAt),
+			StartedAt:         ptr.To(startedAt),
+			StoppedAt:         ptr.To(stoppedAt),
+			BackupLabelFile:   []byte("backup label"),
+			TablespaceMapFile: []byte("tablespace map"),
+			PgControlFile:     []byte("pg_control"),
 		}
 		fakeClient = fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithLists(&snapshots).Build()
@@ -612,6 +616,15 @@ var _ = Describe("annotateSnapshotsWithBackupData", func() {
 		for _, snapshot := range snapshots.Items {
 			Expect(snapshot.Annotations[utils.BackupStartTimeAnnotationName]).To(BeEquivalentTo(startedAt.Format(time.RFC3339)))
 			Expect(snapshot.Annotations[utils.BackupEndTimeAnnotationName]).To(BeEquivalentTo(stoppedAt.Format(time.RFC3339)))
+			Expect(snapshot.Annotations[utils.BackupLabelFileAnnotationName]).To(Equal(
+				base64.StdEncoding.EncodeToString(backupStatus.BackupLabelFile),
+			))
+			Expect(snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName]).To(Equal(
+				base64.StdEncoding.EncodeToString(backupStatus.TablespaceMapFile),
+			))
+			Expect(snapshot.Annotations[utils.BackupPgControlFileAnnotationName]).To(Equal(
+				base64.StdEncoding.EncodeToString(backupStatus.PgControlFile),
+			))
 		}
 	})
 })

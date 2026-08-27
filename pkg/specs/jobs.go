@@ -186,16 +186,7 @@ func CreatePrimaryJobViaRestoreSnapshot(
 		"restoresnapshot",
 	}
 
-	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
-		initCommand = append(initCommand, flag)
-	}
-
-	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
-		initCommand = append(initCommand, flag)
-	}
-
+	initCommand = appendSnapshotRecoveryMetadata(initCommand, object)
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand, getExtensions(&cluster))
@@ -280,7 +271,11 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 }
 
 // RestoreReplicaInstance creates a new PostgreSQL replica starting from a volume snapshot backup
-func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func RestoreReplicaInstance(
+	cluster apiv1.Cluster,
+	nodeSerial int,
+	object *metav1.ObjectMeta,
+) *batchv1.Job {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 4+len(commonFlags))
 	initCommand = append(initCommand,
@@ -290,10 +285,34 @@ func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job 
 		"--immediate",
 	)
 
+	initCommand = appendSnapshotRecoveryMetadata(initCommand, object)
 	initCommand = append(initCommand, commonFlags...)
 
 	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand, getExtensions(&cluster))
 	return job
+}
+
+func appendSnapshotRecoveryMetadata(initCommand []string, object *metav1.ObjectMeta) []string {
+	if object == nil {
+		return initCommand
+	}
+
+	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
+		initCommand = append(initCommand, flag)
+	}
+
+	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
+		initCommand = append(initCommand, flag)
+	}
+
+	if object.Annotations[utils.BackupPgControlFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--pgcontrol=%s", object.Annotations[utils.BackupPgControlFileAnnotationName])
+		initCommand = append(initCommand, flag)
+	}
+
+	return initCommand
 }
 
 func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {

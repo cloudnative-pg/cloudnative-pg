@@ -247,6 +247,35 @@ var _ = Describe("Job created via InitDB", func() {
 	})
 })
 
+var _ = Describe("Job created via VolumeSnapshot", func() {
+	It("passes backup metadata when restoring a replica", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+			},
+		}
+		source := &metav1.ObjectMeta{
+			Annotations: map[string]string{
+				utils.BackupLabelFileAnnotationName:         "encoded-backup-label",
+				utils.BackupTablespaceMapFileAnnotationName: "encoded-tablespace-map",
+				utils.BackupPgControlFileAnnotationName:     "encoded-pg-control",
+			},
+		}
+
+		job := RestoreReplicaInstance(cluster, 2, source)
+
+		Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements(
+			"--immediate",
+			"--backuplabel=encoded-backup-label",
+			"--tablespacemap=encoded-tablespace-map",
+			"--pgcontrol=encoded-pg-control",
+		))
+	})
+})
+
 var _ = Describe("Job service account token", func() {
 	const tokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 

@@ -1543,7 +1543,16 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	// If we can bootstrap this replica from a pre-existing source, we do it
 	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, r.Client, cluster, backupList)
 	if storageSource != nil {
-		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
+		sourceMetadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx,
+			r.Client,
+			cluster.Namespace,
+			storageSource.DataSource,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		job = specs.RestoreReplicaInstance(*cluster, nodeSerial, sourceMetadata)
 	}
 
 	contextLogger.Info("Creating new Job",
@@ -1630,7 +1639,16 @@ func (r *ClusterReconciler) recreateReplicaBootstrapJob(
 
 	job := specs.JoinReplicaInstance(*cluster, serial)
 	if pgdataDataSource != nil {
-		job = specs.RestoreReplicaInstance(*cluster, serial)
+		sourceMetadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx,
+			r.Client,
+			cluster.Namespace,
+			*pgdataDataSource,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		job = specs.RestoreReplicaInstance(*cluster, serial, sourceMetadata)
 	}
 
 	contextLogger.Info("Recreating the bootstrap Job for a replica whose PVCs are not ready",
