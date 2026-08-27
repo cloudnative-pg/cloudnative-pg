@@ -46,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -56,13 +57,7 @@ import (
 const SternLogDirectory = "cluster_logs/"
 
 func getPreserveNamespaces() []string {
-	var preserveNamespacesList []string
-	_, ok := os.LookupEnv("PRESERVE_NAMESPACES")
-	if ok {
-		preserveNamespacesList = strings.Fields(os.Getenv("PRESERVE_NAMESPACES"))
-	}
-
-	return preserveNamespacesList
+	return config.Current().PreserveNamespaces
 }
 
 // CleanupClusterLogs cleans up the cluster logs of a given namespace
