@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -295,5 +297,26 @@ var _ = Describe("automountServiceAccountToken drift detection", func() {
 
 		match, _ = ComparePodSpecs(target, target)
 		Expect(match).To(BeTrue())
+	})
+})
+
+var _ = Describe("Command comparison", func() {
+	baseCommand := []string{"/controller/manager", "instance", "run"}
+
+	It("ignores the status-port-tls flag carried by Pods created before 1.30", func() {
+		current := corev1.Container{Command: append(slices.Clone(baseCommand), "--status-port-tls")}
+		target := corev1.Container{Command: baseCommand}
+
+		Expect(doContainersMatch(current, target)).To(BeTrue())
+		Expect(doContainersMatch(target, current)).To(BeTrue())
+	})
+
+	It("still detects any other command difference", func() {
+		current := corev1.Container{Command: append(slices.Clone(baseCommand), "--status-port-tls")}
+		target := corev1.Container{Command: append(slices.Clone(baseCommand), "--pprof-server")}
+
+		match, diff := doContainersMatch(current, target)
+		Expect(match).To(BeFalse())
+		Expect(diff).To(Equal("command"))
 	})
 })

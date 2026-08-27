@@ -1103,3 +1103,19 @@ var _ = Describe("service account token", func() {
 		}
 	})
 })
+
+var _ = Describe("instance probes", func() {
+	It("queries the status port over HTTPS", func(ctx SpecContext) {
+		pod, err := NewInstance(ctx, apiv1.Cluster{}, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		container := pod.Spec.Containers[0]
+		for _, probe := range []*corev1.Probe{
+			container.StartupProbe,
+			container.ReadinessProbe,
+			container.LivenessProbe,
+		} {
+			Expect(probe.HTTPGet.Scheme).To(Equal(corev1.URISchemeHTTPS))
+		}
+	})
+})
