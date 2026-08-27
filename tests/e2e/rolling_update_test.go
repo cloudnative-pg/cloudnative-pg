@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"os"
-
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
@@ -31,10 +29,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -115,10 +113,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		timeout := 900
 
 		// Update to the latest minor
-		updatedImageName := os.Getenv("POSTGRES_IMG")
-		if updatedImageName == "" {
-			updatedImageName = configuration.Current.PostgresImageName
-		}
+		updatedImageName := config.Current().Postgres.Image
 
 		// We should be able to apply the conf containing the new
 		// image
@@ -502,11 +497,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var pgVersion version.Data
 		BeforeEach(func() {
 			storageClass = env.DefaultStorageClass
-			preRollingImg = os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
-			updatedImageName = os.Getenv("POSTGRES_IMG")
-			if updatedImageName == "" {
-				updatedImageName = configuration.Current.PostgresImageName
-			}
+			preRollingImg = config.Current().Postgres.PreRollingUpdateImage
+			updatedImageName = config.Current().Postgres.Image
 
 			// We automate the extraction of the major version from the image, because we don't want to keep maintaining
 			// the major version in the test

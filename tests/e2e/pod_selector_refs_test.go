@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -62,6 +61,9 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "pod-selector-refs-e2e")
 			Expect(err).ToNot(HaveOccurred())
 
+			storageClass := env.DefaultStorageClass
+			Expect(storageClass).ToNot(BeEmpty())
+
 			cluster := &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      clusterName,
@@ -70,7 +72,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 				Spec: apiv1.ClusterSpec{
 					Instances: 1,
 					StorageConfiguration: apiv1.StorageConfiguration{
-						StorageClass: ptr.To(env.DefaultStorageClass),
+						StorageClass: &storageClass,
 						Size:         "1Gi",
 					},
 					PodSelectorRefs: []apiv1.PodSelectorRef{

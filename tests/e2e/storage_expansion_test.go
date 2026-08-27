@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -46,15 +47,16 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		level       = tests.Lowest
 	)
 	// Initializing a global namespace variable to be used in each test case
-	var namespace, namespacePrefix, defaultStorageClass string
+	var namespace, namespacePrefix string
+	// Gathering default storage class requires to check whether the value
+	// of 'allowVolumeExpansion' is true or false
+	var defaultStorageClass string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		// Gathering default storage class requires to check whether the value
-		// of 'allowVolumeExpansion' is true or false
-		defaultStorageClass = env.DefaultStorageClass
+		defaultStorageClass = config.Current().Storage.StorageClass
 	})
 
 	Context("can be expanded", func() {
