@@ -1692,8 +1692,12 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
+	// A fenced instance keeps answering the status endpoint while PostgreSQL is
+	// shut down, so it is counted as reporting status while its pod can never
+	// become Ready, and the comparison below would never converge.
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&
-		instancesStatus.InstancesReportingStatus() != cluster.Status.ReadyInstances {
+		instancesStatus.InstancesReportingStatusExcept(cluster.IsInstanceFenced) !=
+			cluster.Status.ReadyInstances {
 		// A pod is not ready, let's retry
 		contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
