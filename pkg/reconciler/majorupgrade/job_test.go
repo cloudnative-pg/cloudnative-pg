@@ -69,7 +69,10 @@ var _ = Describe("Major upgrade Job generation", func() {
 		func(job *batchv1.Job, isMajorUpgrade bool) {
 			Expect(isMajorUpgradeJob(job)).To(Equal(isMajorUpgrade))
 		},
-		Entry("initdb jobs are not major upgrades", specs.CreatePrimaryJobViaInitdb(cluster, 1), false),
+		Entry("initdb jobs are not major upgrades", func() *batchv1.Job {
+			cmd := specs.BuildPrimaryBootstrapCommandViaInitdb(cluster)
+			return specs.CreatePrimaryJob(cluster, 1, cmd.Role, cmd.Command, nil)
+		}(), false),
 		Entry("major-upgrade jobs are major upgrades", createMajorUpgradeJobDefinition(&cluster, 1, nil), true),
 	)
 

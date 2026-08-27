@@ -22,7 +22,6 @@ package specs
 import (
 	"slices"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -32,114 +31,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-var _ = Describe("Barman endpoint CA", func() {
-	It("is not added to job specs if backup is not defined", func() {
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				Bootstrap: &apiv1.BootstrapConfiguration{
-					Recovery: &apiv1.BootstrapRecovery{},
-				},
-			},
-		}
-
-		job := batchv1.Job{
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{{}},
-						Volumes: []corev1.Volume{
-							{
-								VolumeSource: corev1.VolumeSource{
-									Secret: &corev1.SecretVolumeSource{
-										Items: []corev1.KeyToPath{
-											{},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-		addBarmanEndpointCAToJobFromCluster(cluster, nil, &job)
-		Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.Secret.Items[0].Key).To(BeEmpty())
-	})
-
-	It("is properly added to job specs", func() {
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				Bootstrap: &apiv1.BootstrapConfiguration{
-					Recovery: &apiv1.BootstrapRecovery{
-						Backup: &apiv1.BackupSource{
-							LocalObjectReference: apiv1.LocalObjectReference{},
-							EndpointCA: &apiv1.SecretKeySelector{
-								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: "test_name_endpoint",
-								},
-								Key: "test_key_endpoint",
-							},
-						},
-					},
-				},
-			},
-		}
-
-		job := batchv1.Job{
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{},
-						},
-					},
-				},
-			},
-		}
-		addBarmanEndpointCAToJobFromCluster(cluster, nil, &job)
-		Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.Secret.Items[0].Key).To(
-			BeEquivalentTo("test_key_endpoint"))
-	})
-
-	It("is properly added to job specs when specified in the backup", func() {
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				Bootstrap: &apiv1.BootstrapConfiguration{
-					Recovery: &apiv1.BootstrapRecovery{
-						Backup: &apiv1.BackupSource{
-							LocalObjectReference: apiv1.LocalObjectReference{Name: "test"},
-						},
-					},
-				},
-			},
-		}
-
-		backup := apiv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "test"}, Status: apiv1.BackupStatus{
-			EndpointCA: &apiv1.SecretKeySelector{
-				LocalObjectReference: apiv1.LocalObjectReference{
-					Name: "test_name_endpoint",
-				},
-				Key: "test_key_endpoint",
-			},
-		}}
-
-		job := batchv1.Job{
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{},
-						},
-					},
-				},
-			},
-		}
-		addBarmanEndpointCAToJobFromCluster(cluster, &backup, &job)
-		Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.Secret.Items[0].Key).To(
-			BeEquivalentTo("test_key_endpoint"))
-	})
-})
 
 var _ = Describe("Job created via InitDB", func() {
 	It("contain cluster post-init SQL instructions", func() {
@@ -164,11 +55,11 @@ var _ = Describe("Job created via InitDB", func() {
 				},
 			},
 		}
-		job := CreatePrimaryJobViaInitdb(cluster, 0)
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitSql"))
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitTemplateSql"))
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement(
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		Expect(cmd.Command).Should(ContainElement("testPostInitSql"))
+		Expect(cmd.Command).Should(ContainElement("testPostInitTemplateSql"))
+		Expect(cmd.Command).Should(ContainElement("testPostInitApplicationSql"))
+		Expect(cmd.Command).Should(ContainElement(
 			postInitApplicationSQLRefsFolder.toString()))
 	})
 
@@ -185,9 +76,9 @@ var _ = Describe("Job created via InitDB", func() {
 				},
 			},
 		}
-		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
 
-		jobCommand := job.Spec.Template.Spec.Containers[0].Command
+		jobCommand := cmd.Command
 		Expect(jobCommand).Should(ContainElement("--initdb-flags"))
 		initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
 		Expect(initdbFlags).Should(ContainSubstring("--encoding=UTF-8"))
@@ -223,7 +114,8 @@ var _ = Describe("Job created via InitDB", func() {
 				},
 			},
 		}
-		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		job := CreatePrimaryJob(cluster, 0, cmd.Role, cmd.Command, getExtensions(&cluster))
 		Expect(job.Labels).To(BeEquivalentTo(map[string]string{
 			utils.ClusterLabelName:                cluster.Name,
 			utils.JobRoleLabelName:                "initdb",
@@ -259,7 +151,8 @@ var _ = Describe("Job service account token", func() {
 	}
 
 	It("always disables the automount and projects the token for non-bootstrap containers", func() {
-		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		job := CreatePrimaryJob(cluster, 0, cmd.Role, cmd.Command, getExtensions(&cluster))
 		podSpec := job.Spec.Template.Spec
 		Expect(podSpec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
 		Expect(podSpec.Volumes).To(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))

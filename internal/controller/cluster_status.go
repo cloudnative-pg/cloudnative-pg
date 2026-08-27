@@ -82,6 +82,25 @@ func (resources *managedResources) failedJobNames() []string {
 	return result
 }
 
+// failedBootstrapPodNames returns the names of the Pods whose bootstrap init
+// container has failed at least once and has not since succeeded.
+func (resources *managedResources) failedBootstrapPodNames() []string {
+	result := make([]string, 0, len(resources.instances.Items))
+	for _, pod := range resources.instances.Items {
+		for _, containerStatus := range pod.Status.InitContainerStatuses {
+			if containerStatus.Name != specs.BootstrapWorkContainerName {
+				continue
+			}
+			succeeded := containerStatus.State.Terminated != nil &&
+				containerStatus.State.Terminated.ExitCode == 0
+			if containerStatus.RestartCount >= 1 && !succeeded {
+				result = append(result, pod.Name)
+			}
+		}
+	}
+	return result
+}
+
 // Check if every managed Pod is active and will be schedules
 func (resources *managedResources) inactiveInstanceNames() []string {
 	result := make([]string, 0, len(resources.instances.Items))

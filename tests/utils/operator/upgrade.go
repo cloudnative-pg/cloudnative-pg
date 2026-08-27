@@ -140,7 +140,7 @@ func InstallLatest(
 	// above and refreshes from discovery on an interval (~30s). Until it picks up
 	// the freshly installed Cluster CRD, any object created with a blockOwnerDeletion
 	// owner reference to a Cluster is rejected with "no matches for kind Cluster",
-	// and the operator hits this the moment it creates the bootstrap Job.
+	// and the operator hits this the moment it creates the primary instance's Pod.
 	//
 	// The check is only enforced for callers that are not cluster-admin, so probe
 	// while impersonating the operator's ServiceAccount: a privileged client (like
@@ -161,7 +161,7 @@ func InstallLatest(
 				OwnerReferences: []metav1.OwnerReference{
 					// BlockOwnerDeletion is what the admission plugin enforces; Controller
 					// is set only to mirror ctrl.SetControllerReference on the real
-					// bootstrap Job.
+					// instance Pod.
 					{
 						APIVersion:         apiv1.SchemeGroupVersion.String(),
 						Kind:               apiv1.ClusterKind,

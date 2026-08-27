@@ -71,7 +71,7 @@ CloudNativePG manages the following predefined labels:
   deprecated `postgresql` label).
 
 `cnpg.io/jobRole`
-: Role of the job (that is, `import`, `initdb`, `join`, ...)
+: Role of the job (that is, `major-upgrade`)
 
 `cnpg.io/majorVersion`
 : Integer PostgreSQL major version of the backup's data directory (for example, `17`).

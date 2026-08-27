@@ -820,6 +820,62 @@ func (r *ClusterReconciler) setDefaults(ctx context.Context, cluster *apiv1.Clus
 	return nil
 }
 
+// reconcileFailedJobs surfaces a permanently failed instance-creation Job
+// (bootstrap, recovery or replica creation) as PhaseUnrecoverable: such a Job
+// is counted as "running" until it succeeds, so one that has exhausted its
+// backoff limit would otherwise keep the cluster waiting forever. The cause
+// is in the job logs and has to be investigated: there is no predefined
+// recipe.
+func (r *ClusterReconciler) reconcileFailedJobs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	failedJobs := resources.failedJobNames()
+	if len(failedJobs) == 0 {
+		return nil, nil
+	}
+
+	log.FromContext(ctx).Warning("An instance creation job has failed", "failedJobs", failedJobs)
+
+	reason := fmt.Sprintf("Instance creation failed for the following jobs: %s. "+
+		"Check the job logs to investigate the cause of the failure.",
+		strings.Join(failedJobs, ", "))
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
+		return &ctrl.Result{}, err
+	}
+	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
+// reconcileFailedBootstrapPods surfaces a failing bootstrap init container as
+// PhaseUnrecoverable. Unlike a Job, it has no backoff limit of its own:
+// kubelet retries it forever, so a doomed bootstrap would otherwise
+// crash-loop with no signal. This only updates Cluster status, leaving the
+// Pod and its logs untouched and kubelet's retry running, so a transient
+// failure that later succeeds clears the phase again on its own.
+func (r *ClusterReconciler) reconcileFailedBootstrapPods(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	failedBootstrapPods := resources.failedBootstrapPodNames()
+	if len(failedBootstrapPods) == 0 {
+		return nil, nil
+	}
+
+	log.FromContext(ctx).Warning("An instance bootstrap has failed", "failedBootstrapPods", failedBootstrapPods)
+
+	reason := fmt.Sprintf("Instance bootstrap failed for the following Pods: %s. "+
+		"Check the bootstrap-instance init container logs to investigate the cause of the failure.",
+		strings.Join(failedBootstrapPods, ", "))
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
+		return &ctrl.Result{}, err
+	}
+	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
 // reconcileResources updates all the objects managed by the controller
 func (r *ClusterReconciler) reconcileResources(
 	ctx context.Context, cluster *apiv1.Cluster,
@@ -844,22 +900,16 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	// A Job that creates an instance (bootstrap, recovery or replica creation)
-	// is counted as "running" until it succeeds, so a Job that has exhausted its
-	// backoff limit would otherwise keep the cluster waiting forever. Surface the
-	// failure in the phase instead. The cause is in the job logs and has to be
-	// investigated: there is no predefined recipe.
-	if failedJobs := resources.failedJobNames(); len(failedJobs) > 0 {
-		contextLogger.Warning("An instance creation job has failed", "failedJobs", failedJobs)
+	if result, err := r.reconcileFailedJobs(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, err
+	} else if result != nil {
+		return *result, nil
+	}
 
-		reason := fmt.Sprintf("Instance creation failed for the following jobs: %s. "+
-			"Check the job logs to investigate the cause of the failure.",
-			strings.Join(failedJobs, ", "))
-
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	if result, err := r.reconcileFailedBootstrapPods(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, err
+	} else if result != nil {
+		return *result, nil
 	}
 
 	runningJobs := resources.runningJobNames()

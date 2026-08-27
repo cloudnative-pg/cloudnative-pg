@@ -59,7 +59,9 @@ const (
 	// List of available instances detected from PVCs
 	instanceNames status = "instanceNames"
 
-	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
+	// List of PVCs that are being initialized: either they have a corresponding
+	// Job but not a corresponding Pod yet, or they have a corresponding Pod
+	// whose bootstrap init container has not completed yet
 	initializing status = "initializing"
 
 	// List of PVCs with resizing condition that have a corresponding pod.
@@ -264,6 +266,13 @@ func classifyPVC(
 
 	// PVC has a corresponding Pod
 	if hasPod(pvc, podList) {
+		// The Pod may carry a bootstrap init container that has not finished
+		// populating this PVC yet (e.g. initdb/join/restore): until it
+		// completes, the PVC is not actually usable, even though a Pod
+		// already references it.
+		if !podBootstrapComplete(pvc, podList) {
+			return initializing
+		}
 		if isResizing(pvc) {
 			return resizing
 		}
@@ -316,6 +325,27 @@ func hasPod(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// podBootstrapComplete checks whether the PVC's Pod, if it carries a
+// bootstrap init container (specs.BootstrapWorkContainerName), has already
+// completed it successfully. A PVC whose Pod has no such init container is
+// treated as already bootstrapped: this is the normal case when reattaching
+// a Pod to a PVC that was already ready (no bootstrap needed), or for
+// PVC roles (e.g. WAL, tablespaces) that never require one of their own.
+func podBootstrapComplete(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
+	for _, pod := range podList {
+		if !podUsesPVC(pod, pvc) {
+			continue
+		}
+		for _, containerStatus := range pod.Status.InitContainerStatuses {
+			if containerStatus.Name != specs.BootstrapWorkContainerName {
+				continue
+			}
+			return containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 0
+		}
+	}
+	return true
 }
 
 // jobUsesPVC checks if the given Job uses the given PVC

@@ -81,6 +81,10 @@ const (
 	// controller inside the Pod file system
 	BootstrapControllerContainerName = "bootstrap-controller"
 
+	// BootstrapWorkContainerName is the name of the init container that runs
+	// the instance-bootstrap command (init/join/restore/restoresnapshot/pgbasebackup)
+	BootstrapWorkContainerName = "bootstrap-instance"
+
 	// PgDataPath is the path to PGDATA variable
 	PgDataPath = "/var/lib/postgresql/data/pgdata"
 
@@ -608,53 +612,53 @@ func GetInstanceName(clusterName string, nodeSerial int) string {
 	return fmt.Sprintf("%s-%v", clusterName, nodeSerial)
 }
 
-// AddBarmanEndpointCAToPodSpec adds the required volumes and env variables needed by barman to work correctly
-func AddBarmanEndpointCAToPodSpec(
-	podSpec *corev1.PodSpec,
-	caSecret *apiv1.SecretKeySelector,
-	credentials apiv1.BarmanCredentials,
-) {
-	if caSecret == nil || caSecret.Name == "" || caSecret.Key == "" {
+// AddBootstrapInitContainer appends the given instance-bootstrap command
+// (init/join/restore/restoresnapshot/pgbasebackup) as an init container on
+// pod, positioned after any init containers already present (the manager
+// binary staging container, and any CNPG-i plugin sidecars already injected
+// by NewInstance's lifecycle hook) so both have already run by the time this
+// container starts. It has no effect if bootstrap is nil, which is the case
+// once the instance's PVCs are already fully bootstrapped.
+func AddBootstrapInitContainer(pod *corev1.Pod, cluster apiv1.Cluster, bootstrap *InstanceBootstrapCommand) {
+	if bootstrap == nil {
 		return
 	}
 
-	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
-		Name: "barman-endpoint-ca",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: caSecret.Name,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  caSecret.Key,
-						Path: postgres.BarmanRestoreEndpointCACertificateFileName,
-					},
-				},
-			},
-		},
+	envConfig := CreatePodEnvConfig(cluster, pod.Name)
+	initContainer := createInstanceInitContainer(InstanceInitContainerConfig{
+		Cluster:     cluster,
+		Name:        BootstrapWorkContainerName,
+		Role:        bootstrap.Role,
+		EnvConfig:   envConfig,
+		InitCommand: bootstrap.Command,
+		Extensions:  getExtensions(&cluster),
 	})
 
-	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
-		corev1.VolumeMount{
-			Name:      "barman-endpoint-ca",
-			MountPath: postgres.CertificatesDir,
-		},
-	)
-
-	var envVars []corev1.EnvVar
-	// todo: add a case for the Google provider
-	switch {
-	case credentials.Azure != nil:
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  "REQUESTS_CA_BUNDLE",
-			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
-		})
-	// If nothing is set we fall back to AWS, this is to avoid breaking changes with previous versions
-	default:
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  "AWS_CA_BUNDLE",
-			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
-		})
+	// Grant this container whatever extra volume mounts a CNPG-i plugin's
+	// lifecycle hook has already added to the "postgres" container beyond the
+	// common base set both containers already compute identically (e.g. a
+	// Unix socket volume mount to reach the plugin's own sidecar), without
+	// this code needing to know anything about plugins. Only append mounts
+	// this container doesn't already have (matched by volume name): the base
+	// set it shares with "postgres" is already present, and so are its own
+	// bootstrap-specific mounts (e.g. post-init SQL refs) computed above by
+	// createInstanceInitContainer — copying the full list wholesale would
+	// duplicate the former and silently drop the latter.
+	for _, container := range pod.Spec.Containers {
+		if container.Name != PostgresContainerName {
+			continue
+		}
+		for _, volumeMount := range container.VolumeMounts {
+			alreadyMounted := slices.ContainsFunc(initContainer.Container.VolumeMounts, func(vm corev1.VolumeMount) bool {
+				return vm.Name == volumeMount.Name
+			})
+			if !alreadyMounted {
+				initContainer.Container.VolumeMounts = append(initContainer.Container.VolumeMounts, volumeMount)
+			}
+		}
+		break
 	}
 
-	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, envVars...)
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer.Container)
+	pod.Spec.Volumes = append(pod.Spec.Volumes, initContainer.Volumes...)
 }
