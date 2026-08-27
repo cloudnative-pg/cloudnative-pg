@@ -147,6 +147,16 @@ func NewCmd() *cobra.Command {
 	)
 	cmd.Flags().BoolVar(&metricsPortTLS, "metrics-port-tls", false,
 		"Enable TLS for metrics scraping")
+
+	// An in-place instance manager upgrade re-execs this binary with the argv of
+	// the Pod, which was chosen by the operator that created it. Pods created
+	// before 1.30 pass --status-port-tls, and rejecting it would crash-loop the
+	// instance manager.
+	//
+	// TODO: delete after minor version 1.29 is discontinued
+	cmd.Flags().Bool("status-port-tls", false, "Deprecated: the status port always uses TLS")
+	_ = cmd.Flags().MarkDeprecated("status-port-tls", "the status port always uses TLS")
+
 	return cmd
 }
 

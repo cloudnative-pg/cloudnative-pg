@@ -356,8 +356,7 @@ func (r *instanceClientImpl) rawInstanceStatusRequest(
 func (r *instanceClientImpl) ArchivePartialWAL(ctx context.Context, pod *corev1.Pod) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	statusURL := url.Build(
-		"https", pod.Status.PodIP, url.PathPgArchivePartial, url.StatusPort)
+	statusURL := url.Build("https", pod.Status.PodIP, url.PathPgArchivePartial, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, statusURL, nil)
 	if err != nil {
 		return "", err
