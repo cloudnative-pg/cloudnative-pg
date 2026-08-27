@@ -1899,6 +1899,41 @@ _Appears in:_
 | `imageCatalogRef` _[ImageCatalogComponentRef](#imagecatalogcomponentref)_ | ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.<br />Mutually exclusive with Image. |  |  |  |
 
 
+#### PgRewindConfiguration
+
+
+
+PgRewindConfiguration defines the pg_rewind configuration.
+
+
+
+_Appears in:_
+
+- [PostgresConfiguration](#postgresconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `syncMethod` _[PgRewindSyncMethod](#pgrewindsyncmethod)_ | SyncMethod selects how pg_rewind synchronizes files to durable storage.<br />The default, `fsync`, recursively opens and synchronizes each file.<br />`syncfs` is available on Linux with PostgreSQL 17 or later and synchronizes<br />the filesystems containing PGDATA, the WAL directory, and tablespaces. |  | fsync | Enum: [fsync syncfs] <br /> |
+
+
+#### PgRewindSyncMethod
+
+_Underlying type:_ _string_
+
+PgRewindSyncMethod is the synchronization method used by pg_rewind.
+
+
+
+_Appears in:_
+
+- [PgRewindConfiguration](#pgrewindconfiguration)
+
+| Field | Description |
+| --- | --- |
+| `fsync` | PgRewindSyncMethodFsync synchronizes every file in the PostgreSQL data directories.<br /> |
+| `syncfs` | PgRewindSyncMethodSyncfs synchronizes the filesystems containing the PostgreSQL data directories.<br /> |
+
+
 #### PluginConfiguration
 
 
@@ -2261,6 +2296,7 @@ _Appears in:_
 | `syncReplicaElectionConstraint` _[SyncReplicaElectionConstraints](#syncreplicaelectionconstraints)_ | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be<br />set up. |  |  |  |
 | `shared_preload_libraries` _string array_ | Lists of shared preload libraries to add to the default ones |  |  |  |
 | `ldap` _[LDAPConfig](#ldapconfig)_ | Options to specify LDAP configuration |  |  |  |
+| `pgRewind` _[PgRewindConfiguration](#pgrewindconfiguration)_ | Configuration of pg_rewind |  |  |  |
 | `promotionTimeout` _integer_ | Specifies the maximum number of seconds to wait when promoting an instance to primary.<br />Default value is 40000000, greater than one year in seconds,<br />big enough to simulate an infinite timeout |  |  |  |
 | `enableAlterSystem` _boolean_ | If this parameter is true, the user will be able to invoke `ALTER SYSTEM`<br />on this CloudNativePG Cluster.<br />This should only be used for debugging and troubleshooting.<br />Defaults to false. |  |  |  |
 | `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | The configuration of the extensions to be added |  |  |  |
