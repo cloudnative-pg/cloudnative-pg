@@ -61,8 +61,11 @@ func TestLevel() (*TestEnvLevel, error) {
 	}
 	if depthEnv, exists := os.LookupEnv(testDepthEnvVarName); exists {
 		depth, err := strconv.Atoi(depthEnv)
-		return &TestEnvLevel{env, depth}, err
+		if err != nil {
+			return nil, err
+		}
+		return &TestEnvLevel{env, depth}, nil
 	}
 
-	return &TestEnvLevel{env, defaultTestDepth}, err
+	return &TestEnvLevel{env, defaultTestDepth}, nil
 }
