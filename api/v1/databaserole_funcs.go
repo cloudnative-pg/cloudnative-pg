@@ -20,8 +20,12 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // SetAsFailed sets the role as failed with the given error
@@ -144,8 +148,105 @@ func (r *DatabaseRole) GetPasswordSecretName() string {
 	return r.Spec.GetRoleSecretName()
 }
 
+// GetPasswordMessage returns the explanation the operator recorded about the
+// password of the role, if it recorded one.
+func (r *DatabaseRole) GetPasswordMessage() string {
+	if r.Status.Password == nil {
+		return ""
+	}
+	return r.Status.Password.Message
+}
+
+// SetPasswordMessage explains in the status why the password is not being
+// generated, without dropping the Secret name and issue/expiration times
+// already recorded: losing those while rotation is stalled would lift the
+// VALID UNTIL PostgreSQL enforces.
+func (r *DatabaseRole) SetPasswordMessage(message string) {
+	var state GeneratedPasswordState
+	if r.Status.Password != nil {
+		state = *r.Status.Password
+	}
+
+	// The revocation is the one thing not kept: it belongs to a role that
+	// stopped generating its password, and this one is still asking for it.
+	state.PendingRevocation = false
+	state.Message = message
+	r.Status.Password = &state
+}
+
+// SetGeneratedPasswordState records what the operator knows about the
+// generated password, field by field rather than by whole-struct assignment,
+// so the applied-expiration field the instance manager writes into the same
+// struct isn't dropped. A nil state means the role generates no password.
+func (r *DatabaseRole) SetGeneratedPasswordState(state *GeneratedPasswordState) {
+	if state == nil {
+		r.Status.Password = nil
+		return
+	}
+
+	if r.Status.Password == nil {
+		r.Status.Password = &GeneratedPasswordState{}
+	}
+	r.Status.Password.SecretName = state.SecretName
+	r.Status.Password.IssuedAt = state.IssuedAt
+	r.Status.Password.Expiration = state.Expiration
+	r.Status.Password.Message = state.Message
+	r.Status.Password.PendingRevocation = state.PendingRevocation
+}
+
 // IsPasswordRotationEnabled returns true when the generated password has a
 // lifetime, and is therefore rotated by the operator.
 func (r *DatabaseRole) IsPasswordRotationEnabled() bool {
 	return r.IsPasswordGenerationEnabled() && r.Spec.Password.Duration != nil
+}
+
+// GetPasswordRenewalDue returns when the current password is due for renewal:
+// issue time plus duration, minus renewBefore. It always recomputes from the
+// current spec rather than a stored deadline, so a config change takes effect
+// immediately. Meaningful only when password rotation is enabled.
+// fallbackIssuedAt stands in for the issue time when rotation was enabled
+// after the password was already generated.
+func (r *DatabaseRole) GetPasswordRenewalDue(fallbackIssuedAt time.Time) (time.Time, error) {
+	issuedAt, err := r.GetPasswordIssuedAt(fallbackIssuedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return issuedAt.Add(r.Spec.Password.Duration.Duration).Add(-r.GetPasswordRenewBefore()), nil
+}
+
+// GetPasswordIssuedAt returns the recorded issue time of the current password,
+// parsed from RFC3339, falling back to the given time when it's absent (which
+// happens when rotation was enabled after the password was already generated).
+func (r *DatabaseRole) GetPasswordIssuedAt(fallback time.Time) (time.Time, error) {
+	if r.Status.Password == nil || r.Status.Password.IssuedAt == "" {
+		return fallback, nil
+	}
+	return time.Parse(time.RFC3339, r.Status.Password.IssuedAt)
+}
+
+// GetPasswordRenewBefore returns how long before its expiration the password
+// of the role is rotated. Meaningful only when password rotation is enabled.
+func (r *DatabaseRole) GetPasswordRenewBefore() time.Duration {
+	duration := r.Spec.Password.Duration.Duration
+
+	if r.Spec.Password.RenewBefore != nil {
+		return r.Spec.Password.RenewBefore.Duration
+	}
+
+	// A non-positive threshold would rotate the password only once it is already
+	// expired, so fall back to the built-in default as the certificates do.
+	threshold := configuration.Current.ExpiringCheckThreshold
+	if threshold <= 0 {
+		threshold = configuration.ExpiringCheckThreshold
+	}
+
+	// The operator-wide default can be longer than a short lifetime, which would
+	// leave the password due for rotation the moment it is generated: cap it at
+	// half of the requested lifetime.
+	renewBefore := time.Duration(threshold) * 24 * time.Hour
+	if renewBefore > duration/2 {
+		renewBefore = duration / 2
+	}
+	return renewBefore
 }

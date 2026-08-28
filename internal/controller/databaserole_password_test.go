@@ -639,7 +639,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 
 	It("keeps the applied expiration while it explains why generation is blocked", func() {
-		// setPasswordMessage rebuilds the password state to add its message,
+		// SetPasswordMessage rebuilds the password state to add its message,
 		// and runs on every loop for as long as the cause lasts.
 		existing := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Name: "role-dante-password", Namespace: namespace},
@@ -713,7 +713,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			Mode:     apiv1.PasswordModeGenerate,
 			Duration: &metav1.Duration{Duration: 30 * 24 * time.Hour},
 		})
-		Expect(passwordRenewBefore(role)).To(Equal(7 * 24 * time.Hour))
+		Expect(role.GetPasswordRenewBefore()).To(Equal(7 * 24 * time.Hour))
 	})
 
 	It("records the password it generated even when the client certificate fails", func() {
@@ -1309,7 +1309,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 	})
 })
 
-var _ = Describe("passwordRenewalDue", func() {
+var _ = Describe("GetPasswordRenewalDue", func() {
 	ctx := context.Background()
 
 	newRole := func(issuedAt time.Time, duration, renewBefore time.Duration) *apiv1.DatabaseRole {
