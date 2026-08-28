@@ -147,4 +147,17 @@ var _ = Describe("Testing Annotations and labels subset", func() {
 			map[string]string{department: "finance"}, ctrl)
 		Expect(isSubset).To(BeFalse())
 	})
+
+	It("should ignore the managed-by label, which is never inherited", func() {
+		ctrl := &fakeInhericanceController{
+			labels: []string{KubernetesAppManagedByLabelName},
+		}
+		// The object keeps the operator-owned managed-by value while the cluster
+		// carries a different one (e.g. set to "Helm"). Since managed-by is never
+		// inherited it must still be recognized as a subset, otherwise resources
+		// would be perpetually flagged as out-of-date.
+		obj := map[string]string{KubernetesAppManagedByLabelName: ManagerName}
+		clusterLabels := map[string]string{KubernetesAppManagedByLabelName: "Helm"}
+		Expect(IsLabelSubset(obj, clusterLabels, nil, ctrl)).To(BeTrue())
+	})
 })
