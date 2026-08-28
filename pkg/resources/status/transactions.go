@@ -27,7 +27,7 @@ import (
 )
 
 // Transaction is a function that modifies a cluster. It is an alias, so that a
-// list of transactions can be handed straight to PatchStatusWithOptimisticLock.
+// list of transactions can be handed straight to PatchObjectWithOptimisticLock.
 type Transaction = func(cluster *apiv1.Cluster)
 
 // SetClusterReadyCondition updates the cluster's readiness condition

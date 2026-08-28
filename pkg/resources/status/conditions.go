@@ -45,7 +45,7 @@ func PatchConditionsWithOptimisticLock(
 		return nil
 	}
 
-	updatedCluster, err := PatchStatusWithOptimisticLock(ctx, c, cluster,
+	updatedCluster, err := PatchObjectWithOptimisticLock(ctx, c, cluster,
 		func(cluster *apiv1.Cluster) {
 			for _, condition := range conditions {
 				meta.SetStatusCondition(&cluster.Status.Conditions, condition)

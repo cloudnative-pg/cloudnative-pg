@@ -31,13 +31,13 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// PatchStatusWithOptimisticLock applies the given transactions, in order, to a
+// PatchObjectWithOptimisticLock applies the given transactions, in order, to a
 // freshly read copy of the object and patches its status under an optimistic
 // lock, retrying on conflict so a write landing between the read and the patch
 // is never lost, even where a merge patch replaces a whole field (as it does
 // for `status.conditions`). The object the caller holds is left alone; a zero
 // value is returned when the patch was a no-op.
-func PatchStatusWithOptimisticLock[T client.Object](
+func PatchObjectWithOptimisticLock[T client.Object](
 	ctx context.Context,
 	c client.Client,
 	obj T,
@@ -93,7 +93,7 @@ func PatchWithOptimisticLock(
 
 	origCluster := cluster.DeepCopy()
 
-	updatedCluster, err := PatchStatusWithOptimisticLock(ctx, c, cluster, txs...)
+	updatedCluster, err := PatchObjectWithOptimisticLock(ctx, c, cluster, txs...)
 	if err != nil {
 		return fmt.Errorf("while patching status: %w", err)
 	}
