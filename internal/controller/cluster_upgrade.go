@@ -127,6 +127,12 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 
 	// If the primary update strategy is supervised, we should not consume a rollout slot.
 	// The user must issue a switchover manually.
+	//
+	// NOTE: the decrease of a hot standby sensitive parameter is handled earlier
+	// (PendingRestartForDecrease returns above) by the instance manager, which asks
+	// for an in-place primary restart instead of a switchover. This branch covers
+	// the remaining supervised rollouts (e.g. image upgrades) where a switchover is
+	// the correct action.
 	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
 		contextLogger := log.FromContext(ctx)
 		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
