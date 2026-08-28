@@ -104,7 +104,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// The reason is otherwise only in a nested status field; emit an event so
 	// it shows in `kubectl describe`, but only when it changes, so a lasting
 	// condition doesn't fill the event stream with copies of itself.
-	if message := passwordMessage(&role); message != "" && message != passwordMessage(origRole) {
+	if message := role.GetPasswordMessage(); message != "" && message != origRole.GetPasswordMessage() {
 		r.Recorder.Event(&role, "Warning", "PasswordGenerationSkipped", message)
 	}
 
@@ -159,7 +159,7 @@ func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv
 	secretChange := meta.FindStatusCondition(role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
 
 	transaction := func(latest *apiv1.DatabaseRole) {
-		setGeneratedPasswordState(latest, password)
+		latest.SetGeneratedPasswordState(password)
 		latest.Status.ClientCertificate = clientCertificate
 
 		if secretChange != nil {
@@ -170,7 +170,7 @@ func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv
 		// password Secret, and that removal has to be applied too.
 		meta.RemoveStatusCondition(&latest.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
 	}
-	_, err := status.PatchStatusWithOptimisticLock(ctx, r.Client, role, transaction)
+	_, err := status.PatchObjectWithOptimisticLock(ctx, r.Client, role, transaction)
 	// The role was deleted while we were reconciling it: there is no status
 	// left to write.
 	if apierrs.IsNotFound(err) {
@@ -218,7 +218,7 @@ func untilPasswordRenewal(role *apiv1.DatabaseRole) time.Duration {
 	// The same deadline the rotation aims at, recomputed from the issue time so
 	// that shortening the lifetime brings the requeue forward with it. The issue
 	// time is recorded, so no fallback is needed here.
-	renewalDue, err := passwordRenewalDue(role, time.Time{})
+	renewalDue, err := role.GetPasswordRenewalDue(time.Time{})
 	if err != nil {
 		return roleSecretReconcileInterval
 	}
