@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -77,15 +78,18 @@ func setStatusPluginHook(
 		plugin.Status = val
 	}
 
-	contextLogger.Info("patching cluster status with the updated plugin statuses")
-	contextLogger.Debug("diff detected",
-		"before", origCluster.Status.PluginStatus,
-		"after", cluster.Status.PluginStatus,
-	)
-
-	if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
-		return ctrl.Result{}, err
+	if !apiequality.Semantic.DeepEqual(origCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
+		contextLogger.Info("patching cluster status with the updated plugin statuses")
+		contextLogger.Debug("diff detected",
+			"before", origCluster.Status.PluginStatus,
+			"after", cluster.Status.PluginStatus,
+		)
+		if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
+
+	// Requeue unconditionally to ensure the plugin always has a chance to set the status
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
 
