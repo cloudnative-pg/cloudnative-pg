@@ -28,15 +28,150 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpgiclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("updatePluginsStatus", func() {
+	const (
+		pluginName      = "test1_plugin"
+		otherPluginName = "test2_plugin"
+		pluginStatus    = `{"status": "testing"}`
+	)
+
+	var (
+		ctx           context.Context
+		cluster       *apiv1.Cluster
+		fakeClient    client.Client
+		pluginCli     *fakePluginClient
+		reconciler    *ClusterReconciler
+		statusPatches int
+	)
+
+	// metadataFor builds the metadata a loaded plugin reports.
+	metadataFor := func(names ...string) []connection.Metadata {
+		result := make([]connection.Metadata, len(names))
+		for i, name := range names {
+			result[i] = connection.Metadata{
+				Name:                       name,
+				Version:                    "0.0.1",
+				Capabilities:               []string{"TYPE_OPERATOR_SERVICE"},
+				OperatorCapabilities:       []string{"TYPE_SET_STATUS_IN_CLUSTER"},
+				WALCapabilities:            []string{},
+				BackupCapabilities:         []string{},
+				RestoreJobHookCapabilities: []string{},
+			}
+		}
+		return result
+	}
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		statusPatches = 0
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "test-namespace",
+			},
+			Status: apiv1.ClusterStatus{
+				PluginStatus: []apiv1.PluginStatus{
+					{
+						Name:                 pluginName,
+						Version:              "0.0.1",
+						Capabilities:         []string{"TYPE_OPERATOR_SERVICE"},
+						OperatorCapabilities: []string{"TYPE_SET_STATUS_IN_CLUSTER"},
+						Status:               pluginStatus,
+					},
+				},
+			},
+		}
+
+		fakeClient = fake.NewClientBuilder().
+			WithObjects(cluster).
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithStatusSubresource(&apiv1.Cluster{}).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(
+					ctx context.Context,
+					c client.Client,
+					subResourceName string,
+					obj client.Object,
+					patch client.Patch,
+					opts ...client.SubResourcePatchOption,
+				) error {
+					if subResourceName == "status" {
+						statusPatches++
+					}
+					return c.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+				},
+			}).
+			Build()
+
+		pluginCli = &fakePluginClient{}
+		reconciler = &ClusterReconciler{Client: fakeClient}
+	})
+
+	It("preserves the status reported by the plugin across the rebuild", func() {
+		pluginCli.metadataList = metadataFor(pluginName)
+		ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginCli)
+
+		Expect(reconciler.updatePluginsStatus(ctx, cluster)).To(Succeed())
+
+		Expect(cluster.Status.PluginStatus).To(HaveLen(1))
+		Expect(cluster.Status.PluginStatus[0].Name).To(Equal(pluginName))
+		Expect(cluster.Status.PluginStatus[0].Status).To(Equal(pluginStatus))
+
+		Expect(statusPatches).To(BeZero())
+	})
+
+	It("patches the status when the plugin metadata changed", func() {
+		pluginCli.metadataList = metadataFor(pluginName)
+		pluginCli.metadataList[0].Version = "0.0.2"
+		ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginCli)
+
+		Expect(reconciler.updatePluginsStatus(ctx, cluster)).To(Succeed())
+
+		Expect(statusPatches).To(Equal(1))
+		Expect(cluster.Status.PluginStatus[0].Version).To(Equal("0.0.2"))
+		// A metadata change must not cost us the plugin-reported status.
+		Expect(cluster.Status.PluginStatus[0].Status).To(Equal(pluginStatus))
+	})
+
+	It("keeps each plugin's status with its own entry when a plugin is added", func() {
+		// The carry-over is by name, not by index, so a plugin appearing
+		// before the existing one in the sorted list must not shift statuses
+		// onto the wrong entry.
+		pluginCli.metadataList = metadataFor(otherPluginName, pluginName)
+		ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginCli)
+
+		Expect(reconciler.updatePluginsStatus(ctx, cluster)).To(Succeed())
+
+		Expect(cluster.Status.PluginStatus).To(HaveLen(2))
+		Expect(cluster.Status.PluginStatus[0].Name).To(Equal(otherPluginName))
+		Expect(cluster.Status.PluginStatus[0].Status).To(BeEmpty())
+		Expect(cluster.Status.PluginStatus[1].Name).To(Equal(pluginName))
+		Expect(cluster.Status.PluginStatus[1].Status).To(Equal(pluginStatus))
+	})
+
+	It("drops the entry of a plugin that is no longer loaded", func() {
+		pluginCli.metadataList = metadataFor(otherPluginName)
+		ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginCli)
+
+		Expect(reconciler.updatePluginsStatus(ctx, cluster)).To(Succeed())
+
+		Expect(cluster.Status.PluginStatus).To(HaveLen(1))
+		Expect(cluster.Status.PluginStatus[0].Name).To(Equal(otherPluginName))
+	})
+})
 
 var _ = Describe("mapPluginEndpointSlicesToClusters", func() {
 	const (
