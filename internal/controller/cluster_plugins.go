@@ -23,6 +23,7 @@ package controller
 import (
 	"context"
 	"reflect"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -49,6 +50,15 @@ func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *ap
 	metadataList := pluginClient.MetadataList()
 	cluster.Status.PluginStatus = make([]apiv1.PluginStatus, len(metadataList))
 	for i, entry := range metadataList {
+		// Check if this plugin already exists in the old cluster
+		if idx := slices.IndexFunc(oldCluster.Status.PluginStatus, func(p apiv1.PluginStatus) bool {
+			return p.Name == entry.Name
+		}); idx >= 0 {
+			// Save the old plugin status so we can carry it over as is without
+			// potentially rewriting fields (like .Status) that are not part of
+			// the plugin client's returned metadata
+			cluster.Status.PluginStatus[i] = oldCluster.Status.PluginStatus[idx]
+		}
 		cluster.Status.PluginStatus[i].Name = entry.Name
 		cluster.Status.PluginStatus[i].Version = entry.Version
 		cluster.Status.PluginStatus[i].Capabilities = entry.Capabilities
