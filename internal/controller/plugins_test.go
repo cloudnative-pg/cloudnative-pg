@@ -32,6 +32,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -44,6 +45,7 @@ type fakePluginClient struct {
 	setClusterStatusErr      error
 	setStatusInClusterCalled bool
 	postReconcileResult      pluginClient.ReconcilerHookResult
+	metadataList             []connection.Metadata
 }
 
 func (f *fakePluginClient) SetStatusInCluster(
@@ -60,6 +62,10 @@ func (f *fakePluginClient) PostReconcile(
 	_ k8client.Object,
 ) pluginClient.ReconcilerHookResult {
 	return f.postReconcileResult
+}
+
+func (f *fakePluginClient) MetadataList() []connection.Metadata {
+	return f.metadataList
 }
 
 var _ = Describe("setStatusPluginHook", func() {
