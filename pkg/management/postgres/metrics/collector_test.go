@@ -130,7 +130,7 @@ var _ = Describe("QueryRunner tests", func() {
 			}
 			labels, success := qc.listLabels(
 				[]string{"LABEL_ENABLED", "LABEL_NOT_ENABLED"},
-				[]interface{}{"SHOULD_FETCH", "SHOULD_NOT_FETCH"},
+				[]any{"SHOULD_FETCH", "SHOULD_NOT_FETCH"},
 			)
 			Expect(success).To(BeTrue())
 			Expect(labels).To(HaveLen(1))
@@ -148,7 +148,7 @@ var _ = Describe("QueryRunner tests", func() {
 			labels, success := qc.listLabels(
 				[]string{"LABEL_ENABLED"},
 				// int is not supported
-				[]interface{}{234},
+				[]any{234},
 			)
 
 			Expect(success).To(BeFalse())
