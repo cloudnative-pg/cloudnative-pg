@@ -23,11 +23,31 @@ SPDX-License-Identifier: Apache-2.0
 package compatibility
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 )
 
-// SetCoredumpFilter set the value of /proc/self/coredump_filter
+// SetCoredumpFilter writes coredumpFilter to /proc/self/coredump_filter.
+//
+// The file is only present when the kernel is built with CONFIG_COREDUMP,
+// and is read-only under some sandboxes (e.g. gVisor). In those cases the
+// filter is purely a diagnostic tuning knob, so the function returns nil
+// rather than failing instance bootstrap.
 func SetCoredumpFilter(coredumpFilter string) error {
-	coredumpFilterFile := "/proc/self/coredump_filter"
-	return os.WriteFile(coredumpFilterFile, []byte(coredumpFilter), 0o600)
+	const coredumpFilterFile = "/proc/self/coredump_filter"
+
+	err := os.WriteFile(coredumpFilterFile, []byte(coredumpFilter), 0o600)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, fs.ErrNotExist):
+		// Kernel built without CONFIG_COREDUMP — nothing to tune.
+		return nil
+	case errors.Is(err, fs.ErrPermission):
+		// Sandboxed runtime (e.g. gVisor) refuses the write — nothing to tune.
+		return nil
+	default:
+		return err
+	}
 }
