@@ -450,10 +450,10 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(acquired).To(BeFalse())
 		})
 
-	It("bounds the Get call so it cannot block past RetryPeriod when the API server is unreachable",
+	It("bounds the Get call so it cannot block past RenewDeadline when the API server is unreachable",
 		func(ctx context.Context) {
 			r := newRunnable(fake.NewClientset())
-			r.config.RetryPeriod = 20 * time.Millisecond
+			r.config.RenewDeadline = 50 * time.Millisecond
 			r.lock = &blockingLock{}
 
 			start := time.Now()
@@ -466,7 +466,49 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(acquired).To(BeFalse())
 			Expect(err).To(MatchError(context.DeadlineExceeded))
 		})
+
+	It("takes the lease over when the API server answers more slowly than the poll interval",
+		func(ctx context.Context) {
+			r := newRunnable(fake.NewClientset())
+			r.config.RetryPeriod = 20 * time.Millisecond
+			r.config.RenewDeadline = 600 * time.Millisecond
+			r.lock = &slowLock{getDelay: 400 * time.Millisecond}
+
+			acquired, err := r.tryTakeOver(ctx)
+
+			// The read answers above the poll interval and below the renew
+			// deadline, so it has to get through: a bound sized on RetryPeriod
+			// fails it on every poll and the take-over never happens.
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeTrue())
+		})
 })
+
+// slowLock is a resourcelock.Interface that answers, but only after getDelay,
+// simulating an API server under load rather than an unreachable one. The
+// record it returns has an empty holder, the cleanly-released state that
+// tryTakeOver claims straight away.
+type slowLock struct {
+	getDelay time.Duration
+}
+
+func (l *slowLock) Get(ctx context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case <-time.After(l.getDelay):
+		return &resourcelock.LeaderElectionRecord{HolderIdentity: ""}, nil, nil
+	}
+}
+
+func (*slowLock) Create(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*slowLock) Update(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*slowLock) RecordEvent(string)                                              {}
+
+// Identity is never empty: an empty identity would make the record read above
+// look like one we already hold, short-circuiting the claim under test.
+func (*slowLock) Identity() string { return "slow-lock" }
+func (*slowLock) Describe() string { return "slowLock" }
 
 // blockingLock is a resourcelock.Interface whose Get never replies on its
 // own, simulating an API server that accepts the connection but never
