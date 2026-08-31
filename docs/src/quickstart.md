@@ -29,6 +29,31 @@ cluster on your local Kubernetes installation and experiment with it.
     on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 :::
 
+:::note[Windows PowerShell]
+    Throughout this documentation, multi-line commands are formatted using the bash line
+    continuation character (`\`). If you are using Windows PowerShell, this will result
+    in errors. Instead, use the backtick (`` ` ``) or run the commands on a single line.
+
+    For example, a command like:
+    ```sh
+    kubectl create secret generic app-secret \
+      --from-literal=username=app \
+      --from-literal=password=app
+    ```
+    
+    Should be written in PowerShell as:
+    ```powershell
+    kubectl create secret generic app-secret `
+      --from-literal=username=app `
+      --from-literal=password=app
+    ```
+    
+    Or on a single line:
+    ```powershell
+    kubectl create secret generic app-secret --from-literal=username=app --from-literal=password=app
+    ```
+:::
+
 ## Part 1: Setup the local Kubernetes playground
 
 The first part is about installing Minikube or Kind. Please spend some time
