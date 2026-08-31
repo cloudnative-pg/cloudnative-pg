@@ -299,11 +299,14 @@ func classifyLeaseAfterRun(
 // clock (the same limitation client-go's elector has); it only adds latency in
 // the rare case of a restart mid-take-over, never correctness.
 func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
-	// Bounded so a Get against an unreachable API server fails fast and
-	// retries at RetryPeriod cadence, instead of blocking the whole
-	// take-over loop for however long the underlying transport takes to
-	// give up on its own.
-	getCtx, cancel := context.WithTimeout(ctx, r.config.RetryPeriod)
+	// Bounded so a Get against an unreachable API server fails instead of
+	// blocking the whole take-over loop for however long the underlying
+	// transport takes to give up on its own. The budget is RenewDeadline, not
+	// the RetryPeriod cadence at which the caller polls: an API server that
+	// answers, but more slowly than that cadence, has to be able to answer,
+	// otherwise every attempt times out here, the observation window never
+	// starts and the take-over never happens.
+	getCtx, cancel := context.WithTimeout(ctx, r.config.RenewDeadline)
 	record, _, err := r.lock.Get(getCtx)
 	cancel()
 	if errors.IsNotFound(err) {
