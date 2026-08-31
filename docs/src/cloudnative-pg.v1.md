@@ -1897,6 +1897,8 @@ _Appears in:_
 | `paused` _boolean_ | When set to `true`, PgBouncer will disconnect from the PostgreSQL<br />server, first waiting for all queries to complete, and pause all new<br />client connections until this value is set to `false` (default). Internally,<br />the operator calls PgBouncer's `PAUSE` and `RESUME` commands. |  | false |  |
 | `image` _string_ | Image is the pgbouncer container image to use. When set, it takes<br />precedence over ImageCatalogRef and the operator default, but is<br />overridden by an explicit image set in the pod template. |  |  |  |
 | `imageCatalogRef` _[ImageCatalogComponentRef](#imagecatalogcomponentref)_ | ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.<br />Mutually exclusive with Image. |  |  |  |
+| `pauseDuringSwitchover` _boolean_ | PauseDuringSwitchover when true, automatically pauses this pooler<br />during switchover/failover operations on the referenced cluster<br />to minimize client connection failures. |  | false |  |
+| `pauseDuringSwitchoverTimeout` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | PauseDuringSwitchoverTimeout is the maximum duration to keep the pooler<br />paused during switchover. If the switchover doesn't complete within<br />this time, the pooler will be automatically resumed. |  | 120s |  |
 
 
 #### PluginConfiguration
@@ -2221,6 +2223,8 @@ _Appears in:_
 | `phaseReason` _string_ | PhaseReason is a human-readable explanation of the current Phase. |  |  |  |
 | `image` _string_ | Image is the resolved pgbouncer container image that the operator is<br />using for this Pooler, including any override coming from spec.template.<br />While Phase is Active or Paused this field reflects what the Deployment<br />actually runs; while Phase is Inactive or Failed it may carry the last<br />successfully resolved value (or be empty if the Pooler has never reconciled<br />successfully). |  |  |  |
 | `error` _string_ | Error is the latest admission validation error |  |  |  |
+| `pausedForSwitchover` _boolean_ | PausedForSwitchover indicates this pooler was automatically paused for switchover |  |  |  |
+| `pausedForSwitchoverTimestamp` _string_ | PausedForSwitchoverTimestamp is when this pooler was paused (RFC3339Micro) |  |  |  |
 
 
 #### PoolerType
