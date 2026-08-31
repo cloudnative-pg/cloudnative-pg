@@ -21,6 +21,8 @@ package postgres
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -38,6 +40,16 @@ func buildPrimaryConnInfo(primaryHostname, applicationName string) string {
 		fmt.Sprintf("sslcert=%v ", postgres.StreamingReplicaCertificateLocation) +
 		fmt.Sprintf("sslrootcert=%v ", postgres.ServerCACertificateLocation) +
 		fmt.Sprintf("application_name=%v ", applicationName) +
-		"sslmode=verify-ca"
+		"sslmode=verify-ca dbname=postgres"
+
+	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
+	if len(standbyTCPUserTimeout) == 0 {
+		// Default to 5000ms (5 seconds) if not explicitly set
+		standbyTCPUserTimeout = "5000"
+	}
+
+	primaryConnInfo = fmt.Sprintf("%s tcp_user_timeout='%s'", primaryConnInfo,
+		strings.ReplaceAll(strings.ReplaceAll(standbyTCPUserTimeout, `\`, `\\`), `'`, `\'`))
+
 	return primaryConnInfo
 }
