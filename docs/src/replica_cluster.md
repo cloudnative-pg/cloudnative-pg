@@ -407,9 +407,7 @@ continuous recovery mode and becomes a primary cluster, completely detached
 from the original source.
 
 :::warning
-    Disabling replication is an **irreversible** operation. Once replication is
-    disabled and the designated primary is promoted to primary, the replica cluster
-    and the source cluster become two independent clusters definitively.
+    Disabling replication is an **irreversible** operation. Once replication is disabled and the designated primary instance in the replica cluster is promoted to primary, the replica cluster and the source cluster become two independent clusters definitively.
 :::
 
 :::info[Important]
