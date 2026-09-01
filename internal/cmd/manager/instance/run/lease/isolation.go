@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -44,6 +45,11 @@ type pinger struct {
 	client *http.Client
 
 	config *apiv1.IsolationCheckConfiguration
+
+	// probe reports the target primary a single peer names. It is a field
+	// (defaulting to ping) rather than a direct call so the concurrent fan-out
+	// below can be unit-tested without real network calls.
+	probe func(host, ip string) (targetPrimary string, err error)
 }
 
 // buildInstanceReachabilityChecker creates a new instance reachability checker by loading
@@ -75,11 +81,14 @@ func buildInstanceReachabilityChecker(cfg *apiv1.IsolationCheckConfiguration) (*
 		Timeout: time.Duration(cfg.RequestTimeout) * time.Millisecond,
 	}
 
-	return &pinger{
+	result := &pinger{
 		dialer: dialer,
 		client: &client,
 		config: cfg,
-	}, nil
+	}
+	result.probe = result.ping
+
+	return result, nil
 }
 
 // ping checks if the instance with the passed coordinates is reachable by
@@ -146,17 +155,38 @@ func peersToProbe(cluster *apiv1.Cluster, ourIdentity string) []peer {
 }
 
 func (e pinger) ensureInstancesAreReachable(cluster *apiv1.Cluster, ourIdentity string) error {
-	for _, target := range peersToProbe(cluster, ourIdentity) {
-		reportedPrimary, err := e.ping(target.host, target.ip)
+	peers := peersToProbe(cluster, ourIdentity)
+
+	// The peers are probed concurrently because the whole step-down decision
+	// has to fit inside the lease TTL. Probing them one after another costs up
+	// to a request timeout each, so the worst case grows with the number of
+	// instances and overruns the TTL on a three-instance cluster with the
+	// default timings.
+	failures := make([]error, len(peers))
+	var wg sync.WaitGroup
+	for i := range peers {
+		target := &peers[i]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			reportedPrimary, err := e.probe(target.host, target.ip)
+			switch {
+			case err != nil:
+				failures[i] = err
+			case reportedPrimary != "" && reportedPrimary != ourIdentity:
+				failures[i] = &SupersededError{
+					Host:          target.host,
+					TargetPrimary: reportedPrimary,
+					OurIdentity:   ourIdentity,
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	for _, err := range failures {
 		if err != nil {
 			return err
-		}
-		if reportedPrimary != "" && reportedPrimary != ourIdentity {
-			return &SupersededError{
-				Host:          target.host,
-				TargetPrimary: reportedPrimary,
-				OurIdentity:   ourIdentity,
-			}
 		}
 	}
 
