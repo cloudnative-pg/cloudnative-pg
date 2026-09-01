@@ -107,16 +107,56 @@ func (e *pinger) ping(host, ip string) (targetPrimary string, err error) {
 	return failsafe.Parse(body).TargetPrimary, nil
 }
 
-func (e pinger) ensureInstancesAreReachable(cluster *apiv1.Cluster, ourIdentity string) error {
+// peer is an instance worth probing for reachability.
+type peer struct {
+	host string
+	ip   string
+}
+
+// peersToProbe returns the instances the isolation check should ping: every
+// instance the cluster reports except ourselves and those without an address
+// yet. It is intentionally pure so the selection can be unit-tested without
+// making real network calls.
+func peersToProbe(cluster *apiv1.Cluster, ourIdentity string) []peer {
+	peers := make([]peer, 0, len(cluster.Status.InstancesReportedState))
 	for name, state := range cluster.Status.InstancesReportedState {
 		host := string(name)
-		ip := state.IP
-		target, err := e.ping(host, ip)
+
+		// Pinging ourselves would just be an HTTPS round trip to re-read the
+		// target primary we already hold in memory.
+		if host == ourIdentity {
+			continue
+		}
+
+		// An instance with no address yet is still Pending, so it is not a peer
+		// we have lost contact with. Skipping it is also the only safe option:
+		// with an empty IP the URL becomes "https://:8000/failsafe", which Go
+		// dials as localhost, and the handshake succeeds because the peer
+		// certificate is verified against the CA without any hostname check
+		// (pkg/certs/tls.go:96-110). The ping would therefore hit our own status
+		// server and report the Pending peer as reachable.
+		if state.IP == "" {
+			continue
+		}
+
+		peers = append(peers, peer{host: host, ip: state.IP})
+	}
+
+	return peers
+}
+
+func (e pinger) ensureInstancesAreReachable(cluster *apiv1.Cluster, ourIdentity string) error {
+	for _, target := range peersToProbe(cluster, ourIdentity) {
+		reportedPrimary, err := e.ping(target.host, target.ip)
 		if err != nil {
 			return err
 		}
-		if target != "" && target != ourIdentity {
-			return &SupersededError{Host: host, TargetPrimary: target, OurIdentity: ourIdentity}
+		if reportedPrimary != "" && reportedPrimary != ourIdentity {
+			return &SupersededError{
+				Host:          target.host,
+				TargetPrimary: reportedPrimary,
+				OurIdentity:   ourIdentity,
+			}
 		}
 	}
 
