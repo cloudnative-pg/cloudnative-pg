@@ -1499,6 +1499,21 @@ func (instance *Instance) RequestImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownImmediate
 }
 
+// TryRequestImmediateShutdown is RequestImmediateShutdown for a caller that
+// must not block, reporting whether the request was taken. The command channel
+// is unbuffered and its only consumer is out of its select for as long as a
+// command already in flight runs, which for a restart or a fencing request is
+// minutes. A caller holding a goroutine that has to stay responsive uses this
+// and retries, instead of parking there for the whole duration.
+func (instance *Instance) TryRequestImmediateShutdown() bool {
+	select {
+	case instance.instanceCommandChan <- shutDownImmediate:
+		return true
+	default:
+		return false
+	}
+}
+
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
 // restart the postmaster, and wait for the postmaster to be restarted
 func (instance *Instance) RequestAndWaitRestartSmartFast(ctx context.Context, timeout time.Duration) error {

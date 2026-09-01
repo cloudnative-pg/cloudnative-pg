@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -113,10 +114,15 @@ type Runnable struct {
 	observedRecord *resourcelock.LeaderElectionRecord
 	observedTime   time.Time
 
+	// lastConfirmed is the unix-nanosecond time of the last lease write that
+	// named this pod as the holder, stamped by the confirmingLock wrapping
+	// r.lock. It is how monitorLeaseAge measures how stale our hold is.
+	lastConfirmed atomic.Int64
+
 	// checkStepDown reports whether this primary should stop believing it is
 	// still the legitimate primary. It is a field (defaulting to
-	// shouldStepDown) rather than a direct call so the step-down branch in
-	// runLeaderElection can be unit-tested without real network calls.
+	// shouldStepDown) rather than a direct call so the step-down decision in
+	// monitorLeaseAge can be unit-tested without real network calls.
 	checkStepDown func(cluster *apiv1.Cluster, ourIdentity string) (bool, error)
 }
 
@@ -125,10 +131,19 @@ func New(
 	kubeClient kubernetes.Interface,
 	instance *postgres.Instance,
 ) *Runnable {
-	return &Runnable{
-		instance: instance,
-		config:   defaultConfig(),
-		lock: &resourcelock.LeaseLock{
+	result := &Runnable{
+		instance:      instance,
+		config:        defaultConfig(),
+		activateCh:    make(chan struct{}),
+		heldCh:        make(chan struct{}),
+		checkStepDown: shouldStepDown,
+	}
+
+	// Every lease write the elector makes goes through le.config.Lock, which is
+	// this same lock, so wrapping it here is enough for no confirmed renewal to
+	// bypass the timestamp monitorLeaseAge reads.
+	result.lock = &confirmingLock{
+		Interface: &resourcelock.LeaseLock{
 			LeaseMeta: metav1.ObjectMeta{
 				Namespace: instance.GetNamespaceName(),
 				Name:      instance.GetClusterName(),
@@ -142,10 +157,10 @@ func New(
 				Identity: instance.GetPodName(),
 			},
 		},
-		activateCh:    make(chan struct{}),
-		heldCh:        make(chan struct{}),
-		checkStepDown: shouldStepDown,
+		lastConfirmed: &result.lastConfirmed,
 	}
+
+	return result
 }
 
 // Acquire signals the runnable to start competing for the lease using the
@@ -257,8 +272,8 @@ const (
 	// controller recreates it on its deletion watch, so we retry.
 	leaseMissing leaseCheckOutcome = iota
 	// leaseUnverifiable means the lease could not be read (e.g. the API server is
-	// unreachable). We have no evidence of preemption, so we retry and rely on
-	// the liveness probe to fence us if we are genuinely isolated.
+	// unreachable). We have no evidence of preemption, so we retry; whether we
+	// have to step down anyway is monitorLeaseAge's decision, not this one.
 	leaseUnverifiable
 	// leasePreempted means the lease is held by a different (or empty) identity:
 	// we no longer own it. This is terminal: the primary must stop.
@@ -288,36 +303,6 @@ func classifyLeaseAfterRun(
 		return leasePreempted
 	default:
 		return leaseStillHeld
-	}
-}
-
-// evaluateStepDownOnLeaseFailure is called whenever a lease read fails while
-// this pod has previously held the primary lease — from every failed
-// take-over attempt in preAcquire's retry loop, for as long as the lease
-// stays unverifiable (see preAcquire). It checks whether this primary should
-// step down — because it can't reach some peer, or because a reachable peer
-// reports a different target primary — and, if so, requests an immediate
-// shutdown. It is a method taking the logger and error as parameters (rather
-// than being inlined in its caller) so this high-consequence decision can be
-// unit-tested without driving a real election loop; the actual check goes
-// through the injectable checkStepDown field for the same reason.
-func (r *Runnable) evaluateStepDownOnLeaseFailure(ctx context.Context, checkErr error) {
-	contextLogger := log.FromContext(ctx).WithName("primary-lease")
-
-	contextLogger.Warning("Primary lease unverifiable, checking primary step-down condition",
-		"error", checkErr)
-
-	stepDown, reason := r.checkStepDown(r.instance.GetClusterOrDefault(), r.instance.GetPodName())
-	switch {
-	case stepDown:
-		contextLogger.Warning("Primary should step down, requesting an immediate shutdown",
-			"reason", reason)
-		r.instance.RequestImmediateShutdown()
-	case reason != nil:
-		contextLogger.Warning("Failed to check primary step-down condition, retrying", "error", reason)
-	default:
-		contextLogger.Warning(
-			"Not stepping down: the other instances are reachable and agree this is the primary, retrying")
 	}
 }
 
@@ -421,17 +406,11 @@ func (r *Runnable) claim(ctx context.Context, current *resourcelock.LeaderElecti
 // window, so a graceful failover stays quick without having to inflate
 // LeaseDuration.
 //
-// checkStepDownOnFailure gates the step-down check (evaluateStepDownOnLeaseFailure)
-// on every failed take-over attempt, not just once: the caller passes true
-// only when this pod has already held the lease before, i.e. this call is
-// re-acquiring after losing contact with the lease rather than a first-time
-// election, so "should this primary step down" is a meaningful question to
-// ask. Re-checking on every retry tick — rather than only immediately after
-// le.Run exits — matters because the step-down condition (peers becoming
-// unreachable, or a peer reporting a different target primary) can develop
-// at any point during a prolonged outage, not just at the moment le.Run gives
-// up.
-func (r *Runnable) preAcquire(ctx context.Context, checkStepDownOnFailure bool) error {
+// Whether this primary should step down while the lease stays unverifiable is
+// not decided here: monitorLeaseAge watches the age of the last confirmed lease
+// write on its own cadence, which also covers the case where the elector never
+// gets far enough for this loop to run at all.
+func (r *Runnable) preAcquire(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
 
 	timer := time.NewTimer(0)
@@ -451,9 +430,6 @@ func (r *Runnable) preAcquire(ctx context.Context, checkStepDownOnFailure bool) 
 			// rather than logging a misleading take-over failure on shutdown.
 			if ctx.Err() != nil {
 				return ctx.Err()
-			}
-			if checkStepDownOnFailure {
-				r.evaluateStepDownOnLeaseFailure(ctx, err)
 			}
 			contextLogger.Debug("Primary lease take-over attempt failed, retrying", "error", err)
 		case acquired:
@@ -490,15 +466,12 @@ func (r *Runnable) preAcquire(ctx context.Context, checkStepDownOnFailure bool) 
 //     different (or empty) holder. We return a fatal error so controller-runtime
 //     shuts down the manager and stops PostgreSQL.
 //
-// If the post-exit read itself fails (API server still unreachable), we have
-// no evidence of preemption, but we may need to step down anyway: check peer
-// reachability and target-primary agreement (see checkStepDown) and request
-// an immediate shutdown if so, rather than waiting on the liveness probe. A
-// retryPeriod-sized timeout is used for the lease-verification read to avoid
-// blocking indefinitely. That check is not one-shot: preAcquire re-evaluates
-// it on every failed take-over attempt for as long as the lease stays
-// unverifiable, since the step-down condition can develop at any point during
-// a prolonged outage, not just at the moment le.Run gives up (see preAcquire).
+// If the post-exit read itself fails (API server still unreachable), we have no
+// evidence of preemption and simply retry; a retryPeriod-sized timeout is used
+// for the lease-verification read to avoid blocking indefinitely. Whether this
+// primary has to step down anyway is decided elsewhere, by monitorLeaseAge,
+// which watches the age of the last confirmed lease write on its own cadence
+// (see monitorLeaseAge for why the trigger cannot hang off this control flow).
 //
 // Instance-level fencing (cnpg.io/fencedInstances) does not release the lease
 // either: the operator deliberately skips switchover while the current primary
@@ -515,16 +488,19 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 	// lease preAcquire has already taken.
 	ctx = log.IntoContext(ctx, contextLogger)
 
-	acquiredBefore := false
+	// The step-down monitor lives as long as this loop does.
+	monitorCtx, stopMonitor := context.WithCancel(ctx)
+	defer stopMonitor()
+
 	for {
-		if err := r.preAcquire(ctx, acquiredBefore); err != nil {
+		if err := r.preAcquire(ctx); err != nil {
 			// preAcquire only returns ctx.Err(); treat as clean shutdown.
 			return nil
 		}
-		acquiredBefore = true
 		r.heldOnce.Do(func() {
 			contextLogger.Info("Acquired primary lease")
 			close(r.heldCh)
+			go r.monitorLeaseAge(monitorCtx)
 		})
 
 		// preAcquire has just confirmed (or re-confirmed) that we hold the
@@ -585,8 +561,8 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 		case leaseUnverifiable:
 			// We have no evidence of preemption, but also can't confirm we
 			// still hold the lease. We don't check the step-down condition
-			// here: the preAcquire call at the top of the loop does that, on
-			// every take-over attempt, for as long as this persists.
+			// here: monitorLeaseAge is already watching the age of the last
+			// confirmed write on its own cadence, for as long as this persists.
 			contextLogger.Warning("Primary lease object unverifiable, will retry take-over", "error", checkErr)
 		case leasePreempted:
 			// A different identity holds the lease: we have been preempted. This is
