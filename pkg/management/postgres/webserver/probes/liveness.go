@@ -23,24 +23,17 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-type livenessExecutor struct {
-	cache    *ClusterCache
-	instance *postgres.Instance
-}
+// livenessExecutor has no state left: the isolation fencing that used to need
+// the cluster cache and the instance now lives in the primary lease. It is kept
+// as the seam the liveness endpoint is wired through, so reintroducing a real
+// check does not mean re-plumbing the web server.
+type livenessExecutor struct{}
 
 // NewLivenessChecker creates a new instance of the liveness probe checker
-func NewLivenessChecker(
-	instance *postgres.Instance,
-	cache *ClusterCache,
-) Checker {
-	return &livenessExecutor{
-		cache:    cache,
-		instance: instance,
-	}
+func NewLivenessChecker() Checker {
+	return &livenessExecutor{}
 }
 
 // IsHealthy always reports success. Primary isolation fencing is handled by

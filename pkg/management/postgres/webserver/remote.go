@@ -154,7 +154,7 @@ func NewRemoteWebServer(
 	endpoints := remoteWebserverEndpoints{
 		typedClient:      typedClient,
 		instance:         instance,
-		livenessChecker:  probes.NewLivenessChecker(instance, sharedCache),
+		livenessChecker:  probes.NewLivenessChecker(),
 		readinessChecker: probes.NewReadinessChecker(instance, sharedCache),
 		startupChecker:   probes.NewStartupChecker(instance, sharedCache),
 	}
