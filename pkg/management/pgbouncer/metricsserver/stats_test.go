@@ -99,6 +99,30 @@ var _ = Describe("MetricsServer", func() {
 			Expect(lastCollectionErrorMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(1))
 		})
 
+		It("should keep binding by name when PgBouncer reports unknown columns", func() {
+			mock.ExpectQuery(showStatsQuery).WillReturnRows(
+				sqlmock.NewRows([]string{
+					"database",
+					"total_xact_count",
+					"total_future_count",
+					"total_query_count",
+				}).AddRow("db1", 1, 99, 2))
+
+			exp.collectShowStats(ch, db)
+
+			metrics, err := registry.Gather()
+			Expect(err).ToNot(HaveOccurred())
+
+			lastCollectionErrorMetric := getMetric(metrics, "cnpg_pgbouncer_last_collection_error")
+			Expect(lastCollectionErrorMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(0))
+
+			totalXactCountMetric := getMetric(metrics, "cnpg_pgbouncer_stats_total_xact_count")
+			Expect(totalXactCountMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(1))
+
+			totalQueryCountMetric := getMetric(metrics, "cnpg_pgbouncer_stats_total_query_count")
+			Expect(totalQueryCountMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(2))
+		})
+
 		It("should handle error during rows scanning", func() {
 			mock.ExpectQuery(showStatsQuery).
 				WillReturnRows(sqlmock.NewRows([]string{"total_xact_count"}).
