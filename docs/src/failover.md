@@ -268,8 +268,9 @@ promotes a new primary as soon as the `Ready` condition flips. By that point
 PostgreSQL on the isolated node has already been stopped locally: with the
 default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
 manager shuts PostgreSQL down once its primary lease has gone past the renew
-deadline without a successful renewal and it can reach neither the API server nor the rest of the
-cluster, which with the default lease timings is roughly 12 seconds. The
+deadline without a successful renewal and it can reach neither the API server
+nor at least one of the other instances, which with the default lease timings is
+roughly 12 seconds. The
 instance manager then terminates along with PostgreSQL, so the container still
 ends up being restarted by the kubelet, but the shutdown no longer waits for a
 liveness probe to fail. Full high availability
