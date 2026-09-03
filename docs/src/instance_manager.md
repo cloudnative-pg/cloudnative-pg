@@ -225,21 +225,26 @@ spec:
 
 ### Primary Isolation
 
-A primary that can reach neither the Kubernetes API server nor any of its
-replicas has lost the ability to tell a network partition from a cluster in
-which it has already been replaced. CloudNativePG **shuts such a primary down**
-so that it stops accepting writes, if **both** of the following conditions are
-met:
+A primary that cannot reach the Kubernetes API server and has also lost contact
+with part of its cluster has lost the ability to tell a network partition from a
+cluster in which it has already been replaced. CloudNativePG **shuts such a
+primary down** so that it stops accepting writes, if **both** of the following
+conditions are met:
 
 1. The instance manager cannot renew the [primary lease](failover.md#safe-primary-election),
    because it cannot reach the Kubernetes API server
-2. The instance manager cannot reach **any** other instance via the instance
-   manager's REST API, or a replica it can reach reports a different instance as
-   the target primary
+2. The instance manager cannot reach **at least one** of the other instances via
+   the instance manager's REST API, or an instance it can reach reports a
+   different instance as the target primary
+
+The second condition is deliberately conservative: a single instance the primary
+can no longer reach is enough, because a primary that has lost both the API
+server and a peer cannot rule out having been replaced.
 
 The check is driven by the primary lease. Once the lease has gone longer than
-its renew deadline without a successful renewal, the instance manager probes its
-peers and, if they confirm the isolation, shuts PostgreSQL down immediately.
+its renew deadline without a successful renewal, the instance manager probes the
+other instances and, if they confirm the isolation, shuts PostgreSQL down
+immediately.
 
 It is **enabled by default** and can be disabled by adding the following:
 
