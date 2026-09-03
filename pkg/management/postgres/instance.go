@@ -1279,6 +1279,35 @@ func pgRewindShouldRetry(ctx context.Context, _ error) bool {
 	return ctx.Err() == nil
 }
 
+func (instance *Instance) pgRewindOptions(
+	primaryConnInfo string,
+) ([]string, apiv1.PgRewindSyncMethod, error) {
+	cluster := instance.GetClusterOrDefault()
+	syncMethod := cluster.Spec.PostgresConfiguration.PgRewind.GetSyncMethod()
+	options := []string{
+		"-P",
+		"--source-server", primaryConnInfo,
+		"--target-pgdata", instance.PgData,
+	}
+
+	switch syncMethod {
+	case apiv1.PgRewindSyncMethodFsync:
+		return options, syncMethod, nil
+	case apiv1.PgRewindSyncMethodSyncfs:
+		pgMajor, err := postgresutils.GetMajorVersionFromPgData(instance.PgData)
+		if err != nil {
+			return nil, syncMethod, fmt.Errorf("while reading PostgreSQL version for pg_rewind: %w", err)
+		}
+		if pgMajor < 17 {
+			return nil, syncMethod,
+				fmt.Errorf("pg_rewind sync method %q requires PostgreSQL 17 or later, found %d", syncMethod, pgMajor)
+		}
+		return append(options, "--sync-method=syncfs"), syncMethod, nil
+	default:
+		return nil, syncMethod, fmt.Errorf("unsupported pg_rewind sync method %q", syncMethod)
+	}
+}
+
 // Rewind uses pg_rewind to align this data directory with the contents of the primary
 // node, using the "--restore-target-wal" option to fetch from the WAL archive any
 // segment that was already recycled locally
@@ -1294,12 +1323,10 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	instance.LogPgControldata(ctx, "before pg_rewind")
 
 	primaryConnInfo := instance.GetPrimaryConnInfo()
-	options := make([]string, 0, 6)
-	options = append(options,
-		"-P",
-		"--source-server", primaryConnInfo,
-		"--target-pgdata", instance.PgData,
-	)
+	options, syncMethod, err := instance.pgRewindOptions(primaryConnInfo)
+	if err != nil {
+		return err
+	}
 
 	// make sure a rewind-mode restore_command is set in override.conf
 	if _, err := configurePostgresOverrideConfFileForRewind(instance.PgData, primaryConnInfo); err != nil {
@@ -1310,6 +1337,7 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 
 	contextLogger.Info("Starting up pg_rewind",
 		"pgdata", instance.PgData,
+		"syncMethod", syncMethod,
 		"options", options)
 
 	// pg_rewind is a single-pass tool: it invokes restore_command itself to fetch
@@ -1323,7 +1351,7 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	// avoids handing a transient failure back to the reconciliation loop, whose
 	// exponential backoff would keep the instance down for much longer.
 	attempt := 0
-	err := retry.OnError(pgRewindRetry, func(err error) bool {
+	err = retry.OnError(pgRewindRetry, func(err error) bool {
 		return pgRewindShouldRetry(ctx, err)
 	}, func() error {
 		attempt++

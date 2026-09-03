@@ -1639,6 +1639,29 @@ type PodSelectorRefStatus struct {
 	IPs []string `json:"ips,omitempty"`
 }
 
+// PgRewindSyncMethod is the synchronization method used by pg_rewind.
+type PgRewindSyncMethod string
+
+const (
+	// PgRewindSyncMethodFsync synchronizes every file in the PostgreSQL data directories.
+	PgRewindSyncMethodFsync PgRewindSyncMethod = "fsync"
+
+	// PgRewindSyncMethodSyncfs synchronizes the filesystems containing the PostgreSQL data directories.
+	PgRewindSyncMethodSyncfs PgRewindSyncMethod = "syncfs"
+)
+
+// PgRewindConfiguration defines the pg_rewind configuration.
+type PgRewindConfiguration struct {
+	// SyncMethod selects how pg_rewind synchronizes files to durable storage.
+	// The default, `fsync`, recursively opens and synchronizes each file.
+	// `syncfs` is available on Linux with PostgreSQL 17 or later and synchronizes
+	// the filesystems containing PGDATA, the WAL directory, and tablespaces.
+	// +kubebuilder:default:=fsync
+	// +kubebuilder:validation:Enum=fsync;syncfs
+	// +optional
+	SyncMethod PgRewindSyncMethod `json:"syncMethod,omitempty"`
+}
+
 // PostgresConfiguration defines the PostgreSQL configuration
 // +kubebuilder:validation:XValidation:rule="!(has(self.syncReplicaElectionConstraint) && self.syncReplicaElectionConstraint.enabled && has(self.synchronous) && ((has(self.synchronous.podFailureDomainKeys) && self.synchronous.podFailureDomainKeys.size() > 0) || (has(self.synchronous.nodeFailureDomainKeys) && self.synchronous.nodeFailureDomainKeys.size() > 0)))",message="syncReplicaElectionConstraint and synchronous failure domain keys are mutually exclusive"
 type PostgresConfiguration struct {
@@ -1674,6 +1697,10 @@ type PostgresConfiguration struct {
 	// Options to specify LDAP configuration
 	// +optional
 	LDAP *LDAPConfig `json:"ldap,omitempty"`
+
+	// Configuration of pg_rewind
+	// +optional
+	PgRewind *PgRewindConfiguration `json:"pgRewind,omitempty"`
 
 	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
 	// Default value is 40000000, greater than one year in seconds,
