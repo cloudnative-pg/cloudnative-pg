@@ -357,7 +357,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -744,7 +744,7 @@ jobs:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -939,7 +939,7 @@ jobs:
         with:
           ref: ${{ env.GIT_REF }}
       - name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -1161,7 +1161,7 @@ jobs:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -1520,7 +1520,7 @@ jobs:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -1921,7 +1921,7 @@ jobs:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -2251,7 +2251,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -2287,7 +2287,7 @@ jobs:
           make olm-catalog
       -
         name: Install OC Installer and client
-        uses: redhat-actions/openshift-tools-installer@144527c7d98999f2652264c048c7a9bd103f8a82 # v1
+        uses: redhat-actions/openshift-tools-installer@37eb3cfb20ac2df6f0511ffa71cd917e4d49cabf # v3
         with:
           source: "mirror"
           openshift-install: ${{ env.K8S_VERSION }}
