@@ -115,7 +115,7 @@ func ComparePodSpecs(
 
 // compareMaps returns true iff the maps are equivalent, otherwise returns
 // false, and the first difference found
-func compareMaps[V comparable](current, target map[string]V) (bool, string) {
+func compareMaps[V any](current, target map[string]V) (bool, string) {
 	for name, currentValue := range current {
 		targetValue, found := target[name]
 		if !found {
