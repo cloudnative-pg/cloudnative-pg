@@ -75,6 +75,9 @@ jobs:
       fail-fast: false
       matrix:
         branch: [release-1.28, release-1.29, release-1.30]
+    concurrency:
+      group: backport-${{ matrix.branch }}
+      cancel-in-progress: false
     env:
       PR: ${{ github.event.pull_request.number }}
       BRANCH: ${{ matrix.branch }}
