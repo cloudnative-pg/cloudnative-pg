@@ -59,7 +59,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.21.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
 CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.17.0
+GORELEASER_VERSION ?= v2.18.0
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
 SPELLCHECK_VERSION ?= 0.63.0@sha256:66991f6dec77ecddc48df138cab6661f2635e8946972f7b8f40a243b406ad2cd
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
@@ -73,7 +73,7 @@ PREFLIGHT_VERSION ?= 1.19.1
 # renovate: datasource=docker depName=cuelang/cue versioning=docker
 CUE_VERSION ?= 0.17.0@sha256:439582a6915f5f4eb11d74fadb0839188eab3f14a969950e7cb27b3226bcea9b
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
-GEMARA_VERSION ?= v1.3.0
+GEMARA_VERSION ?= v1.5.0
 ARCH ?= amd64
 FUZZ_TIME ?= 30s
 
