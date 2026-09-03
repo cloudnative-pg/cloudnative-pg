@@ -374,18 +374,18 @@ function deploy_csi_host_path() {
 
   ## Create a temporary file for the modified plugin deployment. This updates the image tag.
   local plugin_file="${TEMP_DIR}/csi-hostpath-plugin.yaml"
-  _curl_github -fsSL --retry 5 --retry-delay 2 "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
+  _curl_github -fsSL --retry 5 --retry-delay 2 "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.34/hostpath/csi-hostpath-plugin.yaml" |
     sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
 
   # Apply driver info and plugin deployment
-  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-driverinfo.yaml"
+  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.34/hostpath/csi-hostpath-driverinfo.yaml"
   "${K8S_CLI}" apply -f "${plugin_file}"
   rm "${plugin_file}"
 
   # --- 4. Configure Storage Classes ---
 
   ## Create VolumeSnapshotClass
-  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-snapshotclass.yaml"
+  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.34/hostpath/csi-hostpath-snapshotclass.yaml"
 
   ## Patch VolumeSnapshotClass to allow snapshots of running PostgreSQL instances
   ## by ignoring read failures during snapshot creation
