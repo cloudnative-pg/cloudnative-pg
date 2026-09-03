@@ -4,13 +4,13 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=workflow-requirements.txt --strip-extras workflow-requirements.in
 #
-boto3==1.43.44 \
-    --hash=sha256:035d73afe3e29bf271a5b27b30476ff8eefa5ae36f6702eada8e412d5c1420aa \
-    --hash=sha256:621113f7850caec7c8405a07baa26075f700f78844a7f2fdf4d1f879bd3cc3c1
+boto3==1.43.87 \
+    --hash=sha256:671cf88a353f887774603980898bc34249d05a994e1c5e24aba4f4e1bbef0951 \
+    --hash=sha256:8d9521c7c292194b8ce9fb61043d52e45cdba29b5f690981f3eb5e75103ba57d
     # via -r workflow-requirements.in
-botocore==1.43.44 \
-    --hash=sha256:6afb846fd93815133a53baf1578f1d6016ddbeda247623360379758ca2e3f338 \
-    --hash=sha256:cc2a95a53efdcf0ce34a51bca28058e72fcc3b10dd625eb1ad900c5ca3eb8bef
+botocore==1.43.87 \
+    --hash=sha256:01e1e2255a8f4b959c19b210d74a5a916d13841c0344ceee15d8a3eaa4daa892 \
+    --hash=sha256:928598e7275fa70385d7f694d60d59afe115a0b914cc699dbf3eb60954c23bf1
     # via
     #   boto3
     #   s3transfer
