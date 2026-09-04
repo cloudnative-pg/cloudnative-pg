@@ -209,14 +209,18 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				return false
 			}
 
-			// Check common labels
-			commonLabels := []string{
-				utils.KubernetesAppManagedByLabelName,
-				utils.KubernetesAppLabelName,
-				utils.KubernetesAppComponentLabelName,
+			// Check common labels. The value matters, not just the presence: these
+			// labels are part of the selector used to find the PVC to snapshot, and
+			// inheritedMetadata can overwrite them (Build applies the cluster
+			// inheritance after the calculator). Checking only for presence leaves
+			// such a PVC frozen with the wrong value, because update() never runs.
+			commonLabels := map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			}
-			for _, label := range commonLabels {
-				if _, found := pvc.Labels[label]; !found {
+			for label, expected := range commonLabels {
+				if pvc.Labels[label] != expected {
 					return false
 				}
 			}
