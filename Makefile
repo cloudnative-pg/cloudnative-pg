@@ -67,9 +67,9 @@ WOKE_VERSION ?= 0.19.0@sha256:5cdd550a166c9e11f2f53c3f6c23dfafdf879e9bcaffd07c2f
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
 OPERATOR_SDK_VERSION ?= v1.42.3
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.72.0
+OPM_VERSION ?= v1.74.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.19.1
+PREFLIGHT_VERSION ?= 1.21.0
 # renovate: datasource=docker depName=cuelang/cue versioning=docker
 CUE_VERSION ?= 0.17.1@sha256:520f883dcc92642389b3b75e8befe4e5a233a1aa903a8c846c4a3b338b202635
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
