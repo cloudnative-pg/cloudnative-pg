@@ -344,6 +344,192 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		})
 	})
 
+	When("the cluster uses the inPlace resources update strategy", func() {
+		var clusterInPlace apiv1.Cluster
+
+		BeforeEach(func() {
+			utils.SetPodsResize(true)
+			clusterInPlace = apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-inplace",
+				},
+				Spec: apiv1.ClusterSpec{
+					ImageName:               "postgres:13.11",
+					ResourcesUpdateStrategy: apiv1.ResourcesUpdateStrategyInPlace,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"cpu":    resource.MustParse("500m"),
+							"memory": resource.MustParse("1Gi"),
+						},
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("1"),
+							"memory": resource.MustParse("2Gi"),
+						},
+					},
+				},
+				Status: apiv1.ClusterStatus{
+					Image: "postgres:13.11",
+				},
+			}
+		})
+
+		AfterEach(func() {
+			utils.SetPodsResize(false)
+		})
+
+		makeStatus := func(pod *corev1.Pod) postgres.PostgresqlStatus {
+			return postgres.PostgresqlStatus{
+				Pod:            pod,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+		}
+
+		It("resizes in place when only cpu and memory grow", func(ctx SpecContext) {
+			// Build the pod from a deep copy: NewInstance shares the resource
+			// maps of the passed cluster, and mutating them afterwards would
+			// silently change the "live" pod too
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+			clusterInPlace.Spec.Resources.Limits["memory"] = resource.MustParse("4Gi")
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.canBeResizedInPlace).To(BeTrue())
+			Expect(rollout.reason).To(ContainSubstring("resizing the pod in place"))
+		})
+
+		It("recreates the pod when the memory limit decreases", func(ctx SpecContext) {
+			// Build the pod from a deep copy: NewInstance shares the resource
+			// maps of the passed cluster, and mutating them afterwards would
+			// silently change the "live" pod too
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterInPlace.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.canBeResizedInPlace).To(BeFalse())
+			Expect(rollout.reason).To(ContainSubstring("memory limit"))
+		})
+
+		It("recreates the pod when the drift is not limited to resources", func(ctx SpecContext) {
+			// Build the pod from a deep copy: NewInstance shares the resource
+			// maps of the passed cluster, and mutating them afterwards would
+			// silently change the "live" pod too
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+			clusterInPlace.Spec.SchedulerName = "custom-scheduler"
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.canBeResizedInPlace).To(BeFalse())
+			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ"))
+		})
+
+		It("recreates the pod when the cluster does not support pod resize", func(ctx SpecContext) {
+			utils.SetPodsResize(false)
+
+			// Build the pod from a deep copy: NewInstance shares the resource
+			// maps of the passed cluster, and mutating them afterwards would
+			// silently change the "live" pod too
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.canBeResizedInPlace).To(BeFalse())
+			Expect(rollout.reason).To(ContainSubstring("does not support in-place pod resize"))
+		})
+
+		It("resizes in place when the live resources drift with an aligned annotation", func(ctx SpecContext) {
+			// Build the pod from a deep copy: NewInstance shares the resource
+			// maps of the passed cluster, and mutating them afterwards would
+			// silently change the "live" pod too
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Simulate a resize issued outside the operator: the pod spec
+			// changes, the annotation stays aligned with the target
+			for i := range pod.Spec.Containers {
+				if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
+					pod.Spec.Containers[i].Resources.Limits["cpu"] = resource.MustParse("4")
+				}
+			}
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.canBeResizedInPlace).To(BeTrue())
+		})
+
+		It("does not resize when the strategy is recreate", func(ctx SpecContext) {
+			clusterInPlace.Spec.ResourcesUpdateStrategy = apiv1.ResourcesUpdateStrategyRecreate
+
+			// Build the pod from a deep copy: NewInstance shares the resource
+			// maps of the passed cluster, and mutating them afterwards would
+			// silently change the "live" pod too
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.canBeResizedInPlace).To(BeFalse())
+			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ"))
+		})
+
+		It("recreates the pod when the resize is reported infeasible", func(ctx SpecContext) {
+			// Build the pod from a deep copy: NewInstance shares the resource
+			// maps of the passed cluster, and mutating them afterwards would
+			// silently change the "live" pod too
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			pod.Status.Conditions = []corev1.PodCondition{
+				{
+					Type:    corev1.PodResizePending,
+					Status:  corev1.ConditionTrue,
+					Reason:  corev1.PodReasonInfeasible,
+					Message: "Node didn't have enough capacity",
+				},
+			}
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.canBeResizedInPlace).To(BeFalse())
+			Expect(rollout.reason).To(ContainSubstring("infeasible"))
+		})
+
+		It("ignores the infeasible condition when the strategy is recreate", func(ctx SpecContext) {
+			clusterInPlace.Spec.ResourcesUpdateStrategy = apiv1.ResourcesUpdateStrategyRecreate
+
+			// Build the pod from a deep copy: NewInstance shares the resource
+			// maps of the passed cluster, and mutating them afterwards would
+			// silently change the "live" pod too
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			pod.Status.Conditions = []corev1.PodCondition{
+				{
+					Type:   corev1.PodResizePending,
+					Status: corev1.ConditionTrue,
+					Reason: corev1.PodReasonInfeasible,
+				},
+			}
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeFalse())
+		})
+	})
+
 	When("the PodSpec annotation is not available", func() {
 		It("detects when a new custom environment variable is set", func(ctx SpecContext) {
 			pod, err := specs.NewInstance(ctx, cluster, 1, true)

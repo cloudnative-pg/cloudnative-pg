@@ -245,6 +245,12 @@ func RunController(
 		return err
 	}
 
+	// Detect if the API server supports in-place pod resize
+	if err = utils.DetectPodsResize(discoveryClient); err != nil {
+		setupLog.Error(err, "unable to detect if the cluster supports the resize subresource of the pods")
+		return err
+	}
+
 	// Detect the available architectures
 	if err = utils.DetectAvailableArchitectures(); err != nil {
 		setupLog.Error(err, "unable to detect the available instance's architectures")
@@ -254,6 +260,7 @@ func RunController(
 	setupLog.Info("Kubernetes system metadata",
 		"haveSCC", utils.HaveSecurityContextConstraints(),
 		"haveVolumeSnapshot", utils.HaveVolumeSnapshot(),
+		"havePodsResize", utils.HavePodsResize(),
 		"availableArchitectures", utils.GetAvailableArchitectures(),
 	)
 
