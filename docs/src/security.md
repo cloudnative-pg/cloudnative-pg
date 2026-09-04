@@ -895,22 +895,17 @@ unauthenticated.
 The certificate is never written to disk and is regenerated on every operator
 restart, so trust derives from fingerprint pinning rather than CA validation.
 
-This protection has a hard requirement: the status port **must** be served over
-TLS, which has been the default since v1.24. A client certificate can only be
-presented over a TLS connection, so the protected endpoints are reachable by the
-operator only when the status port uses TLS.
+A client certificate can only be presented over a TLS connection, and the
+instance manager always serves the status port over TLS, so this protection is
+unconditional.
 
 :::warning
-If the status port is not served over TLS, the instance manager cannot
-authenticate the operator and **permanently** rejects every call to its
-protected endpoints (backup, `pg_controldata`, partial WAL archive, and
-instance-manager upgrade) with `401 Unauthorized`. This is not a transient
-condition and will not resolve on its own. It can affect instances created by an
-operator older than v1.24 (whose status port serves plain HTTP) once their
-instance manager is upgraded to a version that enforces this authentication: such
-instances must be rolled out so their Pods are recreated with a TLS-enabled status
-port. Newly created instances always enable TLS on the status port and are
-unaffected.
+Instances created by an operator older than v1.24 serve the status port over
+plain HTTP, and the operator no longer falls back to it: it cannot read their
+status, and while none of the cluster's ready instances is reachable the cluster
+is not reconciled at all: no rolling update is started, and Pods you delete are
+not recreated. Roll out such instances **before** upgrading the operator, so
+their Pods are recreated with a TLS-enabled status port.
 :::
 
 ### PostgreSQL

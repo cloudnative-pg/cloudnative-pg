@@ -408,11 +408,13 @@ for details.
 :::warning
 This protection has a hard requirement: the status port **must** be served over
 TLS, which has been the default since v1.24. Instances created by an operator
-older than v1.24 serve the status port over plain HTTP; once their instance
-manager is upgraded to 1.30.0 the operator can no longer authenticate to them
-and every call to the protected endpoints is **permanently** rejected with
-`401 Unauthorized`. If you still run such instances, perform a rolling update so
-their Pods are recreated with a TLS-enabled status port. Instances created by
+older than v1.24 serve it over plain HTTP, and 1.30.0 no longer falls back to
+HTTP: the operator cannot read their status, so it reports
+`Instance Status Extraction Error`. While the cluster has ready instances and
+none of them is reachable, it is not reconciled at all: no rolling update is
+started to fix it, and Pods you delete are not recreated. If you still run such
+instances, perform a rolling update so their Pods are recreated with a
+TLS-enabled status port **before** upgrading to 1.30.0. Instances created by
 v1.24 or later are unaffected.
 :::
 

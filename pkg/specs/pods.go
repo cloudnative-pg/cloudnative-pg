@@ -190,7 +190,6 @@ func createClusterPodSpec(
 	cluster apiv1.Cluster,
 	envConfig EnvConfig,
 	gracePeriod int64,
-	enableHTTPS bool,
 ) corev1.PodSpec {
 	return corev1.PodSpec{
 		Hostname: podName,
@@ -198,7 +197,7 @@ func createClusterPodSpec(
 			createBootstrapContainer(cluster, getExtensions(&cluster)),
 		},
 		SchedulerName:                 cluster.Spec.SchedulerName,
-		Containers:                    createPostgresContainers(cluster, envConfig, enableHTTPS),
+		Containers:                    createPostgresContainers(cluster, envConfig),
 		Volumes:                       createPostgresVolumes(&cluster, podName, getExtensions(&cluster)),
 		SecurityContext:               GetPodSecurityContext(&cluster),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
@@ -213,7 +212,7 @@ func createClusterPodSpec(
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
-func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enableHTTPS bool) []corev1.Container {
+func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []corev1.Container {
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
@@ -233,8 +232,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				TimeoutSeconds: 5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: url.PathStartup,
-						Port: intstr.FromInt32(url.StatusPort),
+						Path:   url.PathStartup,
+						Port:   intstr.FromInt32(url.StatusPort),
+						Scheme: corev1.URISchemeHTTPS,
 					},
 				},
 			},
@@ -245,8 +245,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				PeriodSeconds:  ReadinessProbePeriod,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: url.PathReady,
-						Port: intstr.FromInt32(url.StatusPort),
+						Path:   url.PathReady,
+						Port:   intstr.FromInt32(url.StatusPort),
+						Scheme: corev1.URISchemeHTTPS,
 					},
 				},
 			},
@@ -257,8 +258,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				TimeoutSeconds: 5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: url.PathHealth,
-						Port: intstr.FromInt32(url.StatusPort),
+						Path:   url.PathHealth,
+						Port:   intstr.FromInt32(url.StatusPort),
+						Scheme: corev1.URISchemeHTTPS,
 					},
 				},
 			},
@@ -297,13 +299,6 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 		})
 
 		containers[0].Command = append(containers[0].Command, "--pprof-server")
-	}
-
-	if enableHTTPS {
-		containers[0].StartupProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].LivenessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].ReadinessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].Command = append(containers[0].Command, "--status-port-tls")
 	}
 
 	if cluster.IsMetricsTLSEnabled() {
@@ -495,12 +490,10 @@ func NewInstance(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	// TODO: remove tlsEnabled when we drop the support for instances created without TLS
-	tlsEnabled bool,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx).WithName("new_instance")
 
-	pod, err := buildInstance(cluster, nodeSerial, tlsEnabled)
+	pod, err := buildInstance(cluster, nodeSerial)
 	if err != nil {
 		return nil, err
 	}
@@ -539,7 +532,6 @@ func NewInstance(
 func buildInstance(
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	tlsEnabled bool,
 ) (*corev1.Pod, error) {
 	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
@@ -547,7 +539,7 @@ func buildInstance(
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	podSpec := createClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
+	podSpec := createClusterPodSpec(podName, cluster, envConfig, gracePeriod)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -1014,7 +1014,7 @@ var _ = Describe("NewInstance", func() {
 			},
 		}
 
-		pod, err := NewInstance(ctx, cluster, 1, true)
+		pod, err := NewInstance(ctx, cluster, 1)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod).NotTo(BeNil())
 		Expect(pod.Labels).To(BeEquivalentTo(map[string]string{
@@ -1043,7 +1043,7 @@ var _ = Describe("NewInstance", func() {
 			},
 		}
 
-		pod, err := NewInstance(ctx, cluster, 1, true)
+		pod, err := NewInstance(ctx, cluster, 1)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod).NotTo(BeNil())
 		Expect(pod.Spec.Containers[0].Image).To(Equal("new-image:latest"))
@@ -1060,7 +1060,7 @@ var _ = Describe("NewInstance", func() {
 			},
 		}
 
-		_, err := NewInstance(ctx, cluster, 1, true)
+		_, err := NewInstance(ctx, cluster, 1)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
 	})
@@ -1079,7 +1079,7 @@ var _ = Describe("service account token", func() {
 	}
 
 	It("always disables the automount and projects the token for non-bootstrap containers", func() {
-		pod, err := buildInstance(apiv1.Cluster{}, 1, true)
+		pod, err := buildInstance(apiv1.Cluster{}, 1)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pod.Spec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
 		Expect(pod.Spec.Volumes).To(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
@@ -1100,6 +1100,22 @@ var _ = Describe("service account token", func() {
 				MountPath: tokenMountPath,
 				ReadOnly:  true,
 			}), "container %s should mount the projected token", container.Name)
+		}
+	})
+})
+
+var _ = Describe("instance probes", func() {
+	It("queries the status port over HTTPS", func(ctx SpecContext) {
+		pod, err := NewInstance(ctx, apiv1.Cluster{}, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		container := pod.Spec.Containers[0]
+		for _, probe := range []*corev1.Probe{
+			container.StartupProbe,
+			container.ReadinessProbe,
+			container.LivenessProbe,
+		} {
+			Expect(probe.HTTPGet.Scheme).To(Equal(corev1.URISchemeHTTPS))
 		}
 	})
 })

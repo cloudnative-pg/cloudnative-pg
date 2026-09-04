@@ -315,7 +315,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 			return err
 		}
 		for _, pod := range pods.Items {
-			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod, true)
+			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod)
 			if err != nil {
 				continue
 			}
