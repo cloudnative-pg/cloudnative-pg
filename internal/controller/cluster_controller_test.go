@@ -27,6 +27,7 @@ import (
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -986,6 +987,88 @@ var _ = Describe("Updating target primary", func() {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 			}).WithTimeout(5 * time.Second).Should(Succeed())
+		})
+	})
+
+	It("defers election until the primary lease is confirmed released, then elects", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		generateFakeInitDBJobs(env.client, cluster)
+		generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		managedResources := &managedResources{instances: corev1.PodList{Items: instances}}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{IsPodReady: true, Pod: &instances[1]},
+				{IsPodReady: true, Pod: &instances[2]},
+				{IsPodReady: false, Pod: &instances[0]},
+			},
+		}
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		By("marking the failover as pending without electing anyone yet", func() {
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(""))
+			Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
+		})
+
+		By("still deferring while the primary lease is held", func() {
+			leaseDuration := int32(1)
+			lease := &coordinationv1.Lease{
+				ObjectMeta: metav1.ObjectMeta{Name: cluster.Name, Namespace: cluster.Namespace},
+				Spec: coordinationv1.LeaseSpec{
+					HolderIdentity:       ptr.To(instances[0].Name),
+					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
+					LeaseDurationSeconds: &leaseDuration,
+				},
+			}
+			Expect(env.client.Create(ctx, lease)).To(Succeed())
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources)
+			Expect(err).To(MatchError(ErrPrimaryLeaseHeld))
+			Expect(selectedPrimary).To(Equal(""))
+		})
+
+		By("electing the most advanced replica once the lease is observed unrenewed for its full duration", func() {
+			Eventually(func(g Gomega) {
+				selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+					ctx, cluster, statusList, managedResources)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
+			}).WithTimeout(5 * time.Second).Should(Succeed())
+		})
+	})
+
+	It("elects immediately once the primary lease has been gracefully released", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		generateFakeInitDBJobs(env.client, cluster)
+		generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		managedResources := &managedResources{instances: corev1.PodList{Items: instances}}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{IsPodReady: true, Pod: &instances[1]},
+				{IsPodReady: true, Pod: &instances[2]},
+				{IsPodReady: false, Pod: &instances[0]},
+			},
+		}
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+
+		By("having no primary lease at all (e.g. still being created)", func() {
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 		})
 	})
 

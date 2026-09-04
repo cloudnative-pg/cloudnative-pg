@@ -31,18 +31,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller/leaseobserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// ErrWalReceiversRunning is raised when a new primary server can't be elected
-// because there is a WAL receiver running in our Pod list
-var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
-
 // ErrWaitingOnFailOverDelay is raised when the primary server can't be elected because the .spec.failoverDelay hasn't
 // elapsed yet
 var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
+
+// ErrPrimaryLeaseHeld is raised when a new primary cannot be elected yet
+// because the primary lease is still actively held (or its state could not
+// be verified), so the LSN snapshot used for the election might still be
+// stale.
+var ErrPrimaryLeaseHeld = fmt.Errorf("primary lease is still held or unverifiable, waiting before electing a new primary") //nolint: lll
 
 // reconcileTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion.
@@ -98,6 +101,11 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	mostAdvancedInstance := status.Items[0]
 	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
+		// Steady state: no failover/switchover is in progress. Drop any
+		// leftover observation so a future failover starts from a clean
+		// window rather than one computed for an unrelated, already-resolved
+		// event.
+		r.leaseObserver.Forget(client.ObjectKeyFromObject(cluster))
 		return "", nil
 	}
 
@@ -121,11 +129,14 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		}
 	}
 
-	// The current primary is not correctly working, and we need to elect a new one
-	// but before doing that we need to wait for all the WAL receivers to be
-	// terminated. To make sure they eventually terminate we signal the old primary
-	// (if is still alive) to shut down by setting the apiv1.PendingFailoverMarker as
-	// target primary.
+	// Step 1: the current primary just became unhealthy. Mark the failover as
+	// pending and STOP — do not elect in this same pass. status was
+	// snapshotted moments ago; the old primary (and every other replica) may
+	// still be alive and independently streaming right now, so committing to
+	// mostAdvancedInstance here could promote a replica that's already stale
+	// by the time it actually takes over. We wait for the primary lease to
+	// confirm the old primary is actually gone before picking anyone (step 2
+	// below).
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
 		contextLogger.Info("Current primary isn't healthy, initiating a failover")
 		status.LogStatus(ctx)
@@ -156,13 +167,30 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
 				"oldPrimary", cluster.Status.CurrentPrimary)
 		}
+
+		// A brand-new failover window: forget any stale lease observation
+		// left over from a previous, unrelated hand-over.
+		r.leaseObserver.Forget(client.ObjectKeyFromObject(cluster))
+		return "", nil
 	}
 
-	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
-	// data that is being received (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
-		return "", ErrWalReceiversRunning
+	// Step 2: we've already committed to a failover (TargetPrimary is either
+	// apiv1.PendingFailoverMarker, or a previously-chosen target that has
+	// itself since become unhealthy before ever being promoted). Before
+	// (re-)electing mostAdvancedInstance we must confirm the primary lease is
+	// no longer held, so the LSN snapshot we're about to commit to is taken
+	// as close as possible to the actual promotion.
+	leaseState := r.observePrimaryLease(ctx, cluster)
+	if leaseState.Outcome == leaseobserver.Held || leaseState.Outcome == leaseobserver.Unverifiable {
+		contextLogger.Info("Primary lease still held or unverifiable, deferring election",
+			"leaseObservation", leaseState)
+		return "", ErrPrimaryLeaseHeld
 	}
+
+	// Outcome is NotHeld or Expired: safe to elect using this pass's status.
+	contextLogger.Info("Primary lease confirmed not held, proceeding with election",
+		"leaseObservation", leaseState)
+	r.leaseObserver.Forget(client.ObjectKeyFromObject(cluster))
 
 	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
 	// or change the target primary if the current one is not valid anymore.
@@ -361,14 +389,6 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 
 	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
 		return "", err
-	}
-
-	// The designated primary is not correctly working, and we need to elect a new one
-	// but before doing that we need to wait for all the WAL receivers to be
-	// terminated. This is needed to avoid losing the WAL data that is being received
-	// (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
-		return "", ErrWalReceiversRunning
 	}
 
 	contextLogger.Info("Current target primary isn't healthy, failing over",
