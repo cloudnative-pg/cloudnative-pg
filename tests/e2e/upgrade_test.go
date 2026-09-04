@@ -39,6 +39,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
@@ -121,8 +122,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	)
 
 	BeforeAll(func() {
-		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
-			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
+		if config.Current().SkipUpgradeSuite {
+			Skip("Skipping upgrade test because skipUpgradeSuite is set in the e2e configuration")
 		}
 		if IsOpenshift() {
 			Skip("This test case is not applicable on OpenShift clusters")
@@ -140,9 +141,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		err := namespaces.EnsureNamespace(env.Ctx, env.Client, operatorNamespace)
 		Expect(err).NotTo(HaveOccurred())
 
-		dockerServer := os.Getenv("DOCKER_SERVER")
-		dockerUsername := os.Getenv("DOCKER_USERNAME")
-		dockerPassword := os.Getenv("DOCKER_PASSWORD")
+		pullSecret := config.Current().RegistryPullSecret
+		dockerServer := pullSecret.Server
+		dockerUsername := pullSecret.Username
+		dockerPassword := pullSecret.Password
 		if dockerServer != "" && dockerUsername != "" && dockerPassword != "" {
 			_, _, err := run.Run(fmt.Sprintf(
 				`kubectl -n %v create secret docker-registry
@@ -525,8 +527,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By(fmt.Sprintf("creating a Cluster in the '%v' upgradeNamespace",
 			upgradeNamespace), func() {
 			// set the serverName to a random name
-			err := os.Setenv("SERVER_NAME", serverName1)
-			Expect(err).ToNot(HaveOccurred())
+			config.SetTemplateVariable("SERVER_NAME", serverName1)
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile)
 
 			if online {
@@ -686,8 +687,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		By("installing a second Cluster on the upgraded operator", func() {
 			// set the serverName to a random name
-			err := os.Setenv("SERVER_NAME", serverName2)
-			Expect(err).ToNot(HaveOccurred())
+			config.SetTemplateVariable("SERVER_NAME", serverName2)
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile2)
 			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady])
 		})

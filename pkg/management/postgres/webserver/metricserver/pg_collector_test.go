@@ -78,9 +78,9 @@ var _ = Describe("test metrics parsing", func() {
 				Name: "cluster-example",
 			},
 			Status: apiv1.ClusterStatus{
-				FirstRecoverabilityPoint: "2023-02-16T22:44:56Z",
-				LastSuccessfulBackup:     "2023-02-16T22:44:56Z",
-				LastFailedBackup:         "2023-02-16T22:44:56Z",
+				FirstRecoverabilityPoint: "2023-02-16T22:44:56Z", //nolint:staticcheck
+				LastSuccessfulBackup:     "2023-02-16T22:44:56Z", //nolint:staticcheck
+				LastFailedBackup:         "2023-02-16T22:44:56Z", //nolint:staticcheck
 			},
 		}
 

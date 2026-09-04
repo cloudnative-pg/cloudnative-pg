@@ -46,6 +46,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -127,6 +128,13 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	// We've no WAL archive, so we can't proceed with a PITR
 	if cluster.Spec.Bootstrap.Recovery.Source == "" {
 		return nil
+	}
+
+	// The WAL restore below may reach a TLS-protected object store before the
+	// instance manager's certificate reconciler ever runs in this Pod, so the
+	// recovery-source CA has to be written to disk here.
+	if err := info.writeRecoveryBarmanEndpointCA(ctx, cli, cluster); err != nil {
+		return err
 	}
 
 	contextLogger.Info("Recovering from volume snapshot",
@@ -364,24 +372,47 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 	return true, os.Symlink(info.PgWal, pgDataWal)
 }
 
-// restoreDataDir restores PGDATA from an existing backup
-func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, env []string) error {
-	contextLogger := log.FromContext(ctx)
+// buildRestoreDataDirOptions builds the command line options for barman-cloud-restore
+func (info InitInfo) buildRestoreDataDirOptions(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
+) ([]string, error) {
 	var options []string
 
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
 	}
+
 	options = append(options, backup.Status.DestinationPath)
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
 
 	options, err := barmanCommand.AppendCloudProviderOptionsFromBackup(ctx, options, backup.Status.BarmanCredentials)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	options = append(options, info.PgData)
+	if barmanConfiguration != nil {
+		options = barmanConfiguration.Data.AppendRestoreAdditionalCommandArgs(options)
+	}
+
+	return append(options, info.PgData), nil
+}
+
+// restoreDataDir restores PGDATA from an existing backup
+func (info InitInfo) restoreDataDir(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	env []string,
+	barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	options, err := info.buildRestoreDataDirOptions(ctx, backup, barmanConfiguration)
+	if err != nil {
+		return err
+	}
 
 	contextLogger.Info("Starting barman-cloud-restore",
 		"options", options)
@@ -413,13 +444,78 @@ func (info InitInfo) loadCluster(ctx context.Context, typedClient client.Client)
 	return &cluster, nil
 }
 
+// writeRecoveryBarmanEndpointCA writes to disk the barman endpoint CA of the
+// recovery source, if any, before any barman-cloud command reaches a
+// TLS-protected object store. The precedence is: the recovery backup
+// reference's own CA, then the referenced backup's status CA, then the
+// recovery source external cluster's CA. It writes to the same location the
+// barman-cloud commands already read via AWS_CA_BUNDLE/REQUESTS_CA_BUNDLE, so
+// no extra wiring is needed once the file is on disk. It is a no-op when the
+// recovery source has no endpoint CA.
+func (info InitInfo) writeRecoveryBarmanEndpointCA(
+	ctx context.Context,
+	typedClient client.Client,
+	cluster *apiv1.Cluster,
+) error {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return nil
+	}
+	recovery := cluster.Spec.Bootstrap.Recovery
+
+	var endpointCA *apiv1.SecretKeySelector
+	switch {
+	case recovery.Backup != nil && recovery.Backup.EndpointCA != nil:
+		endpointCA = recovery.Backup.EndpointCA
+
+	case recovery.Backup != nil:
+		var backup apiv1.Backup
+		if err := typedClient.Get(
+			ctx,
+			client.ObjectKey{Namespace: info.Namespace, Name: recovery.Backup.Name},
+			&backup); err != nil {
+			return fmt.Errorf("while loading the recovery backup for the barman endpoint CA: %w", err)
+		}
+		endpointCA = backup.Status.EndpointCA
+
+	case recovery.Source != "":
+		if externalCluster, ok := cluster.ExternalCluster(recovery.Source); ok &&
+			externalCluster.BarmanObjectStore != nil {
+			endpointCA = externalCluster.BarmanObjectStore.EndpointCA
+		}
+	}
+
+	if endpointCA == nil || endpointCA.Name == "" || endpointCA.Key == "" {
+		return nil
+	}
+
+	var secret corev1.Secret
+	if err := typedClient.Get(
+		ctx,
+		client.ObjectKey{Namespace: info.Namespace, Name: endpointCA.Name},
+		&secret); err != nil {
+		return fmt.Errorf("while loading the recovery barman endpoint CA secret: %w", err)
+	}
+
+	data, ok := secret.Data[endpointCA.Key]
+	if !ok {
+		return fmt.Errorf("missing %s entry in Secret %s", endpointCA.Key, endpointCA.Name)
+	}
+
+	if _, err := fileutils.WriteFileAtomic(
+		postgresSpec.BarmanRestoreEndpointCACertificateLocation, data, 0o600); err != nil {
+		return fmt.Errorf("while writing the recovery barman endpoint CA: %w", err)
+	}
+
+	return nil
+}
+
 // loadBackup loads the backup manifest from the API server of from the object store.
 // It also gets the environment variables that are needed to recover the cluster
 func (info InitInfo) loadBackup(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	// Recovery given an existing backup
 	if cluster.Spec.Bootstrap.Recovery.Backup != nil {
 		return info.loadBackupFromReference(ctx, typedClient, cluster)
@@ -434,23 +530,23 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	contextLogger := log.FromContext(ctx)
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
 	if sourceName == "" {
-		return nil, nil, fmt.Errorf("recovery source not specified")
+		return nil, nil, nil, fmt.Errorf("recovery source not specified")
 	}
 
 	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
-		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
+		return nil, nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
 	}
 
 	if server.BarmanObjectStore == nil {
-		return nil, nil, fmt.Errorf("missing barman object store configuration for source: %v", sourceName)
+		return nil, nil, nil, fmt.Errorf("missing barman object store configuration for source: %v", sourceName)
 	}
 
 	serverName := server.GetServerName()
@@ -462,12 +558,12 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		server.BarmanObjectStore,
 		os.Environ())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	backupCatalog, err := barmanCommand.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// We are now choosing the right backup to restore
@@ -478,13 +574,13 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 			cluster.Spec.Bootstrap.Recovery.RecoveryTarget,
 		)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	} else {
 		targetBackup = backupCatalog.LatestBackupInfo()
 	}
 	if targetBackup == nil {
-		return nil, nil, fmt.Errorf("no target backup found")
+		return nil, nil, nil, fmt.Errorf("no target backup found")
 	}
 
 	contextLogger.Info("Target backup found", "backup", targetBackup)
@@ -513,7 +609,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 			CommandOutput:     "",
 			CommandError:      "",
 		},
-	}, env, nil
+	}, env, server.BarmanObjectStore, nil
 }
 
 // loadBackupFromReference loads a backup object and the required credentials given the backup object resource
@@ -521,7 +617,7 @@ func (info InitInfo) loadBackupFromReference(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	contextLogger := log.FromContext(ctx)
 	var backup apiv1.Backup
 	err := typedClient.Get(
@@ -529,21 +625,23 @@ func (info InitInfo) loadBackupFromReference(
 		client.ObjectKey{Namespace: info.Namespace, Name: cluster.Spec.Bootstrap.Recovery.Backup.Name},
 		&backup)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
+
+	barmanConfiguration := barmanObjectStoreFromBackup(&backup)
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
 		typedClient,
 		cluster.Namespace,
-		barmanObjectStoreFromBackup(&backup),
+		barmanConfiguration,
 		os.Environ())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	contextLogger.Info("Recovering existing backup", "backup", backup)
-	return &backup, env, nil
+	return &backup, env, barmanConfiguration, nil
 }
 
 func (info InitInfo) writeCustomRestoreWalConfig(cluster *apiv1.Cluster, conf string) error {
@@ -1083,6 +1181,10 @@ func (info InitInfo) restoreViaBarmanObjectStore(
 	cli client.Client,
 	cluster *apiv1.Cluster,
 ) (config string, envs []string, err error) {
+	if err := info.writeRecoveryBarmanEndpointCA(ctx, cli, cluster); err != nil {
+		return "", nil, err
+	}
+
 	// Before starting the restore we check if the archive destination is safe to
 	// use, otherwise we stop creating the cluster.
 	if err := info.checkBackupDestination(ctx, cli, cluster); err != nil {
@@ -1090,7 +1192,7 @@ func (info InitInfo) restoreViaBarmanObjectStore(
 	}
 
 	// If we need to download data from a backup, we do it.
-	backup, env, err := info.loadBackup(ctx, cli, cluster)
+	backup, env, barmanConfiguration, err := info.loadBackup(ctx, cli, cluster)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1099,7 +1201,7 @@ func (info InitInfo) restoreViaBarmanObjectStore(
 		return "", nil, err
 	}
 
-	if err := info.restoreDataDir(ctx, backup, env); err != nil {
+	if err := info.restoreDataDir(ctx, backup, env, barmanConfiguration); err != nil {
 		return "", nil, err
 	}
 

@@ -23,7 +23,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"os"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +33,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 )
@@ -107,43 +107,36 @@ func ObjectMatchesAnnotations(
 	return true
 }
 
-// EnvVarsForSnapshots represents the environment variables to use to track snapshots
-// and apply them in test fixture templates
-type EnvVarsForSnapshots struct {
+// SnapshotTemplateVariables represents the template variables to use to track
+// snapshots and apply them in test fixture templates
+type SnapshotTemplateVariables struct {
 	DataSnapshot             string
 	WalSnapshot              string
 	TablespaceSnapshotPrefix string
 }
 
-// SetSnapshotNameAsEnv sets the names of a PG_DATA, a PG_WAL and a list of PG_TABLESPACE snapshots from a
-// given snapshotList as env variables
-func SetSnapshotNameAsEnv(
+// SetSnapshotTemplateVariables registers the names of a PG_DATA, a PG_WAL and a
+// list of PG_TABLESPACE snapshots from a given snapshotList as template
+// variables for the fixture templates
+func SetSnapshotTemplateVariables(
 	snapshotList *volumesnapshotv1.VolumeSnapshotList,
 	backup *apiv1.Backup,
-	envVars EnvVarsForSnapshots,
+	vars SnapshotTemplateVariables,
 ) error {
 	if len(snapshotList.Items) != len(backup.Status.BackupSnapshotStatus.Elements) {
 		return fmt.Errorf("could not find the expected number of snapshots")
 	}
 
-	for _, item := range snapshotList.Items {
+	for i := range snapshotList.Items {
+		item := &snapshotList.Items[i]
 		switch utils.PVCRole(item.Annotations[utils.PvcRoleLabelName]) {
 		case utils.PVCRolePgData:
-			err := os.Setenv(envVars.DataSnapshot, item.Name)
-			if err != nil {
-				return err
-			}
+			config.SetTemplateVariable(vars.DataSnapshot, item.Name)
 		case utils.PVCRolePgWal:
-			err := os.Setenv(envVars.WalSnapshot, item.Name)
-			if err != nil {
-				return err
-			}
+			config.SetTemplateVariable(vars.WalSnapshot, item.Name)
 		case utils.PVCRolePgTablespace:
 			tbsName := item.Labels[utils.TablespaceNameLabelName]
-			err := os.Setenv(envVars.TablespaceSnapshotPrefix+"_"+tbsName, item.Name)
-			if err != nil {
-				return err
-			}
+			config.SetTemplateVariable(vars.TablespaceSnapshotPrefix+"_"+tbsName, item.Name)
 		default:
 			return fmt.Errorf("unrecognized PVC snapshot role: %s, name: %s",
 				item.Annotations[utils.PvcRoleLabelName],

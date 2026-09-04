@@ -31,7 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -291,6 +290,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 	})
 
 	It("via ImageCatalog", func() {
+		storageClass := env.DefaultStorageClass
 		clusterName = "postgresql-with-extensions"
 		catalogName := "catalog-with-extensions"
 
@@ -361,11 +361,11 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 					}},
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size:         "1Gi",
-						StorageClass: ptr.To(env.DefaultStorageClass),
+						StorageClass: &storageClass,
 					},
 					WalStorage: &apiv1.StorageConfiguration{
 						Size:         "1Gi",
-						StorageClass: ptr.To(env.DefaultStorageClass),
+						StorageClass: &storageClass,
 					},
 				},
 			}

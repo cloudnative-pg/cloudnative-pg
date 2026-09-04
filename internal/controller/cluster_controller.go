@@ -233,16 +233,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		var errUnknownPlugin *repository.ErrUnknownPlugin
 		if errors.As(err, &errUnknownPlugin) {
-			return ctrl.Result{
-					RequeueAfter: 10 * time.Second,
-				}, r.RegisterPhase(
-					ctx,
-					cluster,
-					apiv1.PhaseUnknownPlugin,
-					fmt.Sprintf("Unknown plugin: '%s'. "+
-						"This may be caused by the plugin not being loaded correctly by the operator. "+
-						"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
-				)
+			regErr := r.RegisterPhase(
+				ctx,
+				cluster,
+				apiv1.PhaseUnknownPlugin,
+				fmt.Sprintf("Unknown plugin: '%s'. "+
+					"This may be caused by the plugin not being loaded correctly by the operator. "+
+					"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
+			)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, regErr
 		}
 
 		if regErr := r.RegisterPhase(
@@ -393,7 +392,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
 			contextLogger.Debug("Conflict error while reconciling resource status", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
@@ -460,7 +459,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		if apierrs.IsConflict(err) {
 			contextLogger.Debug("Conflict error while reconciling cluster status and instance state",
 				"error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
@@ -577,7 +576,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
 			contextLogger.Debug("Conflict error while reconciling online update", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
@@ -763,7 +762,7 @@ func (r *ClusterReconciler) handleSwitchover(
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
 			"error", err)
-		return &ctrl.Result{Requeue: true}, nil
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 	if selectedPrimary != "" {
 		// If we selected a new primary, stop the reconciliation loop here
@@ -821,6 +820,62 @@ func (r *ClusterReconciler) setDefaults(ctx context.Context, cluster *apiv1.Clus
 	return nil
 }
 
+// reconcileFailedJobs surfaces a permanently failed instance-creation Job
+// (bootstrap, recovery or replica creation) as PhaseUnrecoverable: such a Job
+// is counted as "running" until it succeeds, so one that has exhausted its
+// backoff limit would otherwise keep the cluster waiting forever. The cause
+// is in the job logs and has to be investigated: there is no predefined
+// recipe.
+func (r *ClusterReconciler) reconcileFailedJobs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	failedJobs := resources.failedJobNames()
+	if len(failedJobs) == 0 {
+		return nil, nil
+	}
+
+	log.FromContext(ctx).Warning("An instance creation job has failed", "failedJobs", failedJobs)
+
+	reason := fmt.Sprintf("Instance creation failed for the following jobs: %s. "+
+		"Check the job logs to investigate the cause of the failure.",
+		strings.Join(failedJobs, ", "))
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
+		return &ctrl.Result{}, err
+	}
+	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
+// reconcileFailedBootstrapPods surfaces a failing bootstrap init container as
+// PhaseUnrecoverable. Unlike a Job, it has no backoff limit of its own:
+// kubelet retries it forever, so a doomed bootstrap would otherwise
+// crash-loop with no signal. This only updates Cluster status, leaving the
+// Pod and its logs untouched and kubelet's retry running, so a transient
+// failure that later succeeds clears the phase again on its own.
+func (r *ClusterReconciler) reconcileFailedBootstrapPods(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	failedBootstrapPods := resources.failedBootstrapPodNames()
+	if len(failedBootstrapPods) == 0 {
+		return nil, nil
+	}
+
+	log.FromContext(ctx).Warning("An instance bootstrap has failed", "failedBootstrapPods", failedBootstrapPods)
+
+	reason := fmt.Sprintf("Instance bootstrap failed for the following Pods: %s. "+
+		"Check the bootstrap-instance init container logs to investigate the cause of the failure.",
+		strings.Join(failedBootstrapPods, ", "))
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
+		return &ctrl.Result{}, err
+	}
+	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
 // reconcileResources updates all the objects managed by the controller
 func (r *ClusterReconciler) reconcileResources(
 	ctx context.Context, cluster *apiv1.Cluster,
@@ -845,22 +900,16 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	// A Job that creates an instance (bootstrap, recovery or replica creation)
-	// is counted as "running" until it succeeds, so a Job that has exhausted its
-	// backoff limit would otherwise keep the cluster waiting forever. Surface the
-	// failure in the phase instead. The cause is in the job logs and has to be
-	// investigated: there is no predefined recipe.
-	if failedJobs := resources.failedJobNames(); len(failedJobs) > 0 {
-		contextLogger.Warning("An instance creation job has failed", "failedJobs", failedJobs)
+	if result, err := r.reconcileFailedJobs(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, err
+	} else if result != nil {
+		return *result, nil
+	}
 
-		reason := fmt.Sprintf("Instance creation failed for the following jobs: %s. "+
-			"Check the job logs to investigate the cause of the failure.",
-			strings.Join(failedJobs, ", "))
-
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	if result, err := r.reconcileFailedBootstrapPods(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, err
+	} else if result != nil {
+		return *result, nil
 	}
 
 	runningJobs := resources.runningJobNames()
@@ -1211,13 +1260,13 @@ func (r *ClusterReconciler) handleRollingUpdate(
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	case errors.Is(err, errRolloutDelayed):
 		contextLogger.Warning(
-			"A Pod need to be rolled out, but the rollout is being delayed",
+			"A Pod needs to be rolled out, but the rollout is being delayed",
 		)
 		if err := r.RegisterPhase(
 			ctx,
 			cluster,
 			apiv1.PhaseUpgradeDelayed,
-			"The cluster need to be update, but the operator is configured to delay "+
+			"The cluster needs to be updated, but the operator is configured to delay "+
 				"the operation",
 		); err != nil {
 			return ctrl.Result{}, err

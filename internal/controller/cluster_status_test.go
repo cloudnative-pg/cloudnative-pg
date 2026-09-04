@@ -30,11 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -847,5 +849,58 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
 		})
+	})
+})
+
+var _ = Describe("failedBootstrapPodNames", func() {
+	newBootstrapPod := func(name string, restartCount int32, terminatedExitCode *int32) corev1.Pod {
+		containerStatus := corev1.ContainerStatus{
+			Name:         specs.BootstrapWorkContainerName,
+			RestartCount: restartCount,
+		}
+		if terminatedExitCode != nil {
+			containerStatus.State = corev1.ContainerState{
+				Terminated: &corev1.ContainerStateTerminated{ExitCode: *terminatedExitCode},
+			}
+		}
+		return corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status: corev1.PodStatus{
+				InitContainerStatuses: []corev1.ContainerStatus{containerStatus},
+			},
+		}
+	}
+
+	It("flags a bootstrap that has failed at least once", func() {
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{
+				newBootstrapPod("cluster-1", 1, nil),
+			}},
+		}
+		Expect(resources.failedBootstrapPodNames()).To(ConsistOf("cluster-1"))
+	})
+
+	It("does not flag a bootstrap that has not failed yet", func() {
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{
+				newBootstrapPod("cluster-1", 0, nil),
+			}},
+		}
+		Expect(resources.failedBootstrapPodNames()).To(BeEmpty())
+	})
+
+	It("does not flag a bootstrap that failed once but has since succeeded on a later retry", func() {
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{
+				newBootstrapPod("cluster-1", 1, ptr.To(int32(0))),
+			}},
+		}
+		Expect(resources.failedBootstrapPodNames()).To(BeEmpty())
+	})
+
+	It("does not flag a Pod with no bootstrap init container at all", func() {
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "cluster-2"}}
+		resources := &managedResources{instances: corev1.PodList{Items: []corev1.Pod{pod}}}
+		Expect(resources.failedBootstrapPodNames()).To(BeEmpty())
 	})
 })

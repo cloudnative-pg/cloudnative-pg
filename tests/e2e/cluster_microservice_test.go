@@ -21,14 +21,15 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
@@ -156,16 +157,21 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		By("having a imported Cluster in failed state", func() {
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      importedClusterName + "-1-import",
+				Name:      importedClusterName + "-1",
 			}
-			// Eventually the number of failed job should be greater than 1
-			// which will ensure the cluster not getting created
-			job := &batchv1.Job{}
+			// Eventually the bootstrap init container should have restarted at
+			// least once, which will ensure the cluster not getting created
+			pod := &corev1.Pod{}
 			Eventually(func(g Gomega) int32 {
-				err := env.Client.Get(env.Ctx, namespacedName, job)
+				err := env.Client.Get(env.Ctx, namespacedName, pod)
 				g.Expect(err).ToNot(HaveOccurred())
-				return job.Status.Failed
-			}, 100).Should(BeEquivalentTo(1))
+				for _, containerStatus := range pod.Status.InitContainerStatuses {
+					if containerStatus.Name == specs.BootstrapWorkContainerName {
+						return containerStatus.RestartCount
+					}
+				}
+				return 0
+			}, 100).Should(BeNumerically(">=", 1))
 		})
 	})
 
@@ -174,8 +180,8 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		importedClusterName = "cluster-pgdump-different-db-version"
 
 		// Gather the current image
-		postgresImage := os.Getenv("POSTGRES_IMG")
-		Expect(postgresImage).ShouldNot(BeEmpty(), "POSTGRES_IMG env should not be empty")
+		postgresImage := config.Current().Postgres.Image
+		Expect(postgresImage).ShouldNot(BeEmpty(), "the postgres image should not be empty")
 
 		// this test case is only applicable if we are not already on the latest major
 		if postgres.IsLatestMajor(postgresImage) {
