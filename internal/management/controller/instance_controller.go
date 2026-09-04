@@ -1208,10 +1208,12 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// previous holder did not release cleanly, in a single Acquire call. The
 	// runnable's preAcquire loop polls jitter-free every RetryPeriod and takes
 	// over a still-held lease once it has observed the record unchanged for a
-	// full LeaseDuration, so the take-over moment lands at most one RetryPeriod
-	// past LeaseDuration (the poll granularity). Sizing acquireTimeout to
-	// LeaseDuration + 3*RetryPeriod keeps that take-over inside a single
-	// Acquire call with margin for the take-over write and scheduling overhead.
+	// full LeaseDuration. Sizing acquireTimeout to LeaseDuration +
+	// 3*RetryPeriod keeps that take-over inside a single Acquire call, with
+	// margin for the poll granularity, the take-over write and scheduling
+	// overhead, as long as the API server answers promptly. It can be exceeded
+	// when the API server is slow, since a single poll is then budgeted up to
+	// RenewDeadline; the requeue below covers that case.
 	leaseDuration := cluster.GetPrimaryLeaseDuration()
 	retryPeriod := cluster.GetPrimaryLeaseRetryPeriod()
 	acquireTimeout := leaseDuration + 3*retryPeriod
