@@ -50,16 +50,16 @@ const (
 
 var jobExample = `
   # Dry-run command with default values"
-  kubectl-cnpg fio <fio-name> --dry-run
+  kubectl cnpg fio <fio-name> --dry-run
 
   # Create a fio job with default values.
-  kubectl-cnpg fio <fio-name>
+  kubectl cnpg fio <fio-name>
 
   # Dry-run command with given values and clusterName "cluster-example"
-  kubectl-cnpg fio <fio-name> -n <namespace> --storageClass <name> --pvcSize <size> --dry-run
+  kubectl cnpg fio <fio-name> -n <namespace> --storageClass <name> --pvcSize <size> --dry-run
 
   # Create a job with given values and clusterName "cluster-example"
-  kubectl-cnpg fio <fio-name> -n <namespace> --storageClass <name> --pvcSize <size>
+  kubectl cnpg fio <fio-name> -n <namespace> --storageClass <name> --pvcSize <size>
 `
 
 // newFioCommand initialize fio deployment options
