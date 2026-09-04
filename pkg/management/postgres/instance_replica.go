@@ -40,9 +40,15 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	cluster *apiv1.Cluster,
 	cli client.Client,
 ) (changed bool, err error) {
+	pruned, err := PruneManagedReplicationSettingsFromAutoConf(instance.PgData)
+	if err != nil {
+		return false, fmt.Errorf("pruning postgresql.auto.conf: %w", err)
+	}
+	changed = pruned
+
 	// Ensure postgresql.conf includes custom.conf and override.conf, which
 	// are essential for the cluster to operate correctly. See: #5747
-	changed, err = configfile.EnsureIncludes(
+	includesChanged, err := configfile.EnsureIncludes(
 		path.Join(instance.PgData, "postgresql.conf"),
 		constants.PostgresqlCustomConfigurationFile,
 		constants.PostgresqlOverrideConfigurationFile,
@@ -50,6 +56,7 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	if err != nil {
 		return changed, fmt.Errorf("ensuring include directives in postgresql.conf: %w", err)
 	}
+	changed = changed || includesChanged
 
 	primary, err := instance.IsPrimary()
 	if err != nil {

@@ -254,6 +254,58 @@ func (instance *Instance) RefreshPGIdent(
 	return postgresIdentChanged, err
 }
 
+// managedReplicationSettingsInAutoConf lists GUCs managed in override.conf that must not
+// remain in postgresql.auto.conf. PostgreSQL parses postgresql.auto.conf after included
+// files, so stale values there override override.conf.
+var managedReplicationSettingsInAutoConf = []string{
+	"archive_mode",
+	"primary_conninfo",
+	"primary_slot_name",
+	"recovery_target",
+	"recovery_target_inclusive",
+	"recovery_target_lsn",
+	"recovery_target_name",
+	"recovery_target_time",
+	"recovery_target_timeline",
+	"recovery_target_xid",
+	"restore_command",
+}
+
+// PruneManagedReplicationSettingsFromAutoConf removes operator-managed replication
+// and recovery settings from postgresql.auto.conf when present.
+func PruneManagedReplicationSettingsFromAutoConf(pgData string) (changed bool, err error) {
+	autoConfFile := filepath.Join(pgData, "postgresql.auto.conf")
+	lines, err := fileutils.ReadFileLines(autoConfFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("reading postgresql.auto.conf: %w", err)
+	}
+
+	pruned := configfile.RemoveOptionsFromConfigurationContents(
+		lines, managedReplicationSettingsInAutoConf...)
+	if len(pruned) == len(lines) {
+		for i := range lines {
+			if lines[i] != pruned[i] {
+				changed = true
+				break
+			}
+		}
+	} else {
+		changed = true
+	}
+	if !changed {
+		return false, nil
+	}
+
+	written, err := fileutils.WriteLinesToFile(autoConfFile, pruned)
+	if err != nil {
+		return false, fmt.Errorf("writing postgresql.auto.conf: %w", err)
+	}
+	return written, nil
+}
+
 // UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
