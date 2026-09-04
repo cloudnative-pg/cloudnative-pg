@@ -135,7 +135,7 @@ var (
 	// ErrPgRejectingConnection postgres is alive, but rejecting connections
 	ErrPgRejectingConnection = fmt.Errorf("server is alive but rejecting connections")
 
-	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
+	// ErrNoConnectionEstablished no response was received from postgres
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
 
 	// ErrNoFreeWALSpace is returned when there isn't enough disk space
@@ -455,6 +455,11 @@ const (
 	// shutDownFastImmediate means the instance has to be shut down by first
 	// issuing a fast shut down and in case of errors an immediate one
 	shutDownFastImmediate InstanceCommand = "ShutDownFastImmediate"
+
+	// shutDownImmediate means the instance has to be shut down by
+	// skipping straight to an immediate shutdown, with no checkpoint
+	// and no fast-shutdown attempt beforehand
+	shutDownImmediate InstanceCommand = "ShutDownImmediate"
 )
 
 // NewInstance creates a new Instance object setting the defaults
@@ -712,6 +717,32 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 		)
 	}
 	return err
+}
+
+// TryShuttingDownImmediate skips straight to an "immediate" shutdown request, with no
+// checkpoint and no "fast" attempt beforehand.
+// This is meant for a former primary whose PostgreSQL is unreachable: the checkpoint needs
+// a working connection we don't have, and a postmaster that stopped answering pg_isready is
+// not expected to complete the graceful shutdown that "fast" asks for.
+// Note: an immediate shutdown may lead to data loss.
+func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Requesting immediate shutdown of the PostgreSQL instance")
+	err := instance.Shutdown(
+		ctx,
+		shutdownOptions{
+			Mode: shutdownModeImmediate,
+			Wait: true,
+		},
+	)
+	if err != nil {
+		contextLogger.Error(err, "Error while shutting down the PostgreSQL instance")
+		return err
+	}
+
+	contextLogger.Info("PostgreSQL instance shut down")
+	return nil
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status
@@ -1461,6 +1492,30 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownFastImmediate
 }
 
+// RequestImmediateShutdown request the lifecycle manager to shut down
+// PostgreSQL by skipping straight to the immediate strategy, with no
+// checkpoint and no fast-shutdown attempt beforehand.
+func (instance *Instance) RequestImmediateShutdown() {
+	instance.instanceCommandChan <- shutDownImmediate
+}
+
+// TryRequestImmediateShutdown behaves like RequestImmediateShutdown, but
+// never blocks: if the lifecycle manager's command loop isn't immediately
+// ready to receive (e.g. because it is itself shutting PostgreSQL down),
+// the request is dropped rather than waiting. It reports whether the
+// request was actually delivered. This is meant for callers that must
+// never be blocked by a lifecycle manager that turns out not to be
+// listening, since the command channel is unbuffered and a send on it
+// cannot be interrupted by a context cancellation.
+func (instance *Instance) TryRequestImmediateShutdown() bool {
+	select {
+	case instance.instanceCommandChan <- shutDownImmediate:
+		return true
+	default:
+		return false
+	}
+}
+
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
 // restart the postmaster, and wait for the postmaster to be restarted
 func (instance *Instance) RequestAndWaitRestartSmartFast(ctx context.Context, timeout time.Duration) error {
@@ -1622,6 +1677,11 @@ func (instance *Instance) HandleInstanceCommandRequests(
 		return true, instance.TryShuttingDownSmartFast(ctx)
 	case shutDownFastImmediate:
 		if err := instance.TryShuttingDownFastImmediate(ctx); err != nil {
+			contextLogger.Error(err, "error shutting down instance, proceeding")
+		}
+		return false, nil
+	case shutDownImmediate:
+		if err := instance.TryShuttingDownImmediate(ctx); err != nil {
 			contextLogger.Error(err, "error shutting down instance, proceeding")
 		}
 		return false, nil
