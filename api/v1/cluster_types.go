@@ -2746,6 +2746,10 @@ type RoleConfiguration struct {
 
 	// Date and time after which the role's password is no longer valid.
 	// When omitted, the password will never expire (default).
+	// On a `DatabaseRole` whose password the operator generates with a
+	// `password.duration`, this is controlled by the operator instead: the role
+	// is valid until the generated password expires, and setting `validUntil`
+	// explicitly is rejected.
 	// +optional
 	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 

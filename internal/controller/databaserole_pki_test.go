@@ -26,6 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -50,7 +52,7 @@ var _ = Describe("databaserole_pki", func() {
 			WithScheme(scheme).
 			WithStatusSubresource(&apiv1.DatabaseRole{}, &apiv1.Cluster{}).
 			Build()
-		r = DatabaseRoleReconciler{Client: cli, Scheme: scheme}
+		r = DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}
 
 		namespace = "default"
 		cluster = newFakeCNPGCluster(cli, namespace)
@@ -92,7 +94,7 @@ var _ = Describe("databaserole_pki", func() {
 			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
 			role := newRole("alice", true)
 
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 			var certSecret corev1.Secret
 			Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
@@ -116,7 +118,7 @@ var _ = Describe("databaserole_pki", func() {
 				role := newRole("bob", true)
 
 				// First reconcile: creates the secret.
-				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 				firstExpiration := role.Status.ClientCertificate.Expiration
 
 				var certSecret corev1.Secret
@@ -124,7 +126,7 @@ var _ = Describe("databaserole_pki", func() {
 				firstCertBytes := certSecret.Data[certs.TLSCertKey]
 
 				// Second reconcile: secret already exists, no renewal needed.
-				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 				Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
 				Expect(role.Status.ClientCertificate).NotTo(BeNil())
@@ -138,7 +140,7 @@ var _ = Describe("databaserole_pki", func() {
 			role := newRole("ada", true)
 
 			// First reconcile: creates the cert signed by the original CA.
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 			var firstSecret corev1.Secret
 			Expect(r.Get(ctx, certSecretKey(role), &firstSecret)).To(Succeed())
 			firstCert := firstSecret.Data[certs.TLSCertKey]
@@ -155,7 +157,7 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(r.Update(ctx, &caSecret)).To(Succeed())
 
 			// Second reconcile: detects the CA change and re-issues.
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 			var secondSecret corev1.Secret
 			Expect(r.Get(ctx, certSecretKey(role), &secondSecret)).To(Succeed())
@@ -175,6 +177,36 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(cert.Subject.CommonName).To(Equal("ada"))
 		})
 
+		It("re-issues a certificate it cannot read", func(ctx SpecContext) {
+			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+			role := newRole("grace", true)
+
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+			// An unparseable certificate cannot be renewed either, so without a
+			// re-issue the role stays without its credential until somebody
+			// deletes the Secret by hand.
+			var certSecret corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
+			certSecret.Data[certs.TLSCertKey] = []byte("not a certificate")
+			Expect(r.Update(ctx, &certSecret)).To(Succeed())
+
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+			var caSecret corev1.Secret
+			Expect(r.Get(ctx, types.NamespacedName{
+				Name: cluster.GetClientCASecretName(), Namespace: namespace,
+			}, &caSecret)).To(Succeed())
+			Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
+			signed, err := clientCertSignedByCurrentCA(ctx, &caSecret, &certSecret)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(signed).To(BeTrue())
+			Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
+				ContainSubstring("Normal ClientCertificateRenewed"),
+				ContainSubstring("it could not be read"),
+			)))
+		})
+
 		It("sets status.clientCertificate.message and returns nil when CA has no private key", func(ctx SpecContext) {
 			// Create a CA secret with only the certificate, no private key.
 			_, caPair := generateFakeCASecret(r.Client, "tmp-ca", namespace, "test.example.com")
@@ -192,7 +224,7 @@ var _ = Describe("databaserole_pki", func() {
 
 			role := newRole("carol", true)
 
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 			// No cert secret should have been created.
 			var certSecret corev1.Secret
@@ -208,7 +240,7 @@ var _ = Describe("databaserole_pki", func() {
 		It("does nothing when CA secret is absent", func(ctx SpecContext) {
 			role := newRole("dave", true)
 
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 			var certSecret corev1.Secret
 			err := r.Get(ctx, certSecretKey(role), &certSecret)
@@ -233,7 +265,7 @@ var _ = Describe("databaserole_pki", func() {
 			}
 			Expect(r.Create(ctx, unowned)).To(Succeed())
 
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 			// The foreign Secret must be left exactly as it was: not overwritten
 			// with an operator-generated key pair.
@@ -248,6 +280,72 @@ var _ = Describe("databaserole_pki", func() {
 		})
 	})
 
+	Describe("recording what it did", func() {
+		It("records the issuance of a certificate, and its re-issue", func(ctx SpecContext) {
+			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+			role := newRole("beatrice", true)
+
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+			Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
+				ContainSubstring("Normal ClientCertificateIssued"),
+				ContainSubstring(role.GetClientCertSecretName()),
+			)))
+
+			// Rotating the CA of the cluster replaces the certificate of every
+			// role signed by it: a client that mounted the old one has to read
+			// its Secret again, which is worth more than a log line.
+			newCAPair, err := certs.CreateRootCA("test.example.com", namespace)
+			Expect(err).NotTo(HaveOccurred())
+			var caSecret corev1.Secret
+			Expect(r.Get(ctx, types.NamespacedName{
+				Name: cluster.GetClientCASecretName(), Namespace: namespace,
+			}, &caSecret)).To(Succeed())
+			caSecret.Data[certs.CACertKey] = newCAPair.Certificate
+			caSecret.Data[certs.CAPrivateKeyKey] = newCAPair.Private
+			Expect(r.Update(ctx, &caSecret)).To(Succeed())
+
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+			Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
+				ContainSubstring("Normal ClientCertificateRenewed"),
+				ContainSubstring("client CA of the cluster was rotated"),
+			)))
+
+			// Nothing happened to the certificate this time.
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+			Expect(recordedEvents(&r)).To(BeEmpty())
+		})
+
+		It("explains a certificate it will not issue once, not on every loop", func(ctx SpecContext) {
+			// A CA the operator cannot sign with: the certificate is never
+			// issued, and the role is left without the credential it asked for.
+			_, caPair := generateFakeCASecret(r.Client, "tmp-ca", namespace, "test.example.com")
+			Expect(r.Create(ctx, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      cluster.GetClientCASecretName(),
+					Namespace: namespace,
+				},
+				Data: map[string][]byte{certs.CACertKey: caPair.Certificate},
+			})).To(Succeed())
+			role := newRole("cangrande", true)
+			request := ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: role.Namespace, Name: role.Name,
+			}}
+
+			_, err := r.Reconcile(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(recordedEvents(&r)).To(ConsistOf(SatisfyAll(
+				ContainSubstring("Warning ClientCertificateIssuanceSkipped"),
+				ContainSubstring("no private key"),
+			)))
+
+			// The CA is not going to grow a private key on its own: saying so
+			// again on every loop would bury everything else.
+			_, err = r.Reconcile(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(recordedEvents(&r)).To(BeEmpty())
+		})
+	})
+
 	Describe("deleteOwnedCertSecret", func() {
 		It("deletes the owned cert Secret and clears status when clientCertificate is disabled",
 			func(ctx SpecContext) {
@@ -255,12 +353,12 @@ var _ = Describe("databaserole_pki", func() {
 				role := newRole("eve", true)
 
 				// First issue the cert.
-				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 				Expect(r.Get(ctx, certSecretKey(role), &corev1.Secret{})).To(Succeed())
 
 				// Now opt out.
 				role.Spec.ClientCertificate = nil
-				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 				err := r.Get(ctx, certSecretKey(role), &corev1.Secret{})
 				Expect(client.IgnoreNotFound(err)).To(Succeed())
@@ -274,7 +372,7 @@ var _ = Describe("databaserole_pki", func() {
 			role := newRole("frank", false)
 			role.Status.ClientCertificate = &apiv1.ClientCertificateState{Expiration: "2099-01-01T00:00:00Z"}
 
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 			Expect(role.Status.ClientCertificate).To(BeNil())
 		})
 
@@ -290,7 +388,7 @@ var _ = Describe("databaserole_pki", func() {
 			}
 			Expect(r.Create(ctx, unowned)).To(Succeed())
 
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 			// The unowned secret must still exist.
 			Expect(r.Get(ctx, certSecretKey(role), &corev1.Secret{})).To(Succeed())
@@ -305,7 +403,7 @@ var _ = Describe("databaserole_pki", func() {
 			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
 			role := newRole("heidi", false)
 
-			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
 
 			err := r.Get(ctx, certSecretKey(role), &corev1.Secret{})
 			Expect(client.IgnoreNotFound(err)).To(Succeed())
