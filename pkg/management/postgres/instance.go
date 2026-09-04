@@ -455,6 +455,11 @@ const (
 	// shutDownFastImmediate means the instance has to be shut down by first
 	// issuing a fast shut down and in case of errors an immediate one
 	shutDownFastImmediate InstanceCommand = "ShutDownFastImmediate"
+
+	// shutDownImmediate means the instance has to be shut down by
+	// skipping straight to an immediate shutdown, with no checkpoint
+	// and no fast-shutdown attempt beforehand
+	shutDownImmediate InstanceCommand = "ShutDownImmediate"
 )
 
 // NewInstance creates a new Instance object setting the defaults
@@ -712,6 +717,32 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 		)
 	}
 	return err
+}
+
+// TryShuttingDownImmediate skips straight to an "immediate" shutdown request, with no
+// checkpoint and no "fast" attempt beforehand.
+// This is meant for a former primary whose PostgreSQL is unreachable: a checkpoint needs
+// a working connection we don't have, and a "fast" attempt would just burn through its
+// own timeout waiting on a postmaster that can't respond.
+// Note: an immediate shutdown may lead to data loss.
+func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Requesting immediate shutdown of the PostgreSQL instance")
+	err := instance.Shutdown(
+		ctx,
+		shutdownOptions{
+			Mode: shutdownModeImmediate,
+			Wait: true,
+		},
+	)
+	if err != nil {
+		contextLogger.Error(err, "Error while shutting down the PostgreSQL instance")
+		return err
+	}
+
+	contextLogger.Info("PostgreSQL instance shut down")
+	return nil
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status
@@ -1461,6 +1492,28 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownFastImmediate
 }
 
+// RequestImmediateShutdown request the lifecycle manager to shut down
+// PostgreSQL by skipping straight to the immediate strategy, with no
+// checkpoint and no fast-shutdown attempt beforehand.
+func (instance *Instance) RequestImmediateShutdown() {
+	instance.instanceCommandChan <- shutDownImmediate
+}
+
+// TryRequestImmediateShutdown is RequestImmediateShutdown for a caller that
+// must not block, reporting whether the request was taken. The command channel
+// is unbuffered and its only consumer is out of its select for as long as a
+// command already in flight runs, which for a restart or a fencing request is
+// minutes. A caller holding a goroutine that has to stay responsive uses this
+// and retries, instead of parking there for the whole duration.
+func (instance *Instance) TryRequestImmediateShutdown() bool {
+	select {
+	case instance.instanceCommandChan <- shutDownImmediate:
+		return true
+	default:
+		return false
+	}
+}
+
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
 // restart the postmaster, and wait for the postmaster to be restarted
 func (instance *Instance) RequestAndWaitRestartSmartFast(ctx context.Context, timeout time.Duration) error {
@@ -1622,6 +1675,11 @@ func (instance *Instance) HandleInstanceCommandRequests(
 		return true, instance.TryShuttingDownSmartFast(ctx)
 	case shutDownFastImmediate:
 		if err := instance.TryShuttingDownFastImmediate(ctx); err != nil {
+			contextLogger.Error(err, "error shutting down instance, proceeding")
+		}
+		return false, nil
+	case shutDownImmediate:
+		if err := instance.TryShuttingDownImmediate(ctx); err != nil {
 			contextLogger.Error(err, "error shutting down instance, proceeding")
 		}
 		return false, nil

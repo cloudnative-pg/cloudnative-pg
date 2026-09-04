@@ -1491,8 +1491,8 @@ _Appears in:_
 
 
 
-IsolationCheckConfiguration contains the configuration for the isolation check
-functionality in the liveness probe
+IsolationCheckConfiguration contains the configuration for the primary
+isolation check
 
 
 
@@ -1502,7 +1502,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `enabled` _boolean_ | Whether primary isolation checking is enabled for the liveness probe |  | true |  |
+| `enabled` _boolean_ | Whether primary isolation checking is enabled |  | true |  |
 | `requestTimeout` _integer_ | Timeout in milliseconds for requests during the primary isolation check |  | 1000 |  |
 | `connectionTimeout` _integer_ | Timeout in milliseconds for connections during the primary isolation check |  | 1000 |  |
 
@@ -1610,7 +1610,7 @@ _Appears in:_
 | `successThreshold` _integer_ | Minimum consecutive successes for the probe to be considered successful after having failed.<br />Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1. |  |  |  |
 | `failureThreshold` _integer_ | Minimum consecutive failures for the probe to be considered failed after having succeeded.<br />Defaults to 3. Minimum value is 1. |  |  |  |
 | `terminationGracePeriodSeconds` _integer_ | Optional duration in seconds the pod needs to terminate gracefully upon probe failure.<br />The grace period is the duration in seconds after the processes running in the pod are sent<br />a termination signal and the time when the processes are forcibly halted with a kill signal.<br />Set this value longer than the expected cleanup time for your process.<br />If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this<br />value overrides the value provided by the pod spec.<br />Value must be non-negative integer. The value zero indicates stop immediately via<br />the kill signal (no opportunity to shut down).<br />This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.<br />Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset. |  |  |  |
-| `isolationCheck` _[IsolationCheckConfiguration](#isolationcheckconfiguration)_ | Configure the feature that extends the liveness probe for a primary<br />instance. In addition to the basic checks, this verifies whether the<br />primary is isolated from the Kubernetes API server and from its<br />replicas, ensuring that it can be safely shut down if network<br />partition or API unavailability is detected. Enabled by default. |  |  |  |
+| `isolationCheck` _[IsolationCheckConfiguration](#isolationcheckconfiguration)_ | Configure the primary isolation check, which verifies whether a primary<br />is isolated from both the Kubernetes API server and its replicas and<br />shuts it down when it is, so that it stops accepting writes it can no<br />longer safely serve. The check is driven by the age of the primary lease,<br />so its reaction time is set by the `primaryLease` timings rather than by<br />the liveness probe settings this stanza lives under. Enabled by default. |  |  |  |
 
 
 

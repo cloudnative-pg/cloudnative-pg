@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -449,7 +450,89 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(apierrors.IsConflict(err)).To(BeTrue())
 			Expect(acquired).To(BeFalse())
 		})
+
+	It("bounds the Get call so it cannot block past RenewDeadline when the API server is unreachable",
+		func(ctx context.Context) {
+			r := newRunnable(fake.NewClientset())
+			r.config.RenewDeadline = 50 * time.Millisecond
+			r.lock = &blockingLock{}
+
+			start := time.Now()
+			acquired, err := r.tryTakeOver(ctx)
+
+			// The lock never actually replies: the only way this call returns
+			// is the per-call timeout added around it, well before
+			// blockingLock's own 2s safety net would fire.
+			Expect(time.Since(start)).To(BeNumerically("<", time.Second))
+			Expect(acquired).To(BeFalse())
+			Expect(err).To(MatchError(context.DeadlineExceeded))
+		})
+
+	It("takes the lease over when the API server answers more slowly than the poll interval",
+		func(ctx context.Context) {
+			r := newRunnable(fake.NewClientset())
+			r.config.RetryPeriod = 20 * time.Millisecond
+			r.config.RenewDeadline = 600 * time.Millisecond
+			r.lock = &slowLock{getDelay: 400 * time.Millisecond}
+
+			acquired, err := r.tryTakeOver(ctx)
+
+			// The read answers above the poll interval and below the renew
+			// deadline, so it has to get through: a bound sized on RetryPeriod
+			// fails it on every poll and the take-over never happens.
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeTrue())
+		})
 })
+
+// slowLock is a resourcelock.Interface that answers, but only after getDelay,
+// simulating an API server under load rather than an unreachable one. The
+// record it returns has an empty holder, the cleanly-released state that
+// tryTakeOver claims straight away.
+type slowLock struct {
+	getDelay time.Duration
+}
+
+func (l *slowLock) Get(ctx context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case <-time.After(l.getDelay):
+		return &resourcelock.LeaderElectionRecord{HolderIdentity: ""}, nil, nil
+	}
+}
+
+func (*slowLock) Create(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*slowLock) Update(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*slowLock) RecordEvent(string)                                              {}
+
+// Identity is never empty: an empty identity would make the record read above
+// look like one we already hold, short-circuiting the claim under test.
+func (*slowLock) Identity() string { return "slow-lock" }
+func (*slowLock) Describe() string { return "slowLock" }
+
+// blockingLock is a resourcelock.Interface whose Get never replies on its
+// own, simulating an API server that accepts the connection but never
+// answers. It exists to prove tryTakeOver bounds the call itself rather
+// than depending on the caller's context already having a deadline.
+type blockingLock struct{}
+
+func (*blockingLock) Get(ctx context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case <-time.After(2 * time.Second):
+		// Safety net: fails the test with a clear message instead of
+		// hanging forever if the per-call bound regresses.
+		return nil, nil, errors.New("blockingLock.Get: not bounded by a per-call timeout")
+	}
+}
+
+func (*blockingLock) Create(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*blockingLock) Update(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*blockingLock) RecordEvent(string)                                              {}
+func (*blockingLock) Identity() string                                                { return "" }
+func (*blockingLock) Describe() string                                                { return "blockingLock" }
 
 var _ = Describe("classifyLeaseAfterRun", func() {
 	const ourIdentity = "test-cluster-1"
@@ -482,5 +565,52 @@ var _ = Describe("classifyLeaseAfterRun", func() {
 	It("treats our own identity as still held (transient blip, retry)", func() {
 		Expect(classifyLeaseAfterRun(nil, record(ourIdentity), ourIdentity)).
 			To(Equal(leaseStillHeld))
+	})
+})
+
+var _ = Describe("shouldStepDown", func() {
+	const ourIdentity = "test-cluster-1"
+
+	newCluster := func(enabled bool, instances int) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: instances,
+				Probes: &apiv1.ProbesConfiguration{
+					Liveness: &apiv1.LivenessProbe{
+						IsolationCheck: &apiv1.IsolationCheckConfiguration{
+							Enabled:           ptr.To(enabled),
+							RequestTimeout:    1000,
+							ConnectionTimeout: 1000,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("skips the check when isolation checking is disabled", func() {
+		stepDown, err := shouldStepDown(newCluster(false, 3), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("skips the check when the cluster has a single instance", func() {
+		stepDown, err := shouldStepDown(newCluster(true, 1), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("skips the check when no probes configuration is set", func() {
+		stepDown, err := shouldStepDown(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}, ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("fails open when the reachability checker cannot be built", func() {
+		// In the test environment there is no server CA certificate on disk,
+		// so building the checker fails; this must not be reported as a step-down.
+		stepDown, err := shouldStepDown(newCluster(true, 3), ourIdentity)
+		Expect(err).To(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
 	})
 })

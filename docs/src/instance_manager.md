@@ -225,14 +225,26 @@ spec:
 
 ### Primary Isolation
 
-CloudNativePG 1.27 introduces an additional behavior for the liveness
-probe of a PostgreSQL primary, which will report a failure if **both** of the
-following conditions are met:
+A primary that cannot reach the Kubernetes API server and has also lost contact
+with part of its cluster has lost the ability to tell a network partition from a
+cluster in which it has already been replaced. CloudNativePG **shuts such a
+primary down** so that it stops accepting writes, if **both** of the following
+conditions are met:
 
-1. The instance manager cannot reach the Kubernetes API server
-2. The instance manager cannot reach **any** other instance via the instance manager’s REST API
+1. The instance manager cannot renew the [primary lease](failover.md#safe-primary-election),
+   because it cannot reach the Kubernetes API server
+2. The instance manager cannot reach **at least one** of the other instances via
+   the instance manager's REST API, or an instance it can reach reports a
+   different instance as the target primary
 
-The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
+The second condition is deliberately conservative: a single instance the primary
+can no longer reach is enough, because a primary that has lost both the API
+server and a peer cannot rule out having been replaced.
+
+The check is driven by the primary lease. Once the lease has gone longer than
+its renew deadline without a successful renewal, the instance manager probes the
+other instances and, if they confirm the isolation, shuts PostgreSQL down
+immediately.
 
 It is **enabled by default** and can be disabled by adding the following:
 
@@ -245,9 +257,10 @@ spec:
 ```
 
 :::info[Important]
-    Be aware that the default liveness probe settings—automatically derived from `livenessProbeTimeout`—might
-    be aggressive (30 seconds). As such, we recommend explicitly setting the
-    liveness probe configuration to suit your environment.
+    The reaction time is set by the primary lease timings
+    (`.spec.primaryLease`), not by the liveness probe settings: with the
+    defaults the shutdown is requested within roughly 12 seconds of the last
+    successful lease renewal. The liveness probe periods have no effect on it.
 :::
 
 The spec also accepts two optional network settings: `requestTimeout`
@@ -266,10 +279,12 @@ spec:
 ```
 
 :::info
-Primary isolation is distinct from the [safe primary election](failover.md#safe-primary-election)
-mechanism. The isolation check *fences* a primary that has lost connectivity to
-both the API server and the other instances, while the primary lease coordinates
-*which instance is allowed to promote*. The two mechanisms are complementary.
+Primary isolation and [safe primary election](failover.md#safe-primary-election)
+are two uses of the same primary lease, and they answer different questions. The
+lease coordinates *which instance is allowed to promote*; the isolation check
+uses the age of that lease to decide *when the current primary has to stop*. The
+two are complementary, and disabling the isolation check leaves the lease
+coordinating promotions with no mechanism stopping an isolated primary.
 :::
 
 ## Readiness Probe

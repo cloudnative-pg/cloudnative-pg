@@ -237,6 +237,12 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	if err := r.instance.IsReady(); err != nil {
+		if errors.Is(err, postgresManagement.ErrNoConnectionEstablished) {
+			if shutDown, err := r.shutdownUnreachableOldPrimary(ctx, cluster); err != nil || shutDown {
+				return reconcile.Result{}, err
+			}
+		}
+
 		contextLogger.Info("Instance is still down, will retry in 1 second")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
@@ -639,6 +645,42 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 	<-ctx.Done()
 
 	cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
+
+	return true, nil
+}
+
+// shutdownUnreachableOldPrimary demotes this instance, shutting down PostgreSQL with no
+// attempt at a checkpoint, when it is configured as a primary but is no longer the target
+// primary according to the Cluster status, and PostgreSQL is not reachable.
+func (r *InstanceReconciler) shutdownUnreachableOldPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (shutDown bool, err error) {
+	contextLogger := log.FromContext(ctx)
+
+	if cluster.Status.TargetPrimary == r.instance.GetPodName() {
+		return false, nil
+	}
+
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil || !isPrimary {
+		return false, err
+	}
+
+	contextLogger.Info("This is an unreachable former primary instance. " +
+		"Demoting it by shutting it down immediately.")
+
+	// Skip straight to an immediate shutdown: PostgreSQL isn't reachable, so a checkpoint or a
+	// "fast" attempt would just burn through their own timeout waiting on a postmaster that
+	// can't respond, stalling the demotion of this old primary for no benefit.
+	r.Instance().RequestImmediateShutdown()
+
+	// We wait for the lifecycle manager to have received the immediate shutdown request
+	// and, having processed it, to request the termination of the instance manager.
+	// When the termination has been requested, this context will be cancelled.
+	<-ctx.Done()
+
+	cluster.LogTimestampsWithMessage(ctx, "Unreachable old primary shutdown complete")
 
 	return true, nil
 }
@@ -1208,10 +1250,12 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// previous holder did not release cleanly, in a single Acquire call. The
 	// runnable's preAcquire loop polls jitter-free every RetryPeriod and takes
 	// over a still-held lease once it has observed the record unchanged for a
-	// full LeaseDuration, so the take-over moment lands at most one RetryPeriod
-	// past LeaseDuration (the poll granularity). Sizing acquireTimeout to
-	// LeaseDuration + 3*RetryPeriod keeps that take-over inside a single
-	// Acquire call with margin for the take-over write and scheduling overhead.
+	// full LeaseDuration. Sizing acquireTimeout to LeaseDuration +
+	// 3*RetryPeriod keeps that take-over inside a single Acquire call, with
+	// margin for the poll granularity, the take-over write and scheduling
+	// overhead, as long as the API server answers promptly. It can be exceeded
+	// when the API server is slow, since a single poll is then budgeted up to
+	// RenewDeadline; the requeue below covers that case.
 	leaseDuration := cluster.GetPrimaryLeaseDuration()
 	retryPeriod := cluster.GetPrimaryLeaseRetryPeriod()
 	acquireTimeout := leaseDuration + 3*retryPeriod
