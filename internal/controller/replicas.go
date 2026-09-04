@@ -44,6 +44,10 @@ var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 // elapsed yet
 var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
 
+// ErrQuorumCheckFailed is raised when a failover can't complete because the quorum check no
+// longer guarantees that the elected candidate holds every acknowledged transaction
+var ErrQuorumCheckFailed = fmt.Errorf("quorum check failed, cannot complete the failover")
+
 // reconcileTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion.
 // Returns the name of the primary if any changes was made and any error encountered.
@@ -162,6 +166,19 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	// data that is being received (think about a switchover).
 	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
 		return "", ErrWalReceiversRunning
+	}
+
+	// Re-verify quorum safety right before failing over: the set of
+	// promotable replicas may have degraded since we committed to a failover,
+	// while we were waiting for the WAL receivers to go down.
+	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker && cluster.IsFailoverQuorumActive() {
+		safe, err := r.evaluateQuorumCheck(ctx, cluster, status)
+		if err != nil {
+			return "", err
+		}
+		if !safe {
+			return "", ErrQuorumCheckFailed
+		}
 	}
 
 	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker

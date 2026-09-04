@@ -424,7 +424,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
 
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		if cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 	}
 
 	if cluster.ShouldPromoteFromReplicaCluster() {
@@ -757,6 +759,10 @@ func (r *ClusterReconciler) handleSwitchover(
 		}
 		if errors.Is(err, ErrWalReceiversRunning) {
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
+		if errors.Is(err, ErrQuorumCheckFailed) {
+			contextLogger.Info("Quorum check no longer satisfied, waiting before completing the failover")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
