@@ -63,6 +63,62 @@ spec. If a user modifies role attributes directly in the database, the
 CloudNativePG operator will revert those changes during the next reconciliation
 cycle.
 
+## Membership reconciliation strategy
+
+By default, the operator keeps a role's memberships exactly in line with the
+`inRoles` list: missing memberships are granted with `GRANT`, and memberships
+that are present in the database but not listed in `inRoles` are revoked with
+`REVOKE`. This means any membership created out of band (manually, by an
+application, or by another operator) is removed on the next reconciliation.
+
+You can change this with the `inRolesUpdateStrategy` attribute, available in
+the `managed.roles` stanza:
+
+- **`replace`** (default): full reconciliation of memberships, as described
+  above.
+- **`additive`**: the operator only grants the memberships listed in
+  `inRoles` and never revokes existing memberships. Memberships granted out
+  of band are preserved.
+
+### Use case: `createrole_self_grant`
+
+Since PostgreSQL 16, the `createrole_self_grant` parameter lets a role
+with `CREATEROLE` automatically obtain `SET` and/or `INHERIT` memberships on
+every role it creates, for example:
+
+```yaml
+spec:
+  postgresql:
+    parameters:
+      createrole_self_grant: "set, inherit"
+```
+
+A role that creates roles this way (such as a DBaaS `admin` role) accumulates
+memberships that are not part of its specification. With the default
+`replace` strategy, the operator would revoke those memberships on the next
+reconciliation. Setting `inRolesUpdateStrategy: additive` on such a role
+stops the operator from touching the out-of-band memberships while still
+enforcing the ones you declare:
+
+```yaml
+spec:
+  managed:
+    roles:
+    - name: admin
+      login: true
+      createdb: true
+      createrole: true
+      inRolesUpdateStrategy: additive
+      inRoles:
+        - pg_read_all_data
+```
+
+:::caution
+With the `additive` strategy, removing a membership from `inRoles` does **not**
+revoke it: the operator only grants, it never revokes. To remove a membership,
+switch the role back to `replace` (or `REVOKE` it manually).
+:::
+
 ## Password management
 
 The declarative role management feature includes reconciling of role passwords.

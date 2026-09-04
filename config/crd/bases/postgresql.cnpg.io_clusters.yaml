@@ -3303,6 +3303,19 @@ spec:
                           items:
                             type: string
                           type: array
+                        inRolesUpdateStrategy:
+                          default: replace
+                          description: |-
+                            Strategy used to reconcile the role's memberships (inRoles).
+                            replace (the default) grants the memberships listed in inRoles and
+                            revokes any membership not listed there. additive only grants the
+                            memberships listed in inRoles and never revokes existing
+                            memberships, so memberships granted out of band (for example by the
+                            createrole_self_grant parameter) are preserved.
+                          enum:
+                          - replace
+                          - additive
+                          type: string
                         inherit:
                           default: true
                           description: |-

@@ -2366,6 +2366,26 @@ const (
 	EnsureAbsent  EnsureOption = "absent"
 )
 
+// InRolesUpdateStrategy describes how the operator reconciles the
+// memberships of a role (the list of roles it is a member of,
+// the `inRoles` attribute)
+// +kubebuilder:validation:Enum=replace;additive
+type InRolesUpdateStrategy string
+
+// values taken by InRolesUpdateStrategy
+const (
+	// InRolesUpdateStrategyReplace keeps the role's memberships exactly in
+	// line with `inRoles`: missing memberships are granted and memberships
+	// not listed in `inRoles` are revoked. This is the default behavior.
+	InRolesUpdateStrategyReplace InRolesUpdateStrategy = "replace"
+	// InRolesUpdateStrategyAdditive only grants the memberships listed in
+	// `inRoles`. Memberships that are present in the database but not
+	// listed in `inRoles` are left untouched, so memberships granted out of
+	// band (for example by the `createrole_self_grant` parameter) are
+	// preserved.
+	InRolesUpdateStrategyAdditive InRolesUpdateStrategy = "additive"
+)
+
 // ServiceSelectorType describes a valid value for generating the service selectors.
 // It indicates which type of service the selector applies to, such as read-write, read, or read-only
 // +kubebuilder:validation:Enum=rw;r;ro
@@ -2533,6 +2553,16 @@ type RoleConfiguration struct {
 	// immediately added as a new member. Default empty.
 	// +optional
 	InRoles []string `json:"inRoles,omitempty"`
+
+	// Strategy used to reconcile the role's memberships (inRoles).
+	// replace (the default) grants the memberships listed in inRoles and
+	// revokes any membership not listed there. additive only grants the
+	// memberships listed in inRoles and never revokes existing
+	// memberships, so memberships granted out of band (for example by the
+	// createrole_self_grant parameter) are preserved.
+	// +kubebuilder:default:="replace"
+	// +optional
+	InRolesUpdateStrategy InRolesUpdateStrategy `json:"inRolesUpdateStrategy,omitempty"`
 
 	// Whether a role "inherits" the privileges of roles it is a member of.
 	// Defaults is `true`.

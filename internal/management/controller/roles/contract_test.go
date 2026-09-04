@@ -105,6 +105,62 @@ var _ = Describe("DatabaseRole implementation test", func() {
 		Expect(res).To(BeFalse())
 	})
 
+	It("should return true in additive mode when the spec roles are a subset of the db roles", func() {
+		role := DatabaseRole{
+			Name: "abc",
+			InRoles: []string{
+				"role1", "Userrole2", "TestroleABC", "self_granted_role",
+			},
+		}
+		config := apiv1.RoleConfiguration{
+			Name:                  "abc",
+			InRoles:               []string{"Userrole2", "TestroleABC"},
+			InRolesUpdateStrategy: apiv1.InRolesUpdateStrategyAdditive,
+		}
+		res := role.isInSameRolesAs(config)
+		Expect(res).To(BeTrue())
+	})
+
+	It("should return false in additive mode when a spec role is missing from the db", func() {
+		role := DatabaseRole{
+			Name:    "abc",
+			InRoles: []string{"role1", "Userrole2"},
+		}
+		config := apiv1.RoleConfiguration{
+			Name:                  "abc",
+			InRoles:               []string{"role1", "TestroleABC"},
+			InRolesUpdateStrategy: apiv1.InRolesUpdateStrategyAdditive,
+		}
+		res := role.isInSameRolesAs(config)
+		Expect(res).To(BeFalse())
+	})
+
+	It("should return true in additive mode with an empty spec regardless of the db roles", func() {
+		role := DatabaseRole{
+			Name:    "abc",
+			InRoles: []string{"role1", "Userrole2"},
+		}
+		config := apiv1.RoleConfiguration{
+			Name:                  "abc",
+			InRolesUpdateStrategy: apiv1.InRolesUpdateStrategyAdditive,
+		}
+		res := role.isInSameRolesAs(config)
+		Expect(res).To(BeTrue())
+	})
+
+	It("should still require exact matches when no strategy is set", func() {
+		role := DatabaseRole{
+			Name:    "abc",
+			InRoles: []string{"role1", "Userrole2"},
+		}
+		config := apiv1.RoleConfiguration{
+			Name:    "abc",
+			InRoles: []string{"role1"},
+		}
+		res := role.isInSameRolesAs(config)
+		Expect(res).To(BeFalse())
+	})
+
 	It("Detects that spec and db role have the same ValidUntil", func() {
 		role := DatabaseRole{
 			Name:       "abc",

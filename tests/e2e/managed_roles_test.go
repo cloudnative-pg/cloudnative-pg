@@ -63,6 +63,34 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 		}
 	})
 
+	assertInRoles := func(namespace, primaryPod, roleName string, expectedRoles []string) {
+		slices.Sort(expectedRoles)
+		Eventually(func() []string {
+			var rolesInDB []string
+			query := `SELECT mem.inroles 
+				FROM pg_catalog.pg_authid as auth
+				LEFT JOIN (
+					SELECT string_agg(pg_catalog.pg_get_userbyid(roleid), ',') as inroles, member
+					FROM pg_catalog.pg_auth_members GROUP BY member
+				) mem ON member = oid
+				WHERE rolname =` + pq.QuoteLiteral(roleName)
+			stdout, _, err := exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   primaryPod,
+				},
+				postgres.PostgresDBName,
+				query)
+			if err != nil {
+				return []string{ERROR}
+			}
+			rolesInDB = strings.Split(strings.TrimSuffix(stdout, "\n"), ",")
+			slices.Sort(rolesInDB)
+			return rolesInDB
+		}, 30).Should(BeEquivalentTo(expectedRoles))
+	}
+
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
 			namespacePrefix        = "managed-roles"
@@ -99,34 +127,6 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 			})
 		})
-
-		assertInRoles := func(namespace, primaryPod, roleName string, expectedRoles []string) {
-			slices.Sort(expectedRoles)
-			Eventually(func() []string {
-				var rolesInDB []string
-				query := `SELECT mem.inroles 
-					FROM pg_catalog.pg_authid as auth
-					LEFT JOIN (
-						SELECT string_agg(pg_catalog.pg_get_userbyid(roleid), ',') as inroles, member
-						FROM pg_catalog.pg_auth_members GROUP BY member
-					) mem ON member = oid
-					WHERE rolname =` + pq.QuoteLiteral(roleName)
-				stdout, _, err := exec.QueryInInstancePod(
-					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
-						Namespace: namespace,
-						PodName:   primaryPod,
-					},
-					postgres.PostgresDBName,
-					query)
-				if err != nil {
-					return []string{ERROR}
-				}
-				rolesInDB = strings.Split(strings.TrimSuffix(stdout, "\n"), ",")
-				slices.Sort(rolesInDB)
-				return rolesInDB
-			}, 30).Should(BeEquivalentTo(expectedRoles))
-		}
 
 		assertRoleStatus := func(namespace, clusterName, query, expectedResult string) {
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -618,6 +618,103 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPod, postgres.PostgresDBName,
 					pgasserts.RoleExistsQuery(newUserName), "f"),
 					30).Should(Succeed())
+			})
+		})
+	})
+
+	Context("additive membership strategy", Ordered, func() {
+		const (
+			namespacePrefix = "additive-roles"
+			clusterManifest = fixturesDir + "/managed_roles/cluster-additive-roles.yaml.template"
+			adminRoleName   = "admin"
+			createdRoleName = "self_grant_tenant"
+		)
+		var clusterName, namespace string
+
+		BeforeAll(func() {
+			if env.PostgresVersion < 16 {
+				Skip("This test requires the createrole_self_grant parameter (PostgreSQL 16+)")
+			}
+
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("setting up cluster with an additive managed role", func() {
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
+			})
+		})
+
+		It("keeps createrole_self_grant memberships on an additive role", func() {
+			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating a role as the admin role to trigger the self-grant", func() {
+				// SET ROLE makes admin the creating role, so
+				// createrole_self_grant grants it SET and INHERIT
+				// memberships on the new role
+				query := fmt.Sprintf("SET ROLE %s; CREATE ROLE %s;",
+					pq.QuoteLiteral(adminRoleName), createdRoleName)
+				_, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryPod.Name,
+					},
+					postgres.PostgresDBName,
+					query)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("checking that the self-grant has been applied", func() {
+				query := fmt.Sprintf(`SELECT string_agg(inherit_option::text || '|' || set_option::text, ',')
+					FROM pg_catalog.pg_auth_members
+					WHERE member = (SELECT oid FROM pg_catalog.pg_authid WHERE rolname = %s)
+					AND roleid = (SELECT oid FROM pg_catalog.pg_authid WHERE rolname = %s)`,
+					pq.QuoteLiteral(adminRoleName), pq.QuoteLiteral(createdRoleName))
+				Eventually(func() string {
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
+							Namespace: namespace,
+							PodName:   primaryPod.Name,
+						},
+						postgres.PostgresDBName,
+						query)
+					if err != nil {
+						return ERROR
+					}
+					return strings.TrimSpace(stdout)
+				}, 30).Should(Equal("true|true"))
+			})
+
+			By("declaring a membership on the admin role to force a reconciliation", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				updated := cluster.DeepCopy()
+				for i, r := range updated.Spec.Managed.Roles {
+					if r.Name == adminRoleName {
+						updated.Spec.Managed.Roles[i].InRoles = []string{"pg_read_all_data"}
+					}
+				}
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("checking that the declared membership is granted and the self-grant is preserved", func() {
+				Eventually(func(g Gomega) {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(BeEmpty())
+				}, 30).Should(Succeed())
+				// the same reconciliation that grants pg_read_all_data must
+				// not revoke the out-of-band self_grant_tenant membership
+				assertInRoles(namespace, primaryPod.Name, adminRoleName,
+					[]string{"pg_read_all_data", createdRoleName})
 			})
 		})
 	})

@@ -1264,6 +1264,28 @@ _Appears in:_
 | `externalCluster` _string_ | The name of the externalCluster used for import | True |  |  |
 
 
+#### InRolesUpdateStrategy
+
+_Underlying type:_ _string_
+
+InRolesUpdateStrategy describes how the operator reconciles the
+memberships of a role (the list of roles it is a member of,
+the `inRoles` attribute)
+
+_Validation:_
+
+- Enum: [replace additive]
+
+_Appears in:_
+
+- [RoleConfiguration](#roleconfiguration)
+
+| Field | Description |
+| --- | --- |
+| `replace` | InRolesUpdateStrategyReplace keeps the role's memberships exactly in<br />line with `inRoles`: missing memberships are granted and memberships<br />not listed in `inRoles` are revoked. This is the default behavior.<br /> |
+| `additive` | InRolesUpdateStrategyAdditive only grants the memberships listed in<br />`inRoles`. Memberships that are present in the database but not<br />listed in `inRoles` are left untouched, so memberships granted out of<br />band (for example by the `createrole_self_grant` parameter) are<br />preserved.<br /> |
+
+
 #### InstanceID
 
 
@@ -2375,6 +2397,7 @@ _Appears in:_
 | `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
 | `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
 | `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty. |  |  |  |
+| `inRolesUpdateStrategy` _[InRolesUpdateStrategy](#inrolesupdatestrategy)_ | Strategy used to reconcile the role's memberships (inRoles).<br />replace (the default) grants the memberships listed in inRoles and<br />revokes any membership not listed there. additive only grants the<br />memberships listed in inRoles and never revokes existing<br />memberships, so memberships granted out of band (for example by the<br />createrole_self_grant parameter) are preserved. |  | replace | Enum: [replace additive] <br /> |
 | `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Defaults is `true`. |  | true |  |
 | `disablePassword` _boolean_ | DisablePassword indicates that a role's password should be set to NULL in Postgres |  |  |  |
 | `superuser` _boolean_ | Whether the role is a `superuser` who can override all access<br />restrictions within the database - superuser status is dangerous and<br />should be used only when really needed. You must yourself be a<br />superuser to create a new superuser. Defaults is `false`. |  |  |  |

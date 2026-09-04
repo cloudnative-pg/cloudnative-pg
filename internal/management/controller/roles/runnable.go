@@ -287,6 +287,11 @@ func getRoleMembershipDiff(
 		return nil, nil, err
 	}
 	rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
+	if dbRole.InRolesUpdateStrategy == apiv1.InRolesUpdateStrategyAdditive {
+		// additive strategy: never revoke memberships, only grant the
+		// ones listed in the spec
+		return rolesToGrant, nil, nil
+	}
 	rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
 	return rolesToGrant, rolesToRevoke, nil
 }

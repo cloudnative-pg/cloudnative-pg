@@ -58,17 +58,18 @@ func roleAdapterFromName(name string) roleConfigurationAdapter {
 // provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
 func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
 	dbRole := DatabaseRole{
-		Name:            role.Name,
-		Comment:         role.Comment,
-		Superuser:       role.Superuser,
-		CreateDB:        role.CreateDB,
-		CreateRole:      role.CreateRole,
-		Inherit:         role.GetRoleInherit(),
-		Login:           role.Login,
-		Replication:     role.Replication,
-		BypassRLS:       role.BypassRLS,
-		ConnectionLimit: role.ConnectionLimit,
-		InRoles:         role.InRoles,
+		Name:                  role.Name,
+		Comment:               role.Comment,
+		Superuser:             role.Superuser,
+		CreateDB:              role.CreateDB,
+		CreateRole:            role.CreateRole,
+		Inherit:               role.GetRoleInherit(),
+		Login:                 role.Login,
+		Replication:           role.Replication,
+		BypassRLS:             role.BypassRLS,
+		ConnectionLimit:       role.ConnectionLimit,
+		InRoles:               role.InRoles,
+		InRolesUpdateStrategy: role.InRolesUpdateStrategy,
 	}
 	switch {
 	case role.ValidUntil != nil:

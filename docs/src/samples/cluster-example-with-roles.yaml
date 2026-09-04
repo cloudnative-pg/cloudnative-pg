@@ -12,6 +12,13 @@ spec:
     - name: app
       createdb: true
       login: true
+    - name: admin
+      createdb: true
+      createrole: true
+      login: true
+      inRolesUpdateStrategy: additive
+      inRoles:
+        - pg_read_all_data
     - name: dante
       ensure: present
       comment: my database-side comment

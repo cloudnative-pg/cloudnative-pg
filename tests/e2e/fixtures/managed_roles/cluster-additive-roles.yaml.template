@@ -1,0 +1,33 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-additive-roles
+spec:
+  instances: 1 # this feature only requires a primary
+  imageName: "${POSTGRES_IMG}"
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  postgresql:
+    parameters:
+      createrole_self_grant: "set, inherit"
+  managed:
+    roles:
+    - name: admin
+      ensure: present
+      comment: DBaaS admin role
+      login: true
+      createdb: true
+      createrole: true
+      inRolesUpdateStrategy: additive
+      passwordSecret:
+        name: cluster-additive-roles-admin
+---
+apiVersion: v1
+data:
+  username: YWRtaW4=
+  password: YWRtaW4=
+kind: Secret
+metadata:
+  name: cluster-additive-roles-admin
+type: kubernetes.io/basic-auth

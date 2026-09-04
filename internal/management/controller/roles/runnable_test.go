@@ -682,6 +682,107 @@ var _ = Describe("Role synchronizer tests", func() {
 			Expect(rolesWithErrors).To(BeEmpty())
 		})
 
+		It("it will only grant, never revoke, membership with the additive strategy", func(ctx context.Context) {
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:                  "role_to_test2",
+						Superuser:             true,
+						Inherit:               ptr.To(true),
+						InRoles:               []string{"role1"},
+						InRolesUpdateStrategy: apiv1.InRolesUpdateStrategyAdditive,
+						Comment:               "This is a role to test with",
+						ConnectionLimit:       -1,
+					},
+				},
+			}
+			rows := sqlmock.NewRows([]string{
+				"inroles",
+			}).
+				AddRow([]byte(`{"inrole"}`))
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test2").WillReturnRows(rows)
+			mock.ExpectBegin()
+
+			// only the missing membership is granted, the out-of-band
+			// "inrole" membership is left untouched
+			mock.ExpectExec(`GRANT "role1" TO "role_to_test2"`).
+				WillReturnResult(sqlmock.NewResult(2, 3))
+
+			mock.ExpectCommit()
+
+			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test2": {
+					TransactionID: 11, // defined in the mock query to the DB above
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(rolesWithErrors).To(BeEmpty())
+		})
+
+		It("it considers the role reconciled in additive mode when all spec roles are members", func(ctx context.Context) {
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:                  "role_to_test2",
+						Superuser:             true,
+						Inherit:               ptr.To(true),
+						InRolesUpdateStrategy: apiv1.InRolesUpdateStrategyAdditive,
+						Comment:               "This is a role to test with",
+						ConnectionLimit:       -1,
+					},
+				},
+			}
+			// no further expectation: the out-of-band "inrole" membership
+			// makes the role reconciled, no query must be issued
+
+			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test2": {
+					TransactionID: 11, // defined in the mock query to the DB above
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(rolesWithErrors).To(BeEmpty())
+		})
+
+		It("getRoleMembershipDiff returns no revokes with the additive strategy", func(ctx context.Context) {
+			_, err := List(ctx, db)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			rows := sqlmock.NewRows([]string{"inroles"}).
+				AddRow([]byte(`{"foo","bar"}`))
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(rows)
+
+			role := roleConfigurationAdapter{RoleConfiguration: apiv1.RoleConfiguration{
+				Name:                  "role_to_test1",
+				InRoles:               []string{"foo", "baz"},
+				InRolesUpdateStrategy: apiv1.InRolesUpdateStrategyAdditive,
+			}}
+			dbRole := role.toDatabaseRole()
+			grants, revokes, err := getRoleMembershipDiff(ctx, db, role, dbRole)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(grants).To(ConsistOf("baz"))
+			Expect(revokes).To(BeEmpty())
+		})
+
+		It("getRoleMembershipDiff returns revokes with the default strategy", func(ctx context.Context) {
+			_, err := List(ctx, db)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			rows := sqlmock.NewRows([]string{"inroles"}).
+				AddRow([]byte(`{"foo","bar"}`))
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(rows)
+
+			role := roleConfigurationAdapter{RoleConfiguration: apiv1.RoleConfiguration{
+				Name:    "role_to_test1",
+				InRoles: []string{"foo", "baz"},
+			}}
+			dbRole := role.toDatabaseRole()
+			grants, revokes, err := getRoleMembershipDiff(ctx, db, role, dbRole)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(grants).To(ConsistOf("baz"))
+			Expect(revokes).To(ConsistOf("bar"))
+		})
+
 		It("it will call the updateComment method", func(ctx context.Context) {
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{

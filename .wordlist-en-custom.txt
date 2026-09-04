@@ -233,6 +233,9 @@ ImageVolumeSource
 ImportSource
 Infinoid
 InfoSec
+InRolesUpdateStrategy
+InRolesUpdateStrategyAdditive
+InRolesUpdateStrategyReplace
 InstanceID
 InstanceReportedState
 IsolationCheckConfiguration
@@ -1003,6 +1006,8 @@ impactful
 importsource
 inProgress
 inRoles
+inRolesUpdateStrategy
+inrolesupdatestrategy
 indistinctively
 inheritFromAzureAD
 inheritFromIAMRole
