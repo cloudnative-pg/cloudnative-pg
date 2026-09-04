@@ -2,6 +2,8 @@ module github.com/cloudnative-pg/cloudnative-pg/tests
 
 go 1.26.6
 
+toolchain go1.27.1
+
 replace github.com/cloudnative-pg/cloudnative-pg => ../
 
 require (
