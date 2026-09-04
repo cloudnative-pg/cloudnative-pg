@@ -135,7 +135,7 @@ var (
 	// ErrPgRejectingConnection postgres is alive, but rejecting connections
 	ErrPgRejectingConnection = fmt.Errorf("server is alive but rejecting connections")
 
-	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
+	// ErrNoConnectionEstablished no response was received from postgres
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
 
 	// ErrNoFreeWALSpace is returned when there isn't enough disk space
@@ -721,9 +721,9 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 
 // TryShuttingDownImmediate skips straight to an "immediate" shutdown request, with no
 // checkpoint and no "fast" attempt beforehand.
-// This is meant for a former primary whose PostgreSQL is unreachable: a checkpoint needs
-// a working connection we don't have, and a "fast" attempt would just burn through its
-// own timeout waiting on a postmaster that can't respond.
+// This is meant for a former primary whose PostgreSQL is unreachable: the checkpoint needs
+// a working connection we don't have, and a postmaster that stopped answering pg_isready is
+// not expected to complete the graceful shutdown that "fast" asks for.
 // Note: an immediate shutdown may lead to data loss.
 func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
@@ -1497,6 +1497,23 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 // checkpoint and no fast-shutdown attempt beforehand.
 func (instance *Instance) RequestImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownImmediate
+}
+
+// TryRequestImmediateShutdown behaves like RequestImmediateShutdown, but
+// never blocks: if the lifecycle manager's command loop isn't immediately
+// ready to receive (e.g. because it is itself shutting PostgreSQL down),
+// the request is dropped rather than waiting. It reports whether the
+// request was actually delivered. This is meant for callers that must
+// never be blocked by a lifecycle manager that turns out not to be
+// listening, since the command channel is unbuffered and a send on it
+// cannot be interrupted by a context cancellation.
+func (instance *Instance) TryRequestImmediateShutdown() bool {
+	select {
+	case instance.instanceCommandChan <- shutDownImmediate:
+		return true
+	default:
+		return false
+	}
 }
 
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
