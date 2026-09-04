@@ -761,6 +761,10 @@ func (r *ClusterReconciler) handleSwitchover(
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
+		if errors.Is(err, ErrQuorumCheckFailed) {
+			contextLogger.Info("Quorum check no longer satisfied, waiting before completing the failover")
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
 			"error", err)
