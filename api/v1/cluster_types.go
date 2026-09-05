@@ -2717,8 +2717,15 @@ type PluginStatus struct {
 //
 // The defaults of the CREATE ROLE command are applied
 // Reference: https://www.postgresql.org/docs/current/sql-createrole.html
+// +kubebuilder:validation:XValidation:rule="self.name != 'postgres'",message="the role name postgres is reserved"
+// +kubebuilder:validation:XValidation:rule="self.name != 'streaming_replica'",message="the role name streaming_replica is reserved"
+// +kubebuilder:validation:XValidation:rule="!self.name.startsWith('pg_')",message="role names starting with pg_ are reserved by PostgreSQL"
+// +kubebuilder:validation:XValidation:rule="!self.name.startsWith('cnpg_')",message="role names starting with cnpg_ are reserved by the operator"
+// +kubebuilder:validation:XValidation:rule="!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword",message="passwordSecret and disablePassword are mutually exclusive"
 type RoleConfiguration struct {
 	// Name of the role
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
 	Name string `json:"name"`
 
 	// Description of the role
@@ -2740,9 +2747,11 @@ type RoleConfiguration struct {
 
 	// If the role can log in, this specifies how many concurrent
 	// connections the role can make. `-1` (the default) means no limit.
+	// Matches the width of PostgreSQL's own `pg_authid.rolconnlimit` column (int4).
 	// +kubebuilder:default:=-1
+	// +kubebuilder:validation:Minimum=-1
 	// +optional
-	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
+	ConnectionLimit int32 `json:"connectionLimit,omitempty"`
 
 	// Date and time after which the role's password is no longer valid.
 	// When omitted, the password will never expire (default).
@@ -2769,19 +2778,22 @@ type RoleConfiguration struct {
 	// Whether the role is a `superuser` who can override all access
 	// restrictions within the database - superuser status is dangerous and
 	// should be used only when really needed. You must yourself be a
-	// superuser to create a new superuser. Defaults is `false`.
+	// superuser to create a new superuser. Default is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	Superuser bool `json:"superuser,omitempty"`
 
 	// When set to `true`, the role being defined will be allowed to create
-	// new databases. Specifying `false` (default) will deny a role the
+	// new databases. Default is `false`, which denies the role the
 	// ability to create databases.
+	// +kubebuilder:default:=false
 	// +optional
 	CreateDB bool `json:"createdb,omitempty"`
 
 	// Whether the role will be permitted to create, alter, drop, comment
 	// on, change the security label for, and grant or revoke membership in
 	// other roles. Default is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	CreateRole bool `json:"createrole,omitempty"`
 
@@ -2789,6 +2801,7 @@ type RoleConfiguration struct {
 	// attribute can be thought of as a user. Roles without this attribute
 	// are useful for managing database privileges, but are not users in
 	// the usual sense of the word. Default is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	Login bool `json:"login,omitempty"`
 
@@ -2799,11 +2812,13 @@ type RoleConfiguration struct {
 	// the `replication` attribute is a very highly privileged role, and
 	// should only be used on roles actually used for replication. Default
 	// is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	Replication bool `json:"replication,omitempty"`
 
 	// Whether a role bypasses every row-level security (RLS) policy.
 	// Default is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	BypassRLS bool `json:"bypassrls,omitempty"` // Row-Level Security
 }

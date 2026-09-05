@@ -54,14 +54,11 @@ const (
 )
 
 // DatabaseRoleSpec represents a role in Postgres
+//
+// The reserved-name and passwordSecret/disablePassword checks are inherited
+// from RoleConfiguration's own validation.
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="name is immutable"
 // +kubebuilder:validation:XValidation:rule="!has(self.ensure) || self.ensure != 'absent'",message="ensure: absent is not supported for DatabaseRole; delete the resource with databaseRoleReclaimPolicy: delete instead"
-// +kubebuilder:validation:XValidation:rule="self.name != 'postgres'",message="the role name postgres is reserved"
-// +kubebuilder:validation:XValidation:rule="self.name != 'streaming_replica'",message="the role name streaming_replica is reserved"
-// +kubebuilder:validation:XValidation:rule="!self.name.startsWith('pg_')",message="role names starting with pg_ are reserved by PostgreSQL"
-// +kubebuilder:validation:XValidation:rule="!self.name.startsWith('cnpg_')",message="role names starting with cnpg_ are reserved by the operator"
-// +kubebuilder:validation:XValidation:rule="self.name.size() != 0",message="role name must not be empty"
-// +kubebuilder:validation:XValidation:rule="!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword",message="passwordSecret and disablePassword are mutually exclusive"
 // +kubebuilder:validation:XValidation:rule="!has(self.clientCertificate) || !self.clientCertificate.enabled || self.login",message="clientCertificate requires the role to have login enabled"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
@@ -99,6 +96,7 @@ type ClientCertificateConfiguration struct {
 // ClientCertificateState holds the observed state of the generated TLS client certificate.
 type ClientCertificateState struct {
 	// Expiration is the expiration time of the generated client certificate, in RFC3339 format.
+	// +kubebuilder:validation:Format=date-time
 	// +optional
 	Expiration string `json:"expiration,omitempty"`
 

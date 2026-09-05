@@ -59,6 +59,7 @@ spec:
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               bypassrls:
+                default: false
                 description: |-
                   Whether a role bypasses every row-level security (RLS) policy.
                   Default is `false`.
@@ -102,15 +103,19 @@ spec:
                 description: |-
                   If the role can log in, this specifies how many concurrent
                   connections the role can make. `-1` (the default) means no limit.
-                format: int64
+                  Matches the width of PostgreSQL's own `pg_authid.rolconnlimit` column (int4).
+                format: int32
+                minimum: -1
                 type: integer
               createdb:
+                default: false
                 description: |-
                   When set to `true`, the role being defined will be allowed to create
-                  new databases. Specifying `false` (default) will deny a role the
+                  new databases. Default is `false`, which denies the role the
                   ability to create databases.
                 type: boolean
               createrole:
+                default: false
                 description: |-
                   Whether the role will be permitted to create, alter, drop, comment
                   on, change the security label for, and grant or revoke membership in
@@ -151,6 +156,7 @@ spec:
                   Default is `true`.
                 type: boolean
               login:
+                default: false
                 description: |-
                   Whether the role is allowed to log in. A role having the `login`
                   attribute can be thought of as a user. Roles without this attribute
@@ -159,6 +165,8 @@ spec:
                 type: boolean
               name:
                 description: Name of the role
+                maxLength: 63
+                minLength: 1
                 type: string
               passwordSecret:
                 description: |-
@@ -174,6 +182,7 @@ spec:
                 - name
                 type: object
               replication:
+                default: false
                 description: |-
                   Whether a role is a replication role. A role must have this
                   attribute (or be a superuser) in order to be able to connect to the
@@ -184,11 +193,12 @@ spec:
                   is `false`.
                 type: boolean
               superuser:
+                default: false
                 description: |-
                   Whether the role is a `superuser` who can override all access
                   restrictions within the database - superuser status is dangerous and
                   should be used only when really needed. You must yourself be a
-                  superuser to create a new superuser. Defaults is `false`.
+                  superuser to create a new superuser. Default is `false`.
                 type: boolean
               validUntil:
                 description: |-
@@ -206,6 +216,9 @@ spec:
             - message: 'ensure: absent is not supported for DatabaseRole; delete the
                 resource with databaseRoleReclaimPolicy: delete instead'
               rule: '!has(self.ensure) || self.ensure != ''absent'''
+            - message: clientCertificate requires the role to have login enabled
+              rule: '!has(self.clientCertificate) || !self.clientCertificate.enabled
+                || self.login'
             - message: the role name postgres is reserved
               rule: self.name != 'postgres'
             - message: the role name streaming_replica is reserved
@@ -214,13 +227,8 @@ spec:
               rule: '!self.name.startsWith(''pg_'')'
             - message: role names starting with cnpg_ are reserved by the operator
               rule: '!self.name.startsWith(''cnpg_'')'
-            - message: role name must not be empty
-              rule: self.name.size() != 0
             - message: passwordSecret and disablePassword are mutually exclusive
               rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
-            - message: clientCertificate requires the role to have login enabled
-              rule: '!has(self.clientCertificate) || !self.clientCertificate.enabled
-                || self.login'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up
@@ -238,6 +246,7 @@ spec:
                   expiration:
                     description: Expiration is the expiration time of the generated
                       client certificate, in RFC3339 format.
+                    format: date-time
                     type: string
                   message:
                     description: |-

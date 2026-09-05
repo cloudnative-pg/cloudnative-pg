@@ -127,7 +127,7 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 		Login:           inSpec.Login,
 		Replication:     inSpec.Replication,
 		BypassRLS:       inSpec.BypassRLS,
-		ConnectionLimit: inSpec.ConnectionLimit,
+		ConnectionLimit: int64(inSpec.ConnectionLimit),
 	}
 
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)

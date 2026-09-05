@@ -75,7 +75,7 @@ func DatabaseRoleFromConfiguration(config apiv1.RoleConfiguration, validUntilNul
 		Login:           config.Login,
 		Replication:     config.Replication,
 		BypassRLS:       config.BypassRLS,
-		ConnectionLimit: config.ConnectionLimit,
+		ConnectionLimit: int64(config.ConnectionLimit),
 		InRoles:         config.InRoles,
 	}
 	switch {
