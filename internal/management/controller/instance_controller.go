@@ -583,18 +583,26 @@ func (r *InstanceReconciler) verifyParametersForFollower(
 		return err
 	}
 
-	options := make(map[string]string)
-	for key, enforcedparam := range controldataParams {
-		clusterparam, found := clusterParams[key]
-		if !found {
-			continue
-		}
-		// if the values from `pg_controldata` are higher than the cluster spec,
-		// they are the safer choice, so set them in config
-		if enforcedparam > clusterparam {
-			options[key] = strconv.Itoa(enforcedparam)
+	// A parameter removed from the cluster spec would otherwise not be
+	// checked at all, letting the follower restart with the PostgreSQL
+	// default and abort recovery with "insufficient parameter settings"
+	// (#10395). Resolve the value the server will actually start with
+	// (usually its built-in default, since no configuration file sets the
+	// parameter anymore) and check against that. Blindly enforcing the
+	// pg_controldata value would instead make the written configuration
+	// permanently diverge from the cluster spec, triggering an endless
+	// restart loop.
+	for key := range controldataParams {
+		if _, found := clusterParams[key]; !found {
+			value, err := postgresManagement.LoadStartupParameterValue(r.instance.PgData, key)
+			if err != nil {
+				return err
+			}
+			clusterParams[key] = value
 		}
 	}
+
+	options := enforcedParametersToAlign(controldataParams, clusterParams)
 	if len(options) == 0 {
 		return nil
 	}
@@ -608,6 +616,25 @@ func (r *InstanceReconciler) verifyParametersForFollower(
 		return err
 	}
 	return nil
+}
+
+// enforcedParametersToAlign returns the hot standby sensitive parameters whose
+// value recorded in pg_controldata is higher than the value the instance is
+// going to start with, so that they can be kept at the pg_controldata value
+// in the local configuration: a standby cannot start with a value lower than
+// the one the primary is running with. A parameter missing from clusterParams
+// counts as zero.
+func enforcedParametersToAlign(controldataParams, clusterParams map[string]int) map[string]string {
+	options := make(map[string]string)
+	for key, enforcedparam := range controldataParams {
+		clusterparam := clusterParams[key]
+		// if the values from `pg_controldata` are higher than the cluster spec,
+		// they are the safer choice, so set them in config
+		if enforcedparam > clusterparam {
+			options[key] = strconv.Itoa(enforcedparam)
+		}
+	}
+	return options
 }
 
 // reconcileOldPrimary shuts down the instance in case it is an old primary
