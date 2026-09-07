@@ -47,12 +47,6 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "join [options]",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
-				Name:      clusterName,
-				Namespace: namespace,
-			})
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			// The fields in the instance are needed to correctly
@@ -104,6 +98,16 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	client, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		contextLogger.Error(err, "Error creating Kubernetes client")
+		return err
+	}
+
+	// Bootstrap can start before the operator writes Status.Certificates.
+	// Wait for it here. This also retries a failed Get, so the old
+	// PreRunE call to WaitForGetCluster is gone.
+	if err := management.WaitForClusterCertificates(ctx, client, ctrl.ObjectKey{
+		Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName(),
+	}); err != nil {
+		contextLogger.Error(err, "Error while waiting for the certificate status")
 		return err
 	}
 

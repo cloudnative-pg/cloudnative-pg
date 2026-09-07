@@ -165,3 +165,23 @@ func WaitForGetClusterWithClient(ctx context.Context, cli client.Client, cluster
 
 	return nil
 }
+
+// WaitForClusterCertificates waits until the operator writes the
+// certificate secret names in Cluster.Status.Certificates. It has no
+// time limit, because we do not know how long that reconcile takes.
+func WaitForClusterCertificates(ctx context.Context, cli client.Client, clusterObjectKey client.ObjectKey) error {
+	logger := log.FromContext(ctx).WithName("wait-for-cluster-certificates")
+
+	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		var cluster apiv1.Cluster
+		if err := cli.Get(ctx, clusterObjectKey, &cluster); err != nil {
+			logger.Warning("Encountered an error while checking certificate status. Will retry", "error", err.Error())
+			return false, nil
+		}
+		if cluster.Status.Certificates.ServerTLSSecret == "" {
+			logger.Info("Waiting for the operator to write the certificate status")
+			return false, nil
+		}
+		return true, nil
+	})
+}

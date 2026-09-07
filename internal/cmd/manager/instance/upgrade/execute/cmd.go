@@ -155,8 +155,12 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 	}
 
 	clusterObjectKey := ctrl.ObjectKey{Name: instance.GetClusterName(), Namespace: instance.GetNamespaceName()}
-	if err = management.WaitForGetClusterWithClient(ctx, client, clusterObjectKey); err != nil {
-		return err
+
+	// Bootstrap can start before the operator writes Status.Certificates.
+	// Wait for it here. This also retries a failed Get, so the old
+	// WaitForGetClusterWithClient call is gone.
+	if err := management.WaitForClusterCertificates(ctx, client, clusterObjectKey); err != nil {
+		return fmt.Errorf("error while waiting for the certificate status: %w", err)
 	}
 
 	// Download the cluster definition from the API server
