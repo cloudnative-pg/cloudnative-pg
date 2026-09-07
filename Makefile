@@ -372,27 +372,21 @@ distclean: clean ## Clean-up the work tree removing also cached tools binaries
 
 ##@ Tools
 
-## Location to install dependencies to
-$(LOCALBIN):
-	mkdir -p $(LOCALBIN)
-
 ## Tool Binaries
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+controller-gen: ## Download controller-gen locally if necessary.
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION))
 
 KUSTOMIZE = $(LOCALBIN)/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION))
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+envtest: ## Download envtest-setup locally if necessary.
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
 CRDREFDOCS = $(LOCALBIN)/crd-ref-docs
 crd-ref-docs: ## Download github.com/elastic/crd-ref-docs locally if necessary.
@@ -417,7 +411,12 @@ define go-install-tool
 @[ -f $(1) ] || { \
 set -e ;\
 echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
+for i in 1 2 3; do \
+	GOBIN=$(PROJECT_DIR)/bin go install $(2) && exit 0 ;\
+	echo "Retrying download of $(2) ($$i/3)" ;\
+	sleep 5 ;\
+done ;\
+exit 1 ;\
 }
 endef
 
