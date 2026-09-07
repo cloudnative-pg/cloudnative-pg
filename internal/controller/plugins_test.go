@@ -158,8 +158,8 @@ var _ = Describe("finalizeReconciliation", func() {
 	})
 
 	It("registers PhaseHealthy and propagates the requeue when plugins patch their statuses", func(ctx SpecContext) {
-		// setStatusPluginHook returns RequeueAfter=5s on every successful
-		// status patch. That requeue must NOT short-circuit the PhaseHealthy
+		// setStatusPluginHook returns RequeueAfter=5s whenever a plugin
+		// reports a status. That requeue must NOT short-circuit the PhaseHealthy
 		// registration: clusters with status-reporting plugins (e.g.
 		// barman-cloud) requeue every 5s in steady state and would otherwise
 		// never reach Healthy.

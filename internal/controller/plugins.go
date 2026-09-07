@@ -103,8 +103,8 @@ func setStatusPluginHook(
 // oscillating Phase between Healthy and the error phase. See #8582.
 //
 // The result is propagated from the underlying plugin operations so any
-// requeue they request (notably the 5s polling from setStatusPluginHook
-// after a successful status patch) is honored alongside the Healthy
+// requeue they request (notably the 5s polling setStatusPluginHook asks for
+// whenever a plugin reports a status) is honored alongside the Healthy
 // registration.
 func (r *ClusterReconciler) finalizeReconciliation(
 	ctx context.Context,
