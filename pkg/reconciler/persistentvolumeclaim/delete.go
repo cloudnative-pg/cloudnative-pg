@@ -24,9 +24,7 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -42,22 +40,19 @@ func EnsureInstancePVCGroupIsDeleted(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	// todo: this should not rely on expected cluster instance pvc but should fetch every possible pvc name
-	expectedPVCs := getExpectedPVCsFromCluster(cluster, name)
+	pvcs, err := GetInstancePVCs(ctx, c, name, namespace)
+	if err != nil {
+		return fmt.Errorf("getting instance PVCs to delete for %s: %w", name, err)
+	}
 
-	for _, expectedPVC := range expectedPVCs {
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      expectedPVC.name,
-				Namespace: namespace,
-			},
-		}
+	for i := range pvcs {
+		pvc := &pvcs[i]
 		contextLogger.Info("Deleting PVC", "pvc", pvc.Name)
 
-		if err := c.Delete(ctx, &pvc); err != nil {
+		if err := c.Delete(ctx, pvc); err != nil {
 			// Ignore if NotFound, otherwise report the error
 			if !apierrs.IsNotFound(err) {
-				return fmt.Errorf("scaling down node (%s pvc) %v: %w", expectedPVC.name, name, err)
+				return fmt.Errorf("deleting pvc %s for instance %s: %w", pvc.Name, name, err)
 			}
 		}
 	}
