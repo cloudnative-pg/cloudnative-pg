@@ -27,7 +27,7 @@ import (
 var _ = Describe("NewCmd", func() {
 	// An in-place instance manager upgrade re-execs this binary with the argv of
 	// the Pod, so a flag dropped in a newer release must still parse.
-	It("accepts the status-port-tls flag passed by Pods created before 1.30", func() {
+	It("accepts the status-port-tls flag passed by Pods created before 1.31", func() {
 		Expect(NewCmd().ParseFlags([]string{"--status-port-tls"})).To(Succeed())
 	})
 })

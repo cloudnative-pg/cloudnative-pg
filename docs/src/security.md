@@ -899,15 +899,6 @@ A client certificate can only be presented over a TLS connection, and the
 instance manager always serves the status port over TLS, so this protection is
 unconditional.
 
-:::warning
-Instances created by an operator older than v1.24 serve the status port over
-plain HTTP, and the operator no longer falls back to it: it cannot read their
-status, and while none of the cluster's ready instances is reachable the cluster
-is not reconciled at all: no rolling update is started, and Pods you delete are
-not recreated. Roll out such instances **before** upgrading the operator, so
-their Pods are recreated with a TLS-enabled status port.
-:::
-
 ### PostgreSQL
 
 The current implementation of CloudNativePG automatically creates

@@ -303,7 +303,7 @@ var _ = Describe("automountServiceAccountToken drift detection", func() {
 var _ = Describe("Command comparison", func() {
 	baseCommand := []string{"/controller/manager", "instance", "run"}
 
-	It("ignores the status-port-tls flag carried by Pods created before 1.30", func() {
+	It("ignores the status-port-tls flag carried by Pods created before 1.31", func() {
 		current := corev1.Container{Command: append(slices.Clone(baseCommand), "--status-port-tls")}
 		target := corev1.Container{Command: baseCommand}
 
