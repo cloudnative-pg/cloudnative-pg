@@ -21,144 +21,78 @@ package probes
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/watchdog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 type livenessExecutor struct {
-	cache    *ClusterCache
-	instance *postgres.Instance
+	cache         *ClusterCache
+	instance      *postgres.Instance
+	leaseWatchdog *watchdog.LeaseWatchdog
 }
 
-// NewLivenessChecker creates a new instance of the liveness probe checker
+// NewLivenessChecker creates a new instance of the liveness probe checker.
+// leaseWatchdog reports whether the primary-lease loop (see
+// internal/cmd/manager/instance/run/lease) is still attempting work; it does
+// not fence on lease renewal failures alone, since a primary that cannot
+// reach the API server but has confirmed via checkStepDown that it should
+// stay primary must keep running.
 func NewLivenessChecker(
 	instance *postgres.Instance,
 	cache *ClusterCache,
+	leaseWatchdog *watchdog.LeaseWatchdog,
 ) Checker {
 	return &livenessExecutor{
-		cache:    cache,
-		instance: instance,
+		cache:         cache,
+		instance:      instance,
+		leaseWatchdog: leaseWatchdog,
 	}
 }
 
+// IsHealthy fails the liveness probe in the two cases the primary lease and
+// fencing logic cannot recover from on their own:
+//
+//  1. The primary-lease loop has stopped attempting work altogether (a stuck
+//     goroutine, e.g. a deadlock) - as opposed to merely failing to renew,
+//     which is an expected, separately handled condition. leaseWatchdog only
+//     flags this once this instance has actually acquired the lease at least
+//     once, so replicas (and a primary still competing for the lease for the
+//     first time) are never fenced by it. Besides failing the probe, this
+//     also makes a best-effort attempt to shut PostgreSQL down immediately
+//     itself: the stuck goroutine is typically the lease loop specifically,
+//     not the whole process, so the lifecycle manager's command loop is
+//     usually still able to act on this without waiting for the kubelet to
+//     kill the container (which can take far longer than the primary lease
+//     is willing to wait before a challenger takes over).
+//  2. PostgreSQL was asked to shut down immediately (e.g. because this
+//     primary had to step down) but did not honor it within its configured
+//     timeout - e.g. a backend or the postmaster stuck in an uninterruptible
+//     state, or stopped via SIGSTOP. The kubelet's forceful Pod termination
+//     succeeds where the signal-based shutdown request did not.
 func (e *livenessExecutor) IsHealthy(
 	ctx context.Context,
 	w http.ResponseWriter,
 ) {
 	contextLogger := log.FromContext(ctx)
 
-	isPrimary, isPrimaryErr := e.instance.IsPrimary()
-	if isPrimaryErr != nil {
-		contextLogger.Error(
-			isPrimaryErr,
-			"Error while checking the instance role, skipping automatic shutdown.")
-		_, _ = fmt.Fprint(w, "OK")
-		return
-	}
-
-	if !isPrimary {
-		// There's no need to restart a replica if isolated
-		_, _ = fmt.Fprint(w, "OK")
-		return
-	}
-
-	var cluster apiv1.Cluster
-	err := e.cache.tryGetLatestClusterWithTimeout(ctx, &cluster)
-	if err == nil {
-		// We correctly reached the API server but, as a failsafe measure, we
-		// exercise the reachability checker and leave a log message if something
-		// is not right.
-		// In this way, a network configuration problem can be discovered as
-		// quickly as possible.
-		if err := evaluateLivenessPinger(ctx, cluster); err != nil {
-			contextLogger.Warning(
-				"Instance connectivity error - liveness probe succeeding because "+
-					"the API server is reachable",
-				"err",
-				err.Error(),
-			)
+	if err := e.leaseWatchdog.IsHealthy(); err != nil {
+		contextLogger.Warning("liveness probe failing: primary lease loop stuck", "err", err.Error())
+		if e.instance.TryRequestImmediateShutdown() {
+			contextLogger.Warning("requested immediate PostgreSQL shutdown due to stuck primary lease loop")
 		}
-		_, _ = fmt.Fprint(w, "OK")
+		http.Error(w, fmt.Sprintf("primary lease loop stuck: %s", err), http.StatusInternalServerError)
+		return
+	}
+	if e.instance.IsImmediateShutdownUnresponsive() {
+		contextLogger.Warning("liveness probe failing: PostgreSQL unresponsive to immediate shutdown")
+		http.Error(w, "PostgreSQL unresponsive to immediate shutdown", http.StatusInternalServerError)
 		return
 	}
 
-	contextLogger = contextLogger.WithValues("apiServerReachable", false,
-		"apiServerErr", err.Error())
-
-	if cluster.Name == "" {
-		// We were never able to download a cluster definition. This should not
-		// happen because we check the API server connectivity as soon as the
-		// instance manager starts, before starting the probe web server.
-		//
-		// To be safe, we classify this instance manager to be not isolated and
-		// postpone any decision to a later liveness probe call.
-		contextLogger.Warning(
-			"No cluster definition has been received, skipping automatic shutdown.")
-
-		_, _ = fmt.Fprint(w, "OK")
-		return
-	}
-
-	if err = evaluateLivenessPinger(ctx, cluster); err != nil {
-		contextLogger.Error(err, "Instance connectivity error - liveness probe failing")
-		http.Error(
-			w,
-			fmt.Sprintf("liveness check failed: %s", err.Error()),
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
-	contextLogger.Trace(
-		"Instance connectivity test succeeded - liveness probe succeeding",
-		"latestKnownInstancesReportedState", cluster.Status.InstancesReportedState,
-	)
 	_, _ = fmt.Fprint(w, "OK")
-}
-
-func evaluateLivenessPinger(
-	ctx context.Context,
-	cluster apiv1.Cluster,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	var cfg *apiv1.IsolationCheckConfiguration
-	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
-		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
-	}
-	if cfg == nil {
-		return nil
-	}
-
-	// This should never happen given that we set a default value. Fail fast.
-	if cfg.Enabled == nil {
-		return errors.New("enabled field is not set in the liveness isolation check configuration")
-	}
-
-	if !*cfg.Enabled {
-		contextLogger.Debug("pinger config not enabled, skipping")
-		return nil
-	}
-
-	if cluster.Spec.Instances == 1 {
-		contextLogger.Debug("Only one instance present in the latest known cluster definition. Skipping automatic shutdown.")
-		return nil
-	}
-
-	checker, err := buildInstanceReachabilityChecker(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to build instance reachability checker: %w", err)
-	}
-
-	if err := checker.ensureInstancesAreReachable(&cluster); err != nil {
-		return fmt.Errorf("liveness check failed: %w", err)
-	}
-
-	return nil
 }
