@@ -238,7 +238,9 @@ func (r *InstanceReconciler) Reconcile(
 
 	if err := r.instance.IsReady(); err != nil {
 		if errors.Is(err, postgresManagement.ErrNoConnectionEstablished) {
-			if shutDown, err := r.reconcileOldPrimary(ctx, cluster, true); err != nil || shutDown {
+			// This never reports a completed shutdown: an unreachable instance is not
+			// waited for, it is requeued below like any other instance that is down.
+			if _, err := r.reconcileOldPrimary(ctx, cluster, true); err != nil {
 				return reconcile.Result{}, err
 			}
 		}
@@ -649,38 +651,39 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 		// shutdown is used, skipping fast and its checkpoint, because there is no
 		// reachable backend to run one against.
 		//
-		// The request must not block. PostgreSQL being unreachable says nothing about
-		// the lifecycle manager still listening on the command channel: a postmaster
-		// wedged long enough to stop answering pg_isready while the lifecycle manager
-		// is already shutting it down on its own (the SIGTERM path) leaves nobody
-		// receiving. Since the channel is unbuffered and no context cancellation can
-		// interrupt a send, blocking here would park this reconcile goroutine for good.
-		// This controller runs with a single worker, so that one park would also stop
-		// every later reconciliation. A request that cannot be delivered right now is
-		// dropped and retried on the next loop instead.
+		// Neither the request nor its outcome may park this goroutine, and both would
+		// if we let them. PostgreSQL being unreachable says nothing about the lifecycle
+		// manager still listening on the command channel: a postmaster wedged long
+		// enough to stop answering pg_isready while the lifecycle manager is already
+		// shutting it down on its own (the SIGTERM path) leaves nobody receiving, and
+		// the channel is unbuffered. A postmaster that is not processing signals at all
+		// never completes the immediate shutdown either: pg_ctl gives up on its own, the
+		// lifecycle manager logs the failure and carries on, and so the instance manager
+		// is never asked to terminate and this context is never cancelled. Since the
+		// controller runs a single worker, parking on either account stops every later
+		// reconciliation, the retries of this very demotion included. So we request what
+		// can be requested now and leave the caller to requeue.
 		if !r.Instance().TryRequestImmediateShutdown() {
 			contextLogger.Info("The lifecycle manager is not ready to receive the shutdown request, will retry")
-			return false, nil
 		}
-	} else {
-		contextLogger.Info("This is the former primary instance. Shutting it down to allow it to be demoted to a replica.")
 
-		// Perform a fast shutdown on the instance and wait for the instance manager to stop.
-		// The fast shutdown process will be preceded by a CHECKPOINT.
-		// When the Pod restarts, it will be demoted to act as a replica of the new primary.
-		r.Instance().RequestFastImmediateShutdown()
+		return false, nil
 	}
+
+	contextLogger.Info("This is the former primary instance. Shutting it down to allow it to be demoted to a replica.")
+
+	// Perform a fast shutdown on the instance and wait for the instance manager to stop.
+	// The fast shutdown process will be preceded by a CHECKPOINT.
+	// When the Pod restarts, it will be demoted to act as a replica of the new primary.
+	r.Instance().RequestFastImmediateShutdown()
 
 	// We wait for the lifecycle manager to have received the shutdown request
 	// and, having processed it, to request the termination of the instance manager.
 	// When the termination has been requested, this context will be cancelled.
+	// A fast shutdown of a reachable instance does complete, so this wait ends.
 	<-ctx.Done()
 
-	if unreachable {
-		cluster.LogTimestampsWithMessage(ctx, "Unreachable old primary shutdown complete")
-	} else {
-		cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
-	}
+	cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
 
 	return true, nil
 }
