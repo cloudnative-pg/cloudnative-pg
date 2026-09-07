@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -1523,5 +1524,159 @@ var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 
 	It("returns nil for an object that does not reference a cluster", func(ctx SpecContext) {
 		Expect(mapClusterOwnedResourceToCluster(ctx, &corev1.Secret{})).To(BeNil())
+	})
+})
+
+var _ = Describe("deleteTerminatedPods with a stuck running Pod (#9770)", func() {
+	var env *testingEnvironment
+	var namespace string
+	var cluster *apiv1.Cluster
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+		cluster = newFakeCNPGCluster(env.client, namespace)
+	})
+
+	// newInstancePod builds an instance Pod, stores it in the fake client and
+	// applies the given status.
+	newInstancePod := func(ctx SpecContext, serial int, status corev1.PodStatus) *corev1.Pod {
+		pod, err := specs.NewInstance(ctx, *cluster, serial, true)
+		Expect(err).ToNot(HaveOccurred())
+		pod.Namespace = namespace
+		Expect(env.client.Create(ctx, pod)).To(Succeed())
+		pod.Status = status
+		return pod
+	}
+
+	stuckStatus := func(finishedAgo time.Duration) corev1.PodStatus {
+		return corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: specs.PostgresContainerName,
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode:   0,
+							Reason:     "Completed",
+							FinishedAt: metav1.NewTime(time.Now().Add(-finishedAgo)),
+						},
+					},
+				},
+			},
+			InitContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:    "plugin-sidecar",
+					Started: ptr.To(true),
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
+					},
+				},
+			},
+		}
+	}
+
+	It("deletes a running Pod whose postgres container terminated beyond the grace period", func(ctx SpecContext) {
+		pod := newInstancePod(ctx, 1, stuckStatus(10*time.Minute))
+		resources := &managedResources{instances: corev1.PodList{Items: []corev1.Pod{*pod}}}
+
+		res, err := env.clusterReconciler.deleteTerminatedPods(ctx, cluster, resources)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).ToNot(BeNil())
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods, client.InNamespace(namespace))).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "the stuck Pod should have been deleted")
+	})
+
+	It("leaves a Pod alone while the postgres container is within the grace period", func(ctx SpecContext) {
+		pod := newInstancePod(ctx, 1, stuckStatus(time.Minute))
+		resources := &managedResources{instances: corev1.PodList{Items: []corev1.Pod{*pod}}}
+
+		res, err := env.clusterReconciler.deleteTerminatedPods(ctx, cluster, resources)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeNil())
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods, client.InNamespace(namespace))).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1))
+	})
+
+	It("still deletes Pods in a terminated phase", func(ctx SpecContext) {
+		pod := newInstancePod(ctx, 1, corev1.PodStatus{Phase: corev1.PodSucceeded})
+		resources := &managedResources{instances: corev1.PodList{Items: []corev1.Pod{*pod}}}
+
+		res, err := env.clusterReconciler.deleteTerminatedPods(ctx, cluster, resources)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).ToNot(BeNil())
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods, client.InNamespace(namespace))).To(Succeed())
+		Expect(pods.Items).To(BeEmpty())
+	})
+})
+
+var _ = Describe("isPodStuckWithTerminatedPostgres", func() {
+	now := time.Now()
+
+	podWithPostgresState := func(phase corev1.PodPhase, state corev1.ContainerState) *corev1.Pod {
+		return &corev1.Pod{
+			Status: corev1.PodStatus{
+				Phase: phase,
+				ContainerStatuses: []corev1.ContainerStatus{
+					{Name: specs.PostgresContainerName, State: state},
+				},
+			},
+		}
+	}
+
+	terminated := func(finishedAgo time.Duration) corev1.ContainerState {
+		return corev1.ContainerState{
+			Terminated: &corev1.ContainerStateTerminated{
+				ExitCode:   0,
+				FinishedAt: metav1.NewTime(now.Add(-finishedAgo)),
+			},
+		}
+	}
+
+	It("detects a postgres container terminated beyond the grace period", func() {
+		pod := podWithPostgresState(corev1.PodRunning, terminated(10*time.Minute))
+		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeTrue())
+	})
+
+	It("ignores a postgres container terminated within the grace period", func() {
+		pod := podWithPostgresState(corev1.PodRunning, terminated(time.Minute))
+		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
+	})
+
+	It("ignores a running postgres container", func() {
+		pod := podWithPostgresState(corev1.PodRunning, corev1.ContainerState{
+			Running: &corev1.ContainerStateRunning{},
+		})
+		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
+	})
+
+	It("ignores a postgres container waiting to be restarted by the kubelet", func() {
+		pod := podWithPostgresState(corev1.PodRunning, corev1.ContainerState{
+			Waiting: &corev1.ContainerStateWaiting{Reason: "CrashLoopBackOff"},
+		})
+		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
+	})
+
+	It("ignores Pods in a non-running phase", func() {
+		pod := podWithPostgresState(corev1.PodSucceeded, terminated(10*time.Minute))
+		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
+	})
+
+	It("ignores a terminated postgres container without a termination timestamp", func() {
+		pod := podWithPostgresState(corev1.PodRunning, corev1.ContainerState{
+			Terminated: &corev1.ContainerStateTerminated{ExitCode: 0},
+		})
+		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
+	})
+
+	It("ignores Pods without a postgres container", func() {
+		pod := &corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodRunning}}
+		Expect(isPodStuckWithTerminatedPostgres(pod, now)).To(BeFalse())
 	})
 })
