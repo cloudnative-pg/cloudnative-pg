@@ -41,6 +41,9 @@ spec:
       synchronizeLogicalDecoding: true
 
   postgresql:
+    synchronous:
+      method: any
+      number: 1
     parameters:
       hot_standby_feedback: 'on'
       sync_replication_slots: 'on'

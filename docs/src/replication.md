@@ -692,6 +692,9 @@ from that of the node where the primary is:
 spec:
   instances: 3
   postgresql:
+    synchronous:
+      method: any
+      number: 1
     syncReplicaElectionConstraint:
       enabled: true
       nodeLabelsAntiAffinity:

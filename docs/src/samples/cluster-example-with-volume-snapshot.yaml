@@ -4,6 +4,12 @@ metadata:
   name: cluster-example-with-volume-snapshot
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   primaryUpdateStrategy: unsupervised
 
   # Persistent storage configuration
