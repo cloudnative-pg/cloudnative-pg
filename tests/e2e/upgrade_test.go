@@ -309,7 +309,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return err
 		}
 		for _, pod := range pods.Items {
-			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod, true)
+			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod)
 			if err != nil {
 				continue
 			}

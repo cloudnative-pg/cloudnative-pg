@@ -1470,7 +1470,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster)
 	}
 
-	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial, true)
+	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to build replica instance: %w", err)
 	}
@@ -1728,7 +1728,7 @@ func findInstancePodToCreate(
 		if err != nil {
 			return nil, err
 		}
-		return specs.NewInstance(ctx, *cluster, serial, true)
+		return specs.NewInstance(ctx, *cluster, serial)
 	}
 
 	return nil, nil

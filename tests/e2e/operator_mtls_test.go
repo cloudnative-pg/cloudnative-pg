@@ -22,7 +22,6 @@ package e2e
 import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	remoteClient "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -68,13 +67,12 @@ var _ = Describe("Operator mTLS authentication", Label(tests.LabelSecurity), fun
 			Expect(podList.Items).ToNot(BeEmpty())
 
 			pod := podList.Items[0]
-			tlsEnabled := remoteClient.GetStatusSchemeFromPod(&pod).IsHTTPS()
 
 			// /pg/status is unauthenticated: proves the pod is reachable and the API
 			// server proxy credentials are valid. If this fails, the next assertion
 			// would be meaningless.
 			By("confirming the unauthenticated status endpoint is reachable", func() {
-				_, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod, tlsEnabled)
+				_, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -82,7 +80,7 @@ var _ = Describe("Operator mTLS authentication", Label(tests.LabelSecurity), fun
 			// must be rejected. Since /pg/status succeeded above, any error here is
 			// caused by our middleware, not by a network or credentials issue.
 			By("confirming the authenticated pgcontroldata endpoint rejects unauthenticated access", func() {
-				_, err := proxy.RetrievePgControlDataFromInstance(env.Ctx, env.Interface, pod, tlsEnabled)
+				_, err := proxy.RetrievePgControlDataFromInstance(env.Ctx, env.Interface, pod)
 				Expect(err).To(HaveOccurred())
 				Expect(apierrors.IsUnauthorized(err)).To(BeTrue(),
 					"expected a 401 from the operator-auth middleware, got: %v", err)

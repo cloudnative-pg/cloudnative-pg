@@ -69,7 +69,7 @@ var _ = Describe("reconcilePods instance recreation while a PVC is terminating (
 		}
 
 		readyPod := func(serial int) *corev1.Pod {
-			pod, err := specs.NewInstance(ctx, *cluster, serial, true)
+			pod, err := specs.NewInstance(ctx, *cluster, serial)
 			Expect(err).ToNot(HaveOccurred())
 			pod.Status = corev1.PodStatus{
 				Phase:      corev1.PodRunning,
@@ -154,7 +154,7 @@ var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminat
 		cluster.Status.ReadyInstances = 2
 
 		readyPod := func(serial int) *corev1.Pod {
-			pod, err := specs.NewInstance(ctx, *cluster, serial, true)
+			pod, err := specs.NewInstance(ctx, *cluster, serial)
 			Expect(err).ToNot(HaveOccurred())
 			pod.Status = corev1.PodStatus{
 				Phase:      corev1.PodRunning,
@@ -341,7 +341,7 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 		cluster.Status.TargetPrimary = primaryName
 		cluster.Status.DanglingPVC = []string{replicaName}
 
-		primaryPod, err := specs.NewInstance(ctx, *cluster, 1, true)
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		primaryPod.Status = corev1.PodStatus{
 			Phase:      corev1.PodRunning,
@@ -615,7 +615,7 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 		cluster.Status.TargetPrimary = primaryName
 		cluster.Status.DanglingPVC = []string{replicaName}
 
-		primaryPod, err := specs.NewInstance(ctx, *cluster, 1, true)
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		primaryPod.Status = corev1.PodStatus{
 			Phase:      corev1.PodRunning,
@@ -706,7 +706,7 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 		cluster.Status.TargetPrimary = primaryName
 		cluster.Status.DanglingPVC = []string{replicaName}
 
-		primaryPod, err := specs.NewInstance(ctx, *cluster, 1, true)
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		primaryPod.Status = corev1.PodStatus{
 			Phase:      corev1.PodRunning,
@@ -757,7 +757,7 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 		// An incomplete PVC group is classified unusable, not dangling.
 		cluster.Status.UnusablePVC = []string{replicaName}
 
-		primaryPod, err := specs.NewInstance(ctx, *cluster, 1, true)
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		primaryPod.Status = corev1.PodStatus{
 			Phase:      corev1.PodRunning,
@@ -1070,7 +1070,7 @@ var _ = Describe("Updating target primary", func() {
 			}
 
 			By("creating a pod for instance 1 only (instance 2's pod was deleted during rolling update)")
-			pod1, err := specs.NewInstance(ctx, *cluster, 1, true)
+			pod1, err := specs.NewInstance(ctx, *cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.SetInheritedDataAndOwnership(&pod1.ObjectMeta)
 			Expect(env.client.Create(ctx, pod1)).To(Succeed())

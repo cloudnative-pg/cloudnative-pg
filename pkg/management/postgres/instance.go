@@ -225,9 +225,6 @@ type Instance struct {
 	// tablespaceSynchronizerChan is used to send tablespace configuration to the tablespace synchronizer
 	tablespaceSynchronizerChan chan map[string]apiv1.TablespaceConfiguration
 
-	// StatusPortTLS enables TLS on the status port used to communicate with the operator
-	StatusPortTLS bool
-
 	// MetricsPortTLS enables TLS on the port used to publish metrics over HTTP/HTTPS
 	MetricsPortTLS bool
 

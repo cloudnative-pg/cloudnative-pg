@@ -399,22 +399,13 @@ sensitive endpoints of the instance manager's status port (backup,
 `pg_controldata`, partial WAL archive, and instance-manager upgrade) by pinning
 an in-memory client certificate. This is enabled automatically and requires no
 configuration. Status, health, and probe endpoints remain unauthenticated.
-This hardening is not backported; on releases earlier than 1.30.0, continue to
-restrict the status port (TCP 8000) with a `NetworkPolicy`, which remains its
-security boundary there. See
+This protection has a hard requirement: the status port **must** be served
+over TLS, which has been the default since v1.24. This hardening is not
+backported; on releases earlier than 1.30.0, continue to restrict the status
+port (TCP 8000) with a `NetworkPolicy`, which remains its security boundary
+there. See
 [Operator-to-instance authentication](security.md#operator-to-instance-authentication)
 for details.
-
-:::warning
-This protection has a hard requirement: the status port **must** be served over
-TLS, which has been the default since v1.24. Instances created by an operator
-older than v1.24 serve the status port over plain HTTP; once their instance
-manager is upgraded to 1.30.0 the operator can no longer authenticate to them
-and every call to the protected endpoints is **permanently** rejected with
-`401 Unauthorized`. If you still run such instances, perform a rolling update so
-their Pods are recreated with a TLS-enabled status port. Instances created by
-v1.24 or later are unaffected.
-:::
 
 #### Metrics exporter privilege separation (`CVE-2026-44477`)
 
