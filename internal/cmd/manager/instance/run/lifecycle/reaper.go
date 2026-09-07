@@ -43,7 +43,7 @@ import (
 // 1 - a child process we manually executed via `exec.Cmd` (i.e. the postmaster) exited
 // 2 - a postmaster worker process terminated after the postmaster itself
 //
-// The second condition may seem unlikely but it unfortunately happens everytime
+// The second condition may seem unlikely but it unfortunately happens every time
 // the postmaster ends, even if just for the logging collector subprocess.
 //
 // As we can see in the postgres codebase (see [1]) the logging collector process
@@ -52,7 +52,7 @@ import (
 // postmaster and we'll receive a SIGCHLD.
 //
 // If we don't collect the logging collector exit code we would get a
-// zombie process everytime we restart the postmaster.
+// zombie process every time we restart the postmaster.
 //
 // Anyway, if we just accept any SIGCHLD signal, we would break the internals
 // of `os.exec.Command` preventing the detection of the exit code of the child

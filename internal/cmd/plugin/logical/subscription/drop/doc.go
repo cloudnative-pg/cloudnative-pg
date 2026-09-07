@@ -17,5 +17,5 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package drop contains the implementatoin of the cnpg subscription drop command
+// Package drop contains the implementation of the cnpg subscription drop command
 package drop

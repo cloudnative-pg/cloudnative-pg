@@ -158,7 +158,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 	appliedState, unreconciledRoles, err := sr.synchronizeRoles(ctx, superUserDB, config, rolePasswords)
 	if err != nil {
-		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
+		return fmt.Errorf("while synchronizing managed roles: %w", err)
 	}
 
 	if err = sr.client.Get(ctx, types.NamespacedName{
