@@ -138,22 +138,40 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		}, false).
 		Build()
 
+	labels := map[string]string{
+		utils.ClusterLabelName:                cluster.Name,
+		utils.PgbouncerNameLabel:              pooler.Name,
+		utils.PodRoleLabelName:                string(utils.PodRolePooler),
+		utils.KubernetesAppLabelName:          utils.AppName,
+		utils.KubernetesAppInstanceLabelName:  cluster.Name,
+		utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
+		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+	}
+	annotations := map[string]string{
+		utils.PoolerSpecHashAnnotationName: poolerHash,
+	}
+	if pooler.Spec.DeploymentMetadata != nil {
+		// User-supplied metadata is merged in; operator-managed keys above
+		// win on conflict so the controller can always find its own
+		// selectors and spec hash.
+		for k, v := range pooler.Spec.DeploymentMetadata.Labels {
+			if _, ok := labels[k]; !ok {
+				labels[k] = v
+			}
+		}
+		for k, v := range pooler.Spec.DeploymentMetadata.Annotations {
+			if _, ok := annotations[k]; !ok {
+				annotations[k] = v
+			}
+		}
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pooler.Name,
-			Namespace: pooler.Namespace,
-			Labels: map[string]string{
-				utils.ClusterLabelName:                cluster.Name,
-				utils.PgbouncerNameLabel:              pooler.Name,
-				utils.PodRoleLabelName:                string(utils.PodRolePooler),
-				utils.KubernetesAppLabelName:          utils.AppName,
-				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
-				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
-			},
-			Annotations: map[string]string{
-				utils.PoolerSpecHashAnnotationName: poolerHash,
-			},
+			Name:        pooler.Name,
+			Namespace:   pooler.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: pooler.Spec.Instances,

@@ -120,6 +120,18 @@ type PoolerSpec struct {
 	// +optional
 	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
 
+	// DeploymentMetadata specifies annotations and labels applied to the
+	// Deployment created by the Pooler, in addition to the operator-managed
+	// labels and the pooler-spec-hash annotation.
+	//
+	// Semantics are additive: keys declared here are added or updated on
+	// the live Deployment on reconcile. Removing a key from this field
+	// does not remove it from the live Deployment — externally-added
+	// metadata (e.g. from GitOps tooling) is preserved for the same
+	// reason. Operator-managed keys always take precedence on conflict.
+	// +optional
+	DeploymentMetadata *Metadata `json:"deploymentMetadata,omitempty"`
+
 	// Name of an existing ServiceAccount in the same namespace to use for the pooler.
 	// When specified, the operator will not create a new ServiceAccount
 	// but will use the provided one. This is useful for sharing a single
