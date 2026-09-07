@@ -1492,21 +1492,15 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownFastImmediate
 }
 
-// RequestImmediateShutdown request the lifecycle manager to shut down
+// TryRequestImmediateShutdown requests the lifecycle manager to shut down
 // PostgreSQL by skipping straight to the immediate strategy, with no
-// checkpoint and no fast-shutdown attempt beforehand.
-func (instance *Instance) RequestImmediateShutdown() {
-	instance.instanceCommandChan <- shutDownImmediate
-}
-
-// TryRequestImmediateShutdown behaves like RequestImmediateShutdown, but
-// never blocks: if the lifecycle manager's command loop isn't immediately
-// ready to receive (e.g. because it is itself shutting PostgreSQL down),
-// the request is dropped rather than waiting. It reports whether the
-// request was actually delivered. This is meant for callers that must
-// never be blocked by a lifecycle manager that turns out not to be
-// listening, since the command channel is unbuffered and a send on it
-// cannot be interrupted by a context cancellation.
+// checkpoint and no fast-shutdown attempt beforehand. It never blocks: if the
+// lifecycle manager's command loop isn't immediately ready to receive (e.g.
+// because it is itself shutting PostgreSQL down), the request is dropped
+// rather than waiting. It reports whether the request was actually delivered.
+// The command channel is unbuffered and a send on it cannot be interrupted by
+// a context cancellation, so a caller that must not be parked has no other
+// way to ask.
 func (instance *Instance) TryRequestImmediateShutdown() bool {
 	select {
 	case instance.instanceCommandChan <- shutDownImmediate:
