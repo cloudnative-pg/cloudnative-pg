@@ -149,6 +149,64 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	})
 })
 
+var _ = Describe("pg_rewind options", func() {
+	const primaryConnInfo = "host=cluster-rw user=streaming_replica"
+
+	newSyncfsInstance := func(pgMajor string) *Instance {
+		instance := NewInstance()
+		instance.PgData = GinkgoT().TempDir()
+		Expect(os.WriteFile(filepath.Join(instance.PgData, "PG_VERSION"), []byte(pgMajor), 0o600)).To(Succeed())
+		instance.SetCluster(&apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:17",
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgRewind: &apiv1.PgRewindConfiguration{
+						SyncMethod: apiv1.PgRewindSyncMethodSyncfs,
+					},
+				},
+			},
+		})
+		return instance
+	}
+
+	It("uses fsync by default without passing a version-specific option", func() {
+		instance := NewInstance()
+		instance.PgData = "/var/lib/postgresql/data"
+
+		options, syncMethod, err := instance.pgRewindOptions(primaryConnInfo)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(syncMethod).To(Equal(apiv1.PgRewindSyncMethodFsync))
+		Expect(options).To(Equal([]string{
+			"-P",
+			"--source-server", primaryConnInfo,
+			"--target-pgdata", instance.PgData,
+		}))
+	})
+
+	It("passes syncfs to PostgreSQL 17 and later", func() {
+		instance := newSyncfsInstance("17")
+
+		options, syncMethod, err := instance.pgRewindOptions(primaryConnInfo)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(syncMethod).To(Equal(apiv1.PgRewindSyncMethodSyncfs))
+		Expect(options).To(ContainElement("--sync-method=syncfs"))
+	})
+
+	It("rejects syncfs when PGDATA is from before PostgreSQL 17", func() {
+		instance := newSyncfsInstance("16")
+
+		options, syncMethod, err := instance.pgRewindOptions(primaryConnInfo)
+
+		Expect(options).To(BeNil())
+		Expect(syncMethod).To(Equal(apiv1.PgRewindSyncMethodSyncfs))
+		Expect(err).To(MatchError(
+			`pg_rewind sync method "syncfs" requires PostgreSQL 17 or later, found 16`,
+		))
+	})
+})
+
 var _ = Describe("testing replica instance methods", Ordered, func() {
 	tempDir, err := os.MkdirTemp("", "primary")
 	Expect(err).ToNot(HaveOccurred())
