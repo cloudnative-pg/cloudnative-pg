@@ -75,6 +75,7 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 		setClientCertMessage(ctx, role, fmt.Sprintf(
 			"client CA secret %q not found: no client certificate can be issued until it exists",
 			cluster.GetClientCASecretName()))
+		role.Status.ClientCertificate.Expiration = ""
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("while getting client CA secret %q: %w", cluster.GetClientCASecretName(), err)
@@ -141,6 +142,7 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 ) (owned bool, err error) {
 	if !metav1.IsControlledBy(certSecret, role) {
 		setClientCertMessage(ctx, role, fmt.Sprintf(secretNotOwnedMessage, secretKey.Name))
+		role.Status.ClientCertificate.Expiration = ""
 		return false, nil
 	}
 
