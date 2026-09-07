@@ -2706,6 +2706,11 @@ type PluginStatus struct {
 	// +optional
 	RestoreJobHookCapabilities []string `json:"restoreJobHookCapabilities,omitempty"`
 
+	// PostgresCapabilities are the list of capabilities of the
+	// plugin regarding the PostgreSQL configuration
+	// +optional
+	PostgresCapabilities []string `json:"postgresCapabilities,omitempty"`
+
 	// Status contain the status reported by the plugin through the SetStatusInCluster interface
 	// +optional
 	Status string `json:"status,omitempty"`
