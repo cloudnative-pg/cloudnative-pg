@@ -78,6 +78,7 @@ jobs:
     concurrency:
       group: backport-${{ matrix.branch }}
       cancel-in-progress: false
+      queue: max
     env:
       PR: ${{ github.event.pull_request.number }}
       BRANCH: ${{ matrix.branch }}
