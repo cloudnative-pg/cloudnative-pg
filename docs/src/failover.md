@@ -46,10 +46,15 @@ During the time the failing primary is being shut down:
    *immediate shutdown* is initiated.
 
 The sequence above assumes PostgreSQL is reachable. If it is not (it does not
-answer `pg_isready`), the fast shutdown is skipped and the immediate shutdown is
-issued right away: there is no `.spec.switchoverDelay` window, and no attempt to
-archive pending WALs. Any `.ready` WAL segments left behind are archived on the
-next start instead, so no WAL is permanently lost, only its archiving is deferred.
+answer `pg_isready`), the instance manager issues the immediate shutdown right
+away, without the fast shutdown and therefore without any attempt to archive
+pending WALs. Any `.ready` WAL segments left behind are archived when the
+instance starts again, before it rejoins the cluster as a replica.
+
+Previously an unreachable former primary was not shut down at all, so it never
+restarted and never became a replica of the new primary. `.spec.switchoverDelay`
+does not apply to this path and never did: it is the timeout of the fast
+shutdown, which is skipped.
 
 :::info
     "Fast" mode does not wait for PostgreSQL clients to disconnect and will

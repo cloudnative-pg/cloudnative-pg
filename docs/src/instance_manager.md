@@ -423,9 +423,9 @@ the WAL files. By default it is set to `3600` (1 hour).
 :::
 
 If PostgreSQL on the former primary is unreachable, the `CHECKPOINT` and the fast
-shutdown are skipped and an immediate shutdown is issued right away, so
-`.spec.switchoverDelay` has no effect. See the
-["Failover" section](failover.md) for details.
+shutdown are skipped and an immediate shutdown is issued right away. Since
+`.spec.switchoverDelay` is the timeout of that fast shutdown, it does not apply
+to this path. See the ["Failover" section](failover.md) for details.
 
 ## Failover
 
