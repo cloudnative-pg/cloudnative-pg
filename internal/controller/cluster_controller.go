@@ -56,6 +56,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller/leaseobserver"
 	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -104,6 +105,7 @@ type ClusterReconciler struct {
 
 	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
+	leaseObserver  *leaseobserver.Tracker
 	admission      *guard.Admission[*apiv1.Cluster]
 }
 
@@ -128,8 +130,9 @@ func NewClusterReconciler(
 			configuration.Current.GetClustersRolloutDelay(),
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
-		drainTaints: drainTaints,
-		admission:   admission,
+		leaseObserver: leaseobserver.NewTracker(),
+		drainTaints:   drainTaints,
+		admission:     admission,
 	}
 }
 
@@ -180,6 +183,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster == nil || cluster.GetDeletionTimestamp() != nil {
+		r.leaseObserver.Forget(req.NamespacedName)
 		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
 			contextLogger.Error(
 				err,
@@ -424,7 +428,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
 
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		if cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 	}
 
 	if cluster.ShouldPromoteFromReplicaCluster() {
@@ -755,8 +761,8 @@ func (r *ClusterReconciler) handleSwitchover(
 			contextLogger.Info("Waiting for the failover delay to expire")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
-		if errors.Is(err, ErrWalReceiversRunning) {
-			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
+		if errors.Is(err, ErrPrimaryLeaseHeld) {
+			contextLogger.Info("Waiting for the primary lease to be released or expire")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+

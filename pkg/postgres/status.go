@@ -325,22 +325,6 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	return list.Items[i].Pod.Name < list.Items[j].Pod.Name
 }
 
-// AreWalReceiversDown checks if every WAL receiver of the cluster is down
-// ignoring the status of the primary, that does not matter during
-// a switchover or a failover
-func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) bool {
-	for idx := range list.Items {
-		if list.Items[idx].Pod.Name == primaryName {
-			continue
-		}
-		if list.Items[idx].IsWalReceiverActive {
-			return false
-		}
-	}
-
-	return true
-}
-
 // IsPodReporting if a pod is ready
 func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
 	for _, item := range list.Items {

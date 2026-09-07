@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller/leaseobserver"
 )
 
 // primaryLeasePredicate enqueues the parent Cluster only when the owned Lease
@@ -92,6 +93,23 @@ func (r *ClusterReconciler) reconcilePrimaryLease(ctx context.Context, cluster *
 		contextLogger.Info("Adopted orphan primary lease", "leaseName", existing.Name)
 	}
 	return nil
+}
+
+// observePrimaryLease reads the cluster's primary Lease and classifies its
+// current state via r.leaseObserver, so reconcileTargetPrimaryForNonReplicaCluster
+// can tell whether it's safe to elect a new primary yet, and can log something
+// actionable either way.
+func (r *ClusterReconciler) observePrimaryLease(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) leaseobserver.Result {
+	var lease coordinationv1.Lease
+	err := r.Get(ctx, client.ObjectKeyFromObject(cluster), &lease)
+	var leasePtr *coordinationv1.Lease
+	if err == nil {
+		leasePtr = &lease
+	}
+	return r.leaseObserver.Observe(client.ObjectKeyFromObject(cluster), leasePtr, err)
 }
 
 // leaseAdoption is the decision made about an existing Lease named after the

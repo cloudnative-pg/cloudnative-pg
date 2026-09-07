@@ -392,7 +392,8 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		}
 	}()
 
-	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
+	remoteSrv, err := webserver.NewRemoteWebServer(
+		instance, onlineUpgradeCancelFunc, exitedConditions, leaseRunnable.Watchdog())
 	if err != nil {
 		contextLogger.Error(err, "unable to create remote webserver runnable")
 		return err

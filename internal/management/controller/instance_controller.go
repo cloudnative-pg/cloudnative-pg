@@ -24,7 +24,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -39,7 +38,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -72,15 +70,6 @@ const (
 	userSearchFunctionName   = "user_search"
 	userSearchFunction       = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;"
 )
-
-// RetryUntilWalReceiverDown is the default retry configuration that is used
-// to wait for the WAL receiver process to be down
-var RetryUntilWalReceiverDown = wait.Backoff{
-	Duration: 1 * time.Second,
-	// Steps is declared as an "int", so we are capping
-	// to int32 to support ARM-based 32 bit architectures
-	Steps: math.MaxInt32,
-}
 
 // shouldRequeue specifies whether a new reconciliation loop should be triggered
 type shoudRequeue bool
@@ -237,6 +226,12 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	if err := r.instance.IsReady(); err != nil {
+		if errors.Is(err, postgresManagement.ErrNoConnectionEstablished) {
+			if shutDown, err := r.shutdownUnreachableOldPrimary(ctx, cluster); err != nil || shutDown {
+				return reconcile.Result{}, err
+			}
+		}
+
 		contextLogger.Info("Instance is still down, will retry in 1 second")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
@@ -639,6 +634,52 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 	<-ctx.Done()
 
 	cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
+
+	return true, nil
+}
+
+// shutdownUnreachableOldPrimary demotes this instance, shutting down PostgreSQL with no
+// attempt at a checkpoint, when it is configured as a primary but is no longer the target
+// primary according to the Cluster status, and PostgreSQL is not reachable.
+func (r *InstanceReconciler) shutdownUnreachableOldPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (shutDown bool, err error) {
+	contextLogger := log.FromContext(ctx)
+
+	if cluster.Status.TargetPrimary == r.instance.GetPodName() {
+		return false, nil
+	}
+
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil || !isPrimary {
+		return false, err
+	}
+
+	if !r.instance.IsStatusRunning() {
+		// PostgreSQL isn't just unreachable: there is no postmaster to signal at all,
+		// most likely because it already completed a shutdown requested elsewhere
+		// (e.g. the instance manager reacting to SIGTERM). Requesting a shutdown here
+		// would have nothing to act on it: the lifecycle manager that would normally
+		// receive the request may have already exited, and the request would block
+		// forever on the unbuffered command channel.
+		return false, nil
+	}
+
+	contextLogger.Info("This is an unreachable former primary instance. " +
+		"Demoting it by shutting it down immediately.")
+
+	// Skip straight to an immediate shutdown: PostgreSQL isn't reachable, so a checkpoint or a
+	// "fast" attempt would just burn through their own timeout waiting on a postmaster that
+	// can't respond, stalling the demotion of this old primary for no benefit.
+	r.Instance().RequestImmediateShutdown()
+
+	// We wait for the lifecycle manager to have received the immediate shutdown request
+	// and, having processed it, to request the termination of the instance manager.
+	// When the termination has been requested, this context will be cancelled.
+	<-ctx.Done()
+
+	cluster.LogTimestampsWithMessage(ctx, "Unreachable old primary shutdown complete")
 
 	return true, nil
 }
@@ -1253,7 +1294,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		}
 
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
-		if err := r.handlePromotion(ctx, cluster); err != nil {
+		if err := r.handlePromotion(ctx); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
@@ -1288,19 +1329,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	return reconcile.Result{}, nil
 }
 
-func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) handlePromotion(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
-
-	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
-		// if the cluster is not replicating it means it's doing a failover and
-		// we have to wait for wal receivers to be down
-		err := r.waitForWalReceiverDown(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
 	// I must promote my instance here
 	err := r.instance.PromoteAndWait(ctx)
@@ -1336,28 +1366,6 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 		conditions.SetDesignatedPrimaryTransitionCompleted(cluster)
 	}
 	return changed, r.client.Status().Update(ctx, cluster)
-}
-
-// waitForWalReceiverDown wait until the wal receiver is down, and it's used
-// to grab all the WAL files from a replica
-func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context) error {
-	contextLogger := log.FromContext(ctx)
-
-	// This is not really exponential backoff as RetryUntilWalReceiverDown
-	// doesn't contain any increment
-	return wait.ExponentialBackoff(RetryUntilWalReceiverDown, func() (done bool, err error) {
-		status, err := r.instance.IsWALReceiverActive()
-		if err != nil {
-			return true, err
-		}
-
-		if !status {
-			return true, nil
-		}
-
-		contextLogger.Info("WAL receiver is still active, waiting")
-		return false, nil
-	})
 }
 
 // refreshCredentialsFromSecret updates the PostgreSQL users credentials

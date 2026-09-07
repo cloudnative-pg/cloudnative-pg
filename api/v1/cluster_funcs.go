@@ -810,6 +810,15 @@ func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 	return DefaultMaxSwitchoverDelay
 }
 
+// GetImmediateShutdownTimeout get the amount of time PostgreSQL has to stop after an immediate
+// shutdown request before the instance is considered unresponsive
+func (cluster *Cluster) GetImmediateShutdownTimeout() int32 {
+	if cluster.Spec.ImmediateShutdownTimeout > 0 {
+		return cluster.Spec.ImmediateShutdownTimeout
+	}
+	return DefaultImmediateShutdownTimeout
+}
+
 // GetPrimaryUpdateStrategy get the cluster primary update strategy,
 // defaulting to unsupervised
 func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
