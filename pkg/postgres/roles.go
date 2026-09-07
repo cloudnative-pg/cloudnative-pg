@@ -30,7 +30,7 @@ const (
 // or the operator
 func IsRoleReserved(name string) bool {
 	// Check for roles reserved for the operator
-	operatorReservedRoles := map[string]interface{}{
+	operatorReservedRoles := map[string]any{
 		"streaming_replica": nil,
 		"postgres":          nil,
 	}
