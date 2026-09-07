@@ -467,18 +467,21 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(err).To(MatchError(context.DeadlineExceeded))
 		})
 
-	It("takes the lease over when the API server answers more slowly than the poll interval",
+	It("takes the lease over when the API server answers well within RenewDeadline",
 		func(ctx context.Context) {
 			r := newRunnable(fake.NewClientset())
+			// tryTakeOver ignores RetryPeriod. We set it small anyway, so
+			// this test still works if the default value changes later.
 			r.config.RetryPeriod = 20 * time.Millisecond
 			r.config.RenewDeadline = 600 * time.Millisecond
 			r.lock = &slowLock{getDelay: 400 * time.Millisecond}
 
 			acquired, err := r.tryTakeOver(ctx)
 
-			// The read answers above the poll interval and below the renew
-			// deadline, so it has to get through: a bound sized on RetryPeriod
-			// fails it on every poll and the take-over never happens.
+			// getDelay is bigger than RetryPeriod, smaller than
+			// RenewDeadline. So this test only passes if the code waits
+			// for RenewDeadline, not the shorter, wrong bound from an
+			// earlier version of this fix.
 			Expect(err).NotTo(HaveOccurred())
 			Expect(acquired).To(BeTrue())
 		})
