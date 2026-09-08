@@ -1,0 +1,30 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-switchover-supervised
+spec:
+  instances: 2
+
+  postgresql:
+    parameters:
+      # Enforced (hot standby sensitive) parameter that will be decreased
+      # before the switchover to trigger issue #10716.
+      max_connections: '150'
+
+  # supervised: the operator never restarts the primary on its own, it
+  # waits for the user to trigger the switchover. This is the path that
+  # demotes the old primary and triggers issue #10716.
+  primaryUpdateStrategy: supervised
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

@@ -119,7 +119,18 @@ func Logs(
 	kubeInterface kubernetes.Interface,
 	namespace, podName string,
 ) (string, error) {
-	req := kubeInterface.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
+	return LogsWithOptions(ctx, kubeInterface, namespace, podName, &corev1.PodLogOptions{})
+}
+
+// LogsWithOptions gathers pod logs honoring the given PodLogOptions (e.g. to
+// retrieve the logs of the previously terminated container via Previous: true)
+func LogsWithOptions(
+	ctx context.Context,
+	kubeInterface kubernetes.Interface,
+	namespace, podName string,
+	options *corev1.PodLogOptions,
+) (string, error) {
+	req := kubeInterface.CoreV1().Pods(namespace).GetLogs(podName, options)
 	podLogs, err := req.Stream(ctx)
 	if err != nil {
 		return "", err
