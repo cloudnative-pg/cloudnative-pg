@@ -289,6 +289,9 @@ jobs:
             runs_on='["ubuntu-latest"]'
           elif jq -e 'type == "array"' >/dev/null 2>&1 <<<"${E2E_RUNNER}"; then
             runs_on=$(jq -c '.' <<<"${E2E_RUNNER}")
+          elif [[ "${E2E_RUNNER}" == \[* ]]; then
+            echo "::error::E2E_RUNNER looks like a JSON array but failed to parse: ${E2E_RUNNER}"
+            exit 1
           else
             runs_on=$(jq -Rc -n --arg v "${E2E_RUNNER}" '[$v]')
           fi
