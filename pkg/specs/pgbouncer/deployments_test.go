@@ -62,8 +62,8 @@ var _ = Describe("Deployment", func() {
 				DeploymentStrategy: &appsv1.DeploymentStrategy{
 					Type: appsv1.RollingUpdateDeploymentStrategyType,
 				},
-				Monitoring: &apiv1.PoolerMonitoringConfiguration{
-					EnablePodMonitor: true, //nolint:staticcheck
+				Monitoring: &apiv1.PoolerMonitoringConfiguration{ //nolint:staticcheck
+					EnablePodMonitor: true,
 				},
 			},
 		}
