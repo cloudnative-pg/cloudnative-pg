@@ -135,6 +135,45 @@ spec:
           schema: access
 ```
 
+### Excluding tables from an all-tables publication
+
+PostgreSQL 19 introduces the `EXCEPT TABLE` clause for the
+[`CREATE PUBLICATION`](https://www.postgresql.org/docs/current/sql-createpublication.html)
+and [`ALTER PUBLICATION`](https://www.postgresql.org/docs/current/sql-alterpublication.html)
+commands, allowing you to publish all tables in the database except for an
+explicit list. This is convenient when you want broad, future-proof coverage
+(new tables are automatically included) while excluding a small, known set of
+tables, such as audit logs or staging tables.
+
+:::info[Important]
+    The `except` field requires PostgreSQL 19 or higher and can only be used
+    together with `allTables: true`. CloudNativePG rejects the reconciliation
+    of a `Publication` object that sets `target.except` against an older
+    PostgreSQL version.
+:::
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: freddie-publisher
+spec:
+  cluster:
+    name: freddie
+  dbname: app
+  name: publisher
+  target:
+    allTables: true
+    except:
+      - name: audit_log
+      - name: temp_imports
+        schema: staging
+```
+
+In the above example, the publication replicates every table in the `app`
+database except `audit_log` and `staging.temp_imports`. Unlike `allTables`,
+the `except` list can be updated after the publication has been created.
+
 ### Required Fields in the `Publication` Manifest
 
 The following fields are required for a `Publication` object:

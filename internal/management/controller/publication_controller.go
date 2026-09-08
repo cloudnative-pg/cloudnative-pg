@@ -44,9 +44,10 @@ type PublicationReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance            *postgres.Instance
-	finalizerReconciler *finalizerReconciler[*apiv1.Publication]
-	getDB               func(name string) (*sql.DB, error)
+	instance                *postgres.Instance
+	finalizerReconciler     *finalizerReconciler[*apiv1.Publication]
+	getDB                   func(name string) (*sql.DB, error)
+	getPostgresMajorVersion func() (int, error)
 }
 
 // publicationReconciliationInterval is the time between the
@@ -219,6 +220,10 @@ func NewPublicationReconciler(
 		instance: instance,
 		getDB: func(name string) (*sql.DB, error) {
 			return instance.ConnectionPool().Connection(name)
+		},
+		getPostgresMajorVersion: func() (int, error) {
+			version, err := instance.GetPgVersion()
+			return int(version.Major()), err //nolint:gosec
 		},
 	}
 
