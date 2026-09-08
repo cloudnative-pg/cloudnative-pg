@@ -234,6 +234,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		var errUnknownPlugin *repository.ErrUnknownPlugin
 		if errors.As(err, &errUnknownPlugin) {
 			regErr := r.RegisterPhase(
+			return ctrl.Result{
+				RequeueAfter: 10 * time.Second,
+			}, r.RegisterPhase(
 				ctx,
 				cluster,
 				apiv1.PhaseUnknownPlugin,
@@ -530,7 +533,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	if res, err := r.ensureNoFailoverOnFullDisk(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
+	if res, err := r.reconcilePVCsBeforeDiskFullGuard(ctx, cluster, resources.pvcs.Items, instancesStatus); err != nil || !res.IsZero() {
 		return res, err
 	}
 
@@ -718,6 +721,23 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+func (r *ClusterReconciler) reconcilePVCsBeforeDiskFullGuard(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pvcs []corev1.PersistentVolumeClaim,
+	instancesStatus postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	// Reconcile existing PVCs before checking for WAL disk-full conditions. This
+	// allows storage expansions requested in the Cluster spec (for example
+	// walStorage size increases) to be applied even while PostgreSQL is stopped
+	// because WAL space is exhausted.
+	if res, err := persistentvolumeclaim.ReconcileExistingPVCs(ctx, r.Client, cluster, pvcs); err != nil || !res.IsZero() {
+		return res, err
+	}
+
+	return r.ensureNoFailoverOnFullDisk(ctx, cluster, instancesStatus)
 }
 
 func (r *ClusterReconciler) handleSwitchover(
