@@ -125,7 +125,7 @@ func NewShowStatsMetrics(subsystem string) *ShowStatsMetrics {
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "total_server_assignment_count",
-			Help:      "Total time a server was assigned to a client.",
+			Help:      "Total number of times a server was assigned to a client.",
 		}, []string{databaseLabel}),
 		TotalServerParseCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
