@@ -259,6 +259,9 @@ const (
 	// BackupTablespaceMapFileAnnotationName is the name of the annotation where the `tablespace_map` file is kept
 	BackupTablespaceMapFileAnnotationName = MetadataNamespace + "/backupTablespaceMapFile"
 
+	// BackupPgControlFileAnnotationName is the name of the annotation where the `pg_control` file is kept
+	BackupPgControlFileAnnotationName = MetadataNamespace + "/backupPgControlFile"
+
 	// BackupVolumeSnapshotDeadlineAnnotationName is the annotation for the snapshot backup failure deadline in minutes.
 	// It is only applied to snapshot retryable errors
 	BackupVolumeSnapshotDeadlineAnnotationName = MetadataNamespace + "/volumeSnapshotDeadline"

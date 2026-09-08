@@ -196,6 +196,75 @@ var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminat
 	})
 })
 
+var _ = Describe("joinReplicaInstance from a VolumeSnapshot", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	It("passes the source backup metadata to the restore init container", func(ctx SpecContext) {
+		const snapshotName = "replica-snapshot"
+
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 2
+			c.Spec.Plugins = []apiv1.PluginConfiguration{{
+				Name:          "wal-archiver.example.com",
+				Enabled:       ptr.To(true),
+				IsWALArchiver: ptr.To(true),
+			}}
+			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					VolumeSnapshots: &apiv1.DataSource{
+						Storage: corev1.TypedLocalObjectReference{
+							APIGroup: ptr.To(volumesnapshotv1.GroupName),
+							Kind:     apiv1.VolumeSnapshotKind,
+							Name:     snapshotName,
+						},
+					},
+				},
+			}
+		})
+
+		snapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      snapshotName,
+				Namespace: namespace,
+				Annotations: map[string]string{
+					utils.BackupLabelFileAnnotationName:         "encoded-backup-label",
+					utils.BackupTablespaceMapFileAnnotationName: "encoded-tablespace-map",
+					utils.BackupPgControlFileAnnotationName:     "encoded-pg-control",
+				},
+			},
+		}
+		Expect(env.client.Create(ctx, snapshot)).To(Succeed())
+
+		res, err := env.clusterReconciler.joinReplicaInstance(ctx, 2, cluster)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(30 * time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1))
+		var bootstrapContainer *corev1.Container
+		for i := range pods.Items[0].Spec.InitContainers {
+			if pods.Items[0].Spec.InitContainers[i].Name == specs.BootstrapWorkContainerName {
+				bootstrapContainer = &pods.Items[0].Spec.InitContainers[i]
+				break
+			}
+		}
+		Expect(bootstrapContainer).ToNot(BeNil())
+		Expect(bootstrapContainer.Command).To(ContainElements(
+			"--immediate",
+			"--backuplabel=encoded-backup-label",
+			"--tablespacemap=encoded-tablespace-map",
+			"--pgcontrol=encoded-pg-control",
+		))
+	})
+})
+
 var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 	var env *testingEnvironment
 	var namespace string

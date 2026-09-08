@@ -295,15 +295,17 @@ var _ = Describe("onlineExecutor finalize", func() {
 		fakeEndLSN := types.LSN("12345678")
 		fakeLabelFile := []byte("test-label")
 		fakeSpcmapFile := []byte("test-spcamp")
+		fakePgControlFile := []byte("test-pg-control")
 
 		fakeClient.response = &webserver.Response[webserver.BackupResultData]{
 			Data: &webserver.BackupResultData{
-				BeginLSN:   fakeBeginLSN,
-				EndLSN:     fakeEndLSN,
-				LabelFile:  fakeLabelFile,
-				SpcmapFile: fakeSpcmapFile,
-				BackupName: backup.Name,
-				Phase:      webserver.Completed,
+				BeginLSN:      fakeBeginLSN,
+				EndLSN:        fakeEndLSN,
+				LabelFile:     fakeLabelFile,
+				SpcmapFile:    fakeSpcmapFile,
+				PgControlFile: fakePgControlFile,
+				BackupName:    backup.Name,
+				Phase:         webserver.Completed,
 			},
 		}
 
@@ -312,6 +314,7 @@ var _ = Describe("onlineExecutor finalize", func() {
 		Expect(result).To(BeNil())
 		Expect(backup.Status.TablespaceMapFile).To(Equal(fakeSpcmapFile))
 		Expect(backup.Status.BackupLabelFile).To(Equal(fakeLabelFile))
+		Expect(backup.Status.PgControlFile).To(Equal(fakePgControlFile))
 		Expect(backup.Status.BeginLSN).To(BeEquivalentTo(fakeBeginLSN))
 		Expect(backup.Status.EndLSN).To(BeEquivalentTo(fakeEndLSN))
 	})

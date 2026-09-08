@@ -73,6 +73,7 @@ func (o *onlineExecutor) finalize(
 		backup.Status.EndLSN = string(status.EndLSN)
 		backup.Status.TablespaceMapFile = status.SpcmapFile
 		backup.Status.BackupLabelFile = status.LabelFile
+		backup.Status.PgControlFile = status.PgControlFile
 
 		return nil, nil
 	}

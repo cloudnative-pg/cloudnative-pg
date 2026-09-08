@@ -52,6 +52,7 @@ func NewCmd() *cobra.Command {
 		pgWal         string
 		backupLabel   string
 		tablespaceMap string
+		pgControl     string
 		immediate     bool
 	)
 
@@ -117,6 +118,14 @@ func NewCmd() *cobra.Command {
 				restoreProcess.tablespaceMapFile = res
 			}
 
+			if pgControl != "" {
+				res, err := base64.StdEncoding.DecodeString(pgControl)
+				if err != nil {
+					return err
+				}
+				restoreProcess.pgControlFile = res
+			}
+
 			// Step 3: start everything
 			if err := mgr.Start(ctx); err != nil {
 				contextLogger.Error(err, "restore error")
@@ -148,6 +157,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "The PGWAL to be restored")
 	cmd.Flags().StringVar(&backupLabel, "backuplabel", "", "The restore backup_label file content")
 	cmd.Flags().StringVar(&tablespaceMap, "tablespacemap", "", "The restore tablespace_map file content")
+	cmd.Flags().StringVar(&pgControl, "pgcontrol", "", "The restore pg_control file content")
 	cmd.Flags().BoolVar(&immediate, "immediate", false, "Do not start PostgreSQL but just recover the snapshot")
 
 	return cmd

@@ -336,6 +336,12 @@ spec:
                 description: Whether the backup was online/hot (`true`) or offline/cold
                   (`false`)
                 type: boolean
+              pgControlFile:
+                description: |-
+                  PostgreSQL control file content captured after the volume snapshots were taken
+                  and before the online backup was stopped
+                format: byte
+                type: string
               phase:
                 description: The last backup status
                 type: string

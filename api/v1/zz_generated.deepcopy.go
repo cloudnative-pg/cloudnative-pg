@@ -323,6 +323,11 @@ func (in *BackupStatus) DeepCopyInto(out *BackupStatus) {
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
+	if in.PgControlFile != nil {
+		in, out := &in.PgControlFile, &out.PgControlFile
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
 	if in.InstanceID != nil {
 		in, out := &in.InstanceID, &out.InstanceID
 		*out = new(InstanceID)
