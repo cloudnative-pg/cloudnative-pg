@@ -10,7 +10,7 @@ on:
       - labeled
       - unlabeled
 
-permissions: read-all
+permissions: {}
 
 jobs:
   require-labels:
@@ -18,8 +18,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Require labels
-        uses: agilepathway/label-checker@c3d16ad512e7cea5961df85ff2486bb774caf3c5 # v1.6.65
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          any_of: "ok to merge :ok_hand:"
-          none_of: "do not merge"
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const labels = (context.payload.pull_request.labels || []).map((l) => l.name);
+            if (!labels.includes('ok to merge :ok_hand:')) {
+              core.setFailed('Missing required label: "ok to merge :ok_hand:"');
+            }
+            if (labels.includes('do not merge :no_good:')) {
+              core.setFailed('Forbidden label present: "do not merge :no_good:"');
+            }
