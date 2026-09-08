@@ -274,8 +274,29 @@ jobs:
       log_level: ${{ env.LOG_LEVEL }}
       cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
       barman_plugin_version: ${{ env.BARMAN_PLUGIN_VERSION }}
-      runs_on: ${{ vars.E2E_RUNNER || 'ubuntu-latest' }}
+      runs_on: ${{ steps.runner.outputs.runs_on }}
     steps:
+      - name: Normalize E2E runner labels
+        id: runner
+        env:
+          E2E_RUNNER: ${{ vars.E2E_RUNNER }}
+        run: |
+          # E2E_RUNNER may be configured either as a single bare runner label
+          # (e.g. "ubuntu-latest") or as a JSON array of labels (e.g.
+          # '["self-hosted","2xlarge","x64"]'). Normalize both forms to a
+          # JSON array here so downstream jobs don't need to care which one was used.
+          if [ -z "${E2E_RUNNER}" ]; then
+            runs_on='["ubuntu-latest"]'
+          elif jq -e 'type == "array"' >/dev/null 2>&1 <<<"${E2E_RUNNER}"; then
+            runs_on=$(jq -c '.' <<<"${E2E_RUNNER}")
+          elif [[ "${E2E_RUNNER}" == \[* ]]; then
+            echo "::error::E2E_RUNNER looks like a JSON array but failed to parse: ${E2E_RUNNER}"
+            exit 1
+          else
+            runs_on=$(jq -Rc -n --arg v "${E2E_RUNNER}" '[$v]')
+          fi
+          echo "runs_on=${runs_on}" >> "$GITHUB_OUTPUT"
+
       - name: From command
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -326,7 +347,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       needs.evaluate_options.result == 'success'
-    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
+    runs-on: ${{ fromJSON(needs.evaluate_options.outputs.runs_on) }}
     permissions:
       contents: read
       packages: write
@@ -684,7 +705,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.kindMatrix) }}
-    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
+    runs-on: ${{ fromJSON(needs.evaluate_options.outputs.runs_on) }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -883,7 +904,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.k3dMatrix) }}
-    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
+    runs-on: ${{ fromJSON(needs.evaluate_options.outputs.runs_on) }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
