@@ -156,26 +156,20 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 
 	clusterObjectKey := ctrl.ObjectKey{Name: instance.GetClusterName(), Namespace: instance.GetNamespaceName()}
 
-	// Bootstrap can start before the operator writes Status.Certificates.
-	// Wait for it here. This also retries a failed Get, so the old
-	// WaitForGetClusterWithClient call is gone.
-	if err := management.WaitForClusterCertificates(ctx, client, clusterObjectKey); err != nil {
+	// This runs in the major upgrade Job, which may start before the operator
+	// writes the certificate status. Use the Cluster this call returns; see
+	// WaitForClusterCertificates for why.
+	cluster, err := management.WaitForClusterCertificates(ctx, client, clusterObjectKey)
+	if err != nil {
 		return fmt.Errorf("error while waiting for the certificate status: %w", err)
 	}
+	instance.SetCluster(cluster)
 
-	// Download the cluster definition from the API server
-	var cluster apiv1.Cluster
-	if err := client.Get(ctx, clusterObjectKey, &cluster); err != nil {
-		contextLogger.Error(err, "Error while getting cluster")
-		return err
-	}
-	instance.SetCluster(&cluster)
-
-	if err := setupExtensionEnvironment(&cluster); err != nil {
+	if err := setupExtensionEnvironment(cluster); err != nil {
 		return fmt.Errorf("error while setting up extension environment: %w", err)
 	}
 
-	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
+	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, cluster); err != nil {
 		return fmt.Errorf("error while downloading secrets: %w", err)
 	}
 
@@ -239,7 +233,7 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 	}
 
 	contextLogger.Info("Preparing configuration files", "directory", newDataDir)
-	if err := prepareConfigurationFiles(ctx, cluster, newDataDir); err != nil {
+	if err := prepareConfigurationFiles(ctx, *cluster, newDataDir); err != nil {
 		return err
 	}
 

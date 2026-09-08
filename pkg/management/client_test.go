@@ -21,11 +21,13 @@ package management
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -34,33 +36,100 @@ import (
 )
 
 var _ = Describe("waiting for the certificate status", func() {
+	const serverTLSSecret = "cluster-server"
+
 	clusterObjectKey := client.ObjectKey{Namespace: "default", Name: "cluster"}
 
-	It("returns immediately once the certificate status is populated", func(ctx SpecContext) {
-		cluster := &apiv1.Cluster{
+	newCluster := func() *apiv1.Cluster {
+		return &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Namespace: clusterObjectKey.Namespace, Name: clusterObjectKey.Name},
-			Status: apiv1.ClusterStatus{
-				Certificates: apiv1.CertificatesStatus{
-					CertificatesConfiguration: apiv1.CertificatesConfiguration{
-						ServerTLSSecret: "cluster-server",
-					},
-				},
-			},
 		}
-		cli := fake.NewClientBuilder().WithScheme(Scheme).WithObjects(cluster).Build()
+	}
 
-		Expect(WaitForClusterCertificates(ctx, cli, clusterObjectKey)).To(Succeed())
+	withCertificates := func(cluster *apiv1.Cluster) *apiv1.Cluster {
+		cluster.Status.Certificates.ServerTLSSecret = serverTLSSecret
+		return cluster
+	}
+
+	// Bound the wait: specs have no timeout of their own, so a broken
+	// implementation would hang the whole suite instead of just failing.
+	boundedContext := func(ctx context.Context) context.Context {
+		waitCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		DeferCleanup(cancel)
+		return waitCtx
+	}
+
+	It("returns the Cluster it found the certificates in, without polling", func(ctx SpecContext) {
+		cli := fake.NewClientBuilder().WithScheme(Scheme).WithObjects(withCertificates(newCluster())).Build()
+
+		start := time.Now()
+		cluster, err := WaitForClusterCertificates(boundedContext(ctx), cli, clusterObjectKey)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(time.Since(start)).To(BeNumerically("<", time.Second))
+		Expect(cluster.Name).To(Equal(clusterObjectKey.Name))
+		Expect(cluster.Status.Certificates.ServerTLSSecret).To(Equal(serverTLSSecret))
 	})
 
-	It("keeps waiting, and gives up when the context is done, while the status is unset", func(ctx SpecContext) {
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Namespace: clusterObjectKey.Namespace, Name: clusterObjectKey.Name},
-		}
-		cli := fake.NewClientBuilder().WithScheme(Scheme).WithObjects(cluster).Build()
+	It("keeps reading until the certificate status appears", func(ctx SpecContext) {
+		var reads int
+		cli := fake.NewClientBuilder().
+			WithScheme(Scheme).
+			WithObjects(newCluster()).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey,
+					obj client.Object, opts ...client.GetOption,
+				) error {
+					if err := cl.Get(ctx, key, obj, opts...); err != nil {
+						return err
+					}
+					// Simulate the status showing up after the first read.
+					reads++
+					if reads > 1 {
+						withCertificates(obj.(*apiv1.Cluster))
+					}
+					return nil
+				},
+			}).
+			Build()
+
+		cluster, err := WaitForClusterCertificates(boundedContext(ctx), cli, clusterObjectKey)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(reads).To(BeNumerically(">", 1))
+		Expect(cluster.Status.Certificates.ServerTLSSecret).To(Equal(serverTLSSecret))
+	})
+
+	It("retries a failed read instead of giving up on it", func(ctx SpecContext) {
+		var reads int
+		cli := fake.NewClientBuilder().
+			WithScheme(Scheme).
+			WithObjects(withCertificates(newCluster())).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey,
+					obj client.Object, opts ...client.GetOption,
+				) error {
+					reads++
+					if reads == 1 {
+						return errors.New("the API server is not reachable")
+					}
+					return cl.Get(ctx, key, obj, opts...)
+				},
+			}).
+			Build()
+
+		cluster, err := WaitForClusterCertificates(boundedContext(ctx), cli, clusterObjectKey)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(reads).To(BeNumerically(">", 1))
+		Expect(cluster.Status.Certificates.ServerTLSSecret).To(Equal(serverTLSSecret))
+	})
+
+	It("gives up when the context is done, while the status is unset", func(ctx SpecContext) {
+		cli := fake.NewClientBuilder().WithScheme(Scheme).WithObjects(newCluster()).Build()
 
 		waitCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
 		defer cancel()
 
-		Expect(WaitForClusterCertificates(waitCtx, cli, clusterObjectKey)).ToNot(Succeed())
+		cluster, err := WaitForClusterCertificates(waitCtx, cli, clusterObjectKey)
+		Expect(err).To(HaveOccurred())
+		Expect(cluster).To(BeNil())
 	})
 })
