@@ -68,6 +68,17 @@ func (db *Database) GetName() string {
 	return db.Name
 }
 
+// connectionSecretSuffix is the suffix appended to a Database name to form the
+// name of the Secret that the operator generates with its connection
+// information.
+const connectionSecretSuffix = "-conn"
+
+// GetConnectionSecretName returns the name of the Secret that the operator
+// generates to hold the connection information for this Database.
+func (db *Database) GetConnectionSecretName() string {
+	return db.Name + connectionSecretSuffix
+}
+
 // HasReconciliations returns true if the database object has been reconciled at least once
 func (db *Database) HasReconciliations() bool {
 	return db.Status.ObservedGeneration > 0
