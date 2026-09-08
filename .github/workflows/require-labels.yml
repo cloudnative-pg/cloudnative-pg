@@ -10,7 +10,7 @@ on:
       - labeled
       - unlabeled
 
-permissions: read-all
+permissions: {}
 
 jobs:
   require-labels:
@@ -25,6 +25,6 @@ jobs:
             if (!labels.includes('ok to merge :ok_hand:')) {
               core.setFailed('Missing required label: "ok to merge :ok_hand:"');
             }
-            if (labels.includes('do not merge')) {
-              core.setFailed('Forbidden label present: "do not merge"');
+            if (labels.includes('do not merge :no_good:')) {
+              core.setFailed('Forbidden label present: "do not merge :no_good:"');
             }
