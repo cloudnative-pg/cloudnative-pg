@@ -1584,17 +1584,28 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       -
+        name: Determine runner architecture
+        id: arch
+        run: |
+          case "${RUNNER_ARCH}" in
+            X64) ARCH=amd64 ;;
+            ARM64) ARCH=arm64 ;;
+            *) echo "::error::Unsupported RUNNER_ARCH: ${RUNNER_ARCH}"; exit 1 ;;
+          esac
+          echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
+      -
         name: Install eksctl
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARCH: ${{ steps.arch.outputs.arch }}
         with:
           timeout_minutes: 1
           max_attempts: 3
           command: |
             mkdir -p "$HOME/.local/bin"
             curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 \
-              -fsSL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
+              -fsSL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_${ARCH}.tar.gz" \
               | tar xz -C $HOME/.local/bin
             echo "$HOME/.local/bin" >> $GITHUB_PATH
       -
@@ -1649,6 +1660,7 @@ jobs:
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARCH: ${{ steps.arch.outputs.arch }}
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
           VELERO_VERSION: "v1.18.2"
           # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
@@ -1684,8 +1696,8 @@ jobs:
 
             # Download Velero, extract and place it in $PATH
             curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 \
-              -fsSL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" | tar xz
-            mv velero-${VELERO_VERSION}-linux-amd64/velero $HOME/.local/bin
+              -fsSL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-${ARCH}.tar.gz" | tar xz
+            mv velero-${VELERO_VERSION}-linux-${ARCH}/velero $HOME/.local/bin
 
             # Set Velero-specific credentials
             echo -e "[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> credentials-velero
