@@ -27,7 +27,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -69,7 +69,7 @@ func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *ap
 	}
 
 	// If nothing changes, there's no need to hit the API server
-	if apiequality.Semantic.DeepEqual(oldCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
+	if equality.Semantic.DeepEqual(oldCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
 		return nil
 	}
 

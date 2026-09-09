@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/equality"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -78,7 +78,7 @@ func setStatusPluginHook(
 		plugin.Status = val
 	}
 
-	if !apiequality.Semantic.DeepEqual(origCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
+	if !equality.Semantic.DeepEqual(origCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
 		contextLogger.Info("patching cluster status with the updated plugin statuses")
 		contextLogger.Debug("diff detected",
 			"before", origCluster.Status.PluginStatus,
