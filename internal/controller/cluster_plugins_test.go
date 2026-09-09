@@ -162,6 +162,22 @@ var _ = Describe("updatePluginsStatus", func() {
 		Expect(cluster.Status.PluginStatus[1].Status).To(Equal(pluginStatus))
 	})
 
+	It("drops the field if it does not exist in the metadata", func() {
+		pluginCli.metadataList = metadataFor(pluginName)
+		// OperatorCapabilities is empty in the metadata
+		pluginCli.metadataList[0].OperatorCapabilities = []string{}
+
+		ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginCli)
+
+		Expect(reconciler.updatePluginsStatus(ctx, cluster)).To(Succeed())
+
+		Expect(cluster.Status.PluginStatus).To(HaveLen(1))
+		Expect(cluster.Status.PluginStatus[0].Name).To(Equal(pluginName))
+		Expect(cluster.Status.PluginStatus[0].Status).To(Equal(pluginStatus))
+		Expect(cluster.Status.PluginStatus[0].OperatorCapabilities).To(BeEmpty())
+		Expect(cluster.Status.PluginStatus[0].Capabilities).To(HaveLen(1))
+	})
+
 	It("drops the entry of a plugin that is no longer loaded", func() {
 		pluginCli.metadataList = metadataFor(otherPluginName)
 		ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginCli)
