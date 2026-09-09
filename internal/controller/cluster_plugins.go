@@ -39,13 +39,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// updatePluginsStatus ensures that we load the plugins that are required to reconcile
-// this cluster
+// updatePluginsStatus rebuilds cluster.Status.PluginStatus from the metadata
+// reported by the already-loaded plugins, then patches the cluster only if
+// something changed
 func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *apiv1.Cluster) error {
-	// Load the plugins
 	pluginClient := cnpgiclient.GetPluginClientFromContext(ctx)
 
-	// Get the status of the plugins and store it inside the status section
 	oldCluster := cluster.DeepCopy()
 	metadataList := pluginClient.MetadataList()
 	cluster.Status.PluginStatus = make([]apiv1.PluginStatus, len(metadataList))
@@ -54,9 +53,8 @@ func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *ap
 		if idx := slices.IndexFunc(oldCluster.Status.PluginStatus, func(p apiv1.PluginStatus) bool {
 			return p.Name == entry.Name
 		}); idx >= 0 {
-			// Save the old plugin status so we can carry it over as is without
-			// potentially rewriting fields (like .Status) that are not part of
-			// the plugin client's returned metadata
+			// Copy the old entry so .Status survives: it is not part of the
+			// plugin's metadata. Every field below overwrites this copy from entry.
 			cluster.Status.PluginStatus[i] = oldCluster.Status.PluginStatus[idx]
 		}
 		cluster.Status.PluginStatus[i].Name = entry.Name

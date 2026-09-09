@@ -89,7 +89,7 @@ func setStatusPluginHook(
 		}
 	}
 
-	// Requeue unconditionally to ensure the plugin always has a chance to set the status
+	// Requeue in 5s regardless of the patch above, to keep polling the plugin's status
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
 
