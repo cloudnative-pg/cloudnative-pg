@@ -332,6 +332,12 @@ const (
 	// password_encryption setting, restoring the behavior the operator had
 	// before client-side encoding was introduced.
 	PasswordPassthroughAnnotationName = MetadataNamespace + "/passwordPassthrough"
+
+	// DirectPrimaryConnectionsAnnotationName is the name of the annotation that tells instance
+	// controllers to specify the hostname of the primary in primary_conninfo instead of the -rw service.
+	// This requires CREATE_ANY_SERVICES to be enabled in the operator, or else pods will be unresolvable!
+	// Also, check that all pods have "Subdomain" set to "<cluster-name>-any" before enabling.
+	DirectPrimaryConnectionsAnnotationName = AlphaMetadataNamespace + "/directPrimaryConnections"
 )
 
 type annotationStatus string
