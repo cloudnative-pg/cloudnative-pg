@@ -112,6 +112,22 @@ var _ = Describe("Primary update strategy", func() {
 	})
 })
 
+var _ = Describe("Resources update strategy", func() {
+	It("defaults to recreate", func() {
+		emptyCluster := Cluster{}
+		Expect(emptyCluster.GetResourcesUpdateStrategy()).To(BeEquivalentTo(ResourcesUpdateStrategyRecreate))
+	})
+
+	It("respects the preference of the user", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ResourcesUpdateStrategy: ResourcesUpdateStrategyInPlace,
+			},
+		}
+		Expect(cluster.GetResourcesUpdateStrategy()).To(BeEquivalentTo(ResourcesUpdateStrategyInPlace))
+	})
+})
+
 var _ = Describe("Node maintenance window", func() {
 	It("default maintenance not in progress", func() {
 		cluster := Cluster{}

@@ -117,6 +117,102 @@ section in the PostgreSQL documentation.
     page from the Kubernetes documentation.
 :::
 
+## In-place resource updates
+
+By default, changing the `resources` section of a `Cluster` triggers a rolling
+update of the instances: every pod is recreated with the new resources, and the
+primary is updated last through a switchover (or a restart, depending on
+`primaryUpdateMethod`).
+
+Starting from Kubernetes 1.33, pods can be resized in place through the
+[resize subresource](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/),
+without recreating them. CloudNativePG can take advantage of this feature when
+you set the `resourcesUpdateStrategy` field to `inPlace`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql-resize-inplace
+spec:
+  instances: 3
+
+  resourcesUpdateStrategy: inPlace
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: 1
+    limits:
+      memory: "1Gi"
+      cpu: 1
+
+  storage:
+    size: 1Gi
+```
+
+With this strategy, when the only difference between a running instance and
+its desired specification is in the container resources, the operator applies
+the change through the resize subresource: CPU and memory of the running
+containers are updated with no restart, no switchover, and no interruption of
+the client connections. This applies to the `postgres` container and to any
+sidecar container injected by CNPG-I plugins.
+
+The default value of the field is `recreate`, which preserves the rolling
+update behavior described above.
+
+### When a rolling update is still used
+
+The `inPlace` strategy is best-effort by design: whenever the change cannot be
+applied in place, the operator falls back to the standard rolling update.
+This happens when:
+
+- The Kubernetes cluster does not expose the resize subresource of the pods
+  (the feature requires Kubernetes 1.33 or later, and became stable in 1.35).
+- A **memory limit is decreased**. The kubelet applies a memory limit
+  decrease only when the current usage of the container is below the new
+  limit, and PostgreSQL keeps its shared memory (`shared_buffers` above all)
+  allocated for the whole life of the instance, so on a warmed-up instance
+  such a resize would remain pending indefinitely, without any error being
+  reported. Even if the usage momentarily dropped below the target and the
+  decrease were applied, the instance would then be running with a memory
+  configuration sized for the old limit inside a smaller cgroup, exposed to
+  an out-of-memory termination at the next spike of activity. A fresh pod
+  starting under the new limit, with memory parameters reviewed accordingly,
+  is the deterministic option.
+- Resource entries are added or removed, rather than changed: Kubernetes does
+  not allow a resize to add or remove `requests` and `limits` entries.
+- Resources other than `cpu` and `memory` (for example, hugepages) are
+  changed.
+- The change would alter the pod QoS class, which Kubernetes forbids: the API
+  server rejects the resize and the operator recreates the pod.
+- The kubelet reports the resize as *infeasible* because the node can never
+  satisfy the new request: the operator recreates the pod, letting the
+  scheduler place it on a suitable node.
+- The resources change together with any other part of the pod specification:
+  the pod is recreated to apply the whole change.
+
+Run-once init containers cannot be resized and have already terminated when a
+resize takes place, so their recorded resources are left untouched: they will
+pick up the new values the next time the pod is naturally recreated.
+
+:::warning
+With `resourcesUpdateStrategy: inPlace`, the operator treats the resources of
+the running pods as fully declarative: a resize applied to an instance pod by
+any other actor is reverted to match `spec.resources` of the `Cluster`. Do not
+point an in-place vertical autoscaler at the instance pods of a cluster using
+this strategy.
+:::
+
+PostgreSQL benefits from an in-place memory increase right away: the kernel
+page cache can grow within the new limit, caching more relation data, and
+the backends gain headroom for their working memory. What does not adapt
+automatically is the statically-sized configuration: `shared_buffers`
+(typically sized at about 25% of the available memory) keeps its configured
+value, and raising it requires a restart of PostgreSQL. Parameters that only
+inform the planner, like `effective_cache_size`, can instead be updated
+without a restart.
+
 ## Integration with the Vertical Pod Autoscaler (VPA)
 
 The `Cluster` CRD exposes the `scale` subresource together with the label
@@ -150,11 +246,12 @@ spec:
 ```
 
 :::warning
-Do not use `updateMode: Auto`, `Recreate`, or `Initial` against a
-CloudNativePG-managed `Cluster`. The operator owns the pod specification and
-treats `spec.resources` of the `Cluster` as the source of truth: it does not
-adopt the resources VPA writes onto a running pod, so the live pod and the
-declared `spec.resources` silently diverge. Any tuning you sized against the
+Do not use `updateMode: Auto`, `Recreate`, `InPlaceOrRecreate`, or `Initial`
+against a CloudNativePG-managed `Cluster`. The operator owns the pod
+specification and treats `spec.resources` of the `Cluster` as the source of
+truth: it does not adopt the resources VPA writes onto a running pod, so the
+live pod and the declared `spec.resources` silently diverge (and with
+`resourcesUpdateStrategy: inPlace` the operator actively reverts them). Any tuning you sized against the
 declared resources (for example a `shared_buffers` value the operator
 validated against the memory request) no longer matches the pod's actual
 limits. VPA also evicts pods through the Kubernetes eviction API, bypassing

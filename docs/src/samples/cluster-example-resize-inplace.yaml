@@ -1,0 +1,23 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-resize-inplace
+spec:
+  instances: 3
+
+  # Apply changes to `resources` through the Kubernetes resize subresource
+  # whenever possible, without recreating the pods (requires Kubernetes 1.33
+  # or later). Changes that cannot be applied in place, such as memory limit
+  # decreases, fall back to a rolling update.
+  resourcesUpdateStrategy: inPlace
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: 1
+    limits:
+      memory: "1Gi"
+      cpu: 1
+
+  storage:
+    size: 1Gi
