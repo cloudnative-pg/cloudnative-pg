@@ -975,10 +975,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          case "${RUNNER_ARCH}" in
+            X64) K3D_ARCH=amd64 ;;
+            ARM64) K3D_ARCH=arm64 ;;
+            *) echo "::error::Unsupported RUNNER_ARCH for k3d: ${RUNNER_ARCH}"; exit 1 ;;
+          esac
           K3D_URL="https://github.com/k3d-io/k3d/releases/download/${{ env.K3D_VERSION }}"
-          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL "${K3D_URL}/k3d-linux-amd64" -o /tmp/k3d
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL "${K3D_URL}/k3d-linux-${K3D_ARCH}" -o /tmp/k3d
           curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL "${K3D_URL}/checksums.txt" -o /tmp/k3d-checksums.txt
-          grep '_dist/k3d-linux-amd64$' /tmp/k3d-checksums.txt | sed 's|_dist/k3d-linux-amd64|/tmp/k3d|' | sha256sum -c -
+          grep "_dist/k3d-linux-${K3D_ARCH}\$" /tmp/k3d-checksums.txt | sed "s|_dist/k3d-linux-${K3D_ARCH}|/tmp/k3d|" | sha256sum -c -
           install /tmp/k3d /usr/local/bin/k3d
           k3d version
       - name: Install kubectl
