@@ -22,11 +22,12 @@ package controller
 
 import (
 	"context"
-	"reflect"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,17 +39,24 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// updatePluginsStatus ensures that we load the plugins that are required to reconcile
-// this cluster
+// updatePluginsStatus rebuilds cluster.Status.PluginStatus from the metadata
+// reported by the already-loaded plugins, then patches the cluster only if
+// something changed
 func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *apiv1.Cluster) error {
-	// Load the plugins
 	pluginClient := cnpgiclient.GetPluginClientFromContext(ctx)
 
-	// Get the status of the plugins and store it inside the status section
 	oldCluster := cluster.DeepCopy()
 	metadataList := pluginClient.MetadataList()
 	cluster.Status.PluginStatus = make([]apiv1.PluginStatus, len(metadataList))
 	for i, entry := range metadataList {
+		// Check if this plugin already exists in the old cluster
+		if idx := slices.IndexFunc(oldCluster.Status.PluginStatus, func(p apiv1.PluginStatus) bool {
+			return p.Name == entry.Name
+		}); idx >= 0 {
+			// Copy the old entry so .Status survives: it is not part of the
+			// plugin's metadata. Every field below overwrites this copy from entry.
+			cluster.Status.PluginStatus[i] = oldCluster.Status.PluginStatus[idx]
+		}
 		cluster.Status.PluginStatus[i].Name = entry.Name
 		cluster.Status.PluginStatus[i].Version = entry.Version
 		cluster.Status.PluginStatus[i].Capabilities = entry.Capabilities
@@ -59,7 +67,7 @@ func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *ap
 	}
 
 	// If nothing changes, there's no need to hit the API server
-	if reflect.DeepEqual(oldCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
+	if equality.Semantic.DeepEqual(oldCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
 		return nil
 	}
 
