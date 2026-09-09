@@ -782,6 +782,9 @@ cnpg_pgbouncer_stats_avg_recv{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_avg_sent Average sent (to clients) bytes per second.
 # TYPE cnpg_pgbouncer_stats_avg_sent gauge
 cnpg_pgbouncer_stats_avg_sent{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_avg_server_assignment_count Average number of times a server was assigned to a client per second in the last stat period.
+# TYPE cnpg_pgbouncer_stats_avg_server_assignment_count gauge
+cnpg_pgbouncer_stats_avg_server_assignment_count{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_avg_server_parse_count Average number of prepared statements created by pgbouncer on a server.
 # TYPE cnpg_pgbouncer_stats_avg_server_parse_count gauge
 cnpg_pgbouncer_stats_avg_server_parse_count{database="pgbouncer"} 0
@@ -812,6 +815,9 @@ cnpg_pgbouncer_stats_total_received{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_total_sent Total volume in bytes of network traffic sent by pgbouncer.
 # TYPE cnpg_pgbouncer_stats_total_sent gauge
 cnpg_pgbouncer_stats_total_sent{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_total_server_assignment_count Total number of times a server was assigned to a client.
+# TYPE cnpg_pgbouncer_stats_total_server_assignment_count gauge
+cnpg_pgbouncer_stats_total_server_assignment_count{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_total_server_parse_count Total number of prepared statements created by pgbouncer on a server.
 # TYPE cnpg_pgbouncer_stats_total_server_parse_count gauge
 cnpg_pgbouncer_stats_total_server_parse_count{database="pgbouncer"} 0
