@@ -87,9 +87,10 @@ primary did not finish archiving are lost.
 
 ### Relationship with the primary isolation check
 
-The lease does not fence a primary that has lost connectivity to the
-Kubernetes API server but is still running; that is the job of the
-[primary isolation](instance_manager.md#primary-isolation) check.
+Holding the lease is not on its own enough to stop a primary that has lost
+connectivity to the Kubernetes API server but is still running: stopping it is
+the job of the [primary isolation](instance_manager.md#primary-isolation) check,
+which watches how long the lease has gone without a successful renewal.
 The two mechanisms are complementary and both are enabled by default:
 
 * The lease prevents *premature* promotion: a replica cannot promote
@@ -264,12 +265,15 @@ mechanism, driven by `tolerationSeconds` on the
 `node.kubernetes.io/unreachable` `NoExecute` taint (`300s` by default). That
 timer does not hold up the operator's failover decision; CloudNativePG
 promotes a new primary as soon as the `Ready` condition flips. By that point
-the kubelet on the isolated node has already stopped the old PostgreSQL
-container locally: with the default
-`.spec.probes.liveness.isolationCheck.enabled: true`, the instance manager
-fails its own liveness probe once it can reach neither the API server nor
-the rest of the cluster, and the kubelet kills the container within
-approximately three probe periods (`~30s`). Full high availability
+PostgreSQL on the isolated node has already been stopped locally: with the
+default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
+manager shuts PostgreSQL down once its primary lease has gone past the renew
+deadline without a successful renewal and it can reach neither the API server
+nor at least one of the other instances, which with the default lease timings is
+roughly 12 seconds. The
+instance manager then terminates along with PostgreSQL, so the container still
+ends up being restarted by the kubelet, but the shutdown no longer waits for a
+liveness probe to fail. Full high availability
 (recreation of the old primary on a healthy node by the operator) is still
 gated on the taint-based eviction actually deleting the pod.
 
