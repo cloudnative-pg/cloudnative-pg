@@ -1942,6 +1942,7 @@ _Appears in:_
 | `walCapabilities` _string array_ | WALCapabilities are the list of capabilities of the<br />plugin regarding the WAL management |  |  |  |
 | `backupCapabilities` _string array_ | BackupCapabilities are the list of capabilities of the<br />plugin regarding the Backup management |  |  |  |
 | `restoreJobHookCapabilities` _string array_ | RestoreJobHookCapabilities are the list of capabilities of the<br />plugin regarding the RestoreJobHook management |  |  |  |
+| `postgresCapabilities` _string array_ | PostgresCapabilities are the list of capabilities of the<br />plugin regarding the PostgreSQL configuration |  |  |  |
 | `status` _string_ | Status contain the status reported by the plugin through the SetStatusInCluster interface |  |  |  |
 
 
