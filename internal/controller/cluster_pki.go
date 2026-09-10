@@ -23,6 +23,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -339,7 +340,8 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 	case err == nil:
 		return r.renewAndUpdateCertificate(ctx, caSecret, &secret, altDNSNames)
 	case apierrors.IsNotFound(err):
-		serverSecret, err := generateCertificateFromCA(caSecret, commonName, usage, altDNSNames, secretName)
+		serverSecret, err := generateCertificateFromCA(
+			caSecret, commonName, usage, altDNSNames, secretName, certs.CertificateDuration())
 		if err != nil {
 			return err
 		}
@@ -357,20 +359,22 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 	}
 }
 
-// generateCertificateFromCA create a certificate secret using the provided CA secret
+// generateCertificateFromCA create a certificate secret using the provided CA
+// secret, with a leaf certificate living for the given duration.
 func generateCertificateFromCA(
 	caSecret *corev1.Secret,
 	commonName string,
 	usage certs.CertType,
 	altDNSNames []string,
 	secretName client.ObjectKey,
+	duration time.Duration,
 ) (*corev1.Secret, error) {
 	caPair, err := certs.ParseCASecret(caSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	serverPair, err := caPair.CreateAndSignPair(commonName, usage, altDNSNames)
+	serverPair, err := caPair.CreateAndSignPairWithDuration(commonName, usage, altDNSNames, duration)
 	if err != nil {
 		return nil, err
 	}
