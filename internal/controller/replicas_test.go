@@ -277,7 +277,13 @@ var _ = Describe("markOldPrimaryAsUnhealthy", func() {
 	})
 })
 
-var _ = Describe("Check pods not on primary node", func() {
+var _ = Describe("Check schedulable pods not on primary node", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
 	item1 := postgres.PostgresqlStatus{
 		IsPrimary: false,
 		Node:      "node-1",
@@ -292,13 +298,208 @@ var _ = Describe("Check pods not on primary node", func() {
 	statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
 
 	It("if primary is nil", func() {
-		Expect(GetPodsNotOnPrimaryNode(statusList, nil).Items).To(BeEmpty())
+		ctx := context.Background()
+		Expect(env.clusterReconciler.getSchedulablePodsNotOnPrimaryNode(ctx, statusList, nil).Items).To(BeEmpty())
 	})
 
 	item1.IsPrimary = true
 	statusList2 := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
 
 	It("first status element is primary", func() {
-		Expect(GetPodsNotOnPrimaryNode(statusList2, &statusList2.Items[0]).Items).ToNot(BeEmpty())
+		ctx := context.Background()
+
+		node2 := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
+		}
+		Expect(env.client.Create(ctx, &node2)).To(Succeed())
+
+		Expect(env.clusterReconciler.getSchedulablePodsNotOnPrimaryNode(ctx, statusList2, &statusList2.Items[0]).Items).
+			ToNot(BeEmpty())
+	})
+
+	It("excludes pods on unschedulable nodes", func() {
+		ctx := context.Background()
+
+		primaryNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "primary-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		cordonedNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "cordoned-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		schedulableNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "healthy-node"},
+		}
+		Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
+		Expect(env.client.Create(ctx, &cordonedNode)).To(Succeed())
+		Expect(env.client.Create(ctx, &schedulableNode)).To(Succeed())
+
+		primary := postgres.PostgresqlStatus{
+			IsPrimary: true,
+			Node:      "primary-node",
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-primary"}},
+		}
+		onCordonedNode := postgres.PostgresqlStatus{
+			IsPrimary: false,
+			Node:      "cordoned-node",
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-cordoned"}},
+		}
+		onMissingNode := postgres.PostgresqlStatus{
+			IsPrimary: false,
+			Node:      "missing-node",
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-missing-node"}},
+		}
+		onHealthyNode := postgres.PostgresqlStatus{
+			IsPrimary: false,
+			Node:      "healthy-node",
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-healthy"}},
+		}
+		list := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{primary, onCordonedNode, onMissingNode, onHealthyNode},
+		}
+
+		result := env.clusterReconciler.getSchedulablePodsNotOnPrimaryNode(ctx, list, &primary)
+		Expect(result.Items).To(HaveLen(1))
+		Expect(result.Items[0].Pod.Name).To(Equal("pod-healthy"))
+	})
+})
+
+var _ = Describe("shouldSetPrimaryToSchedulableNode", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	newStatus := func(podName, node string, isPrimary bool) postgres.PostgresqlStatus {
+		return postgres.PostgresqlStatus{
+			IsPrimary: isPrimary,
+			Node:      node,
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName}},
+		}
+	}
+
+	It("returns false when the primary is not on an unschedulable node", func() {
+		ctx := context.Background()
+		schedulableNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "primary-node"}}
+		Expect(env.client.Create(ctx, &schedulableNode)).To(Succeed())
+
+		primary := newStatus("pod-primary", "primary-node", true)
+		cluster := &apiv1.Cluster{
+			Spec:   apiv1.ClusterSpec{Instances: 3},
+			Status: apiv1.ClusterStatus{ReadyInstances: 3},
+		}
+		list := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary}}
+
+		Expect(env.clusterReconciler.shouldSetPrimaryToSchedulableNode(ctx, cluster, list, &primary)).To(BeFalse())
+	})
+
+	It("returns false when the primary's node can't be found", func() {
+		ctx := context.Background()
+
+		primary := newStatus("pod-primary", "missing-node", true)
+		cluster := &apiv1.Cluster{
+			Spec:   apiv1.ClusterSpec{Instances: 3},
+			Status: apiv1.ClusterStatus{ReadyInstances: 3},
+		}
+		list := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary}}
+
+		Expect(env.clusterReconciler.shouldSetPrimaryToSchedulableNode(ctx, cluster, list, &primary)).To(BeFalse())
+	})
+
+	It("returns false when the primary is on an unschedulable node but it is the only instance in the cluster", func() {
+		ctx := context.Background()
+
+		primaryNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "primary-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
+
+		primary := newStatus("pod-primary", "primary-node", true)
+		cluster := &apiv1.Cluster{
+			Spec:   apiv1.ClusterSpec{Instances: 1},
+			Status: apiv1.ClusterStatus{ReadyInstances: 1},
+		}
+		list := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary}}
+
+		Expect(env.clusterReconciler.shouldSetPrimaryToSchedulableNode(ctx, cluster, list, &primary)).To(BeFalse())
+	})
+
+	It("returns false when the primary is on an unschedulable node but instances are still becoming ready", func() {
+		ctx := context.Background()
+		primaryNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "primary-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		healthyNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "healthy-node"}}
+		Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
+		Expect(env.client.Create(ctx, &healthyNode)).To(Succeed())
+
+		primary := newStatus("pod-primary", "primary-node", true)
+		replica := newStatus("pod-replica", "healthy-node", false)
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+			// one instance is still joining, so we shouldn't disrupt the primary yet
+			Status: apiv1.ClusterStatus{ReadyInstances: 2},
+		}
+		list := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary, replica}}
+
+		Expect(env.clusterReconciler.shouldSetPrimaryToSchedulableNode(ctx, cluster, list, &primary)).To(BeFalse())
+	})
+
+	It("returns false when not all the replicas have moved to a schedulable node yet", func() {
+		ctx := context.Background()
+		primaryNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "primary-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		unhealthyNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "unhealthy-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		healthyNode := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "healthy-node"}}
+		Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
+		Expect(env.client.Create(ctx, &unhealthyNode)).To(Succeed())
+		Expect(env.client.Create(ctx, &healthyNode)).To(Succeed())
+
+		primary := newStatus("pod-primary", "primary-node", true)
+		// still stuck on the primary's (unschedulable) node
+		replicaNotYetMoved := newStatus("pod-replica-1", "unhealthy-node", false)
+		replicaMoved := newStatus("pod-replica-2", "healthy-node", false)
+		list := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{primary, replicaNotYetMoved, replicaMoved},
+		}
+		cluster := &apiv1.Cluster{
+			Spec:   apiv1.ClusterSpec{Instances: 3},
+			Status: apiv1.ClusterStatus{ReadyInstances: 3},
+		}
+
+		Expect(env.clusterReconciler.shouldSetPrimaryToSchedulableNode(ctx, cluster, list, &primary)).To(BeFalse())
+	})
+
+	It("returns true when the primary is unschedulable and all replicas have moved to schedulable nodes", func() {
+		ctx := context.Background()
+		primaryNode := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "primary-node"},
+			Spec:       corev1.NodeSpec{Unschedulable: true},
+		}
+		healthyNode1 := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "healthy-node-1"}}
+		healthyNode2 := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "healthy-node-2"}}
+		Expect(env.client.Create(ctx, &primaryNode)).To(Succeed())
+		Expect(env.client.Create(ctx, &healthyNode1)).To(Succeed())
+		Expect(env.client.Create(ctx, &healthyNode2)).To(Succeed())
+
+		primary := newStatus("pod-primary", "primary-node", true)
+		replica1 := newStatus("pod-replica-1", "healthy-node-1", false)
+		replica2 := newStatus("pod-replica-2", "healthy-node-2", false)
+		list := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary, replica1, replica2}}
+		cluster := &apiv1.Cluster{
+			Spec:   apiv1.ClusterSpec{Instances: 3},
+			Status: apiv1.ClusterStatus{ReadyInstances: 3},
+		}
+
+		Expect(env.clusterReconciler.shouldSetPrimaryToSchedulableNode(ctx, cluster, list, &primary)).To(BeTrue())
 	})
 })
