@@ -48,6 +48,10 @@ import (
 // and the new primary have not completed the promotion
 var errSwitchoverInProgress = fmt.Errorf("switchover in progress, refusing archiving")
 
+// errStandbySignalCheck is raised when the archiver cannot determine whether
+// the instance is running as a standby by checking the standby.signal file
+var errStandbySignalCheck = fmt.Errorf("failed to check standby.signal")
+
 // ErrMissingWALArchiverPlugin is raised when we try to archive a WAL
 // file with a CNPG-i plugin whose socket does not exist.
 type ErrMissingWALArchiverPlugin struct {
@@ -127,30 +131,63 @@ func Run(
 	cluster *apiv1.Cluster,
 	walName string,
 ) error {
+	if cluster.IsReplica() {
+		return runForReplicaCluster(ctx, podName, pgData, cluster, walName)
+	}
+	return runForPrimaryCluster(ctx, podName, pgData, cluster, walName)
+}
+
+// runForReplicaCluster implements WAL archiving for replica clusters.
+// Only the designated primary (CurrentPrimary or TargetPrimary) archives WAL;
+// all other instances skip silently.
+func runForReplicaCluster(
+	ctx context.Context,
+	podName, pgData string,
+	cluster *apiv1.Cluster,
+	walName string,
+) error {
 	contextLog := log.FromContext(ctx)
 
-	if cluster.IsReplica() {
-		if podName != cluster.Status.CurrentPrimary && podName != cluster.Status.TargetPrimary {
-			contextLog.Debug("WAL archiving on a replica cluster, "+
-				"but this node is not the target primary nor the current one. "+
-				"Skipping WAL archiving",
-				"walName", walName,
-				"currentPrimary", cluster.Status.CurrentPrimary,
-				"targetPrimary", cluster.Status.TargetPrimary,
-			)
-			return nil
-		}
-	}
-
-	if cluster.Status.CurrentPrimary != podName {
-		contextLog.Info("Refusing to archive WAL when there is a switchover in progress",
+	if podName != cluster.Status.CurrentPrimary && podName != cluster.Status.TargetPrimary {
+		contextLog.Debug("WAL archiving on a replica cluster, "+
+			"but this node is not the target primary nor the current one. "+
+			"Skipping WAL archiving",
+			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
-			"podName", podName)
-		return errSwitchoverInProgress
+		)
+		return nil
 	}
 
 	return internalRun(ctx, pgData, cluster, walName)
+}
+
+// runForPrimaryCluster implements WAL archiving for primary clusters.
+func runForPrimaryCluster(
+	ctx context.Context,
+	podName, pgData string,
+	cluster *apiv1.Cluster,
+	walName string,
+) error {
+	contextLog := log.FromContext(ctx)
+
+	if cluster.Status.CurrentPrimary == podName {
+		return internalRun(ctx, pgData, cluster, walName)
+	}
+
+	isStandby, err := fileutils.FileExists(filepath.Join(pgData, "standby.signal"))
+	if err != nil {
+		return fmt.Errorf("%w: %w", errStandbySignalCheck, err)
+	}
+	if isStandby {
+		return nil
+	}
+
+	contextLog.Info("Refusing to archive WAL when there is a switchover in progress",
+		"currentPrimary", cluster.Status.CurrentPrimary,
+		"targetPrimary", cluster.Status.TargetPrimary,
+		"podName", podName)
+	return errSwitchoverInProgress
 }
 
 func internalRun(

@@ -212,7 +212,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName)
 
 			replicationasserts.AssertDetachReplicaModeCluster(
-				env, testTimeouts,
+				env,
 				namespace,
 				srcClusterName,
 				sourceDBName,
@@ -883,7 +883,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 		// "restart" applies it in place (timeline 2); "switchover" instead promotes a
 		// different instance to apply it, costing a second switch (timeline 3).
 		Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
-		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
+		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 2),
 	)
 })
 
