@@ -28,13 +28,112 @@ import (
 	barmanApi "github.com/cloudnative-pg/barman-cloud/pkg/api"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/thoas/go-funk"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("restoring a VolumeSnapshot", func() {
+	It("writes backup metadata during immediate replica recovery", func(ctx SpecContext) {
+		const (
+			clusterName = "cluster"
+			namespace   = "namespace"
+		)
+
+		pgData := GinkgoT().TempDir()
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      clusterName,
+				Namespace: namespace,
+			},
+		}
+		cli := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
+
+		backupLabel := []byte("backup label")
+		tablespaceMap := []byte("tablespace map")
+		pgControl := []byte("pg_control")
+		Expect(os.MkdirAll(path.Join(pgData, "global"), 0o700)).To(Succeed())
+		Expect(os.WriteFile(path.Join(pgData, constants.BackupLabelFile), []byte("stale"), 0o600)).To(Succeed())
+		Expect(os.WriteFile(path.Join(pgData, constants.TablespaceMapFile), []byte("stale"), 0o600)).To(Succeed())
+		Expect(os.WriteFile(
+			path.Join(pgData, "global", constants.PgControlFile),
+			[]byte("stale"),
+			0o600,
+		)).To(Succeed())
+
+		info := InitInfo{
+			ClusterName:       clusterName,
+			Namespace:         namespace,
+			PgData:            pgData,
+			BackupLabelFile:   backupLabel,
+			TablespaceMapFile: tablespaceMap,
+			PgControlFile:     pgControl,
+		}
+		Expect(info.RestoreSnapshot(ctx, cli, true)).To(Succeed())
+
+		content, err := os.ReadFile(path.Join(pgData, constants.BackupLabelFile))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(content).To(Equal(backupLabel))
+
+		content, err = os.ReadFile(path.Join(pgData, constants.TablespaceMapFile))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(content).To(Equal(tablespaceMap))
+
+		content, err = os.ReadFile(path.Join(pgData, "global", constants.PgControlFile))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(content).To(Equal(pgControl))
+	})
+
+	It("keeps the snapshot pg_control when restoring legacy backup metadata", func(ctx SpecContext) {
+		const (
+			clusterName = "cluster"
+			namespace   = "namespace"
+		)
+
+		pgData := GinkgoT().TempDir()
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      clusterName,
+				Namespace: namespace,
+			},
+		}
+		cli := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
+
+		snapshotPgControl := []byte("snapshot pg_control")
+		Expect(os.MkdirAll(path.Join(pgData, "global"), 0o700)).To(Succeed())
+		Expect(os.WriteFile(
+			path.Join(pgData, "global", constants.PgControlFile),
+			snapshotPgControl,
+			0o600,
+		)).To(Succeed())
+
+		info := InitInfo{
+			ClusterName:       clusterName,
+			Namespace:         namespace,
+			PgData:            pgData,
+			BackupLabelFile:   []byte("backup label"),
+			TablespaceMapFile: []byte("tablespace map"),
+		}
+		Expect(info.RestoreSnapshot(ctx, cli, true)).To(Succeed())
+
+		content, err := os.ReadFile(path.Join(pgData, "global", constants.PgControlFile))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(content).To(Equal(snapshotPgControl))
+	})
+})
 
 var _ = Describe("testing restore InitInfo methods", func() {
 	tempDir, err := os.MkdirTemp("", "restore")
