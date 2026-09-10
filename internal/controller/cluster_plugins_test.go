@@ -69,6 +69,7 @@ var _ = Describe("updatePluginsStatus", func() {
 				WALCapabilities:            []string{},
 				BackupCapabilities:         []string{},
 				RestoreJobHookCapabilities: []string{},
+				PostgresCapabilities:       []string{},
 			}
 		}
 		return result
@@ -118,6 +119,40 @@ var _ = Describe("updatePluginsStatus", func() {
 
 		pluginCli = &fakePluginClient{}
 		reconciler = &ClusterReconciler{Client: fakeClient}
+	})
+
+	It("reports every capability list the plugin declares", func(ctx SpecContext) {
+		// PluginStatus mirrors connection.Metadata, so a capability list added
+		// to the metadata and not copied here is silently invisible to the user.
+		metadata := connection.Metadata{
+			Name:                       pluginName,
+			Version:                    "1.0.0",
+			Capabilities:               []string{"CAPABILITY"},
+			OperatorCapabilities:       []string{"OPERATOR_CAPABILITY"},
+			WALCapabilities:            []string{"WAL_CAPABILITY"},
+			BackupCapabilities:         []string{"BACKUP_CAPABILITY"},
+			RestoreJobHookCapabilities: []string{"RESTORE_JOB_HOOK_CAPABILITY"},
+			PostgresCapabilities:       []string{"POSTGRES_CAPABILITY"},
+		}
+		pluginCli.metadataList = []connection.Metadata{metadata}
+		pluginCtx := cnpgiclient.SetPluginClientInContext(ctx, pluginCli)
+		cluster.Status.PluginStatus = nil
+		Expect(reconciler.updatePluginsStatus(pluginCtx, cluster)).To(Succeed())
+
+		var fresh apiv1.Cluster
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
+		Expect(fresh.Status.PluginStatus).To(HaveLen(1))
+		Expect(fresh.Status.PluginStatus[0]).To(Equal(apiv1.PluginStatus{
+			Name:                       metadata.Name,
+			Version:                    metadata.Version,
+			Capabilities:               metadata.Capabilities,
+			OperatorCapabilities:       metadata.OperatorCapabilities,
+			WALCapabilities:            metadata.WALCapabilities,
+			BackupCapabilities:         metadata.BackupCapabilities,
+			RestoreJobHookCapabilities: metadata.RestoreJobHookCapabilities,
+			PostgresCapabilities:       metadata.PostgresCapabilities,
+		}))
+		Expect(statusPatches).To(Equal(1))
 	})
 
 	It("preserves the status reported by the plugin across the rebuild", func() {
@@ -186,39 +221,6 @@ var _ = Describe("updatePluginsStatus", func() {
 
 		Expect(cluster.Status.PluginStatus).To(HaveLen(1))
 		Expect(cluster.Status.PluginStatus[0].Name).To(Equal(otherPluginName))
-	})
-	It("reports every capability list the plugin declares", func(ctx SpecContext) {
-		// PluginStatus mirrors connection.Metadata, so a capability list added
-		// to the metadata and not copied here is silently invisible to the user.
-		metadata := connection.Metadata{
-			Name:                       "plugin-a",
-			Version:                    "1.0.0",
-			Capabilities:               []string{"CAPABILITY"},
-			OperatorCapabilities:       []string{"OPERATOR_CAPABILITY"},
-			WALCapabilities:            []string{"WAL_CAPABILITY"},
-			BackupCapabilities:         []string{"BACKUP_CAPABILITY"},
-			RestoreJobHookCapabilities: []string{"RESTORE_JOB_HOOK_CAPABILITY"},
-			PostgresCapabilities:       []string{"POSTGRES_CAPABILITY"},
-		}
-		pluginCtx := cnpgiclient.SetPluginClientInContext(ctx, &fakePluginClient{
-			metadataList: []connection.Metadata{metadata},
-		})
-
-		Expect(reconciler.updatePluginsStatus(pluginCtx, cluster)).To(Succeed())
-
-		var fresh apiv1.Cluster
-		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
-		Expect(fresh.Status.PluginStatus).To(HaveLen(1))
-		Expect(fresh.Status.PluginStatus[0]).To(Equal(apiv1.PluginStatus{
-			Name:                       metadata.Name,
-			Version:                    metadata.Version,
-			Capabilities:               metadata.Capabilities,
-			OperatorCapabilities:       metadata.OperatorCapabilities,
-			WALCapabilities:            metadata.WALCapabilities,
-			BackupCapabilities:         metadata.BackupCapabilities,
-			RestoreJobHookCapabilities: metadata.RestoreJobHookCapabilities,
-			PostgresCapabilities:       metadata.PostgresCapabilities,
-		}))
 	})
 })
 
