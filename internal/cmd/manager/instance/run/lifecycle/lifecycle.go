@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
 )
 
 // PostgresLifecycle implements the manager.Runnable interface for a postgres.Instance
@@ -132,6 +133,9 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				if err := i.instance.TryShuttingDownSmartFast(ctx); err != nil {
 					contextLogger.Error(err, "error shutting down instance, proceeding")
 				}
+				if err := archiver.ArchiveAllReadyWALs(ctx, i.instance.GetClusterOrDefault(), i.instance.PgData); err != nil {
+					contextLogger.Error(err, "error archiving WALs before exiting, proceeding")
+				}
 				return nil
 
 			case sig := <-signals:
@@ -145,6 +149,9 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				)
 				if err := i.instance.TryShuttingDownSmartFast(ctx); err != nil {
 					contextLogger.Error(err, "error while shutting down instance, proceeding")
+				}
+				if err := archiver.ArchiveAllReadyWALs(ctx, i.instance.GetClusterOrDefault(), i.instance.PgData); err != nil {
+					contextLogger.Error(err, "error archiving WALs before exiting, proceeding")
 				}
 				return nil
 
