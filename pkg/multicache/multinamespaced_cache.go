@@ -26,6 +26,8 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,6 +40,7 @@ type multiNamespaceCache struct {
 	namespaces    *stringset.Data
 	multiCache    cache.Cache
 	externalCache cache.Cache
+	apiReader     client.Reader
 }
 
 // Just to ensure we respect the interface
@@ -48,12 +51,25 @@ var _ cache.Cache = &multiNamespaceCache{}
 // plain client, to requests belonging to namespaces different from the specified
 // ones.
 func DelegatingMultiNamespacedCacheBuilder(namespaces []string, operatorNamespace string) cache.NewCacheFunc {
+	transform := func(obj interface{}) (interface{}, error) {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return obj, nil
+		}
+
+		secret.Data = nil
+
+		return secret, nil
+	}
+
 	return func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 		if opts.DefaultNamespaces == nil {
 			opts.DefaultNamespaces = make(map[string]cache.Config)
 		}
 		for _, namespace := range namespaces {
-			opts.DefaultNamespaces[namespace] = cache.Config{}
+			opts.DefaultNamespaces[namespace] = cache.Config{
+				Transform: transform,
+			}
 		}
 		multiCache, err := cache.New(config, opts)
 		if err != nil {
@@ -62,16 +78,24 @@ func DelegatingMultiNamespacedCacheBuilder(namespaces []string, operatorNamespac
 
 		// create a cache for external resources
 		externalOpts := opts
-		externalOpts.DefaultNamespaces[operatorNamespace] = cache.Config{}
+		externalOpts.DefaultNamespaces[operatorNamespace] = cache.Config{
+			Transform: transform,
+		}
 		externalCache, err := cache.New(config, externalOpts)
 		if err != nil {
 			return nil, fmt.Errorf("error creating global cache %v", err)
+		}
+
+		apiReader, err := client.New(config, client.Options{Scheme: opts.Scheme})
+		if err != nil {
+			return nil, fmt.Errorf("error creating API reader: %v", err)
 		}
 
 		return &multiNamespaceCache{
 			namespaces:    stringset.From(namespaces),
 			multiCache:    multiCache,
 			externalCache: externalCache,
+			apiReader:     apiReader,
 		}, nil
 	}
 }
@@ -148,6 +172,12 @@ func (c *multiNamespaceCache) Get(
 	obj client.Object,
 	opts ...client.GetOption,
 ) error {
+	// Secrets are fetched directly from the API server since the cache
+	// strips their data to reduce memory usage.
+	if _, isSecret := obj.(*corev1.Secret); isSecret {
+		return c.apiReader.Get(ctx, key, obj, opts...)
+	}
+
 	// If the object we are looking for is in one of the watched namespaces just use
 	// the multi-cache, otherwise we can use the global one
 	if key.Namespace != "" && c.namespaces.Has(key.Namespace) {
