@@ -54,3 +54,15 @@ func (sl ReplicationSlotList) Get(name string) *ReplicationSlot {
 func (sl ReplicationSlotList) Has(name string) bool {
 	return sl.Get(name) != nil
 }
+
+// LogicalReplicationSlot represents a logical replication slot for logical decoding.
+// It parallels ReplicationSlot but captures logical-slot-specific fields
+// like Plugin and Synced (PG17+) instead of physical-slot fields like IsHA.
+type LogicalReplicationSlot struct {
+	SlotName   string `json:"slotName"`             // The slot's unique identifier
+	Plugin     string `json:"plugin,omitempty"`     // Output plugin (e.g., "pgoutput", "wal2json")
+	Active     bool   `json:"active"`               // True if a consumer is connected to the slot
+	RestartLSN string `json:"restartLSN,omitempty"` // WAL position from which the slot can start decoding
+	Synced     bool   `json:"synced"`               // PG17+: false if locally created, true if synced from primary
+	Failover   bool   `json:"failover"`             // PG17+: true if slot is configured for failover synchronization
+}
