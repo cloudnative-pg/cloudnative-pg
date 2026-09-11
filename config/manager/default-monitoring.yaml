@@ -161,6 +161,21 @@ data:
             usage: "GAUGE"
             description: "Replication lag in bytes"
 
+    pg_roles:
+      query: |
+        SELECT rolname
+          , EXTRACT(EPOCH FROM rolvaliduntil) AS password_valid_until_seconds
+        FROM pg_catalog.pg_roles
+        WHERE rolcanlogin
+          AND pg_catalog.isfinite(rolvaliduntil)
+      metrics:
+        - rolname:
+            usage: "LABEL"
+            description: "Name of the role"
+        - password_valid_until_seconds:
+            usage: "GAUGE"
+            description: "Time at which the role's password expires (based on epoch)"
+
     pg_stat_archiver:
       query: |
         SELECT archived_count
