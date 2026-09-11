@@ -31,6 +31,21 @@ automated, and consistent approach to managing PostgreSQL databases.
     tools or rely on the applications themselves.
 :::
 
+### Connection and Privileges
+
+Every SQL statement described on this page is issued by the instance manager
+running on the primary, as the `postgres` superuser: database-level commands
+over a connection to the `postgres` database, and everything scoped inside a
+database over a connection to that database. Two consequences are worth keeping
+in mind:
+
+- A schema or a foreign data wrapper declared without an `owner` belongs to
+  `postgres`, and the database owner holds no privileges on it until they are
+  declared.
+- Grants and revokes never fail for lack of `GRANT OPTION`, because a superuser
+  acts as the object owner. A privilege you declare is applied even where the
+  database owner could not have granted it itself.
+
 ### Declarative `Database` Manifest
 
 The following example demonstrates how a `Database` resource interacts with a
@@ -64,7 +79,9 @@ role, in the `cluster-example` PostgreSQL cluster.
 
 - `metadata.name`: Unique name of the Kubernetes object within its namespace.
 - `spec.name`: Name of the database as it will appear in PostgreSQL.
-- `spec.owner`: PostgreSQL role that owns the database.
+- `spec.owner`: PostgreSQL role that owns the database. The role must
+  already exist in the cluster, since CloudNativePG does not create it as
+  part of managing the database. See [PostgreSQL Role management](declarative_role_management.md) for how to declare one.
 - `spec.cluster.name`: Name of the target PostgreSQL cluster.
 
 The `Database` object must reference a specific `Cluster`, determining where
@@ -263,23 +280,49 @@ spec:
   schemas:
     - name: app
       owner: app
+      permissions:
+        usage:
+          - name: public
+            type: revoke
 # ...
 ```
 
 Each schema entry supports the following properties:
 
 - `name` *(mandatory)*: The name of the schema.
-- `owner`: The owner of the schema.
-- `ensure`: Specifies whether the schema should be present or absent in the
-  database:
-    - `present`: Ensures that the schema is installed (default).
-    - `absent`: Ensures that the schema is removed.
+- `owner`: The owner of the schema. If left empty, the schema is owned by
+  `postgres`, the role CloudNativePG uses to connect to the database.
+- `ensure`: Defines whether the schema should exist in the database:
+    - `present`: Ensures that the schema is created (default).
+    - `absent`: Ensures that the schema is dropped.
+- `permissions`: Manages `USAGE` and `CREATE` privileges on the schema:
+    - `usage`: A list of `USAGE` privilege specifications.
+    - `create`: A list of `CREATE` privilege specifications.
+
+Both `usage` and `create` items accept the following fields:
+
+- `name` *(required, string)*: The target role name. Using `public` targets the
+  PostgreSQL `PUBLIC` pseudo-role (which applies to all existing and future
+  roles).
+- `type` *(string)*: The action to take on the privilege. Accepts `grant` or
+  `revoke` (default: `grant`).
 
 :::info
     CloudNativePG manages schemas using the following PostgreSQL’s SQL commands:
     [`CREATE SCHEMA`](https://www.postgresql.org/docs/current/sql-createschema.html),
     [`DROP SCHEMA`](https://www.postgresql.org/docs/current/sql-dropschema.html),
-    [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html).
+    [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html),
+    [`GRANT`](https://www.postgresql.org/docs/current/sql-grant.html),
+    [`REVOKE`](https://www.postgresql.org/docs/current/sql-revoke.html).
+:::
+
+:::warning
+    Privileges are applied when the `Database` spec changes, not continuously.
+    CloudNativePG never reads back the privileges currently held in PostgreSQL,
+    so one granted or revoked directly in the database is not brought back to
+    the declared state until the spec is modified. Removing an entry from
+    `usage` or `create` likewise revokes nothing: to remove a privilege, set its
+    `type` field to `revoke`.
 :::
 
 ## Managing Foreign Data Wrappers (FDWs) in a Database
