@@ -141,7 +141,7 @@ func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
 		}
 	}()
 
-	f, err := fileutils.OpenFileAsync(ctx, p.fileName, os.O_RDONLY, 0o600)
+	f, err := fileutils.OpenFileAsync(ctx, p.fileName, os.O_RDWR, 0o600)
 	if err != nil {
 		return err
 	}
