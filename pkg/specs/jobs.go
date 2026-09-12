@@ -452,6 +452,7 @@ func CreatePrimaryJob(
 					Containers: []corev1.Container{
 						initContainer.Container,
 					},
+<<<<<<< HEAD
 					Volumes: append(
 						createPostgresVolumes(&cluster, instanceName, extList),
 						initContainer.Volumes...,
@@ -464,6 +465,18 @@ func CreatePrimaryJob(
 					RestartPolicy:                corev1.RestartPolicyNever,
 					NodeSelector:                 cluster.Spec.Affinity.NodeSelector,
 					TopologySpreadConstraints:    cluster.Spec.TopologySpreadConstraints,
+=======
+					Volumes:                   createPostgresVolumes(&cluster, instanceName, extList),
+					SecurityContext:           GetPodSecurityContext(&cluster),
+					Affinity:                  CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
+					Tolerations:               cluster.Spec.Affinity.Tolerations,
+					ServiceAccountName:        cluster.GetServiceAccountName(),
+					RestartPolicy:             corev1.RestartPolicyNever,
+					NodeSelector:              cluster.Spec.Affinity.NodeSelector,
+					TopologySpreadConstraints: cluster.Spec.TopologySpreadConstraints,
+					DNSPolicy:                 cluster.Spec.DNSPolicy,
+					DNSConfig:                 cluster.Spec.DNSConfig,
+>>>>>>> a6911800d (feat: allow configuring dnsPolicy and dnsConfig for Cluster pods)
 				},
 			},
 		},

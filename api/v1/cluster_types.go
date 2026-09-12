@@ -403,6 +403,20 @@ type ClusterSpec struct {
 	// +optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 
+	// DNSPolicy sets the DNS policy for every generated Pod. Defaults to the
+	// Kubernetes default ("ClusterFirst") when not specified. More info:
+	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
+	// +kubebuilder:validation:Enum=ClusterFirstWithHostNet;ClusterFirst;Default;None
+	// +optional
+	DNSPolicy corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+
+	// DNSConfig specifies the DNS parameters of every generated Pod. Parameters
+	// given here are merged with the base configuration generated from DNSPolicy.
+	// More info:
+	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-config
+	// +optional
+	DNSConfig *corev1.PodDNSConfig `json:"dnsConfig,omitempty"`
+
 	// Resources requirements of every generated Pod. Please refer to
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// for more information.
