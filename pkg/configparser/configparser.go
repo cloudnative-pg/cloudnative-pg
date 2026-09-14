@@ -64,7 +64,7 @@ var configparserLog = log.WithName("configparser")
 
 // ReadConfigMap reads the configuration from the environment and the passed in data map.
 // Config and defaults are supposed to be pointers to structs of the same type
-func ReadConfigMap(target interface{}, defaults interface{}, data map[string]string) { //nolint: gocognit
+func ReadConfigMap(target any, defaults any, data map[string]string) { //nolint: gocognit
 	ensurePointerToCompatibleStruct("target", target, "default", defaults)
 
 	count := reflect.TypeOf(defaults).Elem().NumField()
@@ -187,7 +187,7 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 	}
 }
 
-func ensurePointerToStruct(name string, data interface{}) {
+func ensurePointerToStruct(name string, data any) {
 	errMsg := fmt.Sprintf(
 		"%v: expecting pointer to struct (found %v)",
 		name,
@@ -203,7 +203,7 @@ func ensurePointerToStruct(name string, data interface{}) {
 }
 
 func ensurePointerToCompatibleStruct(
-	firstName string, firstValue interface{}, secondName string, secondValue interface{},
+	firstName string, firstValue any, secondName string, secondValue any,
 ) {
 	errMsg := fmt.Sprintf(
 		"%v and %v are different structs",
