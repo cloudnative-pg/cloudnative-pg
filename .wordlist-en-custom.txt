@@ -118,6 +118,7 @@ ConnectionLimit
 ContainerID
 ContinuousArchiving
 ContinuousArchivingFailing
+CrashLoopBackOff
 Cron
 CronJobs
 CustomResourceDefinition
@@ -822,6 +823,7 @@ connectionTimeout
 conninfo
 containerImage
 containerPort
+containerd
 controldata
 coredump
 coreos
@@ -1481,6 +1483,7 @@ searchAttribute
 searchFilter
 sebv
 seccompProfile
+seccompprofile
 secretAccessKey
 secretKeyRef
 secretName
@@ -1599,6 +1602,8 @@ synchronousreplicaconfigurationmethod
 syncreplicaelectionconstraints
 syncreplicas
 sys
+syscall's
+syscalls
 syslog
 systemID
 systemd
@@ -1669,6 +1674,7 @@ updateStrategy
 upgradable
 uptime
 uri
+uring
 url
 usagespec
 usagespectype
