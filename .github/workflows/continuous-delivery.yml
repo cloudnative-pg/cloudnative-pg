@@ -2401,10 +2401,10 @@ jobs:
             done
           ) &
           WATCHER_PID=$!
+          trap 'kill "$WATCHER_PID" 2>/dev/null || true' EXIT
 
           preflight check operator ${BUNDLE_IMG} \
             --docker-config docker-config.json --loglevel trace
-          kill "$WATCHER_PID" || true
       -
         name: Check preflight operator results
         run: |
