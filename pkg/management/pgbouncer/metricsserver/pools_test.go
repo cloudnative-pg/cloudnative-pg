@@ -134,6 +134,40 @@ var _ = Describe("Exporter", func() {
 			Expect(errorsMetric.GetCounter().GetValue()).To(BeEquivalentTo(1))
 		})
 
+		It("should keep collecting later rows after one row fails to scan", func() {
+			mock.ExpectQuery("SHOW POOLS;").
+				WillReturnRows(sqlmock.NewRows(columns16).
+					AddRow("db1", "user1", "error", 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, "session").
+					AddRow("db2", "user2", 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, "transaction"))
+
+			poolsRegistry := prometheus.NewPedanticRegistry()
+			poolsRegistry.MustRegister(exp.Metrics.ShowPools)
+
+			exp.collectShowPools(ch, db)
+
+			registry.MustRegister(exp.Metrics.PgCollectionErrors)
+
+			metrics, err := registry.Gather()
+			Expect(err).ToNot(HaveOccurred())
+
+			errorsMetric := getMetric(metrics, collectionErrorsTotalKey).GetMetric()[0]
+			Expect(errorsMetric.GetCounter().GetValue()).To(BeEquivalentTo(1))
+
+			poolsMetrics, err := poolsRegistry.Gather()
+			Expect(err).ToNot(HaveOccurred())
+
+			clActive := getMetric(poolsMetrics, "cnpg_pgbouncer_pools_cl_active")
+			Expect(clActive.GetMetric()).To(HaveLen(1), "the failed row should not have published a metric")
+
+			labels := map[string]string{}
+			for _, l := range clActive.GetMetric()[0].GetLabel() {
+				labels[l.GetName()] = l.GetValue()
+			}
+			Expect(labels["database"]).To(BeEquivalentTo("db2"))
+			Expect(labels["user"]).To(BeEquivalentTo("user2"))
+			Expect(clActive.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(21))
+		})
+
 		It("should bind every released SHOW POOLS column to its own gauge", func() {
 			// Column list of PgBouncer 1.25.2, src/admin.c admin_show_pools(). The gauge names are
 			// spelled out rather than derived from byColumn, so a renamed or re-pointed gauge fails
