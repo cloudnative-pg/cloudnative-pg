@@ -300,6 +300,29 @@ type ClusterSpec struct {
 	// +optional
 	ReplicaCluster *ReplicaClusterConfiguration `json:"replica,omitempty"`
 
+	// RecoveryTarget specifies a runtime PostgreSQL recovery target
+	// (`recovery_target_time`, `recovery_target_lsn`, `recovery_target_xid`,
+	// `recovery_target_name`) for an already-bootstrapped standby cluster.
+	// When set, the operator renders the corresponding `recovery_target_*`
+	// GUCs into the generated PostgreSQL configuration and triggers a
+	// rolling restart of the instance(s) so the GUCs take effect at server
+	// start (PostgreSQL requires `recovery_target_*` to be set at start).
+	// On reaching the target, replay pauses (default `targetAction = pause`),
+	// allowing operators to verify state before promoting via
+	// `replica.enabled = false` or by setting `targetAction = promote`.
+	// This field is meaningful only while the cluster is in recovery
+	// (i.e. `replica.enabled = true`); it is ignored for primaries.
+	// +optional
+	RecoveryTarget *RecoveryTarget `json:"recoveryTarget,omitempty"`
+
+	// RecoveryTargetAction specifies what action the server should take
+	// once the recovery target is reached. One of `pause`, `promote`,
+	// `shutdown`. Defaults to `pause` when `RecoveryTarget` is set.
+	// Maps to PostgreSQL `recovery_target_action`.
+	// +optional
+	// +kubebuilder:validation:Enum=pause;promote;shutdown
+	RecoveryTargetAction string `json:"recoveryTargetAction,omitempty"`
+
 	// The secret containing the superuser password. If not defined a new
 	// secret will be created with a randomly generated password
 	// +optional
