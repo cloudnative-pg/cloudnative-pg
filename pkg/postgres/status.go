@@ -103,6 +103,25 @@ type PostgresqlStatus struct {
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
+
+	// VolumeUsages reports per-volume disk space usage as measured by the
+	// instance manager. Empty when the instance could not measure any volume.
+	VolumeUsages []VolumeUsage `json:"volumeUsages,omitempty"`
+}
+
+// VolumeUsage describes disk space usage for a single volume mounted in
+// the instance (e.g. PGDATA, the WAL volume, or a tablespace volume).
+type VolumeUsage struct {
+	// Name identifies the volume: "pgdata", "wal", or "tbs-<tablespace>".
+	Name string `json:"name"`
+	// MountPoint is the filesystem path that was measured.
+	MountPoint string `json:"mountPoint"`
+	// TotalBytes is the total size of the volume's filesystem.
+	TotalBytes uint64 `json:"totalBytes"`
+	// UsedBytes is the space currently in use.
+	UsedBytes uint64 `json:"usedBytes"`
+	// AvailableBytes is the space available to unprivileged users.
+	AvailableBytes uint64 `json:"availableBytes"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance

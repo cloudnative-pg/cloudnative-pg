@@ -354,3 +354,24 @@ var _ = Describe("Configuration report", func() {
 		),
 	)
 })
+
+var _ = Describe("VolumeUsage JSON round-trip", func() {
+	It("marshals and unmarshals VolumeUsages", func() {
+		in := PostgresqlStatus{
+			VolumeUsages: []VolumeUsage{
+				{Name: "pgdata", MountPoint: "/pgdata", TotalBytes: 100, UsedBytes: 40, AvailableBytes: 55},
+			},
+		}
+		data, err := json.Marshal(in)
+		Expect(err).NotTo(HaveOccurred())
+
+		var out PostgresqlStatus
+		Expect(json.Unmarshal(data, &out)).To(Succeed())
+		Expect(out.VolumeUsages).To(HaveLen(1))
+		Expect(out.VolumeUsages[0].Name).To(Equal("pgdata"))
+		Expect(out.VolumeUsages[0].MountPoint).To(Equal("/pgdata"))
+		Expect(out.VolumeUsages[0].TotalBytes).To(BeNumerically("==", 100))
+		Expect(out.VolumeUsages[0].UsedBytes).To(BeNumerically("==", 40))
+		Expect(out.VolumeUsages[0].AvailableBytes).To(BeNumerically("==", 55))
+	})
+})

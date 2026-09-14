@@ -316,6 +316,26 @@ cnpg_collector_wal_write{stats_reset="2023-06-19T10:51:27.473259Z"} 7243
 # TYPE cnpg_collector_wal_write_time gauge
 cnpg_collector_wal_write_time{stats_reset="2023-06-19T10:51:27.473259Z"} 0
 
+# HELP cnpg_disk_total_bytes Total size in bytes of the filesystem backing a volume
+# TYPE cnpg_disk_total_bytes gauge
+cnpg_disk_total_bytes{volume="pgdata"} 1.099511627776e+12
+cnpg_disk_total_bytes{volume="wal"} 5.36870912e+11
+
+# HELP cnpg_disk_used_bytes Used space in bytes of the filesystem backing a volume
+# TYPE cnpg_disk_used_bytes gauge
+cnpg_disk_used_bytes{volume="pgdata"} 5.36870912e+10
+cnpg_disk_used_bytes{volume="wal"} 1.073741824e+10
+
+# HELP cnpg_disk_available_bytes Available space in bytes of the filesystem backing a volume
+# TYPE cnpg_disk_available_bytes gauge
+cnpg_disk_available_bytes{volume="pgdata"} 1.048576e+11
+cnpg_disk_available_bytes{volume="wal"} 5.2613046272e+11
+
+# HELP cnpg_disk_percent_used Percentage (0-100) of the filesystem backing a volume that is in use
+# TYPE cnpg_disk_percent_used gauge
+cnpg_disk_percent_used{volume="pgdata"} 45.2
+cnpg_disk_percent_used{volume="wal"} 2.0
+
 # HELP cnpg_last_error 1 if the last collection ended with error, 0 otherwise.
 # TYPE cnpg_last_error gauge
 cnpg_last_error 0
@@ -444,6 +464,13 @@ go_threads 18
     the `Major.Minor` version of PostgreSQL. The full semantic version
     `Major.Minor.Patch` can be found inside one of its label field
     named `full`.
+:::
+
+:::note
+    The `cnpg_disk_*` metrics report per-volume filesystem statistics. The `volume` label
+    is one of `pgdata`, `wal`, or `tbs-<tablespace>`. Accurate per-volume figures require
+    a CSI provisioner that isolates each volume's filesystem; directory-based host-path
+    provisioners report the host filesystem for every volume.
 :::
 
 :::warning
