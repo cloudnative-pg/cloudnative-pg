@@ -192,7 +192,8 @@ func createClusterPodSpec(
 	gracePeriod int64,
 ) corev1.PodSpec {
 	return corev1.PodSpec{
-		Hostname: podName,
+		Hostname:           podName,
+		EnableServiceLinks: ptr.To(false),
 		InitContainers: []corev1.Container{
 			createBootstrapContainer(cluster, getExtensions(&cluster)),
 		},
