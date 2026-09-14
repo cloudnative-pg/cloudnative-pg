@@ -164,7 +164,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		return "", ErrWalReceiversRunning
 	}
 
-	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
+	// This may be the last step of a failover if target primary is set to apiv1.PendingFailoverMarker
 	// or change the target primary if the current one is not valid anymore.
 	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
 		contextLogger.Info("Failing over", "newPrimary", mostAdvancedInstance.Pod.Name)
