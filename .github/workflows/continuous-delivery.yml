@@ -2391,7 +2391,7 @@ jobs:
           # can't be pre-created. Watch for the namespace as it appears and stamp the secret into it.
           (
             while true; do
-              for ns in $(oc get ns -o name | grep -oE 'cloudnative-pg-[a-z0-9]{5}$' || true); do
+              for ns in $(oc get ns -o name | grep -oE 'cloudnative-pg-[a-z0-9]+$' || true); do
                 echo "Found operator deployment namespace: $ns"
                 oc create secret docker-registry cnpg-pull-secret -n "$ns" \
                   --docker-server="$REGISTRY" --docker-username="$REGISTRY_USER" --docker-password="$REGISTRY_PASSWORD" \
