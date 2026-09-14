@@ -52,21 +52,21 @@ const (
 
 var jobExample = `
   # Dry-run command with default values and [cluster] "cluster-example"
-  kubectl-cnpg pgbench cluster-example --dry-run
+  kubectl cnpg pgbench cluster-example --dry-run
 
   # Create a pgbench job with default values and [cluster] "cluster-example"
-  kubectl-cnpg pgbench cluster-example
+  kubectl cnpg pgbench cluster-example
 
   # Dry-run command with given values and [cluster] "cluster-example"
-  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --dry-run -- \
+  kubectl cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --dry-run -- \
     --time 30 --client 1 --jobs 1
 
   # Create a job with given values and [cluster] "cluster-example"
-  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name -- \
+  kubectl cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name -- \
     --time 30 --client 1 --jobs 1
 
   # Create a job with given values on [cluster] "cluster-example". The job will be cleaned after 10 minutes.
-  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --ttl 600 -- \
+  kubectl cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --ttl 600 -- \
     --time 30 --client 1 --jobs 1`
 
 func (cmd *pgBenchRun) execute(ctx context.Context) error {
