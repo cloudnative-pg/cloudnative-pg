@@ -22,6 +22,7 @@ package controller
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 
@@ -87,6 +89,14 @@ var _ = Describe("databaserole_pki", func() {
 		return types.NamespacedName{Name: role.GetClientCertSecretName(), Namespace: namespace}
 	}
 
+	leafOf := func(secret corev1.Secret) *x509.Certificate {
+		block, _ := pem.Decode(secret.Data[certs.TLSCertKey])
+		Expect(block).NotTo(BeNil())
+		cert, err := x509.ParseCertificate(block.Bytes)
+		Expect(err).NotTo(HaveOccurred())
+		return cert
+	}
+
 	Describe("issueClientCertificate", func() {
 		It("creates the cert Secret and sets status.clientCertificate.expiration when CA is present", func(ctx SpecContext) {
 			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
@@ -98,12 +108,7 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(r.Get(ctx, certSecretKey(role), &certSecret)).To(Succeed())
 
 			// CN must equal the role name.
-			certPEM := certSecret.Data[certs.TLSCertKey]
-			block, _ := pem.Decode(certPEM)
-			Expect(block).NotTo(BeNil())
-			cert, err := x509.ParseCertificate(block.Bytes)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(cert.Subject.CommonName).To(Equal("alice"))
+			Expect(leafOf(certSecret).Subject.CommonName).To(Equal("alice"))
 
 			Expect(role.Status.ClientCertificate).NotTo(BeNil())
 			Expect(role.Status.ClientCertificate.Expiration).NotTo(BeEmpty())
@@ -164,15 +169,10 @@ var _ = Describe("databaserole_pki", func() {
 			// The certificate must have been re-signed (bytes differ) and must
 			// now validate against the rotated CA, preserving the CN.
 			Expect(secondCert).NotTo(Equal(firstCert))
-			signed, err := clientCertSignedByCurrentCA(ctx, &caSecret, &secondSecret)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(signed).To(BeTrue())
+			Expect(clientCertSignedByCurrentCA(
+				ctx, &caSecret, &secondSecret, leafOf(secondSecret))).To(BeTrue())
 
-			block, _ := pem.Decode(secondCert)
-			Expect(block).NotTo(BeNil())
-			cert, err := x509.ParseCertificate(block.Bytes)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(cert.Subject.CommonName).To(Equal("ada"))
+			Expect(leafOf(secondSecret).Subject.CommonName).To(Equal("ada"))
 		})
 
 		It("sets status.clientCertificate.message and returns nil when CA has no private key", func(ctx SpecContext) {
@@ -205,7 +205,7 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(role.Status.ClientCertificate.Expiration).To(BeEmpty())
 		})
 
-		It("does nothing when CA secret is absent", func(ctx SpecContext) {
+		It("issues nothing and explains why when the CA secret is absent", func(ctx SpecContext) {
 			role := newRole("dave", true)
 
 			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
@@ -215,8 +215,62 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(client.IgnoreNotFound(err)).To(Succeed())
 			Expect(err).To(MatchError(ContainSubstring("not found")))
 
-			// Status untouched (nil) since we returned early.
-			Expect(role.Status.ClientCertificate).To(BeNil())
+			Expect(role.Status.ClientCertificate).NotTo(BeNil())
+			Expect(role.Status.ClientCertificate.Message).To(
+				ContainSubstring(cluster.GetClientCASecretName()))
+			Expect(role.Status.ClientCertificate.Message).To(ContainSubstring("not found"))
+			Expect(role.Status.ClientCertificate.Expiration).To(BeEmpty())
+		})
+
+		It("issues nothing and explains why when the cluster does not exist", func(ctx SpecContext) {
+			role := newRole("frank", true)
+			role.Spec.ClusterRef.Name = "typo-cluster"
+
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+
+			var certSecret corev1.Secret
+			err := r.Get(ctx, certSecretKey(role), &certSecret)
+			Expect(err).To(MatchError(ContainSubstring("not found")))
+
+			Expect(role.Status.ClientCertificate).NotTo(BeNil())
+			Expect(role.Status.ClientCertificate.Message).To(ContainSubstring(`Cluster "typo-cluster" not found`))
+			Expect(role.Status.ClientCertificate.Expiration).To(BeEmpty())
+		})
+
+		It("keeps the expiration of a still-usable certificate when the cluster disappears",
+			func(ctx SpecContext) {
+				_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+				role := newRole("grace", true)
+
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				expiration := role.Status.ClientCertificate.Expiration
+				Expect(expiration).NotTo(BeEmpty())
+
+				Expect(r.Delete(ctx, cluster)).To(Succeed())
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+
+				// The certificate is still in the Secret and still valid, so the
+				// administrator must still be able to tell when it runs out.
+				Expect(role.Status.ClientCertificate.Expiration).To(Equal(expiration))
+				Expect(role.Status.ClientCertificate.Message).To(ContainSubstring("not found"))
+			},
+		)
+
+		It("drops the message once the reason it was recorded is gone", func(ctx SpecContext) {
+			role := newRole("henry", true)
+
+			// The CA secret is missing, so the first pass records why nothing
+			// was issued.
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			Expect(role.Status.ClientCertificate.Message).NotTo(BeEmpty())
+
+			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+
+			// An administrator who fixes the cause reads the status to confirm
+			// it, so a message that outlived its reason is worse than none.
+			Expect(role.Status.ClientCertificate.Message).To(BeEmpty())
+			Expect(role.Status.ClientCertificate.Expiration).NotTo(BeEmpty())
 		})
 
 		It("leaves a same-named Secret it does not own untouched and reports a message", func(ctx SpecContext) {
@@ -300,6 +354,184 @@ var _ = Describe("databaserole_pki", func() {
 		})
 	})
 
+	Describe("client certificate duration and renewal", func() {
+		BeforeEach(func() {
+			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+		})
+
+		It("issues a certificate spanning the operator's default duration when neither field is set",
+			func(ctx SpecContext) {
+				role := newRole("wendy", true)
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+
+				var secret corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(role), &secret)).To(Succeed())
+				cert := leafOf(secret)
+				Expect(cert.NotAfter.Sub(cert.NotBefore)).To(Equal(90 * 24 * time.Hour))
+			},
+		)
+
+		It("honors an explicit duration", func(ctx SpecContext) {
+			role := newRole("xena", true)
+			role.Spec.ClientCertificate.Duration = &metav1.Duration{Duration: 10 * 24 * time.Hour}
+
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+
+			var secret corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &secret)).To(Succeed())
+			cert := leafOf(secret)
+			Expect(cert.NotAfter.Sub(cert.NotBefore)).To(Equal(10 * 24 * time.Hour))
+		})
+
+		// A certificate is backdated to tolerate clock skew, so its usable life is
+		// shorter than the requested duration. If a renewal window could cover
+		// that difference, every freshly issued certificate would already be due
+		// for renewal and the reconciler would re-issue it on every pass, with the
+		// Secret write itself triggering the next pass. The API caps renewBefore at
+		// half the lifetime to close that off; this asserts the resulting property
+		// through the real signing path, across the range the API accepts.
+		DescribeTable("never issues a certificate that is already inside its renewal window",
+			func(ctx SpecContext, name string, duration, renewBefore *metav1.Duration) {
+				role := newRole(name, true)
+				role.Spec.ClientCertificate.Duration = duration
+				role.Spec.ClientCertificate.RenewBefore = renewBefore
+
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				var first corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(role), &first)).To(Succeed())
+				leaf := leafOf(first)
+
+				renewalDue := time.Now().Add(clientCertRenewBefore(role, clientCertDuration(role)))
+				Expect(renewalDue).To(BeTemporally("<", leaf.NotAfter))
+
+				// Therefore a second pass finds nothing to do.
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				var second corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(role), &second)).To(Succeed())
+				Expect(second.Data[certs.TLSCertKey]).To(Equal(first.Data[certs.TLSCertKey]))
+			},
+			Entry("at the shortest lifetime the API allows, renewed as late as it allows",
+				"yara", &metav1.Duration{Duration: time.Minute}, &metav1.Duration{Duration: 30 * time.Second}),
+			Entry("just below the point where the skew allowance stops scaling",
+				"yuri", &metav1.Duration{Duration: 49 * time.Minute}, &metav1.Duration{Duration: 24 * time.Minute}),
+			Entry("just above it, where the allowance is a flat five minutes",
+				"yusuf", &metav1.Duration{Duration: 51 * time.Minute}, &metav1.Duration{Duration: 25 * time.Minute}),
+			Entry("with the renewal window left to the operator default",
+				"yvonne", &metav1.Duration{Duration: time.Hour}, nil),
+			Entry("with both left to the operator defaults", "yves", nil, nil),
+		)
+
+		It("re-issues the certificate when its private key is gone", func(ctx SpecContext) {
+			role := newRole("yolanda", true)
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			var first corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &first)).To(Succeed())
+			firstCert := first.Data[certs.TLSCertKey]
+
+			delete(first.Data, certs.TLSPrivateKeyKey)
+			Expect(r.Update(ctx, &first)).To(Succeed())
+
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			var second corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &second)).To(Succeed())
+			Expect(second.Data[certs.TLSCertKey]).NotTo(Equal(firstCert))
+			Expect(second.Data).To(HaveKey(certs.TLSPrivateKeyKey))
+		})
+
+		It("re-issues the certificate when its private key belongs to another certificate",
+			func(ctx SpecContext) {
+				role := newRole("yannick", true)
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				var first corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(role), &first)).To(Succeed())
+				firstCert := first.Data[certs.TLSCertKey]
+
+				// Swap in a valid private key that does not match the certificate.
+				foreignRole := newRole("yannick-other", true)
+				Expect(r.reconcileClientCertificate(ctx, foreignRole)).To(Succeed())
+				var foreign corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(foreignRole), &foreign)).To(Succeed())
+				first.Data[certs.TLSPrivateKeyKey] = foreign.Data[certs.TLSPrivateKeyKey]
+				Expect(r.Update(ctx, &first)).To(Succeed())
+
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				var second corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(role), &second)).To(Succeed())
+				Expect(second.Data[certs.TLSCertKey]).NotTo(Equal(firstCert))
+				_, err := certs.ParseServerSecret(&second)
+				Expect(err).NotTo(HaveOccurred())
+			},
+		)
+
+		It("does not write the Secret when the certificate needs nothing", func(ctx SpecContext) {
+			role := newRole("yaron", true)
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			var first corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &first)).To(Succeed())
+
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			var second corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &second)).To(Succeed())
+			Expect(second.ResourceVersion).To(Equal(first.ResourceVersion))
+		})
+
+		It("re-issues the certificate when duration shrinks on an existing role", func(ctx SpecContext) {
+			role := newRole("aaron", true)
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			var first corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &first)).To(Succeed())
+			firstCert := first.Data[certs.TLSCertKey]
+
+			role.Spec.ClientCertificate.Duration = &metav1.Duration{Duration: 24 * time.Hour}
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+
+			var second corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &second)).To(Succeed())
+			Expect(second.Data[certs.TLSCertKey]).NotTo(Equal(firstCert))
+			cert := leafOf(second)
+			Expect(cert.NotAfter.Sub(cert.NotBefore)).To(Equal(24 * time.Hour))
+		})
+
+		It("re-issues the certificate of a role that sets no duration when CERTIFICATE_DURATION changes",
+			func(ctx SpecContext) {
+				role := newRole("bruce", true)
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+				var first corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(role), &first)).To(Succeed())
+				Expect(leafOf(first).NotAfter.Sub(leafOf(first).NotBefore)).To(Equal(90 * 24 * time.Hour))
+
+				configuration.Current.CertificateDuration = 30
+				DeferCleanup(func() {
+					configuration.Current = configuration.NewConfiguration()
+				})
+
+				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+
+				var second corev1.Secret
+				Expect(r.Get(ctx, certSecretKey(role), &second)).To(Succeed())
+				Expect(second.Data[certs.TLSCertKey]).NotTo(Equal(first.Data[certs.TLSCertKey]))
+				cert := leafOf(second)
+				Expect(cert.NotAfter.Sub(cert.NotBefore)).To(Equal(30 * 24 * time.Hour))
+			},
+		)
+
+		It("does not re-issue on consecutive reconciles when duration has a sub-second remainder "+
+			"(the truncation guard)", func(ctx SpecContext) {
+			role := newRole("carl", true)
+			role.Spec.ClientCertificate.Duration = &metav1.Duration{Duration: 2*time.Hour + 500*time.Millisecond}
+
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			var first corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &first)).To(Succeed())
+			firstCert := first.Data[certs.TLSCertKey]
+
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			var second corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &second)).To(Succeed())
+			Expect(second.Data[certs.TLSCertKey]).To(Equal(firstCert))
+		})
+	})
+
 	Describe("clientCertificate not set (default)", func() {
 		It("creates no Secret and sets no status", func(ctx SpecContext) {
 			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
@@ -313,5 +545,72 @@ var _ = Describe("databaserole_pki", func() {
 
 			Expect(role.Status.ClientCertificate).To(BeNil())
 		})
+	})
+})
+
+var _ = Describe("clientCertNeedsRenewal", func() {
+	It("renews a certificate that entered its renewal window", func() {
+		leaf := &x509.Certificate{
+			NotBefore: time.Now().Add(-50 * time.Second),
+			NotAfter:  time.Now().Add(10 * time.Second),
+		}
+		Expect(clientCertNeedsRenewal(leaf, 30*time.Second)).To(BeTrue())
+	})
+
+	It("leaves a certificate short of its renewal window alone", func() {
+		// A freshly issued one minute certificate, backdated six seconds for
+		// clock skew: its renewal window opens twenty four seconds from now.
+		leaf := &x509.Certificate{
+			NotBefore: time.Now().Add(-6 * time.Second),
+			NotAfter:  time.Now().Add(54 * time.Second),
+		}
+		Expect(clientCertNeedsRenewal(leaf, 30*time.Second)).To(BeFalse())
+	})
+
+	It("renews a certificate whose validity has not started yet", func() {
+		// Signed by a clock running ahead of the current one: the expiry is far
+		// away, but the certificate is refused until wall-clock time reaches
+		// its notBefore, so waiting for the renewal window would leave the role
+		// without a usable certificate.
+		leaf := &x509.Certificate{
+			NotBefore: time.Now().Add(time.Hour),
+			NotAfter:  time.Now().Add(3 * time.Hour),
+		}
+		Expect(clientCertNeedsRenewal(leaf, 30*time.Second)).To(BeTrue())
+	})
+})
+
+var _ = Describe("clientCertRequeueAfter", func() {
+	roleWith := func(duration, renewBefore *metav1.Duration) *apiv1.DatabaseRole {
+		return &apiv1.DatabaseRole{
+			Spec: apiv1.DatabaseRoleSpec{
+				ClientCertificate: &apiv1.ClientCertificateConfiguration{
+					Duration:    duration,
+					RenewBefore: renewBefore,
+				},
+			},
+		}
+	}
+
+	It("checks hourly at most, whatever the default lifetime allows", func() {
+		Expect(clientCertRequeueAfter(roleWith(nil, nil))).To(Equal(clientCertReconcileInterval))
+	})
+
+	It("checks twice per renewal window for a short-lived certificate", func() {
+		// The shortest configuration the API accepts: a one minute lifetime
+		// renewed thirty seconds early, hence checked every fifteen seconds.
+		requeue := clientCertRequeueAfter(roleWith(
+			&metav1.Duration{Duration: time.Minute},
+			&metav1.Duration{Duration: 30 * time.Second},
+		))
+		Expect(requeue).To(Equal(15 * time.Second))
+	})
+
+	It("halves the capped renewBefore when the role leaves it unset", func() {
+		// renewBefore defaults to the operator threshold capped at half the
+		// lifetime, so a two minute certificate renews one minute early and is
+		// therefore checked every thirty seconds.
+		requeue := clientCertRequeueAfter(roleWith(&metav1.Duration{Duration: 2 * time.Minute}, nil))
+		Expect(requeue).To(Equal(30 * time.Second))
 	})
 })
