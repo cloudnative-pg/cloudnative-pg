@@ -193,16 +193,7 @@ func BuildPrimaryBootstrapCommandViaRestoreSnapshot(
 		"restoresnapshot",
 	}
 
-	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
-		initCommand = append(initCommand, flag)
-	}
-
-	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
-		initCommand = append(initCommand, flag)
-	}
-
+	initCommand = appendSnapshotRecoveryMetadata(initCommand, object)
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	return &InstanceBootstrapCommand{Role: jobRoleSnapshotRecovery, Command: initCommand}
@@ -258,7 +249,10 @@ func BuildReplicaBootstrapCommandViaJoin(cluster apiv1.Cluster) *InstanceBootstr
 
 // BuildReplicaBootstrapCommandViaRestoreSnapshot builds the bootstrap command
 // for a new replica instance, starting from a volume snapshot backup
-func BuildReplicaBootstrapCommandViaRestoreSnapshot(cluster apiv1.Cluster) *InstanceBootstrapCommand {
+func BuildReplicaBootstrapCommandViaRestoreSnapshot(
+	cluster apiv1.Cluster,
+	object *metav1.ObjectMeta,
+) *InstanceBootstrapCommand {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 4+len(commonFlags))
 	initCommand = append(initCommand,
@@ -268,9 +262,33 @@ func BuildReplicaBootstrapCommandViaRestoreSnapshot(cluster apiv1.Cluster) *Inst
 		"--immediate",
 	)
 
+	initCommand = appendSnapshotRecoveryMetadata(initCommand, object)
 	initCommand = append(initCommand, commonFlags...)
 
 	return &InstanceBootstrapCommand{Role: jobRoleSnapshotRecovery, Command: initCommand}
+}
+
+func appendSnapshotRecoveryMetadata(initCommand []string, object *metav1.ObjectMeta) []string {
+	if object == nil {
+		return initCommand
+	}
+
+	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
+		initCommand = append(initCommand, flag)
+	}
+
+	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
+		initCommand = append(initCommand, flag)
+	}
+
+	if object.Annotations[utils.BackupPgControlFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--pgcontrol=%s", object.Annotations[utils.BackupPgControlFileAnnotationName])
+		initCommand = append(initCommand, flag)
+	}
+
+	return initCommand
 }
 
 func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {

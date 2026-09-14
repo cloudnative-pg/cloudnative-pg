@@ -340,6 +340,11 @@ func annotateSnapshotsWithBackupData(
 				backupStatus.TablespaceMapFile)
 		}
 
+		if len(backupStatus.PgControlFile) > 0 {
+			snapshot.Annotations[utils.BackupPgControlFileAnnotationName] = base64.StdEncoding.EncodeToString(
+				backupStatus.PgControlFile)
+		}
+
 		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
 			contextLogger.Error(err, "while updating volume snapshot from backup object",
 				"snapshot", snapshot.Name)

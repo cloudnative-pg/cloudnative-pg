@@ -38,6 +38,7 @@ type restoreRunnable struct {
 	pgWal             string
 	backupLabelFile   []byte
 	tablespaceMapFile []byte
+	pgControlFile     []byte
 	immediate         bool
 	cancel            context.CancelFunc
 }
@@ -60,6 +61,7 @@ func (r *restoreRunnable) Start(ctx context.Context) error {
 		PgWal:             r.pgWal,
 		BackupLabelFile:   r.backupLabelFile,
 		TablespaceMapFile: r.tablespaceMapFile,
+		PgControlFile:     r.pgControlFile,
 	}
 
 	if err := info.RestoreSnapshot(ctx, r.cli, r.immediate); err != nil {

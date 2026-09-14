@@ -46,6 +46,9 @@ const (
 	// TablespaceMapFile holds the content of TablespaceMapFile. Used during a restore from a hot backup.
 	TablespaceMapFile = "tablespace_map"
 
+	// PgControlFile is the name of the PostgreSQL control file.
+	PgControlFile = "pg_control"
+
 	// InitdbName is the name of the command to initialize a PostgreSQL database
 	InitdbName = "initdb"
 

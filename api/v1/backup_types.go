@@ -293,6 +293,11 @@ type BackupStatus struct {
 	// +optional
 	TablespaceMapFile []byte `json:"tablespaceMapFile,omitempty"`
 
+	// PostgreSQL control file content captured after the volume snapshots were taken
+	// and before the online backup was stopped
+	// +optional
+	PgControlFile []byte `json:"pgControlFile,omitempty"`
+
 	// Information to identify the instance where the backup has been taken from
 	// +optional
 	InstanceID *InstanceID `json:"instanceID,omitempty"`

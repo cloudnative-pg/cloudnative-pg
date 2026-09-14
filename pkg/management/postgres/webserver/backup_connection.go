@@ -24,6 +24,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sync"
 
@@ -31,17 +33,19 @@ import (
 	types "github.com/cloudnative-pg/machinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 // BackupResultData is the result of executing pg_start_backup and pg_stop_backup
 type BackupResultData struct {
-	BeginLSN   types.LSN             `json:"beginLSN,omitempty"`
-	EndLSN     types.LSN             `json:"endLSN,omitempty"`
-	LabelFile  []byte                `json:"labelFile,omitempty"`
-	SpcmapFile []byte                `json:"spcmapFile,omitempty"`
-	BackupName string                `json:"backupName,omitempty"`
-	Phase      BackupConnectionPhase `json:"phase,omitempty"`
+	BeginLSN      types.LSN             `json:"beginLSN,omitempty"`
+	EndLSN        types.LSN             `json:"endLSN,omitempty"`
+	LabelFile     []byte                `json:"labelFile,omitempty"`
+	SpcmapFile    []byte                `json:"spcmapFile,omitempty"`
+	PgControlFile []byte                `json:"pgControlFile,omitempty"`
+	BackupName    string                `json:"backupName,omitempty"`
+	Phase         BackupConnectionPhase `json:"phase,omitempty"`
 }
 
 // BackupConnectionPhase a connection phase of the backup
@@ -64,6 +68,7 @@ type backupConnection struct {
 	waitForArchive       bool
 	conn                 *sql.Conn
 	postgresMajorVersion uint64
+	pgData               string
 	data                 BackupResultData
 	err                  error
 }
@@ -96,6 +101,7 @@ func newBackupConnection(
 		waitForArchive:       waitForArchive,
 		conn:                 conn,
 		postgresMajorVersion: vers.Major(),
+		pgData:               instance.PgData,
 		data: BackupResultData{
 			BackupName: backupName,
 			Phase:      Starting,
@@ -174,6 +180,13 @@ func (bc *backupConnection) stopBackup(ctx context.Context, sync *sync.Mutex) {
 	if bc.err != nil {
 		return
 	}
+
+	pgControlFile, err := os.ReadFile(filepath.Join(bc.pgData, "global", constants.PgControlFile))
+	if err != nil {
+		bc.err = fmt.Errorf("while reading pg_control before stopping the backup: %w", err)
+		return
+	}
+	bc.data.PgControlFile = pgControlFile
 
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
