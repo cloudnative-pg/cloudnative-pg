@@ -556,7 +556,7 @@ func IsPasswordPassthroughEnabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[PasswordPassthroughAnnotationName] == string(annotationStatusEnabled)
 }
 
-// GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map
+// GetInstanceRole tries to fetch the ClusterRoleLabelName and ClusterInstanceRoleLabelName value from a given labels map
 func GetInstanceRole(labels map[string]string) (string, bool) {
 	if value := labels[ClusterRoleLabelName]; value != "" {
 		return value, true
