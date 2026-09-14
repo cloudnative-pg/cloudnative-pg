@@ -250,6 +250,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 			if gauges[column] != nil {
 				targets[i] = &values[i]
 			} else {
+				contextLogger.Warning("Missing metric", "query", "SHOW POOLS", "metric", column)
 				targets[i] = new(any)
 			}
 		}
