@@ -323,6 +323,7 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 		case gauges[column] != nil:
 			targets[i] = &values[i]
 		default:
+			contextLogger.Warning("Missing metric", "query", "SHOW STATS", "metric", column)
 			targets[i] = new(any)
 		}
 	}

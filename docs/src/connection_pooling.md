@@ -673,7 +673,6 @@ This example shows the output for `cnpg_pgbouncer` metrics:
 cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} 0.002338805
 # HELP cnpg_pgbouncer_collection_errors_total Total errors occurred accessing PostgreSQL for metrics.
 # TYPE cnpg_pgbouncer_collection_errors_total counter
-cnpg_pgbouncer_collection_errors_total{collector="sql: Scan error on column index 16, name \"load_balance_hosts\": converting NULL to int is unsupported"} 5
 # HELP cnpg_pgbouncer_collections_total Total number of times PostgreSQL was accessed for metrics.
 # TYPE cnpg_pgbouncer_collections_total counter
 cnpg_pgbouncer_collections_total 5
@@ -731,7 +730,7 @@ cnpg_pgbouncer_pools_cl_waiting{database="pgbouncer",user="pgbouncer"} 0
 # HELP cnpg_pgbouncer_pools_cl_waiting_cancel_req Client connections that have not forwarded query cancellations to the server yet.
 # TYPE cnpg_pgbouncer_pools_cl_waiting_cancel_req gauge
 cnpg_pgbouncer_pools_cl_waiting_cancel_req{database="pgbouncer",user="pgbouncer"} 0
-# HELP cnpg_pgbouncer_pools_load_balance_hosts Number of hosts not load balancing between hosts
+# HELP cnpg_pgbouncer_pools_load_balance_hosts The host load balancing mode in use. 1 for disable, 2 for round-robin, 0 when the pool has a single host, -1 if unknown
 # TYPE cnpg_pgbouncer_pools_load_balance_hosts gauge
 cnpg_pgbouncer_pools_load_balance_hosts{database="pgbouncer",user="pgbouncer"} 0
 # HELP cnpg_pgbouncer_pools_maxwait How long the first (oldest) client in the queue has waited, in seconds. If this starts increasing, then the current pool of servers does not handle requests quickly enough. The reason may be either an overloaded server or just too small of a pool_size setting.
