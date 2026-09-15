@@ -111,6 +111,9 @@ var _ = Describe("Managed publication controller tests", func() {
 			getDB: func(_ string) (*sql.DB, error) {
 				return db, nil
 			},
+			getPostgresMajorVersion: func() (int, error) {
+				return minimumPostgresMajorVersionForPublicationExcept, nil
+			},
 		}
 		r.finalizerReconciler = newFinalizerReconciler(
 			fakeClient,
@@ -144,6 +147,12 @@ var _ = Describe("Managed publication controller tests", func() {
 	})
 
 	It("publication object inherits error after patching", func(ctx SpecContext) {
+		// AllTables and Objects are mutually exclusive (enforced by CEL on real
+		// clusters); switch this fixture to an Objects-only target to exercise
+		// the Objects branch of the ALTER statement.
+		publication.Spec.Target.AllTables = false
+		Expect(fakeClient.Update(ctx, publication)).To(Succeed())
+
 		expectedError := fmt.Errorf("no permission")
 		oneHit := sqlmock.NewRows([]string{""}).AddRow("1")
 		dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
@@ -321,6 +330,9 @@ var _ = Describe("Managed publication controller tests", func() {
 			getDB: func(_ string) (*sql.DB, error) {
 				return db, nil
 			},
+			getPostgresMajorVersion: func() (int, error) {
+				return minimumPostgresMajorVersionForPublicationExcept, nil
+			},
 		}
 
 		// Updating the publication object to reference the newly created Cluster
@@ -430,6 +442,24 @@ var _ = Describe("Managed publication controller tests", func() {
 		err := reconcilePublication(ctx, fakeClient, r, pubDuplicate)
 		Expect(err).To(HaveOccurred())
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("fails reconciliation when target.except is set on PostgreSQL versions older than 19", func(ctx SpecContext) {
+		publication.Spec.Target.Objects = nil
+		publication.Spec.Target.Except = []apiv1.PublicationTargetExceptTable{
+			{Name: "audit_log"},
+		}
+		Expect(fakeClient.Update(ctx, publication)).To(Succeed())
+
+		r.getPostgresMajorVersion = func() (int, error) {
+			return minimumPostgresMajorVersionForPublicationExcept - 1, nil
+		}
+
+		err := reconcilePublication(ctx, fakeClient, r, publication)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(publication.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(publication.Status.Message).Should(ContainSubstring("target.except requires PostgreSQL"))
 	})
 
 	It("properly signals a publication is on a replica cluster", func(ctx SpecContext) {
