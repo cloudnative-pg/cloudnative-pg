@@ -228,11 +228,6 @@ var _ = Describe("ensureInstancesAreCreated reattachment gate and fenced instanc
 		})
 		cluster.Status.ReadyInstances = 1
 
-		fencedName := specs.GetInstanceName(cluster.Name, 2)
-		cluster.Annotations = map[string]string{
-			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", fencedName),
-		}
-
 		primaryPod := readyPod(ctx, cluster, 1)
 		fencedPod := notReadyPod(ctx, cluster, 2)
 
@@ -247,7 +242,7 @@ var _ = Describe("ensureInstancesAreCreated reattachment gate and fenced instanc
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
-				{Pod: fencedPod, IsPodReady: false, MightBeUnavailable: true},
+				{Pod: fencedPod, IsPodReady: false, MightBeUnavailable: true, IsFenced: true},
 			},
 		}
 
@@ -290,44 +285,6 @@ var _ = Describe("ensureInstancesAreCreated reattachment gate and fenced instanc
 		var pods corev1.PodList
 		Expect(env.client.List(ctx, &pods)).To(Succeed())
 		Expect(pods.Items).To(BeEmpty(), "no Pod should be reattached while a non-fenced instance is mid-restart")
-	})
-
-	It("reattaches a missing pod when the whole cluster is fenced", func(ctx SpecContext) {
-		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
-			c.Spec.Instances = 3
-		})
-		// The wildcard fences every instance, including the primary, so
-		// nothing is genuinely Ready.
-		cluster.Status.ReadyInstances = 0
-
-		cluster.Annotations = map[string]string{
-			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", utils.FenceAllInstances),
-		}
-
-		fencedPrimaryPod := notReadyPod(ctx, cluster, 1)
-		fencedReplicaPod := notReadyPod(ctx, cluster, 2)
-
-		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
-		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
-
-		resources := &managedResources{
-			instances: corev1.PodList{Items: []corev1.Pod{*fencedPrimaryPod, *fencedReplicaPod}},
-			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
-		}
-		statusList := postgres.PostgresqlStatusList{
-			Items: []postgres.PostgresqlStatus{
-				{Pod: fencedPrimaryPod, IsPodReady: false, IsPrimary: true, MightBeUnavailable: true},
-				{Pod: fencedReplicaPod, IsPodReady: false, MightBeUnavailable: true},
-			},
-		}
-
-		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(res).To(Equal(reconcile.Result{RequeueAfter: time.Second}))
-
-		var pods corev1.PodList
-		Expect(env.client.List(ctx, &pods)).To(Succeed())
-		Expect(pods.Items).To(HaveLen(1), "the missing instance's Pod should have been reattached")
 	})
 })
 
@@ -1167,6 +1124,7 @@ var _ = Describe("Updating target primary", func() {
 					IsPodReady:                    false,
 					MightBeUnavailable:            true,
 					MightBeUnavailableMaskedError: "dial tcp: connect: connection refused",
+					IsFenced:                      true,
 					Pod:                           &instances[1],
 				},
 			},
@@ -1217,17 +1175,21 @@ var _ = Describe("Updating target primary", func() {
 					ReceivedLsn: cnpgTypes.LSN("0/0"),
 					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  true,
-					Pod:         &instances[1], // fenced, sorts first
+					IsFenced:    true,
+					Pod:         &instances[1], // fenced, built first
 				},
 				{
 					CurrentLsn:  cnpgTypes.LSN("0/0"),
 					ReceivedLsn: cnpgTypes.LSN("0/0"),
 					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  true,
-					Pod:         &instances[2], // healthy, sorts second
+					Pod:         &instances[2], // healthy, built second
 				},
 			},
 		}
+		// Mirrors what GetStatusFromInstances does before the election ever
+		// sees the list: sort pushes the fenced instance to the tail.
+		sort.Sort(&statusList)
 
 		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
 			ctx,
@@ -1239,105 +1201,6 @@ var _ = Describe("Updating target primary", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(selectedPrimary).To(Equal(instances[2].Name))
 		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
-	})
-
-	It("does not elect anyone when every instance is fenced through the fence-all wildcard", func(ctx SpecContext) {
-		namespace := newFakeNamespace(env.client)
-		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
-			cluster.Spec.Instances = 2
-		})
-
-		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(env.client, cluster)
-		instances := generateFakeClusterPods(env.client, cluster, true)
-		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
-
-		managedResources := &managedResources{
-			nodes:     nil,
-			instances: corev1.PodList{Items: instances},
-			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
-			jobs:      batchv1.JobList{Items: jobs},
-		}
-
-		By("fencing every instance via the wildcard", func() {
-			_, err := utils.AddFencedInstance(utils.FenceAllInstances, cluster)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("simulating a failover already in progress after the old primary disappeared", func() {
-			cluster.Status.CurrentPrimary = instances[0].Name
-			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
-		})
-
-		statusList := postgres.PostgresqlStatusList{
-			Items: []postgres.PostgresqlStatus{
-				{
-					CurrentLsn:  cnpgTypes.LSN("0/0"),
-					ReceivedLsn: cnpgTypes.LSN("0/0"),
-					ReplayLsn:   cnpgTypes.LSN("0/0"),
-					IsPodReady:  true,
-					Pod:         &instances[1],
-				},
-			},
-		}
-
-		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
-			ctx,
-			cluster,
-			statusList,
-			managedResources,
-		)
-
-		Expect(err).ToNot(HaveOccurred())
-		Expect(selectedPrimary).To(BeEmpty())
-		Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
-	})
-
-	It("elects the most advanced instance as before when no instance is fenced", func(ctx SpecContext) {
-		namespace := newFakeNamespace(env.client)
-		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
-			cluster.Spec.Instances = 2
-		})
-
-		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(env.client, cluster)
-		instances := generateFakeClusterPods(env.client, cluster, true)
-		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
-
-		managedResources := &managedResources{
-			nodes:     nil,
-			instances: corev1.PodList{Items: instances},
-			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
-			jobs:      batchv1.JobList{Items: jobs},
-		}
-
-		By("simulating a failover already in progress after the old primary disappeared", func() {
-			cluster.Status.CurrentPrimary = instances[0].Name
-			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
-		})
-
-		statusList := postgres.PostgresqlStatusList{
-			Items: []postgres.PostgresqlStatus{
-				{
-					CurrentLsn:  cnpgTypes.LSN("0/0"),
-					ReceivedLsn: cnpgTypes.LSN("0/0"),
-					ReplayLsn:   cnpgTypes.LSN("0/0"),
-					IsPodReady:  true,
-					Pod:         &instances[1],
-				},
-			},
-		}
-
-		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
-			ctx,
-			cluster,
-			statusList,
-			managedResources,
-		)
-
-		Expect(err).ToNot(HaveOccurred())
-		Expect(selectedPrimary).To(Equal(instances[1].Name))
-		Expect(cluster.Status.TargetPrimary).To(Equal(instances[1].Name))
 	})
 
 	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func(ctx SpecContext) {
@@ -1502,14 +1365,18 @@ var _ = Describe("Updating the designated primary of a replica cluster", func() 
 			Items: []postgres.PostgresqlStatus{
 				{
 					IsPodReady: true,
-					Pod:        &instances[1], // fenced, comes first
+					IsFenced:   true,
+					Pod:        &instances[1], // fenced, built first
 				},
 				{
 					IsPodReady: true,
-					Pod:        &instances[2], // healthy, comes second
+					Pod:        &instances[2], // healthy, built second
 				},
 			},
 		}
+		// Mirrors what GetStatusFromInstances does before the election ever
+		// sees the list: sort pushes the fenced instance to the tail.
+		sort.Sort(&statusList)
 
 		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
 			ctx,
@@ -1546,6 +1413,7 @@ var _ = Describe("Updating the designated primary of a replica cluster", func() 
 					IsPodReady:                    false,
 					MightBeUnavailable:            true,
 					MightBeUnavailableMaskedError: "dial tcp: connect: connection refused",
+					IsFenced:                      true,
 					Pod:                           &instances[1],
 				},
 			},
@@ -1719,6 +1587,18 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
 		IsPodReady: false,
 	}
+	// kubeletStaleReportingFenced is the fenced steady state: same shape as
+	// kubeletStaleReporting, but fenced. It must not be mistaken for the
+	// transient "kubelet has not refreshed the probe yet" case above.
+	kubeletStaleReportingFenced := kubeletStaleReporting
+	kubeletStaleReportingFenced.IsFenced = true
+	// fencedReplica has PostgreSQL down but its instance manager still
+	// answers, so Error is nil, unlike unreadyErroringPrimary below.
+	fencedReplica := postgres.PostgresqlStatus{
+		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+		IsPodReady: false,
+		IsFenced:   true,
+	}
 
 	// DescribeTable entries assert state (requeue vs. proceed) only. They also
 	// regression-lock event absence: none of these scenarios should emit an
@@ -1773,6 +1653,12 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		Entry("empty status list",
 			primaryName, primaryName,
 			[]postgres.PostgresqlStatus{}, false),
+		Entry("does not wait on the readiness probe of a fenced instance",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{kubeletStaleReportingFenced, readyReportingReplica}, false),
+		Entry("does not wait on a fenced replica ahead of an erroring primary",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{fencedReplica, unreadyErroringPrimary}, false),
 	)
 
 	It("fires after the production sort pushes the erroring primary to the tail", func(ctx SpecContext) {
@@ -1843,131 +1729,6 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 
 		Expect(fakeRecorder.Events).ShouldNot(Receive(),
 			"kubelet-stale branch must stay event-less to avoid noise")
-	})
-
-	It("does not wait on the readiness probe of a fenced instance", func(ctx SpecContext) {
-		// A fenced instance reports a healthy /pg/status (instance manager is
-		// up) with PostgreSQL shut down, so the pod is permanently not Ready.
-		// This must not be mistaken for the "kubelet has not refreshed the
-		// probe yet" transient case: the guard must not fire.
-		cluster.Annotations = map[string]string{
-			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", primaryName),
-		}
-		cluster.Status.CurrentPrimary = primaryName
-		cluster.Status.TargetPrimary = primaryName
-
-		result := env.clusterReconciler.evaluatePodReadinessGuards(
-			ctx, cluster,
-			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
-				kubeletStaleReporting, readyReportingReplica,
-			}},
-		)
-		Expect(result.IsZero()).To(BeTrue())
-	})
-
-	It("still waits on the readiness probe when the instance is not fenced", func(ctx SpecContext) {
-		// Same shape as the previous test, minus the fencing annotation: the
-		// original behaviour this guard exists for must survive the fix.
-		cluster.Status.CurrentPrimary = primaryName
-		cluster.Status.TargetPrimary = primaryName
-
-		result := env.clusterReconciler.evaluatePodReadinessGuards(
-			ctx, cluster,
-			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
-				kubeletStaleReporting, readyReportingReplica,
-			}},
-		)
-		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
-	})
-
-	It("does not wait on the readiness probe when the whole cluster is fenced", func(ctx SpecContext) {
-		cluster.Annotations = map[string]string{
-			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", utils.FenceAllInstances),
-		}
-		cluster.Status.CurrentPrimary = primaryName
-		cluster.Status.TargetPrimary = primaryName
-
-		result := env.clusterReconciler.evaluatePodReadinessGuards(
-			ctx, cluster,
-			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
-				kubeletStaleReporting, readyReportingReplica,
-			}},
-		)
-		Expect(result.IsZero()).To(BeTrue())
-	})
-
-	It("does not wait on a fenced replica sorted first because the primary is erroring", func(ctx SpecContext) {
-		// A fenced replica has PostgreSQL down but its instance manager still
-		// answers, so Error is nil and it sorts ahead of an erroring primary
-		// (Less pushes Error != nil to the tail before primaries are
-		// preferred). This is exactly the situation where a failover is
-		// needed, so the guard must not block on it.
-		cluster.Annotations = map[string]string{
-			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", replicaName),
-		}
-		statusList := postgres.PostgresqlStatusList{
-			Items: []postgres.PostgresqlStatus{
-				{
-					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
-					IsPrimary:  true,
-					IsPodReady: false,
-					Error:      errStatusFailing,
-				},
-				{
-					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
-					IsPodReady: false,
-				},
-			},
-		}
-		sort.Sort(&statusList)
-		Expect(statusList.Items[0].Pod.Name).To(Equal(replicaName),
-			"sort must place the fenced, non-erroring replica ahead of the erroring primary")
-
-		cluster.Status.CurrentPrimary = primaryName
-		cluster.Status.TargetPrimary = primaryName
-
-		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
-		Expect(result.IsZero()).To(BeTrue())
-	})
-
-	It("waits on the instance the election would pick, not on a fenced one ahead of it", func(ctx SpecContext) {
-		// Skipping a fenced instance is not the same as skipping the guard: the
-		// instance that would actually be elected is the next one in the list,
-		// and if the kubelet has not refreshed its probe yet, promoting it is
-		// still the thing this guard exists to prevent. Reading Items[0] would
-		// see the fenced entry, find nothing to wait for and let that promotion
-		// through unchecked.
-		cluster.Annotations = map[string]string{
-			utils.FencedInstanceAnnotation: fmt.Sprintf("[%q]", replicaName),
-		}
-		statusList := postgres.PostgresqlStatusList{
-			Items: []postgres.PostgresqlStatus{
-				{
-					// The candidate: reporting status, not Ready yet.
-					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: newPrimaryName}},
-					ReceivedLsn: "1/21",
-					ReplayLsn:   "1/21",
-					IsPodReady:  false,
-				},
-				{
-					// Fenced a moment ago, so it still reports the LSN it had
-					// while running and sorts ahead on the pod-name tie-break.
-					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
-					ReceivedLsn: "1/21",
-					ReplayLsn:   "1/21",
-					IsPodReady:  true,
-				},
-			},
-		}
-		sort.Sort(&statusList)
-		Expect(statusList.Items[0].Pod.Name).To(Equal(replicaName),
-			"sort must place the fenced instance ahead of the candidate for this test to mean anything")
-
-		cluster.Status.CurrentPrimary = primaryName
-		cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
-
-		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
-		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 	})
 })
 

@@ -137,7 +137,7 @@ var _ = Describe("PostgreSQL status", func() {
 		Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(2))
 	})
 
-	It("lets InstancesReportingStatusExcept skip instances by name", func() {
+	It("lets InstancesReportingStatusIgnoringFenced skip fenced instances", func() {
 		podList := PostgresqlStatusList{
 			Items: []PostgresqlStatus{
 				{
@@ -152,38 +152,19 @@ var _ = Describe("PostgreSQL status", func() {
 			},
 		}
 
-		By("counting every instance when skip is nil", func() {
-			Expect(podList.InstancesReportingStatusExcept(nil)).To(BeEquivalentTo(2))
+		By("counting every instance when none is fenced", func() {
+			Expect(podList.InstancesReportingStatusIgnoringFenced()).To(BeEquivalentTo(2))
 		})
 
-		By("not counting an instance for which skip returns true", func() {
-			skip := func(instanceName string) bool { return instanceName == "server-20" }
-			Expect(podList.InstancesReportingStatusExcept(skip)).To(BeEquivalentTo(1))
+		By("not counting an instance that is fenced", func() {
+			podList.Items[1].IsFenced = true
+			Expect(podList.InstancesReportingStatusIgnoringFenced()).To(BeEquivalentTo(1))
 		})
 
 		By("keeping InstancesReportingStatus unchanged for a fenced-shaped item", func() {
 			// The other three call sites of InstancesReportingStatus depend on a
 			// MightBeUnavailable item being counted regardless of fencing.
 			Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(2))
-		})
-
-		By("skipping an instance that is still Ready", func() {
-			readyPod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "server-30"},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-					Conditions: []corev1.PodCondition{
-						{Type: corev1.PodReady, Status: corev1.ConditionTrue},
-					},
-				},
-			}
-			withReady := PostgresqlStatusList{
-				Items: append(podList.Items, PostgresqlStatus{Pod: readyPod, IsPodReady: true}),
-			}
-			skip := func(instanceName string) bool { return instanceName == "server-30" }
-
-			Expect(withReady.InstancesReportingStatusExcept(nil)).To(BeEquivalentTo(3))
-			Expect(withReady.InstancesReportingStatusExcept(skip)).To(BeEquivalentTo(2))
 		})
 	})
 
@@ -260,13 +241,15 @@ var _ = Describe("PostgreSQL status", func() {
 	})
 
 	Describe("when an instance is fenced", func() {
-		It("puts a fenced instance with no reported LSN behind a healthy replica", func() {
+		It("puts a fenced instance behind a healthy replica even with a more advanced LSN", func() {
 			podList := PostgresqlStatusList{
 				Items: []PostgresqlStatus{
 					{
-						Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
-						MightBeUnavailable: true,
-						IsPodReady:         false,
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+						ReceivedLsn: "1/31",
+						ReplayLsn:   "1/31",
+						IsPodReady:  false,
+						IsFenced:    true,
 					},
 					{
 						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
