@@ -586,6 +586,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 //     kubelet has not yet flipped the readiness probe to True (typical for a
 //     short window after un-fencing an instance). Waiting here prevents
 //     electing a primary that Kubernetes will refuse to route traffic to.
+//     A currently fenced instance is skipped: it reports a healthy /pg/status
+//     with PostgreSQL shut down and its pod permanently not Ready, so this is
+//     the expected steady state rather than a stale probe to wait out.
 //
 //   - Primary pod is Ready but its /pg/status endpoint is failing. A failing
 //     /pg/status on an otherwise Ready pod usually indicates an
@@ -620,7 +623,7 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 	hasHTTPStatus := firstInstance.HasHTTPStatus()
 	isPodReady := firstInstance.IsPodReady
 
-	if hasHTTPStatus && !isPodReady {
+	if hasHTTPStatus && !isPodReady && !firstInstance.IsFenced {
 		// The readiness probe status from the kubelet has not been refreshed
 		// yet, so we wait rather than electing a primary that Kubernetes will
 		// refuse to route traffic to.
