@@ -682,3 +682,47 @@ var _ = Describe("pgRewindShouldRetry", func() {
 		Expect(pgRewindShouldRetry(ctx, errors.New("could not restore file from archive"))).To(BeFalse())
 	})
 })
+
+var _ = Describe("TryRequestImmediateShutdown", func() {
+	It("declines the request when the lifecycle manager is not receiving", func() {
+		instance := NewInstance()
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+	})
+
+	It("leaves nothing on the channel when it declines", func() {
+		instance := NewInstance()
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+
+		// A declined send must not be observable later: the channel is
+		// unbuffered, so a receiver arriving afterwards has to find it empty.
+		var received InstanceCommand
+		select {
+		case received = <-instance.instanceCommandChan:
+			Fail(fmt.Sprintf("a declined request was delivered anyway: %s", received))
+		default:
+		}
+	})
+
+	It("delivers the immediate shutdown request when the lifecycle manager is receiving", func() {
+		instance := NewInstance()
+		received := make(chan InstanceCommand, 1)
+		go func() {
+			received <- <-instance.instanceCommandChan
+		}()
+
+		Eventually(instance.TryRequestImmediateShutdown).Should(BeTrue())
+		Expect(<-received).To(Equal(shutDownImmediate))
+	})
+
+	It("declines again once the only receiver has consumed a request", func() {
+		instance := NewInstance()
+		received := make(chan InstanceCommand, 1)
+		go func() {
+			received <- <-instance.instanceCommandChan
+		}()
+
+		Eventually(instance.TryRequestImmediateShutdown).Should(BeTrue())
+		Expect(<-received).To(Equal(shutDownImmediate))
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+	})
+})
