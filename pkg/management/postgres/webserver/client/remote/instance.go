@@ -135,6 +135,9 @@ func (r instanceClientImpl) extractInstancesStatus(
 
 	for idx := range activePods {
 		instanceStatus := r.getReplicaStatusFromPodViaHTTP(ctx, activePods[idx])
+		if cluster != nil {
+			instanceStatus.IsFenced = cluster.IsInstanceFenced(activePods[idx].Name)
+		}
 		result.Items = append(result.Items, instanceStatus)
 	}
 	return result
