@@ -409,6 +409,7 @@ PostInitApplicationSQLRefs
 PostInitSQLRefs
 PostInitTemplateSQLRefs
 Postgres
+PostgresCapabilities
 PostgresConfiguration
 PrimaryLeaseConfiguration
 PrimaryUpdateMethod
