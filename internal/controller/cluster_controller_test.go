@@ -1474,6 +1474,55 @@ var _ = Describe("reconcileResources surfaces a permanently failed instance crea
 		})
 })
 
+var _ = Describe("reconcile applies PVC resize before WAL disk-full guard", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	It("applies walStorage expansion before returning Not enough disk space", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.StorageConfiguration.Size = "1Gi"
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1Gi"}
+		})
+
+		// Ensure the managed resources already exist with the old size.
+		_ = generateFakeClusterPods(env.client, cluster, true)
+		pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		// Simulate a user-requested WAL volume expansion.
+		cluster.Spec.StorageConfiguration.Size = "2Gi"
+		cluster.Spec.WalStorage.Size = "2Gi"
+		Expect(env.client.Update(ctx, cluster)).To(Succeed())
+
+		walPod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: specs.GetInstanceName(cluster.Name, 1)}}
+		walPod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+			Name:  specs.PostgresContainerName,
+			State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: apiv1.MissingWALDiskSpaceExitCode}},
+		}}
+		res, err := env.clusterReconciler.reconcilePVCsBeforeDiskFullGuard(
+			ctx,
+			cluster,
+			pvcs,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{{Pod: walPod}}},
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(10 * time.Second))
+
+		// The WAL PVC must be resized in the same reconcile pass, before the
+		// disk-full guard short-circuits the loop.
+		walPVCName := specs.GetInstanceName(cluster.Name, 1) + apiv1.WalArchiveVolumeSuffix
+		var walPVC corev1.PersistentVolumeClaim
+		Expect(env.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: walPVCName}, &walPVC)).To(Succeed())
+		walSize := walPVC.Spec.Resources.Requests[corev1.ResourceStorage]
+		Expect(walSize.String()).To(Equal("2Gi"))
+	})
+})
+
 var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 	const (
 		ns             = "ns"
