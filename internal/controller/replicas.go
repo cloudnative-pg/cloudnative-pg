@@ -97,6 +97,11 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	contextLogger := log.FromContext(ctx)
 
 	mostAdvancedInstance := status.Items[0]
+	if mostAdvancedInstance.IsFenced {
+		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
 	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
 		return "", nil
 	}
@@ -369,6 +374,18 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// (think about a switchover).
 	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
 		return "", ErrWalReceiversRunning
+	}
+
+	if status.Items[0].IsFenced {
+		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
+
+	if !status.Items[0].HasHTTPStatus() {
+		contextLogger.Info("No promotable candidate found, status not being reported, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
 	}
 
 	contextLogger.Info("Current target primary isn't healthy, failing over",

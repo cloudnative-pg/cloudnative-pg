@@ -137,6 +137,37 @@ var _ = Describe("PostgreSQL status", func() {
 		Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(2))
 	})
 
+	It("lets InstancesReportingStatusIgnoringFenced skip fenced instances", func() {
+		podList := PostgresqlStatusList{
+			Items: []PostgresqlStatus{
+				{
+					Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+					IsPrimary:          true,
+					MightBeUnavailable: true,
+				},
+				{
+					Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+					MightBeUnavailable: true,
+				},
+			},
+		}
+
+		By("counting every instance when none is fenced", func() {
+			Expect(podList.InstancesReportingStatusIgnoringFenced()).To(BeEquivalentTo(2))
+		})
+
+		By("not counting an instance that is fenced", func() {
+			podList.Items[1].IsFenced = true
+			Expect(podList.InstancesReportingStatusIgnoringFenced()).To(BeEquivalentTo(1))
+		})
+
+		By("keeping InstancesReportingStatus unchanged for a fenced-shaped item", func() {
+			// The other three call sites of InstancesReportingStatus depend on a
+			// MightBeUnavailable item being counted regardless of fencing.
+			Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(2))
+		})
+	})
+
 	Describe("when sorted", func() {
 		sort.Sort(&list)
 
@@ -207,6 +238,78 @@ var _ = Describe("PostgreSQL status", func() {
 		Expect(podList.Items[0].Pod.Name).To(Equal("p-1"))
 		Expect(podList.Items[1].Pod.Name).To(Equal("p-2"))
 		Expect(podList.Items[2].Pod.Name).To(Equal("p-3"))
+	})
+
+	Describe("when an instance is fenced", func() {
+		It("puts a fenced instance behind a healthy replica even with a more advanced LSN", func() {
+			podList := PostgresqlStatusList{
+				Items: []PostgresqlStatus{
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+						ReceivedLsn: "1/31",
+						ReplayLsn:   "1/31",
+						IsPodReady:  false,
+						IsFenced:    true,
+					},
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+						ReceivedLsn: "1/21",
+						ReplayLsn:   "1/21",
+						IsPodReady:  true,
+					},
+				},
+			}
+			sort.Sort(&podList)
+
+			Expect(podList.Items[0].Pod.Name).To(Equal("server-20"))
+			Expect(podList.Items[1].Pod.Name).To(Equal("server-10"))
+		})
+
+		It("breaks a tie between equally advanced replicas on the pod name alone", func() {
+			podList := PostgresqlStatusList{
+				Items: []PostgresqlStatus{
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+						ReceivedLsn: "1/21",
+						ReplayLsn:   "1/21",
+						IsPodReady:  true,
+					},
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+						ReceivedLsn: "1/21",
+						ReplayLsn:   "1/21",
+						IsPodReady:  true,
+					},
+				},
+			}
+			sort.Sort(&podList)
+
+			Expect(podList.Items[0].Pod.Name).To(Equal("server-10"))
+			Expect(podList.Items[1].Pod.Name).To(Equal("server-20"))
+		})
+
+		It("keeps a primary instance always at the front", func() {
+			podList := PostgresqlStatusList{
+				Items: []PostgresqlStatus{
+					{
+						Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+						ReceivedLsn: "1/21",
+						ReplayLsn:   "1/21",
+						IsPodReady:  true,
+					},
+					{
+						Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-30"}},
+						IsPrimary:          true,
+						MightBeUnavailable: true,
+						IsPodReady:         false,
+					},
+				},
+			}
+			sort.Sort(&podList)
+
+			Expect(podList.Items[0].Pod.Name).To(Equal("server-30"))
+			Expect(podList.Items[1].Pod.Name).To(Equal("server-10"))
+		})
 	})
 })
 
