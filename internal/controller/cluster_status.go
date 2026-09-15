@@ -298,7 +298,8 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// If we are switching, check if the target primary is still active
 	// Ignore this check if current primary is empty (it happens during the bootstrap)
 	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary &&
-		cluster.Status.CurrentPrimary != "" {
+		cluster.Status.CurrentPrimary != "" &&
+		cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker {
 		found := false
 		if cluster.Status.ReadyInstances > 0 {
 			for _, instance := range utils.FilterActivePods(resources.instances.Items) {
@@ -314,9 +315,9 @@ func (r *ClusterReconciler) updateResourceStatus(
 		if !found {
 			// Reset the target primary, since the available one is not active
 			// or not present
-			log.FromContext(ctx).Info("Wrong target primary, the chosen one is not active or not present",
-				"targetPrimary", cluster.Status.TargetPrimary,
-				"instances", resources.instances)
+			contextLogger.Info("Wrong target primary, the chosen one is not active or not present",
+				"targetPrimary", cluster.Status.TargetPrimary)
+			contextLogger.Debug("Instances status dump", "instances", resources.instances.Items)
 			cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
 			cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 		}
