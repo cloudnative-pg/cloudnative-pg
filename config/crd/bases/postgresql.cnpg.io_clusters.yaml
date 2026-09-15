@@ -7482,6 +7482,13 @@ spec:
                       items:
                         type: string
                       type: array
+                    postgresCapabilities:
+                      description: |-
+                        PostgresCapabilities are the list of capabilities of the
+                        plugin regarding the PostgreSQL configuration
+                      items:
+                        type: string
+                      type: array
                     restoreJobHookCapabilities:
                       description: |-
                         RestoreJobHookCapabilities are the list of capabilities of the
