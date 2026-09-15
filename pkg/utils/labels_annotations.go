@@ -232,6 +232,13 @@ const (
 	// the secrets managed by the operator inside the generated service account
 	OperatorManagedSecretsAnnotationName = MetadataNamespace + "/managedSecrets"
 
+	// RotatePasswordAnnotationName is the name of the annotation a user sets on
+	// a DatabaseRole to request that its generated password be rotated
+	// immediately, regardless of its renewal deadline. The operator removes
+	// the annotation once the rotation it asked for has happened: it is a
+	// one-shot request, not a persistent setting.
+	RotatePasswordAnnotationName = MetadataNamespace + "/rotatePassword"
+
 	// FencedInstanceAnnotation is the annotation to be used for fencing instances, the value should be a
 	// JSON list of all the instances we want to be fenced, e.g. `["cluster-example-1","cluster-example-2`"].
 	// If the list contain the "*" element, every node is fenced.

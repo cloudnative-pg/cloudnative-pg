@@ -136,8 +136,8 @@ your PostgreSQL cluster.
 
 **Declarative role management with the `DatabaseRole` resource**
 : [`role-examples.yaml`](samples/role-examples.yaml):
-  Standalone `DatabaseRole` resources targeting an existing cluster, including
-  password management with a Kubernetes secret.
+  Standalone `DatabaseRole` resources targeting an existing cluster, with
+  operator-generated passwords and a client certificate.
 
 ## Managed services
 
