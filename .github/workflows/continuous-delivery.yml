@@ -1286,14 +1286,27 @@ jobs:
           timeout_minutes: 27
           max_attempts: 1
           command: |
+            set -euo pipefail
             STORAGECLASSNAME=default
             # renovate: datasource=github-releases depName=mikefarah/yq
             go install github.com/mikefarah/yq/v4@v4
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
-            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/crds.yaml | kubectl apply -f -
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/crds.yaml -o /tmp/rook-crds.yaml
+            kubectl apply -f /tmp/rook-crds.yaml
+            # Without this wait, the CephCluster apply below can race the
+            # apiserver and fail with "no matches for kind", even though the
+            # apply above already succeeded. Only CustomResourceDefinition
+            # objects support condition=Established, so filter the file down
+            # to those before waiting on it.
+            kubectl wait --for=condition=Established --timeout=60s \
+              $(kubectl get -f /tmp/rook-crds.yaml -o name | grep ^customresourcedefinition)
             curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/common.yaml | kubectl apply -f -
-            # csi-operator.yaml defines the csi.ceph.io CRDs that operator.yaml's CRs rely on
-            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi-operator.yaml | kubectl apply -f -
+            # csi-operator.yaml defines the csi.ceph.io CRDs that operator.yaml's CRs rely on,
+            # alongside plain RBAC/Deployment objects that don't support condition=Established.
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi-operator.yaml -o /tmp/rook-csi-operator.yaml
+            kubectl apply -f /tmp/rook-csi-operator.yaml
+            kubectl wait --for=condition=Established --timeout=60s \
+              $(kubectl get -f /tmp/rook-csi-operator.yaml -o name | grep ^customresourcedefinition)
             curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/operator.yaml | kubectl apply -f -
             # keyType "aes" below is required until every AKS node runs
             # Linux kernel 7.0+: Rook's aes256k CephX key (the CVE-2025-30156
@@ -1308,11 +1321,12 @@ jobs:
                 .spec.mon.volumeClaimTemplate.spec.storageClassName = \"${STORAGECLASSNAME}\" |
                 .spec.security.cephx.csi.keyType = \"aes\" " - | \
               kubectl apply -f -
-            while true; do
+            for i in $(seq 1 150); do
               output=$( kubectl get deploy -n rook-ceph -l app=rook-ceph-osd --no-headers -o name )
-              if [[ $(wc -w <<< $output)  == 3 ]]; then
+              if [[ $(wc -w <<< $output) == 3 ]]; then
                 break
               fi
+              sleep 2
             done
             echo "Waiting for Rook OSDs to be available"
             kubectl wait deploy -n rook-ceph --for condition=available --timeout 480s -l app=rook-ceph-osd
