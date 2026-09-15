@@ -2366,13 +2366,6 @@ jobs:
         run: |
           make preflight
       -
-        name: Create Secret
-        run: |
-          export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
-          oc create ns cloudnative-pg
-          oc -n cloudnative-pg create secret docker-registry cnpg-pull-secret \
-            --docker-server="$REGISTRY" --docker-username="$REGISTRY_USER" --docker-password="$REGISTRY_PASSWORD"
-      -
         name: Run preflight operator test
         timeout-minutes: 30
         env:
@@ -2383,8 +2376,27 @@ jobs:
         run: |
           export PATH=$(pwd)/bin/:${PATH}
           export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
-          oc -n cloudnative-pg get secret cnpg-pull-secret \
-            -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > docker-config.json
+          AUTH=$(printf '%s:%s' "$REGISTRY_USER" "$REGISTRY_PASSWORD" | base64 -w0)
+          jq -n --arg registry "$REGISTRY" --arg auth "$AUTH" \
+            '{auths: {($registry): {auth: $auth}}}' > docker-config.json
+
+          # preflight's DeployableByOLM check installs the operator into a namespace
+          # with a random 5-char suffix (cloudnative-pg-xxxxx) since v1.20.0. cnpg-pull-secret
+          # can't be pre-created. Watch for the namespace as it appears and stamp the secret into it.
+          (
+            while true; do
+              for ns in $(oc get ns -o name | grep -oE 'cloudnative-pg-[a-z0-9]+$' || true); do
+                echo "Found operator deployment namespace: $ns"
+                oc create secret docker-registry cnpg-pull-secret -n "$ns" \
+                  --docker-server="$REGISTRY" --docker-username="$REGISTRY_USER" --docker-password="$REGISTRY_PASSWORD" \
+                  --dry-run=client -o yaml | oc apply -f - || true
+              done
+              sleep 2
+            done
+          ) &
+          WATCHER_PID=$!
+          trap 'kill "$WATCHER_PID" 2>/dev/null || true' EXIT
+
           preflight check operator ${BUNDLE_IMG} \
             --docker-config docker-config.json --loglevel trace
       -
