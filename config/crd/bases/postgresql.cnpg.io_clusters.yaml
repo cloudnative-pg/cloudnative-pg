@@ -4689,6 +4689,21 @@ spec:
                     items:
                       type: string
                     type: array
+                  pgRewind:
+                    description: Configuration of pg_rewind
+                    properties:
+                      syncMethod:
+                        default: fsync
+                        description: |-
+                          SyncMethod selects how pg_rewind synchronizes files to durable storage.
+                          The default, `fsync`, recursively opens and synchronizes each file.
+                          `syncfs` is available on Linux with PostgreSQL 17 or later and synchronizes
+                          the filesystems containing PGDATA, the WAL directory, and tablespaces.
+                        enum:
+                        - fsync
+                        - syncfs
+                        type: string
+                    type: object
                   promotionTimeout:
                     description: |-
                       Specifies the maximum number of seconds to wait when promoting an instance to primary.
