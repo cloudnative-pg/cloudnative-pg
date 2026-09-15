@@ -395,6 +395,7 @@ PostInitApplicationSQLRefs
 PostInitSQLRefs
 PostInitTemplateSQLRefs
 Postgres
+PostgresCapabilities
 PostgresConfiguration
 PrimaryUpdateMethod
 PrimaryUpdateMethodRestart
