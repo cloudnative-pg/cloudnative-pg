@@ -134,10 +134,8 @@ The Instance Manager provides a database-aware HTTP server for Kubelet probes:
 
 - **Startup Probe:** Prevents restarts during `initdb`, recovery, or WAL
   replay.
-- **Liveness Probe:** On primary instances, performs an isolation check: if both
-  the API server and peer instances are unreachable (as determined by the
-  configurable `IsolationCheck` settings), the probe fails, causing Kubelet to
-  restart the Pod. Replicas always pass the liveness check.
+- **Liveness Probe:** Ensures the instance manager process itself is
+  operating correctly.
 - **Readiness Probe:** Ensures `pg_isready` succeeds on the primary and
   validates replication lag/hot-standby status on replicas before allowing
   traffic.
