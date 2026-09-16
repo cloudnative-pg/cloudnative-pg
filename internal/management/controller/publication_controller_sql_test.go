@@ -149,6 +149,59 @@ var _ = Describe("publication sql", func() {
 		Expect(sql).To(Equal(`CREATE PUBLICATION "test_pub" FOR TABLE "test"."table" ("a", "b")`))
 	})
 
+	It("generates correct SQL for creating an all-tables publication with exceptions", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Target: apiv1.PublicationTarget{
+					AllTables: true,
+					Except: []apiv1.PublicationTargetExceptTable{
+						{Name: "audit_log", Schema: "public"},
+						{Name: "temp_imports", Only: true},
+					},
+				},
+			},
+		}
+
+		sql := toPublicationCreateSQL(obj)
+		Expect(sql).To(Equal(
+			`CREATE PUBLICATION "test_pub" FOR ALL TABLES EXCEPT (TABLE "public"."audit_log", ONLY "temp_imports")`,
+		))
+	})
+
+	It("generates correct SQL for altering an all-tables publication with exceptions", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Target: apiv1.PublicationTarget{
+					AllTables: true,
+					Except: []apiv1.PublicationTargetExceptTable{
+						{Name: "audit_log", Schema: "public"},
+					},
+				},
+			},
+		}
+
+		sqls := toPublicationAlterSQL(obj)
+		Expect(sqls).To(ContainElement(
+			`ALTER PUBLICATION "test_pub" SET ALL TABLES EXCEPT (TABLE "public"."audit_log")`,
+		))
+	})
+
+	It("generates correct SQL for altering an all-tables publication clearing exceptions", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Target: apiv1.PublicationTarget{
+					AllTables: true,
+				},
+			},
+		}
+
+		sqls := toPublicationAlterSQL(obj)
+		Expect(sqls).To(ContainElement(`ALTER PUBLICATION "test_pub" SET ALL TABLES`))
+	})
+
 	It("generates correct SQL for creating publication with parameters", func() {
 		obj := &apiv1.Publication{
 			Spec: apiv1.PublicationSpec{

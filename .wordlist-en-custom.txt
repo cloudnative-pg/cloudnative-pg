@@ -442,6 +442,7 @@ PublicationSpec
 PublicationStatus
 PublicationTarget
 PublicationTargetAllTables
+PublicationTargetExceptTable
 PublicationTargetObject
 PublicationTargetTable
 PullPolicy
@@ -1388,6 +1389,7 @@ publicationreclaimpolicy
 publicationspec
 publicationstatus
 publicationtarget
+publicationtargetexcepttable
 publicationtargetobject
 publicationtargettable
 pv
