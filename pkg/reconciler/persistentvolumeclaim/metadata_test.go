@@ -128,5 +128,52 @@ var _ = Describe("metadataReconciler", func() {
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
 			})
 		})
+
+		Context("when a common label was overwritten", func() {
+			It("should not consider the PVC up-to-date, and should restore the value", func() {
+				cluster := &apiv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-cluster",
+					},
+					Spec: apiv1.ClusterSpec{
+						InheritedMetadata: &apiv1.EmbeddedObjectMetadata{Labels: map[string]string{
+							utils.KubernetesAppManagedByLabelName: "Helm",
+							utils.KubernetesAppLabelName:          "my-chart",
+						}},
+					},
+					Status: apiv1.ClusterStatus{
+						InstanceNames: []string{"instance1"},
+					},
+				}
+				// All three common labels are present, but two hold the value that
+				// inheritedMetadata wrote instead of the operator's own.
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pvc1",
+						Labels: map[string]string{
+							utils.PvcRoleLabelName:      string(utils.PVCRolePgData),
+							utils.InstanceNameLabelName: "instance1",
+							// Common labels, overwritten
+							utils.KubernetesAppManagedByLabelName: "Helm",
+							utils.KubernetesAppLabelName:          "my-chart",
+							utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+						},
+						Annotations: map[string]string{},
+					},
+				}
+				reconciler := newLabelReconciler(cluster)
+
+				// A presence-only check would report this PVC as up-to-date and never
+				// repair it, leaving it outside the selector used to find the PVC to
+				// snapshot.
+				Expect(reconciler.isUpToDate(pvc)).To(BeFalse())
+
+				reconciler.update(pvc)
+
+				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
+				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
+				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
+			})
+		})
 	})
 })
