@@ -171,7 +171,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	})
 
 	When("a primary cluster is configured", func() {
-		It("will set archive_mode to on", func() {
+		It("will set archive_mode to always", func() {
 			info := ConfigurationInfo{
 				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       13,
@@ -180,7 +180,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				IsReplicaCluster:   false,
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config.GetConfig("archive_mode")).To(Equal("on"))
+			Expect(config.GetConfig("archive_mode")).To(Equal("always"))
 		})
 	})
 

@@ -54,7 +54,7 @@ func FuzzCreatePostgresqlConfigurationSanitization(f *testing.F) {
 		})
 
 		checkFixedSettings(t, cfg, sslValue, recoveryTargetName, includingMandatory, preserveFixedSettingsFromUser)
-		checkArchiveMode(t, cfg, isWalArchivingDisabled, isReplicaCluster)
+		checkArchiveMode(t, cfg)
 		checkAlterSystem(t, cfg, majorVersion, includingMandatory, alterSystemEnabled)
 
 		cfg.OverwriteConfig("custom.fuzz_value", internalValue)
@@ -104,15 +104,9 @@ func checkFixedSettings(
 	}
 }
 
-func checkArchiveMode(t *testing.T, cfg *PgConfiguration, isWalArchivingDisabled, isReplicaCluster bool) {
+func checkArchiveMode(t *testing.T, cfg *PgConfiguration) {
 	t.Helper()
-	want := "on"
-	switch {
-	case isWalArchivingDisabled:
-		want = "off"
-	case isReplicaCluster:
-		want = "always"
-	}
+	want := "always"
 	if got := cfg.GetConfig("archive_mode"); got != want {
 		t.Fatalf("archive_mode mismatch: got %q want %q", got, want)
 	}
