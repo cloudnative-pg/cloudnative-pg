@@ -237,6 +237,19 @@ var _ = Describe("check atomic bool", func() {
 	})
 })
 
+var _ = Describe("status error state", func() {
+	It("should make status fail with the stored error", func() {
+		instance := Instance{}
+		instance.SetStatusError("unrecoverable WAL replay error loop detected")
+
+		Expect(instance.StatusError()).To(ContainSubstring("WAL replay error"))
+
+		status, err := instance.GetStatus()
+		Expect(err).To(MatchError(ContainSubstring("WAL replay error")))
+		Expect(status.Pod.Name).To(BeEmpty())
+	})
+})
+
 var _ = Describe("ALTER SYSTEM enable and disable in PostgreSQL <17", func() {
 	var instance Instance
 	var autoConfFile string
