@@ -69,6 +69,10 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 	// below waits for that same init container to terminate. Publish the
 	// certificate status now, or the two waits deadlock forever.
 	if err := r.setupPostgresPKI(ctx, cluster); err != nil {
+		contextLogger.Error(err, "while setting up the PKI of the restored cluster")
+		if regErr := r.RegisterPhase(ctx, cluster, apiv1.PhaseCannotCreateClusterObjects, err.Error()); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
 		return nil, err
 	}
 	if err := registerCertificatesStatus(ctx, r.Client, cluster); err != nil {

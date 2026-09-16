@@ -27,6 +27,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -1352,5 +1353,28 @@ var _ = Describe("reconcileRestoredCluster", func() {
 		Expect(meta.IsStatusConditionTrue(
 			remoteCluster.Status.Conditions, string(apiv1.ConditionInitialized),
 		)).To(BeTrue(), "the cluster must be marked initialized once the restore gate clears")
+	})
+
+	It("registers the phase when the PKI setup fails", func(ctx SpecContext) {
+		cluster.Spec.Certificates = &apiv1.CertificatesConfiguration{
+			ServerCASecret: "missing-ca",
+		}
+
+		mockCli := fake.NewClientBuilder().
+			WithScheme(k8scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, orphanPVC).
+			WithStatusSubresource(cluster).
+			Build()
+
+		r := &ClusterReconciler{Client: mockCli, Recorder: record.NewFakeRecorder(10)}
+
+		res, err := r.reconcileRestoredCluster(ctx, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(res).To(BeNil())
+
+		remoteCluster := &apiv1.Cluster{}
+		Expect(mockCli.Get(ctx, k8client.ObjectKeyFromObject(cluster), remoteCluster)).To(Succeed())
+		Expect(remoteCluster.Status.Phase).To(Equal(apiv1.PhaseCannotCreateClusterObjects))
+		Expect(remoteCluster.Status.PhaseReason).To(ContainSubstring("missing-ca"))
 	})
 })
