@@ -53,7 +53,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 	var namespace string
 
 	diskSpaceDetectionTest := func(namespace, clusterName string) {
-		const walDir = "/var/lib/postgresql/data/pgdata/pg_wal"
+		const pgDataDir = "/var/lib/postgresql/data/pgdata"
+		const walDir = pgDataDir + "/pg_wal"
 		var cluster *apiv1.Cluster
 		var primaryPod *corev1.Pod
 		By("finding cluster resources", func() {
@@ -104,6 +105,26 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 				postgres.PostgresDBName,
 				query)
 			Expect(err).To(HaveOccurred())
+		})
+		By("stopping the postmaster to force a deterministic disk-space check", func() {
+			// Whichever write above hits ENOSPC first decides if
+			// PostgreSQL already crashed, pure chance. Stop it
+			// ourselves with -m immediate: fast/smart shutdown would
+			// need free disk space for the checkpoint.
+			timeout := time.Minute
+			_, stderr, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   primaryPod.Name,
+				},
+				&timeout,
+				"pg_ctl", "stop", "-D", pgDataDir, "-m", "immediate",
+			)
+			// err doesn't mean failure here: pg_ctl also errors if
+			// PostgreSQL already crashed on its own. Log every time to
+			// tell which case hit.
+			GinkgoWriter.Printf("pg_ctl stop: stderr=%q err=%v\n", stderr, err)
 		})
 		By("waiting for the primary to become not ready", func() {
 			Eventually(func(g Gomega) bool {
