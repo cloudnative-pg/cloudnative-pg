@@ -70,7 +70,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		By("filling the WAL volume", func() {
 			timeout := time.Minute * 5
 
-			_, _, err := exec.CommandInInstancePod(
+			_, stderr, err := exec.CommandInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
 					Namespace: namespace,
@@ -80,7 +80,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 				"dd", "if=/dev/zero", "of="+walDir+"/fill", "bs=1M",
 			)
 			Expect(err).To(HaveOccurred())
-			// FIXME: check if the error is due to the disk being full
+			Expect(stderr).To(ContainSubstring("No space left on device"))
 		})
 		By("writing something when no space is available", func() {
 			// Create the table used by the scenario
