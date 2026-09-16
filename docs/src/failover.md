@@ -51,10 +51,8 @@ away, without the fast shutdown and therefore without any attempt to archive
 pending WALs. Any `.ready` WAL segments left behind are archived when the
 instance starts again, before it rejoins the cluster as a replica.
 
-Previously an unreachable former primary was not shut down at all, so it never
-restarted and never became a replica of the new primary. `.spec.switchoverDelay`
-does not apply to this path and never did: it is the timeout of the fast
-shutdown, which is skipped.
+`.spec.switchoverDelay` does not apply to this path: it is the timeout of the
+fast shutdown, which is skipped.
 
 :::info
     "Fast" mode does not wait for PostgreSQL clients to disconnect and will
