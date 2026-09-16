@@ -114,8 +114,8 @@ type ReconcilerHookResult struct {
 	Identifier         string      `json:"identifier"`
 }
 
-// ClusterReconcilerHooks decsribes a set of behavior needed to enhance
-// the login of the Cluster reconcicliation loop
+// ClusterReconcilerHooks describes a set of behavior needed to enhance
+// the login of the Cluster reconciliation loop
 type ClusterReconcilerHooks interface {
 	// PreReconcile is executed after we get the resources and update the status
 	PreReconcile(

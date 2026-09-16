@@ -135,7 +135,7 @@ func NewCmd() *cobra.Command {
 		&pgadminImage,
 		"image",
 		"dpage/pgadmin4:latest",
-		"Specifes the pgadmin4 image to use, e.g. for internal registries.",
+		"Specifies the pgadmin4 image to use, e.g. for internal registries.",
 	)
 
 	return pgadminCmd
