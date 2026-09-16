@@ -107,7 +107,7 @@ func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 
 	ClientInterface = kubernetes.NewForConfigOrDie(Config)
 
-	return utils.DetectSecurityContextConstraints(ClientInterface.Discovery())
+	return nil
 }
 
 func createClient(cfg *rest.Config) error {
