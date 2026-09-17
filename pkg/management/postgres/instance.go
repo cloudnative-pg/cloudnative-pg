@@ -726,20 +726,13 @@ func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting immediate shutdown of the PostgreSQL instance")
-	err := instance.Shutdown(
+	return instance.Shutdown(
 		ctx,
 		shutdownOptions{
 			Mode: shutdownModeImmediate,
 			Wait: true,
 		},
 	)
-	if err != nil {
-		contextLogger.Error(err, "Error while shutting down the PostgreSQL instance")
-		return err
-	}
-
-	contextLogger.Info("PostgreSQL instance shut down")
-	return nil
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status
@@ -1489,13 +1482,12 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownFastImmediate
 }
 
-// TryRequestImmediateShutdown requests the lifecycle manager to shut down
-// PostgreSQL by skipping straight to the immediate strategy, with no
-// checkpoint and no fast-shutdown attempt beforehand. It never blocks: if the
-// lifecycle manager's command loop isn't immediately ready to receive (e.g.
-// because it is itself shutting PostgreSQL down), the request is dropped
-// rather than waiting. It reports whether the request was actually delivered.
-// The command channel is unbuffered and a send on it cannot be interrupted by
+// TryRequestImmediateShutdown asks the lifecycle manager to run
+// TryShuttingDownImmediate, without blocking. If the lifecycle manager's
+// command loop isn't immediately ready to receive (e.g. because it is
+// itself shutting PostgreSQL down), the request is dropped rather than
+// waited on. It reports whether the request was actually delivered. The
+// command channel is unbuffered and a send on it cannot be interrupted by
 // a context cancellation, so a caller that must not be parked has no other
 // way to ask.
 func (instance *Instance) TryRequestImmediateShutdown() bool {

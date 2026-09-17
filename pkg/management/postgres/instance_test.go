@@ -703,18 +703,8 @@ var _ = Describe("TryRequestImmediateShutdown", func() {
 		}
 	})
 
-	It("delivers the immediate shutdown request when the lifecycle manager is receiving", func() {
-		instance := NewInstance()
-		received := make(chan InstanceCommand, 1)
-		go func() {
-			received <- <-instance.instanceCommandChan
-		}()
-
-		Eventually(instance.TryRequestImmediateShutdown).Should(BeTrue())
-		Expect(<-received).To(Equal(shutDownImmediate))
-	})
-
-	It("declines again once the only receiver has consumed a request", func() {
+	It("delivers the immediate shutdown request when the lifecycle manager is receiving, "+
+		"then declines again once that receiver is gone", func() {
 		instance := NewInstance()
 		received := make(chan InstanceCommand, 1)
 		go func() {
