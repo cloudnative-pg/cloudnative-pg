@@ -26,11 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	k8scheme "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	pkgmanagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -1247,5 +1250,126 @@ var _ = Describe("ensureInitContainersAreCompleted - multiple pods", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(BeNil())
 		})
+	})
+})
+
+var _ = Describe("reconcileRestoredCluster", func() {
+	var (
+		cluster     *apiv1.Cluster
+		orphanPVC   *corev1.PersistentVolumeClaim
+		instancePod *corev1.Pod
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+
+		orphanPVC = &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-1",
+				Namespace: "default",
+				Annotations: map[string]string{
+					utils.ClusterSerialAnnotationName: "1",
+				},
+				Labels: map[string]string{
+					utils.ClusterLabelName:             cluster.Name,
+					utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
+				},
+			},
+		}
+
+		// A pending (not yet started) init container: this is what a fresh
+		// replica pod looks like right after the restore creates it.
+		instancePod = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-1",
+				Namespace: "default",
+				Labels: map[string]string{
+					utils.ClusterLabelName: cluster.Name,
+					utils.PodRoleLabelName: string(utils.PodRoleInstance),
+				},
+			},
+			Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{
+					{Name: "bootstrap-instance"},
+				},
+			},
+		}
+	})
+
+	// Runs both sides of the deadlock for real, in separate goroutines: the
+	// wait from pkg/management, and this function's gate. Without the fix
+	// this times out, because the wait never sees a certificate status, so
+	// the init container never terminates, so the gate never clears.
+	It("does not deadlock on the certificate wait", func(ctx SpecContext) {
+		mockCli := fake.NewClientBuilder().
+			WithScheme(k8scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, orphanPVC, instancePod).
+			WithStatusSubresource(cluster, instancePod).
+			Build()
+
+		r := &ClusterReconciler{Client: mockCli}
+
+		waitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+
+		certWaitDone := make(chan error, 1)
+		go func() {
+			// Simulates the replica's bootstrap-instance container: once the
+			// wait resolves, the real process would exit and kubelet would
+			// report it terminated. Do that step here, since nothing else
+			// in this test runs the container for real.
+			_, waitErr := pkgmanagement.WaitForClusterCertificates(
+				waitCtx, mockCli, k8client.ObjectKeyFromObject(cluster))
+			if waitErr == nil {
+				terminatedPod := instancePod.DeepCopy()
+				terminatedPod.Status.InitContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name:  "bootstrap-instance",
+						State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}},
+					},
+				}
+				waitErr = mockCli.Status().Update(waitCtx, terminatedPod)
+			}
+			certWaitDone <- waitErr
+		}()
+
+		// Stands in for the controller-runtime work queue, which would
+		// requeue this reconcile every 5s until the gate clears.
+		Eventually(func(g Gomega) *ctrl.Result {
+			res, err := r.reconcileRestoredCluster(ctx, cluster)
+			g.Expect(err).ToNot(HaveOccurred())
+			return res
+		}, "4s", "50ms").Should(BeNil(), "the restore gate must clear once the init container terminates")
+
+		Expect(<-certWaitDone).ToNot(HaveOccurred(),
+			"the certificate wait must resolve once the restore gate has written the status")
+	})
+
+	It("registers the phase when the PKI setup fails", func(ctx SpecContext) {
+		cluster.Spec.Certificates = &apiv1.CertificatesConfiguration{
+			ServerCASecret: "missing-ca",
+		}
+
+		mockCli := fake.NewClientBuilder().
+			WithScheme(k8scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, orphanPVC).
+			WithStatusSubresource(cluster).
+			Build()
+
+		r := &ClusterReconciler{Client: mockCli, Recorder: record.NewFakeRecorder(10)}
+
+		res, err := r.reconcileRestoredCluster(ctx, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(res).To(BeNil())
+
+		remoteCluster := &apiv1.Cluster{}
+		Expect(mockCli.Get(ctx, k8client.ObjectKeyFromObject(cluster), remoteCluster)).To(Succeed())
+		Expect(remoteCluster.Status.Phase).To(Equal(apiv1.PhaseCannotCreateClusterObjects))
+		Expect(remoteCluster.Status.PhaseReason).To(ContainSubstring("missing-ca"))
 	})
 })
