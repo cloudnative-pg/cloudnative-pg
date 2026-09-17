@@ -1,0 +1,21 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-pvc-inherited-metadata
+spec:
+  instances: 1
+
+  inheritedMetadata:
+    labels:
+      app.kubernetes.io/name: my-custom-app
+      app.kubernetes.io/managed-by: my-gitops-tool
+      app.kubernetes.io/component: my-custom-component
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

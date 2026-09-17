@@ -40,8 +40,9 @@ var _ = Describe("metadataReconciler", func() {
 					},
 					Spec: apiv1.ClusterSpec{
 						InheritedMetadata: &apiv1.EmbeddedObjectMetadata{Labels: map[string]string{
-							"label1": "value1",
-							"label2": "value2",
+							"label1":                     "value1",
+							"label2":                     "value2",
+							utils.KubernetesAppLabelName: "my-custom-app",
 						}},
 					},
 					Status: apiv1.ClusterStatus{
@@ -69,10 +70,12 @@ var _ = Describe("metadataReconciler", func() {
 				Expect(pvc.Labels).To(HaveKeyWithValue("label1", "value1"))
 				Expect(pvc.Labels).To(HaveKeyWithValue("label2", "value2"))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
+				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, "my-custom-app"))
 				// Expected common labels
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
-				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
+
+				Expect(reconciler.isUpToDate(pvc)).To(BeTrue())
 			})
 		})
 
