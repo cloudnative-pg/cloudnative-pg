@@ -334,9 +334,13 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	// We rely on the `CurrentPrimary` field to identify the designated primary
 	// instance that is replicating from the external cluster, ensuring it is
 	// sorted first among the standbys.
-	if list.IsReplicaCluster &&
-		(list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary) {
-		return true
+	if list.IsReplicaCluster {
+		switch {
+		case list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary:
+			return true
+		case list.Items[j].Pod.Name == list.CurrentPrimary && list.Items[i].Pod.Name != list.CurrentPrimary:
+			return false
+		}
 	}
 
 	return list.Items[i].Pod.Name < list.Items[j].Pod.Name
