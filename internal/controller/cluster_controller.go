@@ -1349,11 +1349,6 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&apiv1.Pooler{},
 			handler.EnqueueRequestsFromMapFunc(r.mapPoolersToClusters()),
 		).
-		Watches(
-			&corev1.Node{},
-			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
-			builder.WithPredicates(r.nodesPredicate()),
-		).
 		// Watch external (non-owned) pods for podSelectorRefs IP resolution.
 		// Owned pods are already handled by Owns(&corev1.Pod{}) above.
 		Watches(
@@ -1406,6 +1401,15 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
 			builder.WithPredicates(isBeingDeletedPredicate),
 		)
+
+	// Conditionally watch node resource
+	if configuration.Current.WatchNodes {
+		ctrlBuilder = ctrlBuilder.Watches(
+			&corev1.Node{},
+			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
+			builder.WithPredicates(r.nodesPredicate()),
+		)
+	}
 
 	if configuration.Current.OperatorNamespace != "" {
 		ctrlBuilder = ctrlBuilder.Watches(
@@ -1488,6 +1492,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by node
+	// This is not used when WatchNodes is false
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&corev1.Pod{},
