@@ -107,6 +107,13 @@ func (e *livenessExecutor) IsHealthy(
 
 	if err = evaluateLivenessPinger(ctx, cluster); err != nil {
 		contextLogger.Error(err, "Instance connectivity error - liveness probe failing")
+
+		// Stop the isolated primary now. Waiting for the kubelet's SIGTERM would give a
+		// smart shutdown instead, letting already-open sessions keep committing for up to
+		// smartShutdownTimeout. Immediate is fine here, the instance faces a rewind anyway.
+		// Fires on the first failure, so a transient blip can trigger it too.
+		e.instance.TryRequestImmediateShutdown()
+
 		http.Error(
 			w,
 			fmt.Sprintf("liveness check failed: %s", err.Error()),
