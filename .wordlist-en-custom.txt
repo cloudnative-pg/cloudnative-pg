@@ -459,6 +459,7 @@ RUNTIME
 ReadWriteOnce
 RedHat
 RelabelConfig
+RenewBefore
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationSlotsConfiguration
