@@ -131,5 +131,24 @@ var _ = Describe("metadataReconciler", func() {
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
 			})
 		})
+
+		Context("when a PVC has a nil labels map", func() {
+			It("should not panic and should set the common labels", func() {
+				cluster := &apiv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-cluster",
+					},
+				}
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pvc1",
+					},
+				}
+				reconciler := newLabelReconciler(cluster)
+
+				Expect(func() { reconciler.update(pvc) }).NotTo(Panic())
+				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
+			})
+		})
 	})
 })
