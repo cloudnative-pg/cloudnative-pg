@@ -34,8 +34,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Test case for validating that spec.inheritedMetadata.labels can override the
-// common app.kubernetes.io/* labels the operator sets on every PVC
+// spec.inheritedMetadata.labels must win over the common app.kubernetes.io/*
+// labels the operator sets on every PVC
 var _ = Describe("PVC inheritedMetadata labels", Label(tests.LabelClusterMetadata), func() {
 	const (
 		namespacePrefix = "cluster-pvc-inherited-metadata"
