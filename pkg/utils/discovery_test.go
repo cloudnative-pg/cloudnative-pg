@@ -126,6 +126,48 @@ var _ = Describe("Detect resources properly when", func() {
 
 		Expect(HaveVolumeSnapshot()).To(BeTrue())
 	})
+
+	It("should not detect the resize subresource of the pods", func() {
+		resources := []*metav1.APIResourceList{
+			{
+				GroupVersion: "v1",
+				APIResources: []metav1.APIResource{
+					{
+						Name: "pods",
+					},
+					{
+						Name: "pods/status",
+					},
+				},
+			},
+		}
+		fakeDiscovery.Resources = resources
+		err := DetectPodsResize(client.Discovery())
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(HavePodsResize()).To(BeFalse())
+	})
+
+	It("should detect the resize subresource of the pods", func() {
+		resources := []*metav1.APIResourceList{
+			{
+				GroupVersion: "v1",
+				APIResources: []metav1.APIResource{
+					{
+						Name: "pods",
+					},
+					{
+						Name: "pods/resize",
+					},
+				},
+			},
+		}
+		fakeDiscovery.Resources = resources
+		err := DetectPodsResize(client.Discovery())
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(HavePodsResize()).To(BeTrue())
+	})
 })
 
 var _ = Describe("AvailableArchitecture", func() {
