@@ -212,6 +212,13 @@ func ForeignServerExistsQuery(serverName string) string {
 	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_server WHERE srvname='%v')", serverName)
 }
 
+// SchemaPrivilegeQuery builds a has_schema_privilege query checking whether
+// the given role holds the given privilege (e.g. USAGE, CREATE) on the named
+// schema.
+func SchemaPrivilegeQuery(roleName, schemaName, privilege string) string {
+	return fmt.Sprintf("SELECT has_schema_privilege('%v', '%v', '%v')", roleName, schemaName, privilege)
+}
+
 // AssertDataExpectedCount verifies that the named table has exactly
 // expectedValue rows.
 func AssertDataExpectedCount(
