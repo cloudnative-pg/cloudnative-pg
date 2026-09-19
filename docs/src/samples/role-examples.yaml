@@ -7,40 +7,29 @@ spec:
     name: cluster-example
   name: reporting
   login: true
+  password:
+    mode: generate
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: role-dante
+  name: cluster-example-dante
 spec:
   cluster:
     name: cluster-example
   name: dante
-  comment: my database-side comment
+  comment: "Dante Alighieri"
   login: true
   superuser: false
-  createdb: true
+  createdb: false
   createrole: false
   inherit: false
-  clientCertificate:
-    enabled: true
   replication: false
   bypassrls: false
-  connectionLimit: 4
-  validUntil: "2053-04-12T15:04:05Z"
-  inRoles:
-    - pg_monitor
-    - pg_signal_backend
-  passwordSecret:
-    name: cluster-example-dante
----
-apiVersion: v1
-data:
-  username: ZGFudGU=
-  password: ZGFudGU=
-kind: Secret
-metadata:
-  name: cluster-example-dante
-  labels:
-    cnpg.io/reload: "true"
-type: kubernetes.io/basic-auth
+  connectionLimit: 5
+  password:
+    mode: generate
+    duration: 1008h    # 6 weeks
+    renewBefore: 96h   # 4 days
+  clientCertificate:
+    enabled: true
