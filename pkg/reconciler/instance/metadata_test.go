@@ -42,6 +42,7 @@ var _ = Describe("object metadata test", func() {
 			cluster := &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
 					CurrentPrimary: "primaryPod",
+					TargetPrimary:  "primaryPod",
 				},
 			}
 
@@ -78,6 +79,7 @@ var _ = Describe("object metadata test", func() {
 			cluster := &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
 					CurrentPrimary: "newPrimaryPod",
+					TargetPrimary:  "newPrimaryPod",
 				},
 			}
 
@@ -155,6 +157,7 @@ var _ = Describe("object metadata test", func() {
 			cluster := &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
 					CurrentPrimary: "primaryPod",
+					TargetPrimary:  "primaryPod",
 				},
 			}
 
@@ -197,6 +200,7 @@ var _ = Describe("object metadata test", func() {
 			cluster := &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
 					CurrentPrimary: "primaryPod",
+					TargetPrimary:  "primaryPod",
 				},
 			}
 
@@ -497,6 +501,7 @@ var _ = Describe("metadata reconciliation test", func() {
 			cluster := &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
 					CurrentPrimary: "pod1",
+					TargetPrimary:  "pod1",
 				},
 				Spec: apiv1.ClusterSpec{
 					InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
@@ -547,6 +552,7 @@ var _ = Describe("metadata update functions", func() {
 			cluster = &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
 					CurrentPrimary: "pod1",
+					TargetPrimary:  "pod1",
 				},
 				Spec: apiv1.ClusterSpec{
 					InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
@@ -597,5 +603,33 @@ var _ = Describe("metadata update functions", func() {
 			Expect(modified).To(BeTrue())
 			Expect(instance.Annotations).To(Equal(cluster.GetFixedInheritedAnnotations()))
 		})
+	})
+})
+
+var _ = Describe("updateRoleLabels during a pending failover", func() {
+	It("should not re-promote an old primary already marked unhealthy while a failover is pending", func() {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "old-primary",
+				TargetPrimary:  apiv1.PendingFailoverMarker,
+			},
+		}
+
+		oldPrimary := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "old-primary",
+				Labels: map[string]string{
+					//nolint:staticcheck
+					utils.ClusterRoleLabelName:         specs.ClusterRoleLabelUnhealthy,
+					utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelUnhealthy,
+				},
+			},
+		}
+
+		updateRoleLabels(context.Background(), cluster, oldPrimary)
+
+		//nolint:staticcheck
+		Expect(oldPrimary.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
+		Expect(oldPrimary.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
 	})
 })
