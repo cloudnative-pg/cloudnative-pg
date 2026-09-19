@@ -137,6 +137,61 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 	})
+
+	It("propagates HostUsers=true to job spec", func() {
+		hostUsersTrue := true
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				HostUsers: &hostUsersTrue,
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		job := CreatePrimaryJob(cluster, 0, cmd.Role, cmd.Command, getExtensions(&cluster))
+		Expect(job.Spec.Template.Spec.HostUsers).To(Equal(&hostUsersTrue))
+	})
+
+	It("propagates HostUsers=false to job spec", func() {
+		hostUsersFalse := false
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				HostUsers: &hostUsersFalse,
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		job := CreatePrimaryJob(cluster, 0, cmd.Role, cmd.Command, getExtensions(&cluster))
+		Expect(job.Spec.Template.Spec.HostUsers).To(Equal(&hostUsersFalse))
+	})
+
+	It("does not set HostUsers when unspecified", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		job := CreatePrimaryJob(cluster, 0, cmd.Role, cmd.Command, getExtensions(&cluster))
+		Expect(job.Spec.Template.Spec.HostUsers).To(BeNil())
+	})
 })
 
 var _ = Describe("Job service account token", func() {
