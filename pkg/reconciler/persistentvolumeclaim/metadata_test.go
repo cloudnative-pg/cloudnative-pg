@@ -40,8 +40,9 @@ var _ = Describe("metadataReconciler", func() {
 					},
 					Spec: apiv1.ClusterSpec{
 						InheritedMetadata: &apiv1.EmbeddedObjectMetadata{Labels: map[string]string{
-							"label1": "value1",
-							"label2": "value2",
+							"label1":                     "value1",
+							"label2":                     "value2",
+							utils.KubernetesAppLabelName: "my-custom-app",
 						}},
 					},
 					Status: apiv1.ClusterStatus{
@@ -69,10 +70,12 @@ var _ = Describe("metadataReconciler", func() {
 				Expect(pvc.Labels).To(HaveKeyWithValue("label1", "value1"))
 				Expect(pvc.Labels).To(HaveKeyWithValue("label2", "value2"))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
+				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, "my-custom-app"))
 				// Expected common labels
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
-				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
+
+				Expect(reconciler.isUpToDate(pvc)).To(BeTrue())
 			})
 		})
 
@@ -126,6 +129,25 @@ var _ = Describe("metadataReconciler", func() {
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
+			})
+		})
+
+		Context("when a PVC has a nil labels map", func() {
+			It("should not panic and should set the common labels", func() {
+				cluster := &apiv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-cluster",
+					},
+				}
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pvc1",
+					},
+				}
+				reconciler := newLabelReconciler(cluster)
+
+				Expect(func() { reconciler.update(pvc) }).NotTo(Panic())
+				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
 			})
 		})
 	})
