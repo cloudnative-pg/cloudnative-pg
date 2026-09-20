@@ -33,24 +33,22 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("podHasContainer", func() {
-	pod := corev1.Pod{
-		Spec: corev1.PodSpec{
-			InitContainers: []corev1.Container{{Name: "bootstrap-instance"}},
-			Containers:     []corev1.Container{{Name: "postgres"}},
-		},
+var _ = Describe("PodSpecHasContainer", func() {
+	spec := corev1.PodSpec{
+		InitContainers: []corev1.Container{{Name: "bootstrap-instance"}},
+		Containers:     []corev1.Container{{Name: "postgres"}},
 	}
 
 	It("finds a regular container", func() {
-		Expect(podHasContainer(pod, "postgres")).To(BeTrue())
+		Expect(PodSpecHasContainer(&spec, "postgres")).To(BeTrue())
 	})
 
 	It("finds an init container", func() {
-		Expect(podHasContainer(pod, "bootstrap-instance")).To(BeTrue())
+		Expect(PodSpecHasContainer(&spec, "bootstrap-instance")).To(BeTrue())
 	})
 
 	It("returns false for a container the pod does not have", func() {
-		Expect(podHasContainer(pod, "does-not-exist")).To(BeFalse())
+		Expect(PodSpecHasContainer(&spec, "does-not-exist")).To(BeFalse())
 	})
 })
 

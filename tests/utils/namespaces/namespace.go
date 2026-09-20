@@ -162,15 +162,7 @@ func dumpGoroutineStacks(
 	var wg sync.WaitGroup
 
 	for _, pod := range managedPods {
-		containerNames := make([]string, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
-		for _, c := range pod.Spec.InitContainers {
-			containerNames = append(containerNames, c.Name)
-		}
-		for _, c := range pod.Spec.Containers {
-			containerNames = append(containerNames, c.Name)
-		}
-
-		for _, containerName := range containerNames {
+		for _, containerName := range pkgutils.PodSpecContainerNames(&pod.Spec) {
 			wg.Add(1)
 			go func(pod corev1.Pod, containerName string) {
 				defer wg.Done()

@@ -109,7 +109,7 @@ func ExecCommand(
 		"container", containerName,
 	)
 
-	if !podHasContainer(pod, containerName) {
+	if !PodSpecHasContainer(&pod.Spec, containerName) {
 		return "", "", ErrorContainerNotFound
 	}
 
@@ -176,16 +176,24 @@ func shouldFallbackToSPDY(err error) bool {
 	return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
 }
 
-// podHasContainer reports whether the pod defines a container (regular or
-// init) with the given name.
-func podHasContainer(pod corev1.Pod, containerName string) bool {
-	for _, cr := range pod.Spec.InitContainers {
-		if cr.Name == containerName {
-			return true
-		}
+// PodSpecContainerNames returns the names of every container (init, then
+// regular) defined in spec.
+func PodSpecContainerNames(spec *corev1.PodSpec) []string {
+	names := make([]string, 0, len(spec.InitContainers)+len(spec.Containers))
+	for _, cr := range spec.InitContainers {
+		names = append(names, cr.Name)
 	}
-	for _, cr := range pod.Spec.Containers {
-		if cr.Name == containerName {
+	for _, cr := range spec.Containers {
+		names = append(names, cr.Name)
+	}
+	return names
+}
+
+// PodSpecHasContainer reports whether spec defines a container (regular or
+// init) with the given name.
+func PodSpecHasContainer(spec *corev1.PodSpec, containerName string) bool {
+	for _, name := range PodSpecContainerNames(spec) {
+		if name == containerName {
 			return true
 		}
 	}
