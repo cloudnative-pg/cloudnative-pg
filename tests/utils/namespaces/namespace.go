@@ -125,6 +125,25 @@ func dumpGoroutineStacks(
 	restConfig *rest.Config,
 	namespace, filename string,
 ) {
+	dumpCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	podList, err := pods.List(dumpCtx, crudClient, namespace)
+	if err != nil {
+		fmt.Printf("could not list pods in %v: %v\n", namespace, err)
+		return
+	}
+
+	managedPods := make([]corev1.Pod, 0, len(podList.Items))
+	for _, pod := range podList.Items {
+		if isCnpgManagedPod(pod) {
+			managedPods = append(managedPods, pod)
+		}
+	}
+	if len(managedPods) == 0 {
+		return
+	}
+
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
@@ -135,15 +154,6 @@ func dumpGoroutineStacks(
 		_ = f.Close()
 	}()
 
-	podList, err := pods.List(ctx, crudClient, namespace)
-	if err != nil {
-		_, _ = fmt.Fprintf(f, "could not list pods in %v: %v\n", namespace, err)
-		return
-	}
-
-	dumpCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
 	type dumpResult struct {
 		pod, container, stdout, stderr string
 		err                            error
@@ -151,10 +161,7 @@ func dumpGoroutineStacks(
 	resultsCh := make(chan dumpResult)
 	var wg sync.WaitGroup
 
-	for _, pod := range podList.Items {
-		if !isCnpgManagedPod(pod) {
-			continue
-		}
+	for _, pod := range managedPods {
 		containerNames := make([]string, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
 		for _, c := range pod.Spec.InitContainers {
 			containerNames = append(containerNames, c.Name)
