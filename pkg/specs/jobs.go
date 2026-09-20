@@ -141,6 +141,9 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 	if config.DataChecksums != nil &&
 		*config.DataChecksums {
 		options = append(options, "-k")
+	} else if config.DataChecksums != nil && !*config.DataChecksums {
+		// In postgres 18+ data checksums are enabled by default, so we must explicitly disable them
+		options = append(options, "--no-data-checksums")
 	}
 	if logLevel := cluster.Spec.LogLevel; log.DebugLevelString == logLevel ||
 		log.TraceLevelString == logLevel {
