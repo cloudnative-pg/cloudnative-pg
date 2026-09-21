@@ -75,11 +75,10 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("cannot get the role resource: %w", err)
 	}
 
-	// The deleteRole finalizer is released by the instance manager from the
-	// cluster state alone, so once deletion is requested this controller has
-	// nothing left to do. Re-issuing the client certificate Secret here would
-	// keep an external finalizer relying on garbage collection (for example
-	// ArgoCD foreground pruning) from ever clearing.
+	// The instance manager clears the deleteRole finalizer on its own.
+	// Re-issuing the client certificate Secret here would block an external
+	// finalizer waiting on garbage collection, for example ArgoCD's
+	// foreground pruning.
 	if !role.DeletionTimestamp.IsZero() {
 		contextLogger.Debug("DatabaseRole is being deleted, skipping reconciliation")
 		return ctrl.Result{}, nil

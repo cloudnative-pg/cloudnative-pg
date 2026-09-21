@@ -82,10 +82,9 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("cannot get the pooler resource: %w", err)
 	}
 
-	// A Pooler carries no finalizer of ours: once deletion is requested there
-	// is nothing left for this controller to do. Keep the owned resources
-	// untouched, or an external finalizer relying on garbage collection (for
-	// example ArgoCD foreground pruning) would never see them go away.
+	// A Pooler carries no finalizer of ours. Touching its owned resources
+	// here would block an external finalizer waiting on garbage collection,
+	// for example ArgoCD's foreground pruning.
 	if !pooler.DeletionTimestamp.IsZero() {
 		contextLogger.Debug("Pooler is being deleted, skipping reconciliation")
 		return ctrl.Result{}, nil
