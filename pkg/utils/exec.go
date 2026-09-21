@@ -28,6 +28,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -192,12 +193,7 @@ func PodSpecContainerNames(spec *corev1.PodSpec) []string {
 // PodSpecHasContainer reports whether spec defines a container (regular or
 // init) with the given name.
 func PodSpecHasContainer(spec *corev1.PodSpec, containerName string) bool {
-	for _, name := range PodSpecContainerNames(spec) {
-		if name == containerName {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(PodSpecContainerNames(spec), containerName)
 }
 
 // execCommandOnce performs a single kubectl exec operation without retries
