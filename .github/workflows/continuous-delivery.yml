@@ -456,12 +456,12 @@ jobs:
           VERSION: ${{ env.VERSION }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       -
         name: Login into docker registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -471,7 +471,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -557,7 +557,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build and push image for upgrade test
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         id: build-prime
         if: needs.evaluate_options.outputs.test_level == '4'
         with:
@@ -740,7 +740,7 @@ jobs:
     steps:
       -
         name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
         with:
           android: true
           dotnet: true
@@ -938,7 +938,7 @@ jobs:
       CNPG_DEPLOYMENT_METHOD: ${{ github.event_name == 'schedule' && 'helm' || needs.evaluate_options.outputs.cnpg_deployment_method }}
     steps:
       - name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
         with:
           android: true
           dotnet: true
@@ -1106,7 +1106,7 @@ jobs:
     steps:
       -
         name: Azure Login
-        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1219,7 +1219,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Azure Login
-        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1488,7 +1488,7 @@ jobs:
       -
         name: Azure Login
         if: always()
-        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1599,7 +1599,7 @@ jobs:
             go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.1
       -
         name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -2316,12 +2316,12 @@ jobs:
           check-latest: true
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
