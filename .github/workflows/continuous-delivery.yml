@@ -83,7 +83,7 @@ jobs:
   # Trigger the workflow on release-* branches for smoke testing whenever it's a scheduled run.
   # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
   smoke_test_release_branches:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       actions: write
     name: smoke test release-* branches when it's a scheduled run
@@ -113,7 +113,7 @@ jobs:
       pull-requests: write
       contents: read
       issues: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       github_ref: ${{ steps.refs.outputs.head_sha }}
       depth: ${{ env.DEPTH }}
@@ -203,7 +203,7 @@ jobs:
     name: Parse arguments
     if: |
       github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       github_ref: ${{ github.ref }}
       depth: ${{ env.DEPTH }}
@@ -258,7 +258,7 @@ jobs:
     needs:
       - check_commenter
       - test_arguments
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: |
       (
         needs.check_commenter.result == 'success' ||
@@ -582,7 +582,7 @@ jobs:
       needs.buildx.result == 'success' &&
       needs.buildx.outputs.upload_artifacts == 'true' &&
       github.repository_owner == 'cloudnative-pg'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       BRANCH: ${{ needs.buildx.outputs.branch_name }}
     steps:
@@ -651,7 +651,7 @@ jobs:
     if: |
       (always() && !cancelled()) &&
       needs.buildx.result == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       controller_img: ${{ needs.buildx.outputs.controller_img }}
       kindMatrix: ${{ steps.generate-jobs.outputs.kindMatrix }}
@@ -1100,7 +1100,7 @@ jobs:
       - buildx
       - generate-jobs
       - evaluate_options
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       azure_storage_account: ${{ steps.setup.outputs.azure_storage_account }}
     steps:
@@ -1146,7 +1146,7 @@ jobs:
       fail-fast: false
       max-parallel: 8
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.aksMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -1481,7 +1481,7 @@ jobs:
       - generate-jobs
       - e2e-aks-setup
       - e2e-aks
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
     steps:
@@ -1522,7 +1522,7 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.eksMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -1940,7 +1940,7 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -2255,7 +2255,7 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.openshiftMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
@@ -2536,7 +2536,7 @@ jobs:
         needs.e2e-openshift.result == 'success' ||
         needs.e2e-openshift.result == 'failure'
       ))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Create a directory for the artifacts
         run: mkdir test-artifacts
@@ -2619,7 +2619,7 @@ jobs:
       needs.e2e-kind.result == 'success' &&
       github.event_name == 'issue_comment' &&
       needs.evaluate_options.outputs.test_level == '4'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Check preconditions
         id: get_pr_number_and_labels
@@ -2649,7 +2649,7 @@ jobs:
       always() &&
       needs.e2e-kind.result == 'failure' &&
       github.event_name == 'issue_comment'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Check preconditions
         id: get_pr_number_and_labels
