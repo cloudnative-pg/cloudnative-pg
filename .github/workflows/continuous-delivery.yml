@@ -740,7 +740,7 @@ jobs:
     steps:
       -
         name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
           android: true
           dotnet: true
@@ -938,7 +938,7 @@ jobs:
       CNPG_DEPLOYMENT_METHOD: ${{ github.event_name == 'schedule' && 'helm' || needs.evaluate_options.outputs.cnpg_deployment_method }}
     steps:
       - name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
           android: true
           dotnet: true
