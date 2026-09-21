@@ -18,7 +18,6 @@
     'releases/**',
     'contribute/**',
     'licenses/**',
-    'pkg/versions/**',
   ],
   postUpdateOptions: [
     'gomodTidy',
@@ -91,7 +90,6 @@
         '/^pkg\\/versions\\/versions\\.go$/',
       ],
       matchStrings: [
-        'DefaultImageName = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
         'DefaultPgbouncerImage = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
       ],
       datasourceTemplate: 'docker',
