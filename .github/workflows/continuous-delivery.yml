@@ -1683,9 +1683,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARCH: ${{ steps.arch.outputs.arch }}
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
-          VELERO_VERSION: "v1.18.2"
+          VELERO_VERSION: "v1.18.3"
           # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
-          VELERO_AWS_PLUGIN_VERSION: "v1.14.2"
+          VELERO_AWS_PLUGIN_VERSION: "v1.14.3"
         with:
           timeout_minutes: 10
           max_attempts: 3
