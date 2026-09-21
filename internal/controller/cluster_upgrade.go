@@ -433,6 +433,7 @@ func isPodNeedingRollout(
 		"pod projected volume is outdated":         checkProjectedVolumeIsOutdated,
 		"pod image is outdated":                    checkPodImageIsOutdated,
 		"cluster has different restart annotation": checkClusterHasDifferentRestartAnnotation,
+		"pod image pull secrets are outdated":      checkPodImagePullSecretsOutdated,
 	}
 
 	podRollout := applyCheckers(checkers)
@@ -616,6 +617,39 @@ func checkClusterHasDifferentRestartAnnotation(
 			return rollout{
 				required: true,
 				reason:   "cluster has been explicitly restarted via annotation",
+			}, nil
+		}
+	}
+
+	return rollout{}, nil
+}
+
+// checkPodImagePullSecretsOutdated checks if the Pod is missing one or more of the
+// image pull secrets configured on the cluster.
+//
+// The operator never sets Pod.Spec.ImagePullSecrets directly: it relies on the
+// ServiceAccount's imagePullSecrets being injected into the Pod by Kubernetes at
+// creation time (see pkg/specs/serviceaccount.go). Because Pod.spec.imagePullSecrets
+// is immutable, a Pod created before a secret was added to the cluster will never
+// pick it up unless it is recreated, so we need to explicitly request a rollout
+// here (see issue #8370).
+func checkPodImagePullSecretsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
+	if len(cluster.Spec.ImagePullSecrets) == 0 {
+		return rollout{}, nil
+	}
+
+	podPullSecrets := make(map[string]bool, len(pod.Spec.ImagePullSecrets))
+	for _, secret := range pod.Spec.ImagePullSecrets {
+		podPullSecrets[secret.Name] = true
+	}
+
+	for _, secret := range cluster.Spec.ImagePullSecrets {
+		if !podPullSecrets[secret.Name] {
+			return rollout{
+				required: true,
+				reason: fmt.Sprintf(
+					"pod '%s' is missing the '%s' image pull secret configured on the cluster",
+					pod.Name, secret.Name),
 			}, nil
 		}
 	}
