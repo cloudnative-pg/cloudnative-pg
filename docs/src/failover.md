@@ -148,14 +148,17 @@ mechanism, driven by `tolerationSeconds` on the
 `node.kubernetes.io/unreachable` `NoExecute` taint (`300s` by default). That
 timer does not hold up the operator's failover decision; CloudNativePG
 promotes a new primary as soon as the `Ready` condition flips. By that point
-the kubelet on the isolated node has already stopped the old PostgreSQL
-container locally: with the default
-`.spec.probes.liveness.isolationCheck.enabled: true`, the instance manager
-fails its own liveness probe once it can reach neither the API server nor
-the rest of the cluster, and the kubelet kills the container within
-approximately three probe periods (`~30s`). Full high availability
-(recreation of the old primary on a healthy node by the operator) is still
-gated on the taint-based eviction actually deleting the pod.
+the kubelet on the isolated node has already noticed the problem: with the
+default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
+manager fails its own liveness probe once it can reach neither the API
+server nor the rest of the cluster, and the kubelet restarts the container
+within approximately three probe periods (`~30s`). That restart goes
+through the normal termination path, a smart shutdown that lets sessions
+already open on the isolated primary keep committing until
+`.spec.smartShutdownTimeout` elapses (180 seconds by default) on top of
+that ~30s detection window. Full high availability (recreation of the old
+primary on a healthy node by the operator) is still gated on the
+taint-based eviction actually deleting the pod.
 
 ## Failover Quorum (Quorum-based Failover)
 

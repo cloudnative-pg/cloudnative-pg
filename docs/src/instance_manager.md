@@ -232,7 +232,7 @@ following conditions are met:
 1. The instance manager cannot reach the Kubernetes API server
 2. The instance manager cannot reach **any** other instance via the instance manager’s REST API
 
-The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
+The effect of this behavior is to consider an isolated primary to be not alive: the liveness probe fails, and the kubelet restarts the container through its normal termination path. That path is a **smart** shutdown: it refuses new connections but lets sessions that are already open keep committing until `.spec.smartShutdownTimeout` elapses (180 seconds by default). Set `.spec.smartShutdownTimeout: 0` if you need the restart to skip straight to a fast shutdown instead of waiting out that window.
 
 It is **enabled by default** and can be disabled by adding the following:
 
