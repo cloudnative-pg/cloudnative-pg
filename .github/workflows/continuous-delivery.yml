@@ -745,7 +745,7 @@ jobs:
           android: true
           dotnet: true
           haskell: true
-          tool-cache: true
+          preinstalled-runtimes: true
           large-packages: false
           swap-storage: false
       -
@@ -943,7 +943,7 @@ jobs:
           android: true
           dotnet: true
           haskell: true
-          tool-cache: true
+          preinstalled-runtimes: true
           large-packages: false
           swap-storage: false
       - name: Cleanup docker cache
