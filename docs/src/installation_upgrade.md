@@ -370,9 +370,11 @@ the monitoring documentation.
 :::
 
 Version 1.27 introduces a change in the default behavior of the
-[liveness probe](instance_manager.md#liveness-probe): it now enforces the
-[shutdown of an isolated primary](instance_manager.md#primary-isolation)
-within the `livenessProbeTimeout` (30 seconds).
+[liveness probe](instance_manager.md#liveness-probe): it now fails if the
+primary [is isolated](instance_manager.md#primary-isolation) from the
+Kubernetes API server and the rest of the cluster within the
+`livenessProbeTimeout` (30 seconds), leading the kubelet to restart it
+through a smart shutdown.
 
 If this behavior is not suitable for your environment, you can disable the
 *isolation check* in the liveness probe with the following configuration:
