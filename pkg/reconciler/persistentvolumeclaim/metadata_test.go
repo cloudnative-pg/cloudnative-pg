@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package persistentvolumeclaim
 
 import (
+	"maps"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -129,6 +131,44 @@ var _ = Describe("metadataReconciler", func() {
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
+			})
+		})
+
+		Context("when a PVC was just built with inheritedMetadata overriding the common labels", func() {
+			It("should consider it up-to-date and leave the labels untouched", func() {
+				inherited := map[string]string{
+					utils.KubernetesAppLabelName:          "my-custom-app",
+					utils.KubernetesAppManagedByLabelName: "my-gitops-tool",
+					utils.KubernetesAppComponentLabelName: "my-custom-component",
+				}
+				cluster := &apiv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-cluster",
+					},
+					Spec: apiv1.ClusterSpec{
+						InheritedMetadata: &apiv1.EmbeddedObjectMetadata{Labels: inherited},
+					},
+					Status: apiv1.ClusterStatus{
+						InstanceNames: []string{"test-cluster-1"},
+					},
+				}
+				pvc, err := Build(cluster, &CreateConfiguration{
+					Status:     StatusReady,
+					NodeSerial: 1,
+					Calculator: NewPgDataCalculator(),
+					Storage:    apiv1.StorageConfiguration{Size: "1Gi"},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				for key, value := range inherited {
+					Expect(pvc.Labels).To(HaveKeyWithValue(key, value))
+				}
+
+				reconciler := newLabelReconciler(cluster)
+				Expect(reconciler.isUpToDate(pvc)).To(BeTrue())
+
+				builtLabels := maps.Clone(pvc.Labels)
+				reconciler.update(pvc)
+				Expect(pvc.Labels).To(Equal(builtLabels))
 			})
 		})
 

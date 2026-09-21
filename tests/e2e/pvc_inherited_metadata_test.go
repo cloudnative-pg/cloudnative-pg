@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"time"
+
 	"k8s.io/client-go/util/retry"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -101,6 +103,30 @@ var _ = Describe("PVC inheritedMetadata labels", Label(tests.LabelClusterMetadat
 			Eventually(func(g Gomega) {
 				assertPVCsHaveLabels(g, updatedLabels)
 			}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
+		})
+
+		By("checking the reconciler settles and stops patching the PVCs", func() {
+			// A label flip-flop between the inherited value and the operator
+			// default would bump resourceVersion on every reconcile, while an
+			// identical patch is a no-op for the API server.
+			pvcList, err := storageutils.GetPVCList(env.Ctx, env.Client, namespace)
+			Expect(err).ToNot(HaveOccurred())
+			resourceVersions := make(map[string]string, len(pvcList.Items))
+			for i := range pvcList.Items {
+				resourceVersions[pvcList.Items[i].Name] = pvcList.Items[i].ResourceVersion
+			}
+
+			Consistently(func(g Gomega) {
+				assertPVCsHaveLabels(g, updatedLabels)
+
+				pvcList, err := storageutils.GetPVCList(env.Ctx, env.Client, namespace)
+				g.Expect(err).ToNot(HaveOccurred())
+				for i := range pvcList.Items {
+					pvc := &pvcList.Items[i]
+					g.Expect(pvc.ResourceVersion).To(Equal(resourceVersions[pvc.Name]),
+						"PVC %q was patched again after converging", pvc.Name)
+				}
+			}, 30*time.Second, 5*time.Second).Should(Succeed())
 		})
 	})
 })
