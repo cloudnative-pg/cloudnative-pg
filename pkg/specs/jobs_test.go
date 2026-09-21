@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -87,6 +88,44 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(initdbFlags).ShouldNot(ContainSubstring("--locale="))
 		Expect(initdbFlags).Should(ContainSubstring("'--icu-rules=&A < z <<< Z'"))
 	})
+
+	DescribeTable("passes the data checksums flag matching the PostgreSQL version",
+		func(imageName string, dataChecksums *bool, expected []string, unexpected []string) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: imageName,
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						InitDB: &apiv1.BootstrapInitDB{
+							DataChecksums: dataChecksums,
+						},
+					},
+				},
+			}
+			job := CreatePrimaryJobViaInitdb(cluster, 0)
+
+			jobCommand := job.Spec.Template.Spec.Containers[0].Command
+			Expect(jobCommand).Should(ContainElement("--initdb-flags"))
+			initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+			for _, flag := range expected {
+				Expect(initdbFlags).Should(ContainSubstring(flag))
+			}
+			for _, flag := range unexpected {
+				Expect(initdbFlags).ShouldNot(ContainSubstring(flag))
+			}
+		},
+		Entry("unset on PostgreSQL 17 leaves the initdb default",
+			"postgres:17.6", nil, nil, []string{"-k", "data-checksums"}),
+		Entry("unset on PostgreSQL 18 leaves the initdb default",
+			"postgres:18.0", nil, nil, []string{"-k", "data-checksums"}),
+		Entry("true on PostgreSQL 17 enables checksums",
+			"postgres:17.6", ptr.To(true), []string{"-k"}, []string{"--no-data-checksums"}),
+		Entry("true on PostgreSQL 18 enables checksums",
+			"postgres:18.0", ptr.To(true), []string{"-k"}, []string{"--no-data-checksums"}),
+		Entry("false on PostgreSQL 17 passes nothing, the flag does not exist before 18",
+			"postgres:17.6", ptr.To(false), nil, []string{"-k", "data-checksums"}),
+		Entry("false on PostgreSQL 18 disables checksums explicitly",
+			"postgres:18.0", ptr.To(false), []string{"--no-data-checksums"}, []string{"-k"}),
+	)
 
 	It("contains correct labels", func() {
 		cluster := apiv1.Cluster{

@@ -263,7 +263,11 @@ builtinLocale
 dataChecksums
 :   When `dataChecksums` is set to `true`, CloudNativePG invokes the `-k` option in
     `initdb` to enable checksums on data pages and help detect corruption by the
-    I/O system - that would otherwise be silent (default: `false`).
+    I/O system - that would otherwise be silent. When set to `false` on
+    PostgreSQL 18 or later, CloudNativePG passes `--no-data-checksums` to
+    `initdb`, since that version enables checksums by default. When unset, the
+    `initdb` default applies: disabled up to PostgreSQL 17, enabled from
+    PostgreSQL 18.
 
 encoding
 :   When `encoding` set to a value, CloudNativePG passes it to the `--encoding`
