@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -312,6 +313,32 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(err).To(MatchError(ContainSubstring("not found")))
 
 			Expect(role.Status.ClientCertificate).To(BeNil())
+		})
+	})
+
+	Describe("Reconcile on a role being deleted", func() {
+		It("does not issue the client certificate Secret nor schedule a renewal", func(ctx SpecContext) {
+			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+			role := newRole("ivan", true)
+
+			// An external finalizer (e.g. ArgoCD foreground pruning) keeps the
+			// role around after deletion is requested.
+			role.Finalizers = []string{"cnpg.io/test-finalizer"}
+			Expect(r.Update(ctx, role)).To(Succeed())
+			Expect(r.Delete(ctx, role)).To(Succeed())
+
+			result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(role)})
+			Expect(err).NotTo(HaveOccurred())
+			// The renewal requeue would keep re-issuing the cert for as long as
+			// the finalizer holds the role.
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			err = r.Get(ctx, certSecretKey(role), &corev1.Secret{})
+			Expect(err).To(MatchError(ContainSubstring("not found")))
+
+			var got apiv1.DatabaseRole
+			Expect(r.Get(ctx, client.ObjectKeyFromObject(role), &got)).To(Succeed())
+			Expect(got.Status.ClientCertificate).To(BeNil())
 		})
 	})
 })
