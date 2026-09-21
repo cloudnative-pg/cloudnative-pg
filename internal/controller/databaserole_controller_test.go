@@ -153,6 +153,22 @@ var _ = Describe("DatabaseRole operator-side controller", func() {
 		Expect(passwordCondition(cli, role)).To(BeNil())
 	})
 
+	It("skips reconciliation when the role has a DeletionTimestamp", func() {
+		secret := newPasswordSecret("role-secret")
+		role := newRole("role-a", "role-secret")
+		// A finalizer (e.g. from ArgoCD foreground pruning) keeps the role
+		// around after deletion is requested.
+		now := metav1.Now()
+		role.Finalizers = []string{"cnpg.io/test-finalizer"}
+		role.DeletionTimestamp = &now
+		r, cli := buildRoleReconciler(role, secret)
+
+		_, err := r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(passwordCondition(cli, role)).To(BeNil())
+	})
+
 	It("getRolesUsingSecret returns only the roles referencing the given secret", func() {
 		list := apiv1.DatabaseRoleList{Items: []apiv1.DatabaseRole{
 			*newRole("uses-it", "shared-secret"),
