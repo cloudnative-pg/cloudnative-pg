@@ -1,1 +1,0 @@
-// PostgreSQL 18 requires --no-data-checksums when dataChecksums is false.
