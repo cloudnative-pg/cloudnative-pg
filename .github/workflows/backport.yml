@@ -16,6 +16,7 @@ jobs:
   label-source-pr:
     name: Add labels to PR
     if: |
+        github.event.action != 'closed' &&
         github.event.pull_request.merged == false &&
         !contains(github.event.pull_request.labels.*.name, 'backport-requested') &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
