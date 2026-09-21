@@ -31,7 +31,7 @@ env:
 jobs:
 
   check-public-clouds-k8s-versions:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       EOL_FILTER: '
         def ver: split(".") | map(tonumber);
