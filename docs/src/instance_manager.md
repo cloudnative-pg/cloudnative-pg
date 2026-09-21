@@ -232,7 +232,7 @@ following conditions are met:
 1. The instance manager cannot reach the Kubernetes API server
 2. The instance manager cannot reach **any** other instance via the instance manager’s REST API
 
-The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
+The effect of this behavior is to consider an isolated primary to be not alive: the liveness probe fails, and the kubelet restarts the container through its normal termination path. That path is a **smart** shutdown: it refuses new connections but lets sessions that are already open keep committing until `.spec.smartShutdownTimeout` elapses (180 seconds by default). Set `.spec.smartShutdownTimeout: 0` if you need the restart to skip straight to a fast shutdown instead of waiting out that window.
 
 It is **enabled by default** and can be disabled by adding the following:
 
@@ -267,9 +267,11 @@ spec:
 
 :::info
 Primary isolation is distinct from the [safe primary election](failover.md#safe-primary-election)
-mechanism. The isolation check *fences* a primary that has lost connectivity to
-both the API server and the other instances, while the primary lease coordinates
-*which instance is allowed to promote*. The two mechanisms are complementary.
+mechanism. The isolation check reports a primary that has lost connectivity to
+both the API server and the other instances as unhealthy, leaving the kubelet
+to restart it through the normal container-termination path described above;
+the primary lease coordinates *which instance is allowed to promote*. The two
+mechanisms are complementary.
 :::
 
 ## Readiness Probe
