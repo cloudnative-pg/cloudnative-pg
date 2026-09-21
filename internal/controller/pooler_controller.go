@@ -79,6 +79,14 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("cannot get the pooler resource: %w", err)
 	}
 
+	// A Pooler carries no finalizer of ours. Touching its owned resources
+	// here would block an external finalizer waiting on garbage collection,
+	// for example ArgoCD's foreground pruning.
+	if !pooler.DeletionTimestamp.IsZero() {
+		contextLogger.Debug("Pooler is being deleted, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+
 	// We make sure that there isn't a cluster with the same name as the pooler
 	conflictingCluster, err := getClusterOrNil(ctx, r.Client, req.NamespacedName)
 	if err != nil {
