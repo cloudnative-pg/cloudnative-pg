@@ -51,7 +51,7 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   SIGN_IMAGES: "true"
   # renovate: datasource=git-refs depName=https://github.com/redhat-openshift-ecosystem/community-operators-pipeline.git versioning=git currentValue=ci/latest
-  OPP_SCRIPT_VERSION: "80f1f4fee6515ebab714d1f320cc20f73d106fcd"
+  OPP_SCRIPT_VERSION: "8ed9daf65b35a6ed456fb02cc0fccac2519c4ba8"
 
 defaults:
   run:
@@ -62,7 +62,7 @@ jobs:
   # Trigger the workflow on release-* branches for smoke testing whenever it's a scheduled run.
   # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
   smoke_test_release_branches:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       actions: write
     name: smoke test release-* branches when it's a scheduled run
@@ -84,7 +84,7 @@ jobs:
   #   1. it's on 'main' branch
   #   2. it's triggered by events in the 'do_not_skip' list
   duplicate_runs:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     name: Skip duplicate runs
     continue-on-error: true
     outputs:
@@ -105,7 +105,7 @@ jobs:
     name: Check changed files
     needs: duplicate_runs
     if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       docs-changed: ${{ steps.filter.outputs.docs-changed }}
       operator-changed: ${{ steps.filter.outputs.operator-changed }}
@@ -166,7 +166,7 @@ jobs:
       - change-triage
     # We need always run linter as go linter is a required check
     if: needs.duplicate_runs.outputs.should_skip != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -202,7 +202,7 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.renovate-changed == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -218,7 +218,7 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.security-insights-changed == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -238,7 +238,7 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.test-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Run govulncheck
         uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1
@@ -268,7 +268,7 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.shell-script-changed == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
         SHELLCHECK_OPTS: -a -x -S style
     steps:
@@ -292,7 +292,7 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.test-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       k8sMatrix: ${{ steps.get-k8s-versions.outputs.k8s_versions }}
       latest_k8s_version: ${{ steps.get-k8s-versions.outputs.latest_k8s_version }}
@@ -345,7 +345,7 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.test-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       matrix:
         # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
@@ -381,7 +381,7 @@ jobs:
     needs:
       - tests
     if: always() && !cancelled()
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Report matrix result
         env:
@@ -402,7 +402,7 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.docs-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -433,7 +433,7 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.docs-changed == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -457,7 +457,7 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.operator-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -637,13 +637,13 @@ jobs:
           RACE: "true"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Login into docker registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -653,7 +653,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
 
       - name: Build and push
-        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -773,7 +773,7 @@ jobs:
 
   olm-bundle:
     name: Create OLM bundle and catalog
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
@@ -791,7 +791,7 @@ jobs:
           ref: ${{ needs.buildx.outputs.commit }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
@@ -803,7 +803,7 @@ jobs:
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Login into docker registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -837,7 +837,7 @@ jobs:
 
   preflight:
     name: Run openshift-preflight test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - buildx
       - olm-bundle
@@ -893,7 +893,7 @@ jobs:
 
   olm-scorecard:
     name: Run OLM scorecard test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - buildx
       - olm-bundle
@@ -912,13 +912,13 @@ jobs:
           version: ${{ env.KIND_VERSION }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Login into docker registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4

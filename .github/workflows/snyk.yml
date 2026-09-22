@@ -16,7 +16,7 @@ jobs:
   # is checked here and surfaced as a job output.
   check-secret:
     name: Check for Snyk token
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       has_token: ${{ steps.check.outputs.has_token }}
     steps:
@@ -29,7 +29,7 @@ jobs:
     needs: check-secret
     if: ${{ needs.check-secret.outputs.has_token == 'true' }}
     name: Security scan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       security-events: write
     steps:
@@ -46,7 +46,7 @@ jobs:
           args: --sarif-file-output=snyk-static.sarif
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         with:
           sarif_file: snyk-static.sarif
 
@@ -62,6 +62,6 @@ jobs:
           args: --sarif-file-output=snyk-test.sarif
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         with:
           sarif_file: snyk-test.sarif
