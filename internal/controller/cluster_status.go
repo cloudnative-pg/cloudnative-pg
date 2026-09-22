@@ -252,16 +252,6 @@ func (r *ClusterReconciler) getManagedJobs(
 	return childJobs, nil
 }
 
-// setCertificatesStatus fills in the certificate secret names and alt DNS
-// names. It only sets fields on cluster; the caller persists the change.
-func setCertificatesStatus(cluster *apiv1.Cluster) {
-	cluster.Status.Certificates.ServerCASecret = cluster.GetServerCASecretName()
-	cluster.Status.Certificates.ServerTLSSecret = cluster.GetServerTLSSecretName()
-	cluster.Status.Certificates.ClientCASecret = cluster.GetClientCASecretName()
-	cluster.Status.Certificates.ReplicationTLSSecret = cluster.GetReplicationSecretName()
-	cluster.Status.Certificates.ServerAltDNSNames = cluster.GetClusterAltDNSNames()
-}
-
 func (r *ClusterReconciler) updateResourceStatus(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -332,7 +322,12 @@ func (r *ClusterReconciler) updateResourceStatus(
 		}
 	}
 
-	setCertificatesStatus(cluster)
+	// set server CA secret,TLS secret and alternative DNS names with default values
+	cluster.Status.Certificates.ServerCASecret = cluster.GetServerCASecretName()
+	cluster.Status.Certificates.ServerTLSSecret = cluster.GetServerTLSSecretName()
+	cluster.Status.Certificates.ClientCASecret = cluster.GetClientCASecretName()
+	cluster.Status.Certificates.ReplicationTLSSecret = cluster.GetReplicationSecretName()
+	cluster.Status.Certificates.ServerAltDNSNames = cluster.GetClusterAltDNSNames()
 
 	// Set the version of the operator inside the status. This will allow us
 	// to discover the exact version of the operator which worked the last time

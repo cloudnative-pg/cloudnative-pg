@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -61,21 +60,6 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 		return nil, nil
 	}
 	contextLogger.Info("found orphan pvcs, trying to restore the cluster", "pvcs", pvcs)
-
-	// A replica's bootstrap-instance init container waits for
-	// Status.Certificates before it can terminate. The restore gate right
-	// below waits for that same init container to terminate. Publish the
-	// certificate status now, or the two waits deadlock forever.
-	if err := r.setupPostgresPKI(ctx, cluster); err != nil {
-		contextLogger.Error(err, "while setting up the PKI of the restored cluster")
-		if regErr := r.RegisterPhase(ctx, cluster, apiv1.PhaseCannotCreateClusterObjects, err.Error()); regErr != nil {
-			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
-		}
-		return nil, err
-	}
-	if err := registerCertificatesStatus(ctx, r.Client, cluster); err != nil {
-		return nil, err
-	}
 
 	if res, err := ensureClusterRestoreCanStart(ctx, r.Client, cluster); res != nil || err != nil {
 		return res, err
@@ -230,18 +214,6 @@ func restoreClusterStatus(
 	clusterOrig := cluster.DeepCopy()
 	cluster.Status.LatestGeneratedNode = latestNodeSerial
 	cluster.Status.TargetPrimary = specs.GetInstanceName(cluster.Name, targetPrimaryNodeSerial)
-	return c.Status().Patch(ctx, cluster, client.MergeFrom(clusterOrig))
-}
-
-// registerCertificatesStatus writes the PKI secret names into the status
-// right away. See reconcileRestoredCluster for why this can't wait.
-func registerCertificatesStatus(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
-	clusterOrig := cluster.DeepCopy()
-	setCertificatesStatus(cluster)
-
-	if reflect.DeepEqual(clusterOrig.Status.Certificates, cluster.Status.Certificates) {
-		return nil
-	}
 	return c.Status().Patch(ctx, cluster, client.MergeFrom(clusterOrig))
 }
 
