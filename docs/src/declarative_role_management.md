@@ -68,6 +68,17 @@ A few points are worth noting:
     conventions.
 4.  Role membership with `inRoles` defaults to no memberships.
 
+:::warning
+Membership in the predefined roles `pg_read_all_data` and `pg_write_all_data`
+also covers the system catalogs, `pg_authid` included. A role granted
+`pg_read_all_data` through `inRoles` can read the SCRAM-SHA-256 verifier of
+every role that has a password, the database owner among them, even though it
+holds no explicit grant on the catalog. A verifier cannot be replayed directly,
+but it can be attacked offline, so a weak password on any role is exposed to
+every member of `pg_read_all_data`. Prefer explicit schema and table grants for
+roles handed to tenants or applications.
+:::
+
 -----
 
 ## The `DatabaseRole` resource
