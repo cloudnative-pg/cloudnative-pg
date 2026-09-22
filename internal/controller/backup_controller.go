@@ -135,7 +135,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
 		if apierrs.IsNotFound(err) {
-			return ctrl.Result{}, reconcile.TerminalError(err)
+			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}

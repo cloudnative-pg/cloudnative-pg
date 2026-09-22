@@ -84,6 +84,24 @@ var _ = Describe("backup reconciliation disabled", func() {
 	})
 })
 
+var _ = Describe("backup deletion reconciliation", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("ignores a Backup that has already been deleted", func(ctx context.Context) {
+		result, err := env.backupReconciler.Reconcile(ctx, ctrl.Request{
+			NamespacedName: client.ObjectKey{
+				Namespace: "default",
+				Name:      "deleted-backup",
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+	})
+})
+
 var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 	var env *testingEnvironment
 	BeforeEach(func() {
