@@ -35,7 +35,7 @@ jobs:
           branch: "license-updater"
           author: "license-updater <license-updater@users.noreply.github.com>"
           committer: "license-updater <license-updater@users.noreply.github.com>"
-          labels: no-issue
+          labels: no-issue,automated
           add-paths: |
             licenses/**
           commit-message: "chore: refresh licenses directory"
