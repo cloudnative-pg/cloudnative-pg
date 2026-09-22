@@ -32,6 +32,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -131,9 +132,17 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 			shellquote.Join(options...))
 		return initCommand
 	}
-	if config.DataChecksums != nil &&
-		*config.DataChecksums {
-		options = append(options, "-k")
+	if config.DataChecksums != nil {
+		majorVersion, err := cluster.GetPostgresqlMajorVersion()
+		if err != nil {
+			log.Warning("cannot detect the PostgreSQL major version, "+
+				"skipping the explicit initdb data checksums flag",
+				"cluster", cluster.Name,
+				"namespace", cluster.Namespace,
+				"err", err)
+		} else if flag := postgres.DataChecksumsInitdbFlag(majorVersion, *config.DataChecksums); flag != "" {
+			options = append(options, flag)
+		}
 	}
 	if logLevel := cluster.Spec.LogLevel; log.DebugLevelString == logLevel ||
 		log.TraceLevelString == logLevel {

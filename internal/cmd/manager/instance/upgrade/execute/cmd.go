@@ -51,6 +51,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	postgresConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -361,15 +362,12 @@ func tryAddDataChecksums(
 		return nil, err
 	}
 
-	if dataPageChecksumVersion != "1" {
-		// In postgres 18 we will have to set "--no-data-checksums" if checksums are disabled (they are enabled by default)
-		if targetMajorVersion >= 18 {
-			return append(options, "--no-data-checksums"), nil
-		}
-		return options, nil
+	enabled := dataPageChecksumVersion != "0"
+	if flag := postgresConfig.DataChecksumsInitdbFlag(targetMajorVersion, enabled); flag != "" {
+		return append(options, flag), nil
 	}
 
-	return append(options, "--data-checksums"), nil
+	return options, nil
 }
 
 func tryAddWalSegmentSize(pgControlData utils.PgControlData, options []string) ([]string, error) {
