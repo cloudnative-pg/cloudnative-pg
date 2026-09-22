@@ -633,8 +633,12 @@ func checkClusterHasDifferentRestartAnnotation(
 // is immutable, a Pod created before a secret was added to the cluster will never
 // pick it up unless it is recreated, so we need to explicitly request a rollout
 // here (see issue #8370).
+//
+// When the cluster references a user-provided ServiceAccount, the operator does
+// not manage its imagePullSecrets, so recreating the Pod would not change
+// anything: skip the check to avoid an endless rollout loop.
 func checkPodImagePullSecretsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	if len(cluster.Spec.ImagePullSecrets) == 0 {
+	if len(cluster.Spec.ImagePullSecrets) == 0 || cluster.Spec.ServiceAccountName != "" {
 		return rollout{}, nil
 	}
 
