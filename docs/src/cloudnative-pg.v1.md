@@ -360,7 +360,7 @@ _Appears in:_
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 | `options` _string array_ | The list of options that must be passed to initdb when creating the cluster.<br />Deprecated: This could lead to inconsistent configurations,<br />please use the explicit provided parameters instead.<br />If defined, explicit values will be ignored. |  |  |  |
-| `dataChecksums` _boolean_ | Whether the `-k` option should be passed to initdb,<br />enabling checksums on data pages (default: `false`) |  |  |  |
+| `dataChecksums` _boolean_ | Whether data checksums are enabled on data pages, to help detect<br />corruption by the I/O system that would otherwise be silent<br />(default: `false` before PostgreSQL 18, `true` from PostgreSQL 18 on,<br />matching the initdb default in each case). |  |  |  |
 | `encoding` _string_ | The value to be passed as option `--encoding` for initdb (default:`UTF8`) |  |  |  |
 | `localeCollate` _string_ | The value to be passed as option `--lc-collate` for initdb (default:`C`) |  |  |  |
 | `localeCType` _string_ | The value to be passed as option `--lc-ctype` for initdb (default:`C`) |  |  |  |

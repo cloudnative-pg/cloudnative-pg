@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -87,6 +88,96 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(initdbFlags).ShouldNot(ContainSubstring("--locale="))
 		Expect(initdbFlags).Should(ContainSubstring("'--icu-rules=&A < z <<< Z'"))
 	})
+
+	DescribeTable("leaves the initdb data checksums default alone when dataChecksums is unset",
+		func(imageName string) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: imageName,
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						InitDB: &apiv1.BootstrapInitDB{},
+					},
+				},
+			}
+			cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+			jobCommand := cmd.Command
+			initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+			Expect(initdbFlags).ShouldNot(ContainSubstring("--data-checksums"))
+		},
+		Entry("on PostgreSQL 17", "postgres:17.0"),
+		Entry("on PostgreSQL 18", "postgres:18.0"),
+	)
+
+	It("does not set --data-checksums or --no-data-checksums when dataChecksums is true on PostgreSQL 18+", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						DataChecksums: ptr.To(true),
+					},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		jobCommand := cmd.Command
+		initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+		Expect(initdbFlags).ShouldNot(ContainSubstring("--data-checksums"))
+	})
+
+	It("sets --no-data-checksums when dataChecksums is false on PostgreSQL 18+", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						DataChecksums: ptr.To(false),
+					},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		jobCommand := cmd.Command
+		initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+		Expect(initdbFlags).Should(ContainSubstring("--no-data-checksums"))
+	})
+
+	It("sets --data-checksums when dataChecksums is true on PostgreSQL versions before 18", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:17.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						DataChecksums: ptr.To(true),
+					},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		jobCommand := cmd.Command
+		initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+		Expect(initdbFlags).Should(ContainSubstring("--data-checksums"))
+		Expect(initdbFlags).ShouldNot(ContainSubstring("--no-data-checksums"))
+	})
+
+	It("does not set --data-checksums or --no-data-checksums when dataChecksums is false on PostgreSQL versions before 18",
+		func() {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:17.0",
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						InitDB: &apiv1.BootstrapInitDB{
+							DataChecksums: ptr.To(false),
+						},
+					},
+				},
+			}
+			cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+			jobCommand := cmd.Command
+			initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+			Expect(initdbFlags).ShouldNot(ContainSubstring("--no-data-checksums"))
+			Expect(initdbFlags).ShouldNot(ContainSubstring("--data-checksums"))
+		})
 
 	It("contains correct labels", func() {
 		cluster := apiv1.Cluster{

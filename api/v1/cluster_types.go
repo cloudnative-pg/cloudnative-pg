@@ -1937,8 +1937,10 @@ type BootstrapInitDB struct {
 	// +optional
 	Options []string `json:"options,omitempty"`
 
-	// Whether the `-k` option should be passed to initdb,
-	// enabling checksums on data pages (default: `false`)
+	// Whether data checksums are enabled on data pages, to help detect
+	// corruption by the I/O system that would otherwise be silent
+	// (default: `false` before PostgreSQL 18, `true` from PostgreSQL 18 on,
+	// matching the initdb default in each case).
 	// +optional
 	DataChecksums *bool `json:"dataChecksums,omitempty"`
 
