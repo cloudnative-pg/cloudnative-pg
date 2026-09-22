@@ -92,6 +92,10 @@ func NewCmd() *cobra.Command {
 					"end-of-wal-stream flag found." +
 						"Exiting with error once to let Postgres try switching to streaming replication")
 				return err
+			case errors.Is(err, barmanRestorer.ErrConnectivity):
+				// Only available from Barman 3.20.0
+				contextLog.Info("transient connectivity issue while restoring WAL, will retry",
+					"walName", args[0], "error", err)
 			default:
 				contextLog.Info("wal-restore command failed", "error", err)
 			}
