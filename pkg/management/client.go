@@ -170,8 +170,8 @@ func WaitForGetClusterWithClient(ctx context.Context, cli client.Client, cluster
 // certificate secret names, then returns it. Use the returned Cluster: a new
 // Get can come back with an older copy, with the names empty again.
 //
-// The wait has no time limit, and this Pod must never be something the
-// operator's own reconcile is waiting on, or the two waits deadlock forever.
+// The wait has no time limit. The operator never waits on this Pod before
+// writing the status, so this wait cannot block that write.
 func WaitForClusterCertificates(
 	ctx context.Context,
 	cli client.Client,
