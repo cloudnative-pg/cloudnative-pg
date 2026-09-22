@@ -262,12 +262,12 @@ builtinLocale
 
 dataChecksums
 :   Data checksums help detect corruption of data pages that would otherwise
-    be silent. From PostgreSQL 18, data checksums are enabled by default. From
-    PostgreSQL 18, setting `dataChecksums` to `false` makes CloudNativePG pass
-    the `--no-data-checksums` option to `initdb` to disable data checksums. On
-    PostgreSQL versions before 18, setting `dataChecksums` to `true` makes
-    CloudNativePG pass the `--data-checksums` option to `initdb` to enable
-    data checksums.
+    be silent. From PostgreSQL 18, where data checksums are enabled by default,
+    setting `dataChecksums` to `false` makes CloudNativePG pass the
+    `--no-data-checksums` option to `initdb` to disable them. On PostgreSQL
+    versions before 18, setting `dataChecksums` to `true` makes CloudNativePG
+    pass the `--data-checksums` option to `initdb` to enable them. When unset,
+    the `initdb` default of the PostgreSQL version in use applies.
 
 encoding
 :   When `encoding` set to a value, CloudNativePG passes it to the `--encoding`
