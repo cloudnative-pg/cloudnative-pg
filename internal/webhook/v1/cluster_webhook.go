@@ -28,6 +28,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	barmanWebhooks "github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
@@ -2666,6 +2667,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getMonitoringFieldsWarnings(r)...)
 	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 	list = append(list, getSynchronousReplicationWarnings(r)...)
+	list = append(list, getPrimaryIsolationTimingWarnings(r)...)
 	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
 
@@ -3169,6 +3171,39 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		"This cluster has no synchronous replication configured. " +
 			"A primary failure can cause data loss for transactions not yet replicated. " +
 			"Consider configuring .spec.postgresql.synchronous to protect against data loss.",
+	}
+}
+
+// getPrimaryIsolationTimingWarnings warns when the primary isolation check
+// cannot stop an isolated primary before a replica is allowed to promote. A
+// replica takes over once the lease has gone a full lease duration without a
+// renewal, while the isolated primary requests its shutdown only on the first
+// retry-period tick after the renew deadline, and after one peer probe bounded
+// by the request timeout. This is a warning and not an error so that existing
+// clusters with such timings can still be updated.
+func getPrimaryIsolationTimingWarnings(r *apiv1.Cluster) admission.Warnings {
+	var cfg *apiv1.IsolationCheckConfiguration
+	if r.Spec.Probes != nil && r.Spec.Probes.Liveness != nil {
+		cfg = r.Spec.Probes.Liveness.IsolationCheck
+	}
+	if cfg == nil || cfg.Enabled == nil || !*cfg.Enabled {
+		return nil
+	}
+
+	stepDownBound := r.GetPrimaryLeaseRenewDeadline() +
+		r.GetPrimaryLeaseRetryPeriod() +
+		time.Duration(cfg.RequestTimeout)*time.Millisecond
+	leaseDuration := r.GetPrimaryLeaseDuration()
+	if stepDownBound < leaseDuration {
+		return nil
+	}
+
+	return admission.Warnings{
+		fmt.Sprintf("An isolated primary may keep accepting writes after a replica is allowed to promote: "+
+			"the isolation check can take up to %s (renewDeadlineSeconds + retryPeriodSeconds + "+
+			"isolationCheck.requestTimeout) to shut it down, which is not less than the %s lease duration. "+
+			"Increase .spec.primaryLease.leaseDurationSeconds or reduce the other timings.",
+			stepDownBound, leaseDuration),
 	}
 }
 
