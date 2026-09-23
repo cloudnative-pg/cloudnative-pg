@@ -168,6 +168,13 @@ admission webhook: `leaseDurationSeconds` must be greater than
 `renewDeadlineSeconds`, and `renewDeadlineSeconds` must be greater than
 `retryPeriodSeconds` multiplied by `1.2`. Both mirror the requirements of the
 underlying Kubernetes leader election.
+
+With the [primary isolation](instance_manager.md#primary-isolation) check
+enabled, keep `renewDeadlineSeconds` plus `retryPeriodSeconds` plus the
+isolation check `requestTimeout` below `leaseDurationSeconds`. That sum is how
+long an isolated primary can take to request its own shutdown, while a replica
+may promote once the lease has gone `leaseDurationSeconds` without a renewal.
+The admission webhook warns when this margin is missing.
 :::
 
 :::note
