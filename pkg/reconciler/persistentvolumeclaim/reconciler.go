@@ -40,11 +40,25 @@ func Reconcile(
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
 	if res, err := reconcileMultipleInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
 		return res, err
 	}
+
+	if res, err := ReconcileExistingPVCs(ctx, c, cluster, pvcs); !res.IsZero() || err != nil {
+		return res, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// ReconcileExistingPVCs aligns existing PVCs to the desired state.
+func ReconcileExistingPVCs(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	pvcs []corev1.PersistentVolumeClaim,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
 
 	if err := reconcileExistingPVCs(ctx, c, cluster, pvcs); err != nil {
 		if apierrs.IsConflict(err) {
