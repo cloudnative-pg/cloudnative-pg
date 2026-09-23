@@ -9,12 +9,14 @@ AZs
 AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
+AdzerKI
 AffinityConfiguration
 AllNamespaces
 Anand
 AntiAffinity
 AppArmor
 AppArmorProfile
+ArgoCD
 Armando
 AuthQuery
 AuthQuerySecret
@@ -189,6 +191,7 @@ Francesco
 GC
 GCE
 GCS
+GHSA
 GID
 GIS
 GKE
@@ -198,6 +201,7 @@ GUCs
 GabriFedi
 Gabriele
 GaugeVec
+GellertBabel
 GeoSpatial
 Gi
 GitOps
@@ -213,6 +217,7 @@ HPA
 HashiCorp
 HistoryTags
 Homebrew
+HoniSanders
 Huß
 IAM
 INPLACE
@@ -239,6 +244,7 @@ Isovalent
 Istio
 Istio's
 JSON
+Jamstah
 JefeDavis
 Joda
 KV
@@ -528,6 +534,7 @@ SubscriptionStatus
 SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
+Symlinked
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
@@ -617,6 +624,7 @@ allowPrivilegeEscalation
 allowVolumeExpansion
 alm
 amd
+andrew
 angus
 anonymization
 api
@@ -794,6 +802,7 @@ coreos
 corev
 cp
 cpu
+crashloop
 crds
 createdAt
 createdb
@@ -820,6 +829,7 @@ customresourcedefinitions
 cutover
 cyber
 dT
+daanvinken
 danglingPVC
 dataChecksums
 dataDurability
@@ -895,6 +905,7 @@ ephemeralVolumesSizeLimit
 ephemeralvolumessizelimitconfiguration
 ermakov
 eu
+evan
 excludePatterns
 executables
 expirations
@@ -919,6 +930,7 @@ failoverquorumstatus
 failovers
 failureThreshold
 faq
+farries
 fastpath
 fb
 fd
@@ -1038,6 +1050,7 @@ jaconi
 jdbc
 jmealo
 jobCount
+jonasbadstuebner
 jq
 json
 jsonpath
@@ -1144,6 +1157,7 @@ minSyncReplicas
 minikube
 minio
 misconfigurations
+mjlshen
 mmap
 monitoringconfiguration
 mountPath
@@ -1210,6 +1224,7 @@ passwordStatus
 passwordstate
 pc
 pchovelon
+pcj
 pdf
 periodSeconds
 persistentVolumeClaims
@@ -1309,6 +1324,7 @@ pprof
 pre
 preferredDuringSchedulingIgnoredDuringExecution
 prefetched
+prefetching
 preload
 prepended
 prepends
@@ -1344,6 +1360,7 @@ pvc
 pvcCount
 pvcName
 pvcTemplate
+qc
 quantile
 queryable
 quickstart
@@ -1593,6 +1610,7 @@ toto
 transactionID
 transactional
 transactionid
+trixie
 tx
 ubi
 ui
@@ -1634,6 +1652,7 @@ volumeSnapshot
 volumeSnapshots
 volumesnapshot
 volumesnapshotconfiguration
+vp
 vpa
 waitForArchive
 wal
