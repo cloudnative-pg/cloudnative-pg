@@ -433,7 +433,6 @@ func isPodNeedingRollout(
 		"pod projected volume is outdated":         checkProjectedVolumeIsOutdated,
 		"pod image is outdated":                    checkPodImageIsOutdated,
 		"cluster has different restart annotation": checkClusterHasDifferentRestartAnnotation,
-		"pod image pull secrets are outdated":      checkPodImagePullSecretsOutdated,
 	}
 
 	podRollout := applyCheckers(checkers)
@@ -445,6 +444,20 @@ func isPodNeedingRollout(
 	// we avoid checking the PodSpec
 	if utils.IsPodSpecReconciliationDisabled(&cluster.ObjectMeta) {
 		return rollout{}
+	}
+
+	// The operator never sets Pod.Spec.ImagePullSecrets itself (only the
+	// ServiceAccount's), so this drift is never captured by the PodSpec
+	// annotation and has to be checked explicitly, regardless of whether
+	// the pod has a valid stored PodSpec. We only know the secret name is
+	// present on the Pod, not that it works, which is a weaker reason to
+	// force a rollout against an explicit opt-out than the checks above,
+	// so this respects `cnpg.io/reconcilePodSpec: disabled` too.
+	podRollout = applyCheckers(map[string]rolloutChecker{
+		"pod image pull secrets are outdated": checkPodImagePullSecretsOutdated,
+	})
+	if podRollout.required {
+		return podRollout
 	}
 
 	// If the pod has a valid PodSpec annotation, that's the final check.
