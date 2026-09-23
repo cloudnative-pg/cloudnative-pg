@@ -7147,6 +7147,67 @@ var _ = Describe("ServiceAccount configuration validation", func() {
 	})
 })
 
+var _ = Describe("getPrimaryIsolationTimingWarnings", func() {
+	clusterWith := func(enabled *bool, requestTimeout int, lease *apiv1.PrimaryLeaseConfiguration) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:    3,
+				PrimaryLease: lease,
+				Probes: &apiv1.ProbesConfiguration{
+					Liveness: &apiv1.LivenessProbe{
+						IsolationCheck: &apiv1.IsolationCheckConfiguration{
+							Enabled:        enabled,
+							RequestTimeout: requestTimeout,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("returns no warning with the default timings", func() {
+		Expect(getPrimaryIsolationTimingWarnings(clusterWith(ptr.To(true), 1000, nil))).To(BeEmpty())
+	})
+
+	It("warns when the step-down bound reaches the lease duration exactly", func() {
+		// 12s + 2s + 1s = 15s: a replica may promote at the same instant the
+		// isolated primary asks for its shutdown, so there is no margin left.
+		cluster := clusterWith(ptr.To(true), 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(12)),
+		})
+		warnings := getPrimaryIsolationTimingWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("15s"))
+	})
+
+	It("warns when only the request timeout pushes the bound past the lease duration", func() {
+		Expect(getPrimaryIsolationTimingWarnings(clusterWith(ptr.To(true), 3000, nil))).To(HaveLen(1))
+	})
+
+	It("returns no warning when the isolation check is disabled", func() {
+		cluster := clusterWith(ptr.To(false), 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		Expect(getPrimaryIsolationTimingWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the isolation check has not been defaulted", func() {
+		cluster := clusterWith(nil, 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		Expect(getPrimaryIsolationTimingWarnings(cluster)).To(BeEmpty())
+		Expect(getPrimaryIsolationTimingWarnings(&apiv1.Cluster{})).To(BeEmpty())
+	})
+
+	It("is reported through the admission warnings", func() {
+		cluster := clusterWith(ptr.To(true), 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		v := &ClusterCustomValidator{}
+		Expect(v.getAdmissionWarnings(cluster)).To(ContainElement(ContainSubstring("isolated primary")))
+	})
+})
+
 var _ = Describe("getSynchronousReplicationWarnings", func() {
 	It("returns no warning for a single-instance cluster", func() {
 		cluster := &apiv1.Cluster{
