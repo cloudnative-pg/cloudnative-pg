@@ -808,6 +808,39 @@ var _ = Describe("checkPodImagePullSecretsOutdated", func() {
 	})
 })
 
+var _ = Describe("isPodNeedingRollout and image pull secrets", func() {
+	It("requires a rollout when a pod is missing a configured image pull secret", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImagePullSecrets: []apiv1.LocalObjectReference{{Name: "secret1"}},
+			},
+		}
+		pod, err := specs.NewInstance(ctx, *cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		rollout := isPodNeedingRollout(ctx, pod, cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("secret1"))
+	})
+
+	It("does not check image pull secrets when reconcilePodSpec is disabled", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImagePullSecrets: []apiv1.LocalObjectReference{{Name: "secret1"}},
+			},
+		}
+		pod, err := specs.NewInstance(ctx, *cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster.Annotations = map[string]string{
+			utils.ReconcilePodSpecAnnotationName: "disabled",
+		}
+
+		rollout := isPodNeedingRollout(ctx, pod, cluster)
+		Expect(rollout.required).To(BeFalse())
+	})
+})
+
 var _ = Describe("hasValidPodSpec", func() {
 	var pod *corev1.Pod
 
