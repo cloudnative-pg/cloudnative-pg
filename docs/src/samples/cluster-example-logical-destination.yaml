@@ -9,6 +9,8 @@ spec:
     size: 1Gi
 
   bootstrap:
+    # database: app
+    # owner: app
     initdb:
       import:
         type: microservice
