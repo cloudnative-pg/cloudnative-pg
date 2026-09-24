@@ -64,7 +64,7 @@ type BackupCustomDefaulter struct{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Backup.
 func (d *BackupCustomDefaulter) Default(_ context.Context, backup *apiv1.Backup) error {
-	backupLog.Info("Defaulting for Backup", "name", backup.GetName(), "namespace", backup.GetNamespace())
+	backupLog.Debug("Defaulting for Backup", "name", backup.GetName(), "namespace", backup.GetNamespace())
 
 	// TODO(user): fill in your defaulting logic.
 

@@ -63,7 +63,7 @@ type ScheduledBackupCustomDefaulter struct{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind ScheduledBackup.
 func (d *ScheduledBackupCustomDefaulter) Default(_ context.Context, scheduledBackup *apiv1.ScheduledBackup) error {
-	scheduledBackupLog.Info("Defaulting for ScheduledBackup",
+	scheduledBackupLog.Debug("Defaulting for ScheduledBackup",
 		"name", scheduledBackup.GetName(), "namespace", scheduledBackup.GetNamespace())
 
 	// TODO(user): fill in your defaulting logic.

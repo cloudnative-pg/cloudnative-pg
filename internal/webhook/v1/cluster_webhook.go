@@ -92,7 +92,7 @@ type ClusterCustomDefaulter struct{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Cluster.
 func (d *ClusterCustomDefaulter) Default(_ context.Context, cluster *apiv1.Cluster) error {
-	clusterLog.Info("Defaulting for Cluster", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
+	clusterLog.Debug("Defaulting for Cluster", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
 
 	cluster.Default()
 
