@@ -171,6 +171,11 @@ metadata:
 spec:
   instances: 3
 
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   bootstrap:
     initdb:
       database: app
@@ -341,6 +346,11 @@ metadata:
 spec:
   instances: 3
 
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   bootstrap:
     initdb:
       database: app
@@ -417,6 +427,11 @@ metadata:
 spec:
   instances: 3
 
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   bootstrap:
     initdb:
       database: app
@@ -441,6 +456,11 @@ metadata:
   name: cluster-example-initdb
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
 
   bootstrap:
     initdb:
@@ -643,6 +663,12 @@ metadata:
   name: target-db
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   bootstrap:
@@ -694,6 +720,12 @@ metadata:
   name: cluster-clone-tls
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   bootstrap:
