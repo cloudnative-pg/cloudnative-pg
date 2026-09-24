@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-pause-switchover-rw
+spec:
+  cluster:
+    name: cluster-pgbouncer-pause-switchover
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session
+    pauseDuringSwitchover: true
+    pauseDuringSwitchoverTimeout: "120s"
