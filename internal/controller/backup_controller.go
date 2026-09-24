@@ -135,7 +135,9 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
 		if apierrs.IsNotFound(err) {
-			return ctrl.Result{}, reconcile.TerminalError(err)
+			// Deletion events may enqueue a reconciliation after the Backup
+			// has already disappeared. There is nothing left to reconcile.
+			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}
