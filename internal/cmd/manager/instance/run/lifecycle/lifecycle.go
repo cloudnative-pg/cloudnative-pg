@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
 )
 
 // PostgresLifecycle implements the manager.Runnable interface for a postgres.Instance
@@ -60,6 +61,32 @@ func NewPostgres(
 // GetGlobalContext returns the PostgresLifecycle's context
 func (i *PostgresLifecycle) GetGlobalContext() context.Context {
 	return i.globalCtx
+}
+
+// archiveRemainingWALFiles archives any WAL files left in the "ready" queue
+// after PostgreSQL has been shut down. This ensures that the final WAL segment
+// is archived before the pod terminates (e.g. during hibernation, rolling
+// update, or node drain).
+func (i *PostgresLifecycle) archiveRemainingWALFiles(parentCtx context.Context) {
+	contextLogger := log.FromContext(parentCtx)
+
+	cluster := i.instance.GetClusterOrDefault()
+	if cluster.Spec.Plugins == nil {
+		return
+	}
+
+	// Use a fresh context because parentCtx may already be cancelled
+	// (e.g. in the context-cancellation shutdown path). The plugin sidecar
+	// is a native sidecar that outlives the postgres container, so gRPC
+	// calls still work. The terminationGracePeriodSeconds budget provides
+	// ample headroom.
+	ctx := context.Background()
+	ctx = log.IntoContext(ctx, contextLogger)
+
+	contextLogger.Info("Archiving remaining WAL files after shutdown")
+	if err := archiver.ArchiveAllReadyWALs(ctx, cluster, i.instance.PgData); err != nil {
+		contextLogger.Error(err, "error while archiving remaining WAL files after shutdown")
+	}
 }
 
 // Start starts running the PostgresLifecycle
@@ -132,6 +159,7 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				if err := i.instance.TryShuttingDownSmartFast(ctx); err != nil {
 					contextLogger.Error(err, "error shutting down instance, proceeding")
 				}
+				i.archiveRemainingWALFiles(ctx)
 				return nil
 
 			case sig := <-signals:
@@ -146,6 +174,7 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				if err := i.instance.TryShuttingDownSmartFast(ctx); err != nil {
 					contextLogger.Error(err, "error while shutting down instance, proceeding")
 				}
+				i.archiveRemainingWALFiles(ctx)
 				return nil
 
 			case req := <-i.instance.GetInstanceCommandChan():
