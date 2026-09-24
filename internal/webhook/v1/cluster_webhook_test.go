@@ -1072,6 +1072,40 @@ var _ = Describe("configuration change validation", func() {
 		Expect(result[0].Detail).To(ContainSubstring("Versions 13 or newer are supported"))
 	})
 
+	It("accepts the syncfs pg_rewind method with PostgreSQL 17", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:17",
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgRewind: &apiv1.PgRewindConfiguration{
+						SyncMethod: apiv1.PgRewindSyncMethodSyncfs,
+					},
+				},
+			},
+		}
+
+		Expect(v.validateConfiguration(cluster)).To(BeEmpty())
+	})
+
+	It("rejects the syncfs pg_rewind method before PostgreSQL 17", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:16",
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgRewind: &apiv1.PgRewindConfiguration{
+						SyncMethod: apiv1.PgRewindSyncMethodSyncfs,
+					},
+				},
+			},
+		}
+
+		result := v.validateConfiguration(cluster)
+
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.postgresql.pgRewind.syncMethod"))
+		Expect(result[0].Detail).To(ContainSubstring("requires PostgreSQL 17 or later"))
+	})
+
 	It("should disallow changing wal_level to minimal for existing clusters", func() {
 		oldCluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{

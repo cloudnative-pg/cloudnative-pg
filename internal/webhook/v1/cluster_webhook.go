@@ -1041,6 +1041,20 @@ func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.
 // GUC relies on them.
 var postgresParameterNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*(\.[A-Za-z_][A-Za-z0-9_$]*)?$`)
 
+func validatePgRewindSyncMethod(r *apiv1.Cluster, pgMajor int) field.ErrorList {
+	syncMethod := r.Spec.PostgresConfiguration.PgRewind.GetSyncMethod()
+	if syncMethod != apiv1.PgRewindSyncMethodSyncfs || pgMajor >= 17 {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("spec", "postgresql", "pgRewind", "syncMethod"),
+			syncMethod,
+			"`syncfs` requires PostgreSQL 17 or later"),
+	}
+}
+
 // validateConfiguration determines whether a PostgreSQL configuration is valid
 func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
@@ -1070,6 +1084,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 				r.Spec.ImageName,
 				"Unsupported PostgreSQL version. Versions 13 or newer are supported"))
 	}
+	result = append(result, validatePgRewindSyncMethod(r, pgMajor)...)
 	info := postgres.ConfigurationInfo{
 		Settings:               postgres.CnpgConfigurationSettings,
 		MajorVersion:           pgMajor,
