@@ -47,6 +47,11 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 
 	instance := Instance{
 		PgData: filepath.Join(tempDir, "/testdata/primary"),
+		Cluster: &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+		},
 	}
 
 	signalPath := filepath.Join(instance.PgData, "standby.signal")
