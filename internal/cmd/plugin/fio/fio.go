@@ -81,6 +81,11 @@ func newFioCommand(
 }
 
 func (cmd *fioCommand) execute(ctx context.Context) error {
+	// Populate utils.HaveSecurityContextConstraints()
+	if err := utils.DetectSecurityContextConstraints(plugin.ClientInterface.Discovery()); err != nil {
+		return err
+	}
+
 	pvc, err := cmd.generatePVCObject()
 	if err != nil {
 		return err

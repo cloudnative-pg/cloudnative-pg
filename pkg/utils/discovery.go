@@ -147,7 +147,7 @@ func DetectSecurityContextConstraints(client discovery.DiscoveryInterface) (err 
 
 // HaveSecurityContextConstraints returns true if we're running under a system that implements
 // OpenShift Security Context Constraints
-// It panics if called before DetectSecurityContextConstraints
+// Always returns false if called before DetectSecurityContextConstraints
 func HaveSecurityContextConstraints() bool {
 	return haveSCC
 }
