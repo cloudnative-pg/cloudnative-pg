@@ -32,6 +32,7 @@ import (
 
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -329,6 +330,22 @@ func AssertClusterIsReady(
 		}
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
 	})
+}
+
+// AssertClusterReadyConditionIsCurrent checks that the Ready condition refers to
+// the Cluster's current spec generation, whatever its status. Call it once the
+// condition has settled, to catch one carried over from an earlier generation.
+func AssertClusterReadyConditionIsCurrent(
+	env *environment.TestingEnvironment,
+	namespace, clusterName string,
+) {
+	GinkgoHelper()
+	cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionClusterReady))
+	Expect(cond).ToNot(BeNil(), "the Ready condition is not reported")
+	Expect(cond.ObservedGeneration).To(Equal(cluster.Generation), "the Ready condition is stale")
 }
 
 // assertClusterHasSequentialPods verifies that pod serial numbers are
