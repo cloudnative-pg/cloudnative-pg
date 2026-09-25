@@ -101,6 +101,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 300
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
+				clusterasserts.AssertClusterReadyConditionIsCurrent(env, namespace, clusterName)
 			})
 			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 

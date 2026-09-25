@@ -93,7 +93,7 @@ func PatchWithOptimisticLock(
 
 	origCluster := cluster.DeepCopy()
 
-	updatedCluster, err := PatchObjectWithOptimisticLock(ctx, c, cluster, txs...)
+	updatedCluster, err := PatchObjectWithOptimisticLock(ctx, c, cluster, withGeneration(cluster.Generation, txs))
 	if err != nil {
 		return fmt.Errorf("while patching status: %w", err)
 	}
@@ -109,4 +109,20 @@ func PatchWithOptimisticLock(
 	}
 
 	return nil
+}
+
+// withGeneration runs the transactions as if the cluster had the given
+// generation, so that the conditions they set record the generation the caller
+// evaluated rather than a newer one the fresh read may already see. The live
+// generation is restored afterwards, so a patch that changes nothing else is
+// still detected as a no-op.
+func withGeneration(generation int64, txs []Transaction) Transaction {
+	return func(cluster *apiv1.Cluster) {
+		liveGeneration := cluster.Generation
+		cluster.Generation = generation
+		for _, tx := range txs {
+			tx(cluster)
+		}
+		cluster.Generation = liveGeneration
+	}
 }
