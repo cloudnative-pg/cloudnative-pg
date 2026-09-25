@@ -21,6 +21,7 @@ package utils
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,4 +44,38 @@ var _ = Describe("Job conditions", func() {
 		Expect(JobHasOneCompletion(nonCompleteJob)).To(BeFalse())
 		Expect(JobHasOneCompletion(completeJob)).To(BeTrue())
 	})
+
+	DescribeTable("detects if a job has permanently failed",
+		func(job batchv1.Job, expected bool) {
+			Expect(JobHasFailed(job)).To(Equal(expected))
+		},
+		Entry("a job that has not started yet", batchv1.Job{}, false),
+		Entry("a running job with one failed pod still within its backoff limit",
+			batchv1.Job{Status: batchv1.JobStatus{Failed: 1}}, false),
+		Entry("a successfully completed job",
+			batchv1.Job{Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
+				},
+			}}, false),
+		Entry("a job that reached its backoff limit",
+			batchv1.Job{Status: batchv1.JobStatus{
+				Failed: 7,
+				Conditions: []batchv1.JobCondition{
+					{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "BackoffLimitExceeded"},
+				},
+			}}, true),
+		Entry("a job whose failure condition is not active",
+			batchv1.Job{Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{Type: batchv1.JobFailed, Status: corev1.ConditionFalse},
+				},
+			}}, false),
+		Entry("a job that is past its backoff limit but whose pods are still terminating",
+			batchv1.Job{Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{Type: batchv1.JobFailureTarget, Status: corev1.ConditionTrue, Reason: "BackoffLimitExceeded"},
+				},
+			}}, false),
+	)
 })

@@ -30,10 +30,10 @@ concurrency:
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=github-releases depName=golangci/golangci-lint versioning=loose
-  GOLANGCI_LINT_VERSION: "v2.12.2"
+  GOLANGCI_LINT_VERSION: "v2.13.2"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
-  KIND_VERSION: "v0.32.0"
+  KIND_VERSION: "v0.33.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   API_DOC_NAME: "cloudnative-pg.v1.md"
   SLACK_USERNAME: "cnpg-bot"
@@ -51,7 +51,7 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   SIGN_IMAGES: "true"
   # renovate: datasource=git-refs depName=https://github.com/redhat-openshift-ecosystem/community-operators-pipeline.git versioning=git currentValue=ci/latest
-  OPP_SCRIPT_VERSION: "fbac22ff0c713188bdcea36791b70fb3999e6e03"
+  OPP_SCRIPT_VERSION: "8ed9daf65b35a6ed456fb02cc0fccac2519c4ba8"
 
 defaults:
   run:
@@ -62,7 +62,7 @@ jobs:
   # Trigger the workflow on release-* branches for smoke testing whenever it's a scheduled run.
   # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
   smoke_test_release_branches:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       actions: write
     name: smoke test release-* branches when it's a scheduled run
@@ -70,12 +70,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.28, release-1.29]
+        branch: [release-1.28, release-1.29, release-1.30]
     env:
       BRANCH: ${{ matrix.branch }}
     steps:
       - name: Invoke workflow with inputs
-        uses: benc-uk/workflow-dispatch@31e2b3319479a63f0ab15bf800eff9e913504e26 # v1
+        uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1
         with:
           workflow: continuous-integration
           ref: ${{ env.BRANCH }}
@@ -84,14 +84,14 @@ jobs:
   #   1. it's on 'main' branch
   #   2. it's triggered by events in the 'do_not_skip' list
   duplicate_runs:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     name: Skip duplicate runs
     continue-on-error: true
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
     steps:
       - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # v5.3.1
+        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
         with:
           concurrent_skipping: 'same_content'
           skip_after_successful_duplicate: 'true'
@@ -105,7 +105,7 @@ jobs:
     name: Check changed files
     needs: duplicate_runs
     if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       docs-changed: ${{ steps.filter.outputs.docs-changed }}
       operator-changed: ${{ steps.filter.outputs.operator-changed }}
@@ -113,16 +113,17 @@ jobs:
       shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
       go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
       renovate-changed: ${{ steps.filter.outputs.renovate-changed }}
+      security-insights-changed: ${{ steps.filter.outputs.security-insights-changed }}
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Check for changes
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         # Remember to add new folders in the operator-changed filter if needed
         with:
-          base: ${{ (github.event_name == 'schedule') && 'main' || '' }}
+          base: ${{ (github.event_name == 'schedule' && 'main') || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name) || '' }}
           filters: |
             docs-changed:
               - '**/*.md'
@@ -155,6 +156,8 @@ jobs:
               - '.golangci.yml'
             renovate-changed:
               - '.github/renovate.json5'
+            security-insights-changed:
+              - 'SECURITY-INSIGHTS.yml'
 
   go-linters:
     name: Run linters
@@ -163,13 +166,13 @@ jobs:
       - change-triage
     # We need always run linter as go linter is a required check
     if: needs.duplicate_runs.outputs.should_skip != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           # Disable setup-go caching. Cache is better handled by the golangci-lint action
           cache: false
@@ -177,9 +180,15 @@ jobs:
           check-latest: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
+
+      - name: Run golangci-lint (tests module)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: tests
 
       - name: Check go mod tidy has no pending changes
         run: |
@@ -193,13 +202,29 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.renovate-changed == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Validate Renovate JSON
         run: npx --yes --package renovate@latest -- renovate-config-validator
+
+  security-insights-linter:
+    name: Security Insights Linter
+    needs:
+      - duplicate_runs
+      - change-triage
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.security-insights-changed == 'true'
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Validate SECURITY-INSIGHTS.yml against its schema
+        run: make validate-security-insights
 
   go-vulncheck:
     name: Run govulncheck
@@ -210,12 +235,13 @@ jobs:
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Run govulncheck
-        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1
         with:
           go-version-file: go.mod
           # Override the default value of "stable" for go-version-input.
@@ -224,6 +250,14 @@ jobs:
           # See https://github.com/golang/go/issues/70036
           go-version-input: ""
           check-latest: true
+
+      - name: Run govulncheck (tests module)
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1
+        with:
+          go-version-file: tests/go.mod
+          go-version-input: ""
+          check-latest: true
+          work-dir: tests
 
   shellcheck:
     name: Run shellcheck linter
@@ -234,12 +268,12 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.shell-script-changed == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
         SHELLCHECK_OPTS: -a -x -S style
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
@@ -249,20 +283,22 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Generate unit tests jobs only if the operator or the Go codebase have changed
+    # Generate unit tests jobs only if the operator, the Go codebase, or the
+    # tests module have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       k8sMatrix: ${{ steps.get-k8s-versions.outputs.k8s_versions }}
       latest_k8s_version: ${{ steps.get-k8s-versions.outputs.latest_k8s_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Get k8s versions for unit test
         id: get-k8s-versions
@@ -300,14 +336,16 @@ jobs:
       - duplicate_runs
       - change-triage
       - generate-unit-tests-jobs
-    # Run unit tests only if the operator or the Go codebase have changed
+    # Run unit tests only if the operator, the Go codebase, or the tests
+    # module have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.test-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       matrix:
         # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
@@ -316,10 +354,10 @@ jobs:
       ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -343,7 +381,7 @@ jobs:
     needs:
       - tests
     if: always() && !cancelled()
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Report matrix result
         env:
@@ -364,13 +402,13 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.docs-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -395,10 +433,10 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.docs-changed == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build documentation
         run: |
@@ -419,13 +457,13 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.operator-changed == 'true'
       )
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -479,13 +517,13 @@ jobs:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -547,7 +585,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
 
       - name: Run GoReleaser to build kubectl plugin
-        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         if: |
           github.event_name == 'schedule' ||
           (
@@ -567,7 +605,7 @@ jobs:
       # Send Slack notification if the kubectl plugin build fails.
       # To avoid message overflow, we only report runs scheduled on main or release branches
       - name: Slack Notification
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         if: |
           failure() &&
           github.repository_owner == env.REPOSITORY_OWNER &&
@@ -587,7 +625,7 @@ jobs:
           SLACK_MESSAGE: Building kubernetes plugin failed!
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
           distribution: goreleaser
           version: v2
@@ -599,23 +637,23 @@ jobs:
           RACE: "true"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
 
       - name: Build and push
-        uses: docker/bake-action@6614cfa25eff9a0b2b2697efb0b6159e7680d584 # v7
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -662,7 +700,7 @@ jobs:
           accept-keywords: key
 
       - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@8e119fbb6c251787721d34ba683ed48eba792766 # master
+        uses: snyk/actions/docker@12140f4059e244892ae643824a95459a102120dd # master
         # Only run when a Snyk token is configured. Forks and downstream
         # repositories without the secret skip this step automatically.
         if: env.SNYK_TOKEN != ''
@@ -735,7 +773,7 @@ jobs:
 
   olm-bundle:
     name: Create OLM bundle and catalog
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
@@ -747,28 +785,28 @@ jobs:
       needs.buildx.outputs.push == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           ref: ${{ needs.buildx.outputs.commit }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -799,7 +837,7 @@ jobs:
 
   preflight:
     name: Run openshift-preflight test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - buildx
       - olm-bundle
@@ -808,10 +846,10 @@ jobs:
       needs.olm-bundle.result == 'success'
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -821,7 +859,7 @@ jobs:
           make operator-sdk preflight
 
       - name: Loging to container registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -855,7 +893,7 @@ jobs:
 
   olm-scorecard:
     name: Run OLM scorecard test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - buildx
       - olm-bundle
@@ -865,32 +903,32 @@ jobs:
       github.repository_owner == 'cloudnative-pg'
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setting up KinD cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           wait: "600s"
           version: ${{ env.KIND_VERSION }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -924,13 +962,13 @@ jobs:
       TEST: ${{ matrix.test }}
     steps:
       - name: Checkout community-operators
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: k8s-operatorhub/community-operators
           persist-credentials: false
 
       - name: Login into docker registry
-        uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603 # v1
+        uses: redhat-actions/podman-login@50c2d9a331bb67c8fdab99b86455fad05e2e3252 # v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -948,5 +986,15 @@ jobs:
           rm -fr bundle.Dockerfile *.zip bundle/
 
       - name: Test bundle
+        env:
+          # Authenticates the raw.githubusercontent.com fetch below: anonymous
+          # requests share a per-IP rate limit across all GitHub Actions runners
+          # and can 429 during a burst; an authenticated request gets its own,
+          # much higher quota. Downloading to a file first (rather than piping
+          # into `bash <(curl ...)`) also means a failed fetch aborts the step
+          # instead of silently running an empty script.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${OPP_SCRIPT_VERSION}/ci/scripts/opp.sh") "${TEST}" "operators/cloudnative-pg/${VERSION}/"
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL \
+            -o opp.sh "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${OPP_SCRIPT_VERSION}/ci/scripts/opp.sh"
+          bash opp.sh "${TEST}" "operators/cloudnative-pg/${VERSION}/"

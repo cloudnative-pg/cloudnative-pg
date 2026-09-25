@@ -34,14 +34,14 @@ permissions: read-all
 
 jobs:
   duplicate_runs:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     name: Skip duplicate runs
     continue-on-error: true
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
     steps:
       - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # v5.3.1
+        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
         with:
           concurrent_skipping: 'same_content'
           skip_after_successful_duplicate: 'true'
@@ -61,17 +61,17 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
     - name: Install Go
-      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
       with:
         go-version-file: go.mod
         check-latest: true
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v4
+      uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
       with:
         languages: "go"
         build-mode: manual
@@ -88,6 +88,6 @@ jobs:
         make
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v4
+      uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
       with:
         category: "/language:go"

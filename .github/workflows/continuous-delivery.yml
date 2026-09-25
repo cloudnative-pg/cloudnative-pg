@@ -22,9 +22,9 @@ on:
         description: >
           Feature Type (backup-restore, basic, cluster-metadata, declarative-database-roles, declarative-databases,
           disruptive, image-volume-extensions, importing-databases, maintenance, no-openshift, observability, operator,
-          performance, plugin, pod-scheduling, postgres-configuration, postgres-major-upgrade, publication-subscription,
-          recovery, replication, security, self-healing, service-connectivity, smoke, snapshot, storage, tablespaces,
-          upgrade)
+          performance, plugin, plugin-barman-cloud, pod-scheduling, postgres-configuration, postgres-major-upgrade,
+          publication-subscription, recovery, replication, security, self-healing, service-connectivity, smoke, snapshot,
+          storage, tablespaces, upgrade)
         required: false
       log_level:
         description: 'Log level for operator (error, warning, info, debug(default), trace)'
@@ -38,6 +38,10 @@ on:
         options:
           - manifest
           - helm
+      barman_plugin:
+        description: 'plugin-barman-cloud version to install: release (default), main, a pinned version like v0.12.0, pr-<number> for a pull request, or a branch name'
+        required: false
+        default: 'release'
   schedule:
     - cron:  '0 1 * * *'
 
@@ -47,11 +51,11 @@ permissions: read-all
 env:
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
-  KIND_VERSION: "v0.32.0"
+  KIND_VERSION: "v0.33.0"
   # renovate: datasource=github-releases depName=k3d-io/k3d versioning=semver
-  K3D_VERSION: "v5.8.3"
+  K3D_VERSION: "v5.9.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
-  ROOK_VERSION: "v1.19.6"
+  ROOK_VERSION: "v1.20.7"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
   EXTERNAL_SNAPSHOTTER_VERSION: "v8.6.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
@@ -79,7 +83,7 @@ jobs:
   # Trigger the workflow on release-* branches for smoke testing whenever it's a scheduled run.
   # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
   smoke_test_release_branches:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       actions: write
     name: smoke test release-* branches when it's a scheduled run
@@ -87,12 +91,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.28, release-1.29]
+        branch: [release-1.28, release-1.29, release-1.30]
     env:
       BRANCH: ${{ matrix.branch }}
     steps:
       - name: Invoke workflow with inputs
-        uses: benc-uk/workflow-dispatch@31e2b3319479a63f0ab15bf800eff9e913504e26 # v1
+        uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1
         with:
           workflow: continuous-delivery
           ref: ${{ env.BRANCH }}
@@ -109,7 +113,7 @@ jobs:
       pull-requests: write
       contents: read
       issues: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       github_ref: ${{ steps.refs.outputs.head_sha }}
       depth: ${{ env.DEPTH }}
@@ -118,6 +122,7 @@ jobs:
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
       cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
+      barman_plugin_version: ${{ env.BARMAN_PLUGIN_VERSION }}
     steps:
       - name: Check for Command
         id: command
@@ -142,6 +147,7 @@ jobs:
           FEATURE_TYPE=""
           LOG_LEVEL="debug"
           CNPG_DEPLOYMENT_METHOD="manifest"
+          BARMAN_PLUGIN_VERSION="release"
 
           for ARG in $ARGS; do
             IFS='=' read name value <<< $ARG
@@ -164,6 +170,9 @@ jobs:
               "cnpg_deployment_method"|"deployment-method"|"dm")
               CNPG_DEPLOYMENT_METHOD="${value}"
               ;;
+              "barman_plugin"|"barman_plugin_version"|"bp")
+              BARMAN_PLUGIN_VERSION="${value}"
+              ;;
               *)
               ;;
             esac
@@ -175,6 +184,7 @@ jobs:
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
           echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
+          echo "BARMAN_PLUGIN_VERSION=${BARMAN_PLUGIN_VERSION}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
         uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3
@@ -193,7 +203,7 @@ jobs:
     name: Parse arguments
     if: |
       github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       github_ref: ${{ github.ref }}
       depth: ${{ env.DEPTH }}
@@ -202,6 +212,7 @@ jobs:
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
       cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
+      barman_plugin_version: ${{ env.BARMAN_PLUGIN_VERSION }}
     steps:
       - name: Parse input to env
         env:
@@ -212,6 +223,7 @@ jobs:
           INPUT_FEATURE_TYPE: ${{ github.event.inputs.feature_type }}
           INPUT_LOG_LEVEL: ${{ github.event.inputs.log_level }}
           INPUT_CNPG_DEPLOYMENT_METHOD: ${{ github.event.inputs.cnpg_deployment_method }}
+          INPUT_BARMAN_PLUGIN_VERSION: ${{ github.event.inputs.barman_plugin }}
         run: |
           # Set the defaults for workflow dispatch
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]]; then
@@ -221,6 +233,7 @@ jobs:
             FEATURE_TYPE="${INPUT_FEATURE_TYPE}"
             LOG_LEVEL="${INPUT_LOG_LEVEL}"
             CNPG_DEPLOYMENT_METHOD="${INPUT_CNPG_DEPLOYMENT_METHOD}"
+            BARMAN_PLUGIN_VERSION="${INPUT_BARMAN_PLUGIN_VERSION}"
           fi
           # Set the defaults for schedule dispatch
           if [[ "${EVENT_NAME}" == 'schedule' ]]; then
@@ -230,6 +243,7 @@ jobs:
             FEATURE_TYPE=""
             LOG_LEVEL="debug"
             CNPG_DEPLOYMENT_METHOD="manifest"
+            BARMAN_PLUGIN_VERSION="release"
           fi
           echo "DEPTH=${DEPTH}" >> $GITHUB_ENV
           echo "LIMIT=${LIMIT}" >> $GITHUB_ENV
@@ -237,13 +251,14 @@ jobs:
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
           echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
+          echo "BARMAN_PLUGIN_VERSION=${BARMAN_PLUGIN_VERSION}" >> $GITHUB_ENV
 
   evaluate_options:
     name: Evaluate workflow options
     needs:
       - check_commenter
       - test_arguments
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: |
       (
         needs.check_commenter.result == 'success' ||
@@ -258,8 +273,30 @@ jobs:
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
       cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
-      runs_on: ${{ steps.set-runner.outputs.runs_on }}
+      barman_plugin_version: ${{ env.BARMAN_PLUGIN_VERSION }}
+      runs_on: ${{ steps.runner.outputs.runs_on }}
     steps:
+      - name: Normalize E2E runner labels
+        id: runner
+        env:
+          E2E_RUNNER: ${{ vars.E2E_RUNNER }}
+        run: |
+          # E2E_RUNNER may be configured either as a single bare runner label
+          # (e.g. "ubuntu-latest") or as a JSON array of labels (e.g.
+          # '["self-hosted","2xlarge","x64"]'). Normalize both forms to a
+          # JSON array here so downstream jobs don't need to care which one was used.
+          if [ -z "${E2E_RUNNER}" ]; then
+            runs_on='["ubuntu-latest"]'
+          elif jq -e 'type == "array"' >/dev/null 2>&1 <<<"${E2E_RUNNER}"; then
+            runs_on=$(jq -c '.' <<<"${E2E_RUNNER}")
+          elif [[ "${E2E_RUNNER}" == \[* ]]; then
+            echo "::error::E2E_RUNNER looks like a JSON array but failed to parse: ${E2E_RUNNER}"
+            exit 1
+          else
+            runs_on=$(jq -Rc -n --arg v "${E2E_RUNNER}" '[$v]')
+          fi
+          echo "runs_on=${runs_on}" >> "$GITHUB_OUTPUT"
+
       - name: From command
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -270,6 +307,7 @@ jobs:
           WD_FEATURE_TYPE: ${{ needs.test_arguments.outputs.feature_type }}
           WD_LOG_LEVEL: ${{ needs.test_arguments.outputs.log_level }}
           WD_CNPG_DEPLOYMENT_METHOD: ${{ needs.test_arguments.outputs.cnpg_deployment_method }}
+          WD_BARMAN_PLUGIN_VERSION: ${{ needs.test_arguments.outputs.barman_plugin_version }}
           IC_GITHUB_REF: ${{ needs.check_commenter.outputs.github_ref }}
           IC_DEPTH: ${{ needs.check_commenter.outputs.depth }}
           IC_LIMIT: ${{ needs.check_commenter.outputs.limit }}
@@ -277,6 +315,7 @@ jobs:
           IC_FEATURE_TYPE: ${{ needs.check_commenter.outputs.feature_type }}
           IC_LOG_LEVEL: ${{ needs.check_commenter.outputs.log_level }}
           IC_CNPG_DEPLOYMENT_METHOD: ${{ needs.check_commenter.outputs.cnpg_deployment_method }}
+          IC_BARMAN_PLUGIN_VERSION: ${{ needs.check_commenter.outputs.barman_plugin_version }}
         run: |
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]; then
             echo "GITHUB_REF=${WD_GITHUB_REF}" >> $GITHUB_ENV
@@ -286,6 +325,7 @@ jobs:
             echo "FEATURE_TYPE=${WD_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${WD_LOG_LEVEL}" >> $GITHUB_ENV
             echo "CNPG_DEPLOYMENT_METHOD=${WD_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
+            echo "BARMAN_PLUGIN_VERSION=${WD_BARMAN_PLUGIN_VERSION}" >> $GITHUB_ENV
           fi
           if [[ "${EVENT_NAME}" == 'issue_comment' ]]; then
             echo "GITHUB_REF=${IC_GITHUB_REF}" >> $GITHUB_ENV
@@ -295,17 +335,7 @@ jobs:
             echo "FEATURE_TYPE=${IC_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${IC_LOG_LEVEL}" >> $GITHUB_ENV
             echo "CNPG_DEPLOYMENT_METHOD=${IC_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
-          fi
-
-      - name: Set runner based on organization
-        env:
-          REPO_OWNER: ${{ github.repository_owner }}
-        id: set-runner
-        run: |
-          if [[ "${REPO_OWNER}" == "cloudnative-pg" ]]; then
-            echo "runs_on=ubuntu-latest-16-cores" >> $GITHUB_OUTPUT
-          else
-            echo "runs_on=ubuntu-24.04" >> $GITHUB_OUTPUT
+            echo "BARMAN_PLUGIN_VERSION=${IC_BARMAN_PLUGIN_VERSION}" >> $GITHUB_ENV
           fi
 
   buildx:
@@ -317,7 +347,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       needs.evaluate_options.result == 'success'
-    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
+    runs-on: ${{ fromJSON(needs.evaluate_options.outputs.runs_on) }}
     permissions:
       contents: read
       packages: write
@@ -341,14 +371,14 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -415,7 +445,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
           distribution: goreleaser
           version: v2
@@ -426,22 +456,22 @@ jobs:
           VERSION: ${{ env.VERSION }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       -
         name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@6614cfa25eff9a0b2b2697efb0b6159e7680d584 # v7
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -507,7 +537,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build binary for upgrade test
-        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         if: needs.evaluate_options.outputs.test_level == '4'
         with:
           distribution: goreleaser
@@ -527,7 +557,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build and push image for upgrade test
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         id: build-prime
         if: needs.evaluate_options.outputs.test_level == '4'
         with:
@@ -552,13 +582,13 @@ jobs:
       needs.buildx.result == 'success' &&
       needs.buildx.outputs.upload_artifacts == 'true' &&
       github.repository_owner == 'cloudnative-pg'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       BRANCH: ${{ needs.buildx.outputs.branch_name }}
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -621,7 +651,7 @@ jobs:
     if: |
       (always() && !cancelled()) &&
       needs.buildx.result == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       controller_img: ${{ needs.buildx.outputs.controller_img }}
       kindMatrix: ${{ steps.generate-jobs.outputs.kindMatrix }}
@@ -645,7 +675,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
@@ -675,12 +705,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.kindMatrix) }}
-    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
+    runs-on: ${{ fromJSON(needs.evaluate_options.outputs.runs_on) }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -708,12 +740,12 @@ jobs:
     steps:
       -
         name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
           android: true
           dotnet: true
           haskell: true
-          tool-cache: true
+          preinstalled-runtimes: true
           large-packages: false
           swap-storage: false
       -
@@ -728,26 +760,26 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Install Kind
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           install_only: true
           version: ${{ env.KIND_VERSION }}
@@ -770,6 +802,7 @@ jobs:
         name: Run Kind End-to-End tests
         env:
           ENABLE_APISERVER_AUDIT: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run:
           make e2e-test-kind
       -
@@ -871,12 +904,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.k3dMatrix) }}
-    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
+    runs-on: ${{ fromJSON(needs.evaluate_options.outputs.runs_on) }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -903,12 +938,12 @@ jobs:
       CNPG_DEPLOYMENT_METHOD: ${{ github.event_name == 'schedule' && 'helm' || needs.evaluate_options.outputs.cnpg_deployment_method }}
     steps:
       - name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
           android: true
           dotnet: true
           haskell: true
-          tool-cache: true
+          preinstalled-runtimes: true
           large-packages: false
           swap-storage: false
       - name: Cleanup docker cache
@@ -921,27 +956,34 @@ jobs:
           df -h
           echo "-----------------------------------------------------"
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.GIT_REF }}
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
       - ## In case hack/setup-cluster.sh needs to pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       - name: Install K3D
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          case "${RUNNER_ARCH}" in
+            X64) K3D_ARCH=amd64 ;;
+            ARM64) K3D_ARCH=arm64 ;;
+            *) echo "::error::Unsupported RUNNER_ARCH for k3d: ${RUNNER_ARCH}"; exit 1 ;;
+          esac
           K3D_URL="https://github.com/k3d-io/k3d/releases/download/${{ env.K3D_VERSION }}"
-          curl -sL "${K3D_URL}/k3d-linux-amd64" -o /tmp/k3d
-          curl -sL "${K3D_URL}/checksums.txt" -o /tmp/k3d-checksums.txt
-          grep '_dist/k3d-linux-amd64$' /tmp/k3d-checksums.txt | sed 's|_dist/k3d-linux-amd64|/tmp/k3d|' | sha256sum -c -
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL "${K3D_URL}/k3d-linux-${K3D_ARCH}" -o /tmp/k3d
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL "${K3D_URL}/checksums.txt" -o /tmp/k3d-checksums.txt
+          grep "_dist/k3d-linux-${K3D_ARCH}\$" /tmp/k3d-checksums.txt | sed "s|_dist/k3d-linux-${K3D_ARCH}|/tmp/k3d|" | sha256sum -c -
           install /tmp/k3d /usr/local/bin/k3d
           k3d version
       - name: Install kubectl
@@ -964,6 +1006,7 @@ jobs:
       - name: Run K3D End-to-End tests
         env:
           ENABLE_APISERVER_AUDIT: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           make e2e-test-k3d
       - # Summarize the failed E2E test cases if there are any
@@ -1057,13 +1100,13 @@ jobs:
       - buildx
       - generate-jobs
       - evaluate_options
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       azure_storage_account: ${{ steps.setup.outputs.azure_storage_account }}
     steps:
       -
         name: Azure Login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1103,12 +1146,14 @@ jobs:
       fail-fast: false
       max-parallel: 8
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.aksMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -1137,12 +1182,12 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -1163,18 +1208,18 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.0
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Azure Login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1231,34 +1276,62 @@ jobs:
         # It can still take a while to deploy rook.
         name: Set up Rook
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
+        env:
+          # Authenticates the raw.githubusercontent.com fetches below: anonymous
+          # requests share a per-IP rate limit across all GitHub Actions runners
+          # and can 429 during a nightly burst; an authenticated request gets its
+          # own, much higher quota.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           timeout_minutes: 27
           max_attempts: 1
           command: |
+            set -euo pipefail
             STORAGECLASSNAME=default
             # renovate: datasource=github-releases depName=mikefarah/yq
             go install github.com/mikefarah/yq/v4@v4
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
-            kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/common.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/csi-operator.yaml
-            curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/crds.yaml -o /tmp/rook-crds.yaml
+            kubectl apply -f /tmp/rook-crds.yaml
+            # Without this wait, the CephCluster apply below can race the
+            # apiserver and fail with "no matches for kind", even though the
+            # apply above already succeeded. Only CustomResourceDefinition
+            # objects support condition=Established, so filter the file down
+            # to those before waiting on it.
+            kubectl wait --for=condition=Established --timeout=60s \
+              $(kubectl get -f /tmp/rook-crds.yaml -o name | grep ^customresourcedefinition)
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/common.yaml | kubectl apply -f -
+            # csi-operator.yaml defines the csi.ceph.io CRDs that operator.yaml's CRs rely on,
+            # alongside plain RBAC/Deployment objects that don't support condition=Established.
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi-operator.yaml -o /tmp/rook-csi-operator.yaml
+            kubectl apply -f /tmp/rook-csi-operator.yaml
+            kubectl wait --for=condition=Established --timeout=60s \
+              $(kubectl get -f /tmp/rook-csi-operator.yaml -o name | grep ^customresourcedefinition)
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/operator.yaml | kubectl apply -f -
+            # keyType "aes" below is required until every AKS node runs
+            # Linux kernel 7.0+: Rook's aes256k CephX key (the CVE-2025-30156
+            # fix) can't be loaded by an older kernel's RBD client, so the
+            # object-store PVC mount fails forever. Drop the pin once that's
+            # no longer true. Rook's own cluster.yaml example already has
+            # this line, for the same reason.
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
               sed '/^ *#/d;/^ *$/d' | \
               yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
                 .spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.storageClassName = \"${STORAGECLASSNAME}\" |
-                .spec.mon.volumeClaimTemplate.spec.storageClassName = \"${STORAGECLASSNAME}\" " - | \
+                .spec.mon.volumeClaimTemplate.spec.storageClassName = \"${STORAGECLASSNAME}\" |
+                .spec.security.cephx.csi.keyType = \"aes\" " - | \
               kubectl apply -f -
-            while true; do
+            for i in $(seq 1 150); do
               output=$( kubectl get deploy -n rook-ceph -l app=rook-ceph-osd --no-headers -o name )
-              if [[ $(wc -w <<< $output)  == 3 ]]; then
+              if [[ $(wc -w <<< $output) == 3 ]]; then
                 break
               fi
+              sleep 2
             done
             echo "Waiting for Rook OSDs to be available"
             kubectl wait deploy -n rook-ceph --for condition=available --timeout 480s -l app=rook-ceph-osd
-            kubectl apply -f ${ROOK_BASE_URL}/csi/rbd/storageclass.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/csi/rbd/snapshotclass.yaml
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi/rbd/storageclass.yaml | kubectl apply -f -
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi/rbd/snapshotclass.yaml | kubectl apply -f -
             kubectl annotate storageclass ${{env.E2E_DEFAULT_STORAGE_CLASS}} storage.kubernetes.io/default-snapshot-class=${{env.E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}} --overwrite
       -
         name: Prepare patch for customization
@@ -1408,14 +1481,14 @@ jobs:
       - generate-jobs
       - e2e-aks-setup
       - e2e-aks
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
     steps:
       -
         name: Azure Login
         if: always()
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1449,12 +1522,14 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.eksMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -1487,19 +1562,19 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-test-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX}" | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1521,23 +1596,37 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.0
       -
         name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       -
+        name: Determine runner architecture
+        id: arch
+        run: |
+          case "${RUNNER_ARCH}" in
+            X64) ARCH=amd64 ;;
+            ARM64) ARCH=arm64 ;;
+            *) echo "::error::Unsupported RUNNER_ARCH: ${RUNNER_ARCH}"; exit 1 ;;
+          esac
+          echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
+      -
         name: Install eksctl
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARCH: ${{ steps.arch.outputs.arch }}
         with:
           timeout_minutes: 1
           max_attempts: 3
           command: |
             mkdir -p "$HOME/.local/bin"
-            curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 \
+              -fsSL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_${ARCH}.tar.gz" \
               | tar xz -C $HOME/.local/bin
             echo "$HOME/.local/bin" >> $GITHUB_PATH
       -
@@ -1546,6 +1635,12 @@ jobs:
           envsubst < hack/e2e/eks-cluster.yaml.template > hack/e2e/eks-cluster.yaml
       -
         name: Setup EKS
+        env:
+          # Authenticates the raw.githubusercontent.com fetches below: anonymous
+          # requests share a per-IP rate limit across all GitHub Actions runners
+          # and can 429 during a nightly burst; an authenticated request gets its
+          # own, much higher quota.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Setting up EKS cluster
           echo "create cluster"
@@ -1564,13 +1659,13 @@ jobs:
 
           # Installing CRD for support volumeSnapshot
           SNAPSHOTTER_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${{env.EXTERNAL_SNAPSHOTTER_VERSION}}
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml | kubectl apply -f -
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml | kubectl apply -f -
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml | kubectl apply -f -
 
           ## Controller
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
-          kubectl apply -f ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml | kubectl apply -f -
+          curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml | kubectl apply -f -
 
           # Install volume snapshot class
           kubectl apply -f hack/e2e/volumesnapshotclass-ebs-csi.yaml
@@ -1585,10 +1680,12 @@ jobs:
         name: Setup Velero
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARCH: ${{ steps.arch.outputs.arch }}
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
-          VELERO_VERSION: "v1.18.1"
+          VELERO_VERSION: "v1.18.3"
           # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
-          VELERO_AWS_PLUGIN_VERSION: "v1.14.1"
+          VELERO_AWS_PLUGIN_VERSION: "v1.14.3"
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1619,8 +1716,9 @@ jobs:
               --create-bucket-configuration LocationConstraint="${AWS_REGION}"
 
             # Download Velero, extract and place it in $PATH
-            curl -sL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" | tar xz
-            mv velero-${VELERO_VERSION}-linux-amd64/velero $HOME/.local/bin
+            curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 \
+              -fsSL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-${ARCH}.tar.gz" | tar xz
+            mv velero-${VELERO_VERSION}-linux-${ARCH}/velero $HOME/.local/bin
 
             # Set Velero-specific credentials
             echo -e "[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> credentials-velero
@@ -1842,12 +1940,14 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+      # BARMAN_PLUGIN_VERSION selects the plugin-barman-cloud build to install for the plugin-based backup tests
+      BARMAN_PLUGIN_VERSION: ${{ needs.evaluate_options.outputs.barman_plugin_version }}
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
@@ -1875,19 +1975,19 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1909,7 +2009,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.0
       -
         name: Set cluster name
         run: |
@@ -2155,7 +2255,7 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.openshiftMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
@@ -2204,28 +2304,28 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-ocp-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_K8S_VERSION}" | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.GIT_REF }}
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -2246,7 +2346,7 @@ jobs:
           make olm-catalog
       -
         name: Install OC Installer and client
-        uses: redhat-actions/openshift-tools-installer@144527c7d98999f2652264c048c7a9bd103f8a82 # v1
+        uses: redhat-actions/openshift-tools-installer@37eb3cfb20ac2df6f0511ffa71cd917e4d49cabf # v3
         with:
           source: "mirror"
           openshift-install: ${{ env.K8S_VERSION }}
@@ -2266,13 +2366,6 @@ jobs:
         run: |
           make preflight
       -
-        name: Create Secret
-        run: |
-          export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
-          oc create ns cloudnative-pg
-          oc -n cloudnative-pg create secret docker-registry cnpg-pull-secret \
-            --docker-server="$REGISTRY" --docker-username="$REGISTRY_USER" --docker-password="$REGISTRY_PASSWORD"
-      -
         name: Run preflight operator test
         timeout-minutes: 30
         env:
@@ -2283,8 +2376,27 @@ jobs:
         run: |
           export PATH=$(pwd)/bin/:${PATH}
           export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
-          oc -n cloudnative-pg get secret cnpg-pull-secret \
-            -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > docker-config.json
+          AUTH=$(printf '%s:%s' "$REGISTRY_USER" "$REGISTRY_PASSWORD" | base64 -w0)
+          jq -n --arg registry "$REGISTRY" --arg auth "$AUTH" \
+            '{auths: {($registry): {auth: $auth}}}' > docker-config.json
+
+          # preflight's DeployableByOLM check installs the operator into a namespace
+          # with a random 5-char suffix (cloudnative-pg-xxxxx) since v1.20.0. cnpg-pull-secret
+          # can't be pre-created. Watch for the namespace as it appears and stamp the secret into it.
+          (
+            while true; do
+              for ns in $(oc get ns -o name | grep -oE 'cloudnative-pg-[a-z0-9]+$' || true); do
+                echo "Found operator deployment namespace: $ns"
+                oc create secret docker-registry cnpg-pull-secret -n "$ns" \
+                  --docker-server="$REGISTRY" --docker-username="$REGISTRY_USER" --docker-password="$REGISTRY_PASSWORD" \
+                  --dry-run=client -o yaml | oc apply -f - || true
+              done
+              sleep 2
+            done
+          ) &
+          WATCHER_PID=$!
+          trap 'kill "$WATCHER_PID" 2>/dev/null || true' EXIT
+
           preflight check operator ${BUNDLE_IMG} \
             --docker-config docker-config.json --loglevel trace
       -
@@ -2424,7 +2536,7 @@ jobs:
         needs.e2e-openshift.result == 'success' ||
         needs.e2e-openshift.result == 'failure'
       ))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Create a directory for the artifacts
         run: mkdir test-artifacts
@@ -2463,7 +2575,7 @@ jobs:
       - name: Send the Ciclops view over Slack
         # Send the Ciclops thermometer on every scheduled run on `main`.
         # or when there are systematic failures in release branches
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         if: |
           github.repository_owner == env.REPOSITORY_OWNER &&
           (
@@ -2507,7 +2619,7 @@ jobs:
       needs.e2e-kind.result == 'success' &&
       github.event_name == 'issue_comment' &&
       needs.evaluate_options.outputs.test_level == '4'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Check preconditions
         id: get_pr_number_and_labels
@@ -2537,7 +2649,7 @@ jobs:
       always() &&
       needs.e2e-kind.result == 'failure' &&
       github.event_name == 'issue_comment'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Check preconditions
         id: get_pr_number_and_labels

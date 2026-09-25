@@ -270,11 +270,36 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 // empty.
 // Returns a boolean indicating if any changes were done and any errors encountered
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+	restoreCommand := fmt.Sprintf(
+		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+		postgres.LogPath, postgres.LogFileName)
+
+	return writePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, restoreCommand)
+}
+
+// configurePostgresOverrideConfFileForRewind writes the content of override.conf file
+// to be used while running `pg_rewind --restore-target-wal`. The restore_command invokes
+// wal-restore in rewind mode, disabling WAL prefetching and the end-of-wal-stream flag
+// machinery: pg_rewind requests the segments it needs walking the WAL backward, and
+// aborts on the first failed restore instead of falling back to streaming replication.
+// This file is replaced with the standard replica configuration when the instance
+// is demoted, right after a successful rewind.
+// Returns a boolean indicating if any changes were done and any errors encountered
+func configurePostgresOverrideConfFileForRewind(pgData, primaryConnInfo string) (changed bool, err error) {
+	restoreCommand := fmt.Sprintf(
+		"/controller/manager wal-restore --log-destination %s/%s.json --rewind %%f %%p",
+		postgres.LogPath, postgres.LogFileName)
+
+	return writePostgresOverrideConfFile(pgData, primaryConnInfo, "", restoreCommand)
+}
+
+// writePostgresOverrideConfFile writes the content of override.conf file, using the
+// given restore_command and replication information.
+// Returns a boolean indicating if any changes were done and any errors encountered
+func writePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, restoreCommand string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 	options := map[string]string{
-		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
+		"restore_command":          restoreCommand,
 		"recovery_target_timeline": "latest",
 		"primary_conninfo":         primaryConnInfo,
 	}

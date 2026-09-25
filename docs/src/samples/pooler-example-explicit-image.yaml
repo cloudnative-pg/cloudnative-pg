@@ -4,7 +4,7 @@ metadata:
   name: cluster-example
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
   storage:
     size: 1Gi
 ---

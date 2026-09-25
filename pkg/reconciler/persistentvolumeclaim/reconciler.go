@@ -21,6 +21,7 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +49,7 @@ func Reconcile(
 	if err := reconcileExistingPVCs(ctx, c, cluster, pvcs); err != nil {
 		if apierrs.IsConflict(err) {
 			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
 		return ctrl.Result{}, err

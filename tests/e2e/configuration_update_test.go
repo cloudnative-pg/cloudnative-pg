@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +43,7 @@ import (
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -75,7 +75,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 	updateClusterPostgresParams := func(paramsMap map[string]string, namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -87,7 +87,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 	updateClusterPostgresPgHBA := func(namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -99,7 +99,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 	updateClusterPostgresPgIdent := func(namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -112,7 +112,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	checkErrorOutFixedAndBlockedConfigurationParameter := func(params map[string]string, namespace string) {
 		// Update the configuration
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
@@ -158,7 +158,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 
 	generateBaseCluster := func(namespace string) *apiv1.Cluster {
-		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		storageClass := env.DefaultStorageClass
 		Expect(storageClass).ToNot(BeEmpty())
 
 		return &apiv1.Cluster{
@@ -223,7 +223,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		}
 
 		cluster := &apiv1.Cluster{}
-		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err = retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			cluster.Spec.ImageName = env.StandardImageName(targetTag)
@@ -280,7 +280,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
 			clusterutils.AddTopologySpreadConstraint(cluster)
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
@@ -324,6 +324,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		It("3. performing a rolling update when a GUC requiring restart is modified", func() {
 			oldPrimary := gatherCurrentPrimary(namespace)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			oldTimeline := cluster.Status.TimelineID
 
 			By("apply configuration update", func() {
 				postgresParams["shared_buffers"] = "256MB"
@@ -347,6 +350,17 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			})
 
 			checkSwitchoverOccurred(namespace, oldPrimary)
+
+			By("verifying that a single switchover happened", func() {
+				// Every promotion advances the PostgreSQL timeline by one.
+				// Promoting a replica whose restart was still pending would
+				// force a second switchover and leave the timeline at
+				// oldTimeline+2 (issue #11129).
+				Eventually(func() (int, error) {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					return cluster.Status.TimelineID, err
+				}, RetryTimeout).Should(Equal(oldTimeline + 1))
+			})
 		})
 
 		It("4. performing a rolling update when mixed parameters are modified", func() {
@@ -489,7 +503,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodRestart
 			clusterutils.AddTopologySpreadConstraint(cluster)
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
@@ -552,7 +566,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updated := cluster.DeepCopy()
 				updated.Spec.PostgresConfiguration.Parameters["max_connections"] = fmt.Sprintf("%v",
 					newMaxConnectionsValue)
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 

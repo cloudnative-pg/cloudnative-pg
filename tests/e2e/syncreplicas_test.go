@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -215,14 +216,14 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MaxSyncReplicas must be lower than the number of instances
 				cluster.Spec.MaxSyncReplicas = 2
-				err = env.Client.Update(env.Ctx, cluster)
+				err = objects.Update(env.Ctx, env.Client, cluster)
 				Expect(err).To(HaveOccurred())
 
 				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas
 				cluster.Spec.MinSyncReplicas = 2
-				err = env.Client.Update(env.Ctx, cluster)
+				err = objects.Update(env.Ctx, env.Client, cluster)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -437,7 +438,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					}
 					cluster.Annotations[utils.ReconciliationLoopAnnotationName] = "disabled"
 
-					err = env.Client.Patch(env.Ctx, cluster, client.MergeFrom(origCluster))
+					err = objects.Patch(env.Ctx, env.Client, cluster, client.MergeFrom(origCluster))
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -466,7 +467,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					}
 					delete(cluster.Annotations, utils.ReconciliationLoopAnnotationName)
 
-					err = env.Client.Patch(env.Ctx, cluster, client.MergeFrom(origCluster))
+					err = objects.Patch(env.Ctx, env.Client, cluster, client.MergeFrom(origCluster))
 					Expect(err).ToNot(HaveOccurred())
 				})
 

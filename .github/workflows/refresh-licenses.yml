@@ -11,13 +11,13 @@ permissions: read-all
 jobs:
   licenses:
     name: Refresh licenses
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -34,6 +34,8 @@ jobs:
           body: "Refresh the licenses directory"
           branch: "license-updater"
           author: "license-updater <license-updater@users.noreply.github.com>"
+          committer: "license-updater <license-updater@users.noreply.github.com>"
+          labels: no-issue,automated
           add-paths: |
             licenses/**
           commit-message: "chore: refresh licenses directory"

@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
-	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
@@ -49,9 +48,9 @@ type LineLogPipe struct {
 	exited      *concurrency.Executed
 }
 
-// GetExecutedCondition returns the condition that can be checked in order to
+// GetInitializedCondition returns the condition that can be checked in order to
 // be sure initialization has been done
-func (p *LineLogPipe) GetExecutedCondition() *concurrency.Executed {
+func (p *LineLogPipe) GetInitializedCondition() *concurrency.Executed {
 	return p.initialized
 }
 
@@ -100,6 +99,11 @@ func (p *LineLogPipe) Start(ctx context.Context) error {
 	defer filenameLog.Info("Exited log pipe")
 	go func() {
 		defer p.exited.Broadcast()
+		// Broadcast the initialization error if the context is canceled before
+		// the initialization is done
+		defer func() {
+			p.initialized.BroadcastError(ctx.Err())
+		}()
 		for {
 			// If the context has been cancelled, let's avoid starting reading
 			// again from the log file
@@ -110,10 +114,11 @@ func (p *LineLogPipe) Start(ctx context.Context) error {
 			// check if the directory exists
 			if err := fileutils.EnsureParentDirectoryExists(p.fileName); err != nil {
 				filenameLog.Error(err, "Error checking if the directory exists")
+				waitBeforeRetry(ctx)
 				continue
 			}
-			if err := compatibility.CreateFifo(p.fileName); err != nil {
-				filenameLog.Error(err, "Error creating log FIFO")
+			if err := ensureLogFifo(filenameLog, p.fileName); err != nil {
+				waitBeforeRetry(ctx)
 				continue
 			}
 			p.initialized.Broadcast()
@@ -123,6 +128,7 @@ func (p *LineLogPipe) Start(ctx context.Context) error {
 					return
 				}
 				filenameLog.Error(err, "Error consuming log stream")
+				waitBeforeRetry(ctx)
 				continue
 			}
 		}

@@ -25,11 +25,13 @@ import (
 	"time"
 
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -37,10 +39,874 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("reconcilePods instance recreation while a PVC is terminating (#10985)", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// Builds a 3-instance cluster with WAL storage where instance serial 1 is
+	// missing while instances 2 and 3 are up and reporting ready. This is the
+	// state in which reconcilePods decides to recreate serial 1.
+	newRecreatingCluster := func(ctx SpecContext) (*apiv1.Cluster, *managedResources, postgres.PostgresqlStatusList) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+		cluster.Status.Instances = 2
+		cluster.Status.ReadyInstances = 2
+		cluster.Status.InstanceNames = []string{
+			specs.GetInstanceName(cluster.Name, 2),
+			specs.GetInstanceName(cluster.Name, 3),
+		}
+
+		readyPod := func(serial int) *corev1.Pod {
+			pod, err := specs.NewInstance(ctx, *cluster, serial)
+			Expect(err).ToNot(HaveOccurred())
+			pod.Status = corev1.PodStatus{
+				Phase:      corev1.PodRunning,
+				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+			}
+			return pod
+		}
+		pod2 := readyPod(2)
+		pod3 := readyPod(3)
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*pod2, *pod3}},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: pod2, IsPodReady: true},
+				{Pod: pod3, IsPodReady: true, IsPrimary: true},
+			},
+		}
+		return cluster, resources, statusList
+	}
+
+	It("creates the join bootstrap Pod when no previous PVC is terminating", func(ctx SpecContext) {
+		cluster, resources, statusList := newRecreatingCluster(ctx)
+
+		res, err := env.clusterReconciler.reconcilePods(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(30 * time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		newInstanceName := specs.GetInstanceName(cluster.Name, 1)
+		idx := -1
+		for i := range pods.Items {
+			if pods.Items[i].Name == newInstanceName {
+				idx = i
+			}
+		}
+		Expect(idx).ToNot(Equal(-1), "the bootstrap Pod for the recreated instance should have been created")
+	})
+
+	It("defers recreation while a previous PVC for the same serial is still terminating", func(ctx SpecContext) {
+		cluster, resources, statusList := newRecreatingCluster(ctx)
+		// The WAL PVC of serial 1 has not finished terminating yet.
+		resources.pvcs = corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              specs.GetInstanceName(cluster.Name, 1) + apiv1.WalArchiveVolumeSuffix,
+					Namespace:         namespace,
+					DeletionTimestamp: ptr.To(metav1.Now()),
+				},
+			},
+		}}
+
+		res, err := env.clusterReconciler.reconcilePods(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		newInstanceName := specs.GetInstanceName(cluster.Name, 1)
+		for _, pod := range pods.Items {
+			Expect(pod.Name).ToNot(Equal(newInstanceName),
+				"no bootstrap Pod should be created while the previous PVC is terminating")
+		}
+	})
+})
+
+var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminating (#10985)", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	It("defers reattaching a Pod while one of the instance's PVCs is still terminating", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+		cluster.Status.ReadyInstances = 2
+
+		readyPod := func(serial int) *corev1.Pod {
+			pod, err := specs.NewInstance(ctx, *cluster, serial)
+			Expect(err).ToNot(HaveOccurred())
+			pod.Status = corev1.PodStatus{
+				Phase:      corev1.PodRunning,
+				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+			}
+			return pod
+		}
+		pod1, pod2 := readyPod(1), readyPod(2)
+
+		// Instance 3 has a podless data PVC (so it is a candidate for
+		// reattachment) while its WAL PVC is still terminating.
+		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		walName := specs.GetInstanceName(cluster.Name, 3) + apiv1.WalArchiveVolumeSuffix
+		for i := range thirdGroup {
+			if thirdGroup[i].Name == walName {
+				thirdGroup[i].DeletionTimestamp = ptr.To(metav1.Now())
+			}
+		}
+		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*pod1, *pod2}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: pod1, IsPodReady: true, IsPrimary: true},
+				{Pod: pod2, IsPodReady: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be reattached while one of its PVCs is terminating")
+	})
+})
+
+var _ = Describe("ensureInstancesAreCreated reattachment gate and fenced instances", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	readyPod := func(ctx SpecContext, cluster *apiv1.Cluster, serial int) *corev1.Pod {
+		pod, err := specs.NewInstance(ctx, *cluster, serial)
+		Expect(err).ToNot(HaveOccurred())
+		pod.Status = corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+		}
+		return pod
+	}
+
+	notReadyPod := func(ctx SpecContext, cluster *apiv1.Cluster, serial int) *corev1.Pod {
+		pod, err := specs.NewInstance(ctx, *cluster, serial)
+		Expect(err).ToNot(HaveOccurred())
+		pod.Status = corev1.PodStatus{Phase: corev1.PodRunning}
+		return pod
+	}
+
+	It("reattaches a missing pod while another instance is fenced", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 3
+		})
+		cluster.Status.ReadyInstances = 1
+
+		primaryPod := readyPod(ctx, cluster, 1)
+		fencedPod := notReadyPod(ctx, cluster, 2)
+
+		// Instance 3's pod is missing: it is the candidate for reattachment.
+		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod, *fencedPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+				{Pod: fencedPod, IsPodReady: false, MightBeUnavailable: true, IsFenced: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(Equal(reconcile.Result{RequeueAfter: time.Second}))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the missing instance's Pod should have been reattached")
+	})
+
+	It("still defers reattachment for a non-fenced instance mid-restart", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 3
+		})
+		cluster.Status.ReadyInstances = 1
+
+		primaryPod := readyPod(ctx, cluster, 1)
+		restartingPod := notReadyPod(ctx, cluster, 2)
+
+		thirdGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod, *restartingPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: thirdGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+				{Pod: restartingPod, IsPodReady: false, MightBeUnavailable: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be reattached while a non-fenced instance is mid-restart")
+	})
+})
+
+var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// findBootstrapInitContainer returns the bootstrap-work init container of a
+	// Pod built by NewInstance + AddBootstrapInitContainer, if present.
+	findBootstrapInitContainer := func(pod *corev1.Pod) *corev1.Container {
+		for i := range pod.Spec.InitContainers {
+			if pod.Spec.InitContainers[i].Name == specs.BootstrapWorkContainerName {
+				return &pod.Spec.InitContainers[i]
+			}
+		}
+		return nil
+	}
+
+	It("bootstraps the first primary through the real PVC classifier handoff", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+
+		// Fresh bootstrap: no instance exists yet.
+		cluster.Status.Instances = 0
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = nil
+		cluster.Status.TargetPrimary = ""
+		cluster.Status.CurrentPrimary = ""
+
+		// First pass: createPrimaryInstance creates the PVC group, records the
+		// target primary and defers bootstrap to the PVC-driven path.
+		res, err := env.clusterReconciler.createPrimaryInstance(ctx, cluster)
+		Expect(err).To(MatchError(ErrNextLoop))
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		Expect(cluster.Status.TargetPrimary).To(Equal(primaryName))
+
+		var pvcs corev1.PersistentVolumeClaimList
+		Expect(env.client.List(ctx, &pvcs)).To(Succeed())
+		Expect(pvcs.Items).To(HaveLen(2), "the PGDATA and WAL PVCs should have been created")
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "createPrimaryInstance must not create the bootstrap Pod itself")
+
+		// Any client write-back strips TypeMeta from the in-memory object (see
+		// the note in newFakeCNPGCluster): restore it as the fresh Get of the
+		// next reconciliation pass would see it, since the ownership set by
+		// the specs builders copies it verbatim.
+		cluster.TypeMeta = metav1.TypeMeta{
+			Kind:       apiv1.ClusterKind,
+			APIVersion: apiv1.SchemeGroupVersion.String(),
+		}
+
+		// Next pass: the production classifier computes the PVC buckets the
+		// routing consumes. The PVC phase is set by the PV controller in a real
+		// cluster; mirror it in memory before classifying.
+		for i := range pvcs.Items {
+			pvcs.Items[i].Status.Phase = corev1.ClaimBound
+		}
+		persistentvolumeclaim.EnrichStatus(ctx, cluster, nil, nil, pvcs.Items)
+		Expect(cluster.Status.Instances).To(Equal(1))
+		Expect(cluster.Status.DanglingPVC).ToNot(BeEmpty())
+
+		resources := &managedResources{pvcs: pvcs}
+		res, err = env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the bootstrap Pod should be created off the classified PVC state")
+		Expect(pods.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(primaryName))
+		initContainer := findBootstrapInitContainer(&pods.Items[0])
+		Expect(initContainer).ToNot(BeNil(), "the Pod must carry a bootstrap init container")
+		Expect(initContainer.Command).To(ContainElement("init"))
+		Expect(persistentvolumeclaim.IsUsedByPodSpec(
+			pods.Items[0].Spec, primaryName, primaryName+"-wal",
+		)).To(BeTrue(), "the bootstrap Pod must mount the whole PVC group")
+	})
+
+	It("creates the bootstrap Pod reusing serial 1 when the primary PVC is stuck initializing", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+		})
+
+		// The first-primary bootstrap created the data PVC for serial 1 and patched
+		// the cluster status (TargetPrimary set, Instances flipped to 1) but lost the
+		// optimistic lock before creating the bootstrap Pod: no Pod exists.
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		pvcGroup := newFakePVC(env.client, cluster, 1, persistentvolumeclaim.StatusInitializing)
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: pvcGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the bootstrap Pod for serial 1 should have been created")
+		Expect(pods.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(primaryName))
+		initContainer := findBootstrapInitContainer(&pods.Items[0])
+		Expect(initContainer).ToNot(BeNil(), "the Pod must carry a bootstrap init container while the PVC is not ready")
+
+		// No serial-2 instance or PVC must be created: the existing serial must be reused.
+		var pvcs corev1.PersistentVolumeClaimList
+		Expect(env.client.List(ctx, &pvcs)).To(Succeed())
+		for _, pvc := range pvcs.Items {
+			serial, serr := specs.GetNodeSerial(pvc.ObjectMeta)
+			Expect(serr).ToNot(HaveOccurred())
+			Expect(serial).To(Equal(1), "no PVC for a different serial should have been created")
+		}
+	})
+
+	It("creates the join bootstrap Pod for a replica whose PVC exists but was never bootstrapped", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 2
+		})
+
+		// A running primary and a replica whose data PVC was created but, for
+		// whatever reason (e.g. a lost race analogous to #11036), bootstrap
+		// never happened: no Pod exists for it (see #7709).
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		replicaName := specs.GetInstanceName(cluster.Name, 2)
+		cluster.Status.Instances = 2
+		cluster.Status.ReadyInstances = 1
+		cluster.Status.InstanceNames = []string{primaryName, replicaName}
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{replicaName}
+
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		primaryPod.Status = corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+		}
+
+		pvcGroup := newFakePVC(env.client, cluster, 2, persistentvolumeclaim.StatusInitializing)
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1), "the bootstrap Pod for the replica should have been created")
+		Expect(pods.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(replicaName))
+		initContainer := findBootstrapInitContainer(&pods.Items[0])
+		Expect(initContainer).ToNot(BeNil())
+		Expect(initContainer.Command).To(ContainElement("join"), "an empty PVC must be advanced by a join bootstrap")
+
+		var pvcs corev1.PersistentVolumeClaimList
+		Expect(env.client.List(ctx, &pvcs)).To(Succeed())
+		for _, pvc := range pvcs.Items {
+			serial, serr := specs.GetNodeSerial(pvc.ObjectMeta)
+			Expect(serr).ToNot(HaveOccurred())
+			Expect(serial).To(Equal(2), "no PVC for a different serial should have been created")
+		}
+	})
+
+	It("recreates the missing WAL PVC of the primary before creating the bootstrap Pod", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		// An incomplete PVC group is classified unusable, not dangling.
+		cluster.Status.UnusablePVC = []string{primaryName}
+
+		// The first-primary bootstrap was interrupted after creating the PGDATA
+		// PVC but before the WAL PVC: creating the bootstrap Pod in this state
+		// would leave it pending forever on a volume that does not exist.
+		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
+			NodeSerial: 1,
+			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
+			Storage:    cluster.Spec.StorageConfiguration,
+		})
+		Expect(err).ToNot(HaveOccurred())
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		Expect(env.client.Create(ctx, pvc)).To(Succeed())
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{*pvc}},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var walPVC corev1.PersistentVolumeClaim
+		Expect(env.client.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      primaryName + "-wal",
+		}, &walPVC)).To(Succeed(), "the missing WAL PVC should have been recreated")
+		serial, err := specs.GetNodeSerial(walPVC.ObjectMeta)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(serial).To(Equal(1))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1))
+		initContainer := findBootstrapInitContainer(&pods.Items[0])
+		Expect(initContainer).ToNot(BeNil())
+		Expect(initContainer.Command).To(ContainElement("init"))
+		Expect(persistentvolumeclaim.IsUsedByPodSpec(
+			pods.Items[0].Spec, primaryName, primaryName+"-wal",
+		)).To(BeTrue(), "the bootstrap Pod must mount the whole PVC group")
+	})
+
+	It("fails cleanly when the primary PVC's snapshot source no longer exists", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					VolumeSnapshots: &apiv1.DataSource{
+						Storage: corev1.TypedLocalObjectReference{
+							APIGroup: ptr.To(volumesnapshotv1.GroupName),
+							Kind:     apiv1.VolumeSnapshotKind,
+							Name:     "bootstrap-snapshot",
+						},
+					},
+				},
+			}
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		// The PGDATA PVC was cloned from a snapshot that has since been
+		// deleted: bootstrap cannot be rebuilt without its metadata, and the
+		// reconciler must fail with a clear error instead of dereferencing the
+		// missing source.
+		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
+			NodeSerial: 1,
+			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
+			Storage:    cluster.Spec.StorageConfiguration,
+			Source: &corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To(volumesnapshotv1.GroupName),
+				Kind:     apiv1.VolumeSnapshotKind,
+				Name:     "bootstrap-snapshot",
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		Expect(env.client.Create(ctx, pvc)).To(Succeed())
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{*pvc}},
+		}
+
+		_, err = env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).To(HaveOccurred())
+		Expect(err).ToNot(MatchError(ErrNextLoop))
+		Expect(err.Error()).To(ContainSubstring("no longer exists"))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be created when the recovery source is gone")
+	})
+
+	It("fails cleanly when the missing WAL PVC would be recreated from a different "+
+		"snapshot than the one PGDATA already holds", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					VolumeSnapshots: &apiv1.DataSource{
+						Storage: corev1.TypedLocalObjectReference{
+							APIGroup: ptr.To(volumesnapshotv1.GroupName),
+							Kind:     apiv1.VolumeSnapshotKind,
+							Name:     "current-bootstrap-snapshot",
+						},
+					},
+				},
+			}
+		})
+
+		currentSnapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "current-bootstrap-snapshot",
+				Namespace: namespace,
+			},
+		}
+		Expect(env.client.Create(ctx, currentSnapshot)).To(Succeed())
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		// An incomplete PVC group is classified unusable, not dangling.
+		cluster.Status.UnusablePVC = []string{primaryName}
+
+		// The PGDATA PVC was actually cloned from a different snapshot than the
+		// one the cluster's bootstrap configuration currently names (for example
+		// the recovery source was edited after the PVC was created): recreating
+		// the missing WAL PVC from the resolved snapshot would pair it with a
+		// PGDATA volume that came from somewhere else entirely.
+		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
+			NodeSerial: 1,
+			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
+			Storage:    cluster.Spec.StorageConfiguration,
+			Source: &corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To(volumesnapshotv1.GroupName),
+				Kind:     apiv1.VolumeSnapshotKind,
+				Name:     "original-bootstrap-snapshot",
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		Expect(env.client.Create(ctx, pvc)).To(Succeed())
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{*pvc}},
+		}
+
+		_, err = env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).To(HaveOccurred())
+		Expect(err).ToNot(MatchError(ErrNextLoop))
+		Expect(err.Error()).To(ContainSubstring("disagrees"))
+
+		var walPVC corev1.PersistentVolumeClaim
+		Expect(env.client.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      primaryName + "-wal",
+		}, &walPVC)).ToNot(Succeed(), "the WAL PVC must not be created from a disagreeing source")
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be created when the recovery source disagrees with PGDATA")
+	})
+
+	It("fails cleanly when the Backup the primary recovers from no longer exists", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 1
+			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					Backup: &apiv1.BackupSource{
+						LocalObjectReference: apiv1.LocalObjectReference{Name: "vanished-backup"},
+					},
+				},
+			}
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.Instances = 1
+		cluster.Status.ReadyInstances = 0
+		cluster.Status.InstanceNames = []string{primaryName}
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{primaryName}
+
+		pvcGroup := newFakePVC(env.client, cluster, 1, persistentvolumeclaim.StatusInitializing)
+
+		resources := &managedResources{
+			pvcs: corev1.PersistentVolumeClaimList{Items: pvcGroup},
+		}
+
+		_, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+		Expect(err).To(HaveOccurred())
+		Expect(err).ToNot(MatchError(ErrNextLoop))
+		Expect(err.Error()).To(ContainSubstring("vanished-backup"))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(BeEmpty(), "no Pod should be created when the origin Backup is gone")
+	})
+
+	It("creates a snapshot-restore bootstrap Pod when the replica PVC was cloned from a snapshot", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 2
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		replicaName := specs.GetInstanceName(cluster.Name, 2)
+		cluster.Status.Instances = 2
+		cluster.Status.ReadyInstances = 1
+		cluster.Status.InstanceNames = []string{primaryName, replicaName}
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{replicaName}
+
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		primaryPod.Status = corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+		}
+
+		// The replica PVC records it was cloned from a volume snapshot. The
+		// snapshot, and the backup it came from, no longer exist: the PVC's own
+		// DataSource is the only truthful record of what is on the volume, and
+		// must win over any recomputation from the current backups.
+		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
+			NodeSerial: 2,
+			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
+			Storage:    cluster.Spec.StorageConfiguration,
+			Source: &corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To(volumesnapshotv1.GroupName),
+				Kind:     apiv1.VolumeSnapshotKind,
+				Name:     "deleted-backup-snapshot",
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		Expect(env.client.Create(ctx, pvc)).To(Succeed())
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{*pvc}},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1))
+		Expect(pods.Items[0].Labels[utils.InstanceNameLabelName]).To(Equal(replicaName))
+		initContainer := findBootstrapInitContainer(&pods.Items[0])
+		Expect(initContainer).ToNot(BeNil())
+		Expect(initContainer.Command).To(ContainElement("restoresnapshot"),
+			"a snapshot-cloned PVC must be advanced by a snapshot-restore bootstrap")
+	})
+
+	It("creates a join bootstrap Pod for an empty replica PVC even with a snapshot candidate", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 2
+			// WAL archiving is active and the cluster was bootstrapped from a
+			// volume snapshot that still exists: recomputing the candidate
+			// storage source would pick the snapshot-restore path.
+			c.Spec.Plugins = []apiv1.PluginConfiguration{{
+				Name:          "wal-archiver.example.com",
+				Enabled:       ptr.To(true),
+				IsWALArchiver: ptr.To(true),
+			}}
+			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					VolumeSnapshots: &apiv1.DataSource{
+						Storage: corev1.TypedLocalObjectReference{
+							APIGroup: ptr.To(volumesnapshotv1.GroupName),
+							Kind:     apiv1.VolumeSnapshotKind,
+							Name:     "bootstrap-snapshot",
+						},
+					},
+				},
+			}
+		})
+
+		snapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bootstrap-snapshot",
+				Namespace: namespace,
+			},
+		}
+		Expect(env.client.Create(ctx, snapshot)).To(Succeed())
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		replicaName := specs.GetInstanceName(cluster.Name, 2)
+		cluster.Status.Instances = 2
+		cluster.Status.ReadyInstances = 1
+		cluster.Status.InstanceNames = []string{primaryName, replicaName}
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+		cluster.Status.DanglingPVC = []string{replicaName}
+
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		primaryPod.Status = corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+		}
+
+		// The replica PVC was created without any data source: whatever
+		// candidate the current cluster state suggests, its content is what a
+		// join bootstrap expects, not what a snapshot-restore bootstrap assumes.
+		pvcGroup := newFakePVC(env.client, cluster, 2, persistentvolumeclaim.StatusInitializing)
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcGroup},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1))
+		initContainer := findBootstrapInitContainer(&pods.Items[0])
+		Expect(initContainer).ToNot(BeNil())
+		Expect(initContainer.Command).To(ContainElement("join"),
+			"an empty PVC must be advanced by a join bootstrap even when a snapshot candidate is available")
+	})
+
+	It("rebuilds an incomplete replica PVC group through a join bootstrap", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+			c.Spec.Instances = 2
+			c.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		})
+
+		primaryName := specs.GetInstanceName(cluster.Name, 1)
+		replicaName := specs.GetInstanceName(cluster.Name, 2)
+		cluster.Status.Instances = 2
+		cluster.Status.ReadyInstances = 1
+		cluster.Status.InstanceNames = []string{primaryName, replicaName}
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+		// An incomplete PVC group is classified unusable, not dangling.
+		cluster.Status.UnusablePVC = []string{replicaName}
+
+		primaryPod, err := specs.NewInstance(ctx, *cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		primaryPod.Status = corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+		}
+
+		// Only the PGDATA PVC of the group exists, and it was cloned from a
+		// snapshot. The sources of the missing WAL PVC cannot be reconstructed,
+		// so the replica must be rebuilt from scratch through a join bootstrap.
+		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
+			NodeSerial: 2,
+			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
+			Storage:    cluster.Spec.StorageConfiguration,
+			Source: &corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To(volumesnapshotv1.GroupName),
+				Kind:     apiv1.VolumeSnapshotKind,
+				Name:     "deleted-backup-snapshot",
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		Expect(env.client.Create(ctx, pvc)).To(Succeed())
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{*primaryPod}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{*pvc}},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: primaryPod, IsPodReady: true, IsPrimary: true},
+			},
+		}
+
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, resources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+
+		var pods corev1.PodList
+		Expect(env.client.List(ctx, &pods)).To(Succeed())
+		Expect(pods.Items).To(HaveLen(1))
+		initContainer := findBootstrapInitContainer(&pods.Items[0])
+		Expect(initContainer).ToNot(BeNil())
+		Expect(initContainer.Command).To(ContainElement("join"),
+			"an incomplete PVC group must be rebuilt from scratch through a join bootstrap")
+
+		var walPVC corev1.PersistentVolumeClaim
+		Expect(env.client.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      replicaName + "-wal",
+		}, &walPVC)).To(Succeed(), "the missing WAL PVC should have been recreated")
+		Expect(walPVC.Spec.DataSource).To(BeNil(), "the recreated WAL PVC must be empty")
+		serial, err := specs.GetNodeSerial(walPVC.ObjectMeta)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(serial).To(Equal(2))
+	})
+})
 
 var _ = Describe("Filtering cluster", func() {
 	metrics := make(map[string]string, 1)
@@ -169,7 +1035,7 @@ var _ = Describe("Updating target primary", func() {
 					CurrentLsn:  cnpgTypes.LSN("0/0"),
 					ReceivedLsn: cnpgTypes.LSN("0/0"),
 					ReplayLsn:   cnpgTypes.LSN("0/0"),
-					IsPodReady:  false,
+					IsPodReady:  true,
 					IsPrimary:   true,
 					Pod:         &instances[1],
 				},
@@ -183,9 +1049,11 @@ var _ = Describe("Updating target primary", func() {
 			},
 		}
 
+		sort.Sort(&statusList)
+
 		By("creating the status list from the cluster pods", func() {
-			cluster.Status.TargetPrimary = instances[1].Name
-			cluster.Status.CurrentPrimary = instances[1].Name
+			cluster.Status.TargetPrimary = instances[0].Name
+			cluster.Status.CurrentPrimary = instances[0].Name
 		})
 
 		By("returning the ErrWaitingOnFailOverDelay when first detecting the failure", func() {
@@ -213,6 +1081,126 @@ var _ = Describe("Updating target primary", func() {
 				g.Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 			}).WithTimeout(5 * time.Second).Should(Succeed())
 		})
+	})
+
+	It("does not elect a fenced instance when it is the only remaining candidate", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.Instances = 2
+		})
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+
+		By("fencing the only remaining replica", func() {
+			_, err := utils.AddFencedInstance(instances[1].Name, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("simulating a failover already in progress after the old primary disappeared", func() {
+			cluster.Status.CurrentPrimary = instances[0].Name
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+		})
+
+		// The old primary is gone from the reported status: the fenced replica
+		// is the only entry left to consider. This is the steady-state shape of
+		// a fenced instance rather than a freshly fenced one: PostgreSQL is
+		// shut down, so the status query never filled the LSNs in, the pod is
+		// not Ready, and the connection error arrives masked, which is what
+		// makes HasHTTPStatus report true and hides the outage from the
+		// election.
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady:                    false,
+					MightBeUnavailable:            true,
+					MightBeUnavailableMaskedError: "dial tcp: connect: connection refused",
+					IsFenced:                      true,
+					Pod:                           &instances[1],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(BeEmpty())
+		Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
+	})
+
+	It("skips a fenced instance and elects the healthy replica even if the fenced one sorts first", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+
+		By("fencing the replica that sorts first in the status list", func() {
+			_, err := utils.AddFencedInstance(instances[1].Name, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("simulating a failover already in progress after the old primary disappeared", func() {
+			cluster.Status.CurrentPrimary = instances[0].Name
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+		})
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
+					IsPodReady:  true,
+					IsFenced:    true,
+					Pod:         &instances[1], // fenced, built first
+				},
+				{
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
+					IsPodReady:  true,
+					Pod:         &instances[2], // healthy, built second
+				},
+			},
+		}
+		// Mirrors what GetStatusFromInstances does before the election ever
+		// sees the list: sort pushes the fenced instance to the tail.
+		sort.Sort(&statusList)
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(instances[2].Name))
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
 	})
 
 	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func(ctx SpecContext) {
@@ -296,7 +1284,7 @@ var _ = Describe("Updating target primary", func() {
 			}
 
 			By("creating a pod for instance 1 only (instance 2's pod was deleted during rolling update)")
-			pod1, err := specs.NewInstance(ctx, *cluster, 1, true)
+			pod1, err := specs.NewInstance(ctx, *cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.SetInheritedDataAndOwnership(&pod1.ObjectMeta)
 			Expect(env.client.Create(ctx, pod1)).To(Succeed())
@@ -328,6 +1316,185 @@ var _ = Describe("Updating target primary", func() {
 			Expect(instanceToCreate).ToNot(BeNil())
 			Expect(instanceToCreate.Name).To(Equal(instance2Name))
 		})
+})
+
+var _ = Describe("Updating the designated primary of a replica cluster", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	newReplicaCluster := func(namespace string) *apiv1.Cluster {
+		return newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Source:  "source-cluster",
+				Enabled: ptr.To(true),
+			}
+		})
+	}
+
+	buildResources := func(cluster *apiv1.Cluster) (*managedResources, []corev1.Pod) {
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		return &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}, instances
+	}
+
+	It("skips a fenced instance and elects the healthy one behind it", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newReplicaCluster(namespace)
+		Expect(cluster.IsReplica()).To(BeTrue())
+
+		managedResources, instances := buildResources(cluster)
+
+		By("fencing the instance that comes first in the status list", func() {
+			_, err := utils.AddFencedInstance(instances[1].Name, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady: true,
+					IsFenced:   true,
+					Pod:        &instances[1], // fenced, built first
+				},
+				{
+					IsPodReady: true,
+					Pod:        &instances[2], // healthy, built second
+				},
+			},
+		}
+		// Mirrors what GetStatusFromInstances does before the election ever
+		// sees the list: sort pushes the fenced instance to the tail.
+		sort.Sort(&statusList)
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(instances[2].Name))
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
+	})
+
+	It("does not elect anyone when every remaining instance is fenced", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newReplicaCluster(namespace)
+
+		managedResources, instances := buildResources(cluster)
+
+		By("fencing the only instance left to consider", func() {
+			_, err := utils.AddFencedInstance(instances[1].Name, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		// The steady-state shape of a fenced instance: PostgreSQL is shut down,
+		// the pod is not Ready, and the connection error arrives masked, so the
+		// status carries no error at all.
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady:                    false,
+					MightBeUnavailable:            true,
+					MightBeUnavailableMaskedError: "dial tcp: connect: connection refused",
+					IsFenced:                      true,
+					Pod:                           &instances[1],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(BeEmpty())
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[0].Name))
+	})
+
+	It("does not elect a candidate that is not reporting its status", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newReplicaCluster(namespace)
+
+		managedResources, instances := buildResources(cluster)
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady: true,
+					Error:      fmt.Errorf("status endpoint unreachable"),
+					Pod:        &instances[1],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(BeEmpty())
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[0].Name))
+	})
+
+	It("elects the first instance in the list when nothing is fenced", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newReplicaCluster(namespace)
+
+		managedResources, instances := buildResources(cluster)
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					IsPodReady: true,
+					Pod:        &instances[1],
+				},
+				{
+					IsPodReady: true,
+					Pod:        &instances[2],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForReplicaCluster(
+			ctx,
+			cluster,
+			statusList,
+			managedResources,
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(instances[1].Name))
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[1].Name))
+	})
 })
 
 var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
@@ -420,6 +1587,18 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
 		IsPodReady: false,
 	}
+	// kubeletStaleReportingFenced is the fenced steady state: same shape as
+	// kubeletStaleReporting, but fenced. It must not be mistaken for the
+	// transient "kubelet has not refreshed the probe yet" case above.
+	kubeletStaleReportingFenced := kubeletStaleReporting
+	kubeletStaleReportingFenced.IsFenced = true
+	// fencedReplica has PostgreSQL down but its instance manager still
+	// answers, so Error is nil, unlike unreadyErroringPrimary below.
+	fencedReplica := postgres.PostgresqlStatus{
+		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+		IsPodReady: false,
+		IsFenced:   true,
+	}
 
 	// DescribeTable entries assert state (requeue vs. proceed) only. They also
 	// regression-lock event absence: none of these scenarios should emit an
@@ -474,6 +1653,12 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		Entry("empty status list",
 			primaryName, primaryName,
 			[]postgres.PostgresqlStatus{}, false),
+		Entry("does not wait on the readiness probe of a fenced instance",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{kubeletStaleReportingFenced, readyReportingReplica}, false),
+		Entry("does not wait on a fenced replica ahead of an erroring primary",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{fencedReplica, unreadyErroringPrimary}, false),
 	)
 
 	It("fires after the production sort pushes the erroring primary to the tail", func(ctx SpecContext) {
@@ -652,5 +1837,102 @@ var _ = Describe("getPluginsNeededForReconcile", func() {
 		}
 		Expect(getPluginsNeededForReconcile(cluster)).
 			To(Equal([]string{"plugin-shared"}))
+	})
+})
+
+var _ = Describe("reconcileResources surfaces a permanently failed instance creation job", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// recoveryJob returns a recovery Job for the cluster with the given status,
+	// mimicking the bootstrap/recovery Job the operator creates.
+	recoveryJob := func(cluster *apiv1.Cluster, status batchv1.JobStatus) batchv1.Job {
+		return batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Name + "-1-full-recovery",
+				Namespace: namespace,
+			},
+			Status: status,
+		}
+	}
+
+	It("reports the unrecoverable phase when a job reaches its backoff limit",
+		func(ctx SpecContext) {
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			failedJob := recoveryJob(cluster, batchv1.JobStatus{
+				Failed: 7,
+				Conditions: []batchv1.JobCondition{
+					{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "BackoffLimitExceeded"},
+				},
+			})
+
+			resources := &managedResources{jobs: batchv1.JobList{Items: []batchv1.Job{failedJob}}}
+
+			res, err := env.clusterReconciler.reconcileResources(ctx, cluster, resources, postgres.PostgresqlStatusList{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.RequeueAfter).To(BeNumerically(">", 0))
+
+			var updated apiv1.Cluster
+			Expect(env.client.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: namespace}, &updated)).
+				To(Succeed())
+			Expect(updated.Status.Phase).To(Equal(apiv1.PhaseUnrecoverable))
+			Expect(updated.Status.PhaseReason).To(ContainSubstring(failedJob.Name))
+		})
+})
+
+var _ = Describe("mapClusterOwnedResourceToCluster", func() {
+	const (
+		ns             = "ns"
+		referencedName = "referenced-cluster"
+	)
+	expectedRequest := reconcile.Request{
+		NamespacedName: types.NamespacedName{Namespace: ns, Name: referencedName},
+	}
+	clusterRef := corev1.LocalObjectReference{Name: referencedName}
+
+	It("maps a Database to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "db"},
+			Spec:       apiv1.DatabaseSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, db)).To(ConsistOf(expectedRequest))
+	})
+
+	It("maps a Publication to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		pub := &apiv1.Publication{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "pub"},
+			Spec:       apiv1.PublicationSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, pub)).To(ConsistOf(expectedRequest))
+	})
+
+	It("maps a Subscription to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		sub := &apiv1.Subscription{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "sub"},
+			Spec:       apiv1.SubscriptionSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, sub)).To(ConsistOf(expectedRequest))
+	})
+
+	It("maps a DatabaseRole to a reconcile request for the referenced cluster", func(ctx SpecContext) {
+		sub := &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "sub"},
+			Spec:       apiv1.DatabaseRoleSpec{ClusterRef: clusterRef},
+		}
+		Expect(mapClusterOwnedResourceToCluster(ctx, sub)).To(ConsistOf(expectedRequest))
+	})
+
+	It("returns nil when the cluster reference is empty", func(ctx SpecContext) {
+		db := &apiv1.Database{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "db"}}
+		Expect(mapClusterOwnedResourceToCluster(ctx, db)).To(BeNil())
+	})
+
+	It("returns nil for an object that does not reference a cluster", func(ctx SpecContext) {
+		Expect(mapClusterOwnedResourceToCluster(ctx, &corev1.Secret{})).To(BeNil())
 	})
 })

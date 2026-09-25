@@ -16,13 +16,13 @@ defaults:
 
 jobs:
   check-latest-postgres-version:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: 3.14
 
@@ -85,6 +85,8 @@ jobs:
           body: "Update default PostgreSQL version from ${{ env.CURRENT_POSTGRES_VERSION }} to ${{ env.LATEST_POSTGRES_VERSION }}"
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          committer: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          labels: "no-issue"
           commit-message: "feat: update default PostgreSQL version to ${{ env.LATEST_POSTGRES_VERSION }}"
           signoff: true
 
@@ -99,6 +101,8 @@ jobs:
           body: "Update the Postgres versions used in E2E tests"
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          committer: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          labels: "no-issue"
           add-paths: ".github/"
           commit-message: "test: Updated Postgres versions used in E2E tests"
           signoff: true

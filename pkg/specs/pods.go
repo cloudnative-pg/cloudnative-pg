@@ -81,6 +81,10 @@ const (
 	// controller inside the Pod file system
 	BootstrapControllerContainerName = "bootstrap-controller"
 
+	// BootstrapWorkContainerName is the name of the init container that runs
+	// the instance-bootstrap command (init/join/restore/restoresnapshot/pgbasebackup)
+	BootstrapWorkContainerName = "bootstrap-instance"
+
 	// PgDataPath is the path to PGDATA variable
 	PgDataPath = "/var/lib/postgresql/data/pgdata"
 
@@ -186,7 +190,6 @@ func createClusterPodSpec(
 	cluster apiv1.Cluster,
 	envConfig EnvConfig,
 	gracePeriod int64,
-	enableHTTPS bool,
 ) corev1.PodSpec {
 	return corev1.PodSpec{
 		Hostname: podName,
@@ -194,12 +197,13 @@ func createClusterPodSpec(
 			createBootstrapContainer(cluster, getExtensions(&cluster)),
 		},
 		SchedulerName:                 cluster.Spec.SchedulerName,
-		Containers:                    createPostgresContainers(cluster, envConfig, enableHTTPS),
+		Containers:                    createPostgresContainers(cluster, envConfig),
 		Volumes:                       createPostgresVolumes(&cluster, podName, getExtensions(&cluster)),
 		SecurityContext:               GetPodSecurityContext(&cluster),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
 		ServiceAccountName:            cluster.GetServiceAccountName(),
+		AutomountServiceAccountToken:  ptr.To(false),
 		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 		TerminationGracePeriodSeconds: &gracePeriod,
 		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
@@ -208,7 +212,7 @@ func createClusterPodSpec(
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
-func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enableHTTPS bool) []corev1.Container {
+func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []corev1.Container {
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
@@ -216,7 +220,11 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
-			VolumeMounts:    CreatePostgresVolumeMounts(cluster, getExtensions(&cluster)),
+			VolumeMounts: CreatePostgresVolumeMounts(VolumeMountsConfig{
+				Cluster:            cluster,
+				Extensions:         getExtensions(&cluster),
+				NeedsKubeAPIAccess: true,
+			}),
 			// This is the default startup probe, and can be overridden
 			// the user configuration in cluster.spec.probes.startup
 			StartupProbe: &corev1.Probe{
@@ -224,8 +232,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				TimeoutSeconds: 5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: url.PathStartup,
-						Port: intstr.FromInt32(url.StatusPort),
+						Path:   url.PathStartup,
+						Port:   intstr.FromInt32(url.StatusPort),
+						Scheme: corev1.URISchemeHTTPS,
 					},
 				},
 			},
@@ -236,8 +245,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				PeriodSeconds:  ReadinessProbePeriod,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: url.PathReady,
-						Port: intstr.FromInt32(url.StatusPort),
+						Path:   url.PathReady,
+						Port:   intstr.FromInt32(url.StatusPort),
+						Scheme: corev1.URISchemeHTTPS,
 					},
 				},
 			},
@@ -248,8 +258,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				TimeoutSeconds: 5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: url.PathHealth,
-						Port: intstr.FromInt32(url.StatusPort),
+						Path:   url.PathHealth,
+						Port:   intstr.FromInt32(url.StatusPort),
+						Scheme: corev1.URISchemeHTTPS,
 					},
 				},
 			},
@@ -288,13 +299,6 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 		})
 
 		containers[0].Command = append(containers[0].Command, "--pprof-server")
-	}
-
-	if enableHTTPS {
-		containers[0].StartupProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].LivenessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].ReadinessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].Command = append(containers[0].Command, "--status-port-tls")
 	}
 
 	if cluster.IsMetricsTLSEnabled() {
@@ -486,12 +490,10 @@ func NewInstance(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	// TODO: remove tlsEnabled when we drop the support for instances created without TLS
-	tlsEnabled bool,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx).WithName("new_instance")
 
-	pod, err := buildInstance(cluster, nodeSerial, tlsEnabled)
+	pod, err := buildInstance(cluster, nodeSerial)
 	if err != nil {
 		return nil, err
 	}
@@ -530,7 +532,6 @@ func NewInstance(
 func buildInstance(
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	tlsEnabled bool,
 ) (*corev1.Pod, error) {
 	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
@@ -538,7 +539,7 @@ func buildInstance(
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	podSpec := createClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
+	podSpec := createClusterPodSpec(podName, cluster, envConfig, gracePeriod)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -603,53 +604,53 @@ func GetInstanceName(clusterName string, nodeSerial int) string {
 	return fmt.Sprintf("%s-%v", clusterName, nodeSerial)
 }
 
-// AddBarmanEndpointCAToPodSpec adds the required volumes and env variables needed by barman to work correctly
-func AddBarmanEndpointCAToPodSpec(
-	podSpec *corev1.PodSpec,
-	caSecret *apiv1.SecretKeySelector,
-	credentials apiv1.BarmanCredentials,
-) {
-	if caSecret == nil || caSecret.Name == "" || caSecret.Key == "" {
+// AddBootstrapInitContainer appends the given instance-bootstrap command
+// (init/join/restore/restoresnapshot/pgbasebackup) as an init container on
+// pod, positioned after any init containers already present (the manager
+// binary staging container, and any CNPG-i plugin sidecars already injected
+// by NewInstance's lifecycle hook) so both have already run by the time this
+// container starts. It has no effect if bootstrap is nil, which is the case
+// once the instance's PVCs are already fully bootstrapped.
+func AddBootstrapInitContainer(pod *corev1.Pod, cluster apiv1.Cluster, bootstrap *InstanceBootstrapCommand) {
+	if bootstrap == nil {
 		return
 	}
 
-	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
-		Name: "barman-endpoint-ca",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: caSecret.Name,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  caSecret.Key,
-						Path: postgres.BarmanRestoreEndpointCACertificateFileName,
-					},
-				},
-			},
-		},
+	envConfig := CreatePodEnvConfig(cluster, pod.Name)
+	initContainer := createInstanceInitContainer(InstanceInitContainerConfig{
+		Cluster:     cluster,
+		Name:        BootstrapWorkContainerName,
+		Role:        bootstrap.Role,
+		EnvConfig:   envConfig,
+		InitCommand: bootstrap.Command,
+		Extensions:  getExtensions(&cluster),
 	})
 
-	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
-		corev1.VolumeMount{
-			Name:      "barman-endpoint-ca",
-			MountPath: postgres.CertificatesDir,
-		},
-	)
-
-	var envVars []corev1.EnvVar
-	// todo: add a case for the Google provider
-	switch {
-	case credentials.Azure != nil:
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  "REQUESTS_CA_BUNDLE",
-			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
-		})
-	// If nothing is set we fall back to AWS, this is to avoid breaking changes with previous versions
-	default:
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  "AWS_CA_BUNDLE",
-			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
-		})
+	// Grant this container whatever extra volume mounts a CNPG-i plugin's
+	// lifecycle hook has already added to the "postgres" container beyond the
+	// common base set both containers already compute identically (e.g. a
+	// Unix socket volume mount to reach the plugin's own sidecar), without
+	// this code needing to know anything about plugins. Only append mounts
+	// this container doesn't already have (matched by volume name): the base
+	// set it shares with "postgres" is already present, and so are its own
+	// bootstrap-specific mounts (e.g. post-init SQL refs) computed above by
+	// createInstanceInitContainer — copying the full list wholesale would
+	// duplicate the former and silently drop the latter.
+	for _, container := range pod.Spec.Containers {
+		if container.Name != PostgresContainerName {
+			continue
+		}
+		for _, volumeMount := range container.VolumeMounts {
+			alreadyMounted := slices.ContainsFunc(initContainer.Container.VolumeMounts, func(vm corev1.VolumeMount) bool {
+				return vm.Name == volumeMount.Name
+			})
+			if !alreadyMounted {
+				initContainer.Container.VolumeMounts = append(initContainer.Container.VolumeMounts, volumeMount)
+			}
+		}
+		break
 	}
 
-	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, envVars...)
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer.Container)
+	pod.Spec.Volumes = append(pod.Spec.Volumes, initContainer.Volumes...)
 }

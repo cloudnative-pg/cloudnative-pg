@@ -20,9 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package tests
 
 import (
-	"os"
-	"strconv"
-
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 )
 
@@ -40,10 +38,6 @@ const (
 	Lowest
 )
 
-// testDepthEnvVarName is the environment variable we expect the user to set
-// to change the default test depth level
-const testDepthEnvVarName = "TEST_DEPTH"
-
 // By default, we run tests with at least a medium level of importance
 const defaultTestDepth = int(Medium)
 
@@ -59,10 +53,10 @@ func TestLevel() (*TestEnvLevel, error) {
 	if err != nil {
 		return nil, err
 	}
-	if depthEnv, exists := os.LookupEnv(testDepthEnvVarName); exists {
-		depth, err := strconv.Atoi(depthEnv)
-		return &TestEnvLevel{env, depth}, err
+
+	if depth := config.Current().Depth; depth != nil {
+		return &TestEnvLevel{env, *depth}, nil
 	}
 
-	return &TestEnvLevel{env, defaultTestDepth}, err
+	return &TestEnvLevel{env, defaultTestDepth}, nil
 }

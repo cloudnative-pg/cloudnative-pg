@@ -92,19 +92,25 @@ export ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 export ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
 export ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
 
+# plugin-barman-cloud release version. Available options:
+#  - "release" (default): the latest published release
+#  - "main":              the current snapshot from the main branch
+#  - "vX.Y.Z" / "X.Y.Z":  a specific pinned release
+export BARMAN_PLUGIN_VERSION=${BARMAN_PLUGIN_VERSION:-"release"}
+
 # --- GENERIC ADD-ON CONSTANTS (Shared CSI/Snapshotter versions for Renovate) ---
 
 # Define default CSI driver version
 # renovate: datasource=github-releases depName=kubernetes-csi/csi-driver-host-path
-CSI_DRIVER_HOST_PATH_DEFAULT_VERSION="v1.17.0"
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION="v1.18.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
-EXTERNAL_SNAPSHOTTER_VERSION="v8.4.0"
+EXTERNAL_SNAPSHOTTER_VERSION="v8.6.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-provisioner
-EXTERNAL_PROVISIONER_VERSION="v6.1.0"
+EXTERNAL_PROVISIONER_VERSION="v6.3.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-resizer
-EXTERNAL_RESIZER_VERSION="v2.0.0"
+EXTERNAL_RESIZER_VERSION="v2.2.1"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-attacher
-EXTERNAL_ATTACHER_VERSION="v4.10.0"
+EXTERNAL_ATTACHER_VERSION="v4.13.0"
 
 # Exporting CSI variables for use in setup scripts
 export CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}

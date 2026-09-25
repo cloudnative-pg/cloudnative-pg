@@ -12,11 +12,12 @@
     'main',
   ],
   ignorePaths: [
-    'docs/**',
+    // Keep the example manifests pinned, but allow custom managers below to
+    // update specific tool images referenced elsewhere in the docs.
+    'docs/src/samples/**',
     'releases/**',
     'contribute/**',
     'licenses/**',
-    'pkg/versions/**',
   ],
   postUpdateOptions: [
     'gomodTidy',
@@ -44,10 +45,10 @@
         '/^Makefile$/',
         '/^hack/setup-cluster.sh$/',
         '/^hack/testing-tools/k8s-engines/[^/]+/settings\\.sh$/',
-        '/^hack/testing-tools/common/40-utils-registry\\.sh$/'
+        '/^hack/testing-tools/common/[^/]+\\.sh$/'
       ],
       matchStrings: [
-        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*["\']?(?<currentValue>[^@"\'\\s]+?)(?:@(?<currentDigest>sha256:[a-f0-9]+))?["\']?\\s',
       ],
     },
     {
@@ -89,7 +90,6 @@
         '/^pkg\\/versions\\/versions\\.go$/',
       ],
       matchStrings: [
-        'DefaultImageName = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
         'DefaultPgbouncerImage = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
       ],
       datasourceTemplate: 'docker',
@@ -107,6 +107,17 @@
       ],
       datasourceTemplate: 'docker',
       versioningTemplate: 'semver',
+    },
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^docs\\/src\\/monitoring\\.md$/',
+      ],
+      matchStrings: [
+        'image: (?<depName>curlimages/curl):(?<currentValue>\\S+)',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'docker',
     },
     {
       customType: 'regex',
@@ -228,9 +239,34 @@
       pinDigests: false,
       matchPackageNames: [
         'vmware-tanzu{/,}**',
-        'rustfs{/,}**',
-        'amazon{/,}**',
       ],
+    },
+    {
+      // All container images consumed by the e2e object-store helper live in
+      // this single file; keep their bumps in one PR.
+      matchFileNames: [
+        'tests/utils/objectstore/objectstore.go',
+      ],
+      groupName: 'objectstore test images',
+      separateMajorMinor: false,
+      pinDigests: false,
+    },
+    {
+      // RustFS's default image is Alpine/musl, slower than glibc
+      // (rustfs/rustfs#1662). A bare `-glibc` suffix isn't a safe pin:
+      // semver compares prerelease identifiers lexically, and "rc" >
+      // "glibc", so a stale 1.0.0-rc.6-glibc still outranks the final
+      // 1.0.0-glibc. Restrict to final MAJOR.MINOR.PATCH-glibc tags so
+      // RC/beta builds never enter the comparison, and a missing glibc
+      // tag just stalls the update instead of falling back to musl or an
+      // old RC.
+      matchFileNames: [
+        'tests/utils/objectstore/objectstore.go',
+      ],
+      matchPackageNames: [
+        'docker.io/rustfs/rustfs',
+      ],
+      allowedVersions: '/^\\d+\\.\\d+\\.\\d+-glibc$/',
     },
     {
       groupName: 'operator framework',
@@ -262,9 +298,16 @@
       groupName: 'Containers no-digests',
       matchPackageNames: [
         'kindest{/,}**',
-        'getwoke{/,}**',
-        'jonasbn/github-action-spellcheck',
         'registry',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
+      // The curl image is only used in a documentation example, so keep it as a
+      // readable tag without a pinned digest.
+      matchPackageNames: [
+        'curlimages/curl',
       ],
       pinDigests: false,
       separateMajorMinor: false,

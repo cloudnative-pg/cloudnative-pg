@@ -82,6 +82,10 @@ func NewCmd() *cobra.Command {
 				client: client,
 			}
 
+			if err := env.info.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
+				return err
+			}
+
 			if err = env.bootstrapUsingPgbasebackup(ctx); err != nil {
 				contextLogger.Error(err, "Unable to bootstrap cluster")
 			}

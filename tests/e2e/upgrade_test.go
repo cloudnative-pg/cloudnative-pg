@@ -39,6 +39,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
@@ -46,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -87,6 +89,7 @@ To check the soundness of the upgrade, on each of the four scenarios:
 
 */
 
+//nolint:dupl
 var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), Ordered, Serial, func() {
 	const (
 		operatorNamespace       = "cnpg-system"
@@ -119,8 +122,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	)
 
 	BeforeAll(func() {
-		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
-			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
+		if config.Current().SkipUpgradeSuite {
+			Skip("Skipping upgrade test because skipUpgradeSuite is set in the e2e configuration")
 		}
 		if IsOpenshift() {
 			Skip("This test case is not applicable on OpenShift clusters")
@@ -138,9 +141,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		err := namespaces.EnsureNamespace(env.Ctx, env.Client, operatorNamespace)
 		Expect(err).NotTo(HaveOccurred())
 
-		dockerServer := os.Getenv("DOCKER_SERVER")
-		dockerUsername := os.Getenv("DOCKER_USERNAME")
-		dockerPassword := os.Getenv("DOCKER_PASSWORD")
+		pullSecret := config.Current().RegistryPullSecret
+		dockerServer := pullSecret.Server
+		dockerUsername := pullSecret.Username
+		dockerPassword := pullSecret.Password
 		if dockerServer != "" && dockerUsername != "" && dockerPassword != "" {
 			_, _, err := run.Run(fmt.Sprintf(
 				`kubectl -n %v create secret docker-registry
@@ -179,7 +183,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		cluster.Spec.PostgresConfiguration.Parameters["max_replication_slots"] = "16"
 		cluster.Spec.PostgresConfiguration.Parameters["maintenance_work_mem"] = "256MB"
 		cluster.Spec.PostgresConfiguration.PgHBA[0] = "host all all all trust"
-		return env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(oldCluster))
+		return objects.Patch(env.Ctx, env.Client, cluster, ctrlclient.MergeFrom(oldCluster))
 	}
 
 	AssertConfUpgrade := func(clusterName, upgradeNamespace string) {
@@ -305,7 +309,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return err
 		}
 		for _, pod := range pods.Items {
-			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod, true)
+			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod)
 			if err != nil {
 				continue
 			}
@@ -322,7 +326,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	// assertOnlineManagerRollout checks for the presence of InstanceManagerUpgraded
 	// events, which are produced on online upgrades.
 	// returns a boolean indicating success
-	assertOnlineManagerRollout := func() bool {
+	assertOnlineManagerRollout := func(namespace, clusterName string, expectedUpgrades int) bool {
 		backoffCheckingEvents := wait.Backoff{
 			Duration: 10 * time.Second,
 			Steps:    5,
@@ -336,9 +340,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			err := env.Client.List(
 				env.Ctx,
 				&eventList,
+				ctrlclient.InNamespace(namespace),
 				ctrlclient.MatchingFields{
 					"involvedObject.kind": "Cluster",
-					"involvedObject.name": clusterName1,
+					"involvedObject.name": clusterName,
 				},
 			)
 			if err != nil {
@@ -358,8 +363,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				}
 			}
 
-			if count != 3 {
-				return fmt.Errorf("expected 3 online rollouts, but %d happened: %w", count, notUpdated)
+			if count != expectedUpgrades {
+				return fmt.Errorf("expected %d online rollouts, but %d happened: %w",
+					expectedUpgrades, count, notUpdated)
 			}
 
 			return nil
@@ -521,8 +527,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By(fmt.Sprintf("creating a Cluster in the '%v' upgradeNamespace",
 			upgradeNamespace), func() {
 			// set the serverName to a random name
-			err := os.Setenv("SERVER_NAME", serverName1)
-			Expect(err).ToNot(HaveOccurred())
+			config.SetTemplateVariable("SERVER_NAME", serverName1)
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile)
 
 			if online {
@@ -643,7 +648,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			GinkgoWriter.Printf("online upgrade\n")
 			testOnlineUpgrade = true
 			// Pods shouldn't change and there should be an event
-			onlineUpgradeDone = assertOnlineManagerRollout()
+			onlineUpgradeDone = assertOnlineManagerRollout(upgradeNamespace, clusterName1, 3)
 			if onlineUpgradeDone {
 				GinkgoWriter.Printf("online manager rollout is done\n")
 				// equivalent to waiting for 300 sec as before
@@ -682,8 +687,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		By("installing a second Cluster on the upgraded operator", func() {
 			// set the serverName to a random name
-			err := os.Setenv("SERVER_NAME", serverName2)
-			Expect(err).ToNot(HaveOccurred())
+			config.SetTemplateVariable("SERVER_NAME", serverName2)
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile2)
 			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady])
 		})
@@ -799,7 +803,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-			operator.InstallLatest(env.Client, mostRecentTag)
+			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
 			DeferCleanup(cleanupOperatorAndObjectStore)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
@@ -807,6 +811,23 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 
 		It("keeps clusters working after an online upgrade", func() {
+			// TODO: remove this Skip in the next minor version.
+			// This version unconditionally sets automountServiceAccountToken=false on
+			// instance Pods, whereas the previous release left it unset. The resulting
+			// spec drift causes a one-time pod rollout when upgrading from the previous
+			// release, which is expected and accepted for this minor version bump.
+			//
+			// Skip aborts the spec immediately, so the namespace cleanup must be
+			// registered beforehand: otherwise the cnpg-system namespace (and its
+			// pull secret) created by the BeforeEach above survives into the next
+			// spec, whose BeforeEach then fails trying to recreate the same secret.
+			DeferCleanup(func() {
+				Expect(namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 60)).
+					To(Succeed())
+			})
+			Skip("one-time pod rollout expected when upgrading from the previous release " +
+				"due to automountServiceAccountToken now being hardcoded to false")
+
 			upgradeNamespacePrefix := onlineUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
 				operator.CreateConfigMap(env.Ctx, env.Client, operatorNamespace, configName, true)
@@ -816,7 +837,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-			operator.InstallLatest(env.Client, mostRecentTag)
+			operator.InstallLatest(env.Ctx, env.Client, env.RestClientConfig, mostRecentTag)
 			DeferCleanup(cleanupOperatorAndObjectStore)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)

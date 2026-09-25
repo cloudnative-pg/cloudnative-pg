@@ -22,12 +22,14 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -72,7 +74,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("will not require a restart for just created Pods", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 
 		status := postgres.PostgresqlStatus{
@@ -87,7 +89,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when running a different image name", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 
 		pod.Spec.Containers[0].Image = "postgres:13.10"
@@ -104,7 +106,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when a restart annotation has been added to the cluster", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		clusterRestart := cluster
 		clusterRestart.Annotations = make(map[string]string)
@@ -129,7 +131,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("should prioritize full rollout over inplace restarts", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 
 		status := postgres.PostgresqlStatus{
@@ -160,7 +162,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when PostgreSQL needs to be restarted", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 
 		status := postgres.PostgresqlStatus{
@@ -187,7 +189,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires pod rollout if executable does not have a hash", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -203,7 +205,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("checkPodSpecIsOutdated should not return any error", func() {
-		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		rollout, err := checkPodSpecIsOutdated(context.TODO(), pod, &cluster)
 		Expect(rollout.required).To(BeFalse())
@@ -213,7 +215,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("checks when a rollout is needed for any reason", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -240,7 +242,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 	When("the PodSpec annotation is not available", func() {
 		It("should trigger a rollout when the scheduler changes", func(ctx SpecContext) {
-			pod, err := specs.NewInstance(ctx, cluster, 1, true)
+			pod, err := specs.NewInstance(ctx, cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Spec.SchedulerName = "newScheduler"
 			delete(pod.Annotations, utils.PodSpecAnnotationName)
@@ -266,7 +268,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				ImageName: "postgres:13.11",
 			},
 		}
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		cluster.Spec.SchedulerName = "newScheduler"
 
@@ -302,7 +304,6 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				context.TODO(),
 				clusterWithResources,
 				1,
-				true,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			clusterWithResources.Spec.Resources.Limits["cpu"] = resource.MustParse("3") // was "2"
@@ -322,7 +323,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.needsToChangeOperatorImage).To(BeFalse())
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
-			pod, err := specs.NewInstance(context.TODO(), clusterWithResources, 1, true)
+			pod, err := specs.NewInstance(context.TODO(), clusterWithResources, 1)
 			Expect(err).ToNot(HaveOccurred())
 			clusterWithResources.Spec.Resources = corev1.ResourceRequirements{}
 
@@ -344,7 +345,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 	When("the PodSpec annotation is not available", func() {
 		It("detects when a new custom environment variable is set", func(ctx SpecContext) {
-			pod, err := specs.NewInstance(ctx, cluster, 1, true)
+			pod, err := specs.NewInstance(ctx, cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 			delete(pod.Annotations, utils.PodSpecAnnotationName)
 
@@ -375,7 +376,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 					ImageName: "postgres:13.11",
 				},
 			}
-			pod, err := specs.NewInstance(ctx, cluster, 1, true)
+			pod, err := specs.NewInstance(ctx, cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 			delete(pod.Annotations, utils.PodSpecAnnotationName)
 
@@ -400,7 +401,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 					ImageName: "postgres:13.11",
 				},
 			}
-			pod, err := specs.NewInstance(ctx, cluster, 1, true)
+			pod, err := specs.NewInstance(ctx, cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 			delete(pod.Annotations, utils.PodSpecAnnotationName)
 
@@ -424,7 +425,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 	When("the podSpec annotation is available", func() {
 		It("detects when a new custom environment variable is set", func(ctx SpecContext) {
-			pod, err := specs.NewInstance(ctx, cluster, 1, true)
+			pod, err := specs.NewInstance(ctx, cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := cluster.DeepCopy()
@@ -455,7 +456,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 					ImageName: "postgres:13.11",
 				},
 			}
-			pod, err := specs.NewInstance(ctx, cluster, 1, true)
+			pod, err := specs.NewInstance(ctx, cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			status := postgres.PostgresqlStatus{
@@ -479,7 +480,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 					ImageName: "postgres:13.11",
 				},
 			}
-			pod, err := specs.NewInstance(ctx, cluster, 1, true)
+			pod, err := specs.NewInstance(ctx, cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			status := postgres.PostgresqlStatus{
@@ -506,7 +507,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				cluster.Spec.ProjectedVolumeTemplate = &corev1.ProjectedVolumeSource{
 					Sources: []corev1.VolumeProjection{},
 				}
-				pod, err := specs.NewInstance(ctx, cluster, 1, true)
+				pod, err := specs.NewInstance(ctx, cluster, 1)
 				Expect(err).ToNot(HaveOccurred())
 				status := postgres.PostgresqlStatus{
 					Pod:            pod,
@@ -524,7 +525,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				cluster.Spec.ProjectedVolumeTemplate = &corev1.ProjectedVolumeSource{
 					Sources: nil,
 				}
-				pod, err := specs.NewInstance(ctx, cluster, 1, true)
+				pod, err := specs.NewInstance(ctx, cluster, 1)
 				Expect(err).ToNot(HaveOccurred())
 				status := postgres.PostgresqlStatus{
 					Pod:            pod,
@@ -540,7 +541,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		It("should not require rollout if projected volume  is nil",
 			func(ctx SpecContext) {
 				cluster.Spec.ProjectedVolumeTemplate = nil
-				pod, err := specs.NewInstance(ctx, cluster, 1, true)
+				pod, err := specs.NewInstance(ctx, cluster, 1)
 				Expect(err).ToNot(HaveOccurred())
 				status := postgres.PostgresqlStatus{
 					Pod:            pod,
@@ -574,7 +575,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			},
 		}
 		var err error
-		pod, err = specs.NewInstance(context.TODO(), *cluster, 1, true)
+		pod, err = specs.NewInstance(context.TODO(), *cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -641,7 +642,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 		It("should not require rollout if pod and spec both lack TopologySpreadConstraints", func(ctx SpecContext) {
 			cluster.Spec.TopologySpreadConstraints = nil
 			var err error
-			pod, err = specs.NewInstance(context.TODO(), *cluster, 1, true)
+			pod, err = specs.NewInstance(context.TODO(), *cluster, 1)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(pod.Spec.TopologySpreadConstraints).To(BeNil())
 
@@ -801,7 +802,7 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 	It("skips the rollout if the annotation that disables PodSpec reconciliation is set", func(ctx SpecContext) {
 		cluster.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
 
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		pod, err := specs.NewInstance(ctx, cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 		cluster.Spec.SchedulerName = "newScheduler"
 		delete(pod.Annotations, utils.PodSpecAnnotationName)
@@ -971,7 +972,7 @@ var _ = Describe("checkPodSpec with plugins", Ordered, func() {
 	})
 
 	It("image change", func() {
-		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 
 		podModifiedByPlugins := pod.DeepCopy()
@@ -992,7 +993,7 @@ var _ = Describe("checkPodSpec with plugins", Ordered, func() {
 	})
 
 	It("init-container change", func() {
-		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 
 		podModifiedByPlugins := pod.DeepCopy()
@@ -1017,7 +1018,7 @@ var _ = Describe("checkPodSpec with plugins", Ordered, func() {
 	})
 
 	It("environment variable change", func() {
-		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 
 		podModifiedByPlugins := pod.DeepCopy()
@@ -1179,5 +1180,112 @@ var _ = Describe("Supervised primary update strategy and rollout slots", func() 
 		result := rm.CoordinateRollout(secondCluster, "other-pod")
 		Expect(result.RolloutAllowed).To(BeFalse(),
 			"unsupervised strategy should consume the rollout slot")
+	})
+})
+
+var _ = Describe("archiverSidecarMissingOnPrimary", func() {
+	const sidecarName = "plugin-barman-cloud"
+
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec:       apiv1.ClusterSpec{ImageName: "postgres:17.0"},
+		}
+	})
+
+	// withArchiverSidecar returns a copy of pod with an extra container,
+	// mimicking the sidecar a WAL-archiver plugin injects at evaluation time.
+	// Real plugins (e.g. plugin-barman-cloud) inject it as a native sidecar: an
+	// init container with RestartPolicy=Always.
+	withArchiverSidecar := func(pod *corev1.Pod) *corev1.Pod {
+		out := pod.DeepCopy()
+		out.Spec.InitContainers = append(out.Spec.InitContainers, corev1.Container{
+			Name:          sidecarName,
+			Image:         "plugin-barman-cloud:latest",
+			RestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
+		})
+		return out
+	}
+
+	enableArchiverPlugin := func() {
+		cluster.Spec.Plugins = []apiv1.PluginConfiguration{
+			{
+				Name:          "barman-cloud.cloudnative-pg.io",
+				Enabled:       ptr.To(true),
+				IsWALArchiver: ptr.To(true),
+			},
+		}
+	}
+
+	It("returns false when no WAL-archiver plugin is enabled", func() {
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(archiverSidecarMissingOnPrimary(context.TODO(), pod, &cluster)).To(BeFalse())
+	})
+
+	It("returns true when the primary is missing the injected sidecar", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		// The freshly evaluated spec carries the sidecar, the running primary does not.
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: withArchiverSidecar(pod)})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, pod, &cluster)).To(BeTrue())
+	})
+
+	It("returns false when the primary already has the injected sidecar", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		podWithSidecar := withArchiverSidecar(pod)
+
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: podWithSidecar})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, podWithSidecar, &cluster)).To(BeFalse())
+	})
+
+	It("ignores a missing run-once init container, only native sidecars matter", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		// The evaluated target adds a plain run-once init container (no
+		// RestartPolicy=Always). A missing one of those is not an archiver
+		// sidecar and must not force an in-place recreate.
+		target := pod.DeepCopy()
+		target.Spec.InitContainers = append(target.Spec.InitContainers, corev1.Container{
+			Name:  "some-run-once-init",
+			Image: "init:latest",
+		})
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedPod: target})
+
+		Expect(archiverSidecarMissingOnPrimary(ctx, pod, &cluster)).To(BeFalse())
+	})
+
+	It("propagates evaluation errors instead of degrading to a switchover decision", func() {
+		enableArchiverPlugin()
+
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		evalErr := errors.New("plugin evaluation failed")
+		ctx := pluginClient.SetPluginClientInContext(context.TODO(),
+			fakePluginClientRollout{returnedError: evalErr})
+
+		missing, err := archiverSidecarMissingOnPrimary(ctx, pod, &cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, evalErr)).To(BeTrue(),
+			"the evaluation error must surface so the caller requeues instead of switching over")
+		Expect(missing).To(BeFalse())
 	})
 })

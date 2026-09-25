@@ -579,5 +579,28 @@ var _ = Describe("PostgreSQL Extensions", func() {
 			Expect(config.GetConfig(ExtensionControlPath)).To(BeEquivalentTo("$system:" + sharePaths))
 			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEquivalentTo("$libdir:" + libPaths))
 		})
+
+		It("skips paths that escape the extension directory instead of including them", func() {
+			// The webhook already rejects these at admission time; this
+			// guards callers that read the Cluster spec directly, without
+			// going through admission.
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+				AdditionalExtensions: []AdditionalExtensionConfiguration{
+					{
+						MountPath:            ExtensionsBaseDirectory + "/postgis",
+						ExtensionControlPath: []string{"share", "../../etc"},
+						DynamicLibraryPath:   []string{"lib", "../mount/lib"},
+					},
+				},
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).
+				To(BeEquivalentTo("$system:" + ExtensionsBaseDirectory + "/postgis/share"))
+			Expect(config.GetConfig(DynamicLibraryPath)).
+				To(BeEquivalentTo("$libdir:" + ExtensionsBaseDirectory + "/postgis/lib"))
+		})
 	})
 })

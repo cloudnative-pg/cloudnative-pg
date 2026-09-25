@@ -25,7 +25,6 @@ package objectstore
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -44,6 +43,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -52,12 +52,12 @@ import (
 
 const (
 	// rustfsImage is the image used to run a RustFS server
-	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8"
+	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-glibc"
 	// awsCliImage is the image used to run the AWS CLI S3 client
-	awsCliImage = "docker.io/amazon/aws-cli:2.35.4"
+	awsCliImage = "docker.io/amazon/aws-cli:2.36.49"
 	// busyboxImage is used by the init container that prepares writable
 	// working directories for the RustFS server
-	busyboxImage = "docker.io/library/busybox:1.37.0"
+	busyboxImage = "docker.io/library/busybox:1.38.0"
 
 	// AccessKeyID is the access key used to authenticate against the object store
 	AccessKeyID = "objectstore"
@@ -338,8 +338,8 @@ func defaultSVC(namespace string) corev1.Service {
 // defaultPVC returns a default PVC for the object storage server
 func defaultPVC(namespace string) (corev1.PersistentVolumeClaim, error) {
 	const claimName = "object-store-pv-claim"
-	storageClass, ok := os.LookupEnv("E2E_DEFAULT_STORAGE_CLASS")
-	if !ok {
+	storageClass := config.Current().Storage.StorageClass
+	if storageClass == "" {
 		return corev1.PersistentVolumeClaim{}, fmt.Errorf("storage class not defined")
 	}
 

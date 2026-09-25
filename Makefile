@@ -55,28 +55,32 @@ PGBOUNCER_IMAGE_NAME ?= $(shell grep 'DefaultPgbouncerImage.*=' "pkg/versions/ve
 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize versioning=loose
 KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
-CONTROLLER_TOOLS_VERSION ?= v0.21.0
+CONTROLLER_TOOLS_VERSION ?= v0.22.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
 CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.16.0
+GORELEASER_VERSION ?= v2.18.2
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.60.0
+SPELLCHECK_VERSION ?= 0.66.0@sha256:6c852d66bdd4ed63cfcf6888bc84dbf7380a99dbffbbc661200b50c48cf3f4d9
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
-WOKE_VERSION ?= 0.19.0
+WOKE_VERSION ?= 0.19.0@sha256:5cdd550a166c9e11f2f53c3f6c23dfafdf879e9bcaffd07c2f8bfef095c1b579
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
-OPERATOR_SDK_VERSION ?= v1.42.2
+OPERATOR_SDK_VERSION ?= v1.42.3
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.69.0
+OPM_VERSION ?= v1.74.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.19.0
+PREFLIGHT_VERSION ?= 1.21.0
 # renovate: datasource=docker depName=cuelang/cue versioning=docker
-CUE_VERSION ?= 0.16.1
+CUE_VERSION ?= 0.17.1@sha256:520f883dcc92642389b3b75e8befe4e5a233a1aa903a8c846c4a3b338b202635
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
-GEMARA_VERSION ?= v1.2.0
-OPENSHIFT_VERSIONS ?= v4.18-v4.22
+GEMARA_VERSION ?= v1.5.0
 ARCH ?= amd64
 FUZZ_TIME ?= 30s
+
+# OPENSHIFT_VERSIONS differs per release branch, unlike the renovate-managed
+# versions above that stay identical. The blank lines around it keep it out of
+# their diff context, so backport cherry-picks of a version bump don't conflict.
+OPENSHIFT_VERSIONS ?= v4.18-v4.22
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -99,6 +103,7 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+.PHONY: all
 all: build
 
 ##@ General
@@ -114,26 +119,34 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
+.PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
+.PHONY: print-version
 print-version:
 	echo ${VERSION}
 
 ENVTEST_ASSETS_DIR=$$(pwd)/testbin
+.PHONY: test
 test: generate fmt vet manifests envtest ## Run tests.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils/...
+	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/...
+	cd tests && go test -coverpkg=./... -coverprofile=cover.out ./utils/...
 
+.PHONY: test-race
 test-race: generate fmt vet manifests envtest ## Run tests enabling race detection.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
-	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
+	go run github.com/onsi/ginkgo/v2/ginkgo -r -p \
+	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites \
+	  ./api/... ./cmd/... ./internal/... ./pkg/...
+	cd tests && go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
 .PHONY: fuzz
@@ -153,36 +166,47 @@ fuzz: ## Run every native fuzz target discovered in the tree.
 	done <<< "$$pairs" ;\
 	exit $$rc
 
+.PHONY: e2e-test-kind
 e2e-test-kind: ## Run e2e tests locally using kind.
 	CLUSTER_ENGINE=kind hack/e2e/run-e2e-local.sh
 
+.PHONY: e2e-test-k3d
 e2e-test-k3d: ## Run e2e tests locally using k3d.
 	CLUSTER_ENGINE=k3d hack/e2e/run-e2e-local.sh
 
+.PHONY: e2e-test-existing-cluster
 e2e-test-existing-cluster: ## Run e2e tests using the default kubernetes context.
 	hack/e2e/run-e2e-suite.sh
 
 ##@ Build
+.PHONY: build
 build: generate fmt vet build-manager build-plugin ## Build binaries.
 
+.PHONY: build-manager
 build-manager: generate fmt vet ## Build manager binary.
 	go build -o bin/manager -ldflags ${LDFLAGS} ./cmd/manager
 
+.PHONY: build-plugin
 build-plugin: generate fmt vet ## Build plugin binary.
 	go build -o bin/kubectl-cnpg -ldflags ${LDFLAGS} ./cmd/kubectl-cnpg
 
+.PHONY: build-race
 build-race: generate fmt vet build-manager-race build-plugin-race ## Build the binaries adding the -race option.
 
+.PHONY: build-manager-race
 build-manager-race: generate fmt vet ## Build manager binary with -race option.
 	go build -race -o bin/manager -ldflags ${LDFLAGS} ./cmd/manager
 
+.PHONY: build-plugin-race
 build-plugin-race: generate fmt vet ## Build plugin binary.
 	go build -race -o bin/kubectl-cnpg -ldflags ${LDFLAGS} ./cmd/kubectl-cnpg
 
 
+.PHONY: run
 run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config.
 	go run ./cmd/manager
 
+.PHONY: docker-build
 docker-build: go-releaser ## Build the docker image.
 	GOOS=linux GOARCH=${ARCH} GOPATH=$(go env GOPATH) DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
 	  $(GO_RELEASER) build --skip=validate --clean --single-target $(if $(VERSION),,--snapshot); \
@@ -195,6 +219,7 @@ docker-build: go-releaser ## Build the docker image.
 	  --set distroless.tags="$${CONTROLLER_IMG}" \
 	  --push distroless
 
+.PHONY: olm-bundle
 olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM installation
 	set -xeEuo pipefail ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
@@ -213,6 +238,7 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	DOCKER_BUILDKIT=1 docker build --push --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMG} . ;\
 	export BUNDLE_IMG="${BUNDLE_IMG}"
 
+.PHONY: olm-catalog
 olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	set -xeEuo pipefail ;\
 	rm -fr catalog* cloudnative-pg-operator-template.yaml ;\
@@ -241,6 +267,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
        - cnpg-pull-secret" | envsubst > cloudnative-pg-catalog.yaml ;\
 
 ##@ Deployment
+.PHONY: generate-manifest
 generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
@@ -259,43 +286,59 @@ generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default > ${OPERATOR_MANIFEST_PATH} ;\
 	rm -fr $$CONFIG_TMP_DIR
 
+.PHONY: manifests
 manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+.PHONY: generate
 generate: controller-gen ## Generate code.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+.PHONY: olm-scorecard
 olm-scorecard: operator-sdk ## Run the Scorecard test from operator-sdk
 	$(OPERATOR_SDK) scorecard ${BUNDLE_IMG} --wait-time 60s --verbose
 
 ##@ Formatters and Linters
 
+.PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
+	cd tests && go fmt ./...
 
+.PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
+	cd tests && go vet ./...
 
+.PHONY: lint
 lint: ## Run the linter.
 	golangci-lint run
+	cd tests && golangci-lint run
 
+.PHONY: lint-fix
 lint-fix: ## Run the linter with --fix.
 	golangci-lint run --fix
+	cd tests && golangci-lint run --fix
 
+.PHONY: shellcheck
 shellcheck: ## Shellcheck for the hack directory.
 	@{ \
 	set -e ;\
 	find -name '*.sh' -exec shellcheck -x -a -S style {} + ;\
 	}
 
+.PHONY: spellcheck
 spellcheck: ## Runs the spellcheck on the project.
 	docker run --rm -v $(PWD):/tmp:Z jonasbn/github-action-spellcheck:$(SPELLCHECK_VERSION)
 
+.PHONY: woke
 woke: ## Runs the woke checks on project.
 	docker run --rm -v $(PWD):/src:Z -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
 
+.PHONY: validate-gemara
 validate-gemara: validate-threat-model ## Alias for validate-threat-model.
 
+.PHONY: validate-threat-model
 validate-threat-model: ## Validate Gemara threat-model artifacts against the schema.
 	docker run --rm -v $(PWD):/src:Z -w /src cuelang/cue:$(CUE_VERSION) \
 		vet -c -d '#ThreatCatalog' \
@@ -304,21 +347,39 @@ validate-threat-model: ## Validate Gemara threat-model artifacts against the sch
 		vet -c -d '#CapabilityCatalog' \
 		github.com/gemaraproj/gemara@$(GEMARA_VERSION) .github/capability-catalog.yaml
 
+.PHONY: validate-security-insights
+validate-security-insights: ## Validate SECURITY-INSIGHTS.yml against the OSSF Security Insights schema.
+	@version=$$(sed -n 's/^[[:space:]]*schema-version:[[:space:]]*//p' SECURITY-INSIGHTS.yml | head -1); \
+	tmp=$$(mktemp -d); \
+	curl -sSfL \
+		"https://raw.githubusercontent.com/ossf/security-insights/v$${version}/spec/schema.cue" \
+		-o "$$tmp/schema.cue"; \
+	docker run --rm -v $(PWD):/src:Z -v "$$tmp":/schema:Z -w /src cuelang/cue:$(CUE_VERSION) \
+		vet SECURITY-INSIGHTS.yml /schema/schema.cue -d '#SecurityInsights'; \
+	rm -rf "$$tmp"
+
+.PHONY: wordlist-ordered
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
 	mv -f .wordlist-en-custom.txt.new .wordlist-en-custom.txt
 
+.PHONY: go-mod-check
 go-mod-check: ## Check if there's any dirty change after `go mod tidy`
 	go mod tidy ;\
-	git diff --exit-code go.mod go.sum
+	go -C tests mod tidy ;\
+	git diff --exit-code go.mod go.sum tests/go.mod tests/go.sum
 
+.PHONY: run-govulncheck
 run-govulncheck: govulncheck ## Check if there's any known vulnerabilities with the currently installed Go modules
 	$(GOVULNCHECK) ./...
+	cd tests && $(GOVULNCHECK) ./...
 
-checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck validate-threat-model ## Runs all the checks on the project.
+.PHONY: checks
+checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck validate-threat-model validate-security-insights ## Runs all the checks on the project.
 
 ##@ Documentation
 
+.PHONY: licenses
 licenses: go-licenses ## Generate the licenses folder.
 	# The following statement is expected to fail because our license is unrecognised
 	$(GO_LICENSES) \
@@ -327,6 +388,7 @@ licenses: go-licenses ## Generate the licenses folder.
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
 
+.PHONY: apidoc
 apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
 	$(CRDREFDOCS) --source-path api/v1 \
 		--config docs/crd-gen-refs/config.yaml \
@@ -339,46 +401,46 @@ apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
 
 ##@ Cleanup
 
+.PHONY: clean
 clean: ## Clean-up the work tree from build/test artifacts
-	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out
+	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out tests/cover.out
 
+.PHONY: distclean
 distclean: clean ## Clean-up the work tree removing also cached tools binaries
 	! [ -d "$(ENVTEST_ASSETS_DIR)" ] || chmod -R u+w $(ENVTEST_ASSETS_DIR)
 	rm -rf $(LOCALBIN) $(ENVTEST_ASSETS_DIR)
 
 ##@ Tools
 
-## Location to install dependencies to
-$(LOCALBIN):
-	mkdir -p $(LOCALBIN)
-
 ## Tool Binaries
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+controller-gen: ## Download controller-gen locally if necessary.
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION))
 
 KUSTOMIZE = $(LOCALBIN)/kustomize
+.PHONY: kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION))
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+envtest: ## Download envtest-setup locally if necessary.
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
 CRDREFDOCS = $(LOCALBIN)/crd-ref-docs
+.PHONY: crd-ref-docs
 crd-ref-docs: ## Download github.com/elastic/crd-ref-docs locally if necessary.
 	$(call go-install-tool,$(CRDREFDOCS),github.com/elastic/crd-ref-docs@$(CRDREFDOCS_VERSION))
 
 GO_LICENSES = $(LOCALBIN)/go-licenses
+.PHONY: go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
 	$(call go-install-tool,$(GO_LICENSES),github.com/google/go-licenses@latest)
 
 GO_RELEASER = $(LOCALBIN)/goreleaser
+.PHONY: go-releaser
 go-releaser: ## Download go-releaser locally if necessary.
 	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION))
 
@@ -393,7 +455,12 @@ define go-install-tool
 @[ -f $(1) ] || { \
 set -e ;\
 echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
+for i in 1 2 3; do \
+	GOBIN=$(PROJECT_DIR)/bin go install $(2) && exit 0 ;\
+	echo "Retrying download of $(2) ($$i/3)" ;\
+	sleep 5 ;\
+done ;\
+exit 1 ;\
 }
 endef
 

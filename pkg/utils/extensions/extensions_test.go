@@ -597,4 +597,20 @@ var _ = Describe("CollectLibraryPaths and CollectBinPaths", func() {
 		Expect(CollectBinPaths(exts, postgres.UpgradeTargetExtensionsBaseDirectory)).
 			To(ConsistOf("/new-extensions/ext1/bin"))
 	})
+
+	It("skips entries that escape the extension directory instead of returning them", func() {
+		// The webhook already rejects these at admission time; this guards
+		// callers (e.g. the major-upgrade Job) that read the Cluster spec
+		// directly, without going through admission.
+		exts := []apiv1.ExtensionConfiguration{{
+			Name:          "ext1",
+			LdLibraryPath: []string{"lib", "../../etc"},
+			BinPath:       []string{"bin", "../mount/lib"},
+		}}
+
+		Expect(CollectLibraryPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(ConsistOf("/extensions/ext1/lib"))
+		Expect(CollectBinPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(ConsistOf("/extensions/ext1/bin"))
+	})
 })

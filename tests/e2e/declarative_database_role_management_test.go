@@ -318,7 +318,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					updatedValidUntil := metav1.NewTime(time.Date(2050, 6, 15, 12, 0, 0, 0, time.UTC))
 					role.Spec.ValidUntil = &updatedValidUntil
 					role.Spec.Comment = "updated comment"
-					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 				})
 
 				By("verifying updated attributes in PostgreSQL", func() {
@@ -526,7 +526,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					role.Spec.PasswordSecret = &apiv1.LocalObjectReference{
 						Name: secretName,
 					}
-					Expect(env.Client.Update(env.Ctx, role)).To(Succeed())
+					Expect(objects.Update(env.Ctx, env.Client, role)).To(Succeed())
 				})
 
 				By("ensuring the CR has been reconciled", func() {
@@ -558,7 +558,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 
 					newPassword = fmt.Sprintf("newpassword-%d", funk.RandomInt(0, 9999))
 					passwordSecret.Data["password"] = []byte(newPassword)
-					Expect(env.Client.Update(env.Ctx, passwordSecret)).To(Succeed())
+					Expect(objects.Update(env.Ctx, env.Client, passwordSecret)).To(Succeed())
 				})
 
 				By("checking if we can connect to PostgreSQL using the new password", func() {
@@ -789,7 +789,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
 					role.Spec.ClientCertificate.Enabled = ptr.To(false)
-					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					Eventually(func(g Gomega) {
 						var secret corev1.Secret
@@ -809,7 +809,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
 					role.Spec.ClientCertificate.Enabled = ptr.To(true)
-					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					Eventually(func(g Gomega) {
 						var secret corev1.Secret

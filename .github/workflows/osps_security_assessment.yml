@@ -9,7 +9,7 @@ permissions: {}
 
 jobs:
   osps-assessment:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     permissions:
       contents: read
@@ -17,15 +17,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Open Source Project Security Baseline Scanner
-        uses: revanite-io/osps-baseline-action@ace75cc1fb748be898275f16f59f78363405bc0a # v1.3.3
+        uses: revanite-io/osps-baseline-action@6ba0e05ce6566af82fd77bb9356ae8387027f32e # v1.5.0
         with:
           owner: ${{ github.repository_owner }}
           repo: ${{ github.event.repository.name }}
           token: ${{ secrets.PVTR_OSPS_TOKEN }}
-          catalog: "osps-baseline"
+          catalog: "osps-baseline-2026-02"
           upload-sarif: "true"
 
       - name: Upload Assessment Results

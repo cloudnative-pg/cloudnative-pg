@@ -26,6 +26,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -72,7 +73,7 @@ var _ = Describe("Pod patch", Label(tests.LabelSmoke, tests.LabelBasic), func() 
 					]
 				`,
 			})
-			err = env.Client.Patch(env.Ctx, patchedCluster, client.MergeFrom(cluster))
+			err = objects.Patch(env.Ctx, env.Client, patchedCluster, client.MergeFrom(cluster))
 			Expect(err).ToNot(HaveOccurred())
 		})
 

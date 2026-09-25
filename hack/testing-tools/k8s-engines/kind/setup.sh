@@ -69,6 +69,12 @@ kubeadmConfigPatchesJSON6902:
         value: docker
 nodes:
 - role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+        extraArgs:
+          enable-admission-plugins: OwnerReferencesPermissionEnforcement
 EOF
 
   if [ "${ENABLE_APISERVER_AUDIT}" = "true" ]; then
@@ -77,7 +83,6 @@ EOF
     mkdir -p "${LOG_DIR}/apiserver"
     touch "${LOG_DIR}/apiserver/kube-apiserver-audit.log"
     cat >>"${config_file}" <<-EOF
-  kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
     apiServer:
@@ -187,6 +192,8 @@ main() {
   echo -e "${bright}Running Kind setup: Creating cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 
   create_cluster_kind "${K8S_VERSION}" "${CLUSTER_NAME}"
+  wait_for_all_nodes
+  label_failure_domain_topology
 
   # Support for docker:dind service
   if [ "${DOCKER_HOST:-}" == "tcp://docker:2376" ]; then

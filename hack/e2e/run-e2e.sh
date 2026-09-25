@@ -27,6 +27,7 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
+source "${ROOT_DIR}/hack/e2e/generate-e2e-config.sh"
 CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-image)}
 CONTROLLER_IMG_DIGEST=${CONTROLLER_IMG_DIGEST:-""}
 CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
@@ -35,6 +36,9 @@ export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pk
 export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 OPERATOR="${OPERATOR:-local}"
 CNPG_DEPLOYMENT_METHOD="${CNPG_DEPLOYMENT_METHOD:-manifest}"
+# plugin-barman-cloud version to install for the plugin-based backup tests:
+# "release" (default), "main", or a pinned version such as "v0.12.0".
+export BARMAN_PLUGIN_VERSION="${BARMAN_PLUGIN_VERSION:-release}"
 export OPERATOR_MANIFEST_PATH="${OPERATOR_MANIFEST_PATH:-${ROOT_DIR}/dist/operator-manifest.yaml}"
 
 # Override pgbouncer image repository if PGBOUNCER_IMG_REPOSITORY is set
@@ -43,7 +47,8 @@ if [ -n "${PGBOUNCER_IMG_REPOSITORY:-}" ]; then
   PGBOUNCER_IMG="${PGBOUNCER_IMG_REPOSITORY}:${PGBOUNCER_VERSION}"
 fi
 
-# variable need export otherwise be invisible in e2e test case
+# exported so that run-e2e-suite.sh sees them when it generates the e2e
+# configuration file
 export DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
 export DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
 export DOCKER_PASSWORD=${DOCKER_PASSWORD:-${REGISTRY_PASSWORD:-}}
@@ -82,17 +87,12 @@ if notinpath "${go_bin}"; then
 fi
 
 # renovate: datasource=github-releases depName=onsi/ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.0
 
 # Build kubectl-cnpg and export its path
 make build-plugin
 export PATH=${ROOT_DIR}/bin/:${PATH}
 
-LABEL_FILTERS=""
-if [ "${FEATURE_TYPE-}" ]; then
-  LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
-fi
-echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 RC=0
 RC_GINKGO1=0
 if [[ "${CNPG_DEPLOYMENT_METHOD}" == "helm" ]]; then
@@ -132,26 +132,30 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
-  unset TEST_SKIP_UPGRADE
-  ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
+  generate_e2e_config false
+  cd "${ROOT_DIR}/tests"
+  ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s \
    --github-output --force-newlines \
-   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
-   --json-report  "upgrade_report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO1=$?
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" \
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_plugin_barman_cloud_test.go" \
+   --output-dir "${ROOT_DIR}/tests/e2e/out" \
+   --json-report  "upgrade_report.json" -v ./e2e/... || RC_GINKGO1=$?
 
   # Report if there are any tests that failed
   jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/upgrade_report.json" || RC=$?
 fi
 
 if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
-  # Getting the operator images need a pull secret
-  kubectl delete namespace cnpg-system || :
-  kubectl create namespace cnpg-system
-  ensure_image_pull_secret
-
   K8S_CLI=kubectl
   bright=${bright:-}
   reset=${reset:-}
   source "${ROOT_DIR}/hack/testing-tools/common/20-utils-k8s.sh"
+
+  # Getting the operator images needs a pull secret
+  reset_operator_namespace
+  kubectl create namespace cnpg-system
+  ensure_image_pull_secret
+
   if [[ "${OPERATOR}" == "local" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" == "manifest" ]]; then
     "${ROOT_DIR}/hack/setup-cluster.sh" generate-manifest
   fi
@@ -160,6 +164,9 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   else
     deploy_operator_from_source
   fi
+
+  # Install plugin-barman-cloud for the plugin-based backup tests.
+  install_barman_cloud_plugin
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

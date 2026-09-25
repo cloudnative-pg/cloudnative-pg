@@ -20,7 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package utils
 
 import (
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,12 +35,12 @@ var _ = Describe("Parsing versions", func() {
 	It("properly works when version is well-formed and >= 10", func() {
 		v, err := parseVersionNum("120034")
 		Expect(err).ToNot(HaveOccurred())
-		Expect(v).To(Equal(&semver.Version{Major: 12, Patch: 34}))
+		Expect(v).To(Equal(semver.New(12, 0, 34, "", "")))
 	})
 
 	It("properly works when version is well-formed and < 10", func() {
 		v, err := parseVersionNum("090807")
 		Expect(err).ToNot(HaveOccurred())
-		Expect(v).To(Equal(&semver.Version{Major: 9, Minor: 8, Patch: 7}))
+		Expect(v).To(Equal(semver.New(9, 8, 7, "", "")))
 	})
 })

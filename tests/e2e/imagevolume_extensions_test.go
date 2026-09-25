@@ -21,12 +21,11 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +41,7 @@ import (
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -79,11 +79,11 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 		// Require K8S 1.33 or greater
 		versionInfo, err := env.Interface.Discovery().ServerVersion()
 		Expect(err).NotTo(HaveOccurred())
-		currentVersion, err := semver.Parse(strings.TrimPrefix(versionInfo.String(), "v"))
+		currentVersion, err := semver.NewVersion(strings.TrimPrefix(versionInfo.String(), "v"))
 		Expect(err).NotTo(HaveOccurred())
-		k8s133, err := semver.Parse("1.33.0")
+		k8s133, err := semver.NewVersion("1.33.0")
 		Expect(err).NotTo(HaveOccurred())
-		if currentVersion.LT(k8s133) {
+		if currentVersion.LessThan(k8s133) {
 			Skip("This test runs only on Kubernetes 1.33 or greater")
 		}
 	})
@@ -290,7 +290,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 	})
 
 	It("via ImageCatalog", func() {
-		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		storageClass := env.DefaultStorageClass
 		clusterName = "postgresql-with-extensions"
 		catalogName := "catalog-with-extensions"
 
@@ -372,7 +372,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			err := env.Client.Create(env.Ctx, catalog)
 			Expect(err).ToNot(HaveOccurred())
 			clusterutils.AddTopologySpreadConstraint(cluster)
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			resources.CreateResourceFromFile(env, namespace, databaseManifest)
@@ -404,7 +404,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 					Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
 				},
 			})
-			err = env.Client.Update(env.Ctx, catalog)
+			err = objects.Update(env.Ctx, env.Client, catalog)
 			Expect(err).ToNot(HaveOccurred())
 
 			extensionConfig := apiv1.ExtensionConfiguration{Name: "pgvector"}

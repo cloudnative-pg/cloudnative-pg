@@ -1,0 +1,29 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-plugin-backup
+spec:
+  instances: 2
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Use plugin-barman-cloud (instead of the deprecated in-core barmanObjectStore)
+  # as the WAL archiver. The referenced ObjectStore is created by the test.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: cluster-plugin-backup

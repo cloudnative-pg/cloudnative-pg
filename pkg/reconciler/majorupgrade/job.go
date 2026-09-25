@@ -78,7 +78,11 @@ func createMajorUpgradeJobDefinition(
 		Image:           cluster.Status.PGDataImageInfo.Image,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Command:         prepareCommand,
-		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, oldExtensions),
+		VolumeMounts: specs.CreatePostgresVolumeMounts(specs.VolumeMountsConfig{
+			Cluster:            *cluster,
+			Extensions:         oldExtensions,
+			NeedsKubeAPIAccess: true,
+		}),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: specs.GetSecurityContext(cluster),
 	}

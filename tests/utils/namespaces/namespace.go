@@ -30,10 +30,12 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -41,12 +43,17 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
+	testsexec "github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -56,13 +63,7 @@ import (
 const SternLogDirectory = "cluster_logs/"
 
 func getPreserveNamespaces() []string {
-	var preserveNamespacesList []string
-	_, ok := os.LookupEnv("PRESERVE_NAMESPACES")
-	if ok {
-		preserveNamespacesList = strings.Fields(os.Getenv("PRESERVE_NAMESPACES"))
-	}
-
-	return preserveNamespacesList
+	return config.Current().PreserveNamespaces
 }
 
 // CleanupClusterLogs cleans up the cluster logs of a given namespace
@@ -82,11 +83,17 @@ func CleanupClusterLogs(namespace string, testFailed bool) error {
 func cleanupNamespace(
 	ctx context.Context,
 	crudClient client.Client,
+	kubeInterface kubernetes.Interface,
+	restConfig *rest.Config,
 	namespace, testName string,
-	testFailed bool,
+	testFailed, testStuck bool,
 ) error {
 	if testFailed {
 		DumpNamespaceObjects(ctx, crudClient, namespace, "out/"+testName+".log")
+	}
+
+	if testStuck {
+		dumpGoroutineStacks(ctx, crudClient, kubeInterface, restConfig, namespace, "out/"+testName+"goroutines.log")
 	}
 
 	if len(namespace) == 0 {
@@ -100,6 +107,101 @@ func cleanupNamespace(
 	return deleteNamespace(ctx, crudClient, namespace)
 }
 
+// dumpGoroutineStacks sends SIGQUIT to every container, regular and init
+// (e.g. "bootstrap-instance", which is where the CNPG-9xxx-style bootstrap
+// hangs happen), of every CNPG-managed pod (instances and pgbouncer poolers)
+// in the namespace, capturing each process's goroutine dump into filename.
+// Go's default SIGQUIT handling prints every goroutine's stack to stderr and
+// terminates the process, so this is only meant to run right before the
+// namespace and its pods are torn down anyway, when a spec got stuck rather
+// than cleanly failing an assertion. Best-effort and bounded: unreachable or
+// already-gone pods/containers are skipped, and the whole step is capped well
+// under Ginkgo's cleanup grace period so it can never eat the dump it's
+// meant to produce.
+func dumpGoroutineStacks(
+	ctx context.Context,
+	crudClient client.Client,
+	kubeInterface kubernetes.Interface,
+	restConfig *rest.Config,
+	namespace, filename string,
+) {
+	dumpCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	podList, err := pods.List(dumpCtx, crudClient, namespace)
+	if err != nil {
+		fmt.Printf("could not list pods in %v: %v\n", namespace, err)
+		return
+	}
+
+	managedPods := make([]corev1.Pod, 0, len(podList.Items))
+	for _, pod := range podList.Items {
+		if isCnpgManagedPod(pod) {
+			managedPods = append(managedPods, pod)
+		}
+	}
+	if len(managedPods) == 0 {
+		return
+	}
+
+	f, err := os.Create(filepath.Clean(filename))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer func() {
+		_ = f.Sync()
+		_ = f.Close()
+	}()
+
+	type dumpResult struct {
+		pod, container, stdout, stderr string
+		err                            error
+	}
+	resultsCh := make(chan dumpResult)
+	var wg sync.WaitGroup
+
+	for _, pod := range managedPods {
+		for _, containerName := range pkgutils.PodSpecContainerNames(&pod.Spec) {
+			wg.Add(1)
+			go func(pod corev1.Pod, containerName string) {
+				defer wg.Done()
+				execTimeout := 3 * time.Second
+				stdout, stderr, err := testsexec.Command(
+					dumpCtx, kubeInterface, restConfig, pod, containerName, &execTimeout,
+					"sh", "-c", "kill -QUIT 1",
+				)
+				resultsCh <- dumpResult{
+					pod: pod.Name, container: containerName, stdout: stdout, stderr: stderr, err: err,
+				}
+			}(pod, containerName)
+		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultsCh)
+	}()
+
+	for result := range resultsCh {
+		_, _ = fmt.Fprintf(f, "Goroutine dump for %v/%v (container %v)\n", namespace, result.pod, result.container)
+		if result.err != nil {
+			_, _ = fmt.Fprintf(f, "could not signal container: %v\n", result.err)
+		}
+		_, _ = fmt.Fprintln(f, result.stdout)
+		_, _ = fmt.Fprintln(f, result.stderr)
+	}
+}
+
+// isCnpgManagedPod reports whether the pod is a CNPG-created instance or
+// pgbouncer pooler pod, as opposed to unrelated pods sharing the test
+// namespace (e.g. an object store or client fixture).
+func isCnpgManagedPod(pod corev1.Pod) bool {
+	_, isInstance := pod.Labels[pkgutils.ClusterLabelName]
+	_, isPooler := pod.Labels[pkgutils.PgbouncerNameLabel]
+	return isInstance || isPooler
+}
+
 // CreateTestNamespace creates a namespace creates a namespace.
 // Prefer CreateUniqueTestNamespace instead, unless you need a
 // specific namespace name. If so, make sure there is no collision
@@ -108,6 +210,8 @@ func cleanupNamespace(
 func CreateTestNamespace(
 	ctx context.Context,
 	crudClient client.Client,
+	kubeInterface kubernetes.Interface,
+	restConfig *rest.Config,
 	name string,
 	opts ...client.CreateOption,
 ) error {
@@ -117,12 +221,23 @@ func CreateTestNamespace(
 	}
 
 	ginkgo.DeferCleanup(func() error {
+		report := ginkgo.CurrentSpecReport()
+		// A stuck test surfaces as one of these SpecStates depending on
+		// whether Ginkgo attributes it to the spec's own timeout or to the
+		// suite-level one; catch all of them rather than betting on a single
+		// reading of Ginkgo's timeout semantics.
+		testStuck := report.State.Is(
+			types.SpecStateTimedout | types.SpecStateInterrupted | types.SpecStateAborted,
+		)
 		return cleanupNamespace(
 			ctx,
 			crudClient,
+			kubeInterface,
+			restConfig,
 			name,
-			ginkgo.CurrentSpecReport().LeafNodeText,
-			ginkgo.CurrentSpecReport().Failed(),
+			report.LeafNodeText,
+			report.Failed(),
+			testStuck,
 		)
 	})
 
@@ -315,7 +430,7 @@ func DumpNamespaceObjects(
 	suffixes := []string{"-r", "-rw", "-any"}
 	for _, cluster := range clusterList.Items {
 		for _, suffix := range suffixes {
-			namespacedName := types.NamespacedName{
+			namespacedName := k8stypes.NamespacedName{
 				Namespace: namespace,
 				Name:      cluster.Name + suffix,
 			}

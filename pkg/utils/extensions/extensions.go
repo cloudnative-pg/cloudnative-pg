@@ -152,6 +152,15 @@ func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir s
 
 	for _, extension := range extensionList {
 		for _, libraryPath := range extension.LdLibraryPath {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", libraryPath)) {
+				log.Warning("Skipping extension LdLibraryPath entry that escapes the extension directory",
+					"extension", extension.Name, "path", libraryPath)
+				continue
+			}
+
 			result = append(
 				result,
 				filepath.Join(baseDir, extension.Name, libraryPath),
@@ -229,6 +238,15 @@ func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration, baseDir strin
 
 	for _, extension := range extensionList {
 		for _, binPath := range extension.BinPath {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", binPath)) {
+				log.Warning("Skipping extension BinPath entry that escapes the extension directory",
+					"extension", extension.Name, "path", binPath)
+				continue
+			}
+
 			result = append(
 				result,
 				filepath.Join(baseDir, extension.Name, binPath),

@@ -54,7 +54,7 @@ func collectPGStatWAL(e *Exporter) error {
 	walMetrics.WalFpi.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalFpi))
 	walMetrics.WalBytes.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalBytes))
 	walMetrics.WALBuffersFull.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WALBuffersFull))
-	if version, _ := e.instance.GetPgVersion(); version.Major < 18 {
+	if version, _ := e.instance.GetPgVersion(); version.Major() < 18 {
 		walMetrics.WalWrite.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWrite))
 		walMetrics.WalSync.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSync))
 		walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(walStat.WalWriteTime)

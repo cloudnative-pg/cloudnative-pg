@@ -16,10 +16,11 @@ jobs:
   label-source-pr:
     name: Add labels to PR
     if: |
+        github.event.action != 'closed' &&
         github.event.pull_request.merged == false &&
         !contains(github.event.pull_request.labels.*.name, 'backport-requested') &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       pull-requests: write
     steps:
@@ -32,9 +33,9 @@ jobs:
           number:  ${{ github.event.pull_request.number }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.25
             release-1.28
             release-1.29
+            release-1.30
       -
         name: Create comment
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
@@ -56,9 +57,9 @@ jobs:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.25
             release-1.28
             release-1.29
+            release-1.30
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
@@ -70,11 +71,15 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'backport-requested :arrow_backward:')
         ) &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.28, release-1.29]
+        branch: [release-1.28, release-1.29, release-1.30]
+    concurrency:
+      group: backport-${{ matrix.branch }}
+      cancel-in-progress: false
+      queue: max
     env:
       PR: ${{ github.event.pull_request.number }}
       BRANCH: ${{ matrix.branch }}
@@ -84,7 +89,7 @@ jobs:
       -
         name: Checkout code
         if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           ref: ${{ env.BRANCH }}
@@ -140,7 +145,7 @@ jobs:
         name: Install Go
         if: |
           contains( github.event.pull_request.labels.*.name, env.BRANCH ) && steps.check_commits.outputs.commit != ''
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ steps.check_commits.outputs.go_version }}
           check-latest: true
@@ -149,7 +154,7 @@ jobs:
         name: Cache Go modules
         if: |
           contains( github.event.pull_request.labels.*.name, env.BRANCH ) && steps.check_commits.outputs.commit != ''
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/go/pkg/mod
@@ -226,7 +231,7 @@ jobs:
     env:
       PR: ${{ github.event.pull_request.number }}
       COMMIT: ${{ needs.back-porting-pr.outputs.commit }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       issues: write
     steps:

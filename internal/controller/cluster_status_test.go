@@ -30,11 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -421,6 +423,35 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(state2.IP).To(Equal("192.168.1.2"))
 	})
 
+	// a condition corrected in place has to stay visible to the comparison
+	// deciding whether the status is written
+	It("persists a condition whose text is the only status change", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{}
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionConsistentSystemID),
+			Status:  metav1.ConditionFalse,
+			Reason:  "NotFound",
+			Message: "wording written by another version of the operator",
+		})
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+
+		// the reported state is the only other field this update writes: an
+		// empty one keeps the condition as the single change
+		cluster.Status.InstancesReportedState = map[apiv1.PodName]apiv1.InstanceReportedState{}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		var persisted apiv1.Cluster
+		Expect(env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		}, &persisted)).To(Succeed())
+		condition := meta.FindStatusCondition(persisted.Status.Conditions, string(apiv1.ConditionConsistentSystemID))
+		Expect(condition).ToNot(BeNil())
+		Expect(condition.Message).To(Equal("No instances are present in the cluster to report a system ID."))
+	})
+
 	Context("Pod termination reason detection", func() {
 		It("should detect when a pod has no PostgreSQL container", func() {
 			pod := &corev1.Pod{
@@ -458,33 +489,6 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 
 			result := hasPostgresContainerTerminationReason(pod, func(state *corev1.ContainerState) bool {
 				return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
-			})
-			Expect(result).To(BeTrue())
-		})
-
-		It("should detect termination with specific exit code in last termination state", func() {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-				Status: corev1.PodStatus{
-					ContainerStatuses: []corev1.ContainerStatus{
-						{
-							Name: "postgres",
-							State: corev1.ContainerState{
-								Running: &corev1.ContainerStateRunning{},
-							},
-							Ready: false,
-							LastTerminationState: corev1.ContainerState{
-								Terminated: &corev1.ContainerStateTerminated{
-									ExitCode: apiv1.MissingWALArchivePlugin,
-								},
-							},
-						},
-					},
-				},
-			}
-
-			result := hasPostgresContainerTerminationReason(pod, func(state *corev1.ContainerState) bool {
-				return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALArchivePlugin
 			})
 			Expect(result).To(BeTrue())
 		})
@@ -577,44 +581,326 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 
 			Expect(isWALSpaceAvailableOnPod(pod)).To(BeFalse())
 		})
+	})
 
-		It("isTerminatedBecauseOfMissingWALArchivePlugin should return true when terminated due to missing plugin", func() {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-				Status: corev1.PodStatus{
-					ContainerStatuses: []corev1.ContainerStatus{
-						{
-							Name: "postgres",
-							State: corev1.ContainerState{
-								Terminated: &corev1.ContainerStateTerminated{
-									ExitCode: apiv1.MissingWALArchivePlugin,
-								},
-							},
-						},
-					},
-				},
+	Describe("getPodsTopology", func() {
+		const zoneLabel = "topology.kubernetes.io/zone"
+
+		makePod := func(name, nodeName string, podLabels map[string]string) corev1.Pod {
+			return corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Labels: podLabels},
+				Spec:       corev1.PodSpec{NodeName: nodeName},
 			}
+		}
 
-			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeTrue())
+		makeNode := func(name string, nodeLabels map[string]string) corev1.Node {
+			return corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Labels: nodeLabels},
+			}
+		}
+
+		labelNames := []string{zoneLabel}
+
+		It("reads pod failure domain keys from pod labels without consulting nodes", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
+				makePod("pod-2", "node-2", map[string]string{zoneLabel: "az2"}),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, labelNames, nil)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
+			Expect(result.Instances["pod-2"][zoneLabel]).To(Equal("az2"))
+			Expect(result.NodesUsed).To(BeEquivalentTo(2))
 		})
 
-		It("isTerminatedBecauseOfMissingWALArchivePlugin should return false when not terminated", func() {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-				Status: corev1.PodStatus{
-					ContainerStatuses: []corev1.ContainerStatus{
-						{
-							Name: "postgres",
-							State: corev1.ContainerState{
-								Running: &corev1.ContainerStateRunning{},
-							},
-							Ready: true,
-						},
-					},
-				},
+		It("fails the extraction when a pod failure domain label is missing, without consulting the node", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az1"}),
+				makePod("pod-2", "node-2", nil),
 			}
+			// the node carries the label: it must not be used as a fallback
+			nodes := map[string]corev1.Node{
+				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
+			}
+			result := getPodsTopology(context.Background(), pods, nodes, labelNames, nil)
 
-			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeFalse())
+			Expect(result.SuccessfullyExtracted).To(BeFalse())
 		})
+
+		It("keeps a pod label explicitly set to an empty value", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: ""}),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, labelNames, nil)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.Instances["pod-1"]).To(HaveKeyWithValue(zoneLabel, ""))
+		})
+
+		It("reads node failure domain keys from node labels", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", nil),
+				makePod("pod-2", "node-2", nil),
+			}
+			nodes := map[string]corev1.Node{
+				"node-1": makeNode("node-1", map[string]string{zoneLabel: "az1"}),
+				"node-2": makeNode("node-2", map[string]string{zoneLabel: "az2"}),
+			}
+			result := getPodsTopology(context.Background(), pods, nodes, nil, labelNames)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
+			Expect(result.Instances["pod-2"][zoneLabel]).To(Equal("az2"))
+		})
+
+		It("ignores pod labels when reading node failure domain keys", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", map[string]string{zoneLabel: "az9"}),
+			}
+			nodes := map[string]corev1.Node{
+				"node-1": makeNode("node-1", map[string]string{zoneLabel: "az1"}),
+			}
+			result := getPodsTopology(context.Background(), pods, nodes, nil, labelNames)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.Instances["pod-1"][zoneLabel]).To(Equal("az1"))
+		})
+
+		It("returns empty topology when a node failure domain key is configured and the node is not found", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", nil),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, nil, labelNames)
+
+			Expect(result.SuccessfullyExtracted).To(BeFalse())
+		})
+
+		It("returns successfully extracted topology when no labels are configured", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", nil),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, nil, nil)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.NodesUsed).To(BeEquivalentTo(1))
+		})
+
+		It("does not count unscheduled pods as used nodes", func() {
+			pods := []corev1.Pod{
+				makePod("pod-1", "node-1", nil),
+				makePod("pod-2", "", nil),
+			}
+			result := getPodsTopology(context.Background(), pods, nil, nil, nil)
+
+			Expect(result.SuccessfullyExtracted).To(BeTrue())
+			Expect(result.NodesUsed).To(BeEquivalentTo(1))
+		})
+	})
+
+	Describe("updateSyncReplicationTopologyCondition", func() {
+		const zoneLabel = "topology.kubernetes.io/zone"
+
+		makeCluster := func(
+			failureDomainKeys []string,
+			primary string,
+			instances map[apiv1.PodName]apiv1.PodTopologyLabels,
+			extracted bool,
+		) *apiv1.Cluster {
+			cluster := &apiv1.Cluster{}
+			if len(failureDomainKeys) > 0 {
+				cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+					Method:                apiv1.SynchronousReplicaConfigurationMethodAny,
+					Number:                1,
+					NodeFailureDomainKeys: failureDomainKeys,
+				}
+			}
+			cluster.Status.CurrentPrimary = primary
+			names := make([]string, 0, len(instances))
+			for name := range instances {
+				names = append(names, string(name))
+			}
+			cluster.Status.InstancesStatus = map[apiv1.PodStatus][]string{apiv1.PodHealthy: names}
+			cluster.Status.Topology = apiv1.Topology{
+				SuccessfullyExtracted: extracted,
+				Instances:             instances,
+			}
+			return cluster
+		}
+
+		getCondition := func(cluster *apiv1.Cluster) *metav1.Condition {
+			for i := range cluster.Status.Conditions {
+				if cluster.Status.Conditions[i].Type == string(apiv1.ConditionSyncReplicationTopologySatisfied) {
+					return &cluster.Status.Conditions[i]
+				}
+			}
+			return nil
+		}
+
+		It("does not set the condition when no failure domain keys are configured", func() {
+			cluster := makeCluster(nil, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az2"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			Expect(getCondition(cluster)).To(BeNil())
+		})
+
+		It("removes a stale condition when the failure domain keys are removed", func() {
+			cluster := makeCluster(nil, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+			}, true)
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:   string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status: metav1.ConditionFalse,
+				Reason: string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+			})
+			updateSyncReplicationTopologyCondition(cluster)
+			Expect(getCondition(cluster)).To(BeNil())
+		})
+
+		It("sets condition to False with TopologyNotExtracted when extraction failed", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", nil, false)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonTopologyNotExtracted)))
+		})
+
+		It("sets condition to False with TopologyNotExtracted when primary has no topology entry", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-2": {zoneLabel: "az2"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonTopologyNotExtracted)))
+		})
+
+		It("sets condition to True when a replica is in a different failure domain", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az2"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonTopologySatisfied)))
+		})
+
+		It("sets condition to False when all replicas are in the same failure domain as the primary", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az1"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
+		})
+
+		It("sets condition to False when the only cross-domain replica is not electable", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az1"},
+				"pod-3": {zoneLabel: "az2"},
+			}, true)
+			// with preferred data durability only healthy replicas are
+			// electable: the cross-domain pod-3 must not satisfy the condition
+			cluster.Spec.PostgresConfiguration.Synchronous.DataDurability = apiv1.DataDurabilityLevelPreferred
+			cluster.Status.InstancesStatus = map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"pod-1", "pod-2"},
+				apiv1.PodFailed:  {"pod-3"},
+			}
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
+		})
+
+		It("sets condition to False when the cross-domain replicas are fewer than the requested number", func() {
+			cluster := makeCluster([]string{zoneLabel}, "pod-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"pod-1": {zoneLabel: "az1"},
+				"pod-2": {zoneLabel: "az1"},
+				"pod-3": {zoneLabel: "az2"},
+			}, true)
+			// with required data durability the constraint is applied only when
+			// the cross-domain replicas cover the whole requested number
+			cluster.Spec.PostgresConfiguration.Synchronous.Number = 2
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
+		})
+
+		It("sets condition to False when the cluster has no replicas", func() {
+			cluster := makeCluster([]string{zoneLabel}, "primary-1", map[apiv1.PodName]apiv1.PodTopologyLabels{
+				"primary-1": {zoneLabel: "az1"},
+			}, true)
+			updateSyncReplicationTopologyCondition(cluster)
+			cond := getCondition(cluster)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonInsufficientCrossDomainReplicas)))
+		})
+	})
+})
+
+var _ = Describe("failedBootstrapPodNames", func() {
+	newBootstrapPod := func(name string, restartCount int32, terminatedExitCode *int32) corev1.Pod {
+		containerStatus := corev1.ContainerStatus{
+			Name:         specs.BootstrapWorkContainerName,
+			RestartCount: restartCount,
+		}
+		if terminatedExitCode != nil {
+			containerStatus.State = corev1.ContainerState{
+				Terminated: &corev1.ContainerStateTerminated{ExitCode: *terminatedExitCode},
+			}
+		}
+		return corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status: corev1.PodStatus{
+				InitContainerStatuses: []corev1.ContainerStatus{containerStatus},
+			},
+		}
+	}
+
+	It("flags a bootstrap that has failed at least once", func() {
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{
+				newBootstrapPod("cluster-1", 1, nil),
+			}},
+		}
+		Expect(resources.failedBootstrapPodNames()).To(ConsistOf("cluster-1"))
+	})
+
+	It("does not flag a bootstrap that has not failed yet", func() {
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{
+				newBootstrapPod("cluster-1", 0, nil),
+			}},
+		}
+		Expect(resources.failedBootstrapPodNames()).To(BeEmpty())
+	})
+
+	It("does not flag a bootstrap that failed once but has since succeeded on a later retry", func() {
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{
+				newBootstrapPod("cluster-1", 1, ptr.To(int32(0))),
+			}},
+		}
+		Expect(resources.failedBootstrapPodNames()).To(BeEmpty())
+	})
+
+	It("does not flag a Pod with no bootstrap init container at all", func() {
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "cluster-2"}}
+		resources := &managedResources{instances: corev1.PodList{Items: []corev1.Pod{pod}}}
+		Expect(resources.failedBootstrapPodNames()).To(BeEmpty())
 	})
 })

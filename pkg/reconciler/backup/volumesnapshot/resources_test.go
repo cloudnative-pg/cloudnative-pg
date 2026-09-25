@@ -64,10 +64,9 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		Expect(err.InternalError).To(BeEquivalentTo(*volumeSnapshot.Status.Error))
 		Expect(err.Name).To(BeEquivalentTo("snapshot"))
 		Expect(err.Namespace).To(BeEquivalentTo("default"))
-		Expect(err.isRetryable()).To(BeFalse())
 	})
 
-	It("should detect retryable errors", func() {
+	It("should capture the message on a snapshot error", func() {
 		volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "snapshot",
@@ -84,7 +83,6 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		info := parseVolumeSnapshotInfo(volumeSnapshot)
 
 		Expect(info.error).To(HaveOccurred())
-		Expect(info.error.isRetryable()).To(BeTrue())
 		Expect(info.ready).To(BeFalse())
 		Expect(info.provisioned).To(BeFalse())
 

@@ -1,0 +1,45 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  instances: 3
+  imageName: "${POSTGRES_IMG}"
+
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  postgresql:
+    parameters:
+      log_checkpoints: 'on'
+      log_lock_waits: 'on'
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+      wal_receiver_timeout: '2s'
+
+  bootstrap:
+    recovery:
+      source: cluster1
+      recoveryTarget:
+        targetTLI: "1"
+
+  externalClusters:
+    - name: cluster1
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: ${RECOVERY_OBJECT_STORE_NAME}
+          serverName: ${RECOVERY_SERVER_NAME}
+
+  superuserSecret:
+    name: cluster-superuser

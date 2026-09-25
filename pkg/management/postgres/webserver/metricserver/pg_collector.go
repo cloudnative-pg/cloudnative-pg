@@ -297,12 +297,12 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 		e.queries.Describe(ch)
 	}
 
-	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
+	if version, _ := e.instance.GetPgVersion(); version.Major() >= 14 {
 		e.Metrics.PgStatWalMetrics.WalRecords.Describe(ch)
 		e.Metrics.PgStatWalMetrics.WalFpi.Describe(ch)
 		e.Metrics.PgStatWalMetrics.WalBytes.Describe(ch)
 		e.Metrics.PgStatWalMetrics.WALBuffersFull.Describe(ch)
-		if version.Major < 18 {
+		if version.Major() < 18 {
 			e.Metrics.PgStatWalMetrics.WalWrite.Describe(ch)
 			e.Metrics.PgStatWalMetrics.WalSync.Describe(ch)
 			e.Metrics.PgStatWalMetrics.WalWriteTime.Describe(ch)
@@ -376,12 +376,12 @@ func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
 	e.Metrics.NodesUsed.Collect(ch)
 
-	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
+	if version, _ := e.instance.GetPgVersion(); version.Major() >= 14 {
 		e.Metrics.PgStatWalMetrics.WalRecords.Collect(ch)
 		e.Metrics.PgStatWalMetrics.WalFpi.Collect(ch)
 		e.Metrics.PgStatWalMetrics.WalBytes.Collect(ch)
 		e.Metrics.PgStatWalMetrics.WALBuffersFull.Collect(ch)
-		if version.Major < 18 {
+		if version.Major() < 18 {
 			e.Metrics.PgStatWalMetrics.WalWrite.Collect(ch)
 			e.Metrics.PgStatWalMetrics.WalSync.Collect(ch)
 			e.Metrics.PgStatWalMetrics.WalWriteTime.Collect(ch)
@@ -477,7 +477,7 @@ func (e *Exporter) updateInstanceMetrics() {
 		e.Metrics.PgVersion.Reset()
 	}
 
-	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
+	if version, _ := e.instance.GetPgVersion(); version.Major() >= 14 {
 		if err := collectPGStatWAL(e); err != nil {
 			log.Error(err, "while collecting pg_stat_wal")
 			e.Metrics.Error.Set(1)
@@ -591,7 +591,7 @@ func collectPGVersion(e *Exporter) error {
 	}
 
 	// we use patch instead of minor because postgres doesn't use semantic versioning
-	majorMinor := fmt.Sprintf("%d.%d", semanticVersion.Major, semanticVersion.Patch)
+	majorMinor := fmt.Sprintf("%d.%d", semanticVersion.Major(), semanticVersion.Patch())
 	version, err := strconv.ParseFloat(majorMinor, 64)
 	if err != nil {
 		return err

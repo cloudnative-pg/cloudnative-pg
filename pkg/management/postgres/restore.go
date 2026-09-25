@@ -41,13 +41,12 @@ import (
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
 	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
-	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
-	"github.com/kballard/go-shellquote"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -56,6 +55,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
@@ -130,6 +130,13 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return nil
 	}
 
+	// The WAL restore below may reach a TLS-protected object store before the
+	// instance manager's certificate reconciler ever runs in this Pod, so the
+	// recovery-source CA has to be written to disk here.
+	if err := info.writeRecoveryBarmanEndpointCA(ctx, cli, cluster); err != nil {
+		return err
+	}
+
 	contextLogger.Info("Recovering from volume snapshot",
 		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
 
@@ -148,33 +155,18 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	}
 
 	var envs []string
-	// Operator-controlled command: LogPath and LogFileName are operator
-	// constants, so no shell-quoting layer is needed here. The config-file
-	// literal escaping is still applied for consistency with the WAL-restore
-	// path in getRestoreWalConfig.
-	restoreCmd := fmt.Sprintf(
-		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-		postgresSpec.LogPath, postgresSpec.LogFileName)
-	config := configfile.RenderPostgresConfiguration(map[string]string{
-		"recovery_target_action": "promote",
-		"restore_command":        restoreCmd,
-	})
 
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration == nil {
 		server, found := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
 		if found && server.BarmanObjectStore != nil {
-			envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster, &server)
+			envs, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster, &server)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	if _, err := info.restoreCustomWalDir(ctx); err != nil {
-		return err
-	}
-
-	return info.concludeRestore(ctx, cli, cluster, config, envs)
+	return info.concludeRestore(ctx, cli, cluster, getRestoreWalConfig(), envs)
 }
 
 func (info InitInfo) concludeRestore(
@@ -184,6 +176,12 @@ func (info InitInfo) concludeRestore(
 	config string,
 	envs []string,
 ) error {
+	// Set up the pg_wal symlink to the dedicated WAL volume before PostgreSQL
+	// replays WALs, otherwise recovery would accumulate WALs on the data volume.
+	if _, err := info.restoreCustomWalDir(ctx); err != nil {
+		return err
+	}
+
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
@@ -223,13 +221,16 @@ func (info InitInfo) concludeRestore(
 	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
 }
 
-// createEnvAndConfigForSnapshotRestore creates env and config for snapshot restore
+// createEnvAndConfigForSnapshotRestore builds the WAL-restore environment for a
+// snapshot restore from an external object store and primes the bootstrap
+// WAL-restore cache. The restore configuration itself is path-independent, so
+// the caller obtains it from getRestoreWalConfig.
 func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
 	server *apiv1.ExternalCluster,
-) ([]string, string, error) {
+) ([]string, error) {
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Recovering from external cluster", "sourceName", server.Name)
@@ -243,7 +244,7 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 		server.BarmanObjectStore,
 		os.Environ())
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	backup := &apiv1.Backup{
@@ -262,14 +263,13 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 		},
 	}
 
-	config, err := getRestoreWalConfig(ctx, backup)
-	return env, config, err
+	setupBootstrapWALRestoreCache(cluster, backup, env)
+
+	return env, nil
 }
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
-	contextLogger := log.FromContext(ctx)
-
 	cluster, err := info.loadCluster(ctx, cli)
 	if err != nil {
 		return err
@@ -285,64 +285,15 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 		info.ApplicationDatabase = cluster.GetApplicationDatabaseName()
 	}
 
-	var envs []string
 	var config string
-
-	//nolint:nestif
+	var envs []string
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
-		contextLogger.Info("Restore through plugin detected, proceeding...")
-		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
-		if err != nil {
-			return err
-		}
-		if res == nil {
-			return errors.New("empty response from restoreViaPlugin, programmatic error")
-		}
-
-		processEnvironment, err := envmap.ParseEnviron()
-		if err != nil {
-			return fmt.Errorf("error while parsing the process environment: %w", err)
-		}
-
-		pluginEnvironment, err := envmap.Parse(res.Envs)
-		if err != nil {
-			return fmt.Errorf("error while parsing the plugin environment: %w", err)
-		}
-
-		envs = envmap.Merge(processEnvironment, pluginEnvironment).StringSlice()
-		config = res.RestoreConfig
+		config, envs, err = restoreViaPlugin(ctx, cluster, pluginConfiguration)
 	} else {
-		// Before starting the restore we check if the archive destination is safe to use
-		// otherwise, we stop creating the cluster
-		err = info.checkBackupDestination(ctx, cli, cluster)
-		if err != nil {
-			return err
-		}
-
-		// If we need to download data from a backup, we do it
-		backup, env, err := info.loadBackup(ctx, cli, cluster)
-		if err != nil {
-			return err
-		}
-
-		if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
-			return err
-		}
-
-		if err := info.restoreDataDir(ctx, backup, env); err != nil {
-			return err
-		}
-
-		if _, err := info.restoreCustomWalDir(ctx); err != nil {
-			return err
-		}
-
-		conf, err := getRestoreWalConfig(ctx, backup)
-		if err != nil {
-			return err
-		}
-		config = conf
-		envs = env
+		config, envs, err = info.restoreViaBarmanObjectStore(ctx, cli, cluster)
+	}
+	if err != nil {
+		return err
 	}
 
 	return info.concludeRestore(ctx, cli, cluster, config, envs)
@@ -373,13 +324,7 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	opts, err := barmanCommand.CloudWalRestoreOptions(ctx, &apiv1.BarmanObjectStoreConfiguration{
-		BarmanCredentials: backup.Status.BarmanCredentials,
-		EndpointCA:        backup.Status.EndpointCA,
-		EndpointURL:       backup.Status.EndpointURL,
-		DestinationPath:   backup.Status.DestinationPath,
-		ServerName:        backup.Status.ServerName,
-	}, cluster.Name)
+	opts, err := barmanCommand.CloudWalRestoreOptions(ctx, barmanObjectStoreFromBackup(backup), cluster.Name)
 	if err != nil {
 		return err
 	}
@@ -427,24 +372,47 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 	return true, os.Symlink(info.PgWal, pgDataWal)
 }
 
-// restoreDataDir restores PGDATA from an existing backup
-func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, env []string) error {
-	contextLogger := log.FromContext(ctx)
+// buildRestoreDataDirOptions builds the command line options for barman-cloud-restore
+func (info InitInfo) buildRestoreDataDirOptions(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
+) ([]string, error) {
 	var options []string
 
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
 	}
+
 	options = append(options, backup.Status.DestinationPath)
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
 
 	options, err := barmanCommand.AppendCloudProviderOptionsFromBackup(ctx, options, backup.Status.BarmanCredentials)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	options = append(options, info.PgData)
+	if barmanConfiguration != nil {
+		options = barmanConfiguration.Data.AppendRestoreAdditionalCommandArgs(options)
+	}
+
+	return append(options, info.PgData), nil
+}
+
+// restoreDataDir restores PGDATA from an existing backup
+func (info InitInfo) restoreDataDir(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	env []string,
+	barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	options, err := info.buildRestoreDataDirOptions(ctx, backup, barmanConfiguration)
+	if err != nil {
+		return err
+	}
 
 	contextLogger.Info("Starting barman-cloud-restore",
 		"options", options)
@@ -476,13 +444,78 @@ func (info InitInfo) loadCluster(ctx context.Context, typedClient client.Client)
 	return &cluster, nil
 }
 
+// writeRecoveryBarmanEndpointCA writes to disk the barman endpoint CA of the
+// recovery source, if any, before any barman-cloud command reaches a
+// TLS-protected object store. The precedence is: the recovery backup
+// reference's own CA, then the referenced backup's status CA, then the
+// recovery source external cluster's CA. It writes to the same location the
+// barman-cloud commands already read via AWS_CA_BUNDLE/REQUESTS_CA_BUNDLE, so
+// no extra wiring is needed once the file is on disk. It is a no-op when the
+// recovery source has no endpoint CA.
+func (info InitInfo) writeRecoveryBarmanEndpointCA(
+	ctx context.Context,
+	typedClient client.Client,
+	cluster *apiv1.Cluster,
+) error {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return nil
+	}
+	recovery := cluster.Spec.Bootstrap.Recovery
+
+	var endpointCA *apiv1.SecretKeySelector
+	switch {
+	case recovery.Backup != nil && recovery.Backup.EndpointCA != nil:
+		endpointCA = recovery.Backup.EndpointCA
+
+	case recovery.Backup != nil:
+		var backup apiv1.Backup
+		if err := typedClient.Get(
+			ctx,
+			client.ObjectKey{Namespace: info.Namespace, Name: recovery.Backup.Name},
+			&backup); err != nil {
+			return fmt.Errorf("while loading the recovery backup for the barman endpoint CA: %w", err)
+		}
+		endpointCA = backup.Status.EndpointCA
+
+	case recovery.Source != "":
+		if externalCluster, ok := cluster.ExternalCluster(recovery.Source); ok &&
+			externalCluster.BarmanObjectStore != nil {
+			endpointCA = externalCluster.BarmanObjectStore.EndpointCA
+		}
+	}
+
+	if endpointCA == nil || endpointCA.Name == "" || endpointCA.Key == "" {
+		return nil
+	}
+
+	var secret corev1.Secret
+	if err := typedClient.Get(
+		ctx,
+		client.ObjectKey{Namespace: info.Namespace, Name: endpointCA.Name},
+		&secret); err != nil {
+		return fmt.Errorf("while loading the recovery barman endpoint CA secret: %w", err)
+	}
+
+	data, ok := secret.Data[endpointCA.Key]
+	if !ok {
+		return fmt.Errorf("missing %s entry in Secret %s", endpointCA.Key, endpointCA.Name)
+	}
+
+	if _, err := fileutils.WriteFileAtomic(
+		postgresSpec.BarmanRestoreEndpointCACertificateLocation, data, 0o600); err != nil {
+		return fmt.Errorf("while writing the recovery barman endpoint CA: %w", err)
+	}
+
+	return nil
+}
+
 // loadBackup loads the backup manifest from the API server of from the object store.
 // It also gets the environment variables that are needed to recover the cluster
 func (info InitInfo) loadBackup(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	// Recovery given an existing backup
 	if cluster.Spec.Bootstrap.Recovery.Backup != nil {
 		return info.loadBackupFromReference(ctx, typedClient, cluster)
@@ -497,23 +530,23 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	contextLogger := log.FromContext(ctx)
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
 	if sourceName == "" {
-		return nil, nil, fmt.Errorf("recovery source not specified")
+		return nil, nil, nil, fmt.Errorf("recovery source not specified")
 	}
 
 	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
-		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
+		return nil, nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
 	}
 
 	if server.BarmanObjectStore == nil {
-		return nil, nil, fmt.Errorf("missing barman object store configuration for source: %v", sourceName)
+		return nil, nil, nil, fmt.Errorf("missing barman object store configuration for source: %v", sourceName)
 	}
 
 	serverName := server.GetServerName()
@@ -525,12 +558,12 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		server.BarmanObjectStore,
 		os.Environ())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	backupCatalog, err := barmanCommand.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// We are now choosing the right backup to restore
@@ -541,13 +574,13 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 			cluster.Spec.Bootstrap.Recovery.RecoveryTarget,
 		)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	} else {
 		targetBackup = backupCatalog.LatestBackupInfo()
 	}
 	if targetBackup == nil {
-		return nil, nil, fmt.Errorf("no target backup found")
+		return nil, nil, nil, fmt.Errorf("no target backup found")
 	}
 
 	contextLogger.Info("Target backup found", "backup", targetBackup)
@@ -576,7 +609,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 			CommandOutput:     "",
 			CommandError:      "",
 		},
-	}, env, nil
+	}, env, server.BarmanObjectStore, nil
 }
 
 // loadBackupFromReference loads a backup object and the required credentials given the backup object resource
@@ -584,7 +617,7 @@ func (info InitInfo) loadBackupFromReference(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, []string, *apiv1.BarmanObjectStoreConfiguration, error) {
 	contextLogger := log.FromContext(ctx)
 	var backup apiv1.Backup
 	err := typedClient.Get(
@@ -592,27 +625,23 @@ func (info InitInfo) loadBackupFromReference(
 		client.ObjectKey{Namespace: info.Namespace, Name: cluster.Spec.Bootstrap.Recovery.Backup.Name},
 		&backup)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
+
+	barmanConfiguration := barmanObjectStoreFromBackup(&backup)
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
 		typedClient,
 		cluster.Namespace,
-		&apiv1.BarmanObjectStoreConfiguration{
-			BarmanCredentials: backup.Status.BarmanCredentials,
-			EndpointCA:        backup.Status.EndpointCA,
-			EndpointURL:       backup.Status.EndpointURL,
-			DestinationPath:   backup.Status.DestinationPath,
-			ServerName:        backup.Status.ServerName,
-		},
+		barmanConfiguration,
 		os.Environ())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	contextLogger.Info("Recovering existing backup", "backup", backup)
-	return &backup, env, nil
+	return &backup, env, barmanConfiguration, nil
 }
 
 func (info InitInfo) writeCustomRestoreWalConfig(cluster *apiv1.Cluster, conf string) error {
@@ -627,29 +656,74 @@ func (info InitInfo) writeCustomRestoreWalConfig(cluster *apiv1.Cluster, conf st
 
 // getRestoreWalConfig obtains the content to append to `custom.conf` allowing PostgreSQL
 // to complete the WAL recovery from the object storage and then start
-// as a new primary
-func getRestoreWalConfig(ctx context.Context, backup *apiv1.Backup) (string, error) {
-	var err error
-
-	cmd := []string{barmanUtils.BarmanCloudWalRestore}
-	if backup.Status.EndpointURL != "" {
-		cmd = append(cmd, "--endpoint-url", backup.Status.EndpointURL)
-	}
-	cmd = append(cmd, backup.Status.DestinationPath)
-	cmd = append(cmd, backup.Status.ServerName)
-
-	cmd, err = barmanCommand.AppendCloudProviderOptionsFromBackup(
-		ctx, cmd, backup.Status.BarmanCredentials)
-	if err != nil {
-		return "", err
-	}
-
-	cmd = append(cmd, "%f", "%p")
+// as a new primary.
+//
+// WAL recovery is delegated to `/controller/manager wal-restore`, the same
+// command HA replicas and CNPG-I plugin restores use. The recovery source
+// object store and its credentials never end up in the command line: they are
+// handed to that command through the local webserver cache, populated by
+// setupBootstrapWALRestoreCache.
+func getRestoreWalConfig() string {
+	restoreCommand := fmt.Sprintf(
+		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+		postgresSpec.LogPath, postgresSpec.LogFileName)
 
 	return configfile.RenderPostgresConfiguration(map[string]string{
 		"recovery_target_action": "promote",
-		"restore_command":        shellquote.Join(cmd...),
-	}), nil
+		"restore_command":        restoreCommand,
+	})
+}
+
+// setupBootstrapWALRestoreCache populates the local webserver cache with the
+// recovery source object store configuration and credentials. During the
+// bootstrap recovery Job the instance-manager reconciler that normally fills
+// this cache is not running, so PostgreSQL's restore_command (`/controller/manager
+// wal-restore`) would otherwise be unable to resolve the recovery source. The
+// source store is not always derivable from the cluster spec (for a
+// recovery.backup reference it lives only in the referenced Backup CR), so we
+// resolve it here, where it is already available, and cache the whole store so
+// the wal-restore command can derive its options and prefetch parallelism from
+// it, exactly as it does for a running instance.
+//
+// For a replica cluster the Job configures streaming replication instead of
+// replaying WAL, so the cached values are simply never read there.
+func setupBootstrapWALRestoreCache(cluster *apiv1.Cluster, backup *apiv1.Backup, env []string) {
+	cache.Store(cache.WALRestoreKey, env)
+	cache.Store(cache.WALRestoreConfigKey, recoverySourceObjectStore(cluster, backup))
+}
+
+// barmanObjectStoreFromBackup maps the object store coordinates recorded in
+// the status of a Backup back to a barman object store configuration.
+func barmanObjectStoreFromBackup(backup *apiv1.Backup) *apiv1.BarmanObjectStoreConfiguration {
+	return &apiv1.BarmanObjectStoreConfiguration{
+		BarmanCredentials: backup.Status.BarmanCredentials,
+		EndpointCA:        backup.Status.EndpointCA,
+		EndpointURL:       backup.Status.EndpointURL,
+		DestinationPath:   backup.Status.DestinationPath,
+		ServerName:        backup.Status.ServerName,
+	}
+}
+
+// recoverySourceObjectStore returns the object store to restore WALs from during
+// a bootstrap recovery. The endpoint, destination, server name and credentials
+// come from the resolved Backup. For a recovery.source the source store's Wal
+// configuration (the prefetch parallelism and the additional
+// barman-cloud-wal-restore command-line arguments) is recorded only in the
+// external cluster definition, so it is carried over here to mirror what the
+// Barman Cloud plugin does with its own ObjectStore resource.
+func recoverySourceObjectStore(cluster *apiv1.Cluster, backup *apiv1.Backup) *apiv1.BarmanObjectStoreConfiguration {
+	store := barmanObjectStoreFromBackup(backup)
+
+	source := cluster.Spec.Bootstrap.Recovery.Source
+	if source == "" {
+		// recovery.backup reference: the Backup CR records no Wal configuration.
+		return store
+	}
+	if externalCluster, found := cluster.ExternalCluster(source); found && externalCluster.BarmanObjectStore != nil {
+		store.Wal = externalCluster.BarmanObjectStore.Wal
+	}
+
+	return store
 }
 
 func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {
@@ -1055,14 +1129,16 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 	})
 }
 
-// restoreViaPlugin tries to restore the cluster using a plugin if available and enabled.
-// Returns true if a restore plugin was found and any error encountered.
+// restoreViaPlugin restores the cluster using the configured recovery source
+// plugin, returning the restore configuration and the environment the plugin
+// produced.
 func restoreViaPlugin(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	plugin *apiv1.PluginConfiguration,
-) (*restore.RestoreResponse, error) {
+) (config string, envs []string, err error) {
 	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Restore through plugin detected, proceeding...")
 
 	plugins := repository.New()
 	defer plugins.Close()
@@ -1072,9 +1148,64 @@ func restoreViaPlugin(
 	pClient, err := pluginClient.NewClient(ctx, pluginEnabledSet)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
-		return nil, err
+		return "", nil, err
 	}
 	defer pClient.Close(ctx)
 
-	return pClient.Restore(ctx, cluster)
+	res, err := pClient.Restore(ctx, cluster)
+	if err != nil {
+		return "", nil, err
+	}
+	if res == nil {
+		return "", nil, errors.New("empty response from restoreViaPlugin, programmatic error")
+	}
+
+	processEnvironment, err := envmap.ParseEnviron()
+	if err != nil {
+		return "", nil, fmt.Errorf("error while parsing the process environment: %w", err)
+	}
+
+	pluginEnvironment, err := envmap.Parse(res.Envs)
+	if err != nil {
+		return "", nil, fmt.Errorf("error while parsing the plugin environment: %w", err)
+	}
+
+	return res.RestoreConfig, envmap.Merge(processEnvironment, pluginEnvironment).StringSlice(), nil
+}
+
+// restoreViaBarmanObjectStore restores the base backup from a Barman Cloud
+// object store, primes the bootstrap WAL-restore cache, and returns the
+// WAL-restore configuration and environment for the recovery phase.
+func (info InitInfo) restoreViaBarmanObjectStore(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+) (config string, envs []string, err error) {
+	if err := info.writeRecoveryBarmanEndpointCA(ctx, cli, cluster); err != nil {
+		return "", nil, err
+	}
+
+	// Before starting the restore we check if the archive destination is safe to
+	// use, otherwise we stop creating the cluster.
+	if err := info.checkBackupDestination(ctx, cli, cluster); err != nil {
+		return "", nil, err
+	}
+
+	// If we need to download data from a backup, we do it.
+	backup, env, barmanConfiguration, err := info.loadBackup(ctx, cli, cluster)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
+		return "", nil, err
+	}
+
+	if err := info.restoreDataDir(ctx, backup, env, barmanConfiguration); err != nil {
+		return "", nil, err
+	}
+
+	setupBootstrapWALRestoreCache(cluster, backup, env)
+
+	return getRestoreWalConfig(), env, nil
 }

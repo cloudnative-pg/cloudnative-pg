@@ -126,7 +126,11 @@ func NewBackupReconciler(
 //nolint:gocognit,gocyclo
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
-	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
+
+	contextLogger.Debug("Reconciliation loop start")
+	defer func() {
+		contextLogger.Debug("Reconciliation loop end")
+	}()
 
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
@@ -255,9 +259,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	default:
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
 	}
-
-	// plugin post hooks
-	contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
 
 	hookResult := postReconcilePluginHooks(ctx, &cluster, &backup)
 	if hookResult.Err != nil || !hookResult.Result.IsZero() {
@@ -729,8 +730,10 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 
 	res, err := r.vsr.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 	if err != nil {
-		// Volume Snapshot errors are not retryable, we need to set this backup as failed
-		// and un-fence the Pod
+		// The reconciler already retried what it could: network errors are
+		// requeued, and snapshot errors reported by the CSI driver are retried
+		// until the volumeSnapshotDeadline elapses. An error here is final, so
+		// we need to set this backup as failed and un-fence the Pod
 		contextLogger.Error(err, "while executing snapshot backup")
 		r.Recorder.Eventf(backup, "Warning", "Error", "snapshot backup failed: %v", err)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster,
@@ -1105,6 +1108,15 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	// Only gate a backup that is still waiting to start. Once it has begun,
+	// the contention check is a no-op for it, but the SetAsPending below would
+	// regress a phase that may have advanced concurrently: the instance manager
+	// writes the terminal phase asynchronously, so a stale read here could flip
+	// an already-completed plugin backup back to pending.
+	if len(backup.Status.Phase) != 0 && backup.Status.Phase != apiv1.BackupPhasePending {
+		return ctrl.Result{}, nil
+	}
 
 	// Validate we don't have other running backups
 	var clusterBackups apiv1.BackupList

@@ -21,21 +21,18 @@ SPDX-License-Identifier: Apache-2.0
 package timeouts
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-)
+	"maps"
 
-// TestTimeoutsEnvVar is the environment variable where specific timeouts can be
-// set for the E2E test suite
-const TestTimeoutsEnvVar = "TEST_TIMEOUTS"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
+)
 
 // Timeout represents an event whose time we want to limit in the test suite
 type Timeout string
 
 // the events we're setting timeouts for
-// NOTE: the text representation will be used as the fields in the JSON representation
-// of the timeout object passed to the ginkgo command as an environment variable
+// NOTE: the text representation will be used as the keys of the `timeouts`
+// section of the e2e configuration file
 const (
 	Failover                  Timeout = "failover"
 	NamespaceCreation         Timeout = "namespaceCreation"
@@ -79,27 +76,19 @@ var DefaultTestTimeouts = map[Timeout]int{
 	ManagedServices:           30,
 }
 
-// Timeouts returns the map of timeouts, where each event gets the timeout specified
-// in the `TEST_TIMEOUTS` environment variable, or if not specified, takes the default
-// value
+// Timeouts returns the map of timeouts, where each event gets the timeout
+// specified in the `timeouts` section of the e2e configuration file, or if
+// not specified, takes the default value
 func Timeouts() (map[Timeout]int, error) {
-	if timeoutsEnv, exists := os.LookupEnv(TestTimeoutsEnvVar); exists {
-		var timeouts map[Timeout]int
-		err := json.Unmarshal([]byte(timeoutsEnv), &timeouts)
-		if err != nil {
-			return map[Timeout]int{},
-				fmt.Errorf("TEST_TIMEOUTS env variable is not valid: %v", err)
+	timeouts := make(map[Timeout]int, len(DefaultTestTimeouts))
+	maps.Copy(timeouts, DefaultTestTimeouts)
+
+	for k, val := range config.Current().Timeouts {
+		if _, known := DefaultTestTimeouts[Timeout(k)]; !known {
+			return nil, fmt.Errorf("unknown timeout %q in the e2e configuration", k)
 		}
-		for k, def := range DefaultTestTimeouts {
-			val, found := timeouts[k]
-			if found {
-				timeouts[k] = val
-			} else {
-				timeouts[k] = def
-			}
-		}
-		return timeouts, nil
+		timeouts[Timeout(k)] = val
 	}
 
-	return DefaultTestTimeouts, nil
+	return timeouts, nil
 }

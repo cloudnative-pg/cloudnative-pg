@@ -165,3 +165,46 @@ func WaitForGetClusterWithClient(ctx context.Context, cli client.Client, cluster
 
 	return nil
 }
+
+// WaitForClusterCertificates polls the Cluster until its status has the
+// certificate secret names, then returns it. Use the returned Cluster: a new
+// Get can come back with an older copy, with the names empty again.
+//
+// The wait has no time limit. The operator never waits on this Pod before
+// writing the status, so this wait cannot block that write.
+func WaitForClusterCertificates(
+	ctx context.Context,
+	cli client.Client,
+	clusterObjectKey client.ObjectKey,
+) (*apiv1.Cluster, error) {
+	logger := log.FromContext(ctx).WithName("wait-for-cluster-certificates").WithValues(
+		"cluster", clusterObjectKey.Name,
+		"namespace", clusterObjectKey.Namespace)
+
+	var cluster apiv1.Cluster
+	var waiting bool
+
+	if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		// Reset first: Get only overwrites fields present in the response,
+		// so a stale value could survive from the previous attempt.
+		cluster = apiv1.Cluster{}
+		if err := cli.Get(ctx, clusterObjectKey, &cluster); err != nil {
+			logger.Warning("Encountered an error while checking certificate status. Will retry", "error", err.Error())
+			return false, nil
+		}
+		if cluster.Status.Certificates.ServerTLSSecret == "" {
+			// Log once: this can run for a long time, one line per second
+			// would flood the log with nothing new to say.
+			if !waiting {
+				waiting = true
+				logger.Info("Waiting for the operator to write the certificate status")
+			}
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return &cluster, nil
+}

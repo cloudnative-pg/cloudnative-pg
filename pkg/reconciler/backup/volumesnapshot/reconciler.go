@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -127,7 +128,10 @@ func (se *Reconciler) enrichSnapshot(
 	vs.Labels[utils.BackupDateLabelName] = now.Format("20060102")
 	vs.Labels[utils.BackupMonthLabelName] = now.Format("200601")
 	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(now.Year())
-	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
+	// backup.Status.Online is only set once the backup is finalized, which happens
+	// after the snapshots have been created: the effective online setting has to be
+	// taken from the configuration, as Status.Online is still empty at this point
+	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.GetOnlineOrDefault(cluster))
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
@@ -202,9 +206,7 @@ func (se *Reconciler) internalReconcile(
 	if err != nil {
 		return nil, err
 	}
-	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-
-	exec := se.newExecutor(volumeSnapshotConfig.GetOnline())
+	exec := se.newExecutor(backup.GetOnlineOrDefault(cluster))
 
 	// Step 1: backup preparation.
 	// This will set PostgreSQL in backup mode for hot snapshots, or fence the Pods for cold snapshots.
@@ -266,14 +268,13 @@ func (se *Reconciler) finalizeSnapshotBackupStep(
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
-	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
 
 	if res, err := exec.finalize(ctx, cluster, backup, targetPod); res != nil || err != nil {
 		return res, err
 	}
 
 	backup.Status.SetAsFinalizing()
-	backup.Status.Online = ptr.To(volumeSnapshotConfig.GetOnline())
+	backup.Status.Online = ptr.To(backup.GetOnlineOrDefault(cluster))
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
@@ -452,8 +453,7 @@ func (se *Reconciler) waitSnapshotToBeReadyStep(
 	return nil, nil
 }
 
-// createSnapshot creates a VolumeSnapshot resource for the given PVC and
-// add it to the command status
+// createSnapshot creates a VolumeSnapshot resource for the given PVC
 func (se *Reconciler) createSnapshot(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -508,8 +508,53 @@ func (se *Reconciler) createSnapshot(
 	}
 
 	if err := se.cli.Create(ctx, &snapshot); err != nil {
+		return se.handleSnapshotCreateError(ctx, err, &snapshot, backup)
+	}
+
+	return nil
+}
+
+// handleSnapshotCreateError decides whether a failed VolumeSnapshot creation can
+// be tolerated. An AlreadyExists collision against a snapshot we manage for this
+// backup is harmless, because the cached VolumeSnapshot list used to decide
+// whether to create the snapshots can lag behind a snapshot we created in a
+// previous reconciliation cycle. In that case this reconciliation requeues and a
+// later cycle picks the snapshot up through the backup label selector. Any other
+// error, or a collision with a foreign object, is returned to the caller.
+func (se *Reconciler) handleSnapshotCreateError(
+	ctx context.Context,
+	err error,
+	snapshot *volumesnapshotv1.VolumeSnapshot,
+	backup *apiv1.Backup,
+) error {
+	if !apierrs.IsAlreadyExists(err) {
 		return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
 	}
+
+	var existing volumesnapshotv1.VolumeSnapshot
+	if getErr := se.cli.Get(ctx, client.ObjectKeyFromObject(snapshot), &existing); getErr != nil {
+		// The same cache lag that triggered the spurious Create can also hide
+		// the object from this Get. The API server already confirmed it exists,
+		// so treat the collision as harmless and let a later cycle re-evaluate
+		// ownership once the cache catches up.
+		if apierrs.IsNotFound(getErr) {
+			log.FromContext(ctx).Trace(
+				"VolumeSnapshot creation collided but the cache still hides it, requeuing",
+				"snapshotName", snapshot.Name,
+				"backupName", backup.Name)
+			return nil
+		}
+		return fmt.Errorf("while verifying pre-existing VolumeSnapshot %s: %w", snapshot.Name, getErr)
+	}
+	if existing.Labels[utils.BackupNameLabelName] != backup.Name {
+		return fmt.Errorf("VolumeSnapshot %s already exists and is not owned by backup %s: %w",
+			snapshot.Name, backup.Name, err)
+	}
+
+	log.FromContext(ctx).Info(
+		"VolumeSnapshot for this backup already exists, reusing it",
+		"snapshotName", snapshot.Name,
+		"backupName", backup.Name)
 
 	return nil
 }
@@ -602,6 +647,15 @@ func (se *Reconciler) waitSnapshotToBeReady(
 	return nil, nil
 }
 
+// handleSnapshotErrors reacts to a VolumeSnapshot.Status.Error reported by
+// the CSI driver. There's no reliable way to tell a permanent condition (a
+// missing VolumeSnapshotClass, bad credentials, an error with no message at
+// all, ...) from a transient one, and a condition that looks permanent
+// today can become resolvable at any point (someone creates the missing
+// class, fixes the credentials, ...). So every error is retried the same
+// way, requeuing until backup.cnpg.io/volumeSnapshotDeadline elapses. The
+// external-snapshotter sidecar itself keeps retrying CreateSnapshot on its
+// own regardless of what CNPG does here.
 func (se *Reconciler) handleSnapshotErrors(
 	ctx context.Context,
 	backup *apiv1.Backup,
@@ -609,10 +663,6 @@ func (se *Reconciler) handleSnapshotErrors(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).
 		WithName("handle_snapshot_errors")
-
-	if !snapshotErr.isRetryable() {
-		return nil, snapshotErr
-	}
 
 	if err := addDeadlineStatus(ctx, se.cli, backup); err != nil {
 		return nil, fmt.Errorf("while adding deadline status: %w", err)

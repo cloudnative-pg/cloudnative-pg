@@ -9,14 +9,18 @@ AZs
 AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
+AdzerKI
 AffinityConfiguration
 AllNamespaces
+Anand
 AntiAffinity
 AppArmor
 AppArmorProfile
+ArgoCD
 Armando
 AuthQuery
 AuthQuerySecret
+AutomountServiceAccountToken
 Autoscaler
 AvailableArchitecture
 AvailableArchitectures
@@ -193,6 +197,7 @@ FQDN
 FQDNs
 FailoverQuorum
 FailoverQuorumStatus
+FailureDomainKeys
 Fei
 Filesystem
 Fluentd
@@ -200,6 +205,7 @@ Francesco
 GC
 GCE
 GCS
+GHSA
 GID
 GIS
 GKE
@@ -209,6 +215,7 @@ GUCs
 GabriFedi
 Gabriele
 GaugeVec
+GellertBabel
 GeoSpatial
 Gi
 GitOps
@@ -224,6 +231,7 @@ HPA
 HashiCorp
 HistoryTags
 Homebrew
+HoniSanders
 Huß
 IAM
 INPLACE
@@ -251,8 +259,10 @@ Isovalent
 Istio
 Istio's
 JSON
+Jamstah
 JefeDavis
 Joda
+KEP
 KV
 Karpenter
 KinD
@@ -316,6 +326,7 @@ Nenciarini
 NetworkPolicies
 NetworkPolicy
 NodeAffinity
+NodeFailureDomainKeys
 NodeMaintenanceWindow
 NodeSelector
 NodesUsed
@@ -376,6 +387,7 @@ PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
 PodDisruptionBudgets
+PodFailureDomainKeys
 PodMonitor
 PodName
 PodSecurityContext
@@ -408,6 +420,7 @@ PostInitApplicationSQLRefs
 PostInitSQLRefs
 PostInitTemplateSQLRefs
 Postgres
+PostgresCapabilities
 PostgresConfiguration
 PrimaryLeaseConfiguration
 PrimaryUpdateMethod
@@ -515,6 +528,7 @@ ServerSpec
 ServerTLSSecret
 ServiceAccount
 ServiceAccountTemplate
+ServiceAccounts
 ServiceMonitor
 ServiceSelectorType
 ServiceSelectorTypeR
@@ -549,7 +563,9 @@ SubscriptionStatus
 SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
+Symlinked
 SyncReplicaElectionConstraints
+SyncReplicationTopologySatisfied
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
@@ -588,6 +604,7 @@ Untrusted
 UpdateStrategy
 UsageSpec
 UsageSpecType
+Utkarsh
 VLDB
 VLDBs
 VM
@@ -638,6 +655,7 @@ allowPrivilegeEscalation
 allowVolumeExpansion
 alm
 amd
+andrew
 angus
 anonymization
 api
@@ -666,6 +684,7 @@ authQuerySecret
 authn
 authz
 autocompletion
+automounted
 autoscaler
 autoscalers
 autovacuum
@@ -717,6 +736,7 @@ beginLSN
 beginWal
 benchmarked
 benchmarking
+binak
 bindAsAuth
 bindDN
 bindPassword
@@ -728,6 +748,7 @@ bootstrapconfiguration
 bootstrapinitdb
 bootstrappgbasebackup
 bootstraprecovery
+boto
 bozkayasalihx
 br
 bs
@@ -816,6 +837,7 @@ coreos
 corev
 cp
 cpu
+crashloop
 crds
 createdAt
 createdb
@@ -842,6 +864,7 @@ customresourcedefinitions
 cutover
 cyber
 dT
+daanvinken
 danglingPVC
 dataChecksums
 dataDurability
@@ -924,6 +947,7 @@ ephemeralVolumesSizeLimit
 ephemeralvolumessizelimitconfiguration
 ermakov
 eu
+evan
 excludePatterns
 executables
 expirations
@@ -948,6 +972,7 @@ failoverquorumstatus
 failovers
 failureThreshold
 faq
+farries
 fastpath
 fb
 fd
@@ -1069,12 +1094,14 @@ jaconi
 jdbc
 jmealo
 jobCount
+jonasbadstuebner
 jq
 json
 jsonpath
 juliamertz
 kb
 kbytes
+kdautrey
 keepalive
 kms
 kube
@@ -1175,6 +1202,7 @@ minSyncReplicas
 minikube
 minio
 misconfigurations
+mjlshen
 mmap
 monitoringconfiguration
 mountPath
@@ -1192,6 +1220,7 @@ networkpolicy
 nextScheduleTime
 nginx
 nodeAffinity
+nodeFailureDomainKeys
 nodeLabelsAntiAffinity
 nodeMaintenanceWindow
 nodeSelector
@@ -1242,6 +1271,7 @@ passwordStatus
 passwordstate
 pc
 pchovelon
+pcj
 pdf
 periodSeconds
 persistentVolumeClaims
@@ -1291,6 +1321,7 @@ podAntiAffinity
 podAntiAffinityType
 podCount
 podDisruptionBudgets
+podFailureDomainKeys
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
@@ -1343,6 +1374,7 @@ pprof
 pre
 preferredDuringSchedulingIgnoredDuringExecution
 prefetched
+prefetching
 preload
 prepended
 prepends
@@ -1379,6 +1411,7 @@ pvc
 pvcCount
 pvcName
 pvcTemplate
+qc
 quantile
 queryable
 quickstart
@@ -1417,6 +1450,7 @@ reportNonRedacted
 reportRedacted
 req
 requestTimeout
+requeued
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
@@ -1497,6 +1531,7 @@ serviceupdatestrategy
 sessionToken
 sha
 sharifmshaker
+sharma
 shm
 shmall
 shmmax
@@ -1580,6 +1615,7 @@ synchronizereplicasconfiguration
 synchronousreplicaconfiguration
 synchronousreplicaconfigurationmethod
 syncreplicaelectionconstraints
+syncreplicas
 sys
 syslog
 systemID
@@ -1629,6 +1665,7 @@ toto
 transactionID
 transactional
 transactionid
+trixie
 tx
 ubi
 ui
@@ -1671,6 +1708,7 @@ volumeSnapshot
 volumeSnapshots
 volumesnapshot
 volumesnapshotconfiguration
+vp
 vpa
 waitForArchive
 wal

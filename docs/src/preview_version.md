@@ -20,12 +20,16 @@ intended for public testing prior to the final release.
 
 ## Current Preview Version
 
-The current preview version is **1.30.0-rc1**.
+There are currently no preview versions available.
+
+<!--
+The current preview version is **1.31.0-rc1**.
 
 For more information on the current preview version and how to test, please view the links below:
 
-- [Announcement](https://cloudnative-pg.io/releases/cloudnative-pg-1-30.0-rc1-released/)
-- [Documentation](https://cloudnative-pg.io/docs/preview/)
+- [Announcement](https://cloudnative-pg.io/releases/cloudnative-pg-1-31.0-rc1-released/)
+- [Documentation](https://cloudnative-pg.io/docs/1.31/)
+-->
 
 ## Purpose of Release Candidates
 
@@ -73,7 +77,7 @@ non-production environment:
 - **Report Issues:** **Immediately report any issues or unexpected behavior**
   by opening a GitHub issue and clearly marking it with a **`Release
   Candidate`** tag or label, along with the RC version number
-  (e.g., `1.29.0-rc1`).
+  (e.g., `1.31.0-rc1`).
 
 ## Usage Advisory
 

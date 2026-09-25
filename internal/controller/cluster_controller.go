@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -232,16 +233,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		var errUnknownPlugin *repository.ErrUnknownPlugin
 		if errors.As(err, &errUnknownPlugin) {
-			return ctrl.Result{
-					RequeueAfter: 10 * time.Second,
-				}, r.RegisterPhase(
-					ctx,
-					cluster,
-					apiv1.PhaseUnknownPlugin,
-					fmt.Sprintf("Unknown plugin: '%s'. "+
-						"This may be caused by the plugin not being loaded correctly by the operator. "+
-						"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
-				)
+			regErr := r.RegisterPhase(
+				ctx,
+				cluster,
+				apiv1.PhaseUnknownPlugin,
+				fmt.Sprintf("Unknown plugin: '%s'. "+
+					"This may be caused by the plugin not being loaded correctly by the operator. "+
+					"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
+			)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, regErr
 		}
 
 		if regErr := r.RegisterPhase(
@@ -392,7 +392,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
 			contextLogger.Debug("Conflict error while reconciling resource status", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
@@ -424,7 +424,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
 
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		if cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 	}
 
 	if cluster.ShouldPromoteFromReplicaCluster() {
@@ -459,7 +461,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		if apierrs.IsConflict(err) {
 			contextLogger.Debug("Conflict error while reconciling cluster status and instance state",
 				"error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
@@ -534,10 +536,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
-	if res, err := r.requireWALArchivingPluginOrDelete(ctx, instancesStatus); err != nil || !res.IsZero() {
-		return res, err
-	}
-
 	if res, err := replicaclusterswitch.Reconcile(
 		ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
@@ -580,7 +578,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
 			contextLogger.Debug("Conflict error while reconciling online update", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
@@ -599,15 +597,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
-	// Calls post-reconcile hooks
-	if hookResult := postReconcilePluginHooks(ctx, cluster, cluster); hookResult.Err != nil ||
-		!hookResult.Result.IsZero() {
-		contextLogger.Info("Post-reconcile hook stopped the reconciliation loop",
-			"hookResult", hookResult)
-		return hookResult.Result, hookResult.Err
-	}
-
-	return setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+	// Run plugin post-reconcile hooks, sync per-plugin statuses, and
+	// register PhaseHealthy as the LAST status mutation. See #8582.
+	return r.finalizeReconciliation(ctx, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
 }
 
 // evaluatePodReadinessGuards short-circuits the reconciliation loop with a
@@ -624,6 +616,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 //     kubelet has not yet flipped the readiness probe to True (typical for a
 //     short window after un-fencing an instance). Waiting here prevents
 //     electing a primary that Kubernetes will refuse to route traffic to.
+//     A currently fenced instance is skipped: it reports a healthy /pg/status
+//     with PostgreSQL shut down and its pod permanently not Ready, so this is
+//     the expected steady state rather than a stale probe to wait out.
 //
 //   - Primary pod is Ready but its /pg/status endpoint is failing. A failing
 //     /pg/status on an otherwise Ready pod usually indicates an
@@ -658,7 +653,7 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 	hasHTTPStatus := firstInstance.HasHTTPStatus()
 	isPodReady := firstInstance.IsPodReady
 
-	if hasHTTPStatus && !isPodReady {
+	if hasHTTPStatus && !isPodReady && !firstInstance.IsFenced {
 		// The readiness probe status from the kubelet has not been refreshed
 		// yet, so we wait rather than electing a primary that Kubernetes will
 		// refuse to route traffic to.
@@ -730,30 +725,6 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
-func (r *ClusterReconciler) requireWALArchivingPluginOrDelete(
-	ctx context.Context,
-	instances postgres.PostgresqlStatusList,
-) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx).WithName("require_wal_archiving_plugin_delete")
-
-	for _, state := range instances.Items {
-		if isTerminatedBecauseOfMissingWALArchivePlugin(state.Pod) {
-			contextLogger.Warning(
-				"Detected instance manager initialization procedure that failed "+
-					"because the required WAL archive plugin is missing. Deleting it to trigger rollout",
-				"targetPod", state.Pod.Name)
-			if err := r.Delete(ctx, state.Pod); err != nil {
-				contextLogger.Error(err, "Cannot delete the pod", "pod", state.Pod.Name)
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-	}
-
-	return ctrl.Result{}, nil
-}
-
 func (r *ClusterReconciler) handleSwitchover(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -793,10 +764,14 @@ func (r *ClusterReconciler) handleSwitchover(
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
+		if errors.Is(err, ErrQuorumCheckFailed) {
+			contextLogger.Info("Quorum check no longer satisfied, waiting before completing the failover")
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
 			"error", err)
-		return &ctrl.Result{Requeue: true}, nil
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 	if selectedPrimary != "" {
 		// If we selected a new primary, stop the reconciliation loop here
@@ -854,6 +829,62 @@ func (r *ClusterReconciler) setDefaults(ctx context.Context, cluster *apiv1.Clus
 	return nil
 }
 
+// reconcileFailedJobs surfaces a permanently failed instance-creation Job
+// (bootstrap, recovery or replica creation) as PhaseUnrecoverable: such a Job
+// is counted as "running" until it succeeds, so one that has exhausted its
+// backoff limit would otherwise keep the cluster waiting forever. The cause
+// is in the job logs and has to be investigated: there is no predefined
+// recipe.
+func (r *ClusterReconciler) reconcileFailedJobs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	failedJobs := resources.failedJobNames()
+	if len(failedJobs) == 0 {
+		return nil, nil
+	}
+
+	log.FromContext(ctx).Warning("An instance creation job has failed", "failedJobs", failedJobs)
+
+	reason := fmt.Sprintf("Instance creation failed for the following jobs: %s. "+
+		"Check the job logs to investigate the cause of the failure.",
+		strings.Join(failedJobs, ", "))
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
+		return &ctrl.Result{}, err
+	}
+	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
+// reconcileFailedBootstrapPods surfaces a failing bootstrap init container as
+// PhaseUnrecoverable. Unlike a Job, it has no backoff limit of its own:
+// kubelet retries it forever, so a doomed bootstrap would otherwise
+// crash-loop with no signal. This only updates Cluster status, leaving the
+// Pod and its logs untouched and kubelet's retry running, so a transient
+// failure that later succeeds clears the phase again on its own.
+func (r *ClusterReconciler) reconcileFailedBootstrapPods(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	failedBootstrapPods := resources.failedBootstrapPodNames()
+	if len(failedBootstrapPods) == 0 {
+		return nil, nil
+	}
+
+	log.FromContext(ctx).Warning("An instance bootstrap has failed", "failedBootstrapPods", failedBootstrapPods)
+
+	reason := fmt.Sprintf("Instance bootstrap failed for the following Pods: %s. "+
+		"Check the bootstrap-instance init container logs to investigate the cause of the failure.",
+		strings.Join(failedBootstrapPods, ", "))
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable, reason); err != nil {
+		return &ctrl.Result{}, err
+	}
+	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
 // reconcileResources updates all the objects managed by the controller
 func (r *ClusterReconciler) reconcileResources(
 	ctx context.Context, cluster *apiv1.Cluster,
@@ -878,6 +909,18 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
+	if result, err := r.reconcileFailedJobs(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, err
+	} else if result != nil {
+		return *result, nil
+	}
+
+	if result, err := r.reconcileFailedBootstrapPods(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, err
+	} else if result != nil {
+		return *result, nil
+	}
+
 	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
@@ -899,6 +942,16 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	} else if result != nil {
 		return *result, err
+	}
+
+	// Handle instances explicitly marked as unrecoverable before the active-instances
+	// gate below. A Pod that is Pending or Terminating is never "active", so the gate
+	// would otherwise return early and the alpha.cnpg.io/unrecoverable annotation would
+	// have no effect on exactly those states. This mirrors the unschedulable-instances
+	// handling above, which sits before the same gate for the same structural reason
+	// (its target Pods are Pending too).
+	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	if !resources.allInstancesAreActive() {
@@ -964,11 +1017,6 @@ func (r *ClusterReconciler) reconcileResources(
 	// PhaseInplacePrimaryRestart will be patched to healthy in instance manager
 	if cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
-	// When everything is reconciled, update the status
-	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	r.cleanupCompletedJobs(ctx, resources.jobs)
@@ -1123,14 +1171,6 @@ func (r *ClusterReconciler) reconcilePods(
 		return r.createPrimaryInstance(ctx, cluster)
 	}
 
-	// Handle instances marked as unrecoverable before waiting for pods to be ready.
-	// This ensures pods annotated with alpha.cnpg.io/unrecoverable=true are
-	// deleted even when they can't report their status (e.g., postgres process
-	// not running, startup probe failing).
-	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
-		return res, err
-	}
-
 	// Stop acting here if there are non-ready Pods unless in maintenance reusing PVCs.
 	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
@@ -1141,11 +1181,9 @@ func (r *ClusterReconciler) reconcilePods(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	// Are there missing nodes? Let's create one
-	if cluster.Status.Instances < cluster.Spec.Instances &&
-		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
-		newNodeSerial := r.generateNodeSerial(cluster)
-		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
+	// Are there missing instances? Let's create one
+	if res, err := r.reconcileMissingInstance(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	// Should we scale down the cluster?
@@ -1231,13 +1269,13 @@ func (r *ClusterReconciler) handleRollingUpdate(
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	case errors.Is(err, errRolloutDelayed):
 		contextLogger.Warning(
-			"A Pod need to be rolled out, but the rollout is being delayed",
+			"A Pod needs to be rolled out, but the rollout is being delayed",
 		)
 		if err := r.RegisterPhase(
 			ctx,
 			cluster,
 			apiv1.PhaseUpgradeDelayed,
-			"The cluster need to be update, but the operator is configured to delay "+
+			"The cluster needs to be updated, but the operator is configured to delay "+
 				"the operation",
 		); err != nil {
 			return ctrl.Result{}, err
@@ -1341,10 +1379,38 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		).
 		Watches(
 			&apiv1.DatabaseRole{},
-			handler.EnqueueRequestsFromMapFunc(r.mapDatabaseRolesToClusters()),
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
 			// The cluster only consumes spec.passwordSecret (to maintain the
-			// instance RBAC), so status-only changes are irrelevant here.
-			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+			// instance RBAC), so status-only changes are irrelevant here. OR-ed with
+			// isBeingDeletedPredicate so a reconciliation loop can be enqueued
+			// to remove the finalizer from the resource.
+			builder.WithPredicates(predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				isBeingDeletedPredicate,
+			)),
+		).
+		// Watch the owned Database, Publication and Subscription resources only
+		// while they are being deleted. Their reconcilers run in the instance
+		// manager, so when the cluster is torn down together with its pods the
+		// finalizer can only be removed by the operator controller.
+		// If the operator is down while the namespace is deleted,
+		// the Cluster object is gone and nothing would ever re-trigger
+		// that cleanup after a restart; these watches deliver the lingering
+		// resources on the initial cache sync so the cleanup runs.
+		Watches(
+			&apiv1.Database{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
+		).
+		Watches(
+			&apiv1.Publication{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
+		).
+		Watches(
+			&apiv1.Subscription{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
+			builder.WithPredicates(isBeingDeletedPredicate),
 		)
 
 	if configuration.Current.OperatorNamespace != "" {
@@ -1607,22 +1673,28 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 	}
 }
 
-// mapDatabaseRolesToClusters returns a function mapping roles to their corresponding cluster
-func (r *ClusterReconciler) mapDatabaseRolesToClusters() handler.MapFunc {
-	return func(_ context.Context, obj client.Object) []reconcile.Request {
-		role, ok := obj.(*apiv1.DatabaseRole)
-		if !ok || role.Spec.ClusterRef.Name == "" {
-			return nil
-		}
+// mapClusterOwnedResourceToCluster maps a namespaced resource that references its
+// Cluster through the `cluster` field to a reconcile request for that Cluster.
+// It resolves the cluster reference by name instead of through an owner reference.
+func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []reconcile.Request {
+	owned, ok := obj.(interface {
+		GetClusterRef() corev1.LocalObjectReference
+	})
+	if !ok {
+		return nil
+	}
+	clusterName := owned.GetClusterRef().Name
+	if clusterName == "" {
+		return nil
+	}
 
-		return []reconcile.Request{
-			{
-				NamespacedName: types.NamespacedName{
-					Namespace: role.GetNamespace(),
-					Name:      role.Spec.ClusterRef.Name,
-				},
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      clusterName,
 			},
-		}
+		},
 	}
 }
 

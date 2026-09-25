@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -513,6 +514,78 @@ var _ = Describe("configuration change validation", func() {
 	BeforeEach(func() {
 		v = &ClusterCustomValidator{}
 	})
+
+	It("accepts well-formed parameter names, including namespaced custom GUCs", func() {
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"work_mem":                      "16MB",
+						"auto_explain.log_min_duration": "100ms",
+						"some$ext.param$1":              "value",
+					},
+				},
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "10Gi",
+				},
+			},
+		}
+		Expect(v.validateConfiguration(clusterNew)).To(BeEmpty())
+	})
+
+	DescribeTable("rejects a parameter name that could inject a directive",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "/bin/evil",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
+					},
+				},
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		Entry("leading comment then newline", "#\narchive_command"),
+		Entry("valid name with a trailing newline injection", "archive_command\nrestart_after = 0"),
+		Entry("carriage return", "archive_command\rrestart_after = 0"),
+	)
+
+	DescribeTable("rejects a malformed parameter name",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "value",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
+					},
+				},
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		// The end anchor in the name regex matches end-of-text, not end-of-line,
+		// so a trailing newline is caught even though it carries no injected directive.
+		Entry("trailing newline", "archive_command\n"),
+		Entry("embedded NUL byte", "work_mem\x00"),
+		Entry("equals sign", "work_mem=128MB"),
+		Entry("leading whitespace", " work_mem"),
+		Entry("space in the middle", "work mem"),
+		Entry("hash character", "work#mem"),
+		Entry("empty string", ""),
+	)
 
 	It("produces no error when WAL size settings are correct", func() {
 		clusterNew := &apiv1.Cluster{
@@ -2402,6 +2475,80 @@ var _ = Describe("validation of an external cluster", func() {
 
 		cluster.Spec.ExternalClusters[0].ConnectionParameters = nil
 		cluster.Spec.ExternalClusters[0].BarmanObjectStore = &apiv1.BarmanObjectStoreConfiguration{}
+		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
+	})
+
+	DescribeTable("rejects names and secret selectors that would escape the secrets directory",
+		func(mutate func(*apiv1.ExternalCluster)) {
+			ec := apiv1.ExternalCluster{
+				Name:                 "one",
+				ConnectionParameters: map[string]string{"dbname": "postgres"},
+			}
+			mutate(&ec)
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{ExternalClusters: []apiv1.ExternalCluster{ec}},
+			}
+			Expect(v.validateExternalClusters(cluster)).ToNot(BeEmpty())
+		},
+		Entry("traversal in the name", func(ec *apiv1.ExternalCluster) {
+			ec.Name = "../pwned"
+		}),
+		Entry("separator in the name", func(ec *apiv1.ExternalCluster) {
+			ec.Name = "nested/pwned"
+		}),
+		Entry("traversal in the sslCert secret name", func(ec *apiv1.ExternalCluster) {
+			ec.SSLCert = &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "../pwned"},
+				Key:                  "tls.crt",
+			}
+		}),
+		Entry("traversal in the sslCert secret key", func(ec *apiv1.ExternalCluster) {
+			ec.SSLCert = &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "cert"},
+				Key:                  "../pwned",
+			}
+		}),
+	)
+
+	It("does not reject a password selector whose value would be unsafe as a path", func() {
+		// The password selector name and key are never joined into a
+		// filesystem path, so the webhook must leave them untouched.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                 "one",
+						ConnectionParameters: map[string]string{"dbname": "postgres"},
+						Password: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "../pwned"},
+							Key:                  "../pwned",
+						},
+					},
+				},
+			},
+		}
+		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
+	})
+
+	It("accepts a well-formed name and secret selectors", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                 "one",
+						ConnectionParameters: map[string]string{"dbname": "postgres"},
+						SSLCert: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "cert"},
+							Key:                  "tls.crt",
+						},
+						Password: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "creds"},
+							Key:                  "password",
+						},
+					},
+				},
+			},
+		}
 		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
 	})
 })
@@ -5978,6 +6125,111 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[3].Field).To(ContainSubstring("bin_path[0]"))
 	})
 
+	It("returns an error for an absolute path with embedded traversal that escapes", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/a/../../../../etc",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
+	It("returns no error for a path traversal that does not escape", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/opt/custom/share",
+							},
+							DynamicLibraryPath: []string{
+								"a/b/../../share",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
+	It("returns an error for a relative path that escapes via leading traversal", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../../mount-evil",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
+	It("returns an error for a path that escapes only once joined under a deeper, realistic mount point", func() {
+		// CollectBinPaths and absolutizePaths join these paths under a
+		// multi-segment mount point at runtime (e.g. "/extensions/<name>"),
+		// not a single-segment one. A containment check resolved against a
+		// shallower placeholder base would wrongly accept these.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../mount/lib",
+							},
+							DynamicLibraryPath: []string{
+								"../../../mount/x",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+		Expect(err[1].Field).To(ContainSubstring("dynamic_library_path[0]"))
+	})
+
 	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -6892,5 +7144,165 @@ var _ = Describe("ServiceAccount configuration validation", func() {
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.serviceAccountName"))
 		Expect(result[0].Detail).To(ContainSubstring("mutually exclusive"))
+	})
+})
+
+var _ = Describe("getSynchronousReplicationWarnings", func() {
+	It("returns no warning for a single-instance cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 1},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a multi-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning when the current synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method: apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number: 1,
+					},
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the legacy synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MinSyncReplicas: 1,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when only maxSyncReplicas is set", func() {
+		// minSyncReplicas is the floor that self-healing can't erase: with it
+		// left at zero, a transient shortfall of ready replicas collapses the
+		// effective synchronous requirement to zero (see getSyncReplicasData
+		// in pkg/postgres/replication/legacy.go), so maxSyncReplicas alone does
+		// not guarantee durability.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: 2,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning for a replica cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a two-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 2},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("is raised on both creation and update", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		v := &ClusterCustomValidator{}
+
+		createWarnings, _ := v.ValidateCreate(context.Background(), cluster)
+		Expect(createWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
+
+		updateWarnings, _ := v.ValidateUpdate(context.Background(), cluster, cluster)
+		Expect(updateWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
+	})
+})
+
+var _ = Describe("getFailureDomainTopologyWarnings", func() {
+	makeCluster := func(failureDomainKeys []string, conditions []metav1.Condition) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{}
+		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+			Method:                apiv1.SynchronousReplicaConfigurationMethodAny,
+			Number:                1,
+			NodeFailureDomainKeys: failureDomainKeys,
+		}
+		cluster.Status.Conditions = conditions
+		return cluster
+	}
+
+	It("returns no warning when no failure domain keys are set", func() {
+		cluster := makeCluster(nil, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+				Message: "No cross-domain replica exists.",
+			},
+		})
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the condition is True", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionTrue,
+				Reason:  string(apiv1.ConditionReasonTopologySatisfied),
+				Message: "Enough electable synchronous standbys are in a different failure domain than the primary.",
+			},
+		})
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the condition is absent", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, nil)
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when the condition is False due to insufficient cross-domain replicas", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+				Message: "Not enough electable synchronous standbys in a different failure domain than the primary.",
+			},
+		})
+		warnings := getFailureDomainTopologyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
+		Expect(warnings[0]).To(ContainSubstring("Not enough electable synchronous standbys"))
+	})
+
+	It("returns a warning when the condition is False due to topology not extracted", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonTopologyNotExtracted),
+				Message: "Topology labels could not be extracted from pods or nodes.",
+			},
+		})
+		warnings := getFailureDomainTopologyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
+		Expect(warnings[0]).To(ContainSubstring("Topology labels could not be extracted"))
 	})
 })

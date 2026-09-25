@@ -1,0 +1,17 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: scheduled-backup-plugin-immediate
+spec:
+  # February 29th: the rarest schedule the controller accepts, so in practice
+  # only the immediate option below triggers a backup. It cannot be an
+  # impossible date (the controller refuses schedules with no next occurrence,
+  # including their immediate backup), and restricting day-of-week instead
+  # would backfire: cron ORs day-of-month with day-of-week when both are set.
+  schedule: "0 0 0 29 2 *"
+  immediate: true
+  method: plugin
+  cluster:
+    name: cluster-plugin-backup
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

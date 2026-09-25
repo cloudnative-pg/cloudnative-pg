@@ -66,7 +66,7 @@ The CloudNativePG operator container images are available on the
 [`cloudnative-pg` project's GitHub Container Registry](https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg)
 in two different flavors:
 
-- Debian 12 distroless
+- Debian 13 distroless
 - Red Hat UBI 9 micro (suffix `-ubi9`)
 
 Red Hat UBI images are primarily intended for OLM consumption.
@@ -99,7 +99,7 @@ Three image flavors are available, each extending the previous one:
     Barman Cloud plugin, or another supported backup solution.
 :::
 
-By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie`.
+By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie`.
 
 All images are signed and shipped with SBOM and provenance attestations.
 Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.

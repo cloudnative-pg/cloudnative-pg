@@ -58,6 +58,7 @@ const clientCertReconcileInterval = time.Hour
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/status,verbs=get;update;patch;watch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/finalizers,verbs=update
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
@@ -72,6 +73,15 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot get the role resource: %w", err)
+	}
+
+	// The instance manager clears the deleteRole finalizer on its own.
+	// Re-issuing the client certificate Secret here would block an external
+	// finalizer waiting on garbage collection, for example ArgoCD's
+	// foreground pruning.
+	if !role.DeletionTimestamp.IsZero() {
+		contextLogger.Debug("DatabaseRole is being deleted, skipping reconciliation")
+		return ctrl.Result{}, nil
 	}
 
 	if err := r.reconcilePasswordCondition(ctx, &role); err != nil {
