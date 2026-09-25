@@ -192,10 +192,14 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		By("verifying cluster readiness condition is false just after scale-up", func() {
 			// Just after scale up the cluster, the condition status set to be `False` and cluster is not ready state.
 			clusterasserts.AssertClusterReadinessStatusIsReached(env, namespace, clusterName, apiv1.ConditionFalse, 180)
+			// The not-ready condition must refer to the generation produced by
+			// the scale-up, not to the one that was ready before it.
+			clusterasserts.AssertClusterReadyConditionIsCurrent(env, namespace, clusterName)
 		})
 
 		By("verifying cluster reaches ready condition after additional waiting", func() {
 			clusterasserts.AssertClusterReadinessStatusIsReached(env, namespace, clusterName, apiv1.ConditionTrue, 180)
+			clusterasserts.AssertClusterReadyConditionIsCurrent(env, namespace, clusterName)
 		})
 	})
 })
