@@ -107,7 +107,14 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 
 	case apierrs.IsNotFound(err):
 		newSecret, err := generateCertificateFromCA(
-			&caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey, clientCertDuration(role))
+			generateCertificateFromCAParamsOpts{
+				caSecret:   &caSecret,
+				commonName: role.Spec.Name,
+				usage:      certs.CertTypeClient,
+				secretName: secretKey,
+				duration:   clientCertDuration(role),
+			},
+		)
 		if err != nil {
 			return fmt.Errorf("while signing client cert for role %q: %w", role.Spec.Name, err)
 		}
@@ -195,8 +202,13 @@ func (r *DatabaseRoleReconciler) reissueClientCert(
 	log.FromContext(ctx).Info("re-issuing client certificate", "secret", secretKey.Name, "reason", reason)
 
 	origSecret := certSecret.DeepCopy()
-	newSecret, err := generateCertificateFromCA(
-		caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey, clientCertDuration(role))
+	newSecret, err := generateCertificateFromCA(generateCertificateFromCAParamsOpts{
+		caSecret:   caSecret,
+		commonName: role.Spec.Name,
+		usage:      certs.CertTypeClient,
+		secretName: secretKey,
+		duration:   clientCertDuration(role),
+	})
 	if err != nil {
 		return fmt.Errorf("while re-signing client cert for role %q: %w", role.Spec.Name, err)
 	}
