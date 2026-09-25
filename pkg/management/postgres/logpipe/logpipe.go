@@ -44,6 +44,7 @@ type LogPipe struct {
 	fileName        string
 	record          CSVRecordParser
 	fieldsValidator FieldsValidator
+	openFlag        int
 
 	initialized *concurrency.Executed
 	exited      *concurrency.Executed
@@ -61,10 +62,23 @@ func NewLogPipe() *LogPipe {
 		fileName:        filepath.Join(postgres.LogPath, postgres.LogFileName+".csv"),
 		record:          NewPgAuditLoggingDecorator(),
 		fieldsValidator: LogFieldValidator,
+		openFlag:        os.O_RDONLY,
 
 		initialized: concurrency.NewExecuted(),
 		exited:      concurrency.NewExecuted(),
 	}
+}
+
+// WithNonBlockingOpen makes the pipe open the log FIFO with O_NONBLOCK, so
+// the open(2) call never blocks waiting for a writer to connect. With this
+// flag, a read that reaches EOF means "no writer is connected" rather than
+// "the stream ended": the pipe backs off and retries until a writer shows
+// up. This is what bootstrap (initdb, join, restore) needs, where nothing
+// may ever write to some of the log FIFOs and a blocking open would park
+// the goroutine in the kernel indefinitely.
+func (p *LogPipe) WithNonBlockingOpen() *LogPipe {
+	p.openFlag = os.O_RDONLY | nonBlockFlag
+	return p
 }
 
 // GetInitializedCondition returns the condition that can be checked in order to
@@ -129,8 +143,10 @@ func (p *LogPipe) Start(ctx context.Context) error {
 	return nil
 }
 
-// collectLogsFromFile opens (blocking) the FIFO file, then starts reading the csv file line by line
-// until the end of the file or an error.
+// collectLogsFromFile opens the FIFO file, then starts reading the csv file
+// line by line until the end of the file or an error. Unless the pipe is
+// configured with WithNonBlockingOpen, the open(2) call blocks until a
+// writer connects.
 func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
 	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)
 
@@ -141,7 +157,7 @@ func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
 		}
 	}()
 
-	f, err := fileutils.OpenFileAsync(ctx, p.fileName, os.O_RDWR, 0o600)
+	f, err := fileutils.OpenFileAsync(ctx, p.fileName, p.openFlag, 0o600)
 	if err != nil {
 		return err
 	}
@@ -174,11 +190,30 @@ func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
 	}
 }
 
-// streamLogFromCSVFile is a function reading csv lines from an io.Reader and
-// writing them to the passed RecordWriter. This function can return
-// ErrFieldCountExtended which enrich the csv.ErrFieldCount with the
-// decoded invalid line
+// streamLogFromCSVFile is a function reading csv lines from an io.Reader
+// and writing them to the passed RecordWriter until an error. With a
+// non-blocking open, reaching EOF means no writer is connected, which is
+// transient: it backs off and reads again, keeping the FIFO open so a
+// writer connecting right away is not dropped. The csv reader is recreated
+// on every attempt, as the previous one latches EOF.
 func (p *LogPipe) streamLogFromCSVFile(ctx context.Context, inputFile io.Reader, writer RecordWriter) error {
+	for {
+		err := p.streamLogFromCSVFileOnce(ctx, inputFile, writer)
+		if err != nil || p.openFlag&nonBlockFlag == 0 {
+			return err
+		}
+		waitBeforeRetry(ctx)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
+}
+
+// streamLogFromCSVFileOnce reads csv lines from an io.Reader until the end
+// of the file or an error, writing them to the passed RecordWriter. It can
+// return ErrFieldCountExtended which enrich the csv.ErrFieldCount with the
+// decoded invalid line
+func (p *LogPipe) streamLogFromCSVFileOnce(ctx context.Context, inputFile io.Reader, writer RecordWriter) error {
 	var (
 		content []string
 		err     error
@@ -189,9 +224,11 @@ func (p *LogPipe) streamLogFromCSVFile(ctx context.Context, inputFile io.Reader,
 
 	// Read the first line outside the loop to validate the number of fields
 	if content, err = reader.Read(); err != nil {
-		// If the stream is finished, we are done before starting
+		// If the stream is finished, we are done before starting. With a
+		// non-blocking open, EOF means no writer is connected yet, so we
+		// surface it to let the caller back off and read again.
 		if errors.Is(err, io.EOF) {
-			return nil
+			return p.eofError()
 		}
 
 		// If the read timed out probably the channel has been cancelled
@@ -228,9 +265,10 @@ reader:
 					Err:      err,
 				}
 
-			// If the stream is finished, we are done
+			// If the stream is finished, we are done. With a non-blocking
+			// open, EOF instead means no writer is connected anymore.
 			case errors.Is(err, io.EOF):
-				break reader
+				return p.eofError()
 
 			case ctx.Err() != nil:
 				break reader
@@ -243,5 +281,17 @@ reader:
 		writer.Write(p.record.FromCSV(content))
 	}
 
+	return nil
+}
+
+// eofError is the error to report when a read reaches EOF. With a blocking
+// open, EOF means the last writer closed the FIFO: the stream is over.
+// With a non-blocking open, EOF means no writer is connected, and the
+// reader cannot be reused (it latches EOF): the caller must back off and
+// read again with a fresh reader, keeping the FIFO open.
+func (p *LogPipe) eofError() error {
+	if p.openFlag&nonBlockFlag != 0 {
+		return io.EOF
+	}
 	return nil
 }

@@ -43,6 +43,7 @@ type lineHandler func(line []byte)
 type LineLogPipe struct {
 	fileName string
 	handler  lineHandler
+	openFlag int
 
 	initialized *concurrency.Executed
 	exited      *concurrency.Executed
@@ -67,9 +68,22 @@ func NewJSONLineLogPipe(fileName string) *LineLogPipe {
 		handler: func(line []byte) {
 			fmt.Println(string(line))
 		},
+		openFlag:    os.O_RDONLY,
 		initialized: concurrency.NewExecuted(),
 		exited:      concurrency.NewExecuted(),
 	}
+}
+
+// WithNonBlockingOpen makes the pipe open the log FIFO with O_NONBLOCK, so
+// the open(2) call never blocks waiting for a writer to connect. With this
+// flag, a read that reaches EOF means "no writer is connected" rather than
+// "the stream ended": the pipe backs off and retries until a writer shows
+// up. This is what bootstrap (initdb, join, restore) needs, where nothing
+// may ever write to some of the log FIFOs and a blocking open would park
+// the goroutine in the kernel indefinitely.
+func (p *LineLogPipe) WithNonBlockingOpen() *LineLogPipe {
+	p.openFlag = os.O_RDONLY | nonBlockFlag
+	return p
 }
 
 // NewRawLineLogPipe returns a logPipe for raw output
@@ -83,6 +97,7 @@ func NewRawLineLogPipe(fileName, name string) *LineLogPipe {
 				logger.Info(string(line))
 			}
 		},
+		openFlag:    os.O_RDONLY,
 		initialized: concurrency.NewExecuted(),
 		exited:      concurrency.NewExecuted(),
 	}
@@ -137,8 +152,10 @@ func (p *LineLogPipe) Start(ctx context.Context) error {
 	return nil
 }
 
-// collectLogsFromFile opens (blocking) the FIFO file, then starts reading the csv file line by line
-// until the end of the file or an error.
+// collectLogsFromFile opens the FIFO file, then starts reading it line by
+// line until the end of the file or an error. Unless the pipe is configured
+// with WithNonBlockingOpen, the open(2) call blocks until a writer
+// connects.
 func (p *LineLogPipe) collectLogsFromFile(ctx context.Context) error {
 	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)
 
@@ -149,7 +166,7 @@ func (p *LineLogPipe) collectLogsFromFile(ctx context.Context) error {
 		}
 	}()
 
-	f, err := fileutils.OpenFileAsync(ctx, p.fileName, os.O_RDWR, 0o600)
+	f, err := fileutils.OpenFileAsync(ctx, p.fileName, p.openFlag, 0o600)
 	if err != nil {
 		return err
 	}
@@ -183,22 +200,34 @@ func (p *LineLogPipe) collectLogsFromFile(ctx context.Context) error {
 	}
 }
 
-// streamLogFromCSVFile is a function reading csv lines from an io.Reader and
-// writing them to the passed RecordWriter. This function can return
-// ErrFieldCountExtended which enrich the csv.ErrFieldCount with the
-// decoded invalid line
-func (p *LineLogPipe) streamLogFromFile(ctx context.Context, reader io.Reader) error {
-	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		p.handler(line)
-	}
+// streamLogFromFile is a function reading lines from the given FIFO file
+// and passing them to the handler until the end of the file or an error.
+func (p *LineLogPipe) streamLogFromFile(ctx context.Context, inputFile io.Reader) error {
+	for {
+		scanner := bufio.NewScanner(inputFile)
+		scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			p.handler(line)
+		}
 
-	// If the read timed out probably the channel has been cancelled
-	if ctx.Err() != nil {
-		return nil
-	}
+		// If the read timed out probably the channel has been cancelled
+		if ctx.Err() != nil {
+			return nil
+		}
 
-	return scanner.Err()
+		if scanner.Err() != nil {
+			return scanner.Err()
+		}
+
+		// EOF with a blocking open means the last writer closed the FIFO:
+		// the stream is over. With a non-blocking open it means no writer
+		// is connected: back off and scan again, keeping the FIFO open so
+		// a writer connecting right away is not dropped. The scanner must
+		// be recreated, as bufio latches EOF on the old one.
+		if p.openFlag&nonBlockFlag == 0 {
+			return nil
+		}
+		waitBeforeRetry(ctx)
+	}
 }

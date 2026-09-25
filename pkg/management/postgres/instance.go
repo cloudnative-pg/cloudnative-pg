@@ -844,7 +844,13 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
-	csvPipe := logpipe.NewLogPipe()
+	// Open the log FIFOs non-blockingly: during bootstrap (initdb, join,
+	// restore) nothing may ever write to some of the FIFOs (e.g. postgres
+	// logs to csvlog only during initdb), and a blocking open(2) would park
+	// the reader goroutine in the kernel forever once this context is
+	// cancelled. The instance manager keeps the blocking open, where
+	// waiting for the first writer is the desired behavior.
+	csvPipe := logpipe.NewLogPipe().WithNonBlockingOpen()
 	go func() {
 		if err := csvPipe.Start(ctx); err != nil {
 			log.Info("csv log pipe encountered an error", "err", err)
@@ -854,7 +860,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	rawPipe := logpipe.NewRawLineLogPipe(
 		filepath.Join(postgres.LogPath, postgres.LogFileName),
 		logpipe.LoggingCollectorRecordName,
-	)
+	).WithNonBlockingOpen()
 	go func() {
 		if err := rawPipe.Start(ctx); err != nil {
 			log.Info("raw log pipe encountered an error", "err", err)
@@ -863,7 +869,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 
 	jsonPipe := logpipe.NewJSONLineLogPipe(
 		filepath.Join(postgres.LogPath, postgres.LogFileName+".json"),
-	)
+	).WithNonBlockingOpen()
 	go func() {
 		if err := jsonPipe.Start(ctx); err != nil {
 			log.Info("json log pipe encountered an error", "err", err)
