@@ -37,18 +37,20 @@ func SetClusterReadyCondition(cluster *apiv1.Cluster) {
 	}
 
 	condition := metav1.Condition{
-		Type:    string(apiv1.ConditionClusterReady),
-		Status:  metav1.ConditionFalse,
-		Reason:  string(apiv1.ClusterIsNotReady),
-		Message: "Cluster Is Not Ready",
+		Type:               string(apiv1.ConditionClusterReady),
+		Status:             metav1.ConditionFalse,
+		Reason:             string(apiv1.ClusterIsNotReady),
+		Message:            "Cluster Is Not Ready",
+		ObservedGeneration: cluster.Generation,
 	}
 
 	if cluster.Status.Phase == apiv1.PhaseHealthy {
 		condition = metav1.Condition{
-			Type:    string(apiv1.ConditionClusterReady),
-			Status:  metav1.ConditionTrue,
-			Reason:  string(apiv1.ClusterReady),
-			Message: "Cluster is Ready",
+			Type:               string(apiv1.ConditionClusterReady),
+			Status:             metav1.ConditionTrue,
+			Reason:             string(apiv1.ClusterReady),
+			Message:            "Cluster is Ready",
+			ObservedGeneration: cluster.Generation,
 		}
 	}
 
