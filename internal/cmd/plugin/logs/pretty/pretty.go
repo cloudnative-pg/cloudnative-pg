@@ -159,10 +159,17 @@ func (bf *prettyCmd) group(ctx context.Context, logChannel <-chan logRecord, gro
 		buffer = bufferArray[0:0]
 	}
 
+	// A single timer is reused across iterations and reset at the top of each
+	// one. This preserves the original "flush the buffer after one second of
+	// inactivity" behaviour while avoiding the allocation of a new timer (and a
+	// piled-up deferred Stop) on every received log record, which previously
+	// grew unbounded for the lifetime of the stream.
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
+
 logLoop:
 	for {
-		timer := time.NewTimer(1 * time.Second)
-		defer timer.Stop()
+		timer.Reset(1 * time.Second)
 
 		select {
 		case <-ctx.Done():

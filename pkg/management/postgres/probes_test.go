@@ -24,7 +24,7 @@ import (
 	"regexp"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -36,26 +36,26 @@ import (
 
 var _ = Describe("areAllParamsUpdated", func() {
 	It("should return true when all params match", func() {
-		decreased := map[string]int{"max_connections": 90, "max_worker_processes": 4}
-		controldata := map[string]int{"max_connections": 90, "max_worker_processes": 4}
+		decreased := map[string]int{maxConnectionsParameter: 90, "max_worker_processes": 4}
+		controldata := map[string]int{maxConnectionsParameter: 90, "max_worker_processes": 4}
 		Expect(areAllParamsUpdated(decreased, controldata)).To(BeTrue())
 	})
 
 	It("should return false when a param doesn't match", func() {
-		decreased := map[string]int{"max_connections": 90}
-		controldata := map[string]int{"max_connections": 100}
+		decreased := map[string]int{maxConnectionsParameter: 90}
+		controldata := map[string]int{maxConnectionsParameter: 100}
 		Expect(areAllParamsUpdated(decreased, controldata)).To(BeFalse())
 	})
 
 	It("should return false when a param is missing from controldata", func() {
-		decreased := map[string]int{"max_connections": 90}
+		decreased := map[string]int{maxConnectionsParameter: 90}
 		controldata := map[string]int{}
 		Expect(areAllParamsUpdated(decreased, controldata)).To(BeFalse())
 	})
 
 	It("should return true for empty decreased values", func() {
 		decreased := map[string]int{}
-		controldata := map[string]int{"max_connections": 100}
+		controldata := map[string]int{maxConnectionsParameter: 100}
 		Expect(areAllParamsUpdated(decreased, controldata)).To(BeTrue())
 	})
 })
@@ -94,7 +94,7 @@ var _ = Describe("updateResultForDecrease", func() {
 
 			mock.ExpectQuery(decreasedSettingsQuery).
 				WillReturnRows(sqlmock.NewRows([]string{"name", "new_setting"}).
-					AddRow("max_connections", 90))
+					AddRow(maxConnectionsParameter, 90))
 
 			instance := &Instance{}
 			result := &postgres.PostgresqlStatus{
@@ -118,7 +118,7 @@ var _ = Describe("updateResultForDecrease", func() {
 
 				mock.ExpectQuery(decreasedSettingsQuery).
 					WillReturnRows(sqlmock.NewRows([]string{"name", "new_setting"}).
-						AddRow("max_connections", 95))
+						AddRow(maxConnectionsParameter, 95))
 
 				instance := (&Instance{}).WithPodName(podName)
 				instance.SetCluster(&apiv1.Cluster{
@@ -156,6 +156,75 @@ var _ = Describe("updateResultForDecrease", func() {
 })
 
 var _ = Describe("probes", func() {
+	Context("pg_stat_wal", func() {
+		// A never-reset instance (or PostgreSQL 18+, where stats_reset starts as
+		// NULL) is coalesced to '-infinity' in the query, so the value always
+		// scans into the plain string field instead of failing on a NULL.
+		DescribeTable("scans the coalesced stats_reset",
+			func(isPG18OrNewer bool) {
+				db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() {
+					_ = db.Close()
+				})
+
+				const query = "SELECT pg_stat_wal"
+				var walStat PgStatWal
+				var rows *sqlmock.Rows
+				var scanArgs []any
+
+				if isPG18OrNewer {
+					rows = sqlmock.NewRows([]string{
+						"wal_records",
+						"wal_fpi",
+						"wal_bytes",
+						"wal_buffers_full",
+						"stats_reset",
+					}).AddRow(int64(1), int64(2), int64(3), int64(4), "-infinity")
+					scanArgs = []any{
+						&walStat.WalRecords,
+						&walStat.WalFpi,
+						&walStat.WalBytes,
+						&walStat.WALBuffersFull,
+						&walStat.StatsReset,
+					}
+				} else {
+					rows = sqlmock.NewRows([]string{
+						"wal_records",
+						"wal_fpi",
+						"wal_bytes",
+						"wal_buffers_full",
+						"wal_write",
+						"wal_sync",
+						"wal_write_time",
+						"wal_sync_time",
+						"stats_reset",
+					}).AddRow(int64(1), int64(2), int64(3), int64(4), int64(5), int64(6), 7.5, 8.5, "-infinity")
+					scanArgs = []any{
+						&walStat.WalRecords,
+						&walStat.WalFpi,
+						&walStat.WalBytes,
+						&walStat.WALBuffersFull,
+						&walStat.WalWrite,
+						&walStat.WalSync,
+						&walStat.WalWriteTime,
+						&walStat.WalSyncTime,
+						&walStat.StatsReset,
+					}
+				}
+
+				mock.ExpectQuery(query).WillReturnRows(rows)
+
+				err = db.QueryRow(query).Scan(scanArgs...)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(walStat.StatsReset).To(Equal("-infinity"))
+				Expect(mock.ExpectationsWereMet()).To(Succeed())
+			},
+			Entry("before PostgreSQL 18", false),
+			Entry("from PostgreSQL 18", true),
+		)
+	})
+
 	It("fillWalStatus should properly handle errors", func() {
 		instance := &Instance{}
 		status := &postgres.PostgresqlStatus{
@@ -218,7 +287,7 @@ var _ = Describe("probes", func() {
 	Context("Fill basebackup stats", func() {
 		It("set the information", func() {
 			instance := (&Instance{
-				pgVersion: &semver.Version{Major: 13},
+				pgVersion: semver.New(13, 0, 0, "", ""),
 			}).WithPodName("test-1")
 			status := &postgres.PostgresqlStatus{
 				IsPrimary: false,

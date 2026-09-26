@@ -90,35 +90,39 @@ var _ = Describe("FindUnknownPlaceholders", func() {
 })
 
 var _ = Describe("ExpandEnvPlaceholders", func() {
+	expand := func(value string) string {
+		return ExpandEnvPlaceholders(value, "my-ext", ExtensionsBaseDirectory)
+	}
+
 	It("expands image_root to the extension mount path", func() {
-		Expect(ExpandEnvPlaceholders("${image_root}/lib", "my-ext")).To(Equal("/extensions/my-ext/lib"))
+		Expect(expand("${image_root}/lib")).To(Equal("/extensions/my-ext/lib"))
 	})
 
 	It("unescapes $${...} to literal ${...}", func() {
-		Expect(ExpandEnvPlaceholders("$${not_expanded}", "my-ext")).To(Equal("${not_expanded}"))
+		Expect(expand("$${not_expanded}")).To(Equal("${not_expanded}"))
 	})
 
 	It("handles mixed escaped and expanded placeholders", func() {
-		Expect(ExpandEnvPlaceholders("${image_root}/$${literal}", "my-ext")).To(Equal("/extensions/my-ext/${literal}"))
+		Expect(expand("${image_root}/$${literal}")).To(Equal("/extensions/my-ext/${literal}"))
 	})
 
 	It("preserves $${image_root} as literal", func() {
-		Expect(ExpandEnvPlaceholders("$${image_root}", "my-ext")).To(Equal("${image_root}"))
+		Expect(expand("$${image_root}")).To(Equal("${image_root}"))
 	})
 
 	It("expands $$${image_root} to literal $ plus expanded path", func() {
-		Expect(ExpandEnvPlaceholders("$$${image_root}", "my-ext")).To(Equal("$/extensions/my-ext"))
+		Expect(expand("$$${image_root}")).To(Equal("$/extensions/my-ext"))
 	})
 
 	It("preserves $$$${image_root} as $${image_root}", func() {
-		Expect(ExpandEnvPlaceholders("$$$${image_root}", "my-ext")).To(Equal("$${image_root}"))
+		Expect(expand("$$$${image_root}")).To(Equal("$${image_root}"))
 	})
 
 	It("does not alter bare $$ without braces", func() {
-		Expect(ExpandEnvPlaceholders("plain $$text", "my-ext")).To(Equal("plain $$text"))
+		Expect(expand("plain $$text")).To(Equal("plain $$text"))
 	})
 
 	It("leaves unknown placeholders as-is", func() {
-		Expect(ExpandEnvPlaceholders("${unknown}", "my-ext")).To(Equal("${unknown}"))
+		Expect(expand("${unknown}")).To(Equal("${unknown}"))
 	})
 })

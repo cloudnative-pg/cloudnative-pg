@@ -1,4 +1,9 @@
 version: "2"
+run:
+  # Resolve `path:` regexes in exclusion rules relative to the git root so a
+  # single config works whether golangci-lint is invoked from the repo root
+  # (linting the operator module) or from tests/ (linting the e2e module).
+  relative-path-mode: gitroot
 linters:
   default: none
   enable:
@@ -16,7 +21,7 @@ linters:
     - gocyclo
     - goheader
     - gomoddirectives
-    - gomodguard
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - govet
@@ -43,6 +48,27 @@ linters:
     - wastedassign
     - whitespace
   settings:
+    goconst:
+      min-occurrences: 10
+      # RBAC verb strings are stable Kubernetes API values not defined as constants
+      # in k8s.io/api/rbac/v1 — extracting them adds noise without reducing risk.
+      ignore-string-values:
+        - "^get$"
+        - "^list$"
+        - "^watch$"
+        - "^create$"
+        - "^patch$"
+        - "^update$"
+        - "^delete$"
+    gomoddirectives:
+      # The tests/ module uses a local replace to point at the parent module
+      # one directory up because it depends on unreleased operator code
+      # (api/v1, pkg/..., a few internal/... constants, and the in-process
+      # webhook validator). The operator module itself has no local replace,
+      # so this allow-list is a no-op there.
+      replace-local: true
+      replace-allow-list:
+        - github.com/cloudnative-pg/cloudnative-pg
     gosec:
       excludes:
         - G101
@@ -101,7 +127,7 @@ linters:
         source: ginkgo|gomega
       - linters:
           - goconst
-        path: _test\.go
+        path: (_test\.go|^tests/)
       - linters:
           - lll
         source: //\s*\+

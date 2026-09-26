@@ -9,14 +9,18 @@ AZs
 AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
+AdzerKI
 AffinityConfiguration
 AllNamespaces
+Anand
 AntiAffinity
 AppArmor
 AppArmorProfile
+ArgoCD
 Armando
 AuthQuery
 AuthQuerySecret
+AutomountServiceAccountToken
 Autoscaler
 AvailableArchitecture
 AvailableArchitectures
@@ -46,6 +50,7 @@ BarmanCredentials
 BarmanObjectStoreConfiguration
 Bartolini
 Battiato
+BlaiseAntony
 BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
@@ -54,6 +59,7 @@ Buildx
 Burstable
 ByStatus
 CAs
+CEL
 CIDR
 CIS
 CKA
@@ -64,13 +70,16 @@ CONTAINERNAME
 CR's
 CRD
 CRDs
+CRLs
 CSI
 CSV
 CSVs
 CVE
 CVEs
+CWE
 CannotReconcile
 Canovai
+CatalogComponentImage
 CatalogImage
 CatalogImages
 Cecchi
@@ -81,6 +90,9 @@ Certmanager
 CiliumNetworkPolicy
 ClassName
 ClientCASecret
+ClientCertificate
+ClientCertificateConfiguration
+ClientCertificateState
 ClientTLSSecret
 CloudNativePG
 CloudNativePG's
@@ -97,6 +109,7 @@ ClusterSpec
 ClusterStatus
 CodeQL
 ColumnName
+ComponentImages
 ConditionStatus
 ConfigMap
 ConfigMapKeySelector
@@ -127,7 +140,15 @@ DatabaseObjectStatus
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
+DatabaseRole
+DatabaseRoleList
+DatabaseRoleReclaimDelete
+DatabaseRoleReclaimPolicy
+DatabaseRoleReclaimRetain
 DatabaseRoleRef
+DatabaseRoleSpec
+DatabaseRoleStatus
+DatabaseRoles
 DatabaseSpec
 DatabaseStatus
 DefaultAzureCredential
@@ -139,6 +160,7 @@ DigitalOcean
 DisablePassword
 DisabledDefaultServices
 DoD
+DoS
 DockerHub
 Dockle
 EBS
@@ -152,6 +174,8 @@ EmbeddedObjectMetadata
 EnablePDB
 Endevir
 EndpointCA
+EndpointSlice
+EndpointSlices
 EnsureOption
 EnterpriseDB
 Enum
@@ -173,6 +197,7 @@ FQDN
 FQDNs
 FailoverQuorum
 FailoverQuorumStatus
+FailureDomainKeys
 Fei
 Filesystem
 Fluentd
@@ -180,6 +205,7 @@ Francesco
 GC
 GCE
 GCS
+GHSA
 GID
 GIS
 GKE
@@ -189,6 +215,7 @@ GUCs
 GabriFedi
 Gabriele
 GaugeVec
+GellertBabel
 GeoSpatial
 Gi
 GitOps
@@ -200,9 +227,11 @@ GoogleCredentials
 Grafana
 GrantUsageSpecType
 HH
+HPA
 HashiCorp
 HistoryTags
 Homebrew
+HoniSanders
 Huß
 IAM
 INPLACE
@@ -214,12 +243,14 @@ IaC
 Ibryam
 IfNotPresent
 ImageCatalog
+ImageCatalogComponentRef
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
 ImageVolume
 ImageVolumeSource
 ImportSource
+Infinoid
 InfoSec
 InstanceID
 InstanceReportedState
@@ -228,8 +259,10 @@ Isovalent
 Istio
 Istio's
 JSON
+Jamstah
 JefeDavis
 Joda
+KEP
 KV
 Karpenter
 KinD
@@ -293,6 +326,7 @@ Nenciarini
 NetworkPolicies
 NetworkPolicy
 NodeAffinity
+NodeFailureDomainKeys
 NodeMaintenanceWindow
 NodeSelector
 NodesUsed
@@ -314,11 +348,13 @@ OpenSSL
 OpenShift
 Openshift
 OperatorCapabilities
+OperatorCertificateFingerprint
 OperatorHub
 OptionSpec
 OwnNamespace
 PDB
 PDBs
+PEM
 PGAudit
 PGDATA
 PGDG
@@ -328,6 +364,7 @@ PGSQL
 PKI
 PODNAME
 PPROF
+PSA
 PV
 PVCs
 PascalBourdier
@@ -350,6 +387,7 @@ PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
 PodDisruptionBudgets
+PodFailureDomainKeys
 PodMonitor
 PodName
 PodSecurityContext
@@ -367,6 +405,12 @@ Pooler's
 PoolerIntegrations
 PoolerList
 PoolerMonitoringConfiguration
+PoolerMonitoringTLSConfiguration
+PoolerPhase
+PoolerPhaseActive
+PoolerPhaseFailed
+PoolerPhaseInactive
+PoolerPhasePaused
 PoolerSecrets
 PoolerSpec
 PoolerStatus
@@ -376,7 +420,9 @@ PostInitApplicationSQLRefs
 PostInitSQLRefs
 PostInitTemplateSQLRefs
 Postgres
+PostgresCapabilities
 PostgresConfiguration
+PrimaryLeaseConfiguration
 PrimaryUpdateMethod
 PrimaryUpdateMethodRestart
 PrimaryUpdateMethodSwitchover
@@ -409,6 +455,7 @@ PushSecret
 QoS
 QuickStart
 RBAC
+RCE
 README
 RHSA
 RLS
@@ -450,6 +497,7 @@ SHA
 SLA
 SLSA
 SPDX
+SPDY
 SPoF
 SQLQuery
 SQLRefs
@@ -468,6 +516,7 @@ Seccomp
 SeccompProfile
 SecretKeySelector
 SecretRefs
+SecretResourceVersion
 SecretStore
 SecretVersion
 SecretsResourceVersion
@@ -479,6 +528,7 @@ ServerSpec
 ServerTLSSecret
 ServiceAccount
 ServiceAccountTemplate
+ServiceAccounts
 ServiceMonitor
 ServiceSelectorType
 ServiceSelectorTypeR
@@ -513,7 +563,9 @@ SubscriptionStatus
 SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
+Symlinked
 SyncReplicaElectionConstraints
+SyncReplicationTopologySatisfied
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
@@ -524,6 +576,8 @@ TLS
 TLSv
 TOC
 TODO
+TTL
+TTY
 TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile
@@ -533,6 +587,7 @@ TablespaceStatus
 TablespaceStatusPendingReconciliation
 TablespaceStatusReconciled
 Tablespaces
+TargetPGDataImageInfo
 TemporaryData
 TimelineId
 TopologyKey
@@ -545,14 +600,17 @@ URIs
 UTF
 Uncomment
 Unrealizable
+Untrusted
 UpdateStrategy
 UsageSpec
 UsageSpecType
+Utkarsh
 VLDB
 VLDBs
 VM
 VMs
 VOLNAME
+VPA
 ValidationError
 VirtualBox
 VolumeSnapshot
@@ -567,6 +625,7 @@ WALs
 WalBackupConfiguration
 WalClassName
 Wallner
+WebSocket
 XXu
 YXBw
 YY
@@ -596,6 +655,7 @@ allowPrivilegeEscalation
 allowVolumeExpansion
 alm
 amd
+andrew
 angus
 anonymization
 api
@@ -624,7 +684,9 @@ authQuerySecret
 authn
 authz
 autocompletion
+automounted
 autoscaler
+autoscalers
 autovacuum
 availableArchitectures
 availablearchitecture
@@ -665,6 +727,7 @@ barmanObjectStore
 barmancloud
 barmanobjectstore
 barmanobjectstoreconfiguration
+bartscheers
 baseDN
 basebackup
 bb
@@ -673,6 +736,7 @@ beginLSN
 beginWal
 benchmarked
 benchmarking
+binak
 bindAsAuth
 bindDN
 bindPassword
@@ -684,6 +748,7 @@ bootstrapconfiguration
 bootstrapinitdb
 bootstrappgbasebackup
 bootstraprecovery
+boto
 bozkayasalihx
 br
 bs
@@ -696,6 +761,7 @@ cGFzc
 caSecretVersion
 cannotReconcile
 catalogName
+catalogcomponentimage
 catalogimage
 cb
 cd
@@ -716,8 +782,11 @@ cli
 clientCA
 clientCASecret
 clientCaSecretVersion
+clientCertificate
 clientTLS
 clientTLSSecret
+clientcertificateconfiguration
+clientcertificatestate
 cloudNativePGCommitHash
 cloudNativePGOperatorHash
 cloudnative
@@ -741,6 +810,7 @@ collationVersion
 columnValue
 commandError
 commandOutput
+componentImages
 conf
 config
 config's
@@ -767,6 +837,7 @@ coreos
 corev
 cp
 cpu
+crashloop
 crds
 createdAt
 createdb
@@ -793,15 +864,23 @@ customresourcedefinitions
 cutover
 cyber
 dT
+daanvinken
 danglingPVC
 dataChecksums
 dataDurability
 databackupconfiguration
 databaseReclaimPolicy
+databaseRoleReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
 databasereclaimpolicy
+databaserole
+databaserolelist
+databaserolereclaimpolicy
 databaseroleref
+databaseroles
+databaserolespec
+databaserolestatus
 databasespec
 databasestatus
 datacenter
@@ -818,6 +897,7 @@ de
 declaratively
 defaultMode
 demotionToken
+dennispidun
 deploymentStrategy
 dereference
 destinationPath
@@ -867,6 +947,7 @@ ephemeralVolumesSizeLimit
 ephemeralvolumessizelimitconfiguration
 ermakov
 eu
+evan
 excludePatterns
 executables
 expirations
@@ -891,6 +972,7 @@ failoverquorumstatus
 failovers
 failureThreshold
 faq
+farries
 fastpath
 fb
 fd
@@ -944,6 +1026,7 @@ historyTags
 hostPort
 hostname
 hostssl
+hpa
 href
 html
 http
@@ -961,6 +1044,7 @@ imagePullPolicy
 imagePullSecrets
 imageVolume
 imagecatalog
+imagecatalogcomponentref
 imagecatalogref
 imagecatalogs
 imagecatalogspec
@@ -993,6 +1077,7 @@ instancereportedstate
 instancesReportedState
 instancesStatus
 inuse
+invariants
 io
 ip
 ipcs
@@ -1005,15 +1090,18 @@ isolationcheckconfiguration
 isready
 issuecomment
 italy
+jaconi
 jdbc
 jmealo
 jobCount
+jonasbadstuebner
 jq
 json
 jsonpath
 juliamertz
 kb
 kbytes
+kdautrey
 keepalive
 kms
 kube
@@ -1049,6 +1137,7 @@ le
 leonardoce
 li
 libpq
+libpq's
 lifecycle
 lifecycles
 linodeobjects
@@ -1093,6 +1182,7 @@ maxParallel
 maxStandbyNamesFromCluster
 maxSyncReplicas
 maximumLag
+maxlengdell
 maxwait
 mcache
 md
@@ -1102,6 +1192,7 @@ memstats
 metav
 metric's
 metricsQueriesTTL
+mhartmann
 microservice
 microservices
 microsoft
@@ -1111,6 +1202,7 @@ minSyncReplicas
 minikube
 minio
 misconfigurations
+mjlshen
 mmap
 monitoringconfiguration
 mountPath
@@ -1128,6 +1220,7 @@ networkpolicy
 nextScheduleTime
 nginx
 nodeAffinity
+nodeFailureDomainKeys
 nodeLabelsAntiAffinity
 nodeMaintenanceWindow
 nodeSelector
@@ -1170,12 +1263,15 @@ ownerReference
 parseable
 paru
 passfile
+passthrough
 passwd
 passwordSecret
+passwordState
 passwordStatus
 passwordstate
 pc
 pchovelon
+pcj
 pdf
 periodSeconds
 persistentVolumeClaims
@@ -1225,6 +1321,7 @@ podAntiAffinity
 podAntiAffinityType
 podCount
 podDisruptionBudgets
+podFailureDomainKeys
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
@@ -1248,6 +1345,8 @@ poolerIntegrations
 poolerName
 poolerintegrations
 poolermonitoringconfiguration
+poolermonitoringtlsconfiguration
+poolerphase
 poolers
 poolersecrets
 poolerspec
@@ -1275,10 +1374,13 @@ pprof
 pre
 preferredDuringSchedulingIgnoredDuringExecution
 prefetched
+prefetching
 preload
 prepended
+prepends
 primaryUpdateMethod
 primaryUpdateStrategy
+primaryleaseconfiguration
 primaryupdatemethod
 primaryupdatestrategy
 priorityClassName
@@ -1309,6 +1411,7 @@ pvc
 pvcCount
 pvcName
 pvcTemplate
+qc
 quantile
 queryable
 quickstart
@@ -1347,6 +1450,7 @@ reportNonRedacted
 reportRedacted
 req
 requestTimeout
+requeued
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
@@ -1363,6 +1467,9 @@ ro
 robfig
 roleRef
 roleconfiguration
+rolelist
+rolespec
+rolestate
 rolestatus
 rollout
 rollouts
@@ -1390,6 +1497,7 @@ schemaspec
 sdk
 searchAttribute
 searchFilter
+sebv
 seccompProfile
 secretAccessKey
 secretKeyRef
@@ -1423,6 +1531,7 @@ serviceupdatestrategy
 sessionToken
 sha
 sharifmshaker
+sharma
 shm
 shmall
 shmmax
@@ -1506,6 +1615,7 @@ synchronizereplicasconfiguration
 synchronousreplicaconfiguration
 synchronousreplicaconfigurationmethod
 syncreplicaelectionconstraints
+syncreplicas
 sys
 syslog
 systemID
@@ -1555,6 +1665,7 @@ toto
 transactionID
 transactional
 transactionid
+trixie
 tx
 ubi
 ui
@@ -1567,6 +1678,7 @@ unencrypted
 unfence
 unfencing
 unix
+unmanaged
 unsatisfiable
 unschedulable
 unsetting
@@ -1587,6 +1699,7 @@ validUntil
 validatingwebhookconfigurations
 validator
 valueFrom
+verifier
 virtualized
 virtualxid
 volumeMode
@@ -1595,6 +1708,8 @@ volumeSnapshot
 volumeSnapshots
 volumesnapshot
 volumesnapshotconfiguration
+vp
+vpa
 waitForArchive
 wal
 walCapabilities
@@ -1607,6 +1722,7 @@ webhook
 webhooks
 webserver
 webtest
+whitespace
 wp
 writeService
 wsl

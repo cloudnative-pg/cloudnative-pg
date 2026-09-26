@@ -22,7 +22,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -43,11 +42,14 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -67,22 +69,13 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		postgresqlSystemEntry  = "postgresql-system"
 		rollbackEntry          = "rollback"
 
-		// custom registry envs
-		customPostgresImageRegistryEnvVar       = "POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY"
-		customPostgresImageStandardSuffixEnvVar = "POSTGRES_MAJOR_UPGRADE_STANDARD_SUFFIX"
-		customPostgresImageMinimalSuffixEnvVar  = "POSTGRES_MAJOR_UPGRADE_MINIMAL_SUFFIX"
-		customPostgresImageSystemSuffixEnvVar   = "POSTGRES_MAJOR_UPGRADE_SYSTEM_SUFFIX"
-		customPostgresImagePostGISSuffixEnvVar  = "POSTGRES_MAJOR_UPGRADE_POSTGIS_SUFFIX"
-
-		// default suffixes used when overriding registry via env vars
-		// as defined by postgres-trunk-containers tests
+		// default suffixes used when overriding the registry via the
+		// majorUpgrade configuration, as defined by postgres-trunk-containers
+		// tests
 		defaultStandardSuffix = "-standard-trixie"
 		defaultMinimalSuffix  = "-minimal-trixie"
 		defaultSystemSuffix   = "-system-trixie"
 		defaultPostGISSuffix  = "-postgis-trixie"
-
-		// env vars used to skip certain scenarios
-		skipArchiveScenarioEnvVar = "POSTGRES_MAJOR_UPGRADE_SKIP_ARCHIVE_SCENARIO"
 	)
 
 	type scenario struct {
@@ -149,10 +142,10 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 						},
 					},
 					DestinationPath: "s3://pg-major-upgrade/",
-					EndpointURL:     "https://minio-service.minio:9000",
+					EndpointURL:     "https://object-store.object-store:9000",
 					EndpointCA: &apiv1.SecretKeySelector{
 						LocalObjectReference: apiv1.LocalObjectReference{
-							Name: "minio-server-ca-secret",
+							Name: "object-store-ca-secret",
 						},
 						Key: "ca.crt",
 					},
@@ -252,7 +245,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 
 		// If same version, choose a previous one for testing
 		if currentMajor == targetMajor {
-			currentMajor = targetMajor - (uint64(rand.Int() % 4)) - 1
+			currentMajor = targetMajor - uint64(rand.Int()%4) - 1
 			GinkgoWriter.Printf("Using %v as the current major version instead.\n", currentMajor)
 		}
 
@@ -286,29 +279,31 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			postgresqlSystemEntry:  env.SystemImageName(targetTag),
 		}
 
-		// Set custom targets when detecting env variables (used by postgres-trunk-containers tests)
-		if envValue := os.Getenv(customPostgresImageRegistryEnvVar); envValue != "" {
-			standardSuffix := os.Getenv(customPostgresImageStandardSuffixEnvVar)
+		// Set custom targets when the majorUpgrade configuration overrides the
+		// registry (used by postgres-trunk-containers tests)
+		if majorUpgrade := config.Current().MajorUpgrade; majorUpgrade.ImageRegistry != "" {
+			registry := majorUpgrade.ImageRegistry
+			standardSuffix := majorUpgrade.StandardSuffix
 			if standardSuffix == "" {
 				standardSuffix = defaultStandardSuffix
 			}
-			minimalSuffix := os.Getenv(customPostgresImageMinimalSuffixEnvVar)
+			minimalSuffix := majorUpgrade.MinimalSuffix
 			if minimalSuffix == "" {
 				minimalSuffix = defaultMinimalSuffix
 			}
-			systemSuffix := os.Getenv(customPostgresImageSystemSuffixEnvVar)
+			systemSuffix := majorUpgrade.SystemSuffix
 			if systemSuffix == "" {
 				systemSuffix = defaultSystemSuffix
 			}
-			postgisSuffix := os.Getenv(customPostgresImagePostGISSuffixEnvVar)
+			postgisSuffix := majorUpgrade.PostGISSuffix
 			if postgisSuffix == "" {
 				postgisSuffix = defaultPostGISSuffix
 			}
 
-			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, standardSuffix)
-			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, minimalSuffix)
-			targetImages[postgresqlSystemEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, systemSuffix)
-			targetImages[postgisEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, postgisSuffix)
+			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v%s", registry, targetTag, standardSuffix)
+			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v%s", registry, targetTag, minimalSuffix)
+			targetImages[postgresqlSystemEntry] = fmt.Sprintf("%v:%v%s", registry, targetTag, systemSuffix)
+			targetImages[postgisEntry] = fmt.Sprintf("%v:%v%s", registry, targetTag, postgisSuffix)
 		}
 
 		return targetImages
@@ -485,22 +480,22 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		storageClass := env.DefaultStorageClass
 		Expect(storageClass).ToNot(BeEmpty())
 
-		By("creating the certificates for MinIO", func() {
-			err := minioEnv.CreateCaSecret(env, namespace)
+		By("creating the certificates for the object store", func() {
+			err := objectStoreEnv.CreateCaSecret(env, namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("creating the credentials for minio", func() {
+		By("creating the credentials for the object store", func() {
 			_, err = secrets.CreateObjectStorageSecret(
 				env.Ctx,
 				env.Client,
 				namespace,
 				"backup-storage-creds",
-				"minio",
-				"minio123",
+				objectstore.AccessKeyID,
+				objectstore.SecretAccessKey,
 			)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -516,37 +511,31 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		scenario := scenarios[scenarioName]
 		startingImage := scenario.startingCluster.Spec.ImageName
 
-		// If the skipArchiveScenarioEnvVar is present, skip the archiving scenario.
-		skipArchiveScenario := false
-		if _, ok := os.LookupEnv(skipArchiveScenarioEnvVar); ok {
-			skipArchiveScenario = true
-		}
-		if scenarioName == postgresqlSystemEntry && skipArchiveScenario {
+		if scenarioName == postgresqlSystemEntry && config.Current().MajorUpgrade.SkipArchiveScenario {
 			Skip("Skipping the archiving scenario")
 		}
 
 		cluster := scenario.startingCluster
 		clusterutils.AddTopologySpreadConstraint(cluster)
-		err := env.Client.Create(env.Ctx, cluster)
+		_, err := objects.Create(env.Ctx, env.Client, cluster)
 		Expect(err).NotTo(HaveOccurred())
-		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady],
-			env)
+		clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 
 		if cluster.Spec.Backup != nil {
-			By("verifying connectivity of barman to minio", func() {
+			By("verifying connectivity of barman to the object store", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func() (bool, error) {
-					connectionStatus, err := minio.TestBarmanConnectivity(
+					connectionStatus, err := objectstore.TestBarmanConnectivity(
 						cluster.Namespace, cluster.Name, primaryPod.Name,
-						"minio", "minio123", minioEnv.ServiceName)
+						objectstore.AccessKeyID, objectstore.SecretAccessKey, objectStoreEnv.ServiceName)
 					return connectionStatus, err
 				}, 60).Should(BeTrue())
 			})
 		}
 
 		By("Performing switchover to move to timeline 2")
-		AssertSwitchover(cluster.Namespace, cluster.Name, env)
+		clusterasserts.AssertSwitchover(env, testTimeouts, cluster.Namespace, cluster.Name)
 
 		By("Verifying cluster is on timeline 2 before upgrade")
 		Eventually(func(g Gomega) {
@@ -611,7 +600,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			By("Rolling back the cluster to the initial major version")
 			applyRollback(env.Ctx, env.Client, cluster, startingImage)
 
-			AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 
 			By("Verifying the cluster was rolled back to the starting version")
 			verifyPostgresVersion(env, primary, oldStdOut, scenario.startingMajor, false)
@@ -624,7 +613,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			return
 		}
 
-		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 
 		// The upgrade destroys all the original pods and creates new ones. We want to make sure that we have
 		// the same amount of pods as before, but with different UUIDs.
@@ -651,7 +640,8 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		// Verify WAL archiving continues to work after the major upgrade
 		if cluster.Spec.Backup != nil {
 			By("Verifying WAL archiving works after the major upgrade")
-			AssertArchiveWalOnMinio(cluster.Namespace, cluster.Name, cluster.Name)
+			objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+				cluster.Namespace, cluster.Name, cluster.Name)
 		}
 	},
 		Entry("PostGIS", postgisEntry),

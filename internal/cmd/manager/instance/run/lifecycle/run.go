@@ -178,7 +178,6 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 
 	contextLogger.Debug("Validating DB configuration")
 
-	// A transaction is required to temporarily disable synchronous replication
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
@@ -190,6 +189,24 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 	}
 
 	if err = configurePgRewindPrivileges(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	// Set up the metrics-exporter role in a separate transaction: the
+	// InstanceReconciler also creates this role on the primary, so a
+	// duplicate-key race here must not roll back the replication-user setup
+	// committed above (see issue #10748).
+	tx, err = db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("creating a new transaction to set up the metrics exporter role: %w", err)
+	}
+
+	if err = postgres.SetupMetricsExporterRole(ctx, tx); err != nil {
 		_ = tx.Rollback()
 		return err
 	}

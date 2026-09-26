@@ -1,0 +1,11 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: databaserole-sample
+spec:
+  name: databaserole-sample
+  login: true
+  cluster:
+    name: cluster-sample
+status:
+  applied: false

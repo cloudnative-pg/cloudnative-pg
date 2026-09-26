@@ -193,10 +193,14 @@ func updateRoleLabels(
 
 	switch instance.Name {
 	case cluster.Status.CurrentPrimary:
+		// A failover in progress owns this pod's label via markOldPrimaryAsUnhealthy.
+		if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary {
+			return false
+		}
 		if !hasRole || podRole != specs.ClusterRoleLabelPrimary || !newHasRole ||
 			newPodRole != specs.ClusterRoleLabelPrimary {
 			contextLogger.Info("Setting primary label", "pod", instance.Name)
-			utils.SetInstanceRole(instance.ObjectMeta, specs.ClusterRoleLabelPrimary)
+			utils.SetInstanceRole(&instance.ObjectMeta, specs.ClusterRoleLabelPrimary)
 			return true
 		}
 
@@ -204,7 +208,7 @@ func updateRoleLabels(
 		if !hasRole || podRole != specs.ClusterRoleLabelReplica || !newHasRole ||
 			newPodRole != specs.ClusterRoleLabelReplica {
 			contextLogger.Info("Setting replica label", "pod", instance.Name)
-			utils.SetInstanceRole(instance.ObjectMeta, specs.ClusterRoleLabelReplica)
+			utils.SetInstanceRole(&instance.ObjectMeta, specs.ClusterRoleLabelReplica)
 			return true
 		}
 	}

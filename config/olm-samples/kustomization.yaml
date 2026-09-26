@@ -8,3 +8,4 @@ resources:
 - postgresql_v1_database.yaml
 - postgresql_v1_publication.yaml
 - postgresql_v1_subscription.yaml
+- postgresql_v1_databaserole.yaml

@@ -1,0 +1,40 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-replica-src-plugin
+spec:
+  instances: 2
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      database: appSrc
+      owner: userSrc
+      postInitApplicationSQL:
+        - ALTER ROLE "userSrc" REPLICATION
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+    pg_hba:
+      - host replication userSrc all md5
+
+  # Archive WALs through plugin-barman-cloud (instead of the deprecated in-core
+  # barmanObjectStore). The referenced ObjectStore is created by the test.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: cluster-replica-src-plugin

@@ -41,6 +41,14 @@ generated outside CNPG.
     communication within the cluster.
 :::
 
+:::note
+    Beyond the CA-managed certificates listed above, the operator also uses a
+    self-signed client certificate, generated in memory, to authenticate to the
+    instance manager's status port. This certificate is not signed by the client
+    CA: the instance manager trusts it by pinning its public-key fingerprint. See
+    [Operator-to-instance authentication](security.md#operator-to-instance-authentication).
+:::
+
 ## Operator-Managed Mode
 
 By default, the operator automatically generates a single Certificate Authority

@@ -122,3 +122,22 @@ func (in *Pooler) GetServiceAccountName() string {
 	}
 	return in.Name
 }
+
+// IsMetricsTLSEnabled checks if the metrics endpoint should use TLS
+func (in *Pooler) IsMetricsTLSEnabled() bool {
+	if in.Spec.Monitoring != nil && in.Spec.Monitoring.TLSConfig != nil {
+		return in.Spec.Monitoring.TLSConfig.Enabled
+	}
+
+	return false
+}
+
+// SetAdmissionError sets the admission error status on the Pooler resource
+func (in *Pooler) SetAdmissionError(msg string) {
+	in.Status.Error = msg
+}
+
+// GetAdmissionError returns the admission error recorded on the Pooler status
+func (in *Pooler) GetAdmissionError() string {
+	return in.Status.Error
+}

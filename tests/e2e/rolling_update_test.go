@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"os"
-
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
@@ -31,12 +29,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -112,10 +113,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		timeout := 900
 
 		// Update to the latest minor
-		updatedImageName := os.Getenv("POSTGRES_IMG")
-		if updatedImageName == "" {
-			updatedImageName = configuration.Current.PostgresImageName
-		}
+		updatedImageName := config.Current().Postgres.Image
 
 		// We should be able to apply the conf containing the new
 		// image
@@ -133,7 +131,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, timeout)
 
 		// Setting up a cluster with three podutils is slow, usually 200-600s
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 	}
 
 	// Verify that the pod name changes amount to an expected number
@@ -231,7 +229,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var originalPodUID []types.UID
 		var originalPVCUID []types.UID
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		// Gather the number of instances in this Cluster
 		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -266,14 +264,14 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to a new TargetPrimary.
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimaryUpdateMethod(namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
+			clusterasserts.AssertPrimaryUpdateMethod(env, namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
 		})
 		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
@@ -380,9 +378,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		err := env.Client.Create(env.Ctx, catalog)
 		Expect(err).ToNot(HaveOccurred())
 		clusterutils.AddTopologySpreadConstraint(cluster)
-		err = env.Client.Create(env.Ctx, cluster)
+		_, err = objects.Create(env.Ctx, env.Client, cluster)
 		Expect(err).ToNot(HaveOccurred())
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 
 		// Gather the number of instances in this Cluster
 		cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -400,11 +398,11 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		By("updating the catalog", func() {
 			// Update to the latest minor
 			catalog.GetSpec().Images[0].Image = updatedImageName
-			err := env.Client.Update(env.Ctx, catalog)
+			err := objects.Update(env.Ctx, env.Client, catalog)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, 900)
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 
 		// Since we're using a pvc, after the update the podutils should
 		// have been created with the same name using the same pvc.
@@ -423,14 +421,14 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to a new TargetPrimary.
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimaryUpdateMethod(namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
+			clusterasserts.AssertPrimaryUpdateMethod(env, namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
 		})
 		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
@@ -498,12 +496,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var updatedImageName string
 		var pgVersion version.Data
 		BeforeEach(func() {
-			storageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-			preRollingImg = os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
-			updatedImageName = os.Getenv("POSTGRES_IMG")
-			if updatedImageName == "" {
-				updatedImageName = configuration.Current.PostgresImageName
-			}
+			storageClass = env.DefaultStorageClass
+			preRollingImg = config.Current().Postgres.PreRollingUpdateImage
+			updatedImageName = config.Current().Postgres.Image
 
 			// We automate the extraction of the major version from the image, because we don't want to keep maintaining
 			// the major version in the test

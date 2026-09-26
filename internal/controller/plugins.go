@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"k8s.io/apimachinery/pkg/api/equality"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -77,14 +78,64 @@ func setStatusPluginHook(
 		plugin.Status = val
 	}
 
-	contextLogger.Info("patching cluster status with the updated plugin statuses")
-	contextLogger.Debug("diff detected",
-		"before", origCluster.Status.PluginStatus,
-		"after", cluster.Status.PluginStatus,
-	)
+	if !equality.Semantic.DeepEqual(origCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
+		contextLogger.Info("patching cluster status with the updated plugin statuses")
+		contextLogger.Debug("diff detected",
+			"before", origCluster.Status.PluginStatus,
+			"after", cluster.Status.PluginStatus,
+		)
+		if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
-	if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+	// Requeue in 5s regardless of the patch above, to keep polling the plugin's status
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
+// finalizeReconciliation runs the post-reconcile plugin hooks, syncs the
+// per-plugin statuses, and registers PhaseHealthy as the very last status
+// mutation of the reconciliation loop.
+//
+// PhaseHealthy MUST be the final status update of a successful loop. Any
+// later phase patch (e.g. an error path that registers PhaseFailurePlugin)
+// would be overwritten by the error path on the next reconciliation,
+// oscillating Phase between Healthy and the error phase. See #8582.
+//
+// The result is propagated from the underlying plugin operations so any
+// requeue they request (notably the 5s polling setStatusPluginHook asks for
+// whenever a plugin reports a status) is honored alongside the Healthy
+// registration.
+func (r *ClusterReconciler) finalizeReconciliation(
+	ctx context.Context,
+	pluginClient cnpgiClient.Client,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	hookResult := pluginClient.PostReconcile(ctx, cluster, cluster)
+	if hookResult.Err != nil {
+		contextLogger.Info("Post-reconcile hook returned an error",
+			"hookResult", hookResult)
+		return hookResult.Result, hookResult.Err
+	}
+	if !hookResult.Result.IsZero() {
+		contextLogger.Info("Post-reconcile hook requested a requeue",
+			"hookResult", hookResult)
+	}
+
+	res := hookResult.Result
+	if res.IsZero() {
+		var err error
+		res, err = setStatusPluginHook(ctx, r.Client, pluginClient, cluster)
+		if err != nil {
+			return res, err
+		}
+	}
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+
+	return res, nil
 }

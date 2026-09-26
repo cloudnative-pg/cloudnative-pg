@@ -21,13 +21,36 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/streaming/pkg/httpstream"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("PodSpecHasContainer", func() {
+	spec := corev1.PodSpec{
+		InitContainers: []corev1.Container{{Name: "bootstrap-instance"}},
+		Containers:     []corev1.Container{{Name: "postgres"}},
+	}
+
+	It("finds a regular container", func() {
+		Expect(PodSpecHasContainer(&spec, "postgres")).To(BeTrue())
+	})
+
+	It("finds an init container", func() {
+		Expect(PodSpecHasContainer(&spec, "bootstrap-instance")).To(BeTrue())
+	})
+
+	It("returns false for a container the pod does not have", func() {
+		Expect(PodSpecHasContainer(&spec, "does-not-exist")).To(BeFalse())
+	})
+})
 
 var _ = Describe("isRetryableExecError", func() {
 	Context("when error is nil", func() {
@@ -158,5 +181,46 @@ var _ = Describe("isRetryableExecError", func() {
 			err := errors.New("I/O TIMEOUT")
 			Expect(isRetryableExecError(err)).To(BeTrue())
 		})
+	})
+})
+
+var _ = Describe("shouldFallbackToSPDY", func() {
+	It("should return false for a nil error", func() {
+		Expect(shouldFallbackToSPDY(nil)).To(BeFalse())
+	})
+
+	It("should return true for a WebSocket upgrade failure (bad handshake)", func() {
+		err := &httpstream.UpgradeFailureError{Cause: errors.New("websocket: bad handshake")}
+		Expect(shouldFallbackToSPDY(err)).To(BeTrue())
+	})
+
+	It("should return true when the upgrade failure is wrapped", func() {
+		err := fmt.Errorf("error streaming: %w",
+			&httpstream.UpgradeFailureError{Cause: errors.New("websocket: bad handshake")})
+		Expect(shouldFallbackToSPDY(err)).To(BeTrue())
+	})
+
+	It("should return true even when the handshake cause is a decoded Kubernetes status", func() {
+		// The WebSocket round tripper replaces the bad-handshake cause with a
+		// StatusError when the server returns a decodable metav1.Status, so the
+		// error string no longer mentions "bad handshake". The fallback must
+		// still trigger off the UpgradeFailureError wrapper.
+		statusErr := &apierrors.StatusError{ErrStatus: metav1.Status{
+			Message: "the server does not allow this method on the requested resource",
+			Reason:  metav1.StatusReasonBadRequest,
+		}}
+		err := &httpstream.UpgradeFailureError{Cause: statusErr}
+		Expect(err.Error()).NotTo(ContainSubstring("bad handshake"))
+		Expect(shouldFallbackToSPDY(err)).To(BeTrue())
+	})
+
+	It("should return true for an HTTPS proxy dial error", func() {
+		err := errors.New("proxy: unknown scheme: https")
+		Expect(shouldFallbackToSPDY(err)).To(BeTrue())
+	})
+
+	It("should return false for an unrelated error", func() {
+		err := errors.New("command terminated with exit code 1")
+		Expect(shouldFallbackToSPDY(err)).To(BeFalse())
 	})
 })

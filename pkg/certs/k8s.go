@@ -83,6 +83,12 @@ type PublicKeyInfrastructure struct {
 	// The labelSelector to be used to get the operators deployment,
 	// e.g. "app.kubernetes.io/name=cloudnative-pg"
 	OperatorDeploymentLabelSelector string
+
+	// ManageWebhookConfigurations controls whether the operator injects the CA
+	// bundle into the mutating and validating webhook configurations. When
+	// false, the serving certificate is still managed but the webhook
+	// configurations are left untouched, as they are managed externally.
+	ManageWebhookConfigurations bool
 }
 
 // RenewLeafCertificate renew a secret containing a server
@@ -273,6 +279,13 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	webhookSecret, err := pki.ensureCertificate(ctx, kubeClient, caSecret)
 	if err != nil {
 		return nil, err
+	}
+
+	// The webhook configurations may be managed externally (e.g. by
+	// cert-manager's CA injector or by GitOps); in that case we keep the
+	// serving certificate up to date but leave their caBundle untouched.
+	if !pki.ManageWebhookConfigurations {
+		return webhookSecret, nil
 	}
 
 	if err := pki.injectPublicKeyIntoMutatingWebhook(

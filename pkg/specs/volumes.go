@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -35,11 +36,22 @@ import (
 // PgWalVolumePath is the path used by the WAL volume when present
 const PgWalVolumePath = "/var/lib/postgresql/wal"
 
+// kubeAPIAccessVolumeName is the name of the volume projecting the
+// ServiceAccount token when the automatic mount is disabled
+const kubeAPIAccessVolumeName = "kube-api-access"
+
+// kubeAPIAccessMountPath is the canonical path where Kubernetes clients
+// expect the ServiceAccount credentials to be mounted
+const kubeAPIAccessMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+
 // PgWalVolumePgWalPath is the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
 // PgTablespaceVolumePath is the base path used by tablespace when present
 const PgTablespaceVolumePath = "/var/lib/postgresql/tablespaces"
+
+// pgdataVolumeName is the name of the PGDATA volume
+const pgdataVolumeName = "pgdata"
 
 // MountForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
@@ -99,7 +111,7 @@ func createPostgresVolumes(
 ) []corev1.Volume {
 	result := []corev1.Volume{
 		{
-			Name: "pgdata",
+			Name: pgdataVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: podName,
@@ -153,7 +165,9 @@ func createPostgresVolumes(
 		result = append(result, createProjectedVolume(cluster))
 	}
 
-	result = append(result, createExtensionVolumes(extensions)...)
+	result = append(result, createKubeAPIAccessVolume())
+
+	result = append(result, CreateExtensionVolumes(extensions)...)
 
 	return result
 }
@@ -230,12 +244,28 @@ func createVolumesAndVolumeMountsForSQLRefs(
 	return volumes, volumeMounts
 }
 
+// VolumeMountsConfig holds all parameters for CreatePostgresVolumeMounts.
+type VolumeMountsConfig struct {
+	// Cluster is the cluster whose spec drives which volumes are created.
+	Cluster apiv1.Cluster
+	// Extensions is the list of extension configurations whose binaries
+	// require dedicated volume mounts.
+	Extensions []apiv1.ExtensionConfiguration
+	// NeedsKubeAPIAccess controls whether the kube-api-access projected volume
+	// mount is included. Set to false for containers that do not need
+	// Kubernetes API access (e.g. the bootstrap init container).
+	NeedsKubeAPIAccess bool
+}
+
 // CreatePostgresVolumeMounts creates the volume mounts that are used
 // by PostgreSQL Pods
-func CreatePostgresVolumeMounts(cluster apiv1.Cluster, extensions []apiv1.ExtensionConfiguration) []corev1.VolumeMount {
+func CreatePostgresVolumeMounts(cfg VolumeMountsConfig) []corev1.VolumeMount {
+	cluster := cfg.Cluster
+	extensions := cfg.Extensions
+
 	volumeMounts := []corev1.VolumeMount{
 		{
-			Name:      "pgdata",
+			Name:      pgdataVolumeName,
 			MountPath: "/var/lib/postgresql/data",
 		},
 		{
@@ -270,6 +300,16 @@ func CreatePostgresVolumeMounts(cluster apiv1.Cluster, extensions []apiv1.Extens
 		)
 	}
 
+	if cfg.NeedsKubeAPIAccess {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      kubeAPIAccessVolumeName,
+				MountPath: kubeAPIAccessMountPath,
+				ReadOnly:  true,
+			},
+		)
+	}
+
 	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
 	// later it will be  retrieved to do deepEquals
 	if cluster.ContainsTablespaces() {
@@ -284,7 +324,7 @@ func CreatePostgresVolumeMounts(cluster apiv1.Cluster, extensions []apiv1.Extens
 		}
 	}
 
-	volumeMounts = append(volumeMounts, createExtensionVolumeMounts(extensions)...)
+	volumeMounts = append(volumeMounts, CreateExtensionVolumeMounts(extensions)...)
 
 	return volumeMounts
 }
@@ -325,10 +365,74 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	}
 }
 
+// createKubeAPIAccessVolume replicates the `kube-api-access-*` projected
+// volume that the ServiceAccount admission controller would have injected
+// if the token automount were not disabled (see TokenVolumeSource in
+// kubernetes/plugin/pkg/admission/serviceaccount), keeping the instance
+// manager able to reach the Kubernetes API.
+func createKubeAPIAccessVolume() corev1.Volume {
+	return corev1.Volume{
+		Name: kubeAPIAccessVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+				Sources: []corev1.VolumeProjection{
+					{
+						ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+							Path:              "token",
+							ExpirationSeconds: ptr.To[int64](3607),
+						},
+					},
+					{
+						ConfigMap: &corev1.ConfigMapProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "kube-root-ca.crt",
+							},
+							Items: []corev1.KeyToPath{
+								{
+									Key:  "ca.crt",
+									Path: "ca.crt",
+								},
+							},
+						},
+					},
+					{
+						DownwardAPI: &corev1.DownwardAPIProjection{
+							Items: []corev1.DownwardAPIVolumeFile{
+								{
+									Path: "namespace",
+									FieldRef: &corev1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.namespace",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 // SanitizeExtensionNameForVolume returns a prefixed, RFC 1123 compliant
 // volume name for an extension.
+//
+// The 4-character "ext-" prefix is what bounds ExtensionConfiguration.Name
+// to MaxLength=59 (RFC 1123 label limit of 63, minus the prefix). The
+// upgrade-target counterpart uses an equally-sized "new-" prefix on purpose,
+// so adjusting either one requires updating the API's MaxLength too.
 func SanitizeExtensionNameForVolume(extensionName string) string {
 	return "ext-" + strings.ReplaceAll(extensionName, "_", "-")
+}
+
+// SanitizeExtensionNameForUpgradeTargetVolume returns the RFC 1123 compliant
+// volume name for a target-version extension during a major upgrade. The
+// distinct prefix guarantees no collision with steady-state volumes (which
+// start with "ext-") regardless of the extension name. See
+// SanitizeExtensionNameForVolume for the prefix-vs-MaxLength accounting.
+func SanitizeExtensionNameForUpgradeTargetVolume(extensionName string) string {
+	return "new-" + strings.ReplaceAll(extensionName, "_", "-")
 }
 
 // getExtensions returns the extension configuration from the cluster status,
@@ -340,32 +444,68 @@ func getExtensions(cluster *apiv1.Cluster) []apiv1.ExtensionConfiguration {
 	return cluster.Status.PGDataImageInfo.Extensions
 }
 
-func createExtensionVolumes(extensions []apiv1.ExtensionConfiguration) []corev1.Volume {
+// CreateExtensionVolumes creates the extensions' ImageVolumes that are used
+// by PostgreSQL Pods
+func CreateExtensionVolumes(extensions []apiv1.ExtensionConfiguration) []corev1.Volume {
+	return createExtensionVolumes(extensions, SanitizeExtensionNameForVolume)
+}
+
+// CreateUpgradeTargetExtensionVolumes creates the ImageVolumes for target-version
+// extensions to be mounted alongside source-version extensions during a major
+// upgrade Job.
+func CreateUpgradeTargetExtensionVolumes(extensions []apiv1.ExtensionConfiguration) []corev1.Volume {
+	return createExtensionVolumes(extensions, SanitizeExtensionNameForUpgradeTargetVolume)
+}
+
+func createExtensionVolumes(
+	extensions []apiv1.ExtensionConfiguration,
+	volumeName func(string) string,
+) []corev1.Volume {
 	extensionVolumes := make([]corev1.Volume, 0, len(extensions))
 	for _, extension := range extensions {
 		extensionVolumes = append(extensionVolumes,
 			corev1.Volume{
-				Name: SanitizeExtensionNameForVolume(extension.Name),
+				Name: volumeName(extension.Name),
 				VolumeSource: corev1.VolumeSource{
 					Image: &extension.ImageVolumeSource,
 				},
 			},
 		)
 	}
-
 	return extensionVolumes
 }
 
-func createExtensionVolumeMounts(extensions []apiv1.ExtensionConfiguration) []corev1.VolumeMount {
+// CreateExtensionVolumeMounts creates the extensions' ImageVolumeMounts that are used
+// by PostgreSQL Pods
+func CreateExtensionVolumeMounts(extensions []apiv1.ExtensionConfiguration) []corev1.VolumeMount {
+	return createExtensionVolumeMounts(extensions,
+		SanitizeExtensionNameForVolume,
+		postgres.ExtensionsBaseDirectory)
+}
+
+// CreateUpgradeTargetExtensionVolumeMounts creates the VolumeMounts for
+// target-version extensions during a major upgrade Job. They are mounted under
+// UpgradeTargetExtensionsBaseDirectory so the target-version server finds them
+// at a path distinct from the source-version mounts.
+func CreateUpgradeTargetExtensionVolumeMounts(extensions []apiv1.ExtensionConfiguration) []corev1.VolumeMount {
+	return createExtensionVolumeMounts(extensions,
+		SanitizeExtensionNameForUpgradeTargetVolume,
+		postgres.UpgradeTargetExtensionsBaseDirectory)
+}
+
+func createExtensionVolumeMounts(
+	extensions []apiv1.ExtensionConfiguration,
+	volumeName func(string) string,
+	baseDir string,
+) []corev1.VolumeMount {
 	extensionVolumeMounts := make([]corev1.VolumeMount, 0, len(extensions))
 	for _, extension := range extensions {
 		extensionVolumeMounts = append(extensionVolumeMounts,
 			corev1.VolumeMount{
-				Name:      SanitizeExtensionNameForVolume(extension.Name),
-				MountPath: filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name),
+				Name:      volumeName(extension.Name),
+				MountPath: filepath.Join(baseDir, extension.Name),
 			},
 		)
 	}
-
 	return extensionVolumeMounts
 }

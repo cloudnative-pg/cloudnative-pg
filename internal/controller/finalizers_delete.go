@@ -73,12 +73,27 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 		return err
 	}
 
-	return notifyOwnedResourceDeletion(
+	if err := notifyOwnedResourceDeletion(
 		ctx,
 		r.Client,
 		namespacedName,
 		toSliceWithPointers(sbList.Items),
 		utils.SubscriptionFinalizerName,
+	); err != nil {
+		return err
+	}
+
+	var roleList apiv1.DatabaseRoleList
+	if err := r.List(ctx, &roleList, client.InNamespace(namespacedName.Namespace)); err != nil {
+		return err
+	}
+
+	return notifyOwnedResourceDeletion(
+		ctx,
+		r.Client,
+		namespacedName,
+		toSliceWithPointers(roleList.Items),
+		utils.RoleFinalizerName,
 	)
 }
 
@@ -126,8 +141,8 @@ func notifyOwnedResourceDeletion[T clusterOwnedResourceWithStatus](
 		if obj.GetStatusMessage() != statusMessage {
 			obj.SetAsFailed(errors.New(statusMessage))
 			obj.SetStatusObservedGeneration(0)
-			// We need to use an update here because of the observed generation set to 0
-			// that would be ignored with the patch method.
+			// Update keeps the optimistic concurrency check on the
+			// resourceVersion, unlike the merge patches used elsewhere.
 			if err := cli.Status().Update(ctx, obj); err != nil {
 				itemLogger.Error(err, "error while updating failed status for cluster deletion")
 				return err

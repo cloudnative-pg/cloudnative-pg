@@ -94,6 +94,12 @@ TCP gRPC endpoint behind a Service, with **mTLS** for secure communication.
 Standalone plugins are discovered dynamically by watching for Services with the
 required labels and annotations — no operator restart is needed.
 
+When a standalone plugin's pods are rolled (for example, after upgrading its
+image), the operator detects the change through the EndpointSlices backing the
+plugin Service and reconciles every cluster using that plugin, so they start
+interacting with the new pods promptly instead of waiting for the periodic
+resync.
+
 Example Deployment:
 
 ```yaml

@@ -177,7 +177,7 @@ by creating the first instance, configuring the replication, cloning a
 second instance, and the third one.
 
 In a declarative approach, the state of a system is defined using
-configuration, namely: there's a PostgreSQL 13 cluster with two replicas.
+configuration, namely: there's a PostgreSQL 18 cluster with two replicas.
 This approach highly simplifies change management operations, and when
 these are stored in source control systems like Git, it enables the
 Infrastructure as Code capability. And Kubernetes takes it farther than

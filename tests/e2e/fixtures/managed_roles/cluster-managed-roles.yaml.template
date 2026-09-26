@@ -63,9 +63,21 @@ type: kubernetes.io/basic-auth
 
 ---
 apiVersion: v1
+# The password below is the SCRAM-SHA-256 hash of the cleartext
+# "cavalcanti" (same as the username) with salt "cavalcanti" and
+# 4096 iterations:
+#   SCRAM-SHA-256$4096:Y2F2YWxjYW50aQ==$eCIyo2QEZvwlcMThm1zwQDPnw0jOHlCapCE+QFpHsGs=:YKhSEcd4QiX3SBzmtTOHHA/9yaTBGJWAMMw7+92OyHM=
+# The e2e test relies on this hash being stored byte-for-byte in
+# pg_authid.rolpassword and on the cleartext "cavalcanti" being able
+# to log in.
+#
+# IMPORTANT: when regenerating these base64 values, do NOT include a
+# trailing newline (use `echo -n "..." | base64`, not `echo "..."`).
+# A stray newline in the username or password breaks login and is hard
+# to spot in the base64-encoded form.
 data:
-  username: Y2F2YWxjYW50aQo=
-  password: U0NSQU0tU0hBLTI1NiQ0MDk2OlkyRjJZV3hqWVc1MGFRPT0kZUNJeW8yUUVadndsY01UaG0xendRRFBudzBqT0hsQ2FwQ0UrUUZwSHNHcz06WUtoU0VjZDRRaVgzU0J6bXRUT0hIQS85eWFUQkdKV0FNTXc3KzkyT3lITT0K
+  username: Y2F2YWxjYW50aQ==
+  password: U0NSQU0tU0hBLTI1NiQ0MDk2OlkyRjJZV3hqWVc1MGFRPT0kZUNJeW8yUUVadndsY01UaG0xendRRFBudzBqT0hsQ2FwQ0UrUUZwSHNHcz06WUtoU0VjZDRRaVgzU0J6bXRUT0hIQS85eWFUQkdKV0FNTXc3KzkyT3lITT0=
 kind: Secret
 metadata:
   name: cluster-example-cavalcanti

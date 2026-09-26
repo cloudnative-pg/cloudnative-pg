@@ -9,7 +9,7 @@ data:
     some_query:
       query: |
         SELECT
-         current_database() as datname,
+         pg_catalog.current_database() as datname,
          count(*) as rows
         FROM test_table
       metrics:
@@ -35,7 +35,7 @@ stringData:
     some_query_test:
       query: |
         SELECT
-         current_database() as datname,
+         pg_catalog.current_database() as datname,
          count(*) as rows
       metrics:
         - datname:

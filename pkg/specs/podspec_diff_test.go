@@ -20,7 +20,10 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
@@ -138,14 +141,14 @@ var _ = Describe("normalizeVolumeName", func() {
 
 	It("does not modify system volumes", func() {
 		vol := corev1.Volume{
-			Name: "pgdata",
+			Name: pgdataVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: "pod-1",
 				},
 			},
 		}
-		Expect(normalizeVolumeName(vol)).To(Equal("pgdata"))
+		Expect(normalizeVolumeName(vol)).To(Equal(pgdataVolumeName))
 	})
 })
 
@@ -192,10 +195,10 @@ var _ = Describe("normalizeVolumeMountName", func() {
 
 	It("does not modify system mounts", func() {
 		mount := corev1.VolumeMount{
-			Name:      "pgdata",
+			Name:      pgdataVolumeName,
 			MountPath: "/var/lib/postgresql/data",
 		}
-		Expect(normalizeVolumeMountName(mount)).To(Equal("pgdata"))
+		Expect(normalizeVolumeMountName(mount)).To(Equal(pgdataVolumeName))
 	})
 })
 
@@ -280,5 +283,40 @@ var _ = Describe("compareVolumeMounts migration", func() {
 		}
 		match, _ := compareVolumeMounts(current, target)
 		Expect(match).To(BeTrue())
+	})
+})
+
+var _ = Describe("automountServiceAccountToken drift detection", func() {
+	It("detects a change of the automountServiceAccountToken value", func() {
+		current := corev1.PodSpec{}
+		target := corev1.PodSpec{AutomountServiceAccountToken: ptr.To(false)}
+
+		match, diff := ComparePodSpecs(current, target)
+		Expect(match).To(BeFalse())
+		Expect(diff).To(Equal("automount-service-account-token"))
+
+		match, _ = ComparePodSpecs(target, target)
+		Expect(match).To(BeTrue())
+	})
+})
+
+var _ = Describe("Command comparison", func() {
+	baseCommand := []string{"/controller/manager", "instance", "run"}
+
+	It("ignores the status-port-tls flag carried by Pods created before 1.31", func() {
+		current := corev1.Container{Command: append(slices.Clone(baseCommand), "--status-port-tls")}
+		target := corev1.Container{Command: baseCommand}
+
+		Expect(doContainersMatch(current, target)).To(BeTrue())
+		Expect(doContainersMatch(target, current)).To(BeTrue())
+	})
+
+	It("still detects any other command difference", func() {
+		current := corev1.Container{Command: append(slices.Clone(baseCommand), "--status-port-tls")}
+		target := corev1.Container{Command: append(slices.Clone(baseCommand), "--pprof-server")}
+
+		match, diff := doContainersMatch(current, target)
+		Expect(match).To(BeFalse())
+		Expect(diff).To(Equal("command"))
 	})
 })

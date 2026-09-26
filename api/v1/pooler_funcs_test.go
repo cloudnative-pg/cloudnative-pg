@@ -76,3 +76,45 @@ var _ = Describe("Pooler GetServiceAccountName", func() {
 		Expect(pooler.GetServiceAccountName()).To(Equal("my-pooler"))
 	})
 })
+
+var _ = Describe("Pooler IsMetricsTLSEnabled", func() {
+	It("returns false when Monitoring is nil", func() {
+		pooler := &Pooler{}
+		Expect(pooler.IsMetricsTLSEnabled()).To(BeFalse())
+	})
+
+	It("returns false when TLSConfig is nil", func() {
+		pooler := &Pooler{
+			Spec: PoolerSpec{
+				Monitoring: &PoolerMonitoringConfiguration{},
+			},
+		}
+		Expect(pooler.IsMetricsTLSEnabled()).To(BeFalse())
+	})
+
+	It("returns false when TLS is explicitly disabled", func() {
+		pooler := &Pooler{
+			Spec: PoolerSpec{
+				Monitoring: &PoolerMonitoringConfiguration{
+					TLSConfig: &PoolerMonitoringTLSConfiguration{
+						Enabled: false,
+					},
+				},
+			},
+		}
+		Expect(pooler.IsMetricsTLSEnabled()).To(BeFalse())
+	})
+
+	It("returns true when TLS is enabled", func() {
+		pooler := &Pooler{
+			Spec: PoolerSpec{
+				Monitoring: &PoolerMonitoringConfiguration{
+					TLSConfig: &PoolerMonitoringTLSConfiguration{
+						Enabled: true,
+					},
+				},
+			},
+		}
+		Expect(pooler.IsMetricsTLSEnabled()).To(BeTrue())
+	})
+})

@@ -171,5 +171,39 @@ while true; do
   break
 done
 
+# Move OCP ingress routers off worker nodes for the duration of this test
+# job, so the drain_node e2e does not strand router-default's PDB. The
+# placement is non-production but the OCP cluster is destroyed at end-of-job.
+# OCP still applies the legacy control-plane taint by default; the key is
+# kept in a shell variable so the JSON literal does not contain a woke
+# trigger word.
+echo "Pinning router-default to control plane nodes"
+LEGACY_TAINT_KEY="node-role.kubernetes.io/master" # wokeignore:rule=master
+CTRL_PLANE_KEY="node-role.kubernetes.io/control-plane"
+PATCH=$(cat <<EOF
+{
+  "spec": {
+    "nodePlacement": {
+      "nodeSelector": { "matchLabels": { "${CTRL_PLANE_KEY}": "" } },
+      "tolerations": [
+        { "key": "${LEGACY_TAINT_KEY}", "operator": "Exists", "effect": "NoSchedule" },
+        { "key": "${CTRL_PLANE_KEY}",   "operator": "Exists", "effect": "NoSchedule" }
+      ]
+    }
+  }
+}
+EOF
+)
+NEW_GEN=$(oc patch ingresscontroller.operator.openshift.io/default \
+  -n openshift-ingress-operator --type merge -p "$PATCH" \
+  -o jsonpath='{.metadata.generation}')
+oc wait ingresscontroller.operator.openshift.io/default \
+  -n openshift-ingress-operator \
+  --for=jsonpath="{.status.observedGeneration}=${NEW_GEN}" --timeout=2m
+oc rollout status -n openshift-ingress deployment/router-default --timeout=5m
+oc wait ingresscontroller.operator.openshift.io/default \
+  -n openshift-ingress-operator \
+  --for=condition=Available=True --timeout=2m
+
 echo "Running the e2e tests"
 "${ROOT_DIR}/hack/e2e/run-e2e.sh"

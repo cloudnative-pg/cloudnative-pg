@@ -20,11 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package roles
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -47,7 +50,13 @@ type DatabaseRole struct {
 	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
 	InRoles         []string         `json:"inRoles,omitempty"`
 	password        sql.NullString   `json:"-"`
-	transactionID   int64            `json:"-"`
+	// passwordPassthrough, when true, instructs the instance manager to send the
+	// password literal verbatim rather than SCRAM-SHA-256 encoding it
+	// client-side. It is populated from the cnpg.io/passwordPassthrough
+	// annotation on the Secret backing the role. Write-only: List() results
+	// always carry false, since PostgreSQL has no concept of the annotation.
+	passwordPassthrough bool  `json:"-"`
+	transactionID       int64 `json:"-"`
 }
 
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
@@ -122,4 +131,37 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	}
 
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
+}
+
+// ApplyPassword updates a database role with the password located in the Secret,
+// and it returns the resource version of the Secret
+func (d *DatabaseRole) ApplyPassword(
+	ctx context.Context,
+	cl client.Client,
+	config *apiv1.RoleConfiguration,
+	namespace string,
+) (string, error) {
+	switch {
+	case config.GetRoleSecretName() == "" && !config.DisablePassword:
+		d.ignorePassword = true
+		return "", nil
+	case config.GetRoleSecretName() == "" && config.DisablePassword:
+		d.password = sql.NullString{}
+		return "", nil
+	case config.GetRoleSecretName() != "" && config.DisablePassword:
+		// For DatabaseRole CRDs this is prevented by CEL validation.
+		// For inline managed roles this is a runtime error.
+		return "",
+			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
+				config.GetRoleSecretName())
+	default:
+		passwordSecret, err := getPassword(ctx, cl, config, namespace)
+		if err != nil {
+			return "", err
+		}
+
+		d.password = sql.NullString{Valid: true, String: passwordSecret.password}
+		d.passwordPassthrough = passwordSecret.passthrough
+		return passwordSecret.version, nil
+	}
 }

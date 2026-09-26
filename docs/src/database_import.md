@@ -24,8 +24,8 @@ As a result, the instructions in this section are suitable for both:
 - importing one or more databases from an existing PostgreSQL instance, even
   outside Kubernetes
 - importing the database from any PostgreSQL version to one that is either the
-  same or newer, enabling *major upgrades* of PostgreSQL (e.g. from version 13.x
-  to version 17.x)
+  same or newer, enabling *major upgrades* of PostgreSQL (e.g. from version 14.x
+  to version 18.x)
 
 :::warning
     When performing major upgrades of PostgreSQL you are responsible for making

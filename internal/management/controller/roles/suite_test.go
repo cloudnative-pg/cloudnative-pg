@@ -20,7 +20,12 @@ SPDX-License-Identifier: Apache-2.0
 package roles
 
 import (
+	"fmt"
+	"regexp"
+	"strings"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,6 +53,36 @@ const (
 
 	wantedRoleCommentTpl = "COMMENT ON ROLE \"%s\" IS %s"
 )
+
+var scramMatcherWhitespace = regexp.MustCompile(`\s+`)
+
+// scramAwareMatcher does an exact string match by default. When the
+// expected SQL contains the literal "${SCRAM}" marker, that marker is
+// replaced with a SCRAM-SHA-256 verifier regex (variable salt) and the
+// actual SQL is matched against the resulting pattern. Used to assert
+// on ALTER ROLE statements whose PASSWORD literal is a freshly generated
+// SCRAM hash on every reconcile.
+var scramAwareMatcher = sqlmock.QueryMatcherFunc(func(expectedSQL, actualSQL string) error {
+	const marker = "${SCRAM}"
+	if !strings.Contains(expectedSQL, marker) {
+		return sqlmock.QueryMatcherEqual.Match(expectedSQL, actualSQL)
+	}
+	// Collapse whitespace before matching, to keep parity with how
+	// QueryMatcherEqual normalises the inputs.
+	expected := strings.TrimSpace(scramMatcherWhitespace.ReplaceAllString(expectedSQL, " "))
+	actual := strings.TrimSpace(scramMatcherWhitespace.ReplaceAllString(actualSQL, " "))
+	pattern := regexp.QuoteMeta(expected)
+	pattern = strings.ReplaceAll(pattern, regexp.QuoteMeta(marker),
+		`SCRAM-SHA-256\$\d+:[^$]+\$[^:]+:[^']+`)
+	matched, err := regexp.MatchString("^"+pattern+"$", actual)
+	if err != nil {
+		return err
+	}
+	if !matched {
+		return fmt.Errorf("query %q does not match SCRAM-aware expected %q", actualSQL, expectedSQL)
+	}
+	return nil
+})
 
 func TestReconciler(t *testing.T) {
 	RegisterFailHandler(Fail)

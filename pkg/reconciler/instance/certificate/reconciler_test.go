@@ -25,7 +25,11 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -174,5 +178,92 @@ var _ = Describe("server certificate refresh handler", func() {
 			cert := fakeReconciler.serverCertificateHandler.GetServerCertificate()
 			Expect(cert).ToNot(BeNil())
 		})
+	})
+})
+
+var _ = Describe("ensure the status-port server certificate is loaded", func() {
+	const serverSecretName = "cluster-server"
+
+	var (
+		cluster      *apiv1.Cluster
+		serverSecret *corev1.Secret
+	)
+
+	BeforeEach(func() {
+		root, err := certs.CreateRootCA("common-name", "organization-unit")
+		Expect(err).ToNot(HaveOccurred())
+
+		pair, err := root.CreateAndSignPair("host", certs.CertTypeServer, nil)
+		Expect(err).ToNot(HaveOccurred())
+
+		serverSecret = pair.GenerateCertificateSecret("default", serverSecretName)
+
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"},
+			Status: apiv1.ClusterStatus{
+				Certificates: apiv1.CertificatesStatus{
+					CertificatesConfiguration: apiv1.CertificatesConfiguration{
+						ServerTLSSecret: serverSecretName,
+					},
+				},
+			},
+		}
+	})
+
+	It("loads the certificate from the secret when none is in memory", func(ctx SpecContext) {
+		handler := &fakeServerCertificateHandler{}
+		r := &Reconciler{
+			cli: fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithObjects(serverSecret).
+				Build(),
+			serverCertificateHandler: handler,
+		}
+
+		Expect(r.EnsureServerCertificateLoaded(ctx, cluster)).To(Succeed())
+		Expect(handler.GetServerCertificate()).ToNot(BeNil())
+	})
+
+	It("short-circuits without reading the secret when one is already loaded", func(ctx SpecContext) {
+		loaded := &tls.Certificate{}
+		handler := &fakeServerCertificateHandler{certificate: loaded}
+		// No objects in the client: a read would fail, proving we never issue one.
+		r := &Reconciler{
+			cli: fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				Build(),
+			serverCertificateHandler: handler,
+		}
+
+		Expect(r.EnsureServerCertificateLoaded(ctx, cluster)).To(Succeed())
+		Expect(handler.GetServerCertificate()).To(BeIdenticalTo(loaded))
+	})
+
+	It("tolerates a missing secret, leaving nothing loaded", func(ctx SpecContext) {
+		handler := &fakeServerCertificateHandler{}
+		r := &Reconciler{
+			cli: fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				Build(),
+			serverCertificateHandler: handler,
+		}
+
+		Expect(r.EnsureServerCertificateLoaded(ctx, cluster)).To(Succeed())
+		Expect(handler.GetServerCertificate()).To(BeNil())
+	})
+
+	It("is a no-op when the certificate status is not populated yet", func(ctx SpecContext) {
+		cluster.Status.Certificates.ServerTLSSecret = ""
+		handler := &fakeServerCertificateHandler{}
+		// No objects in the client: a read would fail, proving we never issue one.
+		r := &Reconciler{
+			cli: fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				Build(),
+			serverCertificateHandler: handler,
+		}
+
+		Expect(r.EnsureServerCertificateLoaded(ctx, cluster)).To(Succeed())
+		Expect(handler.GetServerCertificate()).To(BeNil())
 	})
 })

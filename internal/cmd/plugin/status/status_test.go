@@ -112,3 +112,120 @@ var _ = Describe("getWalArchivingStatus", func() {
 		Expect(result).To(ContainSubstring("Disabled"))
 	})
 })
+
+var _ = Describe("groupInstancesByFailureDomain", func() {
+	const (
+		zoneLabel   = "topology.kubernetes.io/zone"
+		regionLabel = "topology.kubernetes.io/region"
+		primary     = "cluster-1"
+		replica1    = "cluster-2"
+		replica2    = "cluster-3"
+	)
+
+	makeCluster := func(
+		failureDomainKeys []string,
+		instances map[apiv1.PodName]apiv1.PodTopologyLabels,
+		extracted bool,
+	) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{}
+		cluster.Status.CurrentPrimary = primary
+		names := make([]string, 0, len(instances))
+		for name := range instances {
+			names = append(names, string(name))
+		}
+		cluster.Status.InstancesStatus = map[apiv1.PodStatus][]string{apiv1.PodHealthy: names}
+		cluster.Status.Topology = apiv1.Topology{
+			SuccessfullyExtracted: extracted,
+			Instances:             instances,
+		}
+		if failureDomainKeys != nil {
+			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+				NodeFailureDomainKeys: failureDomainKeys,
+			}
+		}
+		return cluster
+	}
+
+	It("returns nil when no failure domain keys are set", func() {
+		cluster := makeCluster(nil, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary: {zoneLabel: "az1"},
+		}, true)
+		Expect(groupInstancesByFailureDomain(cluster)).To(BeNil())
+	})
+
+	It("returns nil when topology extraction failed", func() {
+		cluster := makeCluster([]string{zoneLabel}, nil, false)
+		Expect(groupInstancesByFailureDomain(cluster)).To(BeNil())
+	})
+
+	It("groups instances into two domains with a single key", func() {
+		cluster := makeCluster([]string{zoneLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az2"},
+			replica2: {zoneLabel: "az1"},
+		}, true)
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(2))
+
+		// az1 comes first (cluster-1 < cluster-2 in sort order)
+		Expect(groups[0].display).To(Equal("az1"))
+		Expect(groups[0].instances).To(ConsistOf(primary, replica2))
+		Expect(groups[0].hasPrimary).To(BeTrue())
+
+		Expect(groups[1].display).To(Equal("az2"))
+		Expect(groups[1].instances).To(ConsistOf(replica1))
+		Expect(groups[1].hasPrimary).To(BeFalse())
+	})
+
+	It("produces a single group when all instances share the same domain", func() {
+		cluster := makeCluster([]string{zoneLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az1"},
+		}, true)
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(1))
+		Expect(groups[0].hasPrimary).To(BeTrue())
+	})
+
+	It("marks instances that are not ready", func() {
+		cluster := makeCluster([]string{zoneLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: "az2"},
+		}, true)
+		cluster.Status.InstancesStatus = map[apiv1.PodStatus][]string{
+			apiv1.PodHealthy: {primary},
+			apiv1.PodFailed:  {replica1},
+		}
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(2))
+		Expect(groups[1].instances).To(ConsistOf(replica1 + " (not ready)"))
+	})
+
+	It("renders an empty label value as <empty>", func() {
+		cluster := makeCluster([]string{zoneLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1"},
+			replica1: {zoneLabel: ""},
+		}, true)
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(2))
+		Expect(groups[0].display).To(Equal("<empty>"))
+		Expect(groups[0].instances).To(ConsistOf(replica1))
+		Expect(groups[1].display).To(Equal("az1"))
+	})
+
+	It("formats the display value as key=value pairs for multiple keys", func() {
+		cluster := makeCluster([]string{zoneLabel, regionLabel}, map[apiv1.PodName]apiv1.PodTopologyLabels{
+			primary:  {zoneLabel: "az1", regionLabel: "us-east-1"},
+			replica1: {zoneLabel: "az2", regionLabel: "us-east-1"},
+		}, true)
+
+		groups := groupInstancesByFailureDomain(cluster)
+		Expect(groups).To(HaveLen(2))
+		Expect(groups[0].display).To(ContainSubstring("topology.kubernetes.io/zone=az1"))
+		Expect(groups[0].display).To(ContainSubstring("topology.kubernetes.io/region=us-east-1"))
+	})
+})

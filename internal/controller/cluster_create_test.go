@@ -1540,3 +1540,44 @@ var _ = Describe("ServiceAccount with custom name", func() {
 		Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
 	})
 })
+
+var _ = Describe("generateNodeSerial", func() {
+	const clusterName = "cluster-example"
+
+	newCluster := func(instanceNames ...string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+			Status:     apiv1.ClusterStatus{InstanceNames: instanceNames},
+		}
+	}
+
+	r := &ClusterReconciler{}
+
+	It("returns 1 when there are no instances", func() {
+		Expect(r.generateNodeSerial(newCluster())).To(Equal(1))
+	})
+
+	It("returns the next serial when names are sequential", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 1),
+			specs.GetInstanceName(clusterName, 2),
+		))
+		Expect(serial).To(Equal(3))
+	})
+
+	It("fills the lowest gap left by a removed instance", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 1),
+			specs.GetInstanceName(clusterName, 3),
+		))
+		Expect(serial).To(Equal(2))
+	})
+
+	It("ignores names that don't follow the cluster prefix", func() {
+		serial := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 2),
+			"unrelated-pod",
+		))
+		Expect(serial).To(Equal(1))
+	})
+})

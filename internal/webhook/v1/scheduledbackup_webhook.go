@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -44,6 +45,14 @@ func SetupScheduledBackupWebhookWithManager(mgr ctrl.Manager) error {
 		WithValidator(&ScheduledBackupCustomValidator{}).
 		WithDefaulter(&ScheduledBackupCustomDefaulter{}).
 		Complete()
+}
+
+// NewScheduledBackupAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewScheduledBackupAdmissionGuard() *guard.Admission[*apiv1.ScheduledBackup] {
+	return &guard.Admission[*apiv1.ScheduledBackup]{
+		Defaulter: &ScheduledBackupCustomDefaulter{},
+		Validator: newBypassableValidator[*apiv1.ScheduledBackup](&ScheduledBackupCustomValidator{}),
+	}
 }
 
 // +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},path=/mutate-postgresql-cnpg-io-v1-scheduledbackup,mutating=true,failurePolicy=fail,groups=postgresql.cnpg.io,resources=scheduledbackups,verbs=create;update,versions=v1,name=mscheduledbackup.cnpg.io,sideEffects=None
@@ -87,7 +96,7 @@ func (v *ScheduledBackupCustomValidator) ValidateCreate(
 	}
 
 	return warnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "ScheduledBackup"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "ScheduledBackup"},
 		scheduledBackup.Name, allErrs)
 }
 
@@ -105,7 +114,7 @@ func (v *ScheduledBackupCustomValidator) ValidateUpdate(
 	}
 
 	return warnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "scheduledBackup.cnpg.io", Kind: "ScheduledBackup"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "ScheduledBackup"},
 		scheduledBackup.Name, allErrs)
 }
 

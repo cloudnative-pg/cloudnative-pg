@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -37,6 +36,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -56,12 +56,13 @@ type AzureConfiguration struct {
 	BlobContainer  string
 }
 
-// NewAzureConfigurationFromEnv creates a new AzureConfiguration from the environment variables
-func NewAzureConfigurationFromEnv() AzureConfiguration {
+// NewAzureConfiguration creates a new AzureConfiguration from the e2e configuration
+func NewAzureConfiguration() AzureConfiguration {
+	azure := config.Current().Azure
 	return AzureConfiguration{
-		StorageAccount: os.Getenv("AZURE_STORAGE_ACCOUNT"),
-		StorageKey:     os.Getenv("AZURE_STORAGE_KEY"),
-		BlobContainer:  os.Getenv("AZURE_BLOB_CONTAINER"),
+		StorageAccount: azure.StorageAccount,
+		StorageKey:     azure.StorageKey,
+		BlobContainer:  azure.BlobContainer,
 	}
 }
 
@@ -394,7 +395,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 	azStorageAccount,
 	azBlobContainer string,
 ) (*apiv1.Cluster, error) {
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	storageClassName := config.Current().Storage.StorageClass
 	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/",
 		azStorageAccount, azBlobContainer)
 
@@ -479,7 +480,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 	sourceClusterName,
 	targetTime string,
 ) (*apiv1.Cluster, error) {
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	storageClassName := config.Current().Storage.StorageClass
 	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
 
 	restoreCluster := &apiv1.Cluster{

@@ -25,5 +25,5 @@ spec:
         name: cluster-backup-custom
         endpointCA:
           key: ca.crt
-          name: minio-server-ca-secret
+          name: object-store-ca-secret
 

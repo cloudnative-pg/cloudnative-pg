@@ -45,6 +45,7 @@ export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 export CONTROLLER_IMG_DIGEST=${CONTROLLER_IMG_DIGEST:-""}
 export CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
+export CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD:-manifest}
 
 export DOCKER_REGISTRY_MIRROR=${DOCKER_REGISTRY_MIRROR:-}
 export TEST_CLOUD_VENDOR="${CLUSTER_ENGINE}"
@@ -52,12 +53,12 @@ export TEST_CLOUD_VENDOR="${CLUSTER_ENGINE}"
 # shellcheck disable=SC2329
 cleanup() {
   if [ "${PRESERVE_CLUSTER}" = false ]; then
-    "${HACK_DIR}/setup-cluster.sh" -e "${CLUSTER_ENGINE}" destroy || true
+    "${HACK_DIR}/setup-cluster.sh" -e "${CLUSTER_ENGINE}" teardown || true
   else
     set +x
     echo "You've chosen to preserve the Kubernetes cluster."
     echo "You can delete it manually later running:"
-    echo "'${HACK_DIR}/setup-cluster.sh' -e ${CLUSTER_ENGINE} destroy"
+    echo "'${HACK_DIR}/setup-cluster.sh' -e ${CLUSTER_ENGINE} teardown"
   fi
 }
 

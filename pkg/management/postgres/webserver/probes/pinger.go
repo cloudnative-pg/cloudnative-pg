@@ -25,14 +25,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	cnpgUrl "github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -84,15 +83,11 @@ func buildInstanceReachabilityChecker(cfg *apiv1.IsolationCheckConfiguration) (*
 // ping checks if the instance with the passed coordinates is reachable
 // by calling the failsafe endpoint.
 func (e *pinger) ping(host, ip string) error {
-	failsafeURL := url.URL{
-		Scheme: "https",
-		Host:   fmt.Sprintf("%s:%d", ip, cnpgUrl.StatusPort),
-		Path:   cnpgUrl.PathFailSafe,
-	}
+	failsafeURL := url.Build("https", ip, url.PathFailSafe, url.StatusPort)
 
 	var res *http.Response
 	var err error
-	if res, err = e.client.Get(failsafeURL.String()); err != nil {
+	if res, err = e.client.Get(failsafeURL); err != nil {
 		return &pingError{
 			host:   host,
 			ip:     ip,

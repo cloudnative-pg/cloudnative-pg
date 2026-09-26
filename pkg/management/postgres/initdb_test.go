@@ -172,8 +172,14 @@ var _ = Describe("ConfigureNewInstance role creation", func() {
 		mockSuperUser.ExpectExec(`CREATE ROLE \"app_user\" LOGIN`).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
+		// executeQueries brackets the batch with SET / RESET search_path
+		// so user-authored DDL still resolves into "$user", public.
+		mockSuperUser.ExpectExec(regexp.QuoteMeta(`SET search_path TO "$user", public`)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
 		mockSuperUser.ExpectExec("CREATE ROLE post_init_role LOGIN").
 			WillReturnResult(sqlmock.NewResult(1, 1))
+		mockSuperUser.ExpectExec(regexp.QuoteMeta(`RESET search_path`)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
 
 		err := info.ConfigureNewInstance(mi)
 
@@ -188,8 +194,12 @@ var _ = Describe("ConfigureNewInstance role creation", func() {
 
 		// No direct role creation expected
 
+		mockSuperUser.ExpectExec(regexp.QuoteMeta(`SET search_path TO "$user", public`)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
 		mockSuperUser.ExpectExec("CREATE ROLE post_init_role LOGIN").
 			WillReturnResult(sqlmock.NewResult(1, 1))
+		mockSuperUser.ExpectExec(regexp.QuoteMeta(`RESET search_path`)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
 
 		// Execute function under test
 		err := info.ConfigureNewInstance(mi)
@@ -197,5 +207,55 @@ var _ = Describe("ConfigureNewInstance role creation", func() {
 		// Verify results
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mockSuperUser.ExpectationsWereMet()).NotTo(HaveOccurred())
+	})
+})
+
+var _ = Describe("executeQueries search_path bracketing", func() {
+	DescribeTable("wraps the whole batch with one SET / RESET search_path",
+		func(queries []string) {
+			db, mock, err := sqlmock.New()
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				_ = db.Close()
+			}()
+
+			mock.MatchExpectationsInOrder(true)
+			mock.ExpectExec(regexp.QuoteMeta(`SET search_path TO "$user", public`)).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			for _, q := range queries {
+				mock.ExpectExec(regexp.QuoteMeta(q)).
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			}
+			mock.ExpectExec(regexp.QuoteMeta(`RESET search_path`)).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+
+			info := InitInfo{}
+			Expect(info.executeQueries(db, queries)).To(Succeed())
+			Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
+		},
+		Entry("with independent statements", []string{
+			"CREATE TABLE foo (id int)",
+			"GRANT ALL ON foo TO app",
+		}),
+		// Verifies that a user-issued SET inside the batch persists for
+		// subsequent statements (matches pre-pin PostgreSQL semantics).
+		Entry("with a user-issued SET search_path inside", []string{
+			"SET search_path TO my_schema",
+			"CREATE TABLE foo (id int)",
+		}),
+	)
+
+	It("is a no-op when there are no queries", func() {
+		db, mock, err := sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			_ = db.Close()
+		}()
+
+		info := InitInfo{}
+		err = info.executeQueries(db, nil)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(mock.ExpectationsWereMet()).NotTo(HaveOccurred())
 	})
 })

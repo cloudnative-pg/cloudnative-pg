@@ -1,0 +1,38 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore-tablespaces-plugin
+spec:
+  instances: 2
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  walStorage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    - name: anothertablespace
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  bootstrap:
+    recovery:
+      source: source
+
+  # Recover from the source cluster's plugin-barman-cloud backup. The
+  # ObjectStore is the same one the source used (same namespace), serverName
+  # points at the source cluster's name.
+  externalClusters:
+    - name: source
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cluster-tablespaces-plugin
+          serverName: cluster-tablespaces-plugin

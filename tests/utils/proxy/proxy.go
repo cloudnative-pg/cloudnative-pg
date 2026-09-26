@@ -70,8 +70,9 @@ func RetrieveMetricsFromPgBouncer(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	pod corev1.Pod,
+	tlsEnabled bool,
 ) (string, error) {
-	body, err := runProxyRequest(ctx, kubeInterface, &pod, false, url.PathMetrics, int(url.PgBouncerMetricsPort))
+	body, err := runProxyRequest(ctx, kubeInterface, &pod, tlsEnabled, url.PathMetrics, int(url.PgBouncerMetricsPort))
 	return string(body), err
 }
 
@@ -81,8 +82,17 @@ func RetrievePgStatusFromInstance(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	pod corev1.Pod,
-	tlsEnabled bool,
 ) (string, error) {
-	body, err := runProxyRequest(ctx, kubeInterface, &pod, tlsEnabled, url.PathPgStatus, int(url.StatusPort))
+	body, err := runProxyRequest(ctx, kubeInterface, &pod, true, url.PathPgStatus, int(url.StatusPort))
 	return string(body), err
+}
+
+// RetrievePgControlDataFromInstance makes a GET request to the pgcontroldata endpoint on a
+// PostgreSQL instance pod via the Kubernetes API server proxy.
+func RetrievePgControlDataFromInstance(
+	ctx context.Context,
+	kubeInterface kubernetes.Interface,
+	pod corev1.Pod,
+) ([]byte, error) {
+	return runProxyRequest(ctx, kubeInterface, &pod, true, url.PathPGControlData, int(url.StatusPort))
 }

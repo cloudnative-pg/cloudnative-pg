@@ -243,6 +243,12 @@ The schedule `"0 0 0 * * *"` triggers a backup every day at midnight
 (00:00:00). In Kubernetes CronJobs, the equivalent expression would be `0 0 * * *`,
 since seconds are not supported.
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To schedule backups
+    for a different `Cluster`, create a new `ScheduledBackup` resource instead
+    of updating an existing one.
+:::
+
 ### Backup Frequency and RTO
 
 :::tip[Hint]
@@ -376,7 +382,7 @@ Status:
 CloudNativePG currently supports the following backup methods for scheduled
 and on-demand backups:
 
-- `plugin` – Uses a CNPG-I plugin (requires `.spec.pluginConfiguration`)
+- `plugin` – Uses a CNPG-I plugin (requires `.spec.plugins`)
 - `volumeSnapshot` – Uses native [Kubernetes volume snapshots](appendixes/backup_volumesnapshot.md#how-to-configure-volume-snapshot-backups)
 - `barmanObjectStore` – Uses [Barman Cloud for object storage](appendixes/backup_barmanobjectstore.md)
   *(deprecated starting with v1.26 in favor of the

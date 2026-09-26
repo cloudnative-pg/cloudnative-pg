@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
@@ -104,7 +105,7 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 			Expect(err).ToNot(HaveOccurred())
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 		})
 
 		By("setting up the environment", func() {
@@ -115,7 +116,7 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 			operatorPod, err := operator.GetPod(env.Ctx, env.Client)
 			Expect(err).NotTo(HaveOccurred())
 			if primaryPod.Spec.NodeName == operatorPod.Spec.NodeName {
-				AssertSwitchover(namespace, clusterName, env)
+				clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
 			}
 		})
 
@@ -128,8 +129,9 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 		})
 
 		By("verifying that a new primary has been promoted", func() {
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseFailOver}, 120)
+
 			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())

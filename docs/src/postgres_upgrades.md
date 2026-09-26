@@ -9,15 +9,15 @@ title: PostgreSQL upgrades
 
 PostgreSQL upgrades fall into two categories:
 
-- [Minor version upgrades](#minor-version-upgrades) (e.g., from 17.0 to 17.1)
-- [Major version upgrades](#major-version-upgrades) (e.g., from 16.x to 17.0)
+- [Minor version upgrades](#minor-version-upgrades) (e.g., from 18.0 to 18.1)
+- [Major version upgrades](#major-version-upgrades) (e.g., from 16.x to 18.0)
 
 ## Minor Version Upgrades
 
 PostgreSQL version numbers follow a `major.minor` format. For instance, in
-version 17.1:
+version 18.1:
 
-- `17` is the major version
+- `18` is the major version
 - `1` is the minor version
 
 Minor releases are fully compatible with earlier and later minor releases of
@@ -70,7 +70,7 @@ requested for a cluster.
     There is a bug in PostgreSQL 17.0 through 17.5 that prevents successful upgrades
     if the `max_slot_wal_keep_size` parameter is set to any value other than `-1`.
     The upgrade process will fail with an error related to replication slot configuration.
-    This issue has been [fixed in PostgreSQL 17.6 and 18beta2 or later versions](https://github.com/postgres/postgres/commit/f36e5774).
+    This issue has been [fixed in PostgreSQL 17.6 and 18 or later versions](https://github.com/postgres/postgres/commit/f36e5774).
     If you are using PostgreSQL 17.0 through 17.5, ensure that you upgrade to at least
     PostgreSQL 17.6 before attempting a major upgrade, or make sure to temporarily set
     the `max_slot_wal_keep_size` parameter to `-1` in your cluster configuration.
@@ -158,6 +158,60 @@ version.
     Ensure you monitor the process closely and take corrective action if needed.
 :::
 
+#### Extensions during a major upgrade
+
+When a cluster declares image-volume extensions, the upgrade `Job` mounts both
+the source-version and the target-version extension images side by side.
+Source-version extensions are needed so the old server can start with its
+existing shared libraries already in place.
+Target-version extensions (built for the new PostgreSQL major) must also be
+present so that `pg_upgrade` can properly perform the upgrade to the new major:
+
+- Source-version extensions are mounted at `/extensions/<name>` (the
+  steady-state path), so `dynamic_library_path` and `extension_control_path`
+  GUCs in the old `PGDATA` keep the existing values.
+  This ensures that, in case of major upgrade failure, a revert to the old
+  major version will work seamlessly.
+- Target-version extensions are temporarily mounted at `/new-extensions/<name>`
+  just during the upgrade job, and `dynamic_library_path` and `extension_control_path`
+  are configured accordingly for the `PGDATA` of the new major.
+
+`LD_LIBRARY_PATH` and `PATH` are extended with both sets, so binaries and
+shared objects from either version are reachable.
+Environment variables declared via `extensions[].env` obey the rules
+described in [Precedence and Conflict Resolution](imagevolume_extensions.md#precedence-and-conflict-resolution).
+
+:::note
+Target-version entries are applied **after** source-version entries. When the
+same variable is defined for both, the target-version value takes precedence.
+:::
+
+#### When `pg_upgrade` emits `update_extensions.sql`
+
+`pg_upgrade` emits an `update_extensions.sql` script inside the `PGDATA`
+when a target cluster contains extensions whose `default_version` is
+newer than the version `pg_upgrade` left installed. Until that script is
+applied, the SQL-level extension metadata in `pg_catalog` lags the
+shared libraries actually loaded by the running server.
+
+The script lives inside the primary pod's `PGDATA`.
+You can execute it using the database superuser (`postgres`) to
+update those extensions in all databases:
+
+```sh
+PRIMARY=$(kubectl get cluster <name> -o jsonpath='{.status.currentPrimary}')
+SCRIPT=/var/lib/postgresql/data/pgdata/update_extensions.sql
+
+kubectl exec -i "$PRIMARY" -- psql -f "$SCRIPT"
+```
+
+:::note
+The script path above assumes the default `PGDATA` location used by the
+CloudNativePG operand images. The operator also logs the resolved path when
+`pg_upgrade` emits the script, so check the operator logs if your operand image
+uses a different `PGDATA`.
+:::
+
 ### Backup and WAL Archive Considerations
 
 When performing a major upgrade, `pg_upgrade` creates a new database system
@@ -205,18 +259,18 @@ To trigger the upgrade, change both `imageName` and `serverName` together:
 
 ```yaml
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-minimal-trixie
   plugins:
     - name: plugin-barman-cloud
       enabled: true
       parameters:
         destinationPath: s3://my-bucket/
-        serverName: cluster-example-pg17
+        serverName: cluster-example-pg18
 ```
 
 With this configuration, the old archive at `cluster-example-pg16` remains
 intact for pre-upgrade recovery, while the upgraded cluster writes to
-`cluster-example-pg17`.
+`cluster-example-pg18`.
 
 :::info
 The deprecated in-tree `barmanObjectStore` implementation also requires manual
@@ -251,8 +305,8 @@ This will return output similar to:
 PostgreSQL 16.x ...
 ```
 
-To upgrade the cluster to version 17, update the `imageName` field by changing
-the major version tag from `16` to `17`:
+To upgrade the cluster to version 18, update the `imageName` field by changing
+the major version tag from `16` to `18`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -260,7 +314,7 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-minimal-trixie
   instances: 3
   storage:
     size: 1Gi
@@ -277,7 +331,7 @@ spec:
    - The PVC groups of the replicas (`cluster-example-2` and
      `cluster-example-3`) are removed.
    - The primary pod is restarted.
-   - Two new replicas (`cluster-example-4` and `cluster-example-5`) are
+   - Two new replicas (`cluster-example-2` and `cluster-example-3`) are
      re-cloned from the upgraded primary.
 
 Once the upgrade is complete, you can verify the new major version by running
@@ -290,7 +344,7 @@ kubectl cnpg psql cluster-example -- -qAt -c 'SELECT version()'
 This should now return output similar to:
 
 ```console
-PostgreSQL 17.x ...
+PostgreSQL 18.x ...
 ```
 
 You can now update the statistics by running `ANALYZE` on the `app` database:

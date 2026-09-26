@@ -561,7 +561,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		podSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-1",
@@ -592,7 +592,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					},
 				},
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-1",
@@ -612,7 +612,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		podSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-1",
@@ -625,7 +625,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		reorderedPodSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-foo",
@@ -667,7 +667,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					},
 				},
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-1",
@@ -691,7 +691,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					Image: "postgres:13.11",
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:             "pgdata",
+							Name:             pgdataVolumeName,
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/data",
 							SubPath:          "",
@@ -725,7 +725,7 @@ var _ = Describe("PodSpec drift detection", func() {
 							SubPathExpr:      "",
 						},
 						{
-							Name:             "pgdata",
+							Name:             pgdataVolumeName,
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/data",
 							SubPath:          "",
@@ -795,7 +795,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					Image: "postgres:13.11",
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:             "pgdata",
+							Name:             pgdataVolumeName,
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/data",
 							SubPath:          "",
@@ -1014,7 +1014,7 @@ var _ = Describe("NewInstance", func() {
 			},
 		}
 
-		pod, err := NewInstance(ctx, cluster, 1, true)
+		pod, err := NewInstance(ctx, cluster, 1)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod).NotTo(BeNil())
 		Expect(pod.Labels).To(BeEquivalentTo(map[string]string{
@@ -1043,7 +1043,7 @@ var _ = Describe("NewInstance", func() {
 			},
 		}
 
-		pod, err := NewInstance(ctx, cluster, 1, true)
+		pod, err := NewInstance(ctx, cluster, 1)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod).NotTo(BeNil())
 		Expect(pod.Spec.Containers[0].Image).To(Equal("new-image:latest"))
@@ -1060,8 +1060,62 @@ var _ = Describe("NewInstance", func() {
 			},
 		}
 
-		_, err := NewInstance(ctx, cluster, 1, true)
+		_, err := NewInstance(ctx, cluster, 1)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
+	})
+})
+
+var _ = Describe("service account token", func() {
+	const tokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+	mountsAtTokenPath := func(container corev1.Container) bool {
+		for _, mount := range container.VolumeMounts {
+			if mount.MountPath == tokenMountPath {
+				return true
+			}
+		}
+		return false
+	}
+
+	It("always disables the automount and projects the token for non-bootstrap containers", func() {
+		pod, err := buildInstance(apiv1.Cluster{}, 1)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pod.Spec.AutomountServiceAccountToken).To(HaveValue(BeFalse()))
+		Expect(pod.Spec.Volumes).To(ContainElement(HaveField("Name", kubeAPIAccessVolumeName)))
+
+		// The bootstrap init container only copies the manager binary and does
+		// not need Kubernetes API access.
+		Expect(pod.Spec.InitContainers).To(HaveLen(1))
+		bootstrapContainer := pod.Spec.InitContainers[0]
+		Expect(bootstrapContainer.Name).To(Equal(BootstrapControllerContainerName))
+		Expect(mountsAtTokenPath(bootstrapContainer)).To(BeFalse(),
+			"bootstrap container should not mount the projected token")
+
+		// All other containers need to reach the Kubernetes API.
+		Expect(pod.Spec.Containers).ToNot(BeEmpty())
+		for _, container := range pod.Spec.Containers {
+			Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+				Name:      kubeAPIAccessVolumeName,
+				MountPath: tokenMountPath,
+				ReadOnly:  true,
+			}), "container %s should mount the projected token", container.Name)
+		}
+	})
+})
+
+var _ = Describe("instance probes", func() {
+	It("queries the status port over HTTPS", func(ctx SpecContext) {
+		pod, err := NewInstance(ctx, apiv1.Cluster{}, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		container := pod.Spec.Containers[0]
+		for _, probe := range []*corev1.Probe{
+			container.StartupProbe,
+			container.ReadinessProbe,
+			container.LivenessProbe,
+		} {
+			Expect(probe.HTTPGet.Scheme).To(Equal(corev1.URISchemeHTTPS))
+		}
 	})
 })

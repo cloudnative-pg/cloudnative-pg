@@ -1,0 +1,10 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: cluster-tablespaces-plugin-backup
+spec:
+  method: plugin
+  cluster:
+    name: cluster-tablespaces-plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

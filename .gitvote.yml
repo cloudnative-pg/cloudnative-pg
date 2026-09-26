@@ -1,0 +1,68 @@
+# GitVote configuration for cloudnative-pg/cloudnative-pg.
+#
+# Rendered by cnpg-infra's scripts/render-gitvote-config.sh -- see
+# cnpg-infra's gitvote-policy.yaml and scripts/check-gitvote-config.sh /
+# fix-gitvote-config.sh for how this file is generated and enforced.
+#
+# Voters are this repository's own cloudnative-pg-owners GitHub team (repo-tiers.yaml's
+# owners field is what populates it; see sync-project-owner-teams.sh).
+# Component Owner-level decisions per CONTRIBUTOR_LADDER.md are scoped to
+# the repository, not org-wide. The profiles below mirror
+# CONTRIBUTOR_LADDER.md's two repository-level thresholds:
+#   - default:         simple majority, Contributor promotion/removal
+#   - component-owner:  two-thirds majority, Component Owner
+#                        promotion/removal (/vote-component-owner)
+# plus, where this repo belongs to a subproject, the same two scoped to
+# that subproject's maintainer committee, for the case where this repo has
+# too few named owners to decide for itself.
+#
+# The thresholds are 50.01 and 66.66, not 50 and 66, because gitvote
+# passes a vote on >= rather than >: a flat 50 would let an even-sized
+# electorate tie and still pass. See cnpg-infra's
+# scripts/render-gitvote-config.sh for the full reasoning.
+automation:
+  enabled: false
+  rules:
+    - patterns: []
+      profile: default
+
+profiles:
+  default:
+    duration: 1w
+    pass_threshold: 50.01
+    allowed_voters:
+      teams:
+        - cloudnative-pg-owners
+      users: []
+    close_on_passing: true
+    close_on_passing_min_wait: "10 minutes"
+
+  component-owner:
+    duration: 1w
+    pass_threshold: 66.66
+    allowed_voters:
+      teams:
+        - cloudnative-pg-owners
+      users: []
+    close_on_passing: true
+    close_on_passing_min_wait: "10 minutes"
+
+  committee:
+    duration: 1w
+    pass_threshold: 50.01
+    allowed_voters:
+      teams:
+        - core-maintainers
+      users: []
+    close_on_passing: true
+    close_on_passing_min_wait: "10 minutes"
+
+  committee-component-owner:
+    duration: 1w
+    pass_threshold: 66.66
+    allowed_voters:
+      teams:
+        - core-maintainers
+      users: []
+    close_on_passing: true
+    close_on_passing_min_wait: "10 minutes"

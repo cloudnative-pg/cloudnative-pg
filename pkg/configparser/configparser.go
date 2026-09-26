@@ -89,7 +89,7 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 		case reflect.Int:
 			value = fmt.Sprintf("%v", valueField.Int())
 
-		case reflect.Ptr:
+		case reflect.Pointer:
 			// Handle pointer types - if not nil, get the underlying value
 			if !valueField.IsNil() {
 				switch valueField.Elem().Kind() {
@@ -144,7 +144,7 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 				continue
 			}
 			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetInt(intValue)
-		case reflect.Ptr:
+		case reflect.Pointer:
 			// Handle pointer types
 			if value == "" {
 				// If no value is provided, leave the pointer as nil
@@ -193,7 +193,7 @@ func ensurePointerToStruct(name string, data interface{}) {
 		name,
 		reflect.TypeOf(data).String())
 
-	if reflect.TypeOf(data).Kind() != reflect.Ptr {
+	if reflect.TypeOf(data).Kind() != reflect.Pointer {
 		panic(errMsg)
 	}
 

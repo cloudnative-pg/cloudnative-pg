@@ -23,6 +23,7 @@ package pgbouncer
 
 import (
 	"path"
+	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,8 +41,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
-// Deployment create the deployment of pgbouncer, given
-// the configurations we have in the pooler specifications
+// Deployment creates the pgbouncer Deployment for the given Pooler. The
+// container image and deployment hash both derive from
+// pooler.Status.Image; the caller (updateDeployment) must populate it
+// first.
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
 	operatorImageName := config.Current.OperatorImageName
 
@@ -75,7 +78,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			},
 		}).
 		WithSecurityContext(createPodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
-		WithContainerImage("pgbouncer", config.Current.PgbouncerImageName, false).
+		WithContainerImage("pgbouncer", pooler.Status.Image, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
 			"pgbouncer",
@@ -119,6 +122,10 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:  "PSQL_HISTORY",
 			Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
 		}, false).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{
+			Name:  "METRICS_PORT_TLS",
+			Value: strconv.FormatBool(pooler.IsMetricsTLSEnabled()),
+		}, true).
 		WithContainerSecurityContext("pgbouncer", specs.GetSecurityContext(cluster), true).
 		WithServiceAccountName(pooler.GetServiceAccountName(), true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
@@ -171,12 +178,14 @@ func computeTemplateHash(pooler *apiv1.Pooler, operatorImageName string) (string
 	type deploymentHash struct {
 		poolerSpec                      apiv1.PoolerSpec
 		operatorImageName               string
+		pgbouncerImage                  string
 		isPodSpecReconciliationDisabled bool
 	}
 
 	return hash.ComputeHash(deploymentHash{
 		poolerSpec:                      pooler.Spec,
 		operatorImageName:               operatorImageName,
+		pgbouncerImage:                  pooler.Status.Image,
 		isPodSpecReconciliationDisabled: utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta),
 	})
 }

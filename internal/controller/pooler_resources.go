@@ -68,20 +68,15 @@ type poolerManagedResources struct {
 	Role           *rbacv1.Role
 }
 
-// getManagedResources detects the list of the resources created and manager
-// by this pooler
+// getManagedResources detects the list of the resources created and managed
+// by this pooler. The caller is responsible for resolving the referenced
+// Cluster and passing it in: this function requires a non-nil Cluster.
 func (r *PoolerReconciler) getManagedResources(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
+	cluster *apiv1.Cluster,
 ) (result *poolerManagedResources, err error) {
-	result = &poolerManagedResources{}
-
-	// Get the referenced cluster
-	result.Cluster, err = getClusterOrNil(
-		ctx, r.Client, client.ObjectKey{Name: pooler.Spec.Cluster.Name, Namespace: pooler.Namespace})
-	if err != nil {
-		return nil, err
-	}
+	result = &poolerManagedResources{Cluster: cluster}
 
 	// Get the auth query secret if any
 	result.AuthUserSecret, err = getSecretOrNil(

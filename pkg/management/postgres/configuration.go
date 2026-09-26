@@ -270,11 +270,36 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 // empty.
 // Returns a boolean indicating if any changes were done and any errors encountered
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+	restoreCommand := fmt.Sprintf(
+		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+		postgres.LogPath, postgres.LogFileName)
+
+	return writePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, restoreCommand)
+}
+
+// configurePostgresOverrideConfFileForRewind writes the content of override.conf file
+// to be used while running `pg_rewind --restore-target-wal`. The restore_command invokes
+// wal-restore in rewind mode, disabling WAL prefetching and the end-of-wal-stream flag
+// machinery: pg_rewind requests the segments it needs walking the WAL backward, and
+// aborts on the first failed restore instead of falling back to streaming replication.
+// This file is replaced with the standard replica configuration when the instance
+// is demoted, right after a successful rewind.
+// Returns a boolean indicating if any changes were done and any errors encountered
+func configurePostgresOverrideConfFileForRewind(pgData, primaryConnInfo string) (changed bool, err error) {
+	restoreCommand := fmt.Sprintf(
+		"/controller/manager wal-restore --log-destination %s/%s.json --rewind %%f %%p",
+		postgres.LogPath, postgres.LogFileName)
+
+	return writePostgresOverrideConfFile(pgData, primaryConnInfo, "", restoreCommand)
+}
+
+// writePostgresOverrideConfFile writes the content of override.conf file, using the
+// given restore_command and replication information.
+// Returns a boolean indicating if any changes were done and any errors encountered
+func writePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, restoreCommand string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 	options := map[string]string{
-		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
+		"restore_command":          restoreCommand,
 		"recovery_target_timeline": "latest",
 		"primary_conninfo":         primaryConnInfo,
 	}
@@ -344,18 +369,23 @@ func createPostgresqlConfiguration(
 	}
 	sort.Strings(info.TemporaryTablespaces)
 
-	// Set additional extensions
-	if cluster.Status.PGDataImageInfo != nil {
-		for _, extension := range cluster.Status.PGDataImageInfo.Extensions {
-			info.AdditionalExtensions = append(
-				info.AdditionalExtensions,
-				postgres.AdditionalExtensionConfiguration{
-					Name:                 extension.Name,
-					ExtensionControlPath: extension.ExtensionControlPath,
-					DynamicLibraryPath:   extension.DynamicLibraryPath,
-				},
-			)
-		}
+	// Set additional extensions. During a major upgrade we configure the
+	// target-version cluster, so we read from TargetPGDataImageInfo and resolve
+	// mounts under UpgradeTargetExtensionsBaseDirectory; otherwise we read from
+	// PGDataImageInfo at the steady-state mount path.
+	exts, baseDir, err := selectAdditionalExtensions(cluster, operationType)
+	if err != nil {
+		return "", "", err
+	}
+	for _, extension := range exts {
+		info.AdditionalExtensions = append(
+			info.AdditionalExtensions,
+			postgres.AdditionalExtensionConfiguration{
+				MountPath:            filepath.Join(baseDir, extension.Name),
+				ExtensionControlPath: extension.ExtensionControlPath,
+				DynamicLibraryPath:   extension.DynamicLibraryPath,
+			},
+		)
 	}
 
 	// Setup minimum replay delay if we're on a replica cluster
@@ -388,6 +418,47 @@ func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
 		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
 		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
 		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
+}
+
+// selectAdditionalExtensions returns the extension list and mount base
+// directory the configuration generator should use, picking between the
+// source-version (steady-state) and target-version (major upgrade) layouts
+// according to operationType.
+//
+// Caller invariant for OperationType_TYPE_UPGRADE: cluster.Status.TargetPGDataImageInfo
+// MUST be populated. The configuration being written in upgrade mode belongs
+// to the new pgdata, so the target set is authoritative; falling back to the
+// source set on a missing target would silently produce a config pointing at
+// the wrong mount tree. Today only the major-upgrade reconciler -> upgrade-Job
+// path passes TYPE_UPGRADE, and it always patches TargetPGDataImageInfo
+// atomically with the phase transition before scheduling the Job. New callers
+// adding TYPE_UPGRADE paths (e.g. plugin hooks, restoration jobs) must
+// preserve this invariant.
+//
+// In all other operation types the source set is read from
+// cluster.Status.PGDataImageInfo; a nil there returns an empty list (no
+// error), since a freshly-bootstrapped cluster legitimately has no extensions
+// yet.
+func selectAdditionalExtensions(
+	cluster *apiv1.Cluster,
+	operationType postgresClient.OperationType_Type,
+) ([]apiv1.ExtensionConfiguration, string, error) {
+	if operationType == postgresClient.OperationType_TYPE_UPGRADE {
+		if cluster.Status.TargetPGDataImageInfo == nil {
+			return nil, "", fmt.Errorf(
+				"cannot configure target-version extensions: cluster status is missing TargetPGDataImageInfo")
+		}
+		return cluster.Status.TargetPGDataImageInfo.Extensions,
+			postgres.UpgradeTargetExtensionsBaseDirectory,
+			nil
+	}
+
+	if cluster.Status.PGDataImageInfo == nil {
+		return nil, postgres.ExtensionsBaseDirectory, nil
+	}
+	return cluster.Status.PGDataImageInfo.Extensions,
+		postgres.ExtensionsBaseDirectory,
+		nil
 }
 
 // configurePostgresForImport configures Postgres to be optimized for the firt import

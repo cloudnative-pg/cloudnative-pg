@@ -26,6 +26,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// PoolerPhase represents the lifecycle phase of a Pooler.
+// +kubebuilder:validation:Enum=active;paused;inactive;failed
+type PoolerPhase string
+
+const (
+	// PoolerPhaseActive means the pooler is running normally and serving traffic.
+	PoolerPhaseActive PoolerPhase = "active"
+
+	// PoolerPhasePaused means PgBouncer is up and running but holding new client
+	// connections in the queue because spec.pgbouncer.paused is true. The Deployment
+	// keeps reconciling; lifting the pause transitions back to Active.
+	PoolerPhasePaused PoolerPhase = "paused"
+
+	// PoolerPhaseInactive means the pooler cannot make progress because a
+	// prerequisite resource is missing (cluster, secret, certificate). The
+	// controller retries periodically until the prerequisite shows up. Check
+	// status.phaseReason for the specific cause.
+	PoolerPhaseInactive PoolerPhase = "inactive"
+
+	// PoolerPhaseFailed means the pooler cannot be reconciled due to a
+	// configuration error. Check status.phaseReason for details.
+	PoolerPhaseFailed PoolerPhase = "failed"
+)
+
 // PoolerType is the type of the connection pool, meaning the service
 // we are targeting. Allowed values are `rw` and `ro`.
 // +kubebuilder:validation:Enum=rw;ro;r
@@ -64,6 +88,7 @@ const (
 type PoolerSpec struct {
 	// This is the cluster reference on which the Pooler will work.
 	// Pooler name should never match with any cluster name within the same namespace.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster reference is immutable after creation"
 	Cluster LocalObjectReference `json:"cluster"`
 
 	// Type of service to forward traffic to. Default: `rw`.
@@ -88,9 +113,6 @@ type PoolerSpec struct {
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
 
 	// The configuration of the monitoring infrastructure of this pooler.
-	//
-	// Deprecated: This feature will be removed in an upcoming release. If
-	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	Monitoring *PoolerMonitoringConfiguration `json:"monitoring,omitempty"`
 
@@ -117,17 +139,41 @@ type PoolerSpec struct {
 // part for now.
 type PoolerMonitoringConfiguration struct {
 	// Enable or disable the `PodMonitor`
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +kubebuilder:default:=false
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
+
+	// Configure TLS communication for the metrics endpoint.
+	// Changing tls.enabled option will force a rollout of all instances.
+	// +optional
+	TLSConfig *PoolerMonitoringTLSConfiguration `json:"tls,omitempty"`
+}
+
+// PoolerMonitoringTLSConfiguration is the type containing the TLS configuration
+// for the pooler monitoring
+type PoolerMonitoringTLSConfiguration struct {
+	// Enable TLS for the monitoring endpoint.
+	// Changing this option will force a rollout of all instances.
+	// +kubebuilder:default:=false
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // PodTemplateSpec is a structure allowing the user to set
@@ -167,7 +213,21 @@ type ServiceTemplateSpec struct {
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 }
 
+// ImageCatalogComponentRef identifies a named image within the componentImages list of an
+// ImageCatalog or ClusterImageCatalog.
+type ImageCatalogComponentRef struct {
+	// +kubebuilder:validation:XValidation:rule="self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'",message="Only ImageCatalog and ClusterImageCatalog are supported"
+	// +kubebuilder:validation:XValidation:rule="self.apiGroup == 'postgresql.cnpg.io'",message="apiGroup must be postgresql.cnpg.io"
+	corev1.TypedLocalObjectReference `json:",inline"`
+
+	// Key identifies the entry within the catalog's componentImages list.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=63
+	Key string `json:"key"`
+}
+
 // PgBouncerSpec defines how to configure PgBouncer
+// +kubebuilder:validation:XValidation:rule="!(has(self.image) && has(self.imageCatalogRef))",message="image and imageCatalogRef are mutually exclusive"
 type PgBouncerSpec struct {
 	// The pool mode. Default: `session`.
 	// +kubebuilder:default:=session
@@ -229,6 +289,17 @@ type PgBouncerSpec struct {
 	// +kubebuilder:default:=false
 	// +optional
 	Paused *bool `json:"paused,omitempty"`
+
+	// Image is the pgbouncer container image to use. When set, it takes
+	// precedence over ImageCatalogRef and the operator default, but is
+	// overridden by an explicit image set in the pod template.
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.
+	// Mutually exclusive with Image.
+	// +optional
+	ImageCatalogRef *ImageCatalogComponentRef `json:"imageCatalogRef,omitempty"`
 }
 
 // PoolerStatus defines the observed state of Pooler
@@ -236,9 +307,31 @@ type PoolerStatus struct {
 	// The resource version of the config object
 	// +optional
 	Secrets *PoolerSecrets `json:"secrets,omitempty"`
+
 	// The number of pods trying to be scheduled
 	// +optional
 	Instances int32 `json:"instances,omitempty"`
+
+	// Phase summarizes the overall lifecycle state of the Pooler.
+	// +optional
+	Phase PoolerPhase `json:"phase,omitempty"`
+
+	// PhaseReason is a human-readable explanation of the current Phase.
+	// +optional
+	PhaseReason string `json:"phaseReason,omitempty"`
+
+	// Image is the resolved pgbouncer container image that the operator is
+	// using for this Pooler, including any override coming from spec.template.
+	// While Phase is Active or Paused this field reflects what the Deployment
+	// actually runs; while Phase is Inactive or Failed it may carry the last
+	// successfully resolved value (or be empty if the Pooler has never reconciled
+	// successfully).
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// Error is the latest admission validation error
+	// +optional
+	Error string `json:"error,omitempty"`
 }
 
 // PoolerSecrets contains the versions of all the secrets used
@@ -289,6 +382,7 @@ type SecretVersion struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 // +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".spec.type"
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
 // +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances
 
 // Pooler is the Schema for the poolers API
@@ -314,8 +408,4 @@ type PoolerList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Pooler `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Pooler{}, &PoolerList{})
 }

@@ -7,7 +7,7 @@ metadata:
 data:
   queries.yaml: |
     pg_postmaster: # wokeignore:rule=master
-      query: "SELECT EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time())) AS start_time_seconds" # wokeignore:rule=master
+      query: "SELECT EXTRACT(EPOCH FROM (pg_catalog.now() - pg_catalog.pg_postmaster_start_time())) AS start_time_seconds" # wokeignore:rule=master
       primary: false
       metrics:
         - start_time_seconds:
@@ -15,7 +15,7 @@ data:
             description: "Seconds since the postgres server start"
   additional-queries: |
     pg_wal_files:
-      query: "SELECT COALESCE(sum(1), 0) AS total FROM pg_ls_waldir() AS d (file) WHERE file ~ '^[0-9A-F]{8}[0-9A-F]{8}[0-9A-F]{8}$'"
+      query: "SELECT COALESCE(pg_catalog.sum(1), 0) AS total FROM pg_catalog.pg_ls_waldir() AS d (file) WHERE file ~ '^[0-9A-F]{8}[0-9A-F]{8}[0-9A-F]{8}$'"
       primary: false
       metrics:
         - total:
@@ -47,7 +47,7 @@ metadata:
 data:
   queries.yaml: |
     pg_database:
-      query: "SELECT pg_database.datname, pg_database_size(pg_database.datname) as size_bytes FROM pg_database"
+      query: "SELECT pg_database.datname, pg_catalog.pg_database_size(pg_database.datname) as size_bytes FROM pg_catalog.pg_database"
       primary: false
       metrics:
         - datname:
@@ -59,7 +59,7 @@ data:
 
   additional-queries: |
     e2e_tests_replication_slots_status:
-      query: "SELECT count(*) AS inactive FROM pg_replication_slots WHERE NOT active"
+      query: "SELECT pg_catalog.count(*) AS inactive FROM pg_catalog.pg_replication_slots WHERE NOT active"
       primary: false
       metrics:
         - inactive:
@@ -75,7 +75,7 @@ metadata:
 stringData:
   queries.yaml: |
     pg_stat_archiver:
-      query: "SELECT archived_count, failed_count FROM pg_stat_archiver"
+      query: "SELECT archived_count, failed_count FROM pg_catalog.pg_stat_archiver"
       primary: false
       metrics:
         - archived_count:
@@ -88,7 +88,7 @@ stringData:
   additional-queries: |
     pg_locks:
       query: |
-        SELECT count(*) as blocked_queries
+        SELECT pg_catalog.count(*) as blocked_queries
         FROM pg_catalog.pg_locks blocked_locks
         JOIN pg_catalog.pg_locks blocking_locks
           ON blocking_locks.locktype = blocked_locks.locktype

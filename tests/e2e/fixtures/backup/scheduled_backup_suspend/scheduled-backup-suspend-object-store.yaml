@@ -1,0 +1,10 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: scheduled-backups-suspend-object-store
+spec:
+  # Every minute
+  schedule: "0 * * * * *"
+  cluster:
+    name: pg-backup-object-store
+  suspend: false

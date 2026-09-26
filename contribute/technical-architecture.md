@@ -214,9 +214,11 @@ Networking is purely label-driven. The Operator manages the
 
 2. **Replica:** Labeled as `replica`. The `-ro` Service selects these Pods.
 
-3. **Failover:** When a new primary is promoted via `pg_ctl promote`, the
-   Operator updates the labels. The Kubernetes API Server then automatically
-   updates the **Endpoints** for the respective Services.
+3. **Unhealthy:** Transient value applied to the old primary during a
+   failover or switchover, so that neither the `-rw` nor the `-ro`
+   Service selects it. Once the transition completes, the Operator
+   relabels the demoted instance as `replica` and the Kubernetes API
+   Server updates the Service **Endpoints** accordingly.
 
 ## Source Code Reference
 

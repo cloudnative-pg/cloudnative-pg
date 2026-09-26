@@ -21,6 +21,7 @@ package runner
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"k8s.io/utils/ptr"
@@ -165,5 +166,137 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 
 		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
 		Expect(err).ShouldNot(HaveOccurred())
+	})
+
+	It("continues after a slot fails to be created, and still runs the cleanup", func(ctx SpecContext) {
+		staleSlot := "cluster-5"
+
+		mockPrimary.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false).
+				AddRow(slot3, string(infrastructure.SlotTypePhysical), true, lsnSlot3, false).
+				AddRow(slot4, string(infrastructure.SlotTypePhysical), true, lsnSlot4, false))
+
+		// the local instance has a stale slot to be dropped and none of the primary ones
+		mockLocal.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(staleSlot, string(infrastructure.SlotTypePhysical), false, lsnSlot4, false))
+
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
+			WithArgs(slot3, true).
+			WillReturnError(errors.New("mock create failure"))
+
+		// no advance is expected for slot3: creating it failed. slot4 is
+		// still created and advanced, and the stale slot's deletion is
+		// still attempted (and also fails, to prove both errors are collected).
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
+			WithArgs(slot4, true).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mockLocal.ExpectExec(selectPgSlotAdvance).
+			WithArgs(slot4, lsnSlot4).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(staleSlot).
+			WillReturnError(errors.New("mock drop failure"))
+
+		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(`creating replication slot "cluster-3": mock create failure`))
+		Expect(err.Error()).To(ContainSubstring(`dropping replication slot "cluster-5": mock drop failure`))
+	})
+
+	It("continues after a slot fails to be advanced, and still runs the cleanup", func(ctx SpecContext) {
+		staleSlot := "cluster-5"
+
+		mockPrimary.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false).
+				AddRow(slot3, string(infrastructure.SlotTypePhysical), true, lsnSlot3, false).
+				AddRow(slot4, string(infrastructure.SlotTypePhysical), true, lsnSlot4, false))
+
+		mockLocal.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(slot3, string(infrastructure.SlotTypePhysical), true, lsnSlot3, false).
+				AddRow(slot4, string(infrastructure.SlotTypePhysical), true, lsnSlot4, false).
+				AddRow(staleSlot, string(infrastructure.SlotTypePhysical), false, lsnSlot4, false))
+
+		mockLocal.ExpectExec(selectPgSlotAdvance).
+			WithArgs(slot3, lsnSlot3).
+			WillReturnError(errors.New("mock advance failure"))
+
+		mockLocal.ExpectExec(selectPgSlotAdvance).
+			WithArgs(slot4, lsnSlot4).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(staleSlot).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(`updating replication slot "cluster-3": mock advance failure`))
+		Expect(err.Error()).NotTo(ContainSubstring("cluster-4"))
+		Expect(err.Error()).NotTo(ContainSubstring("cluster-5"))
+	})
+
+	It("continues dropping the remaining stale slots after a drop failure", func(ctx SpecContext) {
+		staleSlot5 := "cluster-5"
+		staleSlot6 := "cluster-6"
+
+		mockPrimary.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false))
+
+		mockLocal.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(staleSlot5, string(infrastructure.SlotTypePhysical), false, lsnSlot4, false).
+				AddRow(staleSlot6, string(infrastructure.SlotTypePhysical), false, lsnSlot4, false))
+
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(staleSlot5).
+			WillReturnError(errors.New("mock drop failure"))
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(staleSlot6).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(`dropping replication slot "cluster-5": mock drop failure`))
+		Expect(err.Error()).NotTo(ContainSubstring("cluster-6"))
+	})
+
+	It("drops a stale user slot only once when synchronizeReplicas is disabled", func(ctx SpecContext) {
+		configNoUserSlots := apiv1.ReplicationSlotsConfiguration{
+			HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+				Enabled:    ptr.To(true),
+				SlotPrefix: "_cnpg_",
+			},
+			SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
+				Enabled: ptr.To(false),
+			},
+		}
+		userSlot := "userslot"
+
+		mockPrimary.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false))
+
+		// the local slot is both missing from the primary and a user slot
+		// while synchronizeReplicas is disabled: it must be dropped exactly once
+		mockLocal.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(userSlot, string(infrastructure.SlotTypePhysical), false, lsnSlot4, false))
+
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(userSlot).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &configNoUserSlots)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("Replicator reconcile", func() {
+	It("returns the recovered error when the reconciliation panics", func(ctx SpecContext) {
+		// a Replicator with a nil instance panics as soon as it dereferences it
+		sr := NewReplicator(nil)
+
+		err := sr.reconcile(ctx, &apiv1.ReplicationSlotsConfiguration{})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("recovered from a panic"))
 	})
 })

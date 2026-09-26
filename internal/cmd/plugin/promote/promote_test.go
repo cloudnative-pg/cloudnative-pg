@@ -20,6 +20,9 @@ SPDX-License-Identifier: Apache-2.0
 package promote
 
 import (
+	"io"
+	"os"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +41,15 @@ var _ = Describe("promote subcommand tests", func() {
 	var client k8client.Client
 	const namespace = "theNamespace"
 	BeforeEach(func() {
+		old := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		DeferCleanup(func() {
+			_ = w.Close()
+			os.Stdout = old
+			_, _ = io.Copy(GinkgoWriter, r)
+		})
+
 		cluster1 := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster1",
