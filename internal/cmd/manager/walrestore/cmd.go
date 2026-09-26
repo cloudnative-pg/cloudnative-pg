@@ -137,8 +137,10 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 
 	// Validate WAL segment timeline to prevent replicas from downloading
 	// old-timeline WAL segments from the archive after switchover/failover
-	if err := validateWALSegmentTimeline(ctx, pgData, walName, cluster, podName); err != nil {
-		return err
+	if !rewindMode {
+		if err := validateWALSegmentTimeline(ctx, pgData, walName, cluster, podName); err != nil {
+			return err
+		}
 	}
 
 	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath, rewindMode)
