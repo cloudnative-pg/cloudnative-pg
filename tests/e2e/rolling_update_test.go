@@ -132,6 +132,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 		// Setting up a cluster with three podutils is slow, usually 200-600s
 		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+		clusterasserts.AssertClusterReadyConditionIsCurrent(env, namespace, clusterName)
 	}
 
 	// Verify that the pod name changes amount to an expected number

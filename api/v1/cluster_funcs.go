@@ -1669,10 +1669,11 @@ func (cluster *Cluster) SetAdmissionError(msg string) {
 		// would normally update the condition together with the phase, but the
 		// guard records the invalid phase directly.
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:    string(ConditionClusterReady),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(ClusterIsNotReady),
-			Message: "Cluster Is Not Ready",
+			Type:               string(ConditionClusterReady),
+			Status:             metav1.ConditionFalse,
+			Reason:             string(ClusterIsNotReady),
+			Message:            "Cluster Is Not Ready",
+			ObservedGeneration: cluster.Generation,
 		})
 		return
 	}
