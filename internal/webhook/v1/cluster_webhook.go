@@ -1329,7 +1329,17 @@ func (v *ClusterCustomValidator) validateConfigurationChange(r, old *apiv1.Clust
 		diff := utils.CollectDifferencesFromMaps(old.Spec.PostgresConfiguration.Parameters,
 			r.Spec.PostgresConfiguration.Parameters)
 		if len(diff) > 0 {
-			jsonDiff, _ := json.Marshal(diff)
+			jsonDiff, err := json.Marshal(diff)
+			if err != nil {
+				return append(result,
+					field.Invalid(
+						field.NewPath("spec", "imageName"),
+						r.Spec.ImageName,
+						fmt.Sprintf("Can't change image name and configuration at the same time when "+
+							"`primaryUpdateMethod` is set to `switchover`. "+
+							"There are differences in PostgreSQL configuration parameters, but "+
+							"failed to marshal them: %v", err)))
+			}
 			result = append(
 				result,
 				field.Invalid(
