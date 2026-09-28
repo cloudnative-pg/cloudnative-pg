@@ -313,6 +313,14 @@
       separateMajorMinor: false,
     },
     {
+      // DefaultPgbouncerImage is a tag-only string; the regex has no
+      // currentDigest group.
+      matchPackageNames: [
+        'ghcr.io/cloudnative-pg/pgbouncer',
+      ],
+      pinDigests: false,
+    },
+    {
       groupName: 'SLSA actions no-digest',
       matchDatasources: [
         'github-tags',
