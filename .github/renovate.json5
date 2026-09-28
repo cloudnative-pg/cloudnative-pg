@@ -284,7 +284,6 @@
         'github.com/cloudnative-pg{/,}**',
       ],
       separateMajorMinor: false,
-      pinDigests: false,
     },
     {
       groupName: 'container distroless digests',
