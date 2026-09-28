@@ -282,7 +282,7 @@ function reset_operator_namespace() {
 # When installed via manifest or the cnpg plugin the deployment is called
 # cnpg-controller-manager; when installed via Helm it is called
 # cnpg-cloudnative-pg. See:
-# https://cloudnative-pg.io/docs/1.29/installation_upgrade#using-the-helm-chart
+# https://cloudnative-pg.io/docs/current/installation_upgrade#using-the-helm-chart
 function wait_operator_ready() {
     local deploy_name="${1:-cnpg-controller-manager}"
     ${K8S_CLI} -n cnpg-system rollout status deploy/"${deploy_name}" --timeout=5m
