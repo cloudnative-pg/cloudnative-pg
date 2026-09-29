@@ -468,6 +468,25 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.canBeResizedInPlace).To(BeTrue())
 		})
 
+		It("never recreates the pod for a drift only present in the live spec", func(ctx SpecContext) {
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
+			Expect(err).ToNot(HaveOccurred())
+
+			// e.g. a mutating webhook raised the memory limit at creation:
+			// a recreated pod would get it again
+			for i := range pod.Spec.Containers {
+				if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
+					pod.Spec.Containers[i].Resources.Limits["memory"] = resource.MustParse("4Gi")
+				}
+			}
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeFalse())
+
+			utils.SetPodsResize(false)
+			rollout = isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeFalse())
+		})
+
 		It("does not loop on the resources defaulted at admission time", func(ctx SpecContext) {
 			// Only limits are declared: the API server defaults the requests
 			// to the limits in the live pod, never in the stored annotation
