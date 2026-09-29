@@ -388,7 +388,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
@@ -404,7 +404,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			clusterInPlace.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
@@ -419,7 +419,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
@@ -437,7 +437,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
@@ -452,7 +452,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Simulate a resize issued outside the operator: the pod spec
@@ -474,7 +474,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
@@ -489,7 +489,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			pod.Status.Conditions = []corev1.PodCondition{
@@ -513,7 +513,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1, true)
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			pod.Status.Conditions = []corev1.PodCondition{

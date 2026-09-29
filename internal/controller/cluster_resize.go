@@ -110,7 +110,7 @@ func (r *ClusterReconciler) refreshPodSpecAnnotationResources(
 		return fmt.Errorf("while unmarshalling the pod spec annotation: %w", err)
 	}
 
-	drifts := specs.GetContainerResourceDrifts(&storedPodSpec, &targetPod.Spec)
+	drifts := specs.GetResizableContainerResourceDrifts(&storedPodSpec, &targetPod.Spec)
 	if len(drifts) == 0 {
 		return nil
 	}
