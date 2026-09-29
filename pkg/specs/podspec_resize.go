@@ -105,24 +105,97 @@ func GetResizableContainerResourceDrifts(current, target *corev1.PodSpec) []Cont
 	return resizable
 }
 
-// CanResizeInPlace verifies that the resource drifts between the current and
-// the target pod spec can be applied through the resize subresource without
-// disrupting the pod: only cpu and memory values may change, no entry may be
-// added or removed, and memory limits may not be decreased (PostgreSQL never
-// releases its shared memory, so the kubelet would keep the resize pending
-// forever). Run-once init container drifts are ignored, being deferred to
-// the next pod recreation. The QoS class invariant is not checked here: the
-// API server enforces it and a rejected patch makes the operator fall back
-// to recreating the pod.
-func CanResizeInPlace(current, target *corev1.PodSpec) (bool, string) {
-	for _, drift := range GetResizableContainerResourceDrifts(current, target) {
-		currentResources := getContainerResources(current, drift.Name, drift.InitContainer)
-		if ok, reason := canResizeResources(drift.Name, currentResources, drift.Target); !ok {
+// GetLiveContainerResourceDrifts returns the resizable containers whose
+// resources in the live pod spec do not match the target pod spec. The live
+// spec went through the API server admission, which defaults the missing
+// requests to the limits and may add entries the operator never declared
+// (for example from a LimitRange). The target is therefore compared after
+// the same requests defaulting, and entries present only in the live spec
+// are ignored, as a resize cannot remove them anyway. The returned targets
+// are the live resources overlaid with the target ones, ready to be applied
+// through the resize subresource.
+func GetLiveContainerResourceDrifts(live, target *corev1.PodSpec) []ContainerResourceDrift {
+	var drifts []ContainerResourceDrift
+	for _, drift := range GetResizableContainerResourceDrifts(live, target) {
+		liveResources := getContainerResources(live, drift.Name, drift.InitContainer)
+		targetResources := defaultRequestsFromLimits(drift.Target)
+		requests, requestsChanged := overlayResourceList(liveResources.Requests, targetResources.Requests)
+		limits, limitsChanged := overlayResourceList(liveResources.Limits, targetResources.Limits)
+		if !requestsChanged && !limitsChanged {
+			continue
+		}
+		drift.Target = corev1.ResourceRequirements{
+			Requests: requests,
+			Limits:   limits,
+			Claims:   liveResources.Claims,
+		}
+		drifts = append(drifts, drift)
+	}
+	return drifts
+}
+
+// CanResizeInPlace verifies that the resource drifts of a running pod can be
+// applied through the resize subresource without disrupting it: only cpu and
+// memory values may change, no entry may be added or removed, and memory
+// limits may not be decreased (PostgreSQL never releases its shared memory,
+// so the kubelet would keep the resize pending forever). Additions and
+// removals are evaluated between the stored pod spec, as recorded by the
+// operator, and the target one, since the live spec may carry entries added
+// at admission time; the changes to apply are evaluated against the live
+// spec. Run-once init container drifts are ignored, being deferred to the
+// next pod recreation. The QoS class invariant is not checked here: the API
+// server enforces it and a rejected patch makes the operator fall back to
+// recreating the pod.
+func CanResizeInPlace(live, stored, target *corev1.PodSpec) (bool, string) {
+	for _, drift := range GetResizableContainerResourceDrifts(stored, target) {
+		storedResources := defaultRequestsFromLimits(getContainerResources(stored, drift.Name, drift.InitContainer))
+		if ok, reason := canResizeResources(drift.Name, storedResources, defaultRequestsFromLimits(drift.Target)); !ok {
+			return false, reason
+		}
+	}
+
+	for _, drift := range GetLiveContainerResourceDrifts(live, target) {
+		liveResources := getContainerResources(live, drift.Name, drift.InitContainer)
+		if ok, reason := canResizeResources(drift.Name, liveResources, drift.Target); !ok {
 			return false, reason
 		}
 	}
 
 	return true, ""
+}
+
+// defaultRequestsFromLimits sets the missing requests to the corresponding
+// limits, as the API server does when a pod is created
+func defaultRequestsFromLimits(resources corev1.ResourceRequirements) corev1.ResourceRequirements {
+	defaulted := *resources.DeepCopy()
+	for name, limit := range defaulted.Limits {
+		if _, found := defaulted.Requests[name]; found {
+			continue
+		}
+		if defaulted.Requests == nil {
+			defaulted.Requests = corev1.ResourceList{}
+		}
+		defaulted.Requests[name] = limit.DeepCopy()
+	}
+	return defaulted
+}
+
+// overlayResourceList returns the live resource list with the target entries
+// applied over it, and whether any entry changed
+func overlayResourceList(live, target corev1.ResourceList) (corev1.ResourceList, bool) {
+	overlaid := live.DeepCopy()
+	changed := false
+	for name, targetValue := range target {
+		if liveValue, found := live[name]; found && liveValue.Cmp(targetValue) == 0 {
+			continue
+		}
+		if overlaid == nil {
+			overlaid = corev1.ResourceList{}
+		}
+		overlaid[name] = targetValue.DeepCopy()
+		changed = true
+	}
+	return overlaid, changed
 }
 
 func canResizeResources(containerName string, current, target corev1.ResourceRequirements) (bool, string) {
