@@ -202,8 +202,9 @@ considered a drift from the `Cluster` specification.
 
 :::warning
 With `resourcesUpdateStrategy: inPlace`, the operator treats the resources of
-the running pods as fully declarative: a resize applied to an instance pod by
-any other actor is reverted to match `spec.resources` of the `Cluster`. Do not
+the running pods as declarative: a resize applied to an instance pod by any
+other actor is reverted to match `spec.resources` of the `Cluster`, whenever
+this is possible in place (a pod is never recreated for this reason). Do not
 point an in-place vertical autoscaler at the instance pods of a cluster using
 this strategy.
 :::
