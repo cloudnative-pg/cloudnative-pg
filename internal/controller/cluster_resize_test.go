@@ -77,7 +77,7 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		// maps of the passed cluster, and mutating them afterwards would
 		// silently change the "live" pod too
 		var err error
-		pod, err = specs.NewInstance(ctx, *cluster.DeepCopy(), 1, true)
+		pod, err = specs.NewInstance(ctx, *cluster.DeepCopy(), 1)
 		Expect(err).ToNot(HaveOccurred())
 
 		recorder = record.NewFakeRecorder(120)
