@@ -193,8 +193,8 @@ This happens when:
   the pod is recreated to apply the whole change.
 
 Run-once init containers cannot be resized and have already terminated when a
-resize takes place, so their recorded resources are left untouched: they will
-pick up the new values the next time the pod is naturally recreated.
+resize takes place, so they are not resized: they will pick up the new
+values the next time the pod is naturally recreated.
 
 Entries that Kubernetes adds when a pod is created, such as requests
 defaulted from the limits or defaults coming from a `LimitRange`, are not
