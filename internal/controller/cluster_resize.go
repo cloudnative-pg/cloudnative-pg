@@ -59,7 +59,7 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 		return fmt.Errorf("while building the target instance to resize the pod: %w", err)
 	}
 
-	if drifts := specs.GetResizableContainerResourceDrifts(&pod.Spec, &targetPod.Spec); len(drifts) > 0 {
+	if drifts := specs.GetLiveContainerResourceDrifts(&pod.Spec, &targetPod.Spec); len(drifts) > 0 {
 		contextLogger.Info("Resizing instance pod in place",
 			"pod", pod.Name,
 			"reason", reason)

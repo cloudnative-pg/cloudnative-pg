@@ -201,7 +201,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		current, target := makeSpecs(
 			makeResources("500m", "1Gi", "500m", "1Gi"),
 			makeResources("500m", "1Gi", "500m", "1Gi"))
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeTrue())
 	})
 
@@ -209,7 +209,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		current, target := makeSpecs(
 			makeResources("500m", "1Gi", "1", "1Gi"),
 			makeResources("250m", "1Gi", "2", "1Gi"))
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeTrue())
 	})
 
@@ -217,7 +217,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		current, target := makeSpecs(
 			makeResources("500m", "1Gi", "500m", "1Gi"),
 			makeResources("500m", "2Gi", "500m", "2Gi"))
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeTrue())
 	})
 
@@ -225,7 +225,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		current, target := makeSpecs(
 			makeResources("500m", "1Gi", "500m", "2Gi"),
 			makeResources("500m", "1Gi", "500m", "1Gi"))
-		ok, reason := CanResizeInPlace(&current, &target)
+		ok, reason := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeFalse())
 		Expect(reason).To(ContainSubstring("memory limit"))
 	})
@@ -234,7 +234,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		current, target := makeSpecs(
 			makeResources("500m", "2Gi", "500m", "2Gi"),
 			makeResources("500m", "1Gi", "500m", "2Gi"))
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeTrue())
 	})
 
@@ -264,7 +264,7 @@ var _ = Describe("CanResizeInPlace", func() {
 				},
 			},
 		}
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeFalse())
 	})
 
@@ -272,7 +272,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		current, target := makeSpecs(
 			makeResources("500m", "1Gi", "500m", "1Gi"),
 			corev1.ResourceRequirements{})
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeFalse())
 	})
 
@@ -283,7 +283,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		targetResources.Limits["hugepages-2Mi"] = resource.MustParse("512Mi")
 
 		current, target := makeSpecs(currentResources, targetResources)
-		ok, reason := CanResizeInPlace(&current, &target)
+		ok, reason := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeFalse())
 		Expect(reason).To(ContainSubstring("hugepages-2Mi"))
 	})
@@ -304,7 +304,7 @@ var _ = Describe("CanResizeInPlace", func() {
 		// the drift is still visible to the full detection
 		Expect(GetContainerResourceDrifts(&current, &target)).To(HaveLen(1))
 
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeTrue())
 	})
 
@@ -319,7 +319,7 @@ var _ = Describe("CanResizeInPlace", func() {
 				{Name: "sidecar", RestartPolicy: &always, Resources: makeResources("200m", "", "", "")},
 			},
 		}
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeTrue())
 	})
 
@@ -336,7 +336,75 @@ var _ = Describe("CanResizeInPlace", func() {
 				{Name: "b", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
 			},
 		}
-		ok, _ := CanResizeInPlace(&current, &target)
+		ok, _ := CanResizeInPlace(&current, &current, &target)
 		Expect(ok).To(BeFalse())
+	})
+
+	It("accepts dropping a request equal to its limit", func() {
+		stored, target := makeSpecs(
+			makeResources("1", "1Gi", "1", "1Gi"),
+			makeResources("", "", "1", "1Gi"))
+		ok, _ := CanResizeInPlace(&stored, &stored, &target)
+		Expect(ok).To(BeTrue())
+	})
+
+	It("refuses an entry removed from the stored spec even if admission defaulted it", func() {
+		stored, target := makeSpecs(
+			makeResources("500m", "1Gi", "1", "1Gi"),
+			makeResources("500m", "1Gi", "", "1Gi"))
+		// a LimitRange default brings back the cpu limit in the live pod
+		live := *stored.DeepCopy()
+		ok, reason := CanResizeInPlace(&live, &stored, &target)
+		Expect(ok).To(BeFalse())
+		Expect(reason).To(ContainSubstring("removed"))
+	})
+
+	It("refuses a memory limit decrease against a live spec resized by someone else", func() {
+		stored, target := makeSpecs(
+			makeResources("500m", "1Gi", "500m", "2Gi"),
+			makeResources("500m", "1Gi", "500m", "3Gi"))
+		live, _ := makeSpecs(makeResources("500m", "1Gi", "500m", "4Gi"), corev1.ResourceRequirements{})
+		ok, reason := CanResizeInPlace(&live, &stored, &target)
+		Expect(ok).To(BeFalse())
+		Expect(reason).To(ContainSubstring("memory limit"))
+	})
+})
+
+var _ = Describe("GetLiveContainerResourceDrifts", func() {
+	makeSpec := func(resources corev1.ResourceRequirements) corev1.PodSpec {
+		return corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: PostgresContainerName, Resources: resources},
+			},
+		}
+	}
+
+	It("ignores the requests the API server defaults from the limits", func() {
+		live := makeSpec(makeResources("1", "1Gi", "1", "1Gi"))
+		target := makeSpec(makeResources("", "", "1", "1Gi"))
+		Expect(GetLiveContainerResourceDrifts(&live, &target)).To(BeEmpty())
+	})
+
+	It("ignores the entries added at admission time", func() {
+		// a LimitRange defaulted the resources of a container declaring none
+		live := makeSpec(makeResources("100m", "256Mi", "500m", "512Mi"))
+		target := makeSpec(corev1.ResourceRequirements{})
+		Expect(GetLiveContainerResourceDrifts(&live, &target)).To(BeEmpty())
+	})
+
+	It("overlays the target over the live resources", func() {
+		live := makeSpec(makeResources("1", "256Mi", "1", "512Mi"))
+		target := makeSpec(corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+		})
+
+		drifts := GetLiveContainerResourceDrifts(&live, &target)
+		Expect(drifts).To(HaveLen(1))
+		Expect(drifts[0].Target.Requests.Cpu().String()).To(Equal("2"))
+		Expect(drifts[0].Target.Limits.Cpu().String()).To(Equal("2"))
+		Expect(drifts[0].Target.Requests.Memory().String()).To(Equal("256Mi"))
+		Expect(drifts[0].Target.Limits.Memory().String()).To(Equal("512Mi"))
+		// the live spec is untouched
+		Expect(live.Containers[0].Resources.Limits.Cpu().String()).To(Equal("1"))
 	})
 })

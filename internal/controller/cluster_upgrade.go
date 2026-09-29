@@ -810,15 +810,15 @@ func checkPodSpecIsOutdated(
 		if cluster.GetResourcesUpdateStrategy() != apiv1.ResourcesUpdateStrategyInPlace {
 			return rollout{}, nil
 		}
-		if len(specs.GetResizableContainerResourceDrifts(&pod.Spec, &targetPod.Spec)) == 0 {
+		if len(specs.GetLiveContainerResourceDrifts(&pod.Spec, &targetPod.Spec)) == 0 {
 			return rollout{}, nil
 		}
-		return evaluateResourcesOnlyDrift(pod, targetPod), nil
+		return evaluateResourcesOnlyDrift(pod, &storedPodSpec, targetPod), nil
 	}
 
 	if cluster.GetResourcesUpdateStrategy() == apiv1.ResourcesUpdateStrategyInPlace {
 		if restMatch, _ := specs.ComparePodSpecsIgnoringContainerResources(storedPodSpec, targetPod.Spec); restMatch {
-			return evaluateResourcesOnlyDrift(pod, targetPod), nil
+			return evaluateResourcesOnlyDrift(pod, &storedPodSpec, targetPod), nil
 		}
 	}
 
@@ -832,7 +832,7 @@ func checkPodSpecIsOutdated(
 // only drift from the target spec is in the container resources: resized in
 // place when the cluster supports it and the delta allows it, recreated
 // otherwise
-func evaluateResourcesOnlyDrift(pod *corev1.Pod, targetPod *corev1.Pod) rollout {
+func evaluateResourcesOnlyDrift(pod *corev1.Pod, storedPodSpec *corev1.PodSpec, targetPod *corev1.Pod) rollout {
 	if !utils.HavePodsResize() {
 		return rollout{
 			required: true,
@@ -841,7 +841,7 @@ func evaluateResourcesOnlyDrift(pod *corev1.Pod, targetPod *corev1.Pod) rollout 
 		}
 	}
 
-	if ok, reason := specs.CanResizeInPlace(&pod.Spec, &targetPod.Spec); !ok {
+	if ok, reason := specs.CanResizeInPlace(&pod.Spec, storedPodSpec, &targetPod.Spec); !ok {
 		return rollout{
 			required: true,
 			reason:   "container resources changed, recreating the pod: " + reason,
