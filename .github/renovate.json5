@@ -322,6 +322,15 @@
       ],
       pinDigests: false,
       separateMajorMinor: false,
+    },
+    {
+      groupName: 'workflow requirements',
+      matchFileNames: [
+        '.github/workflow-requirements.txt',
+      ],
+      schedule: [
+        'before 6am on monday',
+      ],
     }
   ],
 }
