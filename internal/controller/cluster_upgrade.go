@@ -813,7 +813,14 @@ func checkPodSpecIsOutdated(
 		if len(specs.GetLiveContainerResourceDrifts(&pod.Spec, &targetPod.Spec)) == 0 {
 			return rollout{}, nil
 		}
-		return evaluateResourcesOnlyDrift(pod, &storedPodSpec, targetPod), nil
+		// Only a resize can realign the live resources here: this drift was
+		// introduced outside the operator, possibly at admission time (e.g.
+		// by a mutating webhook), and a recreated pod could get it again,
+		// recreating the pod at every reconciliation.
+		if podRollout := evaluateResourcesOnlyDrift(pod, &storedPodSpec, targetPod); podRollout.canBeResizedInPlace {
+			return podRollout, nil
+		}
+		return rollout{}, nil
 	}
 
 	if cluster.GetResourcesUpdateStrategy() == apiv1.ResourcesUpdateStrategyInPlace {
