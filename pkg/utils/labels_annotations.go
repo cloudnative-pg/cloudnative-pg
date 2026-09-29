@@ -151,6 +151,11 @@ const (
 
 	// LivenessPingerAnnotationName is the name of the pinger configuration
 	LivenessPingerAnnotationName = AlphaMetadataNamespace + "/livenessPinger"
+
+	// PgCreateSubscriberEngineAnnotationName forces the engine of the
+	// pg_createsubscriber bootstrap ("emulated" on PostgreSQL 17+, to compare
+	// it with the native binary)
+	PgCreateSubscriberEngineAnnotationName = AlphaMetadataNamespace + "/pgCreateSubscriberEngine"
 )
 
 const (

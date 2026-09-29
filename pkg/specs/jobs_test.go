@@ -301,6 +301,26 @@ var _ = Describe("Job created via pg_basebackup", func() {
 	})
 })
 
+var _ = Describe("Job created via pg_createsubscriber", func() {
+	It("runs the pgcreatesubscriber subcommand with its own role", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:14.8",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgCreateSubscriber: &apiv1.BootstrapPgCreateSubscriber{Source: "source"},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaPgCreateSubscriber(cluster)
+		Expect(cmd.Command).To(Equal([]string{"/controller/manager", "instance", "pgcreatesubscriber"}))
+
+		job := CreatePrimaryJob(cluster, 1, cmd.Role, cmd.Command, getExtensions(&cluster))
+		Expect(job.Name).To(Equal("cluster-1-pgcreatesubscriber"))
+		Expect(job.Labels).To(HaveKeyWithValue(utils.JobRoleLabelName, "pgcreatesubscriber"))
+	})
+})
+
 var _ = Describe("Job service account token", func() {
 	const tokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 
