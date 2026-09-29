@@ -110,7 +110,11 @@ func (r *ClusterReconciler) refreshPodSpecAnnotationResources(
 		return fmt.Errorf("while unmarshalling the pod spec annotation: %w", err)
 	}
 
-	drifts := specs.GetResizableContainerResourceDrifts(&storedPodSpec, &targetPod.Spec)
+	// Run-once init containers are included: they cannot be resized, but
+	// they have already terminated and a recreated pod picks up the target
+	// anyway. Leaving them stale would keep the drift detection firing on
+	// a drift that nothing can act upon.
+	drifts := specs.GetContainerResourceDrifts(&storedPodSpec, &targetPod.Spec)
 	if len(drifts) == 0 {
 		return nil
 	}
