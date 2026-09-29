@@ -1969,7 +1969,8 @@ jobs:
       E2E_CSI_STORAGE_CLASS: standard-rwo
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: pd-csi-snapclass
 
-      REGION: europe-west3
+      REGION: ${{ vars.GKE_REGION || 'europe-west4' }}
+      MACHINE_TYPE: ${{ vars.GKE_MACHINE_TYPE || 'e2-standard-4' }}
       TEST_CLOUD_VENDOR: "gke"
 
     steps:
@@ -2046,7 +2047,7 @@ jobs:
               --cluster-version=${{ env.K8S_VERSION }} \
               --region=${{ env.REGION }} \
               --disk-size=80 \
-              --machine-type=e2-standard-4 \
+              --machine-type=${{ env.MACHINE_TYPE }} \
               --labels=cluster=${{ env.CLUSTER_NAME }}
             then
               exit 0
