@@ -468,6 +468,30 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.canBeResizedInPlace).To(BeTrue())
 		})
 
+		It("does not loop on the resources defaulted at admission time", func(ctx SpecContext) {
+			// Only limits are declared: the API server defaults the requests
+			// to the limits in the live pod, never in the stored annotation
+			clusterInPlace.Spec.Resources.Requests = nil
+			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
+			Expect(err).ToNot(HaveOccurred())
+			for i := range pod.Spec.Containers {
+				container := &pod.Spec.Containers[i]
+				container.Resources.Requests = container.Resources.Limits.DeepCopy()
+				if container.Resources.Limits == nil {
+					// a LimitRange defaults the containers declaring nothing
+					container.Resources.Limits = corev1.ResourceList{"cpu": resource.MustParse("100m")}
+				}
+			}
+
+			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeFalse())
+
+			clusterInPlace.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+			rollout = isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.canBeResizedInPlace).To(BeTrue())
+		})
+
 		It("does not resize when the strategy is recreate", func(ctx SpecContext) {
 			clusterInPlace.Spec.ResourcesUpdateStrategy = apiv1.ResourcesUpdateStrategyRecreate
 
