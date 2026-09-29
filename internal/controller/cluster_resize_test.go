@@ -123,6 +123,12 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		storedResources := getPostgresResources(&storedPodSpec)
 		Expect(storedResources.Limits["cpu"]).To(Equal(resource.MustParse("2")))
 
+		// the drift detection quiesces, including the run-once init
+		// containers that were not resized
+		podRollout, err := checkPodSpecIsOutdated(ctx, &currentPod, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(podRollout.required).To(BeFalse())
+
 		Expect(recorder.Events).To(Receive(ContainSubstring("InPlaceResize")))
 	})
 
@@ -187,6 +193,34 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		err := r.resizeInstanceInPlace(ctx, cluster, pod, "unit test")
 		Expect(errors.Is(err, errInPlaceResizeRejected)).To(BeTrue())
 		Expect(recorder.Events).To(Receive(ContainSubstring("InPlaceResizeFailed")))
+	})
+
+	It("aligns the recorded run-once init containers too", func(ctx SpecContext) {
+		// a run-once init container, as injected by a plugin, whose
+		// resources follow the ones of the cluster
+		pluginInit := corev1.Container{Name: "plugin-init", Resources: *cluster.Spec.Resources.DeepCopy()}
+		var storedPodSpec corev1.PodSpec
+		Expect(json.Unmarshal(
+			[]byte(pod.Annotations[utils.PodSpecAnnotationName]), &storedPodSpec)).To(Succeed())
+		storedPodSpec.InitContainers = append(storedPodSpec.InitContainers, pluginInit)
+		annotation, err := json.Marshal(storedPodSpec)
+		Expect(err).ToNot(HaveOccurred())
+		pod.Annotations[utils.PodSpecAnnotationName] = string(annotation)
+		r := newReconciler(interceptor.Funcs{})
+
+		targetPod := pod.DeepCopy()
+		targetPod.Spec = *storedPodSpec.DeepCopy()
+		targetInit := &targetPod.Spec.InitContainers[len(targetPod.Spec.InitContainers)-1]
+		targetInit.Resources.Limits["cpu"] = resource.MustParse("2")
+		Expect(r.refreshPodSpecAnnotationResources(ctx, pod, targetPod)).To(Succeed())
+
+		var currentPod corev1.Pod
+		Expect(r.Get(ctx, k8client.ObjectKeyFromObject(pod), &currentPod)).To(Succeed())
+		var refreshedPodSpec corev1.PodSpec
+		Expect(json.Unmarshal(
+			[]byte(currentPod.Annotations[utils.PodSpecAnnotationName]), &refreshedPodSpec)).To(Succeed())
+		match, diff := specs.ComparePodSpecs(refreshedPodSpec, targetPod.Spec)
+		Expect(match).To(BeTrue(), diff)
 	})
 
 	It("propagates transient errors without falling back", func(ctx SpecContext) {
