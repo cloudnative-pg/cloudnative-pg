@@ -746,6 +746,101 @@ var _ = Describe("Test pod rollout due to topology", func() {
 	})
 })
 
+var _ = Describe("checkPodImagePullSecretsOutdated", func() {
+	It("does not require a rollout when the cluster has no image pull secrets", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{}
+		pod := &corev1.Pod{}
+
+		result, err := checkPodImagePullSecretsOutdated(ctx, pod, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.required).To(BeFalse())
+	})
+
+	It("does not require a rollout when the pod already has the configured secrets", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImagePullSecrets: []apiv1.LocalObjectReference{{Name: "secret1"}},
+			},
+		}
+		pod := &corev1.Pod{
+			Spec: corev1.PodSpec{
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: "secret1"}, {Name: "secret2"}},
+			},
+		}
+
+		result, err := checkPodImagePullSecretsOutdated(ctx, pod, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.required).To(BeFalse())
+	})
+
+	It("requires a rollout when the pod is missing a configured secret", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImagePullSecrets: []apiv1.LocalObjectReference{{Name: "secret1"}},
+			},
+		}
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster-1"},
+			Spec:       corev1.PodSpec{},
+		}
+
+		result, err := checkPodImagePullSecretsOutdated(ctx, pod, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.required).To(BeTrue())
+		Expect(result.reason).To(ContainSubstring("secret1"))
+	})
+
+	It("does not require a rollout when the cluster uses a user-provided ServiceAccount", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountName: "shared-sa",
+				ImagePullSecrets:   []apiv1.LocalObjectReference{{Name: "secret1"}},
+			},
+		}
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster-1"},
+			Spec:       corev1.PodSpec{},
+		}
+
+		result, err := checkPodImagePullSecretsOutdated(ctx, pod, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.required).To(BeFalse())
+	})
+})
+
+var _ = Describe("isPodNeedingRollout and image pull secrets", func() {
+	It("requires a rollout when a pod is missing a configured image pull secret", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImagePullSecrets: []apiv1.LocalObjectReference{{Name: "secret1"}},
+			},
+		}
+		pod, err := specs.NewInstance(ctx, *cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		rollout := isPodNeedingRollout(ctx, pod, cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("secret1"))
+	})
+
+	It("does not check image pull secrets when reconcilePodSpec is disabled", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImagePullSecrets: []apiv1.LocalObjectReference{{Name: "secret1"}},
+			},
+		}
+		pod, err := specs.NewInstance(ctx, *cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster.Annotations = map[string]string{
+			utils.ReconcilePodSpecAnnotationName: "disabled",
+		}
+
+		rollout := isPodNeedingRollout(ctx, pod, cluster)
+		Expect(rollout.required).To(BeFalse())
+	})
+})
+
 var _ = Describe("hasValidPodSpec", func() {
 	var pod *corev1.Pod
 
