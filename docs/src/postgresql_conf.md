@@ -187,6 +187,33 @@ recovery_target_timeline = 'latest'
     [PostgreSQL documentation](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-TCP-USER-TIMEOUT).
 :::
 
+### `pg_rewind` synchronization method
+
+CloudNativePG uses `pg_rewind` to realign a former primary with the current
+primary after a failover. By default, `pg_rewind` uses `fsync`, which recursively
+opens and synchronizes every file in `PGDATA`, the WAL directory, and configured
+tablespaces.
+
+With PostgreSQL 17 or later on Linux, you can use `syncfs` instead:
+
+```yaml
+postgresql:
+  pgRewind:
+    syncMethod: syncfs
+```
+
+The `syncfs` method synchronizes each filesystem that contains `PGDATA`, the WAL
+directory, or a tablespace. It can be faster on clusters with millions of files
+because it does not open each file individually. However, it also writes unrelated
+dirty data on the same filesystems and can be slower when other applications
+actively share them. On Linux versions before 5.8, write-back I/O errors might
+appear only in the kernel logs instead of being reported to PostgreSQL.
+
+For details, see the PostgreSQL documentation for
+[`pg_rewind --sync-method`](https://www.postgresql.org/docs/current/app-pgrewind.html)
+and
+[`recovery_init_sync_method`](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RECOVERY-INIT-SYNC-METHOD).
+
 ### Log control settings
 
 The operator requires PostgreSQL to output its log in CSV format, and the
