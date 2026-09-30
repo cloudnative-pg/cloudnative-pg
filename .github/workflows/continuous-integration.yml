@@ -700,7 +700,7 @@ jobs:
           accept-keywords: key
 
       - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@12140f4059e244892ae643824a95459a102120dd # master
+        uses: snyk/actions/docker@b075801f26076be9bb50521154cafab73f44da0c # master
         # Only run when a Snyk token is configured. Forks and downstream
         # repositories without the secret skip this step automatically.
         if: env.SNYK_TOKEN != ''
