@@ -1048,9 +1048,13 @@ func createOrPatchPodMonitor(
 	// Pod monitor disabled and no pod monitor - nothing to do
 	case !manager.IsPodMonitorEnabled() && podMonitor == nil:
 		return nil
-	// Pod monitor disabled and pod monitor present - delete it
+	// Pod monitor disabled and pod monitor present - delete it only when
+	// the operator owns it (Cluster or Pooler). Manually created PodMonitors
+	// that share the same name must be left alone.
 	case !manager.IsPodMonitorEnabled() && podMonitor != nil:
-		if _, owned := IsOwnedByCluster(podMonitor); owned {
+		_, ownedByCluster := IsOwnedByCluster(podMonitor)
+		_, ownedByPooler := isOwnedByPoolerKind(podMonitor)
+		if ownedByCluster || ownedByPooler {
 			contextLogger.Info("Deleting PodMonitor")
 			if err := cli.Delete(ctx, podMonitor); err != nil {
 				if !apierrs.IsNotFound(err) {
