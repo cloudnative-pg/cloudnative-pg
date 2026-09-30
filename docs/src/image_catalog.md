@@ -142,6 +142,12 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
     kind: ClusterImageCatalog # Or 'ImageCatalog'
@@ -255,6 +261,12 @@ metadata:
   name: angus
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
     kind: ClusterImageCatalog

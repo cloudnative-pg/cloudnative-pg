@@ -4,6 +4,12 @@ metadata:
   name: cluster-restore
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   imageName: registry.dev:5000/postgresql:16
 
   storage:

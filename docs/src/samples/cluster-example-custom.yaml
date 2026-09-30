@@ -8,6 +8,9 @@ spec:
   # Parameters and pg_hba configuration will be append
   # to the default ones to make the cluster work
   postgresql:
+    synchronous:
+      method: any
+      number: 1
     parameters:
       max_worker_processes: "60"
     pg_hba:

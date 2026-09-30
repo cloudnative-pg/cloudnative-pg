@@ -4,6 +4,12 @@ metadata:
   name: pg-backup-aws-inherit
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   storage:
     storageClass: standard
     size: 1Gi
