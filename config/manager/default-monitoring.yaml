@@ -7,6 +7,16 @@ metadata:
     cnpg.io/reload: ""
 data:
   queries: |
+    autovacuum_workers:
+      query:
+       SELECT count(*)
+       FROM pg_catalog.pg_stat_activity
+       WHERE backend_type = 'autovacuum worker'
+      metrics:
+        - count:
+            usage: "COUNTER"
+            description: "Number of autovacuum workers currently running"
+
     backends:
       query: |
        SELECT sa.datname
@@ -133,6 +143,7 @@ data:
             description: "Number of streaming replicas connected to the instance"
 
     pg_replication_slots:
+      runonserver: "<17.0.0"
       query: |
         SELECT slot_name,
           slot_type,
@@ -157,6 +168,40 @@ data:
         - active:
             usage: "GAUGE"
             description: "Flag indicating whether the slot is active"
+        - pg_wal_lsn_diff:
+            usage: "GAUGE"
+            description: "Replication lag in bytes"
+
+    pg_replication_slots_17:
+      runonserver: ">=17.0.0"
+      query: |
+        SELECT slot_name,
+          slot_type,
+          database,
+          active,
+          EXTRACT(EPOCH FROM inactive_since) AS inactive_since,
+          (CASE pg_catalog.pg_is_in_recovery()
+            WHEN TRUE THEN pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_last_wal_receive_lsn(), restart_lsn)
+            ELSE pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), restart_lsn)
+          END) as pg_wal_lsn_diff
+        FROM pg_catalog.pg_replication_slots
+        WHERE NOT temporary
+      metrics:
+        - slot_name:
+            usage: "LABEL"
+            description: "Name of the replication slot"
+        - slot_type:
+            usage: "LABEL"
+            description: "Type of the replication slot"
+        - database:
+            usage: "LABEL"
+            description: "Name of the database"
+        - active:
+            usage: "GAUGE"
+            description: "Flag indicating whether the slot is active"
+        - inactive_since:
+            usage: "GAUGE"
+            description: "Epoch of the time when the slot become inactive"
         - pg_wal_lsn_diff:
             usage: "GAUGE"
             description: "Replication lag in bytes"
@@ -317,6 +362,7 @@ data:
             description: "Time at which these statistics were last reset"
 
     pg_stat_database:
+      runonserver: "<18.0.0"
       query: |
         SELECT datname
           , xact_commit
@@ -383,7 +429,87 @@ data:
             description: "Time spent reading data file blocks by backends in this database, in milliseconds"
         - blk_write_time:
             usage: "COUNTER"
+            description: "Time spent writing data file blocks by backends in
+            this database, in milliseconds"
+
+    pg_stat_database_18:
+      runonserver: ">=18.0.0"
+      name: pg_stat_database
+      query: |
+        SELECT datname
+          , xact_commit
+          , xact_rollback
+          , blks_read
+          , blks_hit
+          , tup_returned
+          , tup_fetched
+          , tup_inserted
+          , tup_updated
+          , tup_deleted
+          , conflicts
+          , temp_files
+          , temp_bytes
+          , deadlocks
+          , blk_read_time
+          , blk_write_time
+          , parallel_workers_launched
+          , parallel_workers_to_launch
+        FROM pg_catalog.pg_stat_database
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of this database"
+        - xact_commit:
+            usage: "COUNTER"
+            description: "Number of transactions in this database that have been committed"
+        - xact_rollback:
+            usage: "COUNTER"
+            description: "Number of transactions in this database that have been rolled back"
+        - blks_read:
+            usage: "COUNTER"
+            description: "Number of disk blocks read in this database"
+        - blks_hit:
+            usage: "COUNTER"
+            description: "Number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system's file system cache)"
+        - tup_returned:
+            usage: "COUNTER"
+            description: "Number of rows returned by queries in this database"
+        - tup_fetched:
+            usage: "COUNTER"
+            description: "Number of rows fetched by queries in this database"
+        - tup_inserted:
+            usage: "COUNTER"
+            description: "Number of rows inserted by queries in this database"
+        - tup_updated:
+            usage: "COUNTER"
+            description: "Number of rows updated by queries in this database"
+        - tup_deleted:
+            usage: "COUNTER"
+            description: "Number of rows deleted by queries in this database"
+        - conflicts:
+            usage: "COUNTER"
+            description: "Number of queries canceled due to conflicts with recovery in this database"
+        - temp_files:
+            usage: "COUNTER"
+            description: "Number of temporary files created by queries in this database"
+        - temp_bytes:
+            usage: "COUNTER"
+            description: "Total amount of data written to temporary files by queries in this database"
+        - deadlocks:
+            usage: "COUNTER"
+            description: "Number of deadlocks detected in this database"
+        - blk_read_time:
+            usage: "COUNTER"
+            description: "Time spent reading data file blocks by backends in this database, in milliseconds"
+        - blk_write_time:
+            usage: "COUNTER"
             description: "Time spent writing data file blocks by backends in this database, in milliseconds"
+        - parallel_workers_launched:
+            usage: "COUNTER"
+            description: "Number of parallel workers launched by queries on this database"
+        - parallel_workers_to_launch:
+            usage: "COUNTER"
+            description: "Number of parallel workers planned to be launched by queries on this database"
 
     pg_stat_replication:
       primary: true
