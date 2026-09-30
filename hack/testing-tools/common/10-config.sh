@@ -108,7 +108,7 @@ EXTERNAL_SNAPSHOTTER_VERSION="v8.6.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-provisioner
 EXTERNAL_PROVISIONER_VERSION="v6.3.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-resizer
-EXTERNAL_RESIZER_VERSION="v2.2.1"
+EXTERNAL_RESIZER_VERSION="v2.3.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-attacher
 EXTERNAL_ATTACHER_VERSION="v4.13.0"
 
