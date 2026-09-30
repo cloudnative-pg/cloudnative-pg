@@ -1,0 +1,26 @@
+# Pinned to repo go.mod toolchain (go 1.25.0 / toolchain go1.26.2).
+FROM golang:1.26-bookworm
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Pre-fetch envtest before copying full tree so this layer stays cached on code edits.
+ENV ENVTEST_ASSETS_DIR=/app/testbin
+ENV ENVTEST_K8S_VERSION=1.31.0
+RUN mkdir -p "${ENVTEST_ASSETS_DIR}" \
+    && GOBIN=/usr/local/bin go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest \
+    && setup-envtest use "${ENVTEST_K8S_VERSION}" --bin-dir "${ENVTEST_ASSETS_DIR}" --arch "$(go env GOARCH)"
+
+COPY . .
+
+# Same packages as `make test` (excludes e2e Ginkgo suite that requires a real cluster).
+# Paths/version are literal so run-tests-eval.sh can parse JSON CMD without mangling ${...}.
+CMD ["bash", "-c", "set -euo pipefail; export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s; source <(setup-envtest use -p env --bin-dir /app/testbin 1.31.0); export PATH=/usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$$PATH; go test -timeout 45m ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils/..."]
