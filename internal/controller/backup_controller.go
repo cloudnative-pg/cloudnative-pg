@@ -118,6 +118,8 @@ func NewBackupReconciler(
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// rbac markers above define the minimal scope required for backup controller actions.
+// Scope is restricted to cluster-scoped resources and does not extend to secrets.
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
