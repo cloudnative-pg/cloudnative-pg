@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -647,6 +648,53 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cl
 				field.NewPath("spec", "bootstrap", "pg_basebackup", "source"),
 				r.Spec.Bootstrap.PgBaseBackup.Source,
 				fmt.Sprintf("External cluster %v not found", r.Spec.Bootstrap.PgBaseBackup.Source)))
+	}
+
+	result = append(result, v.validateTablespaceMapping(r)...)
+
+	return result
+}
+
+// validateTablespaceMapping validates the tablespace mapping of the
+// pg_basebackup bootstrap: every name must be declared in `spec.tablespaces`
+// and be unique, and every source location must be an absolute path, free of
+// `=` (the separator used by `pg_basebackup`), and unique.
+func (v *ClusterCustomValidator) validateTablespaceMapping(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	basePath := field.NewPath("spec", "bootstrap", "pg_basebackup", "tablespaceMapping")
+	seenNames := make(map[string]struct{})
+	seenLocations := make(map[string]struct{})
+
+	for i, entry := range r.Spec.Bootstrap.PgBaseBackup.TablespaceMapping {
+		entryPath := basePath.Index(i)
+
+		if _, found := seenNames[entry.Name]; found {
+			result = append(result, field.Duplicate(entryPath.Child("name"), entry.Name))
+		}
+		seenNames[entry.Name] = struct{}{}
+
+		if r.GetTablespaceConfiguration(entry.Name) == nil {
+			result = append(result, field.Invalid(
+				entryPath.Child("name"),
+				entry.Name,
+				fmt.Sprintf("Tablespace %v not declared in spec.tablespaces", entry.Name)))
+		}
+
+		locationPath := entryPath.Child("sourceLocation")
+		switch {
+		case !path.IsAbs(entry.SourceLocation):
+			result = append(result, field.Invalid(
+				locationPath, entry.SourceLocation, "The source location must be an absolute path"))
+		case strings.Contains(entry.SourceLocation, "="):
+			result = append(result, field.Invalid(
+				locationPath, entry.SourceLocation, "The source location must not contain the '=' character"))
+		}
+
+		if _, found := seenLocations[entry.SourceLocation]; found {
+			result = append(result, field.Duplicate(locationPath, entry.SourceLocation))
+		}
+		seenLocations[entry.SourceLocation] = struct{}{}
 	}
 
 	return result
@@ -2764,6 +2812,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getMonitoringFieldsWarnings(r)...)
 	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 	list = append(list, getSynchronousReplicationWarnings(r)...)
+	list = append(list, getPgBaseBackupTablespaceWarnings(r)...)
 	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
 
@@ -2868,6 +2917,35 @@ func getRetentionPolicyWarnings(r *apiv1.Cluster) admission.Warnings {
 				"in-tree barman-cloud support, which is not being used in this cluster. "+
 				"Please use a backup plugin and migrate this configuration to the plugin configuration",
 		)
+	}
+
+	return result
+}
+
+// getPgBaseBackupTablespaceWarnings warns about the tablespaces declared in
+// `spec.tablespaces` that are not mapped when bootstrapping via pg_basebackup
+func getPgBaseBackupTablespaceWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.PgBaseBackup == nil {
+		return result
+	}
+
+	mapped := make(map[string]struct{}, len(r.Spec.Bootstrap.PgBaseBackup.TablespaceMapping))
+	for _, entry := range r.Spec.Bootstrap.PgBaseBackup.TablespaceMapping {
+		mapped[entry.Name] = struct{}{}
+	}
+
+	for _, tablespace := range r.Spec.Tablespaces {
+		if _, found := mapped[tablespace.Name]; found {
+			continue
+		}
+		result = append(result, fmt.Sprintf(
+			"Tablespace %q is declared in .spec.tablespaces but has no entry in "+
+				".spec.bootstrap.pg_basebackup.tablespaceMapping: the source instance must use "+
+				"the CloudNativePG location for it. Tablespaces of the source instance that are "+
+				"not declared in .spec.tablespaces are not detected",
+			tablespace.Name))
 	}
 
 	return result

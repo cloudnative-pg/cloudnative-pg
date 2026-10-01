@@ -556,7 +556,9 @@ The following requirements apply to the `pg_basebackup` bootstrap method:
 
 - target and source must have the same hardware architecture
 - target and source must have the same major PostgreSQL version
-- target and source must have the same tablespaces
+- target and source must have the same tablespaces, with the locations in the
+  source mapped through `tablespaceMapping` (see
+  [Mapping tablespaces from the source](#mapping-tablespaces-from-the-source))
 - source must be configured with enough `max_wal_senders` to grant
   access from the target for this one-off operation by providing at least
   one *walsender* for the backup plus one for WAL streaming
@@ -808,6 +810,50 @@ test combinations of `pg_basebackup` options.
 
 This setting only applies to the bootstrap of the cluster. It does not affect
 the `pg_basebackup` executions used to join new replicas.
+
+#### Mapping tablespaces from the source
+
+If the source instance uses tablespaces, map each tablespace declared
+in `spec.tablespaces` to its location in the source instance with
+`tablespaceMapping`:
+
+```yaml
+spec:
+  tablespaces:
+    - name: data_ts
+      storage:
+        size: 1Gi
+  bootstrap:
+    pg_basebackup:
+      source: cluster-example
+      tablespaceMapping:
+        - name: data_ts
+          sourceLocation: /var/lib/postgresql/source-tablespaces/data_ts
+```
+
+:::warning
+Use `tablespaceMapping` with caution when the source cluster is not
+managed by CloudNativePG. The operator does not validate that the
+resulting tablespace layout will work correctly.
+:::
+
+:::warning
+The operator cannot know which tablespaces the source instance has, as the
+connection used by `pg_basebackup` only supports replication commands. Make
+sure that every tablespace of the source instance is declared in
+`spec.tablespaces`, and mapped through `tablespaceMapping` unless the source
+already uses the CloudNativePG location. A tablespace that is not mapped is
+restored under the path it has in the source instance, inside the Pod, and the
+bootstrap may fail or write to an unexpected location. The webhook warns about
+the tablespaces declared in `spec.tablespaces` without a mapping.
+:::
+
+:::warning
+Do not run `CREATE TABLESPACE` on the source between the start of the base
+backup and the promotion of the target. WAL replay carries the source path
+unmodified, so replaying such a record fails on the target. This also applies to
+replica clusters, for as long as they follow the source.
+:::
 
 #### Current limitations
 

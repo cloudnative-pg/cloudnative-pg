@@ -293,3 +293,47 @@ var _ = Describe("Job service account token", func() {
 		}
 	})
 })
+
+var _ = Describe("Job created via pg_basebackup", func() {
+	It("passes one tablespace mapping per entry, in the declared order", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source: "origin",
+						TablespaceMapping: []apiv1.TablespaceMappingEntry{
+							{Name: "fast", SourceLocation: "/data/pg/fast"},
+							{Name: "archive", SourceLocation: "/data/pg/archive"},
+						},
+					},
+				},
+			},
+		}
+
+		command := BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster).Command
+		Expect(command).To(ContainElement(
+			"--tablespace-mapping=/data/pg/fast=" + LocationForTablespace("fast") +
+				" --tablespace-mapping=/data/pg/archive=" + LocationForTablespace("archive")))
+	})
+
+	It("doesn't pass the tablespace mapping when joining a replica", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source: "origin",
+						TablespaceMapping: []apiv1.TablespaceMappingEntry{
+							{Name: "fast", SourceLocation: "/data/pg/fast"},
+						},
+					},
+				},
+			},
+		}
+
+		command := BuildReplicaBootstrapCommandViaJoin(cluster).Command
+		Expect(command).ToNot(ContainElement("--pgbasebackup-additional-args"))
+		for _, arg := range command {
+			Expect(arg).ToNot(ContainSubstring("--tablespace-mapping"))
+		}
+	})
+})

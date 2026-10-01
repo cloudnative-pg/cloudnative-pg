@@ -581,6 +581,7 @@ TTY
 TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile
+TablespaceMappingEntry
 TablespaceName
 TablespaceState
 TablespaceStatus
@@ -1631,6 +1632,7 @@ tablespaceName
 tablespaceStatus
 tablespaceStorage
 tablespaceconfiguration
+tablespacemappingentry
 tablespaces
 tablespacesStatus
 tablespacestate

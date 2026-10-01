@@ -7374,3 +7374,143 @@ var _ = Describe("getFailureDomainTopologyWarnings", func() {
 		Expect(warnings[0]).To(ContainSubstring("Topology labels could not be extracted"))
 	})
 })
+
+var _ = Describe("pg_basebackup tablespaceMapping validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	clusterWithMapping := func(entries ...apiv1.TablespaceMappingEntry) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{{Name: "origin"}},
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					{Name: "fast"},
+					{Name: "archive"},
+				},
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:            "origin",
+						TablespaceMapping: entries,
+					},
+				},
+			},
+		}
+	}
+
+	It("accepts a valid mapping", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/fast"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data/pg/archive"},
+		)
+		Expect(v.validateBootstrapPgBaseBackupSource(cluster)).To(BeEmpty())
+	})
+
+	It("accepts a missing mapping", func() {
+		Expect(v.validateBootstrapPgBaseBackupSource(clusterWithMapping())).To(BeEmpty())
+	})
+
+	It("rejects a tablespace not declared in spec.tablespaces", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "unknown", SourceLocation: "/data/pg/unknown"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].name"))
+	})
+
+	It("rejects a duplicated tablespace name", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/a"},
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/b"},
+		)
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].name"))
+	})
+
+	It("rejects a relative source location", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "data/pg/fast"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
+	It("rejects an empty source location", func() {
+		cluster := clusterWithMapping(apiv1.TablespaceMappingEntry{Name: "fast"})
+		Expect(v.validateBootstrapPgBaseBackupSource(cluster)).To(HaveLen(1))
+	})
+
+	It("rejects a source location containing '='", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg=fast"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
+	It("rejects a duplicated source location", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/ts"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data/pg/ts"},
+		)
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].sourceLocation"))
+	})
+})
+
+var _ = Describe("getPgBaseBackupTablespaceWarnings", func() {
+	clusterWith := func(pgBaseBackup *apiv1.BootstrapPgBaseBackup, tablespaces ...string) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{PgBaseBackup: pgBaseBackup},
+			},
+		}
+		for _, name := range tablespaces {
+			cluster.Spec.Tablespaces = append(cluster.Spec.Tablespaces, apiv1.TablespaceConfiguration{Name: name})
+		}
+		return cluster
+	}
+
+	It("returns no warnings when not bootstrapping via pg_basebackup", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Tablespaces: []apiv1.TablespaceConfiguration{{Name: "fast"}},
+			},
+		}
+		Expect(getPgBaseBackupTablespaceWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warnings when no tablespace is declared", func() {
+		cluster := clusterWith(&apiv1.BootstrapPgBaseBackup{Source: "origin"})
+		Expect(getPgBaseBackupTablespaceWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warnings when every declared tablespace is mapped", func() {
+		cluster := clusterWith(&apiv1.BootstrapPgBaseBackup{
+			Source: "origin",
+			TablespaceMapping: []apiv1.TablespaceMappingEntry{
+				{Name: "fast", SourceLocation: "/data/pg/fast"},
+				{Name: "archive", SourceLocation: "/data/pg/archive"},
+			},
+		}, "fast", "archive")
+		Expect(getPgBaseBackupTablespaceWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns one warning for each declared tablespace that is not mapped", func() {
+		cluster := clusterWith(&apiv1.BootstrapPgBaseBackup{
+			Source: "origin",
+			TablespaceMapping: []apiv1.TablespaceMappingEntry{
+				{Name: "fast", SourceLocation: "/data/pg/fast"},
+			},
+		}, "fast", "archive", "cold")
+		warnings := getPgBaseBackupTablespaceWarnings(cluster)
+		Expect(warnings).To(HaveLen(2))
+		Expect(warnings[0]).To(ContainSubstring(`"archive"`))
+		Expect(warnings[1]).To(ContainSubstring(`"cold"`))
+	})
+})

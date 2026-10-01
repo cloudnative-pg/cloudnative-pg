@@ -1942,6 +1942,35 @@ spec:
                           a physical backup
                         minLength: 1
                         type: string
+                      tablespaceMapping:
+                        description: |-
+                          Maps each tablespace declared in `spec.tablespaces` to its location
+                          in the source instance.
+                        items:
+                          description: |-
+                            TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+                            location of the same tablespace in the source instance of a `pg_basebackup`
+                            bootstrap
+                          properties:
+                            name:
+                              description: Name of the tablespace, as declared in
+                                `spec.tablespaces`
+                              minLength: 1
+                              type: string
+                            sourceLocation:
+                              description: |-
+                                Absolute path of the tablespace in the source instance. It must not
+                                contain the `=` character and must be unique among the entries.
+                              minLength: 1
+                              type: string
+                          required:
+                          - name
+                          - sourceLocation
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
                     required:
                     - source
                     type: object
