@@ -22,23 +22,42 @@ package postgres
 import (
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"sort"
 
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"pgregory.net/rapid"
 
 	. "github.com/onsi/ginkgo/v2"
 )
 
 var podNamePool = []string{"cluster-1", "cluster-2", "cluster-3"}
 
-func genPostgresqlStatus(t *rapid.T) PostgresqlStatus {
-	name := rapid.SampledFrom(podNamePool).Draw(t, "podName")
+// run is one randomized iteration, seeded by its index so failures replay.
+type run struct {
+	*rand.Rand
+	seed int
+}
+
+func (t *run) bool() bool { return t.IntN(2) == 1 }
+
+func (t *run) Fatalf(format string, args ...any) {
+	GinkgoHelper()
+	Fail(fmt.Sprintf("seed %d: ", t.seed) + fmt.Sprintf(format, args...))
+}
+
+func check(f func(t *run)) {
+	for i := range 1000 {
+		f(&run{rand.New(rand.NewPCG(uint64(i), 0)), i}) //nolint:gosec // deterministic seed, not security-sensitive
+	}
+}
+
+func genPostgresqlStatus(t *run) PostgresqlStatus {
+	name := podNamePool[t.IntN(len(podNamePool))]
 
 	var statusErr error
-	if rapid.Bool().Draw(t, "hasError") {
+	if t.bool() {
 		statusErr = errors.New("synthetic status error")
 	}
 
@@ -46,29 +65,29 @@ func genPostgresqlStatus(t *rapid.T) PostgresqlStatus {
 	// generated instances frequently tie on LSN, which is required to reach
 	// the replica-cluster tie-break at the bottom of Less. A wide range would
 	// almost never collide and the interesting branch would go unexercised.
-	receivedLsn := types.Int64ToLSN(rapid.Uint64Range(0, 3).Draw(t, "receivedLsn"))
-	replayLsn := types.Int64ToLSN(rapid.Uint64Range(0, 3).Draw(t, "replayLsn"))
+	receivedLsn := types.Int64ToLSN(t.Uint64N(4))
+	replayLsn := types.Int64ToLSN(t.Uint64N(4))
 
 	return PostgresqlStatus{
 		Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}},
 		Error:       statusErr,
-		IsFenced:    rapid.Bool().Draw(t, "isFenced"),
-		IsPrimary:   rapid.Bool().Draw(t, "isPrimary"),
+		IsFenced:    t.bool(),
+		IsPrimary:   t.bool(),
 		ReceivedLsn: receivedLsn,
 		ReplayLsn:   replayLsn,
 	}
 }
 
-func genPostgresqlStatusList(t *rapid.T) *PostgresqlStatusList {
-	n := rapid.IntRange(2, 5).Draw(t, "n")
+func genPostgresqlStatusList(t *run) *PostgresqlStatusList {
+	n := 2 + t.IntN(4)
 
 	items := make([]PostgresqlStatus, n)
 	for i := range items {
 		items[i] = genPostgresqlStatus(t)
 	}
 
-	isReplicaCluster := rapid.Bool().Draw(t, "isReplicaCluster")
-	currentPrimary := rapid.SampledFrom(podNamePool).Draw(t, "currentPrimary")
+	isReplicaCluster := t.bool()
+	currentPrimary := podNamePool[t.IntN(len(podNamePool))]
 
 	return &PostgresqlStatusList{
 		Items:            items,
@@ -87,7 +106,7 @@ func describeItem(list *PostgresqlStatusList, idx int) string {
 
 var _ = Describe("PostgresqlStatusList.Less", func() {
 	It("forms a strict weak ordering over any generated list", func() {
-		rapid.Check(GinkgoT(), func(t *rapid.T) {
+		check(func(t *run) {
 			list := genPostgresqlStatusList(t)
 			n := len(list.Items)
 
@@ -141,7 +160,7 @@ var _ = Describe("PostgresqlStatusList.Less", func() {
 	// a fenced instance must never be preferred over a non-fenced one: a
 	// fenced instance has PostgreSQL shut down and cannot become primary.
 	It("always sorts a reachable fenced instance after a reachable non-fenced one", func() {
-		rapid.Check(GinkgoT(), func(t *rapid.T) {
+		check(func(t *run) {
 			list := genPostgresqlStatusList(t)
 			n := len(list.Items)
 
@@ -172,7 +191,7 @@ var _ = Describe("PostgresqlStatusList.Less", func() {
 	// not be fenced whenever a reachable, non-fenced alternative exists
 	// anywhere in the list.
 	It("never sorts a fenced instance first when a reachable non-fenced instance exists", func() {
-		rapid.Check(GinkgoT(), func(t *rapid.T) {
+		check(func(t *run) {
 			list := genPostgresqlStatusList(t)
 
 			hasReachableNonFenced := false
