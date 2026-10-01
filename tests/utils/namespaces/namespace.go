@@ -110,7 +110,8 @@ func cleanupNamespace(
 // dumpGoroutineStacks sends SIGQUIT to every container, regular and init
 // (e.g. "bootstrap-instance", which is where the CNPG-9xxx-style bootstrap
 // hangs happen), of every CNPG-managed pod (instances and pgbouncer poolers)
-// in the namespace, capturing each process's goroutine dump into filename.
+// in the namespace. The dumps land in each pod's log; filename only lists
+// the signals sent.
 // Go's default SIGQUIT handling prints every goroutine's stack to stderr and
 // terminates the process, so this is only meant to run right before the
 // namespace and its pods are torn down anyway, when a spec got stuck rather
@@ -183,8 +184,9 @@ func dumpGoroutineStacks(
 		close(resultsCh)
 	}()
 
+	_, _ = fmt.Fprintln(f, "Goroutine dumps are in the pod logs, not in this file.")
 	for result := range resultsCh {
-		_, _ = fmt.Fprintf(f, "Goroutine dump for %v/%v (container %v)\n", namespace, result.pod, result.container)
+		_, _ = fmt.Fprintf(f, "Signaled %v/%v (container %v)\n", namespace, result.pod, result.container)
 		if result.err != nil {
 			_, _ = fmt.Fprintf(f, "could not signal container: %v\n", result.err)
 		}
