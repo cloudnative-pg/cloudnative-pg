@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,8 +45,9 @@ import (
 // CloneInfo is the structure containing all the information needed
 // to clone an existing server
 type CloneInfo struct {
-	info   *postgres.InitInfo
-	client ctrl.Client
+	info           *postgres.InitInfo
+	client         ctrl.Client
+	additionalArgs []string
 }
 
 // NewCmd creates the "pgbasebackup" subcommand
@@ -54,6 +56,7 @@ func NewCmd() *cobra.Command {
 	var namespace string
 	var pgData string
 	var pgWal string
+	var pgBaseBackupAdditionalArgsString string
 
 	cmd := &cobra.Command{
 		Use: "pgbasebackup",
@@ -67,6 +70,12 @@ func NewCmd() *cobra.Command {
 			ctx := cmd.Context()
 			contextLogger := log.FromContext(ctx)
 
+			additionalArgs, err := shellquote.Split(pgBaseBackupAdditionalArgsString)
+			if err != nil {
+				contextLogger.Error(err, "Error while parsing pgbasebackup additional args")
+				return err
+			}
+
 			client, err := management.NewControllerRuntimeClient()
 			if err != nil {
 				return err
@@ -79,7 +88,8 @@ func NewCmd() *cobra.Command {
 					PgData:      pgData,
 					PgWal:       pgWal,
 				},
-				client: client,
+				client:         client,
+				additionalArgs: additionalArgs,
 			}
 
 			if err := env.info.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
@@ -106,6 +116,12 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "the PGWAL to be created")
+	cmd.Flags().StringVar(
+		&pgBaseBackupAdditionalArgsString,
+		"pgbasebackup-additional-args",
+		"",
+		"The list of additional arguments to be passed to pg_basebackup while cloning the data directory",
+	)
 
 	return cmd
 }
@@ -144,7 +160,9 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 	// like when the I/O is overloaded.
 	connectionString += " options='-c wal_sender_timeout=0s'"
 
-	if err := postgres.ClonePgData(ctx, connectionString, env.info.PgData, env.info.PgWal); err != nil {
+	if err := postgres.ClonePgData(
+		ctx, connectionString, env.info.PgData, env.info.PgWal, env.additionalArgs,
+	); err != nil {
 		return fmt.Errorf("while cloning pgdata: %w", err)
 	}
 

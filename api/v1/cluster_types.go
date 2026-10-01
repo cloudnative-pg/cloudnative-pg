@@ -2263,6 +2263,16 @@ type BootstrapPgBaseBackup struct {
 	// created from scratch
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
+
+	// List of custom options to pass to the `pg_basebackup` command.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
+	// +optional
+	AdditionalArgs []string `json:"additionalArgs,omitempty"`
 }
 
 // RecoveryTarget allows to configure the moment where the recovery process
