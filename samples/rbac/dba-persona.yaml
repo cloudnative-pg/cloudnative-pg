@@ -1,0 +1,78 @@
+# CloudNativePG - Read-Only DBA Persona Sample Manifest
+# SPDX-License-Identifier: Apache-2.0
+#
+# This ClusterRole provides read-only operational access for a human Database
+# Administrator (DBA) persona. It allows inspection of cluster state and
+# connection to PostgreSQL, WITHOUT granting platform or cluster administrator
+# privileges.
+#
+# Usage:
+#   kubectl apply -f samples/rbac/dba-persona.yaml
+#   kubectl create rolebinding dba-persona-binding \
+#     --clusterrole=dba-persona \
+#     --user=dba-user@example.com \
+#     --namespace=postgres-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dba-persona
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: rbac
+rules:
+  # Read-only access to CloudNativePG custom resources
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters", "backups", "scheduledbackups", "poolers", "clusterwaves", "clusterautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters/status", "backups/status", "scheduledbackups/status"]
+    verbs: ["get", "list", "watch"]
+
+  # Lease access for failover status inspection
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+
+  # ConfigMap access for configuration inspection
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Service access for connection endpoints
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+
+  # Secret access (scoped to application-user secrets only)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: []
+    # Note: In production, restrict via namespace-scoped Role instead
+
+  # Port-forward access for local tunneling
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"]
+
+  # Pod status inspection (read-only, no exec/attach)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+# Example RoleBinding for namespace-scoped access
+# Uncomment and customize for your environment
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: dba-persona-binding
+#   namespace: postgres-operator
+# subjects:
+#   - kind: User
+#     name: dba-user@example.com
+#     apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: ClusterRole
+#   name: dba-persona
+#   apiGroup: rbac.authorization.k8s.io
