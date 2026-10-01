@@ -37,7 +37,11 @@ import (
 
 // ClonePgData clones an existing server, given its connection string,
 // to a certain data directory
-func ClonePgData(ctx context.Context, connectionString, targetPgData, walDir string) error {
+func ClonePgData(
+	ctx context.Context,
+	connectionString, targetPgData, walDir string,
+	additionalArgs []string,
+) error {
 	log.Info("Waiting for server to be available", "connectionString", connectionString)
 
 	db, err := pool.NewDBConnection(connectionString, pool.ConnectionProfilePostgresqlPhysicalReplication)
@@ -64,6 +68,8 @@ func ClonePgData(ctx context.Context, connectionString, targetPgData, walDir str
 		options = append(options, "--waldir", walDir)
 	}
 
+	options = append(options, additionalArgs...)
+
 	pgBaseBackupCmd := exec.Command(pgBaseBackupName, options...) // #nosec
 	err = execlog.RunStreaming(pgBaseBackupCmd, pgBaseBackupName)
 	if err != nil {
@@ -87,7 +93,7 @@ func (info InitInfo) Join(ctx context.Context, cluster *apiv1.Cluster) error {
 		return err
 	}
 
-	if err := ClonePgData(ctx, primaryConnInfo, info.PgData, info.PgWal); err != nil {
+	if err := ClonePgData(ctx, primaryConnInfo, info.PgData, info.PgWal, nil); err != nil {
 		return err
 	}
 

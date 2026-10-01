@@ -763,6 +763,25 @@ completed**:
    password for the application user (the `app` user in this case) will be
    updated to the `password` value in the secret.
 
+#### Passing additional options to `pg_basebackup`
+
+You can pass custom options to the `pg_basebackup` invocation with
+`additionalArgs`:
+
+```yaml
+spec:
+  bootstrap:
+    pg_basebackup:
+      source: cluster-example
+      additionalArgs:
+        - --checkpoint=fast
+```
+
+:::warning
+The operator does not validate these options, and certain flags may
+interfere with its intended functionality. Use with caution.
+:::
+
 #### Current limitations
 
 ##### Snapshot copy
