@@ -564,6 +564,10 @@ func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(
 		return nil
 	}
 
+	if !metav1.IsControlledBy(&targetPdb, cluster) {
+		return nil
+	}
+
 	r.Recorder.Event(cluster,
 		"Normal",
 		"DeletingPodDisruptionBudget",
