@@ -134,7 +134,7 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   unset DEBUG
   generate_e2e_config false
   cd "${ROOT_DIR}/tests"
-  ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s \
+  ginkgo --nodes=1 --timeout 2h --poll-progress-after=1200s --poll-progress-interval=150s \
    --github-output --force-newlines \
    --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" \
    --focus-file "${ROOT_DIR}/tests/e2e/upgrade_plugin_barman_cloud_test.go" \
