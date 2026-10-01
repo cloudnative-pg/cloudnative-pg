@@ -30,7 +30,7 @@ concurrency:
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=github-releases depName=golangci/golangci-lint versioning=loose
-  GOLANGCI_LINT_VERSION: "v2.13.2"
+  GOLANGCI_LINT_VERSION: "v2.14.0"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.33.0"
@@ -51,7 +51,7 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   SIGN_IMAGES: "true"
   # renovate: datasource=git-refs depName=https://github.com/redhat-openshift-ecosystem/community-operators-pipeline.git versioning=git currentValue=ci/latest
-  OPP_SCRIPT_VERSION: "8ed9daf65b35a6ed456fb02cc0fccac2519c4ba8"
+  OPP_SCRIPT_VERSION: "06c8c50c3e7f60e155595ccc66764aa526e674fc"
 
 defaults:
   run:
@@ -70,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.28, release-1.29, release-1.30]
+        branch: [release-1.28, release-1.30]
     env:
       BRANCH: ${{ matrix.branch }}
     steps:
@@ -700,7 +700,7 @@ jobs:
           accept-keywords: key
 
       - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@12140f4059e244892ae643824a95459a102120dd # master
+        uses: snyk/actions/docker@b075801f26076be9bb50521154cafab73f44da0c # master
         # Only run when a Snyk token is configured. Forks and downstream
         # repositories without the secret skip this step automatically.
         if: env.SNYK_TOKEN != ''
