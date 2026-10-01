@@ -17,8 +17,26 @@ spec:
     - name: postgres_fdw
       ensure: present
   schemas:
+    # Revoke access from "public" (group) to "public" (schema)
+    - name: public
+      ensure: present
+      permissions:
+        usage:
+          - name: public
+            type: revoke
     - name: test_schema
       ensure: present
+      # USAGE goes to "public" and CREATE to a named role on purpose. A
+      # privilege held by PUBLIC satisfies has_schema_privilege() for every
+      # role, so granting both to "public" would make the assertion on the
+      # named role pass even if that grant never ran.
+      permissions:
+        usage:
+          - name: public
+            type: grant
+        create:
+          - name: app
+            type: grant
   fdws:
     - name: postgres_fdw
       ensure: present
