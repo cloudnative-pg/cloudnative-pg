@@ -87,6 +87,13 @@ func reconcilePrimaryHAReplicationSlots(
 			continue
 		}
 
+		// A replica fenced for a timeline divergence can never catch up, and
+		// its slot would pin WAL on the primary until a manual rebuild: the
+		// cleanup loop below drops it like any other slot no longer expected.
+		if diverged, ok := cluster.Status.DivergedInstances[apiv1.PodName(instanceName)]; ok && diverged.Parked {
+			continue
+		}
+
 		slotName := cluster.GetSlotNameFromInstanceName(instanceName)
 		expectedSlots[slotName] = true
 
