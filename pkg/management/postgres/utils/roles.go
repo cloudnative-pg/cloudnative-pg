@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package utils
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -46,11 +47,7 @@ func DisableSuperuserPassword(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		// This has no effect if the transaction
-		// is committed
-		_ = tx.Rollback()
-	}()
+	defer func() { _ = tx.Rollback() }()
 
 	// we don't want to be stuck here if synchronous replicas are still not alive
 	// and kicking
@@ -62,10 +59,49 @@ func DisableSuperuserPassword(db *sql.DB) error {
 	return tx.Commit()
 }
 
-// SetUserPassword change the password of a user in the PostgreSQL database
-func SetUserPassword(username string, password string, db *sql.DB) error {
-	_, err := db.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
+// ExecWithSuppressedLogging executes a SQL statement within a transaction that
+// suppresses PostgreSQL statement logging, preventing passwords from appearing
+// in server logs.
+func ExecWithSuppressedLogging(ctx context.Context, db *sql.DB, statement string) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err = tx.ExecContext(ctx, "SET LOCAL log_statement = 'none'"); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "SET LOCAL log_min_error_statement = 'PANIC'"); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, statement); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// SetUserPassword changes the password of a user in the PostgreSQL database.
+// Cleartext passwords are SCRAM-SHA-256 encoded before being sent so the
+// literal in the ALTER ROLE statement is never cleartext, unless
+// passthrough is true, in which case the value is forwarded verbatim and
+// PostgreSQL encodes it according to its own password_encryption setting.
+func SetUserPassword(
+	ctx context.Context,
+	username string,
+	password string,
+	passthrough bool,
+	db *sql.DB,
+) error {
+	literal := password
+	if !passthrough {
+		encoded, err := EnsureEncryptedPassword(password)
+		if err != nil {
+			return err
+		}
+		literal = encoded
+	}
+	return ExecWithSuppressedLogging(ctx, db, fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
 		pgx.Identifier{username}.Sanitize(),
-		pq.QuoteLiteral(password)))
-	return err
+		pq.QuoteLiteral(literal)))
 }

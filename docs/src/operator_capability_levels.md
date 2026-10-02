@@ -45,36 +45,61 @@ operator and a PostgreSQL cluster configuration.
 
 ### Operator deployment via declarative configuration
 
-The operator is installed in a declarative way using a Kubernetes manifest
-that defines four major `CustomResourceDefinition` objects: `Cluster`, `Pooler`,
-`Backup`, and `ScheduledBackup`.
+The operator is installed in a declarative way using a Kubernetes manifest that
+defines the core `CustomResourceDefinition` objects required to manage the
+PostgreSQL lifecycle. These include:
+
+- **Configuration & Topology:** `Cluster`, `Pooler`, `ImageCatalog`, and
+  `ClusterImageCatalog`.
+- **Identity & Schema:** `DatabaseRole` and `Database`.
+- **Business Continuity:** `Backup`, `ScheduledBackup`, `Publication`, and
+  `Subscription`.
+- **Runtime Orchestration:** `FailoverQuorum` (used by the operator for
+  consensus during automated failover).
 
 ### PostgreSQL cluster deployment via declarative configuration
 
 You define a PostgreSQL cluster (operand) using the `Cluster` custom resource
-in a fully declarative way. The PostgreSQL version is determined by the
-operand container image defined in the CR, which is automatically fetched
-from the requested registry. When deploying an operand, the operator also
-creates the following resources: `Pod`, `Service`, `Secret`,
-`ConfigMap`,`PersistentVolumeClaim`, `PodDisruptionBudget`, `ServiceAccount`,
-`RoleBinding`, and `Role`.
+in a fully declarative way. The PostgreSQL version is determined by the operand
+container image defined in the CR, which is automatically fetched from the
+requested registry.
+
+The operator orchestrates the deployment by creating and managing standard
+Kubernetes resources (`Pod`, `Service`, `Secret`, `ConfigMap`,
+`PersistentVolumeClaim`, `PodDisruptionBudget`, `ServiceAccount`,
+`RoleBinding`, and `Role`), and reconciles user-defined CNPG resources such as
+`Database` and `DatabaseRole` to ensure the database environment matches the
+desired state.
+
+You can optionally provide a pre-existing ServiceAccount for both `Cluster` and
+`Pooler` resources. This shared ServiceAccount support enables seamless
+integration with cloud-native identity providers allowing you to manage IAM
+roles and permissions at the infrastructure level rather than on a per-cluster
+basis.
 
 ### Override of operand images through the CRD
 
-The operator is designed to support any operand container image with
-PostgreSQL inside.
-By default, the operator uses the latest available minor
-version of the latest stable major version supported by the PostgreSQL
-community and published on ghcr.io.
-You can use any compatible image of PostgreSQL supporting the
-primary/standby architecture directly by setting the `imageName`
-attribute in the CR. The operator also supports `imagePullSecrets`
-to access private container registries, and it supports digests and
-tags for finer control of container image immutability.
-If you prefer not to specify an image name, you can leverage
-[image catalogs](image_catalog.md) by simply referencing the PostgreSQL
-major version. Moreover, image catalogs enable you to effortlessly create
-custom catalogs, directing to images based on your specific requirements.
+The operator supports any operand container image containing PostgreSQL.
+While it defaults to the latest stable minor version of the most recent
+community-supported major version on `ghcr.io`, you can override this by
+setting the `.spec.imageName` attribute in the `Cluster` resource.
+This direct method supports `imagePullSecrets` for private registries and
+allows the use of both tags and SHA256 digests to ensure container
+immutability.
+
+Alternatively, you can leverage [image catalogs](image_catalog.md) to manage
+images more effectively by simply referencing a PostgreSQL major version.
+This approach is superior for production environments because it centralizes
+the management of your image supply chain.
+
+Beyond just the core PostgreSQL engine, image catalogs now allow you to define
+[extension volumes](imagevolume_extensions.md) alongside the operand image,
+ensuring that the database and its associated modules are always compatible,
+version-aligned, and treated as a single cohesive unit across your entire
+infrastructure.
+The same catalog mechanism also governs [PgBouncer](connection_pooling.md)
+pooler images, making image catalogs a unified supply-chain primitive across
+the entire PostgreSQL stack managed by the operator.
 
 ### Labels and annotations
 
@@ -144,6 +169,15 @@ Additionally, you can leverage the service template capability
 to create custom service resources, including load balancers, to access
 PostgreSQL outside Kubernetes. This is particularly useful for DBaaS purposes.
 
+### Dynamic network access control via pod selectors
+
+CloudNativePG supports the declarative definition of `podSelectorRefs` to
+manage `pg_hba.conf` rules dynamically. By using label selectors to identify
+client pods, the operator automatically resolves their ephemeral IP addresses
+and updates the PostgreSQL host-based authentication rules accordingly. This
+ensures that only authorized workloads in the same namespace can connect to the
+database, eliminating the need for manual IP management or static CIDR ranges.
+
 ### Database configuration
 
 The operator is designed to bootstrap a PostgreSQL cluster with a single
@@ -167,8 +201,38 @@ authentication rules in the `postgresql` section of the CR.
 ### Configuration of Postgres roles, users, and groups
 
 CloudNativePG supports
-[management of PostgreSQL roles, users, and groups through declarative configuration](declarative_role_management.md)
-using the `.spec.managed.roles` stanza.
+[comprehensive management of PostgreSQL roles, users, and groups](declarative_role_management.md)
+through two declarative methods:
+
+- The `DatabaseRole` CRD (Recommended): A standalone resource for granular lifecycle
+  management. It includes a `databaseRoleReclaimPolicy` (supporting `retain` or
+  `delete`) to define whether the database role should be dropped when the
+  Kubernetes resource is removed.
+
+- The `managed` stanza: For simpler requirements, roles can be defined inline
+  within the `.spec.managed.roles` section of the `Cluster` resource.
+
+Both methods provide automated reconciliation of role attributes (e.g.,
+`login`, `superuser`, `connectionLimit`) and secure, versioned password
+management via Kubernetes Secrets. Passwords are SCRAM-SHA-256 encoded
+operator-side before they are sent to PostgreSQL, so the cleartext value never
+reaches the server log or extensions. A `DatabaseRole` can additionally request
+a TLS client certificate that the operator generates and renews automatically,
+enabling password-free `cert` authentication.
+
+### Configuration of Postgres extensions
+
+CloudNativePG provides declarative support for managing PostgreSQL extensions
+by mounting them as read-only [extension volumes](imagevolume_extensions.md) in
+each pod. Since version 1.29, the recommended approach is to leverage [image
+catalogs](image_catalog.md), which allow the operator to automatically resolve
+image references and directory paths based on the PostgreSQL version.
+Image volumes require the `extension_control_path` parameter (PostgreSQL 18+)
+and the `ImageVolume` feature (Kubernetes 1.35+, or 1.33+ with feature gate).
+If these requirements are not met, extensions must be included directly in the
+operand image.
+Once available on the system, the [`Database` resource](declarative_database_management.md#managing-extensions-in-a-database)
+automates the `CREATE EXTENSION` SQL lifecycle.
 
 ### Pod security standards
 
@@ -318,31 +382,41 @@ or a subsequent switchover of the cluster.
 
 ### Upgrade of the managed workload
 
-The operand can be upgraded using a declarative configuration approach as
-part of changing the CR and, in particular, the `imageName` parameter.
-This is normally initiated by security updates or Postgres minor version updates.
-In the presence of standby servers, the operator performs rolling updates
-starting from the replicas. It does this by dropping the existing pod and creating a new
-one with the new requested operand image that reuses the underlying storage.
-Depending on the value of the `primaryUpdateStrategy`, the operator proceeds
-with a switchover before updating the former primary (`unsupervised`). Or, it waits
-for the user to manually issue the switchover procedure (`supervised`) by way of the
-`cnpg` plugin for kubectl.
-The setting to use depends on the business requirements, as the operation
-might generate some downtime for the applications. This downtime can range from a few seconds to
-minutes, based on the actual database workload.
+The operand is upgraded through a declarative approach by updating the
+`Cluster` resource, specifically via the `.spec.imageName` parameter or by
+updating the version reference in an [image catalog](image_catalog.md).
+This process is typically triggered by security patches or new PostgreSQL minor
+versions. In clusters with standby servers, the operator performs a rolling
+update starting with the replicas; it deletes the existing pods and replaces
+them with new ones using the updated image while reusing the underlying
+storage. Depending on the `primaryUpdateStrategy`, the operator can
+automatically perform a switchover before updating the former primary
+(`unsupervised`) or wait for a manual switchover initiated by the user via the
+`cnpg` plugin (`supervised`).
+This strategy allows organizations to balance business requirements against the
+brief downtime, ranging from seconds to minutes depending on workload, required
+for the switchover.
 
 ### Offline In-Place Major Upgrades of PostgreSQL
 
 CloudNativePG supports declarative offline in-place major upgrades when a new
-operand container image with a higher PostgreSQL major version is applied to a
-cluster. The upgrade can be triggered by updating the image tag via the
-`.spec.imageName` option or by using an image catalog to manage version
-changes. During the upgrade, all cluster pods are shut down to ensure data
-consistency. A new job is then created to validate the upgrade conditions,
-execute `pg_upgrade`, and create new directories for `PGDATA`, WAL files, and
-tablespaces if needed. Once the upgrade is complete, replicas are re-created.
-Failed upgrades can be rolled back.
+operand container image with a higher PostgreSQL major version is applied.
+This upgrade can be triggered by updating the `.spec.imageName` directly or by
+selecting a higher major version within an image catalog. The use of image
+catalogs is particularly beneficial here, as it ensures that any associated
+[extension volumes](imagevolume_extensions.md) are simultaneously updated to
+versions compatible with the new PostgreSQL major version.
+
+During the process, the operator shuts down all cluster pods to maintain data
+consistency and initiates a job to validate upgrade conditions and execute
+`pg_upgrade`. This job creates the necessary new directories for `PGDATA`, WAL
+files, and tablespaces before re-creating the replicas. This structured
+workflow provides a reliable path for major version transitions and supports
+automatic rollback cleanup when the user reverts the image after a failure.
+Clusters that use Image Volume extensions are also supported: the source- and
+target-version extension images are mounted side by side during the upgrade
+job, so the old server keeps its libraries and a failed upgrade reverts
+cleanly.
 
 ### Display cluster availability status during upgrade
 
@@ -547,7 +621,12 @@ The operator allows you to scale up and down the number of instances in a
 PostgreSQL cluster. New replicas are started up from the
 primary server and participate in the cluster's HA infrastructure.
 The CRD declares a "scale" subresource that allows you to use the
-`kubectl scale` command.
+`kubectl scale` command. The scale subresource also publishes the label
+selector of the managed instance pods, which lets autoscalers discover them.
+See the [Vertical Pod Autoscaler integration](resource_management.md#integration-with-the-vertical-pod-autoscaler-vpa)
+for the recommended use, and the
+[Horizontal Pod Autoscaler integration](resource_management.md#integration-with-the-horizontal-pod-autoscaler-hpa)
+for the caveats that apply to HPA.
 
 ### Maintenance window and PodDisruptionBudget for Kubernetes nodes
 
@@ -596,6 +675,10 @@ to clone the data from the primary again.
 The operator allows administrators to control and manage resource usage by
 the cluster's pods in the `resources` section of the manifest. In
 particular, you can set `requests` and `limits` values for both CPU and RAM.
+Because the `Cluster` exposes a label selector through its scale subresource,
+it can also be used as a target for the
+[Vertical Pod Autoscaler](resource_management.md#integration-with-the-vertical-pod-autoscaler-vpa)
+in recommendation-only mode, to obtain sizing suggestions for these values.
 
 ### Connection pooling with PgBouncer
 
@@ -607,15 +690,23 @@ to access the database. This optimizes the query flow toward the instances
 and makes the use of the underlying PostgreSQL resources more efficient.
 Instead of connecting directly to a PostgreSQL service, applications can now
 connect to the PgBouncer service and start reusing any existing connection.
+The PgBouncer image can be managed centrally through an `ImageCatalog` or
+`ClusterImageCatalog` (via `spec.pgbouncer.imageCatalogRef`), and the `Pooler`
+metrics endpoint can optionally be served over TLS.
 
 ### Logical Replication
 
 CloudNativePG supports PostgreSQL's logical replication in a declarative manner
-using `Publication` and `Subscription` custom resource definitions.
+using the `Publication` and `Subscription` custom resource definitions.
 
-Logical replication is particularly useful together with the import facility
-for online data migrations (even from public DBaaS solutions) and major
-PostgreSQL upgrades.
+Logical replication is particularly useful for:
+
+- Online data migrations: Moving data from external PostgreSQL instances or
+  public DBaaS solutions with minimal downtime.
+- Major PostgreSQL upgrades: Facilitating near-zero-downtime upgrades between
+  major versions.
+- Selective Data Distribution: Replicating specific tables or data sets across
+  different clusters for reporting or localized workloads.
 
 ## Level 4: Deep insights
 
@@ -664,10 +755,6 @@ CloudNativePG transparently and natively supports:
   which provides a means for logging execution plans of slow statements
   automatically, without having to manually run `EXPLAIN` (helpful for tracking
   down un-optimized queries)
-- The [`pg_failover_slots` extension](https://github.com/EnterpriseDB/pg_failover_slots),
-  which makes logical replication slots usable across a physical failover,
-  ensuring resilience in change data capture (CDC) contexts based on PostgreSQL's
-  native logical replication
 
 ### Audit
 
@@ -699,6 +786,16 @@ the cluster. It does this by either becoming the new primary or by following it.
 In case the former primary comes back up, the same mechanism avoids a
 split-brain by preventing applications from reaching it, running `pg_rewind` on
 the server and restarting it as a standby.
+The operator further coordinates primary promotion through a per-cluster
+Kubernetes `Lease` that acts as a mutex, ensuring at most one instance promotes
+at any given time: an instance must hold the lease before acting as primary and
+releases it on a clean shutdown, so replicas can promote without waiting for the
+full TTL.
+If synchronous failover quorum is enabled, the operator's "Auto Pilot" logic
+becomes even more sophisticated: it will actively block a promotion if a quorum
+of replicas cannot verify the transaction state. This prevents accidental data
+loss during complex failure scenarios, such as network partitions affecting
+both the primary and its synchronous standby.
 
 ### Automated recreation of a standby
 

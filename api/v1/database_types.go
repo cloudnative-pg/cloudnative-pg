@@ -60,6 +60,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
 type DatabaseSpec struct {
 	// The name of the PostgreSQL cluster hosting the database.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster reference is immutable after creation"
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
 	// Ensure the PostgreSQL database is `present` or `absent` - defaults to "present".
@@ -401,8 +402,4 @@ type DatabaseList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Database `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Database{}, &DatabaseList{})
 }

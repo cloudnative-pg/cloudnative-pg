@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
@@ -63,10 +64,7 @@ type walArchiveAnalyzer struct {
 func newWalArchiveAnalyzerForReplicaInstance(primaryConnInfo string) *walArchiveAnalyzer {
 	return &walArchiveAnalyzer{
 		dbFactory: func() (*sql.DB, error) {
-			db, openErr := sql.Open(
-				"pgx",
-				primaryConnInfo,
-			)
+			db, openErr := pool.NewDBConnection(primaryConnInfo, pool.ConnectionProfilePostgresql)
 			if openErr != nil {
 				log.Error(openErr, "can not open postgres database")
 				return nil, openErr
@@ -129,12 +127,12 @@ func newWalArchiveBootstrapperForPrimary() *walArchiveBootstrapper {
 	return &walArchiveBootstrapper{
 		walArchiveAnalyzer: walArchiveAnalyzer{
 			dbFactory: func() (*sql.DB, error) {
-				db, openErr := sql.Open(
-					"pgx",
+				db, openErr := pool.NewDBConnection(
 					fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
 						GetSocketDir(),
 						GetServerPort(),
 					),
+					pool.ConnectionProfilePostgresql,
 				)
 				if openErr != nil {
 					log.Error(openErr, "can not open postgres database")

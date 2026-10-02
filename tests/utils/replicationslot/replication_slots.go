@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 )
 
 // PrintReplicationSlots prints replications slots with their restart_lsn
@@ -79,12 +80,12 @@ func PrintReplicationSlots(
 				exec.DatabaseName(dbName),
 				query)
 			if err != nil {
-				output.WriteString(fmt.Sprintf("Couldn't retrieve restart_lsn for slot %v: %v\n", slot, err))
+				fmt.Fprintf(&output, "Couldn't retrieve restart_lsn for slot %v: %v\n", slot, err)
 			}
 			m[slot] = strings.TrimSpace(restartLsn)
 		}
-		output.WriteString(fmt.Sprintf("Replication slots on %v pod %v: %v\n",
-			pod.Labels[utils.ClusterInstanceRoleLabelName], pod.GetName(), m))
+		fmt.Fprintf(&output, "Replication slots on %v pod %v: %v\n",
+			pod.Labels[utils.ClusterInstanceRoleLabelName], pod.GetName(), m)
 	}
 	return output.String()
 }
@@ -227,7 +228,7 @@ func ToggleHAReplicationSlots(
 	}
 
 	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(enable)
-	err = crudClient.Patch(ctx, clusterToggle, client.MergeFrom(cluster))
+	err = objects.Patch(ctx, crudClient, clusterToggle, client.MergeFrom(cluster))
 	if err != nil {
 		return err
 	}
@@ -255,7 +256,7 @@ func ToggleSynchronizeReplicationSlots(
 	}
 
 	clusterToggle.Spec.ReplicationSlots.SynchronizeReplicas.Enabled = ptr.To(enable)
-	err = crudClient.Patch(ctx, clusterToggle, client.MergeFrom(cluster))
+	err = objects.Patch(ctx, crudClient, clusterToggle, client.MergeFrom(cluster))
 	if err != nil {
 		return err
 	}

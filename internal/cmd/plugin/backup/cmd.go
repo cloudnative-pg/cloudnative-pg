@@ -22,6 +22,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -50,6 +51,7 @@ type backupCommandOptions struct {
 	waitForArchive      *bool
 	pluginName          string
 	pluginParameters    pluginParameters
+	dryRun              bool
 }
 
 func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfiguration {
@@ -67,6 +69,7 @@ func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfig
 func NewCmd() *cobra.Command {
 	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive, pluginName string
 	var pluginParameters pluginParameters
+	var dryRun bool
 
 	backupMethods := []string{
 		string(apiv1.BackupMethodBarmanObjectStore),
@@ -89,7 +92,7 @@ func NewCmd() *cobra.Command {
 				backupName = fmt.Sprintf(
 					"%s-%s",
 					clusterName,
-					pgTime.ToCompactISO8601(time.Now()),
+					pgTime.ToCompactISO8601(time.Now().UTC()),
 				)
 			}
 
@@ -166,6 +169,7 @@ func NewCmd() *cobra.Command {
 					waitForArchive:      parsedWaitForArchive,
 					pluginName:          pluginName,
 					pluginParameters:    pluginParameters,
+					dryRun:              dryRun,
 				})
 		},
 	}
@@ -228,12 +232,20 @@ func NewCmd() *cobra.Command {
 			"is allowed only when the backup method is set to 'plugin'",
 	)
 
+	backupSubcommand.Flags().BoolVar(&dryRun, "dry-run", false,
+		"When true prints the Backup manifest instead of creating it",
+	)
+
 	return backupSubcommand
 }
 
 // createBackup handles the Backup resource creation
 func createBackup(ctx context.Context, options backupCommandOptions) error {
 	backup := apiv1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiv1.SchemeGroupVersion.String(),
+			Kind:       apiv1.BackupKind,
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: plugin.Namespace,
 			Name:      options.backupName,
@@ -255,6 +267,10 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 			Name:       options.pluginName,
 			Parameters: options.pluginParameters,
 		}
+	}
+
+	if options.dryRun {
+		return plugin.Print(&backup, plugin.OutputFormatYAML, os.Stdout)
 	}
 
 	err := plugin.Client.Create(ctx, &backup)

@@ -1,0 +1,39 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-replica-from-plugin-backup
+spec:
+  instances: 1
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  replica:
+    enabled: true
+    source: cluster-replica-src-plugin
+
+  bootstrap:
+    recovery:
+      source: cluster-replica-src-plugin
+
+  externalClusters:
+    - name: cluster-replica-src-plugin
+      connectionParameters:
+        host: cluster-replica-src-plugin-rw
+        user: userSrc
+        dbname: appSrc
+        port: "5432"
+      password:
+        name: cluster-replica-src-plugin-app
+        key: password
+      # Recover and fetch WALs through plugin-barman-cloud from the source
+      # cluster's object store (same ObjectStore, serverName = source name).
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cluster-replica-src-plugin
+          serverName: cluster-replica-src-plugin

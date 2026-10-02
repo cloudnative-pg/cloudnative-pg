@@ -8,22 +8,18 @@ on:
 
 permissions: read-all
 
-env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.7"
-
 jobs:
   licenses:
     name: Refresh licenses
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Generate licenses
@@ -31,13 +27,15 @@ jobs:
           make licenses
 
       - name: Create Pull Request if licenses have been updated
-        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           title: "chore: refresh licenses directory"
           body: "Refresh the licenses directory"
           branch: "license-updater"
           author: "license-updater <license-updater@users.noreply.github.com>"
+          committer: "license-updater <license-updater@users.noreply.github.com>"
+          labels: no-issue,automated
           add-paths: |
             licenses/**
           commit-message: "chore: refresh licenses directory"

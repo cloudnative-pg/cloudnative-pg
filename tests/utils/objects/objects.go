@@ -89,11 +89,75 @@ func List(
 		retry.DelayType(retry.FixedDelay)).
 		Do(
 			func() error {
-				err := crudClient.List(ctx, objectList, opts...)
-				if err != nil {
-					return err
-				}
-				return nil
+				return crudClient.List(ctx, objectList, opts...)
+			},
+		)
+	return err
+}
+
+// isRetryableWriteError reports whether err is a transient failure worth
+// retrying, as opposed to a decisive rejection from the API server (a stale
+// resourceVersion, a validation failure, an RBAC denial) that would recur
+// unchanged on a subsequent attempt with the same request.
+func isRetryableWriteError(err error) bool {
+	return !errors.IsConflict(err) &&
+		!errors.IsInvalid(err) &&
+		!errors.IsForbidden(err) &&
+		!errors.IsBadRequest(err)
+}
+
+// IsRetryableConflictOrTransientError reports whether err is a Conflict or a
+// transient write failure (see isRetryableWriteError). Callers running their
+// own read-modify-write retry loop (get the object, mutate it, write it
+// back) should retry on both: a Conflict means another writer raced this one
+// and a fresh read will succeed, while a transient failure means the same
+// attempt is worth repeating unchanged.
+func IsRetryableConflictOrTransientError(err error) bool {
+	return errors.IsConflict(err) || isRetryableWriteError(err)
+}
+
+// Patch patches an object in the Kubernetes cluster, retrying on transient
+// errors. Forwarding a mutation to an admission webhook can intermittently
+// fail with a 500/503 on any cluster that routes that hop through a proxy
+// layer (for example an apiserver-network-proxy/konnectivity), so the patch
+// is worth retrying just like objects.Get and objects.List retry reads.
+func Patch(
+	ctx context.Context,
+	crudClient client.Client,
+	object client.Object,
+	patch client.Patch,
+	opts ...client.PatchOption,
+) error {
+	err := retry.New(
+		retry.Delay(PollingTime*time.Second),
+		retry.Attempts(RetryAttempts),
+		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(isRetryableWriteError)).
+		Do(
+			func() error {
+				return crudClient.Patch(ctx, object, patch, opts...)
+			},
+		)
+	return err
+}
+
+// PatchStatus patches an object's status subresource in the Kubernetes cluster,
+// retrying on transient errors. See Patch for the rationale behind retrying.
+func PatchStatus(
+	ctx context.Context,
+	crudClient client.Client,
+	object client.Object,
+	patch client.Patch,
+	opts ...client.SubResourcePatchOption,
+) error {
+	err := retry.New(
+		retry.Delay(PollingTime*time.Second),
+		retry.Attempts(RetryAttempts),
+		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(isRetryableWriteError)).
+		Do(
+			func() error {
+				return crudClient.Status().Patch(ctx, object, patch, opts...)
 			},
 		)
 	return err
@@ -105,6 +169,7 @@ func Get(
 	crudClient client.Client,
 	objectKey client.ObjectKey,
 	object client.Object,
+	opts ...client.GetOption,
 ) error {
 	err := retry.New(
 		retry.Delay(PollingTime*time.Second),
@@ -112,11 +177,31 @@ func Get(
 		retry.DelayType(retry.FixedDelay)).
 		Do(
 			func() error {
-				err := crudClient.Get(ctx, objectKey, object)
-				if err != nil {
-					return err
-				}
-				return nil
+				return crudClient.Get(ctx, objectKey, object, opts...)
+			},
+		)
+	return err
+}
+
+// Update updates an object in the Kubernetes Cluster, retrying on transient
+// errors. Unlike Patch, Update sends the object's resourceVersion, so a retry
+// after a successful-but-unacknowledged write would otherwise surface as a
+// spurious conflict rather than a no-op; isRetryableWriteError avoids
+// retrying that case.
+func Update(
+	ctx context.Context,
+	crudClient client.Client,
+	object client.Object,
+	opts ...client.UpdateOption,
+) error {
+	err := retry.New(
+		retry.Delay(PollingTime*time.Second),
+		retry.Attempts(RetryAttempts),
+		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(isRetryableWriteError)).
+		Do(
+			func() error {
+				return crudClient.Update(ctx, object, opts...)
 			},
 		)
 	return err

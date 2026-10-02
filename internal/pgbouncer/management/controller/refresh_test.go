@@ -67,7 +67,7 @@ var _ = Describe("RefreshConfigurationFiles", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			for filename, content := range files {
-				fileContent, err := os.ReadFile(filename) // nolint: gosec
+				fileContent, err := os.ReadFile(filename) //nolint: gosec
 				Expect(err).NotTo(HaveOccurred())
 				Expect(fileContent).To(Equal(content))
 			}

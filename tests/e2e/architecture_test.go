@@ -22,6 +22,7 @@ package e2e
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -84,7 +85,7 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 
 		// Fetch the operator's available architectures
 		operatorPod, err := operator.GetPod(env.Ctx, env.Client)

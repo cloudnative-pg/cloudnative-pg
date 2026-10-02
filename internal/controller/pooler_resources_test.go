@@ -153,7 +153,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 	})
 
-	// nolint: dupl
+	//nolint: dupl
 	It("should correctly fetch the role when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)
@@ -194,7 +194,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 
 		By("creating the roleBinding", func() {
-			roleBinding := pgbouncer.RoleBinding(pooler)
+			roleBinding := pgbouncer.RoleBinding(pooler, pooler.GetServiceAccountName())
 			err := env.poolerReconciler.Create(ctx, &roleBinding)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -206,7 +206,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 	})
 
-	// nolint: dupl
+	//nolint: dupl
 	It("should correctly fetch the SA when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)

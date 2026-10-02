@@ -83,3 +83,10 @@ func cleanupPgBouncerValue(parameter string) (escaped string) {
 	// so we are just removing from the value
 	return newlineRegexp.ReplaceAllString(parameter, "")
 }
+
+// escapePgBouncerUserListValue doubles any double quote in a value so it can
+// be safely placed inside one of userlist.txt's double-quoted fields without
+// desyncing the line.
+func escapePgBouncerUserListValue(value string) string {
+	return strings.ReplaceAll(value, "\"", "\"\"")
+}

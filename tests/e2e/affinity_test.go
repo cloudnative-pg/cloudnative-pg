@@ -23,6 +23,8 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -50,11 +52,11 @@ var _ = Describe("E2E Affinity", Serial, Label(tests.LabelPodScheduling), func()
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, clusterName, clusterFile, env)
-		createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerFile, 3)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterFile)
+		pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerFile, 3)
 
 		_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 		Expect(err).ToNot(HaveOccurred())
-		AssertClusterIsReady(namespace, clusterName, 300, env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, 300)
 	})
 })

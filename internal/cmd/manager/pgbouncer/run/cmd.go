@@ -22,12 +22,14 @@ package run
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
@@ -45,6 +47,7 @@ import (
 func NewCmd() *cobra.Command {
 	var (
 		poolerNamespacedName types.NamespacedName
+		metricsTLS           bool
 
 		errorMissingPoolerNamespacedName = fmt.Errorf("missing pooler name or namespace")
 	)
@@ -52,6 +55,7 @@ func NewCmd() *cobra.Command {
 	const (
 		poolerNameEnvVar      = "POOLER_NAME"
 		poolerNamespaceEnvVar = "NAMESPACE"
+		metricsPortTLSEnvVar  = "METRICS_PORT_TLS"
 	)
 
 	cmd := &cobra.Command{
@@ -74,7 +78,11 @@ func NewCmd() *cobra.Command {
 			)
 			contextLogger := log.FromContext(ctx)
 
-			if err := runSubCommand(ctx, poolerNamespacedName); err != nil {
+			opts := runOptions{
+				poolerNamespacedName: poolerNamespacedName,
+				metricsPortTLS:       metricsTLS,
+			}
+			if err := runSubCommand(ctx, opts); err != nil {
 				contextLogger.Error(err, "Error while running manager")
 				return err
 			}
@@ -94,23 +102,30 @@ func NewCmd() *cobra.Command {
 		os.Getenv(poolerNamespaceEnvVar),
 		"The namespace of the cluster and of the Pod in k8s. "+
 			"Defaults to the value of the NAMESPACE environment variable")
-
+	cmd.Flags().BoolVar(
+		&metricsTLS,
+		"metrics-port-tls",
+		boolFromEnv(metricsPortTLSEnvVar),
+		"Enable TLS for the metrics endpoint. "+
+			"Defaults to the value of the METRICS_PORT_TLS environment variable",
+	)
 	return cmd
 }
 
-func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedName) error {
+func runSubCommand(ctx context.Context, opts runOptions) error {
 	var err error
 
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("Starting CloudNativePG PgBouncer Instance Manager",
 		"version", versions.Version,
-		"build", versions.Info)
+		"build", versions.Info,
+		"metricsPortTLS", opts.metricsPortTLS)
 
-	if err = startWebServer(ctx); err != nil {
+	if err = startWebServer(ctx, opts.metricsTLSConfig()); err != nil {
 		return fmt.Errorf("while starting the web server: %w", err)
 	}
 
-	reconciler, err := controller.NewPgBouncerReconciler(poolerNamespacedName)
+	reconciler, err := controller.NewPgBouncerReconciler(opts.poolerNamespacedName)
 	if err != nil {
 		return fmt.Errorf("while initializing the new reconciler: %w", err)
 	}
@@ -183,16 +198,16 @@ func registerSignalHandler(ctx context.Context, reconciler *controller.PgBouncer
 	}()
 }
 
-// startWebServer start the web server for handling probes given
-// a certain PostgreSQL instance
-func startWebServer(ctx context.Context) error {
+// startWebServer starts the web server for exposing metrics given
+// a certain PgBouncer instance
+func startWebServer(ctx context.Context, tlsConfig *tls.Config) error {
 	contextLogger := log.FromContext(ctx)
 	if err := metricsserver.Setup(ctx); err != nil {
 		return err
 	}
 
 	go func() {
-		err := metricsserver.ListenAndServe()
+		err := metricsserver.ListenAndServe(tlsConfig)
 		if err != nil {
 			contextLogger.Error(err, "Error while starting the metrics server")
 		}
@@ -204,4 +219,26 @@ func startWebServer(ctx context.Context) error {
 // startReconciler start the reconciliation loop
 func startReconciler(ctx context.Context, reconciler *controller.PgBouncerReconciler) {
 	go reconciler.Run(ctx)
+}
+
+// boolFromEnv reads a boolean value from the given environment variable.
+// Returns false when the variable is unset. Terminates the process with a
+// fatal error written to stderr when the variable is set to a value that
+// strconv.ParseBool cannot parse, to avoid silently ignoring an operator
+// misconfiguration. stderr is used directly because os.Exit skips deferred
+// log-sink flushes and a structured log entry could otherwise be buffered
+// and lost.
+func boolFromEnv(envVar string) bool {
+	str := os.Getenv(envVar)
+	if str == "" {
+		return false
+	}
+	val, err := strconv.ParseBool(str)
+	if err != nil {
+		fmt.Fprintf(os.Stderr,
+			"invalid boolean value %q for environment variable %s: %v\n",
+			str, envVar, err)
+		os.Exit(1)
+	}
+	return val
 }

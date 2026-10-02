@@ -39,13 +39,13 @@ we use to organize the flow of items.
 
 ---
 
-<!--
-TODO:
+## Architecture
 
-- Add architecture diagrams in the "contribute" folder
-- ...
+If you are new to the project, we recommend starting with the
+[Technical Architecture](technical-architecture.md) document, which describes
+the core design principles and reconciliation architecture of CloudNativePG.
 
--->
+---
 
 ## Testing the latest development snapshot
 

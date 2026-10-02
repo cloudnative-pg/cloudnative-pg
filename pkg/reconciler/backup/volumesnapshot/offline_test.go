@@ -53,7 +53,7 @@ var _ = Describe("offlineExecutor", func() {
 			Status: corev1.PodStatus{
 				Conditions: []corev1.PodCondition{
 					{
-						Type:   corev1.ContainersReady,
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					},
 				},

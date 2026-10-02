@@ -28,7 +28,7 @@ import (
 
 // CreateRoleBinding is the binding between the permissions that the instance manager can use
 // and the ServiceAccount used by the Pod
-func CreateRoleBinding(objectMeta metav1.ObjectMeta) rbacv1.RoleBinding {
+func CreateRoleBinding(objectMeta metav1.ObjectMeta, serviceAccountName string) rbacv1.RoleBinding {
 	return rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: objectMeta.Namespace,
@@ -41,7 +41,7 @@ func CreateRoleBinding(objectMeta metav1.ObjectMeta) rbacv1.RoleBinding {
 			{
 				Kind:      "ServiceAccount",
 				APIGroup:  "",
-				Name:      objectMeta.Name,
+				Name:      serviceAccountName,
 				Namespace: objectMeta.Namespace,
 			},
 		},

@@ -22,9 +22,15 @@ package specs
 import (
 	"fmt"
 	"reflect"
+	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // ComparePodSpecs compares two pod specs, returns true iff they are equivalent, and
@@ -85,6 +91,9 @@ func ComparePodSpecs(
 		"service-account-name": func() bool {
 			return currentPodSpec.ServiceAccountName == targetPodSpec.ServiceAccountName
 		},
+		"automount-service-account-token": func() bool {
+			return ptr.Equal(currentPodSpec.AutomountServiceAccountToken, targetPodSpec.AutomountServiceAccountToken)
+		},
 		"scheduler-name": func() bool {
 			return currentPodSpec.SchedulerName == targetPodSpec.SchedulerName
 		},
@@ -111,7 +120,7 @@ func ComparePodSpecs(
 
 // compareMaps returns true iff the maps are equivalent, otherwise returns
 // false, and the first difference found
-func compareMaps[V comparable](current, target map[string]V) (bool, string) {
+func compareMaps[V any](current, target map[string]V) (bool, string) {
 	for name, currentValue := range current {
 		targetValue, found := target[name]
 		if !found {
@@ -132,23 +141,69 @@ func compareMaps[V comparable](current, target map[string]V) (bool, string) {
 	return true, ""
 }
 
-// shouldIgnoreCurrentVolume checks if a volume or mount is the superuser or app
-// mount, which had been added, superflously, in previous versions. If so, ignores
-// it for the PodSpec drift detector, to avoid unnecessary restarts
+// normalizeVolumeName maps old unprefixed volume names to the new prefixed
+// scheme (ext- for extensions, tbs- for tablespaces) to avoid spurious
+// pod restarts on upgrade. Names already starting with the correct prefix
+// are left unchanged, which causes one spurious restart for extensions
+// named "ext_*" or tablespaces named "tbs_*".
 //
-// TODO: delete this function after minor version 1.24 is discontinued
-func shouldIgnoreCurrentVolume(name string) bool {
-	return name == "superuser-secret" || name == "app-secret"
+// TODO: delete this function after minor version 1.28 is discontinued
+func normalizeVolumeName(vol corev1.Volume) string {
+	name := vol.Name
+
+	if vol.Image != nil && !strings.HasPrefix(name, "ext-") {
+		return SanitizeExtensionNameForVolume(name)
+	}
+
+	if vol.PersistentVolumeClaim != nil &&
+		strings.Contains(vol.PersistentVolumeClaim.ClaimName, apiv1.TablespaceVolumeInfix) &&
+		!strings.HasPrefix(name, "tbs-") {
+		return "tbs-" + name
+	}
+
+	return name
+}
+
+// normalizeVolumeMountName is the VolumeMount counterpart of
+// normalizeVolumeName, using mount paths to detect the volume type.
+//
+// TODO: delete this function after minor version 1.28 is discontinued
+func normalizeVolumeMountName(mount corev1.VolumeMount) string {
+	name := mount.Name
+
+	extensionPathPrefix := postgres.ExtensionsBaseDirectory + "/"
+	if strings.HasPrefix(mount.MountPath, extensionPathPrefix) && !strings.HasPrefix(name, "ext-") {
+		return SanitizeExtensionNameForVolume(name)
+	}
+
+	if strings.HasPrefix(mount.MountPath, PgTablespaceVolumePath+"/") && !strings.HasPrefix(name, "tbs-") {
+		return "tbs-" + name
+	}
+
+	return name
+}
+
+// normalizeCommand drops the instance manager flag that Pods created before
+// 1.31 pass and that the current one no longer sets. Their PodSpec annotation
+// still records it, so comparing the command verbatim reports a spec difference
+// and rolls every existing instance, even when
+// ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES would otherwise upgrade them without
+// recreating the Pod.
+//
+// TODO: delete this function after minor version 1.30 is discontinued
+func normalizeCommand(command []string) []string {
+	return slices.DeleteFunc(slices.Clone(command), func(arg string) bool {
+		return arg == "--status-port-tls"
+	})
 }
 
 func compareVolumes(currentVolumes, targetVolumes []corev1.Volume) (bool, string) {
 	current := make(map[string]corev1.Volume)
 	target := make(map[string]corev1.Volume)
 	for _, vol := range currentVolumes {
-		if shouldIgnoreCurrentVolume(vol.Name) {
-			continue
-		}
-		current[vol.Name] = vol
+		normalized := normalizeVolumeName(vol)
+		vol.Name = normalized
+		current[normalized] = vol
 	}
 	for _, vol := range targetVolumes {
 		target[vol.Name] = vol
@@ -161,10 +216,9 @@ func compareVolumeMounts(currentMounts, targetMounts []corev1.VolumeMount) (bool
 	current := make(map[string]corev1.VolumeMount)
 	target := make(map[string]corev1.VolumeMount)
 	for _, mount := range currentMounts {
-		if shouldIgnoreCurrentVolume(mount.Name) {
-			continue
-		}
-		current[mount.Name] = mount
+		normalized := normalizeVolumeMountName(mount)
+		mount.Name = normalized
+		current[normalized] = mount
 	}
 	for _, mount := range targetMounts {
 		target[mount.Name] = mount
@@ -196,7 +250,10 @@ func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool
 			return reflect.DeepEqual(currentContainer.StartupProbe, targetContainer.StartupProbe)
 		},
 		"command": func() bool {
-			return reflect.DeepEqual(currentContainer.Command, targetContainer.Command)
+			return slices.Equal(
+				normalizeCommand(currentContainer.Command),
+				normalizeCommand(targetContainer.Command),
+			)
 		},
 		"resources": func() bool {
 			// semantic equality will compare the two objects semantically, not only numbers

@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"os"
-
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
@@ -31,13 +29,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -113,10 +113,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		timeout := 900
 
 		// Update to the latest minor
-		updatedImageName := os.Getenv("POSTGRES_IMG")
-		if updatedImageName == "" {
-			updatedImageName = configuration.Current.PostgresImageName
-		}
+		updatedImageName := config.Current().Postgres.Image
 
 		// We should be able to apply the conf containing the new
 		// image
@@ -134,7 +131,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, timeout)
 
 		// Setting up a cluster with three podutils is slow, usually 200-600s
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 	}
 
 	// Verify that the pod name changes amount to an expected number
@@ -204,37 +201,6 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		Expect(matchingPVC).To(BeEquivalentTo(expectedUnchangedPvcUIDs))
 	}
 
-	// Verify that the -rw endpoint points to the expected primary
-	AssertPrimary := func(
-		namespace, clusterName string,
-		oldPrimaryPod *corev1.Pod, expectNewPrimaryIdx bool,
-	) {
-		var cluster *apiv1.Cluster
-		var err error
-
-		Eventually(func(g Gomega) {
-			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			g.Expect(err).ToNot(HaveOccurred())
-			if expectNewPrimaryIdx {
-				g.Expect(cluster.Status.CurrentPrimary).ToNot(BeEquivalentTo(oldPrimaryPod.Name))
-			} else {
-				g.Expect(cluster.Status.CurrentPrimary).To(BeEquivalentTo(oldPrimaryPod.Name))
-			}
-		}, RetryTimeout).Should(Succeed())
-
-		// Get the new current primary Pod
-		currentPrimaryPod, err := podutils.Get(env.Ctx, env.Client, namespace, cluster.Status.CurrentPrimary)
-		Expect(err).ToNot(HaveOccurred())
-
-		endpointName := clusterName + "-rw"
-		// we give 10 seconds to the apiserver to update the endpoint
-		timeout := 10
-		Eventually(func() (string, error) {
-			endpointSlice, err := testsUtils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, endpointName)
-			return testsUtils.FirstEndpointSliceIP(endpointSlice), err
-		}, timeout).Should(BeEquivalentTo(currentPrimaryPod.Status.PodIP))
-	}
-
 	// Verify that the IPs of the podutils match the ones in the -r endpoint and
 	// that the amount of podutils is the expected one
 	AssertReadyEndpoint := func(namespace string, clusterName string, expectedEndpoints int) {
@@ -257,13 +223,13 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 	AssertRollingUpdate := func(
 		namespace string, clusterName string,
-		sampleFile string, expectNewPrimaryIdx bool,
+		sampleFile string, primaryUpdateMethod apiv1.PrimaryUpdateMethod,
 	) {
 		var originalPodNames []string
 		var originalPodUID []types.UID
 		var originalPVCUID []types.UID
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		// Gather the number of instances in this Cluster
 		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -298,14 +264,14 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to a new TargetPrimary.
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimary(namespace, clusterName, originalPrimaryPod, expectNewPrimaryIdx)
+			clusterasserts.AssertPrimaryUpdateMethod(env, namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
 		})
 		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
@@ -401,7 +367,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 	AssertRollingUpdateWithImageCatalog := func(
 		cluster *apiv1.Cluster, catalog apiv1.GenericImageCatalog, updatedImageName string,
-		expectNewPrimaryIdx bool,
+		primaryUpdateMethod apiv1.PrimaryUpdateMethod,
 	) {
 		var originalPodNames []string
 		var originalPodUID []types.UID
@@ -411,9 +377,10 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		clusterName := cluster.Name
 		err := env.Client.Create(env.Ctx, catalog)
 		Expect(err).ToNot(HaveOccurred())
-		err = env.Client.Create(env.Ctx, cluster)
+		clusterutils.AddTopologySpreadConstraint(cluster)
+		_, err = objects.Create(env.Ctx, env.Client, cluster)
 		Expect(err).ToNot(HaveOccurred())
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 
 		// Gather the number of instances in this Cluster
 		cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -431,11 +398,11 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		By("updating the catalog", func() {
 			// Update to the latest minor
 			catalog.GetSpec().Images[0].Image = updatedImageName
-			err := env.Client.Update(env.Ctx, catalog)
+			err := objects.Update(env.Ctx, env.Client, catalog)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, 900)
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 
 		// Since we're using a pvc, after the update the podutils should
 		// have been created with the same name using the same pvc.
@@ -454,14 +421,14 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to a new TargetPrimary.
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimary(namespace, clusterName, originalPrimaryPod, expectNewPrimaryIdx)
+			clusterasserts.AssertPrimaryUpdateMethod(env, namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
 		})
 		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
@@ -485,7 +452,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				Expect(err).ToNot(HaveOccurred())
 				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertRollingUpdate(namespace, clusterName, sampleFile, true)
+				AssertRollingUpdate(namespace, clusterName, sampleFile, apiv1.PrimaryUpdateMethodSwitchover)
 			})
 		})
 
@@ -504,7 +471,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				Expect(err).ToNot(HaveOccurred())
 				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
+				AssertRollingUpdate(namespace, clusterName, sampleFile, apiv1.PrimaryUpdateMethodRestart)
 			})
 		})
 
@@ -518,7 +485,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				Expect(err).ToNot(HaveOccurred())
 				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
+				AssertRollingUpdate(namespace, clusterName, sampleFile, apiv1.PrimaryUpdateMethodRestart)
 			})
 		})
 	})
@@ -529,12 +496,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var updatedImageName string
 		var pgVersion version.Data
 		BeforeEach(func() {
-			storageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-			preRollingImg = os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
-			updatedImageName = os.Getenv("POSTGRES_IMG")
-			if updatedImageName == "" {
-				updatedImageName = configuration.Current.PostgresImageName
-			}
+			storageClass = env.DefaultStorageClass
+			preRollingImg = config.Current().Postgres.PreRollingUpdateImage
+			updatedImageName = config.Current().Postgres.Image
 
 			// We automate the extraction of the major version from the image, because we don't want to keep maintaining
 			// the major version in the test
@@ -566,7 +530,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					catalog := newImageCatalog(namespace, clusterName, pgVersion.Major(), preRollingImg)
 					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 3, storageClass)
 
-					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, true)
+					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, apiv1.PrimaryUpdateMethodSwitchover)
 				})
 			})
 			Context("Single Instance", func() {
@@ -584,7 +548,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 					catalog := newImageCatalog(namespace, clusterName, pgVersion.Major(), preRollingImg)
 					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 1, storageClass)
-					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, false)
+					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, apiv1.PrimaryUpdateMethodRestart)
 				})
 			})
 		})
@@ -620,7 +584,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 3, storageClass)
 					cluster.Spec.ImageCatalogRef.Kind = "ClusterImageCatalog"
-					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, true)
+					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, apiv1.PrimaryUpdateMethodSwitchover)
 				})
 			})
 			Context("Single Instance", func() {
@@ -638,7 +602,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 1, storageClass)
 					cluster.Spec.ImageCatalogRef.Kind = "ClusterImageCatalog"
-					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, false)
+					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, apiv1.PrimaryUpdateMethodRestart)
 				})
 			})
 		})

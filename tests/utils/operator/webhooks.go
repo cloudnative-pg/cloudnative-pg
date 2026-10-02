@@ -34,6 +34,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 )
 
@@ -76,7 +77,10 @@ func UpdateMutatingWebhookConf(
 	return nil
 }
 
-// getCNPGsValidatingWebhookConf get the ValidatingWebhook linked to the operator
+// getCNPGsValidatingWebhookConf get the ValidatingWebhook linked to the operator.
+// The lookup name is resolved from configuration.Current, which reads the test
+// process's environment, so ENABLE_WEBHOOK_NAMESPACE_SUFFIX and OPERATOR_NAMESPACE
+// must be set to match the operator deployment under test.
 func getCNPGsValidatingWebhookConf(
 	ctx context.Context,
 	crudClient client.Client,
@@ -84,7 +88,7 @@ func getCNPGsValidatingWebhookConf(
 	*admissionregistrationv1.ValidatingWebhookConfiguration, error,
 ) {
 	validatingWebhookConf := &admissionregistrationv1.ValidatingWebhookConfiguration{}
-	err := crudClient.Get(ctx, types.NamespacedName{Name: controller.ValidatingWebhookConfigurationName},
+	err := crudClient.Get(ctx, types.NamespacedName{Name: configuration.Current.GetValidatingWebhookConfigurationName()},
 		validatingWebhookConf)
 	return validatingWebhookConf, err
 }
@@ -129,6 +133,9 @@ func UpdateValidatingWebhookConf(
 }
 
 // checkWebhookSetup ensures that the operator has finished the webhook setup.
+// Webhook configuration names are resolved via configuration.Current, so
+// ENABLE_WEBHOOK_NAMESPACE_SUFFIX and OPERATOR_NAMESPACE must be set in the
+// test process environment to match the operator deployment under test.
 func checkWebhookSetup(
 	ctx context.Context,
 	crudClient client.Client,
@@ -154,8 +161,13 @@ func checkWebhookSetup(
 
 	for _, webhook := range mutatingWebhookConfig.Webhooks {
 		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
-			return fmt.Errorf("secret %+v not match with ca bundle in %v: %v is not equal to %v",
-				controller.MutatingWebhookConfigurationName, secret, string(ca), string(webhook.ClientConfig.CABundle))
+			return fmt.Errorf("CA bundle mismatch in %v: secret %v/%v (ca len=%d) does not match webhook config (bundle len=%d)",
+				configuration.Current.GetMutatingWebhookConfigurationName(),
+				secret.Namespace,
+				secret.Name,
+				len(ca),
+				len(webhook.ClientConfig.CABundle),
+			)
 		}
 	}
 
@@ -166,15 +178,23 @@ func checkWebhookSetup(
 
 	for _, webhook := range validatingWebhookConfig.Webhooks {
 		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
-			return fmt.Errorf("secret not match with ca bundle in %v",
-				controller.ValidatingWebhookConfigurationName)
+			return fmt.Errorf("CA bundle mismatch in %v: secret %v/%v (ca len=%d) does not match webhook config (bundle len=%d)",
+				configuration.Current.GetValidatingWebhookConfigurationName(),
+				secret.Namespace,
+				secret.Name,
+				len(ca),
+				len(webhook.ClientConfig.CABundle),
+			)
 		}
 	}
 
 	return nil
 }
 
-// getCNPGsMutatingWebhookConf get the MutatingWebhook linked to the operator
+// getCNPGsMutatingWebhookConf get the MutatingWebhook linked to the operator.
+// The lookup name is resolved from configuration.Current, which reads the test
+// process's environment, so ENABLE_WEBHOOK_NAMESPACE_SUFFIX and OPERATOR_NAMESPACE
+// must be set to match the operator deployment under test.
 func getCNPGsMutatingWebhookConf(
 	ctx context.Context,
 	crudClient client.Client,
@@ -182,7 +202,7 @@ func getCNPGsMutatingWebhookConf(
 	*admissionregistrationv1.MutatingWebhookConfiguration, error,
 ) {
 	mutatingWebhookConfiguration := &admissionregistrationv1.MutatingWebhookConfiguration{}
-	err := crudClient.Get(ctx, types.NamespacedName{Name: controller.MutatingWebhookConfigurationName},
+	err := crudClient.Get(ctx, types.NamespacedName{Name: configuration.Current.GetMutatingWebhookConfigurationName()},
 		mutatingWebhookConfiguration)
 	return mutatingWebhookConfiguration, err
 }

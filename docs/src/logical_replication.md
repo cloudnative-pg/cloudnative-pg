@@ -149,6 +149,12 @@ The `Publication` object must reference a specific `Cluster`, determining where
 the publication will be created. It is managed by the cluster's primary instance,
 ensuring the publication is created or updated as needed.
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To create a
+    publication on a different `Cluster`, create a new `Publication` resource
+    instead of updating an existing one.
+:::
+
 ### Reconciliation and Status
 
 After creating a `Publication`, CloudNativePG manages it on the primary
@@ -190,6 +196,11 @@ spec:
 
 In this case, deleting the `Publication` object also removes the `publisher`
 publication from the `app` database of the `freddie` cluster.
+
+On a replica cluster the database is read-only, so deleting a `Publication`
+object releases its finalizer and removes the Kubernetes object without dropping
+the publication in PostgreSQL, even with `publicationReclaimPolicy: delete`.
+Dropping the publication is left to the primary cluster, which owns it.
 
 ## Subscriptions
 
@@ -287,6 +298,12 @@ where the subscription will be managed. CloudNativePG ensures that the
 subscription is created or updated on the primary instance of the specified
 cluster.
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To manage the
+    subscription on a different `Cluster`, create a new `Subscription`
+    resource instead of updating an existing one.
+:::
+
 ### Reconciliation and Status
 
 After creating a `Subscription`, CloudNativePG manages it on the primary
@@ -328,6 +345,11 @@ spec:
 
 In this case, deleting the `Subscription` object also removes the `subscriber`
 subscription from the `app` database of the `king` cluster.
+
+On a replica cluster the database is read-only, so deleting a `Subscription`
+object releases its finalizer and removes the Kubernetes object without dropping
+the subscription in PostgreSQL, even with `subscriptionReclaimPolicy: delete`.
+Dropping the subscription is left to the primary cluster, which owns it.
 
 ### Resilience to Failovers
 
@@ -388,6 +410,17 @@ resource:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: freddie-app
+spec:
+  cluster:
+    name: freddie
+  name: app
+  login: true
+  replication: true
+---
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: freddie
@@ -405,12 +438,6 @@ spec:
         - CREATE TABLE n (i SERIAL PRIMARY KEY, m INTEGER)
         - INSERT INTO n (m) (SELECT generate_series(1, 10000))
         - ALTER TABLE n OWNER TO app
-
-  managed:
-    roles:
-      - name: app
-        login: true
-        replication: true
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Publication

@@ -20,67 +20,15 @@ SPDX-License-Identifier: Apache-2.0
 package persistentvolumeclaim
 
 import (
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-var _ = Describe("PVC detection", func() {
-	It("will list PVCs with Jobs or Pods or which are Ready", func(ctx SpecContext) {
-		clusterName := "myCluster"
-		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, serial, NewPgDataCalculator(), isResizing)
-		}
-		pvcs := []corev1.PersistentVolumeClaim{
-			makeClusterPVC("1", false), // has a Pod
-			makeClusterPVC("2", false), // has a Job
-			makeClusterPVC("3", true),  // resizing
-			makeClusterPVC("4", false), // dangling
-		}
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterName,
-			},
-		}
-		EnrichStatus(
-			ctx,
-			cluster,
-			[]corev1.Pod{
-				makePod(clusterName, "1", specs.ClusterRoleLabelPrimary),
-				makePod(clusterName, "3", specs.ClusterRoleLabelReplica),
-			},
-			[]batchv1.Job{makeJob(clusterName, "2")},
-			pvcs,
-		)
-
-		Expect(cluster.Status.PVCCount).Should(BeEquivalentTo(4))
-		Expect(cluster.Status.InstanceNames).Should(Equal([]string{
-			clusterName + "-1",
-			clusterName + "-2",
-			clusterName + "-3",
-			clusterName + "-4",
-		}))
-		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{
-			clusterName + "-2",
-		}))
-		Expect(cluster.Status.ResizingPVC).Should(Equal([]string{
-			clusterName + "-3",
-		}))
-		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{
-			clusterName + "-4",
-		}))
-		Expect(cluster.Status.HealthyPVC).Should(Equal([]string{
-			clusterName + "-1",
-		}))
-		Expect(cluster.Status.UnusablePVC).Should(BeEmpty())
-	})
-})
 
 var _ = Describe("PVCs used by instance", func() {
 	clusterName := "cluster-pvc-instance"
@@ -106,6 +54,71 @@ var _ = Describe("PVCs used by instance", func() {
 	It("fails when trying to get a pvc that doesn't belong to the instance", func() {
 		res := BelongToInstance(cluster, instanceName, instanceName+"-nil")
 		Expect(res).To(BeFalse())
+	})
+})
+
+var _ = Describe("GetTerminatingInstancePVCName", func() {
+	const clusterName = "cluster-terminating-pvc"
+	instanceName := clusterName + "-1"
+
+	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+		Spec: apiv1.ClusterSpec{
+			WalStorage: &apiv1.StorageConfiguration{},
+		},
+	}
+
+	pvc := func(name string, terminating bool) corev1.PersistentVolumeClaim {
+		p := corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: name}}
+		if terminating {
+			p.DeletionTimestamp = ptr.To(metav1.Now())
+		}
+		return p
+	}
+
+	It("returns empty for an empty list", func() {
+		Expect(GetTerminatingInstancePVCName(cluster, instanceName, nil)).To(BeEmpty())
+	})
+
+	It("returns empty when no expected PVC is terminating", func() {
+		pvcs := []corev1.PersistentVolumeClaim{
+			pvc(instanceName, false),
+			pvc(instanceName+"-wal", false),
+		}
+		Expect(GetTerminatingInstancePVCName(cluster, instanceName, pvcs)).To(BeEmpty())
+	})
+
+	It("returns the name of a terminating data PVC the instance expects", func() {
+		pvcs := []corev1.PersistentVolumeClaim{pvc(instanceName, true)}
+		Expect(GetTerminatingInstancePVCName(cluster, instanceName, pvcs)).To(Equal(instanceName))
+	})
+
+	It("returns the name of a terminating WAL PVC the instance expects", func() {
+		pvcs := []corev1.PersistentVolumeClaim{pvc(instanceName+"-wal", true)}
+		Expect(GetTerminatingInstancePVCName(cluster, instanceName, pvcs)).To(Equal(instanceName + "-wal"))
+	})
+
+	It("ignores a terminating PVC of a different instance", func() {
+		pvcs := []corev1.PersistentVolumeClaim{pvc(clusterName+"-2-wal", true)}
+		Expect(GetTerminatingInstancePVCName(cluster, instanceName, pvcs)).To(BeEmpty())
+	})
+
+	// A PVC the instance will NOT remount (e.g. a tablespace that has been
+	// dropped from the spec) must not hold up recreation, even if terminating.
+	It("ignores a terminating PVC the instance no longer expects", func() {
+		pvcs := []corev1.PersistentVolumeClaim{pvc(instanceName+"-tbs-removed", true)}
+		Expect(GetTerminatingInstancePVCName(cluster, instanceName, pvcs)).To(BeEmpty())
+	})
+
+	// The #10985 scenario: the data PVC has finished terminating and been
+	// recreated fresh, while the WAL PVC of the same instance is still
+	// terminating.
+	It("detects a terminating WAL PVC even when the data PVC was recreated", func() {
+		pvcs := []corev1.PersistentVolumeClaim{
+			pvc(instanceName, false),
+			pvc(instanceName+"-wal", true),
+		}
+		Expect(GetTerminatingInstancePVCName(cluster, instanceName, pvcs)).To(Equal(instanceName + "-wal"))
 	})
 })
 

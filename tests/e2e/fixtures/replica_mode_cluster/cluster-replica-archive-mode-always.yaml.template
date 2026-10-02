@@ -32,10 +32,10 @@ spec:
 
     barmanObjectStore:
       destinationPath: s3://replica-cluster/
-      endpointURL: https://minio-service.minio:9000
+      endpointURL: https://object-store.object-store:9000
       endpointCA:
         key: ca.crt
-        name: minio-server-ca-secret
+        name: object-store-ca-secret
       s3Credentials:
         accessKeyId:
           name: backup-storage-creds
@@ -51,10 +51,10 @@ spec:
   backup:
     barmanObjectStore:
       destinationPath: s3://replica-cluster/
-      endpointURL: https://minio-service.minio:9000
+      endpointURL: https://object-store.object-store:9000
       endpointCA:
         key: ca.crt
-        name: minio-server-ca-secret
+        name: object-store-ca-secret
       s3Credentials:
         accessKeyId:
           name: backup-storage-creds
