@@ -26,6 +26,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
+
+	"github.com/cloudnative-pg/machinery/pkg/types"
 )
 
 const (
@@ -181,6 +184,70 @@ func WalSegmentsPerFile(walSegmentSize int64) int32 {
 	// we compute the number of wal segments in a file, by dividing
 	// the "max segment number" by the wal segment size.
 	return int32(0xFFFFFFFF / walSegmentSize) //nolint:gosec
+}
+
+// LatestTimelines returns the highest timeline among the WAL segments and the
+// highest timeline among the timeline history files in the given pg_wal file
+// names. Any other file is ignored, and a zero means none was found.
+func LatestTimelines(names []string) (segmentTLI, historyTLI int) {
+	for _, name := range names {
+		if IsWALFile(name) {
+			if segment, err := SegmentFromName(name); err == nil && int(segment.Tli) > segmentTLI {
+				segmentTLI = int(segment.Tli)
+			}
+			continue
+		}
+		if tli, err := ParseTimelineFromHistoryFilename(name); err == nil && tli > historyTLI {
+			historyTLI = tli
+		}
+	}
+
+	return segmentTLI, historyTLI
+}
+
+// DetectTimelineDivergence reports whether a standby whose WAL is on
+// timeline segmentTLI, and which has replayed up to replayLSN, can never
+// follow timeline historyTLI, whose history file content is historyContent.
+//
+// A standby only learns about a newer timeline when its WAL receiver fetches
+// that timeline's history file from the primary, and it only holds WAL
+// segments of that timeline once it actually switches to it. The standby is
+// stuck on its own timeline when segmentTLI is not in the history at all (it
+// is not an ancestor of historyTLI) or when it has replayed past the point
+// where historyTLI forked away from it. This is the same check PostgreSQL's
+// startup process makes before refusing the switch with "new timeline forked
+// off current database system timeline before current recovery point".
+//
+// A standby that has replayed exactly up to the fork point, or not yet, is
+// not diverged: PostgreSQL switches it to the new timeline on its own.
+func DetectTimelineDivergence(
+	segmentTLI, historyTLI int,
+	historyContent string,
+	replayLSN types.LSN,
+) *TimelineDivergence {
+	if segmentTLI == 0 || historyTLI <= segmentTLI || replayLSN == "" {
+		return nil
+	}
+
+	// each history line is "<parentTLI>\t<forkLSN>\t<reason>", one per
+	// ancestor of historyTLI
+	var forkLSN types.LSN
+	for line := range strings.Lines(historyContent) {
+		if fields := strings.Fields(line); len(fields) >= 2 && fields[0] == strconv.Itoa(segmentTLI) {
+			forkLSN = types.LSN(fields[1])
+			break
+		}
+	}
+	if forkLSN != "" && !forkLSN.Less(replayLSN) {
+		return nil
+	}
+
+	return &TimelineDivergence{
+		TimeLineID:        segmentTLI,
+		PrimaryTimeLineID: historyTLI,
+		ForkLSN:           forkLSN,
+		ReplayLSN:         replayLSN,
+	}
 }
 
 // NextSegments generate the list of all possible segment names starting

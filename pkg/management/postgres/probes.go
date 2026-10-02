@@ -22,11 +22,13 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -553,11 +555,44 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 		result.ReceivedLsn = result.ReplayLsn
 	}
 
+	result.Divergence, err = instance.DetectTimelineDivergence(result.ReplayLsn)
+	if err != nil {
+		return err
+	}
+
 	result.IsWalReceiverActive, err = instance.IsWALReceiverActive()
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+// DetectTimelineDivergence checks, from this standby's own pg_wal, whether it
+// can still switch to the newest timeline its WAL receiver learned about from
+// the primary. See postgres.DetectTimelineDivergence.
+func (instance *Instance) DetectTimelineDivergence(replayLSN types.LSN) (*postgres.TimelineDivergence, error) {
+	walDir := filepath.Join(instance.PgData, pgWalDirectory)
+	entries, err := os.ReadDir(walDir)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+
+	segmentTLI, historyTLI := postgres.LatestTimelines(names)
+	if historyTLI <= segmentTLI {
+		return nil, nil
+	}
+
+	content, err := os.ReadFile(filepath.Join(walDir, fmt.Sprintf("%08X.history", historyTLI))) //nolint:gosec
+	if err != nil {
+		return nil, err
+	}
+
+	return postgres.DetectTimelineDivergence(segmentTLI, historyTLI, string(content), replayLSN), nil
 }
 
 // IsWALReceiverActive check if the WAL receiver process is active by looking
