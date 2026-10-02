@@ -599,7 +599,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Run plugin post-reconcile hooks, sync per-plugin statuses, and
 	// register PhaseHealthy as the LAST status mutation. See #8582.
-	return r.finalizeReconciliation(ctx, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+	finalResult, err := r.finalizeReconciliation(ctx, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+	if err != nil {
+		return finalResult, err
+	}
+
+	return withSystemIDRefresh(ctx, finalResult, cluster, instancesStatus), nil
 }
 
 // evaluatePodReadinessGuards short-circuits the reconciliation loop with a

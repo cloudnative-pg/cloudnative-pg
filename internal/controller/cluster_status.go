@@ -821,7 +821,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionConsistentSystemID),
 			Status:  metav1.ConditionFalse,
-			Reason:  "NotFound",
+			Reason:  systemIDNotFoundReason,
 			Message: message,
 		})
 
