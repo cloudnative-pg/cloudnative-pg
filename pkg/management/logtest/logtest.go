@@ -21,6 +21,8 @@ SPDX-License-Identifier: Apache-2.0
 package logtest
 
 import (
+	"maps"
+
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/go-logr/logr"
 )
@@ -51,17 +53,17 @@ type LogRecord struct {
 	Level      LogLevel
 	Message    string
 	Error      error
-	Attributes map[string]interface{}
+	Attributes map[string]any
 }
 
 // NewRecord create a new log record
-func NewRecord(name string, level LogLevel, msg string, err error, keysAndValues ...interface{}) *LogRecord {
+func NewRecord(name string, level LogLevel, msg string, err error, keysAndValues ...any) *LogRecord {
 	result := &LogRecord{
 		LoggerName: name,
 		Level:      level,
 		Message:    msg,
 		Error:      err,
-		Attributes: make(map[string]interface{}),
+		Attributes: make(map[string]any),
 	}
 	result.WithValues(keysAndValues...)
 	return result
@@ -69,7 +71,7 @@ func NewRecord(name string, level LogLevel, msg string, err error, keysAndValues
 
 // WithValues reads a set of keys and values, using them as attributes
 // of the log record
-func (record *LogRecord) WithValues(keysAndValues ...interface{}) {
+func (record *LogRecord) WithValues(keysAndValues ...any) {
 	if len(keysAndValues)%2 != 0 {
 		panic("key and values set is not even")
 	}
@@ -85,7 +87,7 @@ type SpyLogger struct {
 	// The following attributes are referred to the current context
 
 	Name       string
-	Attributes map[string]interface{}
+	Attributes map[string]any
 
 	// The following attributes represent the event sink
 
@@ -116,41 +118,39 @@ func (s *SpyLogger) Enabled() bool {
 }
 
 // Error implements the log.Logger interface
-func (s *SpyLogger) Error(err error, msg string, keysAndValues ...interface{}) {
+func (s *SpyLogger) Error(err error, msg string, keysAndValues ...any) {
 	s.AddRecord(NewRecord(s.Name, LogLevelError, msg, err, keysAndValues...))
 }
 
 // Warning implements the log.Logger interface
-func (s *SpyLogger) Warning(msg string, keysAndValues ...interface{}) {
+func (s *SpyLogger) Warning(msg string, keysAndValues ...any) {
 	s.AddRecord(NewRecord(s.Name, LogLevelWarning, msg, nil, keysAndValues...))
 }
 
 // Info implements the log.Logger interface
-func (s *SpyLogger) Info(msg string, keysAndValues ...interface{}) {
+func (s *SpyLogger) Info(msg string, keysAndValues ...any) {
 	s.AddRecord(NewRecord(s.Name, LogLevelInfo, msg, nil, keysAndValues...))
 }
 
 // Debug implements the log.Logger interface
-func (s *SpyLogger) Debug(msg string, keysAndValues ...interface{}) {
+func (s *SpyLogger) Debug(msg string, keysAndValues ...any) {
 	s.AddRecord(NewRecord(s.Name, LogLevelDebug, msg, nil, keysAndValues...))
 }
 
 // Trace implements the log.Logger interface
-func (s *SpyLogger) Trace(msg string, keysAndValues ...interface{}) {
+func (s *SpyLogger) Trace(msg string, keysAndValues ...any) {
 	s.AddRecord(NewRecord(s.Name, LogLevelTrace, msg, nil, keysAndValues...))
 }
 
 // WithValues implements the log.Logger interface
-func (s *SpyLogger) WithValues(keysAndValues ...interface{}) log.Logger {
+func (s *SpyLogger) WithValues(keysAndValues ...any) log.Logger {
 	result := &SpyLogger{
 		Name:      s.Name,
 		EventSink: s,
 	}
 
-	result.Attributes = make(map[string]interface{})
-	for key, value := range s.Attributes {
-		result.Attributes[key] = value
-	}
+	result.Attributes = make(map[string]any)
+	maps.Copy(result.Attributes, s.Attributes)
 	for idx := 0; idx < len(keysAndValues); idx += 2 {
 		result.Attributes[keysAndValues[idx].(string)] = keysAndValues[idx+1]
 	}

@@ -1213,8 +1213,8 @@ var _ = Describe("archiverSidecarMissingOnPrimary", func() {
 		cluster.Spec.Plugins = []apiv1.PluginConfiguration{
 			{
 				Name:          "barman-cloud.cloudnative-pg.io",
-				Enabled:       ptr.To(true),
-				IsWALArchiver: ptr.To(true),
+				Enabled:       new(true),
+				IsWALArchiver: new(true),
 			},
 		}
 	}

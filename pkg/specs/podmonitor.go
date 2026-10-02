@@ -75,10 +75,10 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 					Key: certs.CACertKey,
 				},
 			},
-			ServerName: ptr.To(c.cluster.GetServiceReadWriteName()),
+			ServerName: new(c.cluster.GetServiceReadWriteName()),
 			// InsecureSkipVerify needs to be set to match the ssl_mode=verify-ca
 			// used by postgres when connecting to the other instances.
-			InsecureSkipVerify: ptr.To(true),
+			InsecureSkipVerify: new(true),
 		}
 	}
 

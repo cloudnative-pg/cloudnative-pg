@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -285,7 +284,7 @@ var _ = Describe("Managed Database status", func() {
 
 			// Demote the cluster to a replica after the finalizer was added.
 			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			}
 			Expect(fakeClient.Update(ctx, cluster)).To(Succeed())
 
@@ -420,7 +419,7 @@ var _ = Describe("Managed Database status", func() {
 	It("properly signals a database is on a replica cluster", func(ctx SpecContext) {
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
@@ -437,13 +436,13 @@ var _ = Describe("Managed Database status", func() {
 	// The demotion behavior is identical across the three managed-object
 	// controllers, and so are its tests.
 	It("reports the replica condition when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
-		database.Status.Applied = ptr.To(true)
+		database.Status.Applied = new(true)
 		database.Status.ObservedGeneration = database.Generation
 		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
 
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
@@ -463,13 +462,13 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("keeps an applied database untouched on pods other than the designated primary", func(ctx SpecContext) {
-		database.Status.Applied = ptr.To(true)
+		database.Status.Applied = new(true)
 		database.Status.ObservedGeneration = database.Generation
 		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
 
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 		cluster.Status.CurrentPrimary = "another-pod"
@@ -491,13 +490,13 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("re-applies a database when the cluster is promoted back", func(ctx SpecContext) {
-		database.Status.Applied = ptr.To(true)
+		database.Status.Applied = new(true)
 		database.Status.ObservedGeneration = database.Generation
 		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
 
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
@@ -506,7 +505,7 @@ var _ = Describe("Managed Database status", func() {
 		Expect(database.Status.Applied).To(BeNil())
 
 		demotedCluster := cluster.DeepCopy()
-		cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+		cluster.Spec.ReplicaCluster.Enabled = new(false)
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(demotedCluster))).To(Succeed())
 
 		expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
@@ -530,7 +529,7 @@ var _ = Describe("Managed Database status", func() {
 		// A previously failed reconciliation that left the recorded
 		// reconciliation in place: the generation gate must not let it sit
 		// at applied=false, the object has to be evaluated again.
-		database.Status.Applied = ptr.To(false)
+		database.Status.Applied = new(false)
 		database.Status.ObservedGeneration = database.Generation
 		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
 
@@ -551,13 +550,13 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("retains the ownership of the managed database across a demotion", func(ctx SpecContext) {
-		database.Status.Applied = ptr.To(true)
+		database.Status.Applied = new(true)
 		database.Status.ObservedGeneration = database.Generation
 		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
 
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
@@ -584,7 +583,7 @@ var _ = Describe("Managed Database status", func() {
 		Expect(fakeClient.Create(ctx, dbDuplicate)).To(Succeed())
 
 		demotedCluster := cluster.DeepCopy()
-		cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+		cluster.Spec.ReplicaCluster.Enabled = new(false)
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(demotedCluster))).To(Succeed())
 
 		err = reconcileDatabase(ctx, fakeClient, r, dbDuplicate)
@@ -599,7 +598,7 @@ var _ = Describe("Managed Database status", func() {
 	// The cluster-fetch behavior is identical across the three
 	// managed-object controllers, and so are its tests.
 	It("keeps a reconciled database status when the cluster cannot be fetched", func(ctx SpecContext) { //nolint:dupl
-		database.Status.Applied = ptr.To(true)
+		database.Status.Applied = new(true)
 		database.Status.ObservedGeneration = database.Generation
 		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
 

@@ -27,7 +27,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -37,7 +36,7 @@ func UpdateServiceAccount(
 	imagePullSecretsNames []string,
 	serviceAccount *corev1.ServiceAccount,
 ) error {
-	serviceAccount.AutomountServiceAccountToken = ptr.To(false)
+	serviceAccount.AutomountServiceAccountToken = new(false)
 
 	if serviceAccount.ImagePullSecrets == nil {
 		serviceAccount.ImagePullSecrets = []corev1.LocalObjectReference{}

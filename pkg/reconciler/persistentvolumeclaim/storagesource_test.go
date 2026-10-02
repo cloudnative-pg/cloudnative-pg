@@ -26,7 +26,6 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -92,12 +91,12 @@ var _ = Describe("Storage source", func() {
 						Storage: corev1.TypedLocalObjectReference{
 							Name:     pgDataSnapshotVolumeName,
 							Kind:     apiv1.VolumeSnapshotKind,
-							APIGroup: ptr.To("snapshot.storage.k8s.io"),
+							APIGroup: new("snapshot.storage.k8s.io"),
 						},
 						WalStorage: &corev1.TypedLocalObjectReference{
 							Name:     pgWalSnapshotVolumeName,
 							Kind:     apiv1.VolumeSnapshotKind,
-							APIGroup: ptr.To("snapshot.storage.k8s.io"),
+							APIGroup: new("snapshot.storage.k8s.io"),
 						},
 					},
 				},
@@ -136,7 +135,7 @@ var _ = Describe("Storage source", func() {
 			Plugins: []apiv1.PluginConfiguration{
 				{
 					Name:          "test-wal-archiver",
-					IsWALArchiver: ptr.To(true),
+					IsWALArchiver: new(true),
 				},
 			},
 		},

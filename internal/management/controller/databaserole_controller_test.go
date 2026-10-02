@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -92,7 +91,7 @@ func shadowRole(cluster *apiv1.Cluster) {
 }
 
 func makeReplica(cluster *apiv1.Cluster) {
-	cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{Enabled: ptr.To(true)}
+	cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{Enabled: new(true)}
 }
 
 // markReconciled records a successful past reconciliation, as
@@ -219,7 +218,7 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		Entry("stops when the role is already reconciled and applied",
 			func(role *apiv1.DatabaseRole, _ *apiv1.Cluster) {
 				role.Status.ObservedGeneration = role.Generation
-				role.Status.Applied = ptr.To(true)
+				role.Status.Applied = new(true)
 			}, &ctrl.Result{}),
 		Entry("requeues when this pod is not the primary",
 			func(_ *apiv1.DatabaseRole, cluster *apiv1.Cluster) {
@@ -257,7 +256,7 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 
 	It("persists Applied=false when shadowed by inline managed.roles", func() {
 		role := newTestDatabaseRole()
-		role.Status.Applied = ptr.To(true)
+		role.Status.Applied = new(true)
 		cluster := newTestCluster()
 		shadowRole(cluster)
 		r := reconcilerFor(role)
@@ -267,13 +266,13 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 
 		got := &apiv1.DatabaseRole{}
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
-		Expect(got.Status.Applied).To(Equal(ptr.To(false)))
+		Expect(got.Status.Applied).To(Equal(new(false)))
 	})
 
 	It("reports the conflict but keeps the recorded reconciliation when shadowed after a successful apply", func() {
 		role := newTestDatabaseRole()
 		markReconciled(role)
-		role.Status.Applied = ptr.To(true)
+		role.Status.Applied = new(true)
 		cluster := newTestCluster()
 		shadowRole(cluster)
 		r := reconcilerFor(role)
@@ -284,7 +283,7 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 
 		got := &apiv1.DatabaseRole{}
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
-		Expect(got.Status.Applied).To(Equal(ptr.To(false)))
+		Expect(got.Status.Applied).To(Equal(new(false)))
 		Expect(got.Status.Message).To(ContainSubstring("managed by the CNPG cluster"))
 		// The reconciliation is kept so a conflicting DatabaseRole cannot take
 		// over the role while it is shadowed.
@@ -294,7 +293,7 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 	It("reports the replica condition but keeps the recorded reconciliation when the cluster is demoted", func() {
 		role := newTestDatabaseRole()
 		markReconciled(role)
-		role.Status.Applied = ptr.To(true)
+		role.Status.Applied = new(true)
 		cluster := newTestCluster()
 		makeReplica(cluster)
 		r := reconcilerFor(role)
@@ -329,7 +328,7 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 	It("keeps polling without writing on a replica while the cluster status is still settling", func() {
 		role := newTestDatabaseRole()
 		markReconciled(role)
-		role.Status.Applied = ptr.To(true) // stale, not yet cleared
+		role.Status.Applied = new(true) // stale, not yet cleared
 		cluster := newTestCluster()
 		makeReplica(cluster)
 		cluster.Status.CurrentPrimary = "other-pod" // this pod is not (yet) the designated primary
@@ -342,12 +341,12 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		// A non-designated pod must not write the status.
 		got := &apiv1.DatabaseRole{}
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
-		Expect(got.Status.Applied).To(Equal(ptr.To(true)))
+		Expect(got.Status.Applied).To(Equal(new(true)))
 	})
 
 	It("persists Applied=Unknown (nil) on a replica cluster", func() {
 		role := newTestDatabaseRole()
-		role.Status.Applied = ptr.To(true)
+		role.Status.Applied = new(true)
 		cluster := newTestCluster()
 		makeReplica(cluster)
 		r := reconcilerFor(role)

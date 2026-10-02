@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -167,8 +166,8 @@ func InstallLatest(
 						Kind:               apiv1.ClusterKind,
 						Name:               "owner-ref-probe",
 						UID:                types.UID("00000000-0000-0000-0000-000000000000"),
-						BlockOwnerDeletion: ptr.To(true),
-						Controller:         ptr.To(true),
+						BlockOwnerDeletion: new(true),
+						Controller:         new(true),
 					},
 				},
 			},

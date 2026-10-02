@@ -24,7 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -114,7 +113,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 		By("creating the required resources", func() {
 			cluster = newFakeCNPGCluster(env.client, namespace)
 			cluster.Spec.Monitoring = &apiv1.MonitoringConfiguration{
-				DisableDefaultQueries: ptr.To(false),
+				DisableDefaultQueries: new(false),
 			}
 			err := crReconciler.Update(context.Background(), cluster)
 			Expect(err).ToNot(HaveOccurred())

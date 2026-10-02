@@ -119,7 +119,7 @@ var _ = Describe("cluster_create unit tests", func() {
 	It("should make sure that superUser secret is created if EnableSuperuserAccess is enabled", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
-		cluster.Spec.EnableSuperuserAccess = ptr.To(true)
+		cluster.Spec.EnableSuperuserAccess = new(true)
 
 		By("executing reconcilePostgresSecrets", func() {
 			err := env.clusterReconciler.reconcilePostgresSecrets(ctx, cluster)
@@ -1065,7 +1065,7 @@ var _ = Describe("createOrPatchOwnedPodDisruptionBudget", func() {
 		})
 
 		It("should update the existing PodDisruptionBudget if the spec is different", func() {
-			pdb.Spec.MinAvailable = ptr.To(intstr.FromInt32(3))
+			pdb.Spec.MinAvailable = new(intstr.FromInt32(3))
 			err = reconciler.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
 			Expect(err).ShouldNot(HaveOccurred())
 

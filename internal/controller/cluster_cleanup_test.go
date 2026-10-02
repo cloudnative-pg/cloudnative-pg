@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -52,7 +51,7 @@ var _ = Describe("cluster_cleanup", func() {
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-1", Namespace: "test"},
 				Spec: batchv1.JobSpec{
-					Completions: ptr.To(int32(1)),
+					Completions: new(int32(1)),
 				},
 				Status: batchv1.JobStatus{
 					Succeeded: 1,
@@ -61,7 +60,7 @@ var _ = Describe("cluster_cleanup", func() {
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-2", Namespace: "test"},
 				Spec: batchv1.JobSpec{
-					Completions: ptr.To(int32(1)),
+					Completions: new(int32(1)),
 				},
 				Status: batchv1.JobStatus{
 					Succeeded: 0,

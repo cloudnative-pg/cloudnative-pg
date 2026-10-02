@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strings"
 	"time"
@@ -199,9 +200,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			g.Expect(err).NotTo(HaveOccurred())
 			cluster.Spec.PostgresConfiguration.Extensions = append(
 				cluster.Spec.PostgresConfiguration.Extensions, extensionConfig)
-			for key, value := range additionalGucParams {
-				cluster.Spec.PostgresConfiguration.Parameters[key] = value
-			}
+			maps.Copy(cluster.Spec.PostgresConfiguration.Parameters, additionalGucParams)
 			g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 
 			// Updating the Database

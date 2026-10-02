@@ -30,7 +30,7 @@ import (
 // the expected query, message and logger triple. It is a predicate, not
 // an Assert*-style helper, so it returns a bool for callers to feed into
 // Eventually(...).Should(BeTrue()).
-func HasQueryRecord(logEntries []map[string]interface{}, errorTestQuery, message, logger string) bool {
+func HasQueryRecord(logEntries []map[string]any, errorTestQuery, message, logger string) bool {
 	for _, logEntry := range logEntries {
 		if logsutils.IsWellFormedLogForLogger(logEntry, logger) &&
 			logsutils.CheckRecordForQuery(logEntry, errorTestQuery, "postgres", "app", message) {

@@ -27,7 +27,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -91,11 +90,11 @@ var _ = Describe("Managed Database SQL", func() {
 
 	Context("createDatabase", func() {
 		It("should create a new Database", func(ctx SpecContext) {
-			database.Spec.IsTemplate = ptr.To(true)
+			database.Spec.IsTemplate = new(true)
 			database.Spec.Template = "myTemplate"
 			database.Spec.Tablespace = "myTablespace"
-			database.Spec.AllowConnections = ptr.To(true)
-			database.Spec.ConnectionLimit = ptr.To(-1)
+			database.Spec.AllowConnections = new(true)
+			database.Spec.ConnectionLimit = new(-1)
 
 			expectedValue := sqlmock.NewResult(0, 1)
 			expectedQuery := fmt.Sprintf(
@@ -162,9 +161,9 @@ var _ = Describe("Managed Database SQL", func() {
 	Context("updateDatabase", func() {
 		It("should reconcile an existing Database", func(ctx SpecContext) {
 			database.Spec.Owner = "newOwner"
-			database.Spec.IsTemplate = ptr.To(true)
-			database.Spec.AllowConnections = ptr.To(true)
-			database.Spec.ConnectionLimit = ptr.To(-1)
+			database.Spec.IsTemplate = new(true)
+			database.Spec.AllowConnections = new(true)
+			database.Spec.ConnectionLimit = new(-1)
 			database.Spec.Tablespace = "newTablespace"
 
 			expectedValue := sqlmock.NewResult(0, 1)

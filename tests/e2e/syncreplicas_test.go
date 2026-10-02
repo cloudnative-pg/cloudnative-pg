@@ -26,7 +26,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -281,7 +280,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				Eventually(func(g Gomega) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
-					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = ptr.To(1)
+					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = new(1)
 					cluster.Spec.PostgresConfiguration.Synchronous.Number = 1
 					g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 				}, RetryTimeout, 5).Should(Succeed())

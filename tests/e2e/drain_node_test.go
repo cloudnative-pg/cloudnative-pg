@@ -25,7 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -598,7 +597,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					Expect(err).ToNot(HaveOccurred())
 
 					updated := cluster.DeepCopy()
-					updated.Spec.EnablePDB = ptr.To(true)
+					updated.Spec.EnablePDB = new(true)
 					err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 					Expect(err).ToNot(HaveOccurred())
 				})

@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -123,7 +122,7 @@ var _ = Describe("reconcilePrimaryLease", func() {
 					Kind:       apiv1.ClusterKind,
 					Name:       clusterName,
 					UID:        cluster.UID,
-					Controller: ptr.To(true),
+					Controller: new(true),
 				}},
 			},
 		}
@@ -164,7 +163,7 @@ var _ = Describe("reconcilePrimaryLease", func() {
 					Kind:       apiv1.ClusterKind,
 					Name:       clusterName,
 					UID:        "previous-cluster-uid",
-					Controller: ptr.To(true),
+					Controller: new(true),
 				}},
 			},
 		}
@@ -186,7 +185,7 @@ var _ = Describe("reconcilePrimaryLease", func() {
 					Kind:       "Pod",
 					Name:       "some-pod",
 					UID:        "pod-uid",
-					Controller: ptr.To(true),
+					Controller: new(true),
 				}},
 			},
 		}
@@ -216,7 +215,7 @@ var _ = Describe("reconcilePrimaryLease", func() {
 					Kind:       apiv1.ClusterKind,
 					Name:       "other-cluster",
 					UID:        "other-cluster-uid",
-					Controller: ptr.To(true),
+					Controller: new(true),
 				}},
 			},
 		}
@@ -264,7 +263,7 @@ var _ = Describe("classifyLeaseAdoption", func() {
 		Kind:       apiv1.ClusterKind,
 		Name:       clusterName,
 		UID:        cluster.UID,
-		Controller: ptr.To(true),
+		Controller: new(true),
 	}
 
 	It("treats a lease controlled by this cluster (UID match) as already ours", func() {
@@ -284,7 +283,7 @@ var _ = Describe("classifyLeaseAdoption", func() {
 	It("refuses a controllerRef of a different kind", func() {
 		differentKind := metav1.OwnerReference{
 			APIVersion: "v1", Kind: "Pod", Name: clusterName,
-			UID: "pod-uid", Controller: ptr.To(true),
+			UID: "pod-uid", Controller: new(true),
 		}
 		Expect(classifyLeaseAdoption(leaseWithOwner(differentKind), cluster)).To(Equal(adoptRefuseForeign))
 	})

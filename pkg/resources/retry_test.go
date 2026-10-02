@@ -23,7 +23,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -49,7 +48,7 @@ var _ = Describe("RetryWithRefreshedResource", func() {
 		testResource = &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 			Spec: appsv1.DeploymentSpec{
-				Replicas: ptr.To(int32(1)),
+				Replicas: new(int32(1)),
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
@@ -74,7 +73,7 @@ var _ = Describe("RetryWithRefreshedResource", func() {
 			Expect(fakeClient.Create(ctx, testResource)).To(Succeed())
 
 			modified := testResource.DeepCopy()
-			modified.Spec.Replicas = ptr.To(int32(10))
+			modified.Spec.Replicas = new(int32(10))
 			err := fakeClient.Update(ctx, modified)
 			Expect(err).ToNot(HaveOccurred())
 		})

@@ -880,7 +880,7 @@ var _ = Describe("Barman Endpoint CA for replica cluster", func() {
 		Spec: ClusterSpec{
 			ReplicaCluster: &ReplicaClusterConfiguration{
 				Source:  "testSource",
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			},
 		},
 	}
@@ -909,7 +909,7 @@ var _ = Describe("Barman Endpoint CA for replica cluster", func() {
 			},
 			ReplicaCluster: &ReplicaClusterConfiguration{
 				Source:  "testReplica",
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			},
 		},
 	}
@@ -987,7 +987,7 @@ var _ = Describe("Replication slots names for instances", func() {
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -1002,7 +1002,7 @@ var _ = Describe("Replication slots names for instances", func() {
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    ptr.To(true),
+						Enabled:    new(true),
 						SlotPrefix: "%232'test_",
 					},
 					UpdateInterval: 0,
@@ -1088,7 +1088,7 @@ var _ = Describe("Cluster ShouldRecoveryCreateApplicationDatabase", func() {
 	})
 
 	It("should return false if the cluster is a replica", func() {
-		cluster.Spec.ReplicaCluster = &ReplicaClusterConfiguration{Enabled: ptr.To(true)}
+		cluster.Spec.ReplicaCluster = &ReplicaClusterConfiguration{Enabled: new(true)}
 		result := cluster.ShouldRecoveryCreateApplicationDatabase()
 		Expect(result).To(BeFalse())
 	})
@@ -1130,8 +1130,8 @@ var _ = Describe("Ephemeral volume size limits", func() {
 
 	It("works correctly when fully specified", func() {
 		spec := &EphemeralVolumesSizeLimitConfiguration{
-			Shm:           ptr.To(resource.MustParse("10Mi")),
-			TemporaryData: ptr.To(resource.MustParse("20Mi")),
+			Shm:           new(resource.MustParse("10Mi")),
+			TemporaryData: new(resource.MustParse("20Mi")),
 		}
 
 		Expect(spec.GetShmLimit().String()).To(Equal("10Mi"))
@@ -1228,12 +1228,12 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 			})
 
 			It("should return true when Enabled is true", func() {
-				synchronizeReplicas.Enabled = ptr.To(true)
+				synchronizeReplicas.Enabled = new(true)
 				Expect(synchronizeReplicas.GetEnabled()).To(BeTrue())
 			})
 
 			It("should return false when Enabled is false", func() {
-				synchronizeReplicas.Enabled = ptr.To(false)
+				synchronizeReplicas.Enabled = new(false)
 				Expect(synchronizeReplicas.GetEnabled()).To(BeFalse())
 			})
 		})
@@ -1306,7 +1306,7 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        ptr.To(true),
+					Enabled:        new(true),
 					PromotionToken: "ABC",
 				},
 			},
@@ -1318,7 +1318,7 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 				},
 			},
 		}
@@ -1338,7 +1338,7 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        ptr.To(true),
+					Enabled:        new(true),
 					PromotionToken: "ABC",
 				},
 			},
@@ -1353,7 +1353,7 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        ptr.To(true),
+					Enabled:        new(true),
 					PromotionToken: "ABC",
 				},
 			},
@@ -1370,7 +1370,7 @@ var _ = Describe("IsReplica", func() {
 		replicaClusterOldAPI := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "source-cluster",
 				},
 			},
@@ -1385,7 +1385,7 @@ var _ = Describe("IsReplica", func() {
 		primaryClusterOldAPIExplicit := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: ptr.To(false),
+					Enabled: new(false),
 					Source:  "source-cluster",
 				},
 			},

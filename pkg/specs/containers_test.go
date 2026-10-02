@@ -22,7 +22,6 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -84,7 +83,7 @@ var _ = Describe("GetSecurityContext", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				SecurityContext: &corev1.SecurityContext{
-					RunAsUser: ptr.To(int64(1000)),
+					RunAsUser: new(int64(1000)),
 				},
 			},
 		}
@@ -139,10 +138,10 @@ var _ = Describe("GetSecurityContext", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				SecurityContext: &corev1.SecurityContext{
-					Privileged:               ptr.To(true),
-					RunAsNonRoot:             ptr.To(false),
-					ReadOnlyRootFilesystem:   ptr.To(false),
-					AllowPrivilegeEscalation: ptr.To(true),
+					Privileged:               new(true),
+					RunAsNonRoot:             new(false),
+					ReadOnlyRootFilesystem:   new(false),
+					AllowPrivilegeEscalation: new(true),
 					Capabilities: &corev1.Capabilities{
 						Add:  []corev1.Capability{"NET_BIND_SERVICE"},
 						Drop: []corev1.Capability{"MKNOD"},

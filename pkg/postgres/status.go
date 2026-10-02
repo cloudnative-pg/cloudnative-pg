@@ -27,7 +27,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -550,5 +549,5 @@ func (report ConfigurationReport) IsUniform() *bool {
 		detectedConfigurationHash.Put(item.ConfigHash)
 	}
 
-	return ptr.To(detectedConfigurationHash.Len() == 1)
+	return new(detectedConfigurationHash.Len() == 1)
 }

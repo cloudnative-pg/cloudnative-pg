@@ -27,7 +27,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -468,7 +467,7 @@ var _ = Describe("Configuration report", func() {
 					ConfigHash: "def",
 				},
 			},
-			ptr.To(false),
+			new(false),
 		),
 		Entry(
 			"with instance manager that are reporting the same configuration",
@@ -482,7 +481,7 @@ var _ = Describe("Configuration report", func() {
 					ConfigHash: "abc",
 				},
 			},
-			ptr.To(true),
+			new(true),
 		),
 	)
 })

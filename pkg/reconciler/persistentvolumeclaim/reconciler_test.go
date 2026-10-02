@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -178,7 +177,7 @@ var _ = Describe("Reconcile resource requests", func() {
 	It("Reconcile resources with resize in use and empty PVCs shouldn't fail", func() {
 		cluster.Spec = apiv1.ClusterSpec{
 			StorageConfiguration: apiv1.StorageConfiguration{
-				ResizeInUseVolumes: ptr.To(false),
+				ResizeInUseVolumes: new(false),
 			},
 		}
 
@@ -644,7 +643,7 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		storage := &apiv1.StorageConfiguration{
 			Size: "1Gi",
 			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-				VolumeAttributesClassName: ptr.To(className),
+				VolumeAttributesClassName: new(className),
 			},
 		}
 
