@@ -20,16 +20,98 @@ SPDX-License-Identifier: Apache-2.0
 package roles
 
 import (
+	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("ApplyPassword", func() {
+	const (
+		namespace  = "default"
+		roleName   = "dante"
+		secretName = "role-dante-password"
+		password   = "0mA3nCe0f6THe1dIvIne"
+	)
+
+	// A role whose password the operator generates carries no `passwordSecret`,
+	// which on its own means "leave the password alone".
+	config := apiv1.RoleConfiguration{Name: roleName, Login: true}
+
+	buildClient := func() *fake.ClientBuilder {
+		return fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).WithObjects(
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: namespace},
+				Type:       corev1.SecretTypeBasicAuth,
+				Data: map[string][]byte{
+					corev1.BasicAuthUsernameKey: []byte(roleName),
+					corev1.BasicAuthPasswordKey: []byte(password),
+				},
+			},
+		)
+	}
+
+	It("applies a password read from a Secret the role does not refer to", func() {
+		dbRole := DatabaseRoleFromConfiguration(config, false)
+		Expect(dbRole.ignorePassword).To(BeTrue())
+
+		version, err := dbRole.ApplyPassword(
+			context.Background(), buildClient().Build(), secretName, false, namespace)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(version).ToNot(BeEmpty())
+
+		// The password reaching PostgreSQL is what matters: an ignored password
+		// leaves the CREATE/ALTER ROLE statement without a PASSWORD clause, and
+		// the role ends up with a NULL password while the reconciliation reports
+		// success.
+		var query strings.Builder
+		Expect(appendPasswordOption(dbRole, &query)).To(Succeed())
+		Expect(query.String()).To(ContainSubstring(" PASSWORD "))
+		Expect(query.String()).ToNot(ContainSubstring("PASSWORD NULL"))
+	})
+
+	It("leaves the password alone when there is no Secret to read", func() {
+		dbRole := DatabaseRoleFromConfiguration(config, false)
+
+		version, err := dbRole.ApplyPassword(
+			context.Background(), buildClient().Build(), "", false, namespace)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(version).To(BeEmpty())
+
+		var query strings.Builder
+		Expect(appendPasswordOption(dbRole, &query)).To(Succeed())
+		Expect(query.String()).ToNot(ContainSubstring("PASSWORD"))
+	})
+
+	It("sets the password to NULL when disabled, whatever the role was built from", func() {
+		// A `password.mode: setNull` DatabaseRole is built from a configuration
+		// that does not disable the password, so it starts out ignoring it, and
+		// only ApplyPassword asks for the password to be disabled. That has to
+		// override the earlier "leave it alone", or the role keeps whatever
+		// password it already had in PostgreSQL.
+		dbRole := DatabaseRoleFromConfiguration(config, false)
+		Expect(dbRole.ignorePassword).To(BeTrue())
+
+		version, err := dbRole.ApplyPassword(
+			context.Background(), buildClient().Build(), "", true, namespace)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(version).To(BeEmpty())
+
+		var query strings.Builder
+		Expect(appendPasswordOption(dbRole, &query)).To(Succeed())
+		Expect(query.String()).To(ContainSubstring("PASSWORD NULL"))
+	})
+})
 
 var _ = Describe("DatabaseRole implementation test", func() {
 	fixedTime := time.Date(2023, 4, 4, 0, 0, 0, 0, time.UTC)

@@ -42,6 +42,7 @@ import (
 func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
+	cluster *apiv1.Cluster,
 ) error {
 	secretKey := client.ObjectKey{
 		Namespace: role.Namespace,
@@ -54,19 +55,11 @@ func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 		return r.deleteOwnedCertSecret(ctx, role, secretKey)
 	}
 
-	var cluster apiv1.Cluster
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: role.Namespace,
-		Name:      role.Spec.ClusterRef.Name,
-	}, &cluster); apierrs.IsNotFound(err) {
-		log.FromContext(ctx).Info("cluster not found, will retry when it appears",
-			"cluster", role.Spec.ClusterRef.Name)
+	if cluster == nil {
 		return nil
-	} else if err != nil {
-		return fmt.Errorf("while getting cluster %q: %w", role.Spec.ClusterRef.Name, err)
 	}
 
-	return r.issueClientCertificate(ctx, role, &cluster)
+	return r.issueClientCertificate(ctx, role, cluster, secretKey)
 }
 
 // issueClientCertificate ensures the TLS client certificate Secret for the
@@ -77,9 +70,9 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	cluster *apiv1.Cluster,
+	secretKey client.ObjectKey,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	secretKey := client.ObjectKey{Namespace: role.Namespace, Name: role.GetClientCertSecretName()}
 
 	var caSecret corev1.Secret
 	if err := r.Get(ctx, client.ObjectKey{
@@ -127,6 +120,8 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 		if err := r.Create(ctx, newSecret); err != nil {
 			return fmt.Errorf("while creating cert secret %q: %w", secretKey.Name, err)
 		}
+		r.Recorder.Eventf(role, "Normal", "ClientCertificateIssued",
+			"Issued a client certificate for role %q into Secret %q", role.Spec.Name, secretKey.Name)
 
 		certSecret = *newSecret
 
@@ -165,43 +160,49 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 		contextLogger.Warning("cert secret exists but is not owned by this DatabaseRole, skipping issuance",
 			"secret", secretKey.Name)
 		role.Status.ClientCertificate = &apiv1.ClientCertificateState{
-			Message: fmt.Sprintf("Secret %q already exists and is not owned by this DatabaseRole", secretKey.Name),
+			Message: fmt.Sprintf(secretNotOwnedMessage, secretKey.Name),
 		}
 		return false, nil
 	}
 
 	origSecret := certSecret.DeepCopy()
 
-	// Detect a CA rotation explicitly: RenewLeafCertificate only re-signs on
-	// expiry or altDNSName changes. A parse or renewal error means the cert is
-	// corrupt; treat it as a re-issue trigger rather than error-looping.
-	certInvalid := false
+	// Set to why the certificate must be re-issued rather than renewed in
+	// place: RenewLeafCertificate alone doesn't handle a CA rotation, or a
+	// certificate that can't be read or renewed.
+	var reissueReason string
 
-	signedByCurrentCA, err := clientCertSignedByCurrentCA(ctx, caSecret, certSecret)
-	if err != nil {
+	signedByCurrentCA, readErr := clientCertSignedByCurrentCA(ctx, caSecret, certSecret)
+	renewed, renewErr := false, error(nil)
+	if readErr == nil && signedByCurrentCA {
+		renewed, renewErr = certs.RenewLeafCertificate(caSecret, certSecret, nil)
+	}
+
+	switch {
+	case readErr != nil:
 		contextLogger.Warning("client cert is unreadable, re-issuing",
-			"secret", secretKey.Name, "err", err)
-		signedByCurrentCA = false
-		certInvalid = true
+			"secret", secretKey.Name, "err", readErr)
+		reissueReason = "it could not be read"
+
+	case !signedByCurrentCA:
+		contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
+		reissueReason = "the client CA of the cluster was rotated"
+
+	case renewErr != nil:
+		contextLogger.Warning("client cert renewal failed, re-issuing",
+			"secret", secretKey.Name, "err", renewErr)
+		reissueReason = "it could not be renewed"
+
+	case !renewed:
+		// The certificate is still the one the role should present.
+		return true, nil
 	}
 
-	if signedByCurrentCA {
-		renewed, err := certs.RenewLeafCertificate(caSecret, certSecret, nil)
-		if err == nil && !renewed {
-			return true, nil
-		}
-		if err != nil {
-			contextLogger.Warning("client cert renewal failed, re-issuing",
-				"secret", secretKey.Name, "err", err)
-			signedByCurrentCA = false
-			certInvalid = true
-		}
-	}
-
-	if !signedByCurrentCA {
-		if !certInvalid {
-			contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
-		}
+	// The reason recorded on the event below: a renewal, a re-issue after a CA
+	// rotation, or a replacement of an unreadable certificate.
+	reason := "it was approaching its expiration"
+	if reissueReason != "" {
+		reason = reissueReason
 		newSecret, err := generateCertificateFromCA(caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey)
 		if err != nil {
 			return false, fmt.Errorf("while re-signing client cert for role %q: %w", role.Spec.Name, err)
@@ -212,7 +213,23 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 	if err := r.Patch(ctx, certSecret, client.MergeFrom(origSecret)); err != nil {
 		return false, fmt.Errorf("while patching cert secret %q: %w", secretKey.Name, err)
 	}
+
+	// Recorded once the new certificate has reached its Secret: the previous one
+	// stops being the credential of the role at that point, and a client that
+	// mounted it has to read the Secret again.
+	r.Recorder.Eventf(role, "Normal", "ClientCertificateRenewed",
+		"Renewed the client certificate of role %q in Secret %q, since %s",
+		role.Spec.Name, secretKey.Name, reason)
 	return true, nil
+}
+
+// certificateMessage returns the explanation the operator recorded about the
+// client certificate of the role, if it recorded one.
+func certificateMessage(role *apiv1.DatabaseRole) string {
+	if role.Status.ClientCertificate == nil {
+		return ""
+	}
+	return role.Status.ClientCertificate.Message
 }
 
 // deleteOwnedCertSecret deletes the cert Secret if it exists and is owned by
@@ -222,26 +239,13 @@ func (r *DatabaseRoleReconciler) deleteOwnedCertSecret(
 	role *apiv1.DatabaseRole,
 	secretKey client.ObjectKey,
 ) error {
-	var secret corev1.Secret
-	if err := r.Get(ctx, secretKey, &secret); apierrs.IsNotFound(err) {
-		role.Status.ClientCertificate = nil
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("while getting cert secret %q: %w", secretKey.Name, err)
+	deleted, err := r.deleteOwnedSecret(ctx, role, secretKey)
+	if err != nil {
+		return err
 	}
-
-	if metav1.IsControlledBy(&secret, role) {
-		if err := r.Delete(ctx, &secret); err != nil && !apierrs.IsNotFound(err) {
-			return fmt.Errorf("while deleting cert secret %q: %w", secretKey.Name, err)
-		}
-	} else {
-		log.FromContext(ctx).Warning("cert secret exists but is not owned by this DatabaseRole, skipping deletion",
-			"secret", secretKey.Name)
+	if !deleted {
 		role.Status.ClientCertificate = &apiv1.ClientCertificateState{
-			Message: fmt.Sprintf(
-				"Secret %q is not owned by this DatabaseRole and will not be deleted automatically",
-				secretKey.Name,
-			),
+			Message: fmt.Sprintf(secretNotDeletableMessage, secretKey.Name),
 		}
 		return nil
 	}
