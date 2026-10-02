@@ -21,14 +21,17 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -38,7 +41,7 @@ import (
 
 // This e2e test is to test the wal-restore handling when maxParallel (specified as "3" in this testing) is specified in
 // wal section under backup for wal archive storing/recovering. To facilitate controlling the testing, we directly forge
-// wals on the object storage ("minio" in this testing) by copying and renaming an existing wal file.
+// wals on the object storage by copying and renaming an existing wal file.
 
 var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), func() {
 	const (
@@ -48,53 +51,54 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 	)
 
 	var namespace string
-	var primary, standby, latestWAL, walFile1, walFile2, walFile3, walFile4, walFile5, walFile6 string
+	var primary, standby, latestWAL string
+	var walFile1, walFile2, walFile3, walFile4, walFile5, walFile6, walFile7, walFile8 string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if !IsLocal() {
-			Skip("This test is only run on local cluster")
+		if !(IsKind() || IsK3D()) {
+			Skip("This test only runs on kind or k3d clusters")
 		}
 	})
 
-	It("Wal-restore in parallel using minio as object storage for backup", func() {
-		// This is a set of tests using a minio server deployed in the same
-		// namespace as the cluster. Since each cluster is installed in its
-		// own namespace, they can share the configuration file
+	It("Wal-restore in parallel using the object store for backup", func() {
+		// This is a set of tests using an object storage server deployed in
+		// the same namespace as the cluster. Since each cluster is installed
+		// in its own namespace, they can share the configuration file
 
 		const (
-			clusterWithMinioSampleFile = fixturesDir +
-				"/backup/minio/cluster-with-backup-minio-with-wal-max-parallel.yaml.template"
+			clusterWithObjectStoreSampleFile = fixturesDir +
+				"/backup/object_store/cluster-with-backup-object-store-with-wal-max-parallel.yaml.template"
 		)
 
-		const namespacePrefix = "pg-backup-minio-wal-max-parallel"
-		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithMinioSampleFile)
+		const namespacePrefix = "pg-backup-object-store-wal-max-parallel"
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithObjectStoreSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		By("creating the credentials for minio", func() {
+		By("creating the credentials for the object store", func() {
 			_, err = secrets.CreateObjectStorageSecret(
 				env.Ctx,
 				env.Client,
 				namespace,
 				"backup-storage-creds",
-				"minio",
-				"minio123",
+				objectstore.AccessKeyID,
+				objectstore.SecretAccessKey,
 			)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("create the certificates for MinIO", func() {
-			err := minioEnv.CreateCaSecret(env, namespace)
+		By("create the certificates for the object store", func() {
+			err := objectStoreEnv.CreateCaSecret(env, namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// Create the cluster and assert it be ready
-		AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithObjectStoreSampleFile)
 
 		// Get the primary
 		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -113,40 +117,45 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		}
 		Expect(err).ToNot(HaveOccurred())
 
-		// Make sure both Wal-archive and Minio work
-		// Create a WAL on the primary and check if it arrives at minio, within a short time
+		// Make sure both Wal-archive and the object store work
+		// Create a WAL on the primary and check if it arrives at the object store, within a short time
 		By("archiving WALs and verifying they exist", func() {
 			pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
-			latestWAL = switchWalAndGetLatestArchive(namespace, primary)
-			latestWALPath := minio.GetFilePath(clusterName, latestWAL+".gz")
+			latestWAL = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary)
+			latestWALPath := objectstore.GetFilePath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
-				return minio.CountFiles(minioEnv, latestWALPath)
+				return objectstore.CountFiles(objectStoreEnv, latestWALPath)
 			}, RetryTimeout).Should(BeEquivalentTo(1),
-				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
+				fmt.Sprintf("verify the existence of WAL %v in the object store", latestWALPath))
 		})
 
-		By("forging 5 wals on Minio by copying and renaming an existing archive file", func() {
+		By("forging 5 wals on the object store by copying and renaming an existing archive file", func() {
 			walFile1 = "0000000100000000000000F1"
 			walFile2 = "0000000100000000000000F2"
 			walFile3 = "0000000100000000000000F3"
 			walFile4 = "0000000100000000000000F4"
 			walFile5 = "0000000100000000000000F5"
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile1)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile2)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile3)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile4)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile5)).
 				ShouldNot(HaveOccurred())
 		})
@@ -285,7 +294,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Generate a new wal file; the archive also contains WAL #6.
 		By("forging a new wal file, the #6 wal", func() {
 			walFile6 = "0000000100000000000000F6"
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile6)).
 				ShouldNot(HaveOccurred())
 		})
@@ -370,6 +380,110 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"end-of-wal-stream flag is set for #7 and #8 wal is not present")
+		})
+
+		// Generate a new wal file; the archive also contains WAL #7.
+		By("forging a new wal file, the #7 wal", func() {
+			walFile7 = "0000000100000000000000F7"
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
+				walFile7)).
+				ShouldNot(HaveOccurred())
+		})
+
+		// listSpoolContents returns the exact content of the spool directory,
+		// one file name per line. The TestFileExist/TestDirectoryEmpty helpers
+		// cannot express "the spool contains no WAL files": kubectl exec runs
+		// the command with no shell, so glob patterns are never expanded.
+		listSpoolContents := func() (string, error) {
+			stdout, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"ls", "-A", SpoolDirectory)
+			return strings.TrimSpace(stdout), err
+		}
+
+		// Invoke the wal-restore command in rewind mode requesting the #7 file,
+		// with the end-of-wal-stream flag still set.
+		// Expected outcome:
+		//		exit code 0, #7 is in the output location, nothing is prefetched
+		//		into the spool directory, and the flag is neither consumed nor unset.
+		By("invoking the wal-restore command in rewind mode with a stale end-of-wal-stream flag", func() {
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", "--rewind", walFile7, PgWalPath+"/"+walFile7)
+			Expect(err).ToNot(HaveOccurred(),
+				"exit code should be 0: in rewind mode a stale flag must not abort the restore")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile7) }).
+				WithTimeout(RetryTimeout).
+				Should(BeTrue(),
+					"#7 wal is in the output location")
+			Eventually(listSpoolContents).
+				WithTimeout(RetryTimeout).
+				Should(Equal("end-of-wal-stream"),
+					"the spool directory contains the untouched end-of-wal-stream flag "+
+						"and no prefetched wals")
+		})
+
+		// Reset state for the next scenario: this plain (non-rewind) invocation
+		// clears the stale flag from the step above. It does not fetch
+		// walFile8 itself; #8 is forged onto the archive and restored below.
+		// Expected outcome:
+		//		exit code 1, the flag is consumed and unset.
+		By("consuming the end-of-wal-stream flag with a regular invocation", func() {
+			walFile8 = "0000000100000000000000F8"
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile8, PgWalPath+"/"+walFile8)
+			Expect(err).To(HaveOccurred(), "exit code should be 1 since the flag is set")
+			Eventually(listSpoolContents).
+				WithTimeout(RetryTimeout).
+				Should(BeEmpty(),
+					"end-of-wal-stream flag is consumed and unset")
+		})
+
+		// Generate a new wal file; the archive also contains WAL #8.
+		By("forging a new wal file, the #8 wal", func() {
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
+				walFile8)).
+				ShouldNot(HaveOccurred())
+		})
+
+		// Invoke the wal-restore command in rewind mode requesting the #8 file,
+		// while #9 and #10 are not in the archive.
+		// Expected outcome:
+		//		exit code 0, #8 is in the output location, no files in the spool directory.
+		//		The flag is not set, while a regular invocation would have set it.
+		By("invoking the wal-restore command in rewind mode does not set the flag", func() {
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", "--rewind", walFile8, PgWalPath+"/"+walFile8)
+			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile8) }).
+				WithTimeout(RetryTimeout).
+				Should(BeTrue(),
+					"#8 wal is in the output location")
+			Eventually(listSpoolContents).
+				WithTimeout(RetryTimeout).
+				Should(BeEmpty(),
+					"the spool directory is empty: no prefetched wals, and no "+
+						"end-of-wal-stream flag set by the rewind mode")
 		})
 	})
 })

@@ -51,6 +51,7 @@ var (
 		OperatorNamespace:                  operatorNamespaceName,
 		MutatingWebhookConfigurationName:   "mutating-webhook",
 		ValidatingWebhookConfigurationName: "validating-webhook",
+		ManageWebhookConfigurations:        true,
 	}
 
 	mutatingWebhookTemplate = admissionregistrationv1.MutatingWebhookConfiguration{
@@ -372,5 +373,57 @@ var _ = Describe("Webhook environment creation", func() {
 			&updatedValidatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
+	})
+
+	It("manages the serving certificate but leaves the webhook configurations untouched "+
+		"when CA injection is disabled", func(ctx SpecContext) {
+		pki := pkiEnvironmentTemplate
+		pki.ManageWebhookConfigurations = false
+		mutatingWebhook := mutatingWebhookTemplate
+		validatingWebhook := validatingWebhookTemplate
+
+		kubeClient := generateFakeClient()
+
+		err := createFakeOperatorDeployment(ctx, kubeClient)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = kubeClient.Create(ctx, &mutatingWebhook)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = kubeClient.Create(ctx, &validatingWebhook)
+		Expect(err).ToNot(HaveOccurred())
+
+		ca, err := pki.ensureRootCACertificate(ctx, kubeClient)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, err = pki.setupWebhooksCertificate(ctx, kubeClient, ca)
+		Expect(err).ToNot(HaveOccurred())
+
+		// The serving certificate is still created
+		webhookSecret := corev1.Secret{}
+		err = kubeClient.Get(
+			ctx,
+			client.ObjectKey{Namespace: pki.OperatorNamespace, Name: pki.SecretName},
+			&webhookSecret)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(webhookSecret.Data).To(HaveKey("tls.crt"))
+		Expect(webhookSecret.Data["tls.crt"]).ToNot(BeEmpty())
+
+		// but the webhook configurations keep their original (empty) caBundle
+		updatedMutatingWebhook := admissionregistrationv1.MutatingWebhookConfiguration{}
+		err = kubeClient.Get(
+			ctx,
+			client.ObjectKey{Name: pki.MutatingWebhookConfigurationName},
+			&updatedMutatingWebhook)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedMutatingWebhook.Webhooks[0].ClientConfig.CABundle).To(BeEmpty())
+
+		updatedValidatingWebhook := admissionregistrationv1.ValidatingWebhookConfiguration{}
+		err = kubeClient.Get(
+			ctx,
+			client.ObjectKey{Name: pki.ValidatingWebhookConfigurationName},
+			&updatedValidatingWebhook)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(BeEmpty())
 	})
 })

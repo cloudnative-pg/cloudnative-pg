@@ -168,6 +168,26 @@ spec:
         [...]
 ```
 
+:::note
+Recent changes to the [boto3 implementation](https://github.com/boto/boto3/issues/4392)
+of [Amazon S3 Data Integrity Protections](https://docs.aws.amazon.com/sdkref/latest/guide/feature-dataintegrity.html)
+may lead to the `x-amz-content-sha256` error. If you encounter this issue, you
+can apply the following workaround by setting specific environment variables at
+the cluster level through `spec.env`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  env:
+    - name: AWS_REQUEST_CHECKSUM_CALCULATION
+      value: when_required
+    - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+      value: when_required
+```
+:::
+
 ### Using Object Storage with a private CA
 
 Suppose you configure an Object Storage provider which uses a certificate

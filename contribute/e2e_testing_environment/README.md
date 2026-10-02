@@ -49,7 +49,7 @@ hack/setup-cluster.sh deploy
 To cleanup everything:
 
 ``` shell
-hack/setup-cluster.sh destroy
+hack/setup-cluster.sh teardown
 ```
 
 All flags have corresponding environment variables labeled `(Env:...` in the table below.
@@ -59,6 +59,27 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 | -e    / --engine <CLUSTER_ENGINE>   | Use the specified Kubernetes engine (e.g., `-e k3d`). (Env: `CLUSTER_ENGINE`)                                   |
 | -k    / --k8s-version <K8S_VERSION> | Use the specified Kubernetes full version number (e.g., `-k v1.30.0`). (Env: `K8S_VERSION`)                                   |
 | -n    / --nodes \<NODES>            | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
+| -o    / --operator \<OPERATOR>      | Select the operator to deploy: `local` (default), a version, or a branch. See below. (Env: `OPERATOR`) |
+| -d    / --deployment-method \<METHOD> | How to deploy the operator: `manifest` (default) or `helm`. (Env: `CNPG_DEPLOYMENT_METHOD`) |
+
+The `-o`/`--operator` flag accepts:
+
+- `local` (default): build and deploy from the local worktree.
+- A version such as `1.28.1`: deploy the matching published release.
+- A branch such as `main` or `release-1.28`: deploy the latest snapshot for
+  that branch from the
+  [`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts)
+  repository.
+
+The `-d`/`--deployment-method` flag accepts:
+
+- `manifest` (default): deploy using a kustomize-generated manifest.
+- `helm`: deploy using the official Helm chart from the [`cloudnative-pg/charts`](https://github.com/cloudnative-pg/charts) repository.
+
+> **NOTE:** the `helm` deployment method currently only supports `-o local` deploys.
+> When deploying via helm with `-o local`, CRDs are always applied from the local
+> source tree (config/helm) so they always match the locally built operator binary.
+> The chart's built-in CRD management is disabled via `--set crds.create=false`.
 
 > **NOTE:** on ARM64 architecture like Apple M1/M2/M3, `kind` provides different
 > images for AMD64 and ARM64 nodes. If the **x86/amd64 emulation** is not enabled,
@@ -131,7 +152,7 @@ See [operator config](../../docs/src/operator_conf.md#profiling-tools)
 and [instance-pprof](../../docs/src/troubleshooting.md#visualizing-and-analyzing-profiling-data)
 for details.
 
-If issues arise, verify that teh Pyroscope annotations are on the pods
+If issues arise, verify that the Pyroscope annotations are on the pods
 and the `--pprof-server` flag is present in the pod command arguments.
 
 ## E2E tests suite
@@ -142,46 +163,186 @@ you have a Kubernetes cluster and `kubectl` is configured to point to it
 (this should be the default when you are running tests locally as per the
 instructions in the above section).
 
+The test suite itself is driven exclusively by a YAML configuration file
+(`tests/e2e/config.yaml` by default): the suite reads no environment
+variables. The `hack/e2e` scripts generate that file before invoking the
+suite, using the variables below as their inputs. See
+[the e2e configuration file](#the-e2e-configuration-file) for the file format
+and for how to run the suite directly (e.g. through `ginkgo` or an IDE) with
+a hand-written file.
+
 The script can be configured through the following environment variables:
 
-* `CONTROLLER_IMG`: the controller image to deploy on K8s
-* `POSTGRES_IMG`: the PostgreSQL image used by default in the clusters
-* `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
+- `CONTROLLER_IMG`: the controller image to deploy on K8s
+- `POSTGRES_IMG`: the PostgreSQL image used by default in the clusters, i.e.
+  the image actually under test
+- `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
   latest minor
-* `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
-* `E2E_CSI_STORAGE_CLASS`: csi storage class to be used together with volume snapshots, depending on the provider,
-  must be set if `E2E_DEFAULT_STORAGE_CLASS` is not a csi storage class
-* `E2E_DEFAULT_VOLUMESNAPSHOT_CLASS`: default volume snapshot class, depending on the provider,
-  need to match with `E2E_CSI_STORAGE_CLASS`
-* `AZURE_STORAGE_ACCOUNT`: Azure storage account to test backup and restore, using Barman Cloud on Azure
-  blob storage
-* `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using Barman Cloud on Azure
-  blob storage
-* `TEST_DEPTH`: maximum test level included in the run.
+- `POSTGRES_IMG_REPOSITORY`: repository used to build the PostgreSQL images
+  the suite needs but is not testing — currently only the major upgrade
+  tests' starting-version images (see `env.OfficialStandardImageName` and
+  siblings in
+  [`tests/utils/environment/environment.go`](../../tests/utils/environment/environment.go)).
+  Defaults to the operator's official repository. Downstream consumers that
+  run these tests against a PostgreSQL distribution other than the default
+  (where that distribution's own images live in a different repository than
+  `POSTGRES_IMG`) are expected to set this alongside `POSTGRES_IMG`
+- `POSTGIS_IMG_REPOSITORY`: same as `POSTGRES_IMG_REPOSITORY`, for the PostGIS
+  images
+- `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
+- `E2E_CSI_STORAGE_CLASS`: csi storage class to be used together with volume
+  snapshots, depending on the provider, must be set if
+  `E2E_DEFAULT_STORAGE_CLASS` is not a csi storage class
+- `E2E_DEFAULT_VOLUMESNAPSHOT_CLASS`: default volume snapshot class, depending
+  on the provider, need to match with `E2E_CSI_STORAGE_CLASS`
+- `AZURE_STORAGE_ACCOUNT`: Azure storage account to test backup and restore,
+  using Barman Cloud on Azure blob storage
+- `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using
+  Barman Cloud on Azure blob storage
+- `AZURE_BLOB_CONTAINER`: Azure blob container to test backup and restore,
+  using Barman Cloud on Azure blob storage
+- `TEST_CLOUD_VENDOR`: the cloud vendor the cluster runs on (`kind`, `k3d`,
+  `aks`, `eks`, `gke`, `ocp`); selects vendor-specific behaviour in the suite
+  (e.g. specs that don't apply to a given vendor). Defaults to `kind`
+- `TEST_DEPTH`: maximum test level included in the run.
    From `0` (only critical tests) to `4` (all the tests), default `2`
-* `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex: smoke, basic, security... details
-  can be fetched from labels file [`tests/labels.go`](../../tests/labels.go)
+- `TEST_TIMEOUTS`: a JSON object partially overriding the default timeout, in
+  seconds, of the named suite events (e.g. `{"failover": 240}`)
+- `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex:
+  smoke, basic, security... details can be fetched from labels file
+  [`tests/labels.go`](../../tests/labels.go)
+- `BRANCH_NAME`: the git branch the suite is running from, used to detect
+  release branches (e.g. to pick the correct "previous release" for the
+  operator upgrade tests). When unset, it is detected via git
+- `CNPG_DEPLOYMENT_METHOD`: the deployment method to choose between `manifest`
+  and `helm`; default `manifest`, helm to be used only for kind and k3d
+  clusters; other environments will ignore it and use manifest.
+- `CNPG_CHART_VERSION`: when `CNPG_DEPLOYMENT_METHOD=helm`, pin the chart to
+  this version (passed as `--version`). Unset by default, in which case the
+  latest published chart is installed.
+- `BARMAN_PLUGIN_VERSION`: the `plugin-barman-cloud` build to install for the
+  plugin-based backup tests: `release` (default) for the latest
+  published release, `main` for the current snapshot, a pinned version such
+  as `v0.12.0`, `pr-<number>` to install the testing images its CI publishes
+  for a pull request, or the name of a `plugin-barman-cloud` branch to install
+  the testing images its CI publishes for that branch.
+- `BARMAN_PLUGIN_VERSION_RESOLVED`: the `plugin-barman-cloud` version that was
+  actually installed once `BARMAN_PLUGIN_VERSION` has been resolved to a
+  concrete tag (e.g. `release`/`main`/`pr-<number>` resolve to a version
+  number). Purely informational, shown in the suite banner; normally set by
+  the `hack/e2e` scripts themselves rather than by the caller
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:
 
-* `DOCKER_SERVER`: the registry containing the image
-* `DOCKER_USERNAME`: the registry username
-* `DOCKER_PASSWORD`: the registry password
+- `DOCKER_SERVER`: the registry containing the image
+- `DOCKER_USERNAME`: the registry username
+- `DOCKER_PASSWORD`: the registry password
 
 Additionally, you can specify a DockerHub mirror to be used by
 specifying the following variable
 
-* `DOCKER_REGISTRY_MIRROR`: DockerHub mirror URL (i.e. https://mirror.gcr.io)
+- `DOCKER_REGISTRY_MIRROR`: DockerHub mirror URL (i.e. https://mirror.gcr.io)
+
+The following variables let the major upgrade tests target images from a
+registry other than the official one, keeping the same tags but overriding
+the suffix of each image flavor. They are consumed by
+[`tests/e2e/cluster_major_upgrade_test.go`](../../tests/e2e/cluster_major_upgrade_test.go)
+and are meant to be set by an external, downstream workflow driving these
+tests against custom-built images (e.g. PostgreSQL trunk snapshots), not by
+anything in this repository's own CI:
+
+- `POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY`: registry the major upgrade target
+  images are pulled from. When unset, the official images are used and the
+  rest of this group is ignored
+- `POSTGRES_MAJOR_UPGRADE_STANDARD_SUFFIX`: tag suffix of the standard image
+  flavor. Default `-standard-trixie`
+- `POSTGRES_MAJOR_UPGRADE_MINIMAL_SUFFIX`: tag suffix of the minimal image
+  flavor. Default `-minimal-trixie`
+- `POSTGRES_MAJOR_UPGRADE_SYSTEM_SUFFIX`: tag suffix of the system image
+  flavor (includes barman-cloud tools). Default `-system-trixie`
+- `POSTGRES_MAJOR_UPGRADE_POSTGIS_SUFFIX`: tag suffix of the PostGIS image
+  flavor. Default `-postgis-trixie`
+- `POSTGRES_MAJOR_UPGRADE_SKIP_ARCHIVE_SCENARIO`: when set to any non-empty
+  value, skips the "system" (barman-cloud-archive) scenario in the major
+  upgrade suite
 
 To run E2E testing you can also use `TEST_UPGRADE_TO_V1=false make e2e-test-kind`.
 Replace `-kind` with `-k3d` to run it on `k3d`.
 
+> [!IMPORTANT]
+> Upgrade tests are currently disabled with Helm deployment.
+
+### The e2e configuration file
+
+The suite is configured by a single YAML file, loaded from
+`tests/e2e/config.yaml` (relative to the suite working directory) or from the
+path passed through the `--e2e-config` flag of the test binary. When the
+default file does not exist, the suite runs with defaults: the operator
+default PostgreSQL image, `kind` as cloud vendor, medium test depth, and
+storage classes autodetected from the cluster.
+
+The `hack/e2e` scripts generate this file automatically from their
+environment (the variables documented above), right before each `ginkgo`
+invocation, through
+[`hack/e2e/generate-e2e-config.sh`](../../hack/e2e/generate-e2e-config.sh).
+The generated file may contain credentials: it is git-ignored, written with
+mode 0600, and must not be moved into directories uploaded as CI artifacts.
+
+For a direct run (plain `ginkgo`, `go test`, or an IDE) you can hand-write
+the file. All fields are optional:
+
+``` yaml
+postgres:
+  image: ghcr.io/cloudnative-pg/postgresql:18.1-standard-trixie
+  preRollingUpdateImage: ghcr.io/cloudnative-pg/postgresql:18
+  imageRepository: ghcr.io/cloudnative-pg/postgresql
+  postgisImageRepository: ghcr.io/cloudnative-pg/postgis
+storage:
+  storageClass: standard        # empty: autodetected from the cluster
+  csiStorageClass: csi-hostpath-sc
+  volumeSnapshotClass: csi-hostpath-snapclass
+cloudVendor: kind               # kind|k3d|aks|eks|gke|ocp
+depth: 2                        # 0 (only critical tests) to 4 (all tests)
+labelFilter: "backup-restore || basic"
+skipUpgradeSuite: true
+timeouts:                       # partial override of the default timeouts
+  failover: 240
+deployment:
+  method: manifest
+  barmanPluginVersion: release
+  barmanPluginVersionResolved: v0.7.0   # informational; the version actually installed
+registryPullSecret:             # pull secret for a private registry
+  server: registry.example.com
+  username: user
+  password: secret
+azure:                          # Azure Blob Storage backup tests only
+  storageAccount: account
+  storageKey: key
+  blobContainer: container
+preserveNamespaces:
+  - my-namespace
+branchName: main                # used to detect release branches
+majorUpgrade:                   # postgres-trunk-containers variants only
+  imageRegistry: registry.example.com/trunk
+  standardSuffix: -standard-trixie
+  minimalSuffix: -minimal-trixie
+  systemSuffix: -system-trixie
+  postgisSuffix: -postgis-trixie
+  skipArchiveScenario: false
+```
+
+Unknown fields are rejected, so typos fail the run immediately instead of
+being silently ignored. When `labelFilter` is set it overrides any
+`--label-filter` passed on the `ginkgo` command line; when it is empty the
+command-line filter applies as usual.
+
 ### Using feature type test selection/filter
 
-All the current test cases are labeled with features. Which can be selected
-by exporting value `FEATURE_TYPE` and running any script. By default, if test level is not
-exported, it will select all medium test cases from the feature type provided.
+All the current test cases are labeled with features. Which can be selected by
+exporting value `FEATURE_TYPE` and running any script. By default, if test
+level is not exported, it will select all medium test cases from the feature
+type provided.
 
 | Currently Available Feature Types |
 |-----------------------------------|
@@ -198,6 +359,7 @@ exported, it will select all medium test cases from the feature type provided.
 | `observability`                   |
 | `replication`                     |
 | `plugin`                          |
+| `plugin-barman-cloud`             |
 | `postgres-configuration`          |
 | `pod-scheduling`                  |
 | `cluster-metadata`                |
@@ -209,6 +371,7 @@ exported, it will select all medium test cases from the feature type provided.
 | `tablespaces`                     |
 | `publication-subscription`        |
 | `declarative-databases`           |
+| `declarative-database-roles`      |
 | `postgres-major-upgrade`          |
 | `image-volume-extensions`         |
 
@@ -233,7 +396,9 @@ live cluster during `BeforeSuite` by looking at the
 `storage.kubernetes.io/default-snapshot-class` annotations on
 StorageClass objects. You can override detection by setting the
 `E2E_DEFAULT_STORAGE_CLASS`, `E2E_CSI_STORAGE_CLASS`, and
-`E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` environment variables explicitly.
+`E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` environment variables (which the scripts
+write into the `storage` section of the configuration file), or by filling
+that section directly in a hand-written file.
 
 #### On kind
 
@@ -275,7 +440,11 @@ You can test the operator on an existing Kubernetes cluster with:
 run-e2e-suite.sh
 ```
 
-The Go test framework auto-detects storage class configuration from the live cluster (see above). You can override any value by setting `E2E_DEFAULT_STORAGE_CLASS`, `E2E_CSI_STORAGE_CLASS`, or `E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` in the environment before running the script.
+The Go test framework auto-detects storage class configuration from the live
+cluster (see above). You can override any value by setting
+`E2E_DEFAULT_STORAGE_CLASS`, `E2E_CSI_STORAGE_CLASS`, or
+`E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` in the environment before running the
+script, which writes them into the configuration file it generates.
 
 We have also provided a shortcut to this script in the main `Makefile`:
 
@@ -288,13 +457,22 @@ make e2e-test-existing-cluster
 In addition to the environment variables for the script,
 the following ones can be defined:
 
-* `PRESERVE_CLUSTER`: true to prevent the script from destroying the Kubernetes cluster.
+- `CNPG_DEPLOYMENT_METHOD`: deployment method for the operator. Default
+  value is `manifest`. Available values are:
+  - `manifest`: deploy using kustomize manifests
+  - `helm`: deploy using the official Helm chart
+
+  **Note:** The `helm` method is only supported on Kind and k3d local
+  clusters. Other environments will ignore this and always use `manifest`.
+- `CNPG_CHART_VERSION`: when `CNPG_DEPLOYMENT_METHOD=helm`, pin the chart to
+  this version. Unset by default (latest published chart).
+- `PRESERVE_CLUSTER`: true to prevent the script from destroying the Kubernetes cluster.
   Default: `false`
-* `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
+- `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`
-* `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
+- `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
   false to get the image from a registry. Default: `false`
-* `LOG_DIR`: the directory where the container logs are exported. Default:
+- `LOG_DIR`: the directory where the container logs are exported. Default:
   `_logs/` directory in the project root
 
 By default, the script uses the `setup-cluster.sh` script to initialize the cluster using
@@ -302,14 +480,16 @@ the `kind` engine.
 
 ### Running E2E tests on a fork of the repository
 
-**For maintainers and organization members:** If you fork the repository and want to run the tests on your fork, you can do so
-by running the `/test` command in a Pull Request opened in your forked repository.
-`/test` is used to trigger a run of the end-to-end tests in the GitHub Actions.
+**For maintainers and organization members:** If you fork the repository and
+want to run the tests on your fork, you can do so by running the `/test`
+command in a Pull Request opened in your forked repository.  `/test` is used to
+trigger a run of the end-to-end tests in the GitHub Actions.
 Only users who have `write` permission to the repository can use this command.
 
 **For external contributors:** You can run local e2e tests using:
+
 - `FEATURE_TYPE=smoke,basic make e2e-test-kind` for smoke and basic tests
-- `TEST_DEPTH=0 make e2e-test-kind` for critical tests only  
+- `TEST_DEPTH=0 make e2e-test-kind` for critical tests only
 - `TEST_DEPTH=1 make e2e-test-kind` for critical and high priority tests
 
 > NOTE:
@@ -332,22 +512,30 @@ Options supported are:
   - 4: lowest (default)
 
 - depth (`d` for short)
-  Depth determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed.
-  Default value is `main`. Available values are:
+  Depth determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E
+  tests will be executed. Default value is `main`. Available values are:
   - push:
     * oldest K8S_VERSION x oldest POSTGRES_VERSION
     * latest K8S_VERSION x latest POSTGRES_VERSION
-    * no cloud providers
+    * no non-kind engines
   - main:
     * each K8S_VERSION x oldest POSTGRES_VERSION
     * each K8S_VERSION x latest POSTGRES_VERSION
     * latest K8S_VERSION x each POSTGRES_VERSION
-    * On cloud providers: latest K8S_VERSION x latest POSTGRES_VERSION
+    * On non-kind engines: latest K8S_VERSION x latest POSTGRES_VERSION
   - pull_request:
     * same as `main`
   - schedule:
     * same as `main`
-    * On cloud providers: each K8S_VERSION x latest POSTGRES_VERSION
+    * On non-kind engines: each K8S_VERSION x latest POSTGRES_VERSION
+
+- limit (`l` for short)
+  Restrict the test run to specific engines. Default value is `kind`.
+  Available engines: `kind`, `k3d`, `eks`, `aks`, `gke`, `openshift`.
+  Multiple engines can be specified as a comma-separated list.
+  Note that `eks`, `aks`, `gke`, and `openshift` require additional
+  secrets that are not available in the main repository and will be
+  silently skipped when those secrets are not configured.
 
 - feature_type (`type` or `ft` for short)
   A label to select a subset of E2E tests to be run, divided by functionality.
@@ -363,6 +551,28 @@ Options supported are:
   - debug (default)
   - trace
 
+- cnpg_deployment_method (`deployment-method` or `dm` for short)
+  Deployment method for the CNPG operator. Default
+  value is `manifest`. Available values are:
+  - manifest: deploy using kustomize manifests
+  - helm: deploy using the official Helm chart
+
+  **Note:** The `helm` method is only supported on
+  Kind and k3d clusters. Other environments will
+  ignore this and always use `manifest`.
+
+- barman_plugin (`barman_plugin_version` or `bp` for short)
+  The `plugin-barman-cloud` build to install for the plugin-based backup tests.
+  Only applied on Kind and k3d clusters. Default value is `release`. Available
+  values are:
+  - release: the latest published plugin release (default)
+  - main: the current snapshot from the main branch
+  - a pinned version such as `v0.12.0`
+  - `pr-<number>`, to install the testing images its CI publishes for a
+    pull request
+  - the name of a `plugin-barman-cloud` branch, to install the testing images
+    its CI publishes for that branch
+
 Example:
 1. Trigger an e2e test to run all test cases with `lowest` test level.
    We want to cover most Kubernetes x Postgres combinations.
@@ -373,6 +583,10 @@ Example:
    ```
       /test type=smoke,upgrade
    ```
+3. Run tests using Helm deployment
+    ```
+      /test deployment-method=helm
+    ```
 
 ## Storage class for volume snapshots
 

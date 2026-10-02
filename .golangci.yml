@@ -1,4 +1,9 @@
 version: "2"
+run:
+  # Resolve `path:` regexes in exclusion rules relative to the git root so a
+  # single config works whether golangci-lint is invoked from the repo root
+  # (linting the operator module) or from tests/ (linting the e2e module).
+  relative-path-mode: gitroot
 linters:
   default: none
   enable:
@@ -16,7 +21,7 @@ linters:
     - gocyclo
     - goheader
     - gomoddirectives
-    - gomodguard
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - govet
@@ -27,6 +32,7 @@ linters:
     - misspell
     - nakedret
     - nestif
+    - nolintlint
     - prealloc
     - predeclared
     - revive
@@ -42,6 +48,27 @@ linters:
     - wastedassign
     - whitespace
   settings:
+    goconst:
+      min-occurrences: 10
+      # RBAC verb strings are stable Kubernetes API values not defined as constants
+      # in k8s.io/api/rbac/v1 — extracting them adds noise without reducing risk.
+      ignore-string-values:
+        - "^get$"
+        - "^list$"
+        - "^watch$"
+        - "^create$"
+        - "^patch$"
+        - "^update$"
+        - "^delete$"
+    gomoddirectives:
+      # The tests/ module uses a local replace to point at the parent module
+      # one directory up because it depends on unreleased operator code
+      # (api/v1, pkg/..., a few internal/... constants, and the in-process
+      # webhook validator). The operator module itself has no local replace,
+      # so this allow-list is a no-op there.
+      replace-local: true
+      replace-allow-list:
+        - github.com/cloudnative-pg/cloudnative-pg
     gosec:
       excludes:
         - G101
@@ -86,6 +113,11 @@ linters:
           alias: metav1
         - pkg: k8s.io/client-go/kubernetes/typed/core/v1
           alias: corev1client
+    nolintlint:
+      # We are temporarily allowing unused nolints due to apparently
+      # false failures in CI. See
+      # https://github.com/golangci/golangci-lint/issues/3228
+      allow-unused: true
   exclusions:
     generated: lax
     rules:
@@ -95,7 +127,7 @@ linters:
         source: ginkgo|gomega
       - linters:
           - goconst
-        path: _test\.go
+        path: (_test\.go|^tests/)
       - linters:
           - lll
         source: //\s*\+
@@ -107,10 +139,30 @@ linters:
           - revive
         path: /(utils|common)/[^/]+.go
         text: avoid meaningless package names
-      # TODO: fix by renaming or removing pkg/utils/context and pkg/utils/hash packages
+      # TODO: fix by renaming packages that conflict with Go standard library names
       - linters:
           - revive
         path: pkg/utils/(context|hash)/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: internal/(cmd|cnpi)/plugin/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: internal/cmd/manager/debug/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: tests/utils/exec/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: pkg/management/(postgres/metrics|url)/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: pkg/postgres/plugin/
         text: avoid package names that conflict with Go standard library package names
     paths:
       - zz_generated.*

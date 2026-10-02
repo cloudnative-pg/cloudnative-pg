@@ -1,0 +1,34 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-pvc-hot-snapshot-plugin
+spec:
+  instances: 1
+  primaryUpdateStrategy: unsupervised
+  imageName: "${POSTGRES_IMG}"
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  backup:
+    # Online (hot) volume-snapshot base backups. WAL archiving is delegated to
+    # plugin-barman-cloud below (no in-core barmanObjectStore).
+    volumeSnapshot:
+      className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}
+      online: true
+      onlineConfiguration:
+        immediateCheckpoint: true
+        waitForArchive: true
+
+  # Use plugin-barman-cloud as the WAL archiver. The referenced ObjectStore is
+  # created by the test.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: cluster-pvc-hot-snapshot-plugin

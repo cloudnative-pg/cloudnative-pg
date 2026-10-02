@@ -72,18 +72,6 @@ func HasLogger(logEntries []map[string]interface{}, logger string) bool {
 	return false
 }
 
-// AssertQueryRecord verifies if any of the message record field of each JSON row
-// contains the expectedResult string, then applies the assertions related to the log format
-func AssertQueryRecord(logEntries []map[string]interface{}, errorTestQuery string, message string, logger string) bool {
-	for _, logEntry := range logEntries {
-		if IsWellFormedLogForLogger(logEntry, logger) &&
-			CheckRecordForQuery(logEntry, errorTestQuery, "postgres", "app", message) {
-			return true
-		}
-	}
-	return false
-}
-
 // IsWellFormedLogForLogger verifies if the message record field of the given map
 // contains the expectedResult string. If the message field matches the expectedResult,
 // then the related record is returned. Otherwise return nil.

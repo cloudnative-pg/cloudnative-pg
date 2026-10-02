@@ -71,6 +71,12 @@ The `Database` object must reference a specific `Cluster`, determining where
 the database will be created. It is managed by the cluster's primary instance,
 ensuring the database is created or updated as needed.
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To target a
+    different `Cluster`, create a new `Database` resource instead of updating
+    an existing one.
+:::
+
 :::info
     The distinction between `metadata.name` and `spec.name` allows multiple
     `Database` resources to reference databases with the same name across different
@@ -149,6 +155,11 @@ spec:
 
 Deleting this `Database` object will automatically remove the `two` database
 from the `cluster-example` cluster.
+
+On a replica cluster the database is read-only, so deleting a `Database` object
+releases its finalizer and removes the Kubernetes object without dropping the
+PostgreSQL database, even with `databaseReclaimPolicy: delete`. Dropping the
+database is left to the primary cluster, which owns it.
 
 ### Declaratively Setting `ensure: absent`
 

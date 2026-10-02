@@ -23,12 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 	"sort"
 
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -189,15 +187,6 @@ func (fb *FencingMetadataExecutor) Execute(ctx context.Context, key types.Namesp
 
 	if err := fb.cli.Get(ctx, key, obj); err != nil {
 		return err
-	}
-
-	for _, name := range fb.instanceNames {
-		if name != FenceAllInstances {
-			var pod corev1.Pod
-			if err := fb.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: name}, &pod); err != nil {
-				return fmt.Errorf("node %s not found in namespace %s: %w", name, key.Namespace, err)
-			}
-		}
 	}
 
 	var appliedChange bool

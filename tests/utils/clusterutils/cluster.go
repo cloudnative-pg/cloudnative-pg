@@ -25,6 +25,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -180,7 +181,7 @@ func GetPrimary(
 			}
 		}
 		err = fmt.Errorf("all pod with primary role has deletion timestamp")
-		return &(podList.Items[0]), err
+		return &podList.Items[0], err
 	}
 	err = fmt.Errorf("no primary found")
 	return &corev1.Pod{}, err
@@ -225,6 +226,26 @@ func GetFirstReplica(
 	return &podList.Items[0], nil
 }
 
+// AddTopologySpreadConstraint appends a soft topology spread constraint
+// that distributes all CNPG-managed pods (instances and jobs) across
+// nodes. Call this on E2E clusters to prevent co-location of concurrent
+// test workloads.
+func AddTopologySpreadConstraint(cluster *apiv1.Cluster) {
+	cluster.Spec.TopologySpreadConstraints = append(
+		cluster.Spec.TopologySpreadConstraints,
+		corev1.TopologySpreadConstraint{
+			MaxSkew:           1,
+			TopologyKey:       "kubernetes.io/hostname",
+			WhenUnsatisfiable: corev1.ScheduleAnyway,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+				},
+			},
+		},
+	)
+}
+
 // ScaleSize scales a cluster to the requested size
 func ScaleSize(
 	ctx context.Context,
@@ -238,7 +259,7 @@ func ScaleSize(
 	}
 	originalCluster := cluster.DeepCopy()
 	cluster.Spec.Instances = newClusterSize
-	err = crudClient.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+	err = objects.Patch(ctx, crudClient, cluster, client.MergeFrom(originalCluster))
 	if err != nil {
 		return err
 	}

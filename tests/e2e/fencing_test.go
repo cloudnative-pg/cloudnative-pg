@@ -32,6 +32,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
@@ -170,7 +172,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 				Expect(beforeFencingPodName).Should(BeEquivalentTo(currentPrimaryPodInfo.GetName()))
 			})
 			By("all followers should be streaming again from the primary instance", func() {
-				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+				replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 			})
 			checkFencingAnnotationSet(fencingMethod, nil)
 		})
@@ -178,7 +180,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	assertFencingFollowerWorks := func(fencingMethod fencing.Method) {
 		It("can fence a follower instance", func() {
 			var beforeFencingPodName string
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 			By("fence a follower instance", func() {
 				podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(len(podList.Items)).To(BeEquivalentTo(3))
@@ -254,7 +256,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 				Expect(primaryPodName).Should(BeEquivalentTo(podName.GetName()))
 			})
 			By("cluster functionality are back", func() {
-				AssertClusterIsReady(namespace, clusterName, 30, env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, 30)
 			})
 			checkFencingAnnotationSet(fencingMethod, nil)
 		})
@@ -269,7 +271,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 		})
 
 		assertFencingPrimaryWorks(fencing.UsingPlugin)
@@ -286,7 +288,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 		})
 
 		assertFencingPrimaryWorks(fencing.UsingAnnotation)

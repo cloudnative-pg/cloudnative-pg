@@ -50,17 +50,39 @@ for PostGIS via the
 [`postgres-extensions-containers`](https://github.com/cloudnative-pg/postgres-extensions-containers/tree/main/postgis)
 repository.
 
-<!--
-### For CloudNativePG 1.29+
+### Via an image catalog (for CloudNativePG 1.29+)
 
 Starting from CloudNativePG 1.29 you can take advantage of
 [image catalogs with image volume extensions](image_catalog.md)
 to automate the management of these versions.
 
-### For other supported CNPG versions
--->
+Refer to the [image volume extensions page](imagevolume_extensions.md#via-an-image-catalog-recommended)
+for instructions on how to add an extension to a PostgreSQL cluster, making
+sure you use the `postgis` key:
 
-The following illustrative example shows how to add PostGIS 3.6.1 to a
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-postgis
+spec:
+  # ... <snip>
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+
+  postgresql:
+    extensions:
+      # ... <snip>
+      - name: postgis
+      # ... <snip>
+```
+
+### Directly in the `Cluster` resource
+
+The following illustrative example shows how to add PostGIS 3.6.2 to a
 PostgreSQL 18 cluster, by loading the extension directly in the `Cluster`
 resource:
 
@@ -70,7 +92,7 @@ kind: Cluster
 metadata:
   name: cluster-postgis
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-minimal-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie
   instances: 1
 
   storage:
@@ -80,7 +102,7 @@ spec:
     extensions:
     - name: postgis
       image:
-        reference: ghcr.io/cloudnative-pg/postgis-extension:3.6.1-18-trixie
+        reference: ghcr.io/cloudnative-pg/postgis-extension:3.6.2-18-trixie
       ld_library_path:
       - system
 ```
@@ -112,7 +134,7 @@ metadata:
   name: cluster-postgis
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgis:18.1-3.6.1-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgis:18.6-3.6.2-system-trixie
   storage:
     size: 1Gi
 ```
@@ -142,7 +164,7 @@ spec:
     name: cluster-postgis
   extensions:
   - name: postgis
-    version: '3.6.1'
+    version: '3.6.2'
   - name: postgis_raster
   - name: postgis_sfcgal
   - name: fuzzystrmatch
@@ -176,16 +198,16 @@ ones in this document):
 ```console
            name           | default_version | installed_version |                          comment
 --------------------------+-----------------+-------------------+------------------------------------------------------------
- postgis                  | 3.6.1           | 3.6.1             | PostGIS geometry and geography spatial types and functions
- postgis-3                | 3.6.1           |                   | PostGIS geometry and geography spatial types and functions
- postgis_raster           | 3.6.1           | 3.6.1             | PostGIS raster types and functions
- postgis_raster-3         | 3.6.1           |                   | PostGIS raster types and functions
- postgis_sfcgal           | 3.6.1           | 3.6.1             | PostGIS SFCGAL functions
- postgis_sfcgal-3         | 3.6.1           |                   | PostGIS SFCGAL functions
- postgis_tiger_geocoder   | 3.6.1           | 3.6.1             | PostGIS tiger geocoder and reverse geocoder
- postgis_tiger_geocoder-3 | 3.6.1           |                   | PostGIS tiger geocoder and reverse geocoder
- postgis_topology         | 3.6.1           | 3.6.1             | PostGIS topology spatial types and functions
- postgis_topology-3       | 3.6.1           |                   | PostGIS topology spatial types and functions
+ postgis                  | 3.6.2           | 3.6.2             | PostGIS geometry and geography spatial types and functions
+ postgis-3                | 3.6.2           |                   | PostGIS geometry and geography spatial types and functions
+ postgis_raster           | 3.6.2           | 3.6.2             | PostGIS raster types and functions
+ postgis_raster-3         | 3.6.2           |                   | PostGIS raster types and functions
+ postgis_sfcgal           | 3.6.2           | 3.6.2             | PostGIS SFCGAL functions
+ postgis_sfcgal-3         | 3.6.2           |                   | PostGIS SFCGAL functions
+ postgis_tiger_geocoder   | 3.6.2           | 3.6.2             | PostGIS tiger geocoder and reverse geocoder
+ postgis_tiger_geocoder-3 | 3.6.2           |                   | PostGIS tiger geocoder and reverse geocoder
+ postgis_topology         | 3.6.2           | 3.6.2             | PostGIS topology spatial types and functions
+ postgis_topology-3       | 3.6.2           |                   | PostGIS topology spatial types and functions
 (10 rows)
 ```
 
@@ -202,15 +224,15 @@ The command returns something like this:
                                         List of installed extensions
              Name             | Version | Default version |   Schema   |                  Description
 ------------------------------+---------+-----------------+------------+------------------------------------------------
- address_standardizer         | 3.6.1   | 3.6.1           | public     | Used to parse an address into constituent ...
- address_standardizer_data_us | 3.6.1   | 3.6.1           | public     | Address Standardizer US dataset example
+ address_standardizer         | 3.6.2   | 3.6.2           | public     | Used to parse an address into constituent ...
+ address_standardizer_data_us | 3.6.2   | 3.6.2           | public     | Address Standardizer US dataset example
  fuzzystrmatch                | 1.2     | 1.2             | public     | determine similarities and distance between...
  plpgsql                      | 1.0     | 1.0             | pg_catalog | PL/pgSQL procedural language
- postgis                      | 3.6.1   | 3.6.1           | public     | PostGIS geometry and geography spatial type...
- postgis_raster               | 3.6.1   | 3.6.1           | public     | PostGIS raster types and functions
- postgis_sfcgal               | 3.6.1   | 3.6.1           | public     | PostGIS SFCGAL functions
- postgis_tiger_geocoder       | 3.6.1   | 3.6.1           | tiger      | PostGIS tiger geocoder and reverse geocoder
- postgis_topology             | 3.6.1   | 3.6.1           | topology   | PostGIS topology spatial types and functions
+ postgis                      | 3.6.2   | 3.6.2           | public     | PostGIS geometry and geography spatial type...
+ postgis_raster               | 3.6.2   | 3.6.2           | public     | PostGIS raster types and functions
+ postgis_sfcgal               | 3.6.2   | 3.6.2           | public     | PostGIS SFCGAL functions
+ postgis_tiger_geocoder       | 3.6.2   | 3.6.2           | tiger      | PostGIS tiger geocoder and reverse geocoder
+ postgis_topology             | 3.6.2   | 3.6.2           | topology   | PostGIS topology spatial types and functions
 (9 rows)
 ```
 
@@ -225,7 +247,7 @@ Returning:
 ```console
                                                     postgis_full_version
 ------------------------------------------------------------------------------------------------------------------------
- POSTGIS="3.6.1 f533623" [EXTENSION] PGSQL="180" GEOS="3.13.1-CAPI-1.19.2"
+ POSTGIS="3.6.2 08d9b9f" [EXTENSION] PGSQL="180" GEOS="3.13.1-CAPI-1.19.2"
  SFCGAL="SFCGAL 2.0.0, CGAL 6.0, BOOST 1.83.0"
  PROJ="9.6.0 NETWORK_ENABLED=OFF URL_ENDPOINT= USER_WRITABLE_DIRECTORY=/tmp/proj"
  (compiled against PROJ 9.6.0)

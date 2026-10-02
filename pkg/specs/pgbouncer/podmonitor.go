@@ -21,20 +21,24 @@ package pgbouncer
 
 import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PoolerPodMonitorManager builds the PodMonitor for the pooler resource
 type PoolerPodMonitorManager struct {
-	pooler *apiv1.Pooler
+	pooler  *apiv1.Pooler
+	cluster *apiv1.Cluster
 }
 
 // NewPoolerPodMonitorManager returns a new instance of PoolerPodMonitorManager
-func NewPoolerPodMonitorManager(pooler *apiv1.Pooler) *PoolerPodMonitorManager {
-	return &PoolerPodMonitorManager{pooler: pooler}
+func NewPoolerPodMonitorManager(pooler *apiv1.Pooler, cluster *apiv1.Cluster) *PoolerPodMonitorManager {
+	return &PoolerPodMonitorManager{pooler: pooler, cluster: cluster}
 }
 
 // IsPodMonitorEnabled returns a boolean indicating if the PodMonitor should exists or not
@@ -63,6 +67,31 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	metricsPort := "metrics"
 	endpoint := monitoringv1.PodMetricsEndpoint{
 		Port: &metricsPort,
+	}
+
+	if c.pooler.IsMetricsTLSEnabled() {
+		endpoint.Scheme = ptr.To(monitoringv1.SchemeHTTPS)
+		endpoint.TLSConfig = &monitoringv1.SafeTLSConfig{
+			CA: monitoringv1.SecretOrConfigMap{
+				Secret: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.pooler.GetClientCASecretNameOrDefault(c.cluster),
+					},
+					Key: certs.CACertKey,
+				},
+			},
+			ServerName: ptr.To(c.pooler.Name),
+			// Prometheus scrapes pods by IP, so the cert's SANs will not
+			// generally match the scrape target. The operator-generated
+			// PodMonitor is therefore hardcoded to InsecureSkipVerify=true.
+			// CA and ServerName are still set so the scrape config is
+			// internally coherent, but the value cannot be flipped off here:
+			// the operator overwrites Spec on every reconcile, so any manual
+			// patch on the generated PodMonitor would not survive. Users who
+			// need strict verification must set enablePodMonitor=false and
+			// manage their own PodMonitor.
+			InsecureSkipVerify: ptr.To(true),
+		}
 	}
 
 	//nolint:staticcheck // Using deprecated fields during deprecation period

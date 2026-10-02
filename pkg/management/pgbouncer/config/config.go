@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,11 +41,11 @@ const (
 
 	// ClientTLSCertPath is the path where the client TLS certificate
 	// is stored
-	clientTLSCertPath = ConfigsDir + "/client-tls/tls.crt"
+	ClientTLSCertPath = ConfigsDir + "/client-tls/tls.crt"
 
 	// ClientTLSKeyPath is the path where the client TLS private key
 	// is stored
-	clientTLSKeyPath = ConfigsDir + "/client-tls/tls.key"
+	ClientTLSKeyPath = ConfigsDir + "/client-tls/tls.key"
 
 	// ServerTLSCertPath is the path where the server TLS certificate
 	// is stored
@@ -136,8 +135,8 @@ var (
 		"admin_users":          PgBouncerAdminUser,
 		"auth_hba_file":        ConfigsDir + "/pg_hba.conf",
 		"server_tls_ca_file":   serverTLSCAPath,
-		"client_tls_cert_file": clientTLSCertPath,
-		"client_tls_key_file":  clientTLSKeyPath,
+		"client_tls_cert_file": ClientTLSCertPath,
+		"client_tls_key_file":  ClientTLSKeyPath,
 		"client_tls_ca_file":   clientTLSCAPath,
 	}
 )
@@ -169,7 +168,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		switch authQuerySecretType {
 		case corev1.SecretTypeBasicAuth:
 			authQueryUser = string(authQuerySecret.Data["username"])
-			authQueryPassword = strings.ReplaceAll(string(authQuerySecret.Data["password"]), "\"", "\"\"")
+			authQueryPassword = escapePgBouncerUserListValue(string(authQuerySecret.Data["password"]))
 
 		case corev1.SecretTypeTLS:
 			keyPair, err := certs.ParseServerSecret(authQuerySecret)
@@ -193,6 +192,16 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	}
 
 	parameters := buildPgBouncerParameters(pooler.Spec.PgBouncer.Parameters)
+
+	// auth_user has its own slot in the pgbouncer.ini template, so an override
+	// is applied to that value and the key is removed from the generic
+	// parameters block to avoid emitting the setting twice. An empty value is
+	// ignored so it cannot blank the user derived from the auth query secret.
+	if explicitAuthUser := parameters["auth_user"]; explicitAuthUser != "" {
+		authQueryUser = explicitAuthUser
+	}
+	delete(parameters, "auth_user")
+	authQueryUser = escapePgBouncerUserListValue(authQueryUser)
 
 	if isCertAuth {
 		parameters["server_tls_cert_file"] = authUserCrtPath
@@ -252,8 +261,8 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	// The required crypto-material
 	files[serverTLSCAPath] = secrets.ServerCA.Data[certs.CACertKey]
 	files[clientTLSCAPath] = secrets.ClientCA.Data[certs.CACertKey]
-	files[clientTLSCertPath] = secrets.ClientTLS.Data[certs.TLSCertKey]
-	files[clientTLSKeyPath] = secrets.ClientTLS.Data[certs.TLSPrivateKeyKey]
+	files[ClientTLSCertPath] = secrets.ClientTLS.Data[certs.TLSCertKey]
+	files[ClientTLSKeyPath] = secrets.ClientTLS.Data[certs.TLSPrivateKeyKey]
 
 	if secrets.ServerTLS != nil {
 		files[serverTLSCertPath] = secrets.ServerTLS.Data[certs.TLSCertKey]

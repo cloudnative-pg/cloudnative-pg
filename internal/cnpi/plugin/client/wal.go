@@ -35,14 +35,16 @@ func (data *data) ArchiveWAL(
 	ctx context.Context,
 	cluster client.Object,
 	sourceFileName string,
+	checkEmptyWalArchive bool,
 ) error {
-	return wrapAsPluginErrorIfNeeded(data.innerArchiveWAL(ctx, cluster, sourceFileName))
+	return wrapAsPluginErrorIfNeeded(data.innerArchiveWAL(ctx, cluster, sourceFileName, checkEmptyWalArchive))
 }
 
 func (data *data) innerArchiveWAL(
 	ctx context.Context,
 	cluster client.Object,
 	sourceFileName string,
+	checkEmptyWalArchive bool,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -64,8 +66,9 @@ func (data *data) innerArchiveWAL(
 
 		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
 		request := wal.WALArchiveRequest{
-			ClusterDefinition: serializedCluster,
-			SourceFileName:    sourceFileName,
+			ClusterDefinition:    serializedCluster,
+			SourceFileName:       sourceFileName,
+			CheckEmptyWalArchive: &checkEmptyWalArchive,
 		}
 
 		pluginLogger.Trace(
@@ -87,8 +90,9 @@ func (data *data) RestoreWAL(
 	cluster client.Object,
 	sourceWALName string,
 	destinationFileName string,
+	mode wal.WALRestoreRequest_Mode,
 ) (bool, error) {
-	b, err := data.innerRestoreWAL(ctx, cluster, sourceWALName, destinationFileName)
+	b, err := data.innerRestoreWAL(ctx, cluster, sourceWALName, destinationFileName, mode)
 	return b, wrapAsPluginErrorIfNeeded(err)
 }
 
@@ -97,6 +101,7 @@ func (data *data) innerRestoreWAL(
 	cluster client.Object,
 	sourceWALName string,
 	destinationFileName string,
+	mode wal.WALRestoreRequest_Mode,
 ) (bool, error) {
 	var errorCollector error
 
@@ -123,6 +128,7 @@ func (data *data) innerRestoreWAL(
 			ClusterDefinition:   serializedCluster,
 			SourceWalName:       sourceWALName,
 			DestinationFileName: destinationFileName,
+			Mode:                mode,
 		}
 
 		pluginLogger.Trace(
@@ -130,6 +136,7 @@ func (data *data) innerRestoreWAL(
 			"clusterDefinition", request.ClusterDefinition,
 			"sourceWALName", sourceWALName,
 			"destinationFileName", destinationFileName,
+			"mode", mode,
 		)
 		if _, err := plugin.WALClient().Restore(ctx, &request); err != nil {
 			pluginLogger.Trace("WAL restore via plugin failed, trying next one", "err", err)

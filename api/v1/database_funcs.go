@@ -48,6 +48,11 @@ func (db *Database) GetStatusMessage() string {
 	return db.Status.Message
 }
 
+// GetStatusApplied returns the applied status of the database
+func (db *Database) GetStatusApplied() *bool {
+	return db.Status.Applied
+}
+
 // GetClusterRef returns the cluster reference of the database
 func (db *Database) GetClusterRef() corev1.LocalObjectReference {
 	return db.Spec.ClusterRef
@@ -87,4 +92,18 @@ func (dbObject DatabaseObjectSpec) GetEnsure() EnsureOption {
 // GetName gets the name of the resource
 func (dbObject DatabaseObjectSpec) GetName() string {
 	return dbObject.Name
+}
+
+// SetAdmissionError sets the admission error status on the Database resource
+func (db *Database) SetAdmissionError(msg string) {
+	db.Status.Message = msg
+	db.Status.Applied = ptr.To(len(msg) == 0)
+}
+
+// GetAdmissionError always returns an empty string: the Database reports the
+// admission error through Status.Message and Status.Applied, which its own
+// reconciler rewrites on every loop, so the guard must not persist the clear
+// itself and overwrite that state.
+func (db *Database) GetAdmissionError() string {
+	return ""
 }

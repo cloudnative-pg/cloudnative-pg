@@ -28,6 +28,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 const (
@@ -108,15 +110,7 @@ func ExecCommand(
 		"container", containerName,
 	)
 
-	targetContainer := -1
-	for i, cr := range pod.Spec.Containers {
-		if cr.Name == containerName {
-			targetContainer = i
-			break
-		}
-	}
-
-	if targetContainer < 0 {
+	if !PodSpecHasContainer(&pod.Spec, containerName) {
 		return "", "", ErrorContainerNotFound
 	}
 
@@ -146,7 +140,7 @@ func ExecCommand(
 		func() error {
 			stdout, stderr, execErr = execCommandOnce(
 				execCtx, client, config, pod,
-				targetContainer, timeout, command...,
+				containerName, timeout, command...,
 			)
 
 			// Don't retry if context was cancelled or timed out
@@ -172,13 +166,43 @@ func ExecCommand(
 	return stdout, stderr, execErr
 }
 
+// shouldFallbackToSPDY reports whether a failed WebSocket streaming attempt
+// should be retried over SPDY. This mirrors kubectl's own fallback predicate:
+// a WebSocket upgrade failure (e.g. an API server or container runtime that
+// does not support the V5 WebSocket subprotocol, as on some OpenShift
+// versions) is wrapped as an httpstream.UpgradeFailureError, and an HTTPS
+// proxy dial failure is detected separately. Both indicate the connection was
+// never established over WebSocket and is safe to retry over SPDY.
+func shouldFallbackToSPDY(err error) bool {
+	return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+}
+
+// PodSpecContainerNames returns the names of every container (init, then
+// regular) defined in spec.
+func PodSpecContainerNames(spec *corev1.PodSpec) []string {
+	names := make([]string, 0, len(spec.InitContainers)+len(spec.Containers))
+	for _, cr := range spec.InitContainers {
+		names = append(names, cr.Name)
+	}
+	for _, cr := range spec.Containers {
+		names = append(names, cr.Name)
+	}
+	return names
+}
+
+// PodSpecHasContainer reports whether spec defines a container (regular or
+// init) with the given name.
+func PodSpecHasContainer(spec *corev1.PodSpec, containerName string) bool {
+	return slices.Contains(PodSpecContainerNames(spec), containerName)
+}
+
 // execCommandOnce performs a single kubectl exec operation without retries
 func execCommandOnce(
 	ctx context.Context,
 	client kubernetes.Interface,
 	config *rest.Config,
 	pod corev1.Pod,
-	targetContainer int,
+	containerName string,
 	timeout *time.Duration,
 	command ...string,
 ) (string, string, error) {
@@ -187,7 +211,7 @@ func execCommandOnce(
 		Name(pod.Name).
 		Namespace(pod.Namespace).
 		SubResource("exec").
-		Param("container", pod.Spec.Containers[targetContainer].Name)
+		Param("container", containerName)
 
 	newConfig := *config // local copy avoids modifying the passed config arg
 	if timeout != nil {
@@ -196,13 +220,21 @@ func execCommandOnce(
 	}
 
 	req.VersionedParams(&corev1.PodExecOptions{
-		Container: pod.Spec.Containers[targetContainer].Name,
+		Container: containerName,
 		Command:   command,
 		Stdout:    true,
 		Stderr:    true,
 	}, scheme.ParameterCodec)
 
-	executor, err := remotecommand.NewSPDYExecutor(&newConfig, "POST", req.URL())
+	wsExecutor, err := remotecommand.NewWebSocketExecutor(&newConfig, "POST", req.URL().String())
+	if err != nil {
+		return "", "", err
+	}
+	spdyExecutor, err := remotecommand.NewSPDYExecutor(&newConfig, "POST", req.URL())
+	if err != nil {
+		return "", "", err
+	}
+	executor, err := remotecommand.NewFallbackExecutor(wsExecutor, spdyExecutor, shouldFallbackToSPDY)
 	if err != nil {
 		return "", "", err
 	}
