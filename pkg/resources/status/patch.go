@@ -56,6 +56,7 @@ func PatchWithOptimisticLock(
 		}
 
 		updatedCluster := currentCluster.DeepCopy()
+		updatedCluster.Generation = cluster.Generation
 		for _, tx := range txs {
 			tx(updatedCluster)
 		}
