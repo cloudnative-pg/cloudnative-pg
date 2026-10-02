@@ -65,11 +65,12 @@ func statusSubCommand(ctx context.Context) error {
 		return err
 	}
 
-	ctx, err = certs.NewTLSConfigForContext(
-		ctx,
-		cli,
-		cluster.GetServerCASecretObjectKey(),
-	)
+	// No client certificate: this command runs inside the Pod and only reads
+	// the local instance status; it has no access to the operator's private key.
+	ctx, err = certs.NewTLSConfigForContext(ctx, certs.TLSConfigOptions{
+		Client:   cli,
+		CASecret: cluster.GetServerCASecretObjectKey(),
+	})
 	if err != nil {
 		contextLogger.Error(err, "Error while building the TLS context")
 		return err
@@ -135,5 +136,5 @@ func executeRequest(ctx context.Context, scheme string) (*http.Response, error) 
 		return nil, err
 	}
 	httpClient := common.NewHTTPClient(connectionTimeout, requestTimeout)
-	return httpClient.Do(req) // nolint:gosec
+	return httpClient.Do(req) //nolint:gosec
 }

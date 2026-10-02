@@ -24,7 +24,6 @@ import (
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,7 +47,7 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 			},
 			Status: &volumesnapshotv1.VolumeSnapshotStatus{
 				Error: &volumesnapshotv1.VolumeSnapshotError{
-					Time:    ptr.To(metav1.Now()),
+					Time:    new(metav1.Now()),
 					Message: nil,
 				},
 			},
@@ -64,10 +63,9 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		Expect(err.InternalError).To(BeEquivalentTo(*volumeSnapshot.Status.Error))
 		Expect(err.Name).To(BeEquivalentTo("snapshot"))
 		Expect(err.Namespace).To(BeEquivalentTo("default"))
-		Expect(err.isRetryable()).To(BeFalse())
 	})
 
-	It("should detect retryable errors", func() {
+	It("should capture the message on a snapshot error", func() {
 		volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "snapshot",
@@ -75,8 +73,8 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 			},
 			Status: &volumesnapshotv1.VolumeSnapshotStatus{
 				Error: &volumesnapshotv1.VolumeSnapshotError{
-					Time: ptr.To(metav1.Now()),
-					Message: ptr.To(
+					Time: new(metav1.Now()),
+					Message: new(
 						"the object has been modified; please apply your changes to the latest version and try again"),
 				},
 			},
@@ -84,7 +82,6 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		info := parseVolumeSnapshotInfo(volumeSnapshot)
 
 		Expect(info.error).To(HaveOccurred())
-		Expect(info.error.isRetryable()).To(BeTrue())
 		Expect(info.ready).To(BeFalse())
 		Expect(info.provisioned).To(BeFalse())
 
@@ -112,9 +109,9 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		It("should detect that a VolumeSnapshot is not provisioned", func() {
 			volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
-					ReadyToUse:                     ptr.To(false),
+					ReadyToUse:                     new(false),
 					Error:                          nil,
-					BoundVolumeSnapshotContentName: ptr.To(""),
+					BoundVolumeSnapshotContentName: new(""),
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
@@ -125,9 +122,9 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		It("should detect that a VolumeSnapshot is not provisioned", func() {
 			volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
-					ReadyToUse:                     ptr.To(false),
+					ReadyToUse:                     new(false),
 					Error:                          nil,
-					BoundVolumeSnapshotContentName: ptr.To("content-name"),
+					BoundVolumeSnapshotContentName: new("content-name"),
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
@@ -138,10 +135,10 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		It("should detect that a VolumeSnapshot is provisioned", func() {
 			volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
-					ReadyToUse:                     ptr.To(false),
+					ReadyToUse:                     new(false),
 					Error:                          nil,
-					BoundVolumeSnapshotContentName: ptr.To("content-name"),
-					CreationTime:                   ptr.To(metav1.Now()),
+					BoundVolumeSnapshotContentName: new("content-name"),
+					CreationTime:                   new(metav1.Now()),
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
@@ -156,8 +153,8 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
 					ReadyToUse:                     nil,
 					Error:                          nil,
-					BoundVolumeSnapshotContentName: ptr.To("content-name"),
-					CreationTime:                   ptr.To(metav1.Now()),
+					BoundVolumeSnapshotContentName: new("content-name"),
+					CreationTime:                   new(metav1.Now()),
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
@@ -170,10 +167,10 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		It("should detect that a VolumeSnapshot is not ready to use", func() {
 			volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
-					ReadyToUse:                     ptr.To(false),
+					ReadyToUse:                     new(false),
 					Error:                          nil,
-					BoundVolumeSnapshotContentName: ptr.To("content-name"),
-					CreationTime:                   ptr.To(metav1.Now()),
+					BoundVolumeSnapshotContentName: new("content-name"),
+					CreationTime:                   new(metav1.Now()),
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
@@ -184,10 +181,10 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		It("should detect that a VolumeSnapshot is ready to use", func() {
 			volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
-					ReadyToUse:                     ptr.To(true),
+					ReadyToUse:                     new(true),
 					Error:                          nil,
-					BoundVolumeSnapshotContentName: ptr.To("content-name"),
-					CreationTime:                   ptr.To(metav1.Now()),
+					BoundVolumeSnapshotContentName: new("content-name"),
+					CreationTime:                   new(metav1.Now()),
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)

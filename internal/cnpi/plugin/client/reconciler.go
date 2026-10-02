@@ -54,7 +54,7 @@ func newReconcilerRequeueResult(identifier string, after int64) ReconcilerHookRe
 	return ReconcilerHookResult{
 		Err:                nil,
 		StopReconciliation: true,
-		Result:             ctrl.Result{Requeue: true, RequeueAfter: time.Second * time.Duration(after)},
+		Result:             ctrl.Result{RequeueAfter: time.Second * time.Duration(after)},
 		Identifier:         identifier,
 	}
 }
@@ -174,7 +174,7 @@ func reconcilerHook(
 			return newReconcilerRequeueResult(plugin.Name(), result.GetRequeueAfter())
 
 		case reconciler.ReconcilerHooksResult_BEHAVIOR_CONTINUE:
-			return newContinueResult(plugin.Name())
+			// Continue to next plugin
 		}
 	}
 

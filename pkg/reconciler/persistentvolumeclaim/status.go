@@ -22,12 +22,12 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -59,10 +59,13 @@ const (
 	// List of available instances detected from PVCs
 	instanceNames status = "instanceNames"
 
-	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
+	// List of PVCs that are being initialized: either they have a corresponding
+	// Job but not a corresponding Pod yet, or they have a corresponding Pod
+	// whose bootstrap init container has not completed yet
 	initializing status = "initializing"
 
-	// List of PVCs with resizing condition. Requires a pod restart.
+	// List of PVCs with resizing condition that have a corresponding pod.
+	// Podless resizing PVCs are classified as dangling instead (see #9786).
 	//
 	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
 	resizing status = "resizing"
@@ -253,7 +256,7 @@ func classifyPVC(
 		return ignored
 	}
 
-	expectedPVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
+	expectedPVCs := GetExpectedInstancePVCNamesFromCluster(cluster, instanceName)
 	pvcNames := getNamesFromPVCList(pvcList)
 
 	// PVC is part of an incomplete group
@@ -261,14 +264,36 @@ func classifyPVC(
 		return unusable
 	}
 
-	// PVC is resizing
-	if isResizing(pvc) {
-		return resizing
-	}
-
 	// PVC has a corresponding Pod
 	if hasPod(pvc, podList) {
+		// The Pod may carry a bootstrap init container that has not finished
+		// populating this PVC yet (e.g. initdb/join/restore): until it
+		// completes, the PVC is not actually usable, even though a Pod
+		// already references it.
+		if !podBootstrapComplete(pvc, podList) {
+			return initializing
+		}
+		if isResizing(pvc) {
+			return resizing
+		}
 		return healthy
+	}
+
+	// A resizing PVC without a pod must be classified as dangling so the
+	// reconciler recreates the pod. Two reasons:
+	//
+	//   1. Filesystem resize requires a mounted pod — kubelet performs it on mount.
+	//
+	//   2. Without a pod, the "resizing" classification is a dead end: a
+	//      simultaneous storage + resource change would leave the PVC orphaned
+	//      because the rolling-update-deleted pod is never recreated (see #9786).
+	//
+	// For online-expandable volumes reason 1 does not apply, but reason 2 still
+	// does; classifying as dangling is always safe here.
+	if isResizing(pvc) {
+		log.FromContext(ctx).Info("PVC resizing without a pod, classifying as dangling",
+			"pvc", pvc.Name)
+		return dangling
 	}
 
 	// PVC has a corresponding Job but not a corresponding Pod
@@ -300,6 +325,27 @@ func hasPod(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// podBootstrapComplete checks whether the PVC's Pod, if it carries a
+// bootstrap init container (specs.BootstrapWorkContainerName), has already
+// completed it successfully. A PVC whose Pod has no such init container is
+// treated as already bootstrapped: this is the normal case when reattaching
+// a Pod to a PVC that was already ready (no bootstrap needed), or for
+// PVC roles (e.g. WAL, tablespaces) that never require one of their own.
+func podBootstrapComplete(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
+	for _, pod := range podList {
+		if !podUsesPVC(pod, pvc) {
+			continue
+		}
+		for _, containerStatus := range pod.Status.InitContainerStatuses {
+			if containerStatus.Name != specs.BootstrapWorkContainerName {
+				continue
+			}
+			return containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 0
+		}
+	}
+	return true
 }
 
 // jobUsesPVC checks if the given Job uses the given PVC

@@ -104,10 +104,12 @@ func (f *fakeOperatorClient) Deregister(
 }
 
 type fakeConnection struct {
-	lifecycleClient       lifecycle.OperatorLifecycleClient
-	lifecycleCapabilities []*lifecycle.OperatorLifecycleCapabilities
-	name                  string
-	operatorClient        *fakeOperatorClient
+	lifecycleClient        lifecycle.OperatorLifecycleClient
+	lifecycleCapabilities  []*lifecycle.OperatorLifecycleCapabilities
+	name                   string
+	operatorClient         *fakeOperatorClient
+	reconcilerHooksClient  reconciler.ReconcilerHooksClient
+	reconcilerCapabilities []reconciler.ReconcilerHooksCapability_Kind
 }
 
 func (f *fakeConnection) MetricsClient() metrics.MetricsClient {
@@ -173,7 +175,7 @@ func (f *fakeConnection) BackupClient() backup.BackupClient {
 }
 
 func (f *fakeConnection) ReconcilerHooksClient() reconciler.ReconcilerHooksClient {
-	panic("not implemented") // TODO: Implement
+	return f.reconcilerHooksClient
 }
 
 func (f *fakeConnection) PluginCapabilities() []identity.PluginCapability_Service_Type {
@@ -205,7 +207,7 @@ func (f *fakeConnection) BackupCapabilities() []backup.BackupCapability_RPC_Type
 }
 
 func (f *fakeConnection) ReconcilerCapabilities() []reconciler.ReconcilerHooksCapability_Kind {
-	panic("not implemented")
+	return f.reconcilerCapabilities
 }
 
 func (f *fakeConnection) Ping(_ context.Context) error {

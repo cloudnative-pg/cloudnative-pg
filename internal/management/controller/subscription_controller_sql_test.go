@@ -17,7 +17,6 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// nolint: dupl
 package controller
 
 import (
@@ -33,7 +32,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// nolint: dupl
 var _ = Describe("subscription sql", func() {
 	const defaultPostgresMajorVersion = 17
 

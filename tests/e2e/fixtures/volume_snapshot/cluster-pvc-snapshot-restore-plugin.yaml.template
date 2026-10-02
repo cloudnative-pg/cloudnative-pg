@@ -1,0 +1,41 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-pvc-snapshot-plugin-recovery
+spec:
+  instances: 2
+  primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      source: cluster-pvc-snapshot-plugin
+      volumeSnapshots:
+        storage:
+          name: ${SNAPSHOT_PLUGIN_PITR_PGDATA}
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+        walStorage:
+          name: ${SNAPSHOT_PLUGIN_PITR_PGWAL}
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+      recoveryTarget:
+        targetTime: ${SNAPSHOT_PLUGIN_PITR}
+
+  # Fetch the WALs needed to reach the recovery target through
+  # plugin-barman-cloud, from the same ObjectStore the source archived to
+  # (serverName matches the source cluster name).
+  externalClusters:
+    - name: cluster-pvc-snapshot-plugin
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cluster-pvc-snapshot-plugin
+          serverName: cluster-pvc-snapshot-plugin

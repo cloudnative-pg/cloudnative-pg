@@ -24,6 +24,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -77,13 +78,14 @@ var _ = Describe("Operator High Availability", Serial,
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create Cluster
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			By("verifying current leader", func() {
 				// Check for the current Operator Pod leader from ConfigMap
 				Expect(operator.GetLeaderInfoFromLease(
 					env.Ctx, env.Interface,
-					operatorNamespace)).To(HavePrefix(operatorPodName.GetName()))
+					operatorNamespace,
+				)).To(HavePrefix(operatorPodName.GetName()))
 			})
 
 			By("scale up operator replicas to 3", func() {
@@ -122,7 +124,7 @@ var _ = Describe("Operator High Availability", Serial,
 				Eventually(func() []string {
 					podList, err := podutils.List(env.Ctx, env.Client, operatorNamespace)
 					Expect(err).ToNot(HaveOccurred())
-					var podNames []string
+					podNames := make([]string, 0, len(podList.Items))
 					for _, podItem := range podList.Items {
 						podNames = append(podNames, podItem.GetName())
 					}
@@ -153,7 +155,7 @@ var _ = Describe("Operator High Availability", Serial,
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect a new primary to be elected and promoted
-				AssertNewPrimary(namespace, clusterName, oldPrimary)
+				clusterasserts.AssertNewPrimary(env, namespace, clusterName, oldPrimary)
 			})
 
 			By("scale down operator replicas to 1", func() {

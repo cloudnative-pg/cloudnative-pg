@@ -10,16 +10,14 @@
   prConcurrentLimit: 5,
   baseBranchPatterns: [
     'main',
-    'release-1.25',
-    'release-1.27',
-    'release-1.28',
   ],
   ignorePaths: [
-    'docs/**',
+    // Keep the example manifests pinned, but allow custom managers below to
+    // update specific tool images referenced elsewhere in the docs.
+    'docs/src/samples/**',
     'releases/**',
     'contribute/**',
     'licenses/**',
-    'pkg/versions/**',
   ],
   postUpdateOptions: [
     'gomodTidy',
@@ -27,7 +25,6 @@
   semanticCommits: 'enabled',
   labels: [
     'automated',
-    'do not backport',
     'no-issue',
   ],
   'pip-compile': {
@@ -47,10 +44,11 @@
       managerFilePatterns: [
         '/^Makefile$/',
         '/^hack/setup-cluster.sh$/',
-        '/^hack/e2e/run-e2e-kind.sh$/',
+        '/^hack/testing-tools/k8s-engines/[^/]+/settings\\.sh$/',
+        '/^hack/testing-tools/common/[^/]+\\.sh$/'
       ],
       matchStrings: [
-        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*["\']?(?<currentValue>[^@"\'\\s]+?)(?:@(?<currentDigest>sha256:[a-f0-9]+))?["\']?\\s',
       ],
     },
     {
@@ -60,6 +58,7 @@
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))? currentValue=(?<currentValue>[^\\s]+?)\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentDigest>.+?)["\']?\\s',
       ],
     },
     {
@@ -91,7 +90,6 @@
         '/^pkg\\/versions\\/versions\\.go$/',
       ],
       matchStrings: [
-        'DefaultImageName = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
         'DefaultPgbouncerImage = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
       ],
       datasourceTemplate: 'docker',
@@ -100,20 +98,32 @@
     {
       customType: 'regex',
       managerFilePatterns: [
-        '/^tests\\/utils\\/minio\\/minio\\.go$/',
+        '/^tests\\/utils\\/objectstore\\/objectstore\\.go$/',
       ],
       matchStrings: [
-        'minioImage = "(?<depName>.+?):(?<currentValue>.*?)"',
-        'minioClientImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'rustfsImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'awsCliImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'busyboxImage = "(?<depName>.+?):(?<currentValue>.*?)"',
       ],
       datasourceTemplate: 'docker',
-      versioningTemplate: 'regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T\\d{2}-\\d{2}-\\d{2}Z$',
+      versioningTemplate: 'semver',
+    },
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^docs\\/src\\/monitoring\\.md$/',
+      ],
+      matchStrings: [
+        'image: (?<depName>curlimages/curl):(?<currentValue>\\S+)',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'docker',
     },
     {
       customType: 'regex',
       managerFilePatterns:  [
         '/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/',
-        '/^hack/e2e/run-e2e-local.sh$/',
+        '/^hack/e2e/run-e2e-suite.sh$/',
         '/^hack/e2e/run-e2e\\.sh$/',
       ],
       matchStrings: [
@@ -178,7 +188,6 @@
         'major',
       ],
       matchPackageNames: [
-        '*',
         '!k8s.io{/,}**',
         '!sigs.k8s.io{/,}**',
         '!github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
@@ -195,7 +204,6 @@
       ],
       groupName: 'all non-major go dependencies',
       matchPackageNames: [
-        '*',
         '!k8s.io{/,}**',
         '!sigs.k8s.io{/,}**',
         '!github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
@@ -209,10 +217,11 @@
       matchUpdateTypes: [
         'digest',
         'pinDigest',
+        'major',
         'minor',
         'patch',
       ],
-      groupName: 'all non-major github action',
+      groupName: 'all github action',
       pinDigests: true,
     },
     {
@@ -230,8 +239,34 @@
       pinDigests: false,
       matchPackageNames: [
         'vmware-tanzu{/,}**',
-        'minio{/,}**',
       ],
+    },
+    {
+      // All container images consumed by the e2e object-store helper live in
+      // this single file; keep their bumps in one PR.
+      matchFileNames: [
+        'tests/utils/objectstore/objectstore.go',
+      ],
+      groupName: 'objectstore test images',
+      separateMajorMinor: false,
+      pinDigests: false,
+    },
+    {
+      // RustFS's default image is Alpine/musl, slower than glibc
+      // (rustfs/rustfs#1662). A bare `-glibc` suffix isn't a safe pin:
+      // semver compares prerelease identifiers lexically, and "rc" >
+      // "glibc", so a stale 1.0.0-rc.6-glibc still outranks the final
+      // 1.0.0-glibc. Restrict to final MAJOR.MINOR.PATCH-glibc tags so
+      // RC/beta builds never enter the comparison, and a missing glibc
+      // tag just stalls the update instead of falling back to musl or an
+      // old RC.
+      matchFileNames: [
+        'tests/utils/objectstore/objectstore.go',
+      ],
+      matchPackageNames: [
+        'docker.io/rustfs/rustfs',
+      ],
+      allowedVersions: '/^\\d+\\.\\d+\\.\\d+-glibc$/',
     },
     {
       groupName: 'operator framework',
@@ -249,7 +284,6 @@
         'github.com/cloudnative-pg{/,}**',
       ],
       separateMajorMinor: false,
-      pinDigests: false,
     },
     {
       groupName: 'container distroless digests',
@@ -263,11 +297,47 @@
       groupName: 'Containers no-digests',
       matchPackageNames: [
         'kindest{/,}**',
-        'getwoke{/,}**',
-        'jonasbn/github-action-spellcheck'
+        'registry',
       ],
       pinDigests: false,
       separateMajorMinor: false,
+    },
+    {
+      // The curl image is only used in a documentation example, so keep it as a
+      // readable tag without a pinned digest.
+      matchPackageNames: [
+        'curlimages/curl',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
+      // DefaultPgbouncerImage is a tag-only string; the regex has no
+      // currentDigest group.
+      matchPackageNames: [
+        'ghcr.io/cloudnative-pg/pgbouncer',
+      ],
+      pinDigests: false,
+    },
+    {
+      groupName: 'SLSA actions no-digest',
+      matchDatasources: [
+        'github-tags',
+      ],
+      matchPackageNames: [
+        'slsa-framework{/,}**',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
+      groupName: 'workflow requirements',
+      matchFileNames: [
+        '.github/workflow-requirements.txt',
+      ],
+      schedule: [
+        'before 6am on monday',
+      ],
     }
   ],
 }

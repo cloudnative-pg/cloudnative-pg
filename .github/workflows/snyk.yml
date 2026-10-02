@@ -11,14 +11,30 @@ on:
 permissions: read-all
 
 jobs:
+  # Expose whether a Snyk token is configured so the security job can gate
+  # on it. The secrets context is not available in a job-level 'if', so it
+  # is checked here and surfaced as a job output.
+  check-secret:
+    name: Check for Snyk token
+    runs-on: ubuntu-26.04
+    outputs:
+      has_token: ${{ steps.check.outputs.has_token }}
+    steps:
+      - id: check
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: echo "has_token=${{ env.SNYK_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
   security:
+    needs: check-secret
+    if: ${{ needs.check-secret.outputs.has_token == 'true' }}
     name: Security scan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Static Code Analysis
         uses: snyk/actions/golang@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
@@ -30,7 +46,7 @@ jobs:
           args: --sarif-file-output=snyk-static.sarif
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7 # v4
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
         with:
           sarif_file: snyk-static.sarif
 
@@ -39,10 +55,13 @@ jobs:
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          # snyk/snyk:golang bundles a fixed Go toolchain that can lag behind
+          # go.mod's toolchain requirement; let 'go list' fetch a newer one.
+          GOTOOLCHAIN: auto
         with:
           args: --sarif-file-output=snyk-test.sarif
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7 # v4
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
         with:
           sarif_file: snyk-test.sarif

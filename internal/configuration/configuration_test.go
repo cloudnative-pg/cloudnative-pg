@@ -171,3 +171,28 @@ var _ = Describe("Annotation and label inheritance", func() {
 		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
 	})
 })
+
+var _ = Describe("Webhook configuration names", func() {
+	It("uses default names when suffix is disabled", func() {
+		config := &Data{}
+		Expect(config.GetMutatingWebhookConfigurationName()).To(Equal(DefaultMutatingWebhookConfigurationName))
+		Expect(config.GetValidatingWebhookConfigurationName()).To(Equal(DefaultValidatingWebhookConfigurationName))
+	})
+
+	It("appends operator namespace when suffix is enabled", func() {
+		config := &Data{
+			EnableWebhookNamespaceSuffix: true,
+			OperatorNamespace:            "cnpg-team-a",
+		}
+		Expect(config.GetMutatingWebhookConfigurationName()).To(
+			Equal(DefaultMutatingWebhookConfigurationName + "-cnpg-team-a"))
+		Expect(config.GetValidatingWebhookConfigurationName()).To(
+			Equal(DefaultValidatingWebhookConfigurationName + "-cnpg-team-a"))
+	})
+
+	It("getter falls back to default names when suffix is enabled but OperatorNamespace is empty", func() {
+		config := &Data{EnableWebhookNamespaceSuffix: true}
+		Expect(config.GetMutatingWebhookConfigurationName()).To(Equal(DefaultMutatingWebhookConfigurationName))
+		Expect(config.GetValidatingWebhookConfigurationName()).To(Equal(DefaultValidatingWebhookConfigurationName))
+	})
+})

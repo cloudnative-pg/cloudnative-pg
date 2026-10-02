@@ -169,7 +169,7 @@ func (r pgDataCalculator) GetSnapshotName(backupName string) string {
 // GetVolumeSnapshotClass implements the Role interface
 func (r pgDataCalculator) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
 	if len(configuration.ClassName) > 0 {
-		return ptr.To(configuration.ClassName)
+		return new(configuration.ClassName)
 	}
 
 	return nil
@@ -243,11 +243,11 @@ func (r pgWalCalculator) GetSnapshotName(backupName string) string {
 // GetVolumeSnapshotClass implements the Role interface
 func (r pgWalCalculator) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
 	if len(configuration.WalClassName) > 0 {
-		return ptr.To(configuration.WalClassName)
+		return new(configuration.WalClassName)
 	}
 
 	if len(configuration.ClassName) > 0 {
-		return ptr.To(configuration.ClassName)
+		return new(configuration.ClassName)
 	}
 
 	return nil
@@ -326,11 +326,11 @@ func (r pgTablespaceCalculator) GetSnapshotName(backupName string) string {
 // GetVolumeSnapshotClass implements the Role interface
 func (r pgTablespaceCalculator) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
 	if className, ok := configuration.TablespaceClassName[r.tablespaceName]; ok && len(className) > 0 {
-		return ptr.To(className)
+		return new(className)
 	}
 
 	if len(configuration.ClassName) > 0 {
-		return ptr.To(configuration.ClassName)
+		return new(configuration.ClassName)
 	}
 
 	return nil

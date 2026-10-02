@@ -71,8 +71,8 @@ func DrainPrimary(
 	})
 	By("ensuring no cluster pod is still running on the drained node", func() {
 		Eventually(func() ([]string, error) {
-			var usedNodes []string
 			podList, err := clusterutils.ListPods(ctx, crudClient, namespace, clusterName)
+			usedNodes := make([]string, 0, len(podList.Items))
 			for _, pod := range podList.Items {
 				usedNodes = append(usedNodes, pod.Spec.NodeName)
 			}

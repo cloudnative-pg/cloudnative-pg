@@ -29,8 +29,13 @@ import (
 // The type of functions returning a moment in time
 type timeFunc func() time.Time
 
-// Manager is the rollout manager. It is safe to use
-// concurrently
+// Manager is the rollout manager. It is safe to use concurrently.
+//
+// A single Manager instance is shared across all cluster reconciliations.
+// It tracks the most recent rollout in a single slot (lastCluster,
+// lastInstance, lastUpdate). This means only one rollout can be in
+// progress at a time: any call to [Manager.CoordinateRollout] that
+// arrives before the applicable delay has elapsed will be denied.
 type Manager struct {
 	m sync.Mutex
 
@@ -46,8 +51,10 @@ type Manager struct {
 	// used by the unit tests to inject a fake time
 	timeProvider timeFunc
 
-	// The following data is relative to the last
-	// rollout
+	// The following fields form the single global slot.
+	// They record which cluster and instance last performed
+	// a rollout, and when. All scheduling decisions are
+	// derived from these three values.
 	lastInstance string
 	lastCluster  client.ObjectKey
 	lastUpdate   time.Time
@@ -73,8 +80,14 @@ func New(clusterRolloutDelay, instancesRolloutDelay time.Duration) *Manager {
 	}
 }
 
-// CoordinateRollout is called to check whether this rollout is allowed or not
-// by the manager
+// CoordinateRollout checks whether a Pod rollout is allowed and, when
+// allowed, claims the global slot by recording the cluster, instance,
+// and current time.
+//
+// Callers must only invoke this method when they intend to actually
+// perform a rollout. Calling it without following through (e.g. for a
+// supervised primary that only waits for user action) would occupy the
+// slot and block other clusters from rolling out.
 func (manager *Manager) CoordinateRollout(
 	cluster client.ObjectKey,
 	instanceName string,

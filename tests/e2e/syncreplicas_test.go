@@ -26,17 +26,18 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -97,7 +98,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	assertProbeRespectsReplicaLag := func(namespace, replicaName, probeType string) {
 		By(fmt.Sprintf(
 			"checking that %s probe of replica %s is waiting for lag to decrease before marking the pod ready",
-			probeType, replicaName), func() {
+			probeType, replicaName,
+		), func() {
 			timeout := 2 * time.Minute
 
 			// This "Eventually" block is needed because we may grab only a portion
@@ -176,7 +178,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			// First we check that the starting situation is the expected one
 			By("checking that we have the correct amount of sync replicas", func() {
@@ -213,14 +215,14 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MaxSyncReplicas must be lower than the number of instances
 				cluster.Spec.MaxSyncReplicas = 2
-				err = env.Client.Update(env.Ctx, cluster)
+				err = objects.Update(env.Ctx, env.Client, cluster)
 				Expect(err).To(HaveOccurred())
 
 				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas
 				cluster.Spec.MinSyncReplicas = 2
-				err = env.Client.Update(env.Ctx, cluster)
+				err = objects.Update(env.Ctx, env.Client, cluster)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -244,8 +246,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-			AssertClusterIsReady(namespace, clusterName, 30, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, 30)
 
 			By("checking that have 2 quorum-based replicas", func() {
 				getSyncReplicationCount(namespace, clusterName, "quorum", 2)
@@ -267,7 +269,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			By("verifying we have 2 quorum-based replicas", func() {
 				getSyncReplicationCount(namespace, clusterName, "quorum", 2)
@@ -278,7 +280,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				Eventually(func(g Gomega) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
-					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = ptr.To(1)
+					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = new(1)
 					cluster.Spec.PostgresConfiguration.Synchronous.Number = 1
 					g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 				}, RetryTimeout, 5).Should(Succeed())
@@ -325,7 +327,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 				By("verifying we have 2 quorum-based replicas", func() {
 					getSyncReplicationCount(namespace, clusterName, "quorum", 2)
@@ -366,7 +368,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			})
 		})
 
-		Context("Lag-control in startup & readiness probes", func() {
+		Context("Lag-control in startup & readiness probes", Serial, func() {
 			var (
 				namespace         string
 				namespacePrefix   string
@@ -382,7 +384,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 				// Set our target fencedReplica
 				fencedReplicaName = fmt.Sprintf("%s-2", clusterName)
@@ -435,7 +437,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					}
 					cluster.Annotations[utils.ReconciliationLoopAnnotationName] = "disabled"
 
-					err = env.Client.Patch(env.Ctx, cluster, client.MergeFrom(origCluster))
+					err = objects.Patch(env.Ctx, env.Client, cluster, client.MergeFrom(origCluster))
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -464,7 +466,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					}
 					delete(cluster.Annotations, utils.ReconciliationLoopAnnotationName)
 
-					err = env.Client.Patch(env.Ctx, cluster, client.MergeFrom(origCluster))
+					err = objects.Patch(env.Ctx, env.Client, cluster, client.MergeFrom(origCluster))
 					Expect(err).ToNot(HaveOccurred())
 				})
 

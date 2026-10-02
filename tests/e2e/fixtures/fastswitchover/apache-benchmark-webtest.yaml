@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
       - name: apache-benchmark
-        image: httpd
+        image: docker.io/httpd:latest
         command:
           - "/usr/local/apache2/bin/ab"
           - "-t"

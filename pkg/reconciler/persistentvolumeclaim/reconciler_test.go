@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -177,7 +177,7 @@ var _ = Describe("Reconcile resource requests", func() {
 	It("Reconcile resources with resize in use and empty PVCs shouldn't fail", func() {
 		cluster.Spec = apiv1.ClusterSpec{
 			StorageConfiguration: apiv1.StorageConfiguration{
-				ResizeInUseVolumes: ptr.To(false),
+				ResizeInUseVolumes: new(false),
 			},
 		}
 
@@ -599,6 +599,7 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		pvc         corev1.PersistentVolumeClaim
 		cli         client.Client
 		ctx         context.Context
+		patchCount  int
 	)
 
 	BeforeEach(func() {
@@ -609,9 +610,18 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 			},
 		}
 		pvc = makePVC(clusterName, "1", "1", NewPgDataCalculator(), false)
+		patchCount = 0
 		cli = fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithObjects(cluster, &pvc).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object,
+					patch client.Patch, opts ...client.PatchOption,
+				) error {
+					patchCount++
+					return c.Patch(ctx, obj, patch, opts...)
+				},
+			}).
 			Build()
 	})
 
@@ -633,13 +643,14 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		storage := &apiv1.StorageConfiguration{
 			Size: "1Gi",
 			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-				VolumeAttributesClassName: &className,
+				VolumeAttributesClassName: new(className),
 			},
 		}
 
 		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(*pvc.Spec.VolumeAttributesClassName).To(Equal(className))
+		Expect(pvc.Spec.VolumeAttributesClassName).To(HaveValue(Equal(className)))
+		Expect(patchCount).To(BeZero(), "no patch should be issued for an already-correct PVC")
 	})
 
 	It("updates VolumeAttributesClassName when it differs from the expected value", func() {
@@ -657,6 +668,7 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(*pvc.Spec.VolumeAttributesClassName).To(Equal(expectedClassName))
+		Expect(patchCount).To(Equal(1))
 	})
 
 	It("sets VolumeAttributesClassName to nil when template specifies nil", func() {
@@ -673,5 +685,6 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.VolumeAttributesClassName).To(BeNil())
+		Expect(patchCount).To(Equal(1))
 	})
 })

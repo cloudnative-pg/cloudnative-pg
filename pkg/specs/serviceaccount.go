@@ -32,7 +32,12 @@ import (
 )
 
 // UpdateServiceAccount sets the needed values in the ServiceAccount that will be used in every Pod
-func UpdateServiceAccount(imagePullSecretsNames []string, serviceAccount *corev1.ServiceAccount) error {
+func UpdateServiceAccount(
+	imagePullSecretsNames []string,
+	serviceAccount *corev1.ServiceAccount,
+) error {
+	serviceAccount.AutomountServiceAccountToken = new(false)
+
 	if serviceAccount.ImagePullSecrets == nil {
 		serviceAccount.ImagePullSecrets = []corev1.LocalObjectReference{}
 	}
@@ -86,6 +91,11 @@ func IsServiceAccountAligned(
 	updatedMetadata metav1.ObjectMeta,
 ) bool {
 	contextLogger := log.FromContext(ctx)
+
+	if sa.AutomountServiceAccountToken == nil || *sa.AutomountServiceAccountToken {
+		return false
+	}
+
 	// This is an old version of the ServiceAccount, that need to be refreshed to
 	// store the annotation value
 	if sa.Annotations == nil {

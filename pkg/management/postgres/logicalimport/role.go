@@ -23,12 +23,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 
-	"github.com/blang/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
-	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
@@ -152,7 +152,7 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 
 	// Retrieve the roles excluding those that are owned by the postgres catalog
 	// see FirstNormalObjectId in https://github.com/postgres/postgres/blob/662dbe2/src/include/access/transam.h#L197
-	if vers.GTE(semver.Version{Major: 9, Minor: 5}) {
+	if vers.GreaterThanEqual(semver.New(9, 5, 0, "", "")) {
 		query = "SELECT oid, rolname, rolsuper, rolinherit, " +
 			"rolcreaterole, rolcreatedb, " +
 			"rolcanlogin, rolconnlimit, rolpassword, " +
@@ -183,7 +183,7 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 	defer func() {
 		closeErr := rows.Close()
 		if closeErr != nil {
-			contextLogger.Error(closeErr, "while closing rows: %w")
+			contextLogger.Error(closeErr, "while closing rows")
 		}
 	}()
 
@@ -192,6 +192,7 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 		"postgres",
 		apiv1.StreamingReplicationUser,
 		apiv1.PGBouncerPoolerUserName,
+		apiv1.MetricsExporterUserName,
 		rs.cluster.Spec.Bootstrap.InitDB.Owner,
 	}
 

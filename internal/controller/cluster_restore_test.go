@@ -132,17 +132,15 @@ var _ = Describe("restoreClusterStatus", func() {
 
 	Context("when restoring cluster status", func() {
 		It("should patch the cluster with the updated status", func(ctx SpecContext) {
-			latestNodeSerial := 10
 			targetPrimaryNodeSerial := 3
 
-			err := restoreClusterStatus(ctx, mockCli, cluster, latestNodeSerial, targetPrimaryNodeSerial)
+			err := restoreClusterStatus(ctx, mockCli, cluster, targetPrimaryNodeSerial)
 			Expect(err).ToNot(HaveOccurred())
 
 			modifiedCluster := &apiv1.Cluster{}
 			err = mockCli.Get(ctx, k8client.ObjectKeyFromObject(cluster), modifiedCluster)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(modifiedCluster.Status.LatestGeneratedNode).To(Equal(latestNodeSerial))
 			Expect(modifiedCluster.Status.TargetPrimary).To(
 				Equal(specs.GetInstanceName(cluster.Name, targetPrimaryNodeSerial)))
 		})
@@ -165,7 +163,7 @@ var _ = Describe("getOrphanPVCs", func() {
 			},
 		}
 
-		goodPvcs = []corev1.PersistentVolumeClaim{
+		goodPvcs = []corev1.PersistentVolumeClaim{ //nolint:prealloc
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-1",
@@ -801,6 +799,88 @@ var _ = Describe("ensureInitContainersAreCompleted", func() {
 				})
 		})
 
+		Context("when the pod carries the operator's own bootstrap init containers", func() {
+			// A Pod restored by a backup tool together with its PVC still has
+			// the bootstrap-instance init container it was created with. That
+			// container already did its job before the backup and never
+			// completes on a volume that holds live data. The gate exists for
+			// the tool's own init container, not for ours.
+			terminatedOK := corev1.ContainerState{
+				Terminated: &corev1.ContainerStateTerminated{ExitCode: 0, Reason: "Completed"},
+			}
+			terminatedFailed := corev1.ContainerState{
+				Terminated: &corev1.ContainerStateTerminated{ExitCode: 1, Reason: "Error"},
+			}
+			running := corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
+
+			expectGateOpen := func(ctx SpecContext) {
+				mockCli = fake.NewClientBuilder().
+					WithScheme(k8scheme.BuildWithAllKnownScheme()).
+					WithObjects(cluster, pod).
+					Build()
+				res, err := ensureInitContainersAreCompleted(ctx, mockCli, cluster)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(res).To(BeNil())
+			}
+
+			BeforeEach(func() {
+				pod.Spec.InitContainers = []corev1.Container{
+					{Name: "restore-init"},
+					{Name: specs.BootstrapControllerContainerName},
+					{Name: specs.BootstrapWorkContainerName},
+				}
+			})
+
+			It("proceeds while bootstrap-instance is still running", func(ctx SpecContext) {
+				pod.Status.InitContainerStatuses = []corev1.ContainerStatus{
+					{Name: "restore-init", State: terminatedOK},
+					{Name: specs.BootstrapControllerContainerName, State: terminatedOK},
+					{Name: specs.BootstrapWorkContainerName, State: running},
+				}
+				expectGateOpen(ctx)
+			})
+
+			It("proceeds when bootstrap-instance failed", func(ctx SpecContext) {
+				pod.Status.InitContainerStatuses = []corev1.ContainerStatus{
+					{Name: "restore-init", State: terminatedOK},
+					{Name: specs.BootstrapControllerContainerName, State: terminatedOK},
+					{Name: specs.BootstrapWorkContainerName, State: terminatedFailed},
+				}
+				expectGateOpen(ctx)
+			})
+
+			It("proceeds when only our own init containers are present and none has started", func(ctx SpecContext) {
+				pod.Spec.InitContainers = pod.Spec.InitContainers[1:]
+				pod.Status.InitContainerStatuses = nil
+				expectGateOpen(ctx)
+			})
+		})
+
+		Context("when a foreign init container is still running next to our own", func() {
+			BeforeEach(func() {
+				pod.Spec.InitContainers = []corev1.Container{
+					{Name: "restore-init"},
+					{Name: specs.BootstrapWorkContainerName},
+				}
+				pod.Status.InitContainerStatuses = []corev1.ContainerStatus{
+					{Name: "restore-init", State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
+					}},
+				}
+				mockCli = fake.NewClientBuilder().
+					WithScheme(k8scheme.BuildWithAllKnownScheme()).
+					WithObjects(cluster, pod).
+					Build()
+			})
+
+			It("still waits for the foreign one", func(ctx SpecContext) {
+				res, err := ensureInitContainersAreCompleted(ctx, mockCli, cluster)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(res).ToNot(BeNil())
+				Expect(res.RequeueAfter).To(Equal(5 * time.Second))
+			})
+		})
+
 		Context("when pod has owner references but init containers completed", func() {
 			BeforeEach(func() {
 				pod.OwnerReferences = []metav1.OwnerReference{
@@ -882,7 +962,7 @@ var _ = Describe("isSidecarInitContainer", func() {
 	})
 })
 
-var _ = Describe("hasNonSidecarInitContainers", func() {
+var _ = Describe("hasForeignInitContainers", func() {
 	Context("when pod has no init containers", func() {
 		It("should return false", func() {
 			pod := &corev1.Pod{
@@ -890,7 +970,7 @@ var _ = Describe("hasNonSidecarInitContainers", func() {
 					InitContainers: []corev1.Container{},
 				},
 			}
-			Expect(hasNonSidecarInitContainers(pod)).To(BeFalse())
+			Expect(hasForeignInitContainers(pod)).To(BeFalse())
 		})
 	})
 
@@ -905,7 +985,7 @@ var _ = Describe("hasNonSidecarInitContainers", func() {
 					},
 				},
 			}
-			Expect(hasNonSidecarInitContainers(pod)).To(BeTrue())
+			Expect(hasForeignInitContainers(pod)).To(BeTrue())
 		})
 	})
 
@@ -922,7 +1002,7 @@ var _ = Describe("hasNonSidecarInitContainers", func() {
 					},
 				},
 			}
-			Expect(hasNonSidecarInitContainers(pod)).To(BeFalse())
+			Expect(hasForeignInitContainers(pod)).To(BeFalse())
 		})
 	})
 
@@ -942,15 +1022,15 @@ var _ = Describe("hasNonSidecarInitContainers", func() {
 					},
 				},
 			}
-			Expect(hasNonSidecarInitContainers(pod)).To(BeTrue())
+			Expect(hasForeignInitContainers(pod)).To(BeTrue())
 		})
 	})
 })
 
-var _ = Describe("getNonSidecarInitContainerStatuses", func() {
+var _ = Describe("getForeignInitContainerStatuses", func() {
 	Context("when no init containers exist", func() {
 		It("should return empty slice", func() {
-			statuses := getNonSidecarInitContainerStatuses(
+			statuses := getForeignInitContainerStatuses(
 				[]corev1.ContainerStatus{},
 				[]corev1.Container{},
 			)
@@ -969,7 +1049,7 @@ var _ = Describe("getNonSidecarInitContainerStatuses", func() {
 				{Name: "init-2", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}},
 			}
 
-			result := getNonSidecarInitContainerStatuses(statuses, initContainers)
+			result := getForeignInitContainerStatuses(statuses, initContainers)
 			Expect(result).To(HaveLen(2))
 			Expect(result[0].Name).To(Equal("init-1"))
 			Expect(result[1].Name).To(Equal("init-2"))
@@ -989,7 +1069,7 @@ var _ = Describe("getNonSidecarInitContainerStatuses", func() {
 				{Name: "sidecar-init", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 			}
 
-			result := getNonSidecarInitContainerStatuses(statuses, initContainers)
+			result := getForeignInitContainerStatuses(statuses, initContainers)
 			Expect(result).To(BeEmpty())
 		})
 	})
@@ -1008,7 +1088,7 @@ var _ = Describe("getNonSidecarInitContainerStatuses", func() {
 				{Name: "init-2", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}},
 			}
 
-			result := getNonSidecarInitContainerStatuses(statuses, initContainers)
+			result := getForeignInitContainerStatuses(statuses, initContainers)
 			Expect(result).To(HaveLen(2))
 			Expect(result[0].Name).To(Equal("init-1"))
 			Expect(result[1].Name).To(Equal("init-2"))

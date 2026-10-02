@@ -26,4 +26,10 @@ const (
 	WALArchiveKey = "wal-archive"
 	// WALRestoreKey is the key to be used to access the cached envs for wal-restore
 	WALRestoreKey = "wal-restore"
+	// WALRestoreConfigKey is the key to be used to access the cached recovery
+	// source object store configuration. It is populated only by the bootstrap
+	// recovery Job, which resolves that store (not derivable from the cluster
+	// spec for a recovery.backup reference) and hands it to the wal-restore
+	// command via the local webserver cache.
+	WALRestoreConfigKey = "wal-restore-config"
 )

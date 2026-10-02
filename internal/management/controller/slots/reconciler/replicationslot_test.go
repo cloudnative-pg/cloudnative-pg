@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
@@ -44,7 +43,7 @@ func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.
 		Spec: apiv1.ClusterSpec{
 			ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 				HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-					Enabled:    ptr.To(true),
+					Enabled:    new(true),
 					SlotPrefix: slotPrefix,
 				},
 			},
@@ -125,6 +124,57 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 
 		_, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
+	})
+
+	It("continues creating the other slots and cleaning up stale ones after a create failure", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance2", true, "lsn2")...).
+			AddRow(newRepSlot("instance9", false, "lsn9")...)
+
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").
+			WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
+			WithArgs(slotPrefix+"instance3", false).
+			WillReturnError(errors.New("mock create failure"))
+
+		// the slot for instance4 is still created, and the stale slot
+		// of instance9 is still dropped
+		mock.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
+			WithArgs(slotPrefix+"instance4", false).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance9").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		cluster := makeClusterWithInstanceNames(
+			[]string{"instance1", "instance2", "instance3", "instance4"}, "instance1")
+
+		res, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(`creating replication slot "_cnpg_instance3": mock create failure`))
+		Expect(res.IsZero()).To(BeTrue())
+	})
+
+	It("continues dropping the remaining stale slots after a drop failure", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance2", true, "lsn2")...).
+			AddRow(newRepSlot("instance8", false, "lsn8")...).
+			AddRow(newRepSlot("instance9", false, "lsn9")...)
+
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").
+			WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance8").
+			WillReturnError(errors.New("mock drop failure"))
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance9").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"}, "instance1")
+
+		_, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(`dropping replication slot "_cnpg_instance8": mock drop failure`))
+		Expect(err.Error()).NotTo(ContainSubstring("instance9"))
 	})
 })
 
@@ -208,5 +258,25 @@ var _ = Describe("dropReplicationSlots", func() {
 		res, err := dropReplicationSlots(ctx, db, &cluster, true)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.RequeueAfter).To(Equal(time.Duration(0)))
+	})
+
+	It("continues dropping the remaining slots after a drop failure", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", false, "lsn1")...).
+			AddRow(newRepSlot("instance2", false, "lsn2")...)
+		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
+			WillReturnError(errors.New("mock drop failure"))
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance2").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		cluster := makeClusterWithInstanceNames([]string{}, "")
+
+		res, err := dropReplicationSlots(ctx, db, &cluster, true)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(`dropping replication slot "_cnpg_instance1": mock drop failure`))
+		Expect(err.Error()).NotTo(ContainSubstring("_cnpg_instance2"))
+		Expect(res.IsZero()).To(BeTrue())
 	})
 })

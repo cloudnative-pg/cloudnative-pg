@@ -38,6 +38,7 @@ type tablespaceReconcilerStep interface {
 
 type createTablespaceAction struct {
 	tablespace apiv1.TablespaceConfiguration
+	pvcChecker func(tablespaceName string) bool
 }
 
 func (r *createTablespaceAction) execute(
@@ -47,7 +48,7 @@ func (r *createTablespaceAction) execute(
 ) apiv1.TablespaceState {
 	contextLog := log.FromContext(ctx).WithName("tbs_create_reconciler")
 
-	contextLog.Trace("creating tablespace ", "tablespace", r.tablespace.Name)
+	contextLog.Trace("creating tablespace", "tablespace", r.tablespace.Name)
 	if exists, err := tbsStorageManager.storageExists(r.tablespace.Name); err != nil || !exists {
 		contextLog.Debug("deferring tablespace until creation of the mount point for the new volume",
 			"tablespaceName", r.tablespace.Name,
@@ -57,6 +58,16 @@ func (r *createTablespaceAction) execute(
 			State: apiv1.TablespaceStatusPendingReconciliation,
 			Owner: r.tablespace.Owner.Name,
 			Error: "deferred until mount point is created",
+		}
+	}
+	if !r.pvcChecker(r.tablespace.Name) {
+		contextLog.Debug("deferring tablespace until required PVCs in all instances are healthy",
+			"tablespaceName", r.tablespace.Name)
+		return apiv1.TablespaceState{
+			Name:  r.tablespace.Name,
+			State: apiv1.TablespaceStatusPendingReconciliation,
+			Owner: r.tablespace.Owner.Name,
+			Error: "deferred until all required PVCs are healthy",
 		}
 	}
 	tablespace := infrastructure.Tablespace{
@@ -92,7 +103,7 @@ func (r *updateTablespaceAction) execute(
 ) apiv1.TablespaceState {
 	contextLog := log.FromContext(ctx).WithName("tbs_update_reconciler")
 
-	contextLog.Trace("updating tablespace ", "tablespace", r.tablespace.Name)
+	contextLog.Trace("updating tablespace", "tablespace", r.tablespace.Name)
 	tablespace := infrastructure.Tablespace{
 		Name:  r.tablespace.Name,
 		Owner: r.tablespace.Owner.Name,

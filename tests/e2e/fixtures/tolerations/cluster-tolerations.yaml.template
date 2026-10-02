@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-tolerations
 spec:
-  instances: 3
+  instances: 1
 
   affinity:
       tolerations:

@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -40,8 +39,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -73,7 +75,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 	updateClusterPostgresParams := func(paramsMap map[string]string, namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -85,7 +87,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 	updateClusterPostgresPgHBA := func(namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -97,7 +99,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 	updateClusterPostgresPgIdent := func(namespace string) {
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -110,7 +112,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	checkErrorOutFixedAndBlockedConfigurationParameter := func(params map[string]string, namespace string) {
 		// Update the configuration
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
@@ -125,8 +127,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		// Expect other config parameters applied together with a blockedParameter to not have changed
 		for _, pod := range podList.Items {
-			Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-				"SHOW autovacuum_max_workers", "4"), RetryTimeout).ShouldNot(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+				"SHOW autovacuum_max_workers", "4"),
+				RetryTimeout).ShouldNot(Succeed())
 		}
 	}
 
@@ -155,7 +158,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 
 	generateBaseCluster := func(namespace string) *apiv1.Cluster {
-		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		storageClass := env.DefaultStorageClass
 		Expect(storageClass).ToNot(BeEmpty())
 
 		return &apiv1.Cluster{
@@ -200,8 +203,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		By("verify that work_mem result as expected", func() {
 			// Check that GUCs has been modified in every pod
 			for _, pod := range podList.Items {
-				Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-					"SHOW work_mem", "8MB"), RetryTimeout).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+					"SHOW work_mem", "8MB"),
+					RetryTimeout).Should(Succeed())
 			}
 		})
 	}
@@ -219,7 +223,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		}
 
 		cluster := &apiv1.Cluster{}
-		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err = retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			cluster.Spec.ImageName = env.StandardImageName(targetTag)
@@ -236,19 +240,21 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		if primaryUpdateMethod == apiv1.PrimaryUpdateMethodRestart {
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that pgaudit is enabled", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName,
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName,
 					"SELECT extname FROM pg_extension WHERE extname = 'pgaudit'", "pgaudit")
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log", "all, -misc")
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_catalog", "off")
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_parameter", "on")
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_relation", "on")
+
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName, "SHOW pgaudit.log", "all, -misc")
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName, "SHOW pgaudit.log_catalog", "off")
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName, "SHOW pgaudit.log_parameter", "on")
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName, "SHOW pgaudit.log_relation", "on")
 			})
 		}
 	}
@@ -273,9 +279,10 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			cluster := generateBaseCluster(namespace)
 			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
-			err = env.Client.Create(env.Ctx, cluster)
+			clusterutils.AddTopologySpreadConstraint(cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		It("1. reloading PG when a GUC requiring reload is modified", func() {
@@ -290,7 +297,8 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			// Connection should fail now because we are not supplying a password
 			By("verify that connections with an empty password fail by default", func() {
 				commandTimeout := time.Second * 10
-				_, _, err := exec.Command(env.Ctx, env.Interface, env.RestClientConfig, podList.Items[0],
+				_, _, err := exec.Command(
+					env.Ctx, env.Interface, env.RestClientConfig, podList.Items[0],
 					specs.PostgresContainerName, &commandTimeout,
 					"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1",
 				)
@@ -305,37 +313,54 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				// The new pg_hba rule should be present in every pod
 				query := "select count(*) from pg_catalog.pg_hba_file_rules where type = 'host' and auth_method = 'trust'"
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						query, "1"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						query, "1"),
+						RetryTimeout).Should(Succeed())
 				}
 				// The connection should now work
-				AssertConnection(namespace, endpointName, postgres.PostgresDBName, postgres.PostgresDBName, "", env)
+				pgasserts.AssertConnection(env, namespace, endpointName, postgres.PostgresDBName, postgres.PostgresDBName, "")
 			})
 		})
 
 		It("3. performing a rolling update when a GUC requiring restart is modified", func() {
 			oldPrimary := gatherCurrentPrimary(namespace)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			oldTimeline := cluster.Status.TimelineID
 
 			By("apply configuration update", func() {
 				postgresParams["shared_buffers"] = "256MB"
 				updateClusterPostgresParams(postgresParams, namespace)
 			})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that shared_buffers setting changed", func() {
 				// Check that the new parameter has been modified in every pod
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW shared_buffers", "256MB"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW shared_buffers", "256MB"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
 			checkSwitchoverOccurred(namespace, oldPrimary)
+
+			By("verifying that a single switchover happened", func() {
+				// Every promotion advances the PostgreSQL timeline by one.
+				// Promoting a replica whose restart was still pending would
+				// force a second switchover and leave the timeline at
+				// oldTimeline+2 (issue #11129).
+				Eventually(func() (int, error) {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					return cluster.Status.TimelineID, err
+				}, RetryTimeout).Should(Equal(oldTimeline + 1))
+			})
 		})
 
 		It("4. performing a rolling update when mixed parameters are modified", func() {
@@ -347,19 +372,22 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updateClusterPostgresParams(postgresParams, namespace)
 			})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that both parameters have been modified in each pod", func() {
 				// Check that both parameters have been modified in each pod
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW max_replication_slots", "16"), RetryTimeout).Should(Succeed())
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW maintenance_work_mem", "128MB"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_replication_slots", "16"),
+						RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW maintenance_work_mem", "128MB"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
@@ -388,17 +416,19 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updateClusterPostgresParams(postgresParams, namespace)
 			})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that max_connections has been decreased in every pod", func() {
 				// Check that the new GUC has been modified in every pod
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW max_connections", "105"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_connections", "105"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
@@ -413,17 +443,19 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updateClusterPostgresParams(postgresParams, namespace)
 			})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that the max_connections has been set to default in every pod", func() {
 				// Check that the new parameter has been modified in every pod
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW max_connections", "100"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_connections", "100"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
@@ -438,8 +470,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				query := "select count(1) from pg_catalog.pg_ident_file_mappings;"
 
 				By("check that there is the expected number of entry in pg_ident_file_mappings", func() {
-					Eventually(QueryMatchExpectationPredicate(primaryPod, postgres.PostgresDBName,
-						query, "3"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPod, postgres.PostgresDBName,
+						query, "4"),
+						RetryTimeout).Should(Succeed())
 				})
 
 				By("apply configuration update", func() {
@@ -447,8 +480,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				})
 
 				By("verify that there is one more entry in pg_ident_file_mappings", func() {
-					Eventually(QueryMatchExpectationPredicate(primaryPod, postgres.PostgresDBName,
-						query, "4"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPod, postgres.PostgresDBName,
+						query, "5"),
+						RetryTimeout).Should(Succeed())
 				})
 			}
 		})
@@ -468,9 +502,10 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			cluster := generateBaseCluster(namespace)
 			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodRestart
-			err = env.Client.Create(env.Ctx, cluster)
+			clusterutils.AddTopologySpreadConstraint(cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		It("1. reloading PG when a GUC requiring reload is modified", func() {
@@ -479,7 +514,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		It("2. restarting (in place) the primary after increasing max_connection", func() {
 			// Ensure cluster is fully ready after previous test configuration change
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			var oldPrimaryPodName string
 			var newMaxConnectionsValue int
@@ -531,7 +566,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updated := cluster.DeepCopy()
 				updated.Spec.PostgresConfiguration.Parameters["max_connections"] = fmt.Sprintf("%v",
 					newMaxConnectionsValue)
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				err = objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -539,8 +574,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW max_connections", strconv.Itoa(newMaxConnectionsValue)), 180).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_connections", strconv.Itoa(newMaxConnectionsValue)),
+						180).Should(Succeed())
 				}
 			})
 

@@ -27,6 +27,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -82,11 +85,11 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up source cluster", func() {
-				AssertCreateCluster(namespace, sourceClusterName, sourceClusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceClusterManifest)
 			})
 
 			By("setting up destination cluster", func() {
-				AssertCreateCluster(namespace, destinationClusterName, destinationClusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, destinationClusterName, destinationClusterManifest)
 			})
 		})
 
@@ -132,12 +135,14 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(DeleteResourcesFromFile(namespace, destinationDatabaseManifest)).To(Succeed())
-			Expect(DeleteResourcesFromFile(namespace, sourceDatabaseManifest)).To(Succeed())
-			Eventually(QueryMatchExpectationPredicate(sourcePrimaryPod, postgres.PostgresDBName,
-				databaseExistsQuery(dbname), "f"), 30).Should(Succeed())
-			Eventually(QueryMatchExpectationPredicate(destPrimaryPod, postgres.PostgresDBName,
-				databaseExistsQuery(dbname), "f"), 30).Should(Succeed())
+			Expect(resources.DeleteResourcesFromFile(env, namespace, destinationDatabaseManifest)).To(Succeed())
+			Expect(resources.DeleteResourcesFromFile(env, namespace, sourceDatabaseManifest)).To(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, sourcePrimaryPod, postgres.PostgresDBName,
+				pgasserts.DatabaseExistsQuery(dbname), "f"),
+				30).Should(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, destPrimaryPod, postgres.PostgresDBName,
+				pgasserts.DatabaseExistsQuery(dbname), "f"),
+				30).Should(Succeed())
 		})
 
 		assertCreateDatabase := func(namespace, clusterName, databaseManifest string) {
@@ -146,7 +151,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("applying the %s Database CRD manifest", databaseObjectName), func() {
-				CreateResourceFromFile(namespace, databaseManifest)
+				resources.CreateResourceFromFile(env, namespace, databaseManifest)
 			})
 
 			By(fmt.Sprintf("ensuring the %s Database CRD succeeded reconciliation", databaseObjectName), func() {
@@ -166,18 +171,19 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
-					databaseExistsQuery(databaseObject.Spec.Name), "t"), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+					pgasserts.DatabaseExistsQuery(databaseObject.Spec.Name), "t"),
+					30).Should(Succeed())
 			})
 		}
 
-		// nolint:dupl
+		//nolint:dupl
 		assertCreatePublication := func(namespace, clusterName, publicationManifest string) {
 			pubObjectName, err := yaml.GetResourceNameFromYAML(env.Scheme, publicationManifest)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("applying Publication CRD manifest", func() {
-				CreateResourceFromFile(namespace, publicationManifest)
+				resources.CreateResourceFromFile(env, namespace, publicationManifest)
 			})
 
 			By("ensuring the Publication CRD succeeded reconciliation", func() {
@@ -199,18 +205,19 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
-					publicationExistsQuery(pubName), "t"), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, dbname,
+					publicationExistsQuery(pubName), "t"),
+					30).Should(Succeed())
 			})
 		}
 
-		// nolint:dupl
+		//nolint:dupl
 		assertCreateSubscription := func(namespace, clusterName, subscriptionManifest string) {
 			subObjectName, err := yaml.GetResourceNameFromYAML(env.Scheme, subscriptionManifest)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("applying Subscription CRD manifest", func() {
-				CreateResourceFromFile(namespace, subscriptionManifest)
+				resources.CreateResourceFromFile(env, namespace, subscriptionManifest)
 			})
 
 			By("ensuring the Subscription CRD succeeded reconciliation", func() {
@@ -232,21 +239,22 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
-					subscriptionExistsQuery(subName), "t"), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, dbname,
+					subscriptionExistsQuery(subName), "t"),
+					30).Should(Succeed())
 			})
 		}
 
 		assertTestPubSub := func(retainOnDeletion bool) {
 			assertCreateDatabase(namespace, sourceClusterName, sourceDatabaseManifest)
 
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  sourceClusterName,
 				DatabaseName: dbname,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			assertCreateDatabase(namespace, destinationClusterName, destinationDatabaseManifest)
 
@@ -304,7 +312,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 
 			By("checking that the data is present inside the destination cluster database", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  destinationClusterName,
 					DatabaseName: dbname,
@@ -340,8 +348,9 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, sourceClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
-					publicationExistsQuery(pubName), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, dbname,
+					publicationExistsQuery(pubName), pgasserts.BoolPGOutput(retainOnDeletion)),
+					30).Should(Succeed())
 			})
 
 			By("verifying the subscription reclaim policy outcome", func() {
@@ -351,8 +360,9 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
-					subscriptionExistsQuery(subName), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, dbname,
+					subscriptionExistsQuery(subName), pgasserts.BoolPGOutput(retainOnDeletion)),
+					30).Should(Succeed())
 			})
 		}
 

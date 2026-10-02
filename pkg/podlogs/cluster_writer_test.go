@@ -22,7 +22,6 @@ package podlogs
 import (
 	"bytes"
 	"context"
-	"strings"
 	"sync"
 	"time"
 
@@ -153,19 +152,15 @@ var _ = Describe("Cluster logging tests", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
 	})
 
-	It("should catch extra logs if given the follow option", func(ctx context.Context) {
+	It("should continue streaming when follow option is enabled", func(ctx context.Context) {
 		client := fake.NewClientset(pod)
-
-		wg := sync.WaitGroup{}
+		var wg sync.WaitGroup
 		wg.Add(1)
 		var logBuffer syncBuffer
+		errChan := make(chan error, 1)
+		streamCtx, cancel := context.WithCancel(ctx)
 
-		// let's set a short follow-wait, and keep the cluster streaming for two
-		// cycles
-		followWaiting := 150 * time.Millisecond
-		ctx2, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 		go func() {
-			// we always invoke done no matter what happens
 			defer wg.Done()
 			defer GinkgoRecover()
 			streamClusterLogs := ClusterWriter{
@@ -173,20 +168,34 @@ var _ = Describe("Cluster logging tests", func() {
 				Options: &corev1.PodLogOptions{
 					Follow: true,
 				},
-				FollowWaiting: followWaiting,
+				FollowWaiting: 50 * time.Millisecond, // Short interval for test speed
 				Client:        client,
 			}
-			err := streamClusterLogs.SingleStream(ctx2, &logBuffer)
-			// we cannot reliably now if we will close the function before the context
-			// deadline, so we accept both nil and context.DeadlineExceeded
-			Expect(err).To(Or(BeNil(), Equal(context.DeadlineExceeded)))
+			err := streamClusterLogs.SingleStream(streamCtx, &logBuffer)
+			errChan <- err
 		}()
 
-		time.Sleep(350 * time.Millisecond)
+		Eventually(func() bool {
+			return len(logBuffer.String()) > 0
+		}, 2*time.Second, 10*time.Millisecond).Should(BeTrue(),
+			"streaming should capture logs")
+
+		Consistently(func() bool {
+			select {
+			case <-errChan:
+				return false
+			default:
+				return true
+			}
+		}, 200*time.Millisecond, 50*time.Millisecond).Should(BeTrue(),
+			"streaming should continue until cancelled")
+
 		cancel()
 		wg.Wait()
 
-		fakeLogCount := strings.Count(logBuffer.String(), "fake logs\n")
-		Expect(fakeLogCount).To(BeNumerically(">=", 2))
+		var streamErr error
+		Eventually(errChan, time.Second).Should(Receive(&streamErr))
+		Expect(streamErr).To(Equal(context.Canceled))
+		Expect(logBuffer.String()).To(ContainSubstring("fake logs"))
 	})
 })

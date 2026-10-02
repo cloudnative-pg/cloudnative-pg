@@ -22,13 +22,13 @@ package postgres
 import (
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/mitchellh/go-ps"
-	"k8s.io/utils/strings/slices"
 )
 
 // PostgresqlPidFile is the name of the file which contains
@@ -127,7 +127,7 @@ func (instance *Instance) GetPostmasterPidFromFile(pidFile string) ([]byte, int,
 
 	// Inside the PID file, the first line contain the actual postmaster
 	// PID working on the data directory
-	pidLine := strings.Split(string(pidFileContents), "\n")[0]
+	pidLine, _, _ := strings.Cut(string(pidFileContents), "\n")
 	pid, err := strconv.Atoi(strings.TrimSpace(pidLine))
 	return pidFileContents, pid, err
 }

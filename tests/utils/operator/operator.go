@@ -30,12 +30,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
@@ -59,7 +58,7 @@ func ReloadDeployment(
 	}
 
 	err = crudClient.Delete(ctx, &operatorPod,
-		&client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(1))},
+		&client.DeleteOptions{GracePeriodSeconds: new(int64(1))},
 	)
 	if err != nil {
 		return err
@@ -213,17 +212,17 @@ func WaitForReady(
 	timeoutSeconds uint,
 	checkWebhook bool,
 ) error {
-	return retry.Do(
-		func() error {
-			ready, err := IsReady(ctx, crudClient, checkWebhook)
-			if err != nil || !ready {
-				return fmt.Errorf("operator deployment is not ready")
-			}
-			return nil
-		},
-		retry.Delay(time.Second),
-		retry.Attempts(timeoutSeconds),
-	)
+	return retry.New(retry.Delay(time.Second),
+		retry.Attempts(timeoutSeconds)).
+		Do(
+			func() error {
+				ready, err := IsReady(ctx, crudClient, checkWebhook)
+				if err != nil || !ready {
+					return fmt.Errorf("operator deployment is not ready")
+				}
+				return nil
+			},
+		)
 }
 
 // isDeploymentReady returns true if the operator deployment has the expected number
@@ -248,9 +247,9 @@ func ScaleOperatorDeployment(
 	}
 
 	updatedOperatorDeployment := *operatorDeployment.DeepCopy()
-	updatedOperatorDeployment.Spec.Replicas = ptr.To(replicas)
+	updatedOperatorDeployment.Spec.Replicas = new(replicas)
 
-	err = crudClient.Patch(ctx, &updatedOperatorDeployment, client.MergeFrom(&operatorDeployment))
+	err = objects.Patch(ctx, crudClient, &updatedOperatorDeployment, client.MergeFrom(&operatorDeployment))
 	if err != nil {
 		return err
 	}

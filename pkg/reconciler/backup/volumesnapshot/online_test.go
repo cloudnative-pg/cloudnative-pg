@@ -28,7 +28,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -97,7 +96,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 			Spec: apiv1.ClusterSpec{
 				Backup: &apiv1.BackupConfiguration{VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
 					ClassName:           "vs-test",
-					Online:              ptr.To(true),
+					Online:              new(true),
 					OnlineConfiguration: apiv1.OnlineConfiguration{},
 				}},
 			},

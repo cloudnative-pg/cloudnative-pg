@@ -36,7 +36,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -110,7 +109,7 @@ func getInstanceStatusFromPod(
 		CoreV1().
 		Pods(pod.Namespace).
 		ProxyGet(
-			remote.GetStatusSchemeFromPod(&pod).ToString(),
+			"https",
 			pod.Name,
 			strconv.Itoa(int(url.StatusPort)),
 			url.PathPgStatus,
@@ -154,8 +153,7 @@ func IsInstanceRunning(
 		return true, nil
 	}
 
-	var codeExitError exec.CodeExitError
-	if errors.As(err, &codeExitError) {
+	if codeExitError, ok := errors.AsType[exec.CodeExitError](err); ok {
 		switch pgCtlStatusExitCode(codeExitError.Code) {
 		case pgCtlStatusStopped:
 			return false, nil

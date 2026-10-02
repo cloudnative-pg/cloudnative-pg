@@ -101,6 +101,15 @@ recovery. There are three main options:
    methods. PostgreSQL can manage and switch between these two approaches as
    needed to ensure data consistency and availability.
 
+:::warning[Cascading standbys and restore from WAL archive]
+A PostgreSQL bug present since version 9.3 could permanently prevent a
+*cascading* standby from resuming WAL shipping replication
+(via `restore_command`), failing with an error such as
+`requested starting point ... is ahead of the WAL flush position of this server`
+and never retrying on its own.
+The bug is fixed in PostgreSQL 18.6, 17.11, 16.15, 15.19, and 14.24.
+:::
+
 ### Defining an External Cluster
 
 When configuring the external cluster, you have the following options:
@@ -407,9 +416,10 @@ continuous recovery mode and becomes a primary cluster, completely detached
 from the original source.
 
 :::warning
-    Disabling replication is an **irreversible** operation. Once replication is
-    disabled and the designated primary is promoted to primary, the replica cluster
-    and the source cluster become two independent clusters definitively.
+Disabling replication is an **irreversible** operation. Once replication is
+disabled and the designated primary instance in the replica cluster is promoted
+to primary, the replica cluster and the source cluster become two independent
+clusters definitively.
 :::
 
 :::info[Important]

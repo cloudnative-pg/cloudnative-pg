@@ -21,12 +21,11 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 )
 
 // SetAsFailed sets the publication as failed with the given error
 func (pub *Publication) SetAsFailed(err error) {
-	pub.Status.Applied = ptr.To(false)
+	pub.Status.Applied = new(false)
 	pub.Status.Message = err.Error()
 }
 
@@ -38,7 +37,7 @@ func (pub *Publication) SetAsUnknown(err error) {
 
 // SetAsReady sets the subscription as working correctly
 func (pub *Publication) SetAsReady() {
-	pub.Status.Applied = ptr.To(true)
+	pub.Status.Applied = new(true)
 	pub.Status.Message = ""
 	pub.Status.ObservedGeneration = pub.Generation
 }
@@ -46,6 +45,11 @@ func (pub *Publication) SetAsReady() {
 // GetStatusMessage returns the status message of the publication
 func (pub *Publication) GetStatusMessage() string {
 	return pub.Status.Message
+}
+
+// GetStatusApplied returns the applied status of the publication
+func (pub *Publication) GetStatusApplied() *bool {
+	return pub.Status.Applied
 }
 
 // GetClusterRef returns the cluster reference of the publication

@@ -21,9 +21,9 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -31,17 +31,24 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
+	"k8s.io/client-go/util/retry"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -87,24 +94,96 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			replicaNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, replicaNamespace, srcClusterName, srcClusterSample)
 
-			AssertReplicaModeCluster(
+			replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 				replicaNamespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSampleTLS,
-				testTableName,
-			)
+				testTableName)
 
 			replicaName, err := yaml.GetResourceNameFromYAML(env.Scheme, replicaClusterSampleTLS)
 			Expect(err).ToNot(HaveOccurred())
 
 			assertReplicaClusterTopology(replicaNamespace, replicaName)
 
-			AssertSwitchoverOnReplica(replicaNamespace, replicaName, env)
+			clusterasserts.AssertSwitchoverOnReplica(env, testTimeouts, replicaNamespace, replicaName)
 
 			assertReplicaClusterTopology(replicaNamespace, replicaName)
+
+			By("increasing max_connections to 120 on the replica cluster", func() {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, replicaNamespace, replicaName)
+					if err != nil {
+						return err
+					}
+					if cluster.Spec.PostgresConfiguration.Parameters == nil {
+						cluster.Spec.PostgresConfiguration.Parameters = map[string]string{}
+					}
+					cluster.Spec.PostgresConfiguration.Parameters["max_connections"] = "120"
+					return env.Client.Update(env.Ctx, cluster)
+				})
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("waiting for the replica cluster to apply the increased max_connections", func() {
+				clusterasserts.AssertClusterEventuallyReachesPhase(env, replicaNamespace, replicaName,
+					[]string{
+						apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade,
+						apiv1.PhaseWaitingForInstancesToBeActive,
+					}, 30)
+
+				clusterasserts.AssertClusterIsReady(env, replicaNamespace, replicaName,
+					testTimeouts[timeouts.ClusterIsReadyQuick])
+			})
+
+			By("verifying max_connections is 120 on all pods", func() {
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, replicaNamespace, replicaName)
+				Expect(err).ToNot(HaveOccurred())
+				for idx := range podList.Items {
+					pod := &podList.Items[idx]
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env,
+						pod, postgres.PostgresDBName, "SHOW max_connections", "120"),
+
+						30).Should(Succeed())
+				}
+			})
+
+			By("decreasing max_connections to 110 on the replica cluster", func() {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, replicaNamespace, replicaName)
+					if err != nil {
+						return err
+					}
+					cluster.Spec.PostgresConfiguration.Parameters["max_connections"] = "110"
+					return env.Client.Update(env.Ctx, cluster)
+				})
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("waiting for the replica cluster to apply the decreased max_connections", func() {
+				clusterasserts.AssertClusterEventuallyReachesPhase(env, replicaNamespace, replicaName,
+					[]string{
+						apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade,
+						apiv1.PhaseWaitingForInstancesToBeActive,
+					}, 30)
+
+				clusterasserts.AssertClusterIsReady(env, replicaNamespace, replicaName,
+					testTimeouts[timeouts.ClusterIsReadyQuick])
+			})
+
+			By("verifying max_connections is 110 on all pods", func() {
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, replicaNamespace, replicaName)
+				Expect(err).ToNot(HaveOccurred())
+				for idx := range podList.Items {
+					pod := &podList.Items[idx]
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env,
+						pod, postgres.PostgresDBName, "SHOW max_connections", "110"),
+
+						30).Should(Succeed())
+				}
+			})
 		})
 	})
 
@@ -122,17 +201,17 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, srcClusterName, srcClusterSample, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, srcClusterName, srcClusterSample)
 
-			AssertReplicaModeCluster(
+			replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 				namespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSampleBasicAuth,
-				testTableName,
-			)
+				testTableName)
 
-			AssertDetachReplicaModeCluster(
+			replicationasserts.AssertDetachReplicaModeCluster(
+				env, testTimeouts,
 				namespace,
 				srcClusterName,
 				sourceDBName,
@@ -154,9 +233,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			)
 			var clusterOnePrimary, clusterTwoPrimary *corev1.Pod
 
-			getReplicaClusterSwitchCondition := func(conditions []metav1.Condition) *metav1.Condition {
-				for _, condition := range conditions {
-					if condition.Type == replicaclusterswitch.ConditionReplicaClusterSwitch {
+			getReplicaClusterSwitchCondition := func(conds []metav1.Condition) *metav1.Condition {
+				for _, condition := range conds {
+					if condition.Type == conditions.ReplicaClusterSwitch {
 						return &condition
 					}
 				}
@@ -165,23 +244,22 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "replica-promotion-demotion")
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterOneName, clusterOneFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterOneName, clusterOneFile)
 
-			AssertReplicaModeCluster(
+			replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 				namespace,
 				clusterOneName,
 				sourceDBName,
 				clusterTwoFile,
-				testTableName,
-			)
+				testTableName)
 
 			// turn the src cluster into a replica
 			By("setting replica mode on the src cluster", func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterOneName)
 				Expect(err).ToNot(HaveOccurred())
 				updateTime := time.Now().Truncate(time.Second)
-				cluster.Spec.ReplicaCluster.Enabled = ptr.To(true)
-				err = env.Client.Update(ctx, cluster)
+				cluster.Spec.ReplicaCluster.Enabled = new(true)
+				err = objects.Update(ctx, env.Client, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func(g Gomega) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterOneName)
@@ -191,7 +269,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 					g.Expect(condition.LastTransitionTime.Time).To(BeTemporally(">=", updateTime))
 				}).WithTimeout(30 * time.Second).Should(Succeed())
-				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[timeouts.ClusterIsReady], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterOneName, testTimeouts[timeouts.ClusterIsReady])
 			})
 
 			By("checking that src cluster is now a replica cluster", func() {
@@ -200,17 +278,17 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 						clusterOneName)
 					return err
 				}, 30, 3).Should(Succeed())
-				AssertPgRecoveryMode(clusterOnePrimary, true)
+				pgasserts.AssertPgRecoveryMode(env, clusterOnePrimary, true)
 			})
 
 			// turn the dst cluster into a primary
 			By("disabling the replica mode on the dst cluster", func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterTwoName)
 				Expect(err).ToNot(HaveOccurred())
-				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
-				err = env.Client.Update(ctx, cluster)
+				cluster.Spec.ReplicaCluster.Enabled = new(false)
+				err = objects.Update(ctx, env.Client, cluster)
 				Expect(err).ToNot(HaveOccurred())
-				AssertClusterIsReady(namespace, clusterTwoName, testTimeouts[timeouts.ClusterIsReady], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterTwoName, testTimeouts[timeouts.ClusterIsReady])
 			})
 
 			By("checking that dst cluster has been promoted", func() {
@@ -219,18 +297,19 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 						clusterTwoName)
 					return err
 				}, 30, 3).Should(Succeed())
-				AssertPgRecoveryMode(clusterTwoPrimary, false)
+				pgasserts.AssertPgRecoveryMode(env, clusterTwoPrimary, false)
 			})
 
 			By("creating a new data in the new source cluster", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterTwoName,
 					DatabaseName: sourceDBName,
 					TableName:    "new_test_table",
 				}
 				Eventually(func() error {
-					_, err := postgres.RunExecOverForward(ctx,
+					_, err := postgres.RunExecOverForward(
+						ctx,
 						env.Client,
 						env.Interface,
 						env.RestClientConfig,
@@ -240,7 +319,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					)
 					return err
 				}, testTimeouts[timeouts.Short]).Should(Succeed())
-				AssertCreateTestData(env, tableLocator)
+				pgasserts.AssertCreateTestData(env, tableLocator)
 			})
 
 			// The dst Cluster gets promoted to primary, hence the new appUser password will
@@ -253,18 +332,25 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					clusterTwoName, namespace,
 					apiv1.ApplicationUserSecretSuffix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertUpdateSecret("password", appSecretPassword, clusterOneName+apiv1.ApplicationUserSecretSuffix,
-					namespace, clusterOneName, 30, env)
+				secretsasserts.AssertUpdateSecret(
+					env,
+					namespace,
+					clusterOneName,
+					clusterOneName+apiv1.ApplicationUserSecretSuffix,
+					"password",
+					appSecretPassword,
+					30,
+				)
 			})
 
 			By("checking that the data is present in the old src cluster", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterOneName,
 					DatabaseName: sourceDBName,
 					TableName:    "new_test_table",
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 	})
@@ -282,32 +368,31 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			replicaNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the credentials for minio", func() {
+			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
 					env.Ctx,
 					env.Client,
 					replicaNamespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, replicaNamespace)
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, replicaNamespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, replicaNamespace, srcClusterName, srcClusterSample)
 
-			AssertReplicaModeCluster(
+			replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 				replicaNamespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSample,
-				testTableName,
-			)
+				testTableName)
 
 			// Get primary from replica cluster
 			primaryReplicaCluster, err := clusterutils.GetPrimary(
@@ -333,9 +418,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				}, 30).Should(BeEquivalentTo("always"))
 			})
 			By("verify the WALs are archived from the designated primary", func() {
-				// only replica cluster has backup configure to minio,
-				// need the server name  be replica cluster name here
-				AssertArchiveWalOnMinio(replicaNamespace, srcClusterName, replicaClusterName)
+				// only replica cluster has backup configured to the object store,
+				// need the server name to be replica cluster name here
+				objectstoreasserts.AssertArchiveWalOnObjectStore(
+					env, testTimeouts, objectStoreEnv, replicaNamespace, srcClusterName, replicaClusterName,
+				)
 			})
 		})
 	})
@@ -353,27 +440,27 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the credentials for minio", func() {
+			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
 					env.Ctx,
 					env.Client,
 					namespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			// Create the cluster
 			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterSample)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, clusterSample, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSample)
 		})
 
 		It("using a Backup from the object store", func() {
@@ -410,13 +497,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a replica cluster from the backup", func() {
-				AssertReplicaModeCluster(
+				replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 					namespace,
 					clusterName,
 					sourceDBName,
 					replicaClusterSample,
-					testTableName,
-				)
+					testTableName)
 			})
 		})
 
@@ -428,16 +514,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName        = "replica_mode_snapshot"
 			)
 
-			DeferCleanup(func() error {
-				err := os.Unsetenv(snapshotDataEnv)
-				if err != nil {
-					return err
-				}
-				err = os.Unsetenv(snapshotWalEnv)
-				if err != nil {
-					return err
-				}
-				return nil
+			DeferCleanup(func() {
+				config.UnsetTemplateVariable(snapshotDataEnv)
+				config.UnsetTemplateVariable(snapshotWalEnv)
 			})
 
 			var backup *apiv1.Backup
@@ -480,22 +559,21 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-				envVars := storage.EnvVarsForSnapshots{
+				templateVars := storage.SnapshotTemplateVariables{
 					DataSnapshot: snapshotDataEnv,
 					WalSnapshot:  snapshotWalEnv,
 				}
-				err = storage.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
+				err = storage.SetSnapshotTemplateVariables(&snapshotList, backup, templateVars)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("creating a replica cluster from the snapshot", func() {
-				AssertReplicaModeCluster(
+				replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 					namespace,
 					clusterName,
 					sourceDBName,
 					replicaClusterSample,
-					testTableName,
-				)
+					testTableName)
 			})
 		})
 	})
@@ -503,6 +581,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
+//
+//nolint:dupl
 var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.LabelBackupRestore), Ordered, func() {
 	const (
 		replicaSwitchoverClusterDir = "/replica_mode_cluster/"
@@ -537,7 +617,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			"CREATE TABLE test_replication AS SELECT 1;",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		_ = switchWalAndGetLatestArchive(namespace, primary.Name)
+		_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
 
 		Eventually(func(g Gomega) {
 			podListA, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
@@ -582,19 +662,20 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 		}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
 	}
 
-	DescribeTable("should demote and promote the clusters correctly",
+	DescribeTable(
+		"should demote and promote the clusters correctly",
 		func(clusterAFile string, clusterBFile string, expectedTimeline int) {
 			var err error
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				// Since we use multiple times the same cluster names for the same minio instance, we need to clean it up
-				// between tests
-				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterAName))
+				// The object store isn't wiped between runs, so leftover files from a
+				// previous run of this test need cleaning up here
+				_, err = objectstore.CleanFiles(objectStoreEnv, path.Join("cluster-backups", clusterAName))
 				if err != nil {
 					return err
 				}
-				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterBName))
+				_, err = objectstore.CleanFiles(objectStoreEnv, path.Join("cluster-backups", clusterBName))
 				if err != nil {
 					return err
 				}
@@ -602,22 +683,26 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			})
 
 			stopLoad := make(chan struct{})
-			DeferCleanup(func() { close(stopLoad) })
+			var loadWG sync.WaitGroup
+			DeferCleanup(func() {
+				close(stopLoad)
+				loadWG.Wait()
+			})
 
-			By("creating the credentials for minio", func() {
+			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
 					env.Ctx,
 					env.Client,
 					namespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -625,7 +710,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				var err error
 				clusterAName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterAFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterAName, clusterAFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterAName, clusterAFile)
 			})
 			By("creating some load on the A cluster", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
@@ -638,7 +723,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				)
 				Expect(err).ToNot(HaveOccurred())
 
+				loadWG.Add(1)
 				go func() {
+					defer GinkgoRecover()
+					defer loadWG.Done()
 					for {
 						_, _, _ = exec.QueryInInstancePod(
 							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -677,7 +765,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				// Speed up backup finalization
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
-				_ = switchWalAndGetLatestArchive(namespace, primary.Name)
+				_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(
@@ -697,7 +785,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				var err error
 				clusterBName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterBFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterBName, clusterBFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterBName, clusterBFile)
 			})
 
 			By("demoting A to a replica", func() {
@@ -705,11 +793,11 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				Expect(err).ToNot(HaveOccurred())
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.Primary = clusterBName
-				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				Expect(objects.Patch(env.Ctx, env.Client, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					AssertPgRecoveryMode(&pod, true)
+					pgasserts.AssertPgRecoveryMode(env, &pod, true)
 				}
 			})
 
@@ -723,6 +811,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			By("forging an invalid token", func() {
 				tokenContent, err := utils.ParsePgControldataToken(token)
 				Expect(err).ToNot(HaveOccurred())
+				// A REDO location behind the replica's actual position is rejected outright
+				// (PhaseUnrecoverable); one ahead of it is retried instead, as "not yet caught up".
 				tokenContent.LatestCheckpointREDOLocation = "0/0"
 				Expect(tokenContent.IsValid()).To(Succeed())
 				invalidToken, err = tokenContent.Encode()
@@ -736,7 +826,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = invalidToken
 				cluster.Spec.ReplicaCluster.Primary = clusterBName
-				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				Expect(objects.Patch(env.Ctx, env.Client, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 
 			By("failing to promote B with the invalid token", func() {
@@ -765,7 +855,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = token
 				cluster.Spec.ReplicaCluster.Primary = clusterBName
-				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				Expect(objects.Patch(env.Ctx, env.Client, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 
 			By("reaching the target timeline", func() {
@@ -775,11 +865,11 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			By("verifying B contains the primary", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
-				AssertPgRecoveryMode(primary, false)
+				pgasserts.AssertPgRecoveryMode(env, primary, false)
 				podList, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					AssertPgRecoveryMode(&pod, true)
+					pgasserts.AssertPgRecoveryMode(env, &pod, true)
 				}
 			})
 
@@ -787,6 +877,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				validateReplication(namespace, clusterAName, clusterBName)
 			})
 		},
+		// B's own promotion is one timeline switch, common to both entries. Leaving
+		// replica-cluster mode then flips B's archive_mode GUC, forcing a primary restart:
+		// "restart" applies it in place (timeline 2); "switchover" instead promotes a
+		// different instance to apply it, costing a second switch (timeline 3).
 		Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
 		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
 	)
@@ -841,7 +935,8 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 			for _, standby := range standbys {
 				streamingInstances, err := getStreamingInfo(standby)
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(streamingInstances).To(BeEmpty(),
+				g.Expect(streamingInstances).To(
+					BeEmpty(),
 					fmt.Sprintf("the standby %s should not stream to any other instance", standby),
 				)
 			}

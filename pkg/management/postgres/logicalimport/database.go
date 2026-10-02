@@ -23,11 +23,11 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
-	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
@@ -67,7 +67,7 @@ func (ds *databaseSnapshotter) getDatabaseList(ctx context.Context, target pool.
 	defer func() {
 		closeErr := rows.Close()
 		if closeErr != nil {
-			contextLogger.Error(closeErr, "while closing rows: %w")
+			contextLogger.Error(closeErr, "while closing rows")
 		}
 	}()
 
@@ -94,21 +94,23 @@ func (ds *databaseSnapshotter) exportDatabases(
 	extraOptions []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	sectionsToExport := []string{}
+	sections := ds.getSectionsToExecute()
+	sectionsToExport := make([]string, 0, len(sections))
 
-	for _, section := range ds.getSectionsToExecute() {
+	for _, section := range sections {
 		sectionsToExport = append(sectionsToExport, fmt.Sprintf("--section=%s", section))
 	}
 
 	for _, database := range databases {
 		contextLogger.Info("exporting database", "databaseName", database)
 		dsn := target.GetDsn(database)
-		options := []string{
+		options := make([]string, 0, 6+len(sectionsToExport)+len(extraOptions))
+		options = append(options,
 			"-Fd",
 			"-f", generateFileNameForDatabase(database),
 			"-d", dsn,
 			"-v",
-		}
+		)
 		options = append(options, sectionsToExport...)
 		options = append(options, extraOptions...)
 
@@ -212,8 +214,6 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			"section", section,
 		)
 
-		var options []string
-
 		alwaysPresentOptions := []string{
 			"-U", "postgres",
 			"--no-owner",
@@ -224,7 +224,9 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			generateFileNameForDatabase(database),
 		}
 
-		options = append(options, flags.forSection(section)...)
+		sectionFlags := flags.forSection(section)
+		options := make([]string, 0, len(sectionFlags)+len(alwaysPresentOptions))
+		options = append(options, sectionFlags...)
 		options = append(options, alwaysPresentOptions...)
 
 		contextLogger.Info("Running pg_restore",
@@ -285,9 +287,30 @@ func (ds *databaseSnapshotter) executePostImportQueries(
 		return err
 	}
 
+	// The pool pins search_path to pg_catalog. User-authored import
+	// scripts expect the standard `"$user", public` resolution, so we
+	// set that once at the start of the batch on a dedicated *sql.Conn
+	// and reset at the end. Any user SET inside the script persists
+	// across statements within the same batch.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring dedicated connection for post-import queries: %w", err)
+	}
+	defer func() {
+		// Reset in a defer so the pin is restored even if a query fails;
+		// pooled pgx connections keep session GUCs across reuse.
+		if _, resetErr := conn.ExecContext(ctx, `RESET search_path`); resetErr != nil {
+			contextLogger.Error(resetErr, "while resetting search_path after post-import queries")
+		}
+		_ = conn.Close()
+	}()
+
+	if _, err := conn.ExecContext(ctx, `SET search_path TO "$user", public`); err != nil {
+		return fmt.Errorf("setting search_path before post-import queries: %w", err)
+	}
+
 	for _, query := range postImportQueries {
-		_, err := db.Exec(query)
-		if err != nil {
+		if _, err := conn.ExecContext(ctx, query); err != nil {
 			return err
 		}
 	}

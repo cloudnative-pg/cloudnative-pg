@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: pg-backup-azurite
 spec:
-  instances: 2
+  instances: 1
 
   # Persistent storage configuration
   storage:

@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -53,7 +52,7 @@ var _ = Describe("Deployment", func() {
 			Spec: apiv1.PoolerSpec{
 				Cluster:   apiv1.LocalObjectReference{Name: "test-cluster"},
 				Type:      apiv1.PoolerTypeRW,
-				Instances: ptr.To(int32(1)),
+				Instances: new(int32(1)),
 				Template:  &apiv1.PodTemplateSpec{},
 				PgBouncer: &apiv1.PgBouncerSpec{
 					PoolMode:  apiv1.PgBouncerPoolModeSession,
@@ -62,10 +61,12 @@ var _ = Describe("Deployment", func() {
 				DeploymentStrategy: &appsv1.DeploymentStrategy{
 					Type: appsv1.RollingUpdateDeploymentStrategyType,
 				},
-				//nolint:staticcheck // Using deprecated type during deprecation period
 				Monitoring: &apiv1.PoolerMonitoringConfiguration{
-					EnablePodMonitor: true,
+					EnablePodMonitor: true, //nolint:staticcheck
 				},
+			},
+			Status: apiv1.PoolerStatus{
+				Image: config.Current.PgbouncerImageName,
 			},
 		}
 
@@ -124,7 +125,7 @@ var _ = Describe("Deployment", func() {
 	})
 
 	It("sets the correct number of replicas", func() {
-		pooler.Spec.Instances = ptr.To(int32(3))
+		pooler.Spec.Instances = new(int32(3))
 		deployment, err := Deployment(pooler, cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
@@ -159,11 +160,20 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment.Spec.Template.Spec.InitContainers[0].Name).To(Equal(specs.BootstrapControllerContainerName))
 	})
 
-	It("sets the correct service account name", func() {
+	It("sets the correct service account name when not specified", func() {
 		deployment, err := Deployment(pooler, cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
 		Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal(pooler.Name))
+	})
+
+	It("sets the custom service account name when specified", func() {
+		customPooler := pooler.DeepCopy()
+		customPooler.Spec.ServiceAccountName = "custom-service-account"
+		deployment, err := Deployment(customPooler, cluster)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(deployment).ToNot(BeNil())
+		Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal("custom-service-account"))
 	})
 
 	It("sets the correct readiness probe", func() {

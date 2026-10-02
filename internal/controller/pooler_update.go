@@ -33,6 +33,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -59,18 +60,32 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
-	return createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, pgbouncer.NewPoolerPodMonitorManager(pooler))
+	return createOrPatchPodMonitor(
+		ctx,
+		r.Client,
+		r.DiscoveryClient,
+		pgbouncer.NewPoolerPodMonitorManager(pooler, resources.Cluster),
+	)
 }
 
 // updateDeployment update the deployment or create it when needed
-//
-//nolint:dupl
 func (r *PoolerReconciler) updateDeployment(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
+
+	// Skip deployment reconciliation while the image cannot be resolved:
+	// either Phase=Failed (catalog currently broken) or Status.Image is empty
+	// (no prior success). Unrelated spec changes wait until
+	// updatePoolerStatus resolves the image again.
+	if pooler.Status.Phase == apiv1.PoolerPhaseFailed || pooler.Status.Image == "" {
+		contextLog.Info("Skipping deployment reconciliation: pgbouncer image is not resolved",
+			"phase", pooler.Status.Phase,
+			"reason", pooler.Status.PhaseReason)
+		return nil
+	}
 
 	generatedDeployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
 	if err != nil {
@@ -141,6 +156,7 @@ func (r *PoolerReconciler) reconcileService(
 
 	if resources.Service == nil {
 		contextLog.Info("Creating the service")
+		servicespec.SetLastApplied(&expectedService.ObjectMeta, &expectedService.Spec)
 		err := r.Create(ctx, expectedService)
 		if err != nil && !apierrs.IsAlreadyExists(err) {
 			return err
@@ -150,13 +166,22 @@ func (r *PoolerReconciler) reconcileService(
 	}
 
 	patchedService := resources.Service.DeepCopy()
-	patchedService.Spec = expectedService.Spec
+	if err := servicespec.ApplyProposedChanges(
+		&patchedService.Spec,
+		&expectedService.Spec,
+		resources.Service.Annotations,
+	); err != nil {
+		return err
+	}
 	utils.MergeObjectsMetadata(patchedService, expectedService)
 
 	if reflect.DeepEqual(patchedService.ObjectMeta, resources.Service.ObjectMeta) &&
 		reflect.DeepEqual(patchedService.Spec, resources.Service.Spec) {
 		return nil
 	}
+
+	// Store the proposed spec for future three-way merges
+	servicespec.SetLastApplied(&patchedService.ObjectMeta, &expectedService.Spec)
 
 	contextLog.Info("Updating the service metadata")
 
@@ -191,7 +216,7 @@ func (r *PoolerReconciler) updateRBAC(
 		}
 	}
 
-	roleBinding := pgbouncer.RoleBinding(pooler)
+	roleBinding := pgbouncer.RoleBinding(pooler, pooler.GetServiceAccountName())
 	if resources.RoleBinding == nil {
 		if err := ctrl.SetControllerReference(pooler, &roleBinding, r.Scheme); err != nil {
 			return err
@@ -220,13 +245,21 @@ func (r *PoolerReconciler) updateRBAC(
 //   - the ServiceAccount exits
 //   - it contains the ImagePullSecret if required
 //
-// Any other property of the ServiceAccount is preserved
+// Any other property of the ServiceAccount is preserved.
+//
+// If a custom ServiceAccount is specified via serviceAccountName,
+// this method validates that it exists but does not create or modify it.
 func (r *PoolerReconciler) updateServiceAccount(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
+
+	// If a custom ServiceAccount is specified, validate it exists and return
+	if pooler.Spec.ServiceAccountName != "" {
+		return r.validateExistingServiceAccount(ctx, pooler)
+	}
 
 	pullSecretName, err := r.ensureServiceAccountPullSecret(ctx, pooler, configuration.Current)
 	if err != nil {
@@ -254,6 +287,26 @@ func (r *PoolerReconciler) updateServiceAccount(
 		if err := r.Patch(ctx, resources.ServiceAccount, client.MergeFrom(origServiceAccount)); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// validateExistingServiceAccount checks if the specified ServiceAccount exists for a Pooler
+func (r *PoolerReconciler) validateExistingServiceAccount(ctx context.Context, pooler *apiv1.Pooler) error {
+	var sa corev1.ServiceAccount
+	err := r.Get(ctx, client.ObjectKey{
+		Name:      pooler.Spec.ServiceAccountName,
+		Namespace: pooler.Namespace,
+	}, &sa)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(pooler, "Warning", "ServiceAccountNotFound",
+				"Specified ServiceAccount %q not found in namespace %q",
+				pooler.Spec.ServiceAccountName, pooler.Namespace)
+			return fmt.Errorf("serviceAccount %q not found: %w", pooler.Spec.ServiceAccountName, err)
+		}
+		return fmt.Errorf("while validating existing service account: %w", err)
 	}
 
 	return nil

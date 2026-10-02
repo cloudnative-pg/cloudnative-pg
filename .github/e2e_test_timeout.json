@@ -1,5 +1,5 @@
 {
-  "local": {
+  "kind": {
     "failover":                  240,
     "namespaceCreation":         30,
     "clusterIsReady":            600,
@@ -10,8 +10,25 @@
     "newTargetOnFailover":       120,
     "operatorIsReady":           120,
     "largeObject":               300,
-    "walsInMinio":               60,
-    "minioInstallation":         300,
+    "walsInObjectStore":         60,
+    "objectStoreInstallation":   300,
+    "backupIsReady":             180,
+    "drainNode":                 900,
+    "short":                     5
+  },
+  "k3d": {
+    "failover":                  240,
+    "namespaceCreation":         30,
+    "clusterIsReady":            600,
+    "clusterIsReadyQuick":       300,
+    "clusterIsReadySlow":        800,
+    "newPrimaryAfterSwitchover": 45,
+    "newPrimaryAfterFailover":   30,
+    "newTargetOnFailover":       120,
+    "operatorIsReady":           120,
+    "largeObject":               300,
+    "walsInObjectStore":         60,
+    "objectStoreInstallation":   300,
     "backupIsReady":             180,
     "drainNode":                 900,
     "short":                     5
@@ -27,8 +44,8 @@
     "newTargetOnFailover":       120,
     "operatorIsReady":           120,
     "largeObject":               300,
-    "walsInMinio":               60,
-    "minioInstallation":         300,
+    "walsInObjectStore":         60,
+    "objectStoreInstallation":   300,
     "backupIsReady":             180,
     "drainNode":                 900,
     "short":                     10
@@ -44,8 +61,8 @@
     "newTargetOnFailover":       120,
     "operatorIsReady":           120,
     "largeObject":               300,
-    "walsInMinio":               60,
-    "minioInstallation":         300,
+    "walsInObjectStore":         60,
+    "objectStoreInstallation":   300,
     "backupIsReady":             180,
     "drainNode":                 900,
     "short":                     10
@@ -61,8 +78,8 @@
     "newTargetOnFailover":       120,
     "operatorIsReady":           120,
     "largeObject":               300,
-    "walsInMinio":               60,
-    "minioInstallation":         300,
+    "walsInObjectStore":         60,
+    "objectStoreInstallation":   300,
     "backupIsReady":             180,
     "drainNode":                 900,
     "short":                     10
@@ -78,8 +95,8 @@
     "newTargetOnFailover":       120,
     "operatorIsReady":           120,
     "largeObject":               300,
-    "walsInMinio":               60,
-    "minioInstallation":         300,
+    "walsInObjectStore":         60,
+    "objectStoreInstallation":   300,
     "backupIsReady":             180,
     "drainNode":                 900,
     "short":                     10

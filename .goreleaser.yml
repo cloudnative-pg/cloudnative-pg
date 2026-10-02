@@ -124,6 +124,11 @@ snapshot:
 changelog:
   disable: true
 
+sboms:
+  - artifacts: archive
+  - id: packages
+    artifacts: package
+
 signs:
   - artifacts: all
     args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]

@@ -49,3 +49,14 @@ func LoadEnv(c string) ([]string, error) {
 
 	return nil, ErrUnsupportedObject
 }
+
+// Load reads an arbitrary object from the local cache. It returns ErrCacheMiss
+// when the key is not present.
+func Load(c string) (any, error) {
+	value, ok := cache.Load(c)
+	if !ok {
+		return nil, ErrCacheMiss
+	}
+
+	return value, nil
+}

@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -36,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// nolint: dupl
+//nolint:dupl
 var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 	var (
 		r              ClusterReconciler
@@ -73,7 +72,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 						},
 					},
 					Status: apiv1.DatabaseStatus{
-						Applied: ptr.To(true),
+						Applied: new(true),
 						Message: "",
 					},
 				},
@@ -164,7 +163,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 						},
 					},
 					Status: apiv1.PublicationStatus{
-						Applied: ptr.To(true),
+						Applied: new(true),
 						Message: "",
 					},
 				},
@@ -254,7 +253,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 						},
 					},
 					Status: apiv1.SubscriptionStatus{
-						Applied: ptr.To(true),
+						Applied: new(true),
 						Message: "",
 					},
 				},

@@ -21,10 +21,10 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -65,10 +65,9 @@ external:
 	return true
 }
 
-// isResizing returns true if PersistentVolumeClaimResizing condition is present
-func isResizing(pvc corev1.PersistentVolumeClaim) bool {
+func hasPVCCondition(pvc corev1.PersistentVolumeClaim, condType corev1.PersistentVolumeClaimConditionType) bool {
 	for _, condition := range pvc.Status.Conditions {
-		if condition.Type == corev1.PersistentVolumeClaimResizing {
+		if condition.Type == condType && condition.Status == corev1.ConditionTrue {
 			return true
 		}
 	}
@@ -76,10 +75,38 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return false
 }
 
+func isResizing(pvc corev1.PersistentVolumeClaim) bool {
+	return hasPVCCondition(pvc, corev1.PersistentVolumeClaimResizing)
+}
+
 // BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
 func BelongToInstance(cluster *apiv1.Cluster, instanceName, pvcName string) bool {
-	expectedPVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
+	expectedPVCs := GetExpectedInstancePVCNamesFromCluster(cluster, instanceName)
 	return slices.Contains(expectedPVCs, pvcName)
+}
+
+// GetTerminatingInstancePVCName returns the name of a PVC that the given
+// instance expects (and would (re)mount) which is still terminating (its
+// DeletionTimestamp is set), or "" if none is found.
+//
+// Callers should wait until this returns "" before (re)creating the instance,
+// to avoid binding it to a volume about to be garbage-collected (see #10985).
+// PVCs the instance no longer expects (e.g. a dropped tablespace) are ignored:
+// they will not be remounted, so they need not hold up recreation.
+func GetTerminatingInstancePVCName(
+	cluster *apiv1.Cluster,
+	instanceName string,
+	pvcs []corev1.PersistentVolumeClaim,
+) string {
+	for i := range pvcs {
+		if pvcs[i].DeletionTimestamp == nil {
+			continue
+		}
+		if BelongToInstance(cluster, instanceName, pvcs[i].Name) {
+			return pvcs[i].Name
+		}
+	}
+	return ""
 }
 
 func filterByInstanceExpectedPVCs(
@@ -87,7 +114,7 @@ func filterByInstanceExpectedPVCs(
 	instanceName string,
 	pvcs []corev1.PersistentVolumeClaim,
 ) []corev1.PersistentVolumeClaim {
-	expectedInstancePVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
+	expectedInstancePVCs := GetExpectedInstancePVCNamesFromCluster(cluster, instanceName)
 	var belongingPVCs []corev1.PersistentVolumeClaim
 	for i := range pvcs {
 		pvc := pvcs[i]
@@ -110,7 +137,7 @@ func getNamesFromPVCList(pvcs []corev1.PersistentVolumeClaim) []string {
 
 // InstanceHasMissingMounts returns true if the instance has expected PVCs that are not mounted
 func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool {
-	for _, pvcName := range getExpectedInstancePVCNamesFromCluster(cluster, instance.Name) {
+	for _, pvcName := range GetExpectedInstancePVCNamesFromCluster(cluster, instance.Name) {
 		if !IsUsedByPodSpec(instance.Spec, pvcName) {
 			return true
 		}
@@ -151,8 +178,8 @@ func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []e
 	return buildExpectedPVCs(instanceName, roles)
 }
 
-// getExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
-func getExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName string) []string {
+// GetExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
+func GetExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName string) []string {
 	expectedPVCs := getExpectedPVCsFromCluster(cluster, instanceName)
 	expectedPVCNames := make([]string, len(expectedPVCs))
 	for idx, mount := range expectedPVCs {

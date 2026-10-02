@@ -18,6 +18,4 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package context contains utility functions to work with context.Context
-//
-//nolint:revive
 package context

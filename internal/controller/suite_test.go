@@ -36,12 +36,12 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -80,6 +80,9 @@ func buildTestEnvironment() *testingEnvironment {
 		WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
 		WithIndex(&apiv1.Backup{}, ".spec.cluster.name", func(rawObj client.Object) []string {
 			return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
+		}).
+		WithIndex(&apiv1.Backup{}, backupPhase, func(rawObj client.Object) []string {
+			return []string{string(rawObj.(*apiv1.Backup).Status.Phase)}
 		}).
 		Build()
 	Expect(err).ToNot(HaveOccurred())
@@ -145,10 +148,16 @@ func newFakePooler(k8sClient client.Client, cluster *apiv1.Cluster) *apiv1.Poole
 				Name: cluster.Name,
 			},
 			Type:      "rw",
-			Instances: ptr.To(int32(1)),
+			Instances: new(int32(1)),
 			PgBouncer: &apiv1.PgBouncerSpec{
 				PoolMode: apiv1.PgBouncerPoolModeSession,
 			},
+		},
+		Status: apiv1.PoolerStatus{
+			// Pre-populate the resolved image so unit tests that call
+			// updateDeployment directly (bypassing updatePoolerStatus) start from
+			// the same precondition as a fully reconciled Pooler.
+			Image: configuration.Current.PgbouncerImageName,
 		},
 	}
 
@@ -213,7 +222,7 @@ func newFakeCNPGCluster(
 			},
 		},
 	}
-	// nolint: lll
+	//nolint: lll
 	// https://github.com/kubernetes-sigs/controller-runtime/blob/c3c1f058a9a080581e8fe99c004fcc792b2aff07/pkg/client/fake/doc.go#L30
 	for _, mutator := range mutators {
 		mutator(cluster)
@@ -320,7 +329,7 @@ func generateFakeClusterPods(
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {
 		idx++
-		pod, _ := specs.NewInstance(context.TODO(), *cluster, idx, true)
+		pod, _ := specs.NewInstance(context.TODO(), *cluster, idx)
 		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
 
 		err := c.Create(context.Background(), pod)
@@ -333,7 +342,7 @@ func generateFakeClusterPods(
 				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
 					{
-						Type:   corev1.ContainersReady,
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					},
 				},
@@ -357,7 +366,8 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	var jobs []batchv1.Job
 	for idx < cluster.Spec.Instances {
 		idx++
-		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
+		cmd := specs.BuildPrimaryBootstrapCommandViaInitdb(*cluster)
+		job := specs.CreatePrimaryJob(*cluster, idx, cmd.Role, cmd.Command, nil)
 		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 
 		err := c.Create(context.Background(), job)
@@ -374,7 +384,7 @@ func generateFakeInitDBJobsWithDefaultClient(k8sClient client.Client, cluster *a
 func generateClusterPVC(
 	c client.Client,
 	cluster *apiv1.Cluster,
-	status persistentvolumeclaim.PVCStatus, // nolint:unparam
+	status persistentvolumeclaim.PVCStatus, //nolint:unparam
 ) []corev1.PersistentVolumeClaim {
 	var idx int
 	var pvcs []corev1.PersistentVolumeClaim
@@ -478,7 +488,7 @@ type (
 func (f fakeClientWithIndexAdapter) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	var optsWithoutMatchingFields []client.ListOption
 	// matchingFields rely on indexes that we don't have on the default kube client
-	var matchingFields []client.ListOption // nolint:prealloc
+	var matchingFields []client.ListOption
 	for _, opt := range opts {
 		_, ok := opt.(client.MatchingFields)
 		if !ok {

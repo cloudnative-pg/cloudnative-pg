@@ -22,7 +22,6 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -33,7 +32,7 @@ import (
 var _ = Describe("Bootstrap Container creation", func() {
 	It("create a Bootstrap Container with resources with nil values into Limits and Requests fields", func() {
 		cluster := apiv1.Cluster{}
-		container := createBootstrapContainer(cluster)
+		container := createBootstrapContainer(cluster, nil)
 		Expect(container.Resources.Limits).To(BeNil())
 		Expect(container.Resources.Requests).To(BeNil())
 	})
@@ -52,7 +51,7 @@ var _ = Describe("Bootstrap Container creation", func() {
 				LogLevel: "info",
 			},
 		}
-		container := createBootstrapContainer(cluster)
+		container := createBootstrapContainer(cluster, nil)
 		Expect(container.Resources.Limits["a_test_field"]).ToNot(BeNil())
 		Expect(container.Resources.Requests["another_test_field"]).ToNot(BeNil())
 	})
@@ -84,7 +83,7 @@ var _ = Describe("GetSecurityContext", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				SecurityContext: &corev1.SecurityContext{
-					RunAsUser: ptr.To(int64(1000)),
+					RunAsUser: new(int64(1000)),
 				},
 			},
 		}
@@ -139,10 +138,10 @@ var _ = Describe("GetSecurityContext", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				SecurityContext: &corev1.SecurityContext{
-					Privileged:               ptr.To(true),
-					RunAsNonRoot:             ptr.To(false),
-					ReadOnlyRootFilesystem:   ptr.To(false),
-					AllowPrivilegeEscalation: ptr.To(true),
+					Privileged:               new(true),
+					RunAsNonRoot:             new(false),
+					ReadOnlyRootFilesystem:   new(false),
+					AllowPrivilegeEscalation: new(true),
 					Capabilities: &corev1.Capabilities{
 						Add:  []corev1.Capability{"NET_BIND_SERVICE"},
 						Drop: []corev1.Capability{"MKNOD"},

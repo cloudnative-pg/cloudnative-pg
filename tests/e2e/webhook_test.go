@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -79,9 +81,9 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		// Create a basic PG cluster
 		webhookNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, webhookNamespace, clusterName, sampleFile)
 		// Check if cluster is ready and the default values are populated
-		AssertClusterDefault(webhookNamespace, clusterName, env)
+		clusterasserts.AssertClusterDefault(env, webhookNamespace, clusterName)
 	})
 
 	It("Does not crash the operator when disabled", func() {
@@ -118,9 +120,9 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		// Create a basic PG cluster
 		webhookNamespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, webhookNamespace, clusterName, sampleFile)
 		// Check if cluster is ready and has no default value in the object
-		AssertClusterDefault(webhookNamespace, clusterName, env)
+		clusterasserts.AssertClusterDefault(env, webhookNamespace, clusterName)
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {
@@ -135,3 +137,21 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 	})
 })
+
+func AssertWebhookEnabled(env *environment.TestingEnvironment, mutating, validating string) {
+	By("re-setting namespace selector for all admission controllers", func() {
+		// Setting the namespace selector in MutatingWebhook and ValidatingWebhook
+		// to nil will go back to the default behaviour
+		mWhc, position, err := operator.GetMutatingWebhookByName(env.Ctx, env.Client, mutating)
+		Expect(err).ToNot(HaveOccurred())
+		mWhc.Webhooks[position].NamespaceSelector = nil
+		err = operator.UpdateMutatingWebhookConf(env.Ctx, env.Interface, mWhc)
+		Expect(err).ToNot(HaveOccurred())
+
+		vWhc, position, err := operator.GetValidatingWebhookByName(env.Ctx, env.Client, validating)
+		Expect(err).ToNot(HaveOccurred())
+		vWhc.Webhooks[position].NamespaceSelector = nil
+		err = operator.UpdateValidatingWebhookConf(env.Ctx, env.Interface, vWhc)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}

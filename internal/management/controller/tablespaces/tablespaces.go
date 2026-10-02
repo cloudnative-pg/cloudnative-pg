@@ -33,6 +33,7 @@ func evaluateNextSteps(
 	ctx context.Context,
 	tablespaceInDBSlice []infrastructure.Tablespace,
 	tablespaceInSpecSlice []apiv1.TablespaceConfiguration,
+	pvcChecker func(tablespaceName string) bool,
 ) []tablespaceReconcilerStep {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
 	contextLog.Debug("evaluating tablespace actions")
@@ -53,6 +54,7 @@ func evaluateNextSteps(
 		case !isTbsInDB:
 			result[idx] = &createTablespaceAction{
 				tablespace: tbsInSpec,
+				pvcChecker: pvcChecker,
 			}
 
 		case dbTablespace.Owner != tbsInSpec.Owner.Name:

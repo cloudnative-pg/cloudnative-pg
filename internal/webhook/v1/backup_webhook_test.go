@@ -21,7 +21,6 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -63,7 +62,7 @@ var _ = Describe("Backup webhook validate", func() {
 		backup := &apiv1.Backup{
 			Spec: apiv1.BackupSpec{
 				Method: apiv1.BackupMethodBarmanObjectStore,
-				Online: ptr.To(true),
+				Online: new(true),
 			},
 		}
 		result := v.validate(backup)

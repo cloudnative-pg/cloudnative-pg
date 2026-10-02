@@ -47,10 +47,10 @@ func CreateSyncScript(source, destination SequenceMap, offset int) string {
 			}
 		}
 
-		script.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&script,
 			"SELECT pg_catalog.setval(%s, %v);\n",
 			pq.QuoteLiteral(name),
-			sqlTargetValue))
+			sqlTargetValue)
 	}
 
 	return script.String()

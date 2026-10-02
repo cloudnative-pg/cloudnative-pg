@@ -44,6 +44,10 @@ var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 // elapsed yet
 var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
 
+// ErrQuorumCheckFailed is raised when a failover can't complete because the quorum check no
+// longer guarantees that the elected candidate holds every acknowledged transaction
+var ErrQuorumCheckFailed = fmt.Errorf("quorum check failed, cannot complete the failover")
+
 // reconcileTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion.
 // Returns the name of the primary if any changes was made and any error encountered.
@@ -97,6 +101,11 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	contextLogger := log.FromContext(ctx)
 
 	mostAdvancedInstance := status.Items[0]
+	if mostAdvancedInstance.IsFenced {
+		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
 	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
 		return "", nil
 	}
@@ -140,12 +149,41 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		if err != nil {
 			return "", err
 		}
+
+		// Mark the old primary as unhealthy immediately when failover starts,
+		// removing it from both the -rw and -ro services. This prevents replicas
+		// from reconnecting to it (primary_conninfo uses <cluster>-rw) and
+		// satisfying the synchronous replication quorum on a stale primary.
+		// Best-effort: the failover must proceed even if this fails. The
+		// retryable call in the reconcile loop's failover guard will correct
+		// the label on subsequent passes.
+		if err := r.markOldPrimaryAsUnhealthy(
+			ctx,
+			cluster.Status.CurrentPrimary,
+			resources.instances.Items,
+		); err != nil {
+			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
+				"oldPrimary", cluster.Status.CurrentPrimary)
+		}
 	}
 
 	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
 	// data that is being received (think about a switchover).
 	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
 		return "", ErrWalReceiversRunning
+	}
+
+	// Re-verify quorum safety right before failing over: the set of
+	// promotable replicas may have degraded since we committed to a failover,
+	// while we were waiting for the WAL receivers to go down.
+	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker && cluster.IsFailoverQuorumActive() {
+		safe, err := r.evaluateQuorumCheck(ctx, cluster, status)
+		if err != nil {
+			return "", err
+		}
+		if !safe {
+			return "", ErrQuorumCheckFailed
+		}
 	}
 
 	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
@@ -180,9 +218,43 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
 }
 
+// markOldPrimaryAsUnhealthy labels the old primary pod as unhealthy when failover
+// starts, removing it from both the -rw and -ro service selectors until
+// ReconcileMetadata restores the correct label after promotion completes.
+func (r *ClusterReconciler) markOldPrimaryAsUnhealthy(
+	ctx context.Context,
+	oldPrimaryName string,
+	instances []corev1.Pod,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	idx := slices.IndexFunc(instances, func(pod corev1.Pod) bool {
+		return pod.Name == oldPrimaryName
+	})
+	if idx == -1 {
+		contextLogger.Warning(
+			"Old primary pod not found in managed instances, skipping label demotion",
+			"oldPrimary", oldPrimaryName)
+		return nil
+	}
+
+	oldPrimary := &instances[idx]
+	if role, _ := utils.GetInstanceRole(oldPrimary.Labels); role == specs.ClusterRoleLabelUnhealthy {
+		return nil
+	}
+
+	contextLogger.Info(
+		"Setting primary label to unhealthy in the old primary during failover",
+		"pod", oldPrimary.Name)
+	origPod := oldPrimary.DeepCopy()
+	utils.SetInstanceRole(&oldPrimary.ObjectMeta, specs.ClusterRoleLabelUnhealthy)
+	return r.Patch(ctx, oldPrimary, client.MergeFrom(origPod))
+}
+
 // isNodeUnschedulableOrBeingDrained checks if a node is currently being drained.
-// nolint: lll
 // Copied from https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/7bacf2d36f397bd098b3388403e8759c480be7e5/cmd/hooks/prestop.go#L91
+//
+//nolint:lll
 func isNodeUnschedulableOrBeingDrained(node *corev1.Node, drainTaints []string) bool {
 	for _, taint := range node.Spec.Taints {
 		if slices.Contains(drainTaints, taint.Key) {
@@ -321,6 +393,18 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 		return "", ErrWalReceiversRunning
 	}
 
+	if status.Items[0].IsFenced {
+		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
+
+	if !status.Items[0].HasHTTPStatus() {
+		contextLogger.Info("No promotable candidate found, status not being reported, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
+
 	contextLogger.Info("Current target primary isn't healthy, failing over",
 		"newPrimary", status.Items[0].Pod.Name)
 	status.LogStatus(ctx)
@@ -333,6 +417,11 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 		return "", err
 	}
 
+	// Unlike the non-replica path, we do not strip the old primary label here:
+	// a designated primary does not accept application writes via the -rw
+	// service, so the split-brain window #10403 guards against does not
+	// apply. The retryable call in the reconcile loop's failover guard still
+	// relabels the pod on its next pass.
 	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
 }
 
