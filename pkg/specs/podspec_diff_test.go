@@ -300,6 +300,20 @@ var _ = Describe("automountServiceAccountToken drift detection", func() {
 	})
 })
 
+var _ = Describe("hostUsers drift detection", func() {
+	It("detects a change of the hostUsers value", func() {
+		current := corev1.PodSpec{}
+		target := corev1.PodSpec{HostUsers: ptr.To(false)}
+
+		match, diff := ComparePodSpecs(current, target)
+		Expect(match).To(BeFalse())
+		Expect(diff).To(Equal("host-users"))
+
+		match, _ = ComparePodSpecs(target, target)
+		Expect(match).To(BeTrue())
+	})
+})
+
 var _ = Describe("Command comparison", func() {
 	baseCommand := []string{"/controller/manager", "instance", "run"}
 
