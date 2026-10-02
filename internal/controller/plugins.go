@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"k8s.io/apimachinery/pkg/api/equality"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -77,15 +78,18 @@ func setStatusPluginHook(
 		plugin.Status = val
 	}
 
-	contextLogger.Info("patching cluster status with the updated plugin statuses")
-	contextLogger.Debug("diff detected",
-		"before", origCluster.Status.PluginStatus,
-		"after", cluster.Status.PluginStatus,
-	)
-
-	if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
-		return ctrl.Result{}, err
+	if !equality.Semantic.DeepEqual(origCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
+		contextLogger.Info("patching cluster status with the updated plugin statuses")
+		contextLogger.Debug("diff detected",
+			"before", origCluster.Status.PluginStatus,
+			"after", cluster.Status.PluginStatus,
+		)
+		if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
+
+	// Requeue in 5s regardless of the patch above, to keep polling the plugin's status
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
 
@@ -99,8 +103,8 @@ func setStatusPluginHook(
 // oscillating Phase between Healthy and the error phase. See #8582.
 //
 // The result is propagated from the underlying plugin operations so any
-// requeue they request (notably the 5s polling from setStatusPluginHook
-// after a successful status patch) is honored alongside the Healthy
+// requeue they request (notably the 5s polling setStatusPluginHook asks for
+// whenever a plugin reports a status) is honored alongside the Healthy
 // registration.
 func (r *ClusterReconciler) finalizeReconciliation(
 	ctx context.Context,

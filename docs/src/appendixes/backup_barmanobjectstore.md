@@ -248,23 +248,25 @@ spec:
         backupRetentionPolicy: "keep"
 ```
 
-## Extra options for the backup and WAL commands
+## Extra options for the backup, WAL Archiving, and Restore
 
-You can append additional options to the `barman-cloud-backup` and `barman-cloud-wal-archive` commands by using
-the `additionalCommandArgs` property in the
-`.spec.backup.barmanObjectStore.data` and `.spec.backup.barmanObjectStore.wal` sections respectively.
-These properties are lists of strings that will be appended to the
-`barman-cloud-backup` and `barman-cloud-wal-archive` commands.
+You can append additional options to the underlying `barman-cloud-*` commands using
+the corresponding fields in the `barmanObjectStore` section of the `Cluster` resource.
+
+- `.barmanObjectStore.data.additionalCommandArgs` for the `barman-cloud-backup`
+- `.barmanObjectStore.data.restoreAdditionalCommandArgs` for the `barman-cloud-restore`
+- `.barmanObjectStore.wal.archiveAdditionalCommandArgs` for the `barman-cloud-wal-archive`
+- `.barmanObjectStore.wal.restoreAdditionalCommandArgs` for the `barman-cloud-wal-restore`
+
+
+Each field accepts a list of string arguments. If an argument conflicts with one already
+present in the declared options in its section, the user-provided value will be ignored.
 
 For example, you can use the `--read-timeout=60` to customize the connection
 reading timeout.
 
-For additional options supported by `barman-cloud-backup` and `barman-cloud-wal-archive` commands you can refer to the
+For additional options supported by `barman-cloud-*` commands you can refer to the
 official barman documentation [here](https://www.pgbarman.org/documentation/).
-
-If an option provided in `additionalCommandArgs` is already present in the
-declared options in its section (`.spec.backup.barmanObjectStore.data` or `.spec.backup.barmanObjectStore.wal`), the extra option will be
-ignored.
 
 The following is an example of how to use this property:
 
@@ -284,7 +286,25 @@ spec:
         - "--read-timeout=60"
 ```
 
-For WAL files:
+For restores, the `restoreAdditionalCommandArgs` are taken from the `barmanObjectStore`
+of the external cluster the recovery is reading from, that is the entry named by
+`.spec.bootstrap.recovery.source`, not from `.spec.backup`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        [...]
+        data:
+          restoreAdditionalCommandArgs:
+          - "--read-timeout=60"
+```
+
+For WAL Archiving files:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -295,9 +315,25 @@ spec:
     barmanObjectStore:
       [...]
       wal:
-        additionalCommandArgs:
+        archiveAdditionalCommandArgs:
         - "--max-concurrency=1"
         - "--read-timeout=60"
+```
+
+For WAL Restoring files:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        [...]
+        wal:
+          restoreAdditionalCommandArgs:
+          - "--read-timeout=60"
 ```
 
 ## Recovery from an object store

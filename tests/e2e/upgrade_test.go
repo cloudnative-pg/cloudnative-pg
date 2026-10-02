@@ -39,12 +39,11 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
@@ -90,6 +89,7 @@ To check the soundness of the upgrade, on each of the four scenarios:
 
 */
 
+//nolint:dupl
 var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), Ordered, Serial, func() {
 	const (
 		operatorNamespace       = "cnpg-system"
@@ -122,8 +122,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	)
 
 	BeforeAll(func() {
-		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
-			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
+		if config.Current().SkipUpgradeSuite {
+			Skip("Skipping upgrade test because skipUpgradeSuite is set in the e2e configuration")
 		}
 		if IsOpenshift() {
 			Skip("This test case is not applicable on OpenShift clusters")
@@ -141,9 +141,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		err := namespaces.EnsureNamespace(env.Ctx, env.Client, operatorNamespace)
 		Expect(err).NotTo(HaveOccurred())
 
-		dockerServer := os.Getenv("DOCKER_SERVER")
-		dockerUsername := os.Getenv("DOCKER_USERNAME")
-		dockerPassword := os.Getenv("DOCKER_PASSWORD")
+		pullSecret := config.Current().RegistryPullSecret
+		dockerServer := pullSecret.Server
+		dockerUsername := pullSecret.Username
+		dockerPassword := pullSecret.Password
 		if dockerServer != "" && dockerUsername != "" && dockerPassword != "" {
 			_, _, err := run.Run(fmt.Sprintf(
 				`kubectl -n %v create secret docker-registry
@@ -308,7 +309,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return err
 		}
 		for _, pod := range pods.Items {
-			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod, true)
+			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod)
 			if err != nil {
 				continue
 			}
@@ -526,8 +527,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By(fmt.Sprintf("creating a Cluster in the '%v' upgradeNamespace",
 			upgradeNamespace), func() {
 			// set the serverName to a random name
-			err := os.Setenv("SERVER_NAME", serverName1)
-			Expect(err).ToNot(HaveOccurred())
+			config.SetTemplateVariable("SERVER_NAME", serverName1)
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile)
 
 			if online {
@@ -687,8 +687,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		By("installing a second Cluster on the upgraded operator", func() {
 			// set the serverName to a random name
-			err := os.Setenv("SERVER_NAME", serverName2)
-			Expect(err).ToNot(HaveOccurred())
+			config.SetTemplateVariable("SERVER_NAME", serverName2)
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile2)
 			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady])
 		})
@@ -812,6 +811,23 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 
 		It("keeps clusters working after an online upgrade", func() {
+			// TODO: remove this Skip in the next minor version.
+			// This version unconditionally sets automountServiceAccountToken=false on
+			// instance Pods, whereas the previous release left it unset. The resulting
+			// spec drift causes a one-time pod rollout when upgrading from the previous
+			// release, which is expected and accepted for this minor version bump.
+			//
+			// Skip aborts the spec immediately, so the namespace cleanup must be
+			// registered beforehand: otherwise the cnpg-system namespace (and its
+			// pull secret) created by the BeforeEach above survives into the next
+			// spec, whose BeforeEach then fails trying to recreate the same secret.
+			DeferCleanup(func() {
+				Expect(namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 60)).
+					To(Succeed())
+			})
+			Skip("one-time pod rollout expected when upgrading from the previous release " +
+				"due to automountServiceAccountToken now being hardcoded to false")
+
 			upgradeNamespacePrefix := onlineUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
 				operator.CreateConfigMap(env.Ctx, env.Client, operatorNamespace, configName, true)
@@ -861,106 +877,5 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, false)
 		})
-
-		It("keeps a plugin-backed cluster working across an operator upgrade",
-			Label(tests.LabelPluginBarmanCloud), func() {
-				const (
-					pluginClusterName     = "cluster-plugin-upgrade"
-					pluginClusterManifest = fixturesDir + "/upgrade/cluster-with-plugin.yaml.template"
-					pluginBackupManifest  = fixturesDir + "/upgrade/backup-plugin.yaml"
-					barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
-				)
-
-				By("applying environment changes for current upgrade to be performed", func() {
-					operator.CreateConfigMap(env.Ctx, env.Client, operatorNamespace, configName, true)
-				})
-
-				GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
-				deployOperator(currentOperatorManifest)
-				// This spec owns its operator lifecycle, so it tears down cnpg-system
-				// itself. cleanupOperatorAndObjectStore is not reused: it also cleans
-				// object store paths that only the in-core upgrade specs create, which
-				// would fail here. The plugin is removed before cnpg-system because the operator
-				// puts a cnpg.io/cleanupPlugin finalizer on the plugin Service, so
-				// deleting cnpg-system wholesale would otherwise wedge the namespace
-				// on that finalizer; removing the plugin while the operator is still
-				// up lets it be cleared.
-				DeferCleanup(func() {
-					if CurrentSpecReport().Failed() {
-						namespaces.DumpNamespaceObjects(env.Ctx, env.Client,
-							objectStoreEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"objectstore.log")
-						operator.Dump(env.Ctx, env.Client,
-							operatorNamespace, "out/"+CurrentSpecReport().LeafNodeText+"operator.log")
-					}
-					_, stderr, err := run.Run(fmt.Sprintf(
-						"kubectl delete deployment,service barman-cloud -n %s "+
-							"--ignore-not-found --wait=true --timeout=2m",
-						operatorNamespace))
-					Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
-					Expect(namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 120)).
-						To(Succeed())
-				})
-
-				// The upgrade test owns its operator lifecycle and recreates
-				// cnpg-system, so the plugin has to be installed here, after the
-				// operator is up. cert-manager is cluster-scoped and the plugin's
-				// Deployment lives outside the operator manifest, so both survive the
-				// in-place upgrade to the prime build below.
-				By("installing cert-manager and the Barman Cloud plugin", func() {
-					_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
-					Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
-				})
-
-				upgradeNamespace := assertCreateNamespace("plugin-upgrade")
-
-				setupPluginObjectStore(upgradeNamespace, pluginClusterName)
-
-				By("creating a cluster that archives through the plugin", func() {
-					resources.CreateResourceFromFile(env, upgradeNamespace, pluginClusterManifest)
-					clusterasserts.AssertClusterIsReady(env, upgradeNamespace, pluginClusterName,
-						testTimeouts[timeouts.ClusterIsReady])
-				})
-
-				assertPluginLoaded := func() {
-					clusterasserts.AssertPluginLoaded(env, upgradeNamespace, pluginClusterName,
-						barmanCloudPluginName, 120)
-				}
-
-				By("verifying the plugin is loaded before the upgrade", assertPluginLoaded)
-
-				By("upgrading the operator to the prime build", func() {
-					deployOperator(primeOperatorManifest)
-				})
-
-				By("waiting for the in-place instance manager rollout to complete", func() {
-					// This spec enables ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES, so
-					// the upgrade replaces the instance manager process inside each
-					// pod. The backup below must not race that rollout: a backup
-					// started on an instance whose manager is replaced moments later
-					// dies with it, leaving the Backup resource in the "started"
-					// phase forever.
-					Expect(assertOnlineManagerRollout(upgradeNamespace, pluginClusterName, 2)).To(BeTrue(),
-						"expected an online instance manager rollout on both instances")
-				})
-
-				By("verifying the plugin-backed cluster is still healthy after the upgrade", func() {
-					clusterasserts.AssertClusterIsReady(env, upgradeNamespace, pluginClusterName, 300)
-				})
-				By("verifying the plugin is still loaded after the upgrade", assertPluginLoaded)
-
-				By("verifying WAL archiving still works after the upgrade", func() {
-					// Switch a WAL after the upgrade and require it to reach the
-					// object store: the archiving condition on the cluster may still
-					// reflect pre-upgrade activity, so it is not enough here.
-					objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
-						upgradeNamespace, pluginClusterName, pluginClusterName)
-				})
-
-				By("taking a backup through the plugin after the upgrade", func() {
-					backups.Execute(env.Ctx, env.Client, env.Scheme, upgradeNamespace, pluginBackupManifest, false,
-						testTimeouts[timeouts.BackupIsReady])
-					backupasserts.AssertBackupConditionInClusterStatus(env, upgradeNamespace, pluginClusterName)
-				})
-			})
 	})
 })

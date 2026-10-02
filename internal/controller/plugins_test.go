@@ -29,9 +29,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -44,6 +46,7 @@ type fakePluginClient struct {
 	setClusterStatusErr      error
 	setStatusInClusterCalled bool
 	postReconcileResult      pluginClient.ReconcilerHookResult
+	metadataList             []connection.Metadata
 }
 
 func (f *fakePluginClient) SetStatusInCluster(
@@ -62,16 +65,21 @@ func (f *fakePluginClient) PostReconcile(
 	return f.postReconcileResult
 }
 
+func (f *fakePluginClient) MetadataList() []connection.Metadata {
+	return f.metadataList
+}
+
 var _ = Describe("setStatusPluginHook", func() {
 	const pluginName = "test1_plugin"
 	var (
-		cluster   *apiv1.Cluster
-		cli       k8client.Client
-		pluginCli *fakePluginClient
+		cluster       *apiv1.Cluster
+		cli           k8client.Client
+		pluginCli     *fakePluginClient
+		statusPatches int
 	)
 
-	BeforeEach(func() {
-		cluster = &apiv1.Cluster{
+	newCluster := func(reportedStatus string) *apiv1.Cluster {
+		return &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "test-suite",
@@ -79,17 +87,43 @@ var _ = Describe("setStatusPluginHook", func() {
 			Status: apiv1.ClusterStatus{
 				PluginStatus: []apiv1.PluginStatus{
 					{
-						Name: pluginName,
+						Name:   pluginName,
+						Status: reportedStatus,
 					},
 				},
 			},
 		}
-		cli = fake.NewClientBuilder().
+	}
+
+	// newClient counts the status patches reaching the API server, so a spec
+	// can tell "converged" from "written again with the same content".
+	newClient := func(cluster *apiv1.Cluster) k8client.Client {
+		return fake.NewClientBuilder().
 			WithObjects(cluster).
 			WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithStatusSubresource(&apiv1.Cluster{}).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(
+					ctx context.Context,
+					c k8client.Client,
+					subResourceName string,
+					obj k8client.Object,
+					patch k8client.Patch,
+					opts ...k8client.SubResourcePatchOption,
+				) error {
+					if subResourceName == "status" {
+						statusPatches++
+					}
+					return c.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+				},
+			}).
 			Build()
+	}
 
+	BeforeEach(func() {
+		statusPatches = 0
+		cluster = newCluster("")
+		cli = newClient(cluster)
 		pluginCli = &fakePluginClient{}
 	})
 
@@ -101,6 +135,24 @@ var _ = Describe("setStatusPluginHook", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res).ToNot(BeNil())
 		Expect(cluster.Status.PluginStatus[0].Status).To(BeEquivalentTo(string(content)))
+		Expect(statusPatches).To(Equal(1))
+	})
+
+	It("does not patch when the plugin reports the status already stored", func(ctx SpecContext) {
+		// The other half of the flapping loop: re-writing an unchanged status
+		// wakes the reconciler through its own Cluster watch, which has no
+		// predicate, so the loop sustains itself.
+		const content = `{"key":"value"}`
+		cluster = newCluster(content)
+		cli = newClient(cluster)
+		pluginCli.setClusterStatus = map[string]string{pluginName: content}
+
+		res, err := setStatusPluginHook(ctx, cli, pluginCli, cluster)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(statusPatches).To(BeZero())
+		// Converging must not stop the polling of the reporting plugin.
+		Expect(res.RequeueAfter).To(Equal(5 * time.Second))
 	})
 })
 
@@ -152,8 +204,8 @@ var _ = Describe("finalizeReconciliation", func() {
 	})
 
 	It("registers PhaseHealthy and propagates the requeue when plugins patch their statuses", func(ctx SpecContext) {
-		// setStatusPluginHook returns RequeueAfter=5s on every successful
-		// status patch. That requeue must NOT short-circuit the PhaseHealthy
+		// setStatusPluginHook returns RequeueAfter=5s whenever a plugin
+		// reports a status. That requeue must NOT short-circuit the PhaseHealthy
 		// registration: clusters with status-reporting plugins (e.g.
 		// barman-cloud) requeue every 5s in steady state and would otherwise
 		// never reach Healthy.

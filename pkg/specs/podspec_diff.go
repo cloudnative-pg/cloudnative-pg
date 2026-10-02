@@ -22,10 +22,12 @@ package specs
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -89,6 +91,9 @@ func ComparePodSpecs(
 		"service-account-name": func() bool {
 			return currentPodSpec.ServiceAccountName == targetPodSpec.ServiceAccountName
 		},
+		"automount-service-account-token": func() bool {
+			return ptr.Equal(currentPodSpec.AutomountServiceAccountToken, targetPodSpec.AutomountServiceAccountToken)
+		},
 		"scheduler-name": func() bool {
 			return currentPodSpec.SchedulerName == targetPodSpec.SchedulerName
 		},
@@ -115,7 +120,7 @@ func ComparePodSpecs(
 
 // compareMaps returns true iff the maps are equivalent, otherwise returns
 // false, and the first difference found
-func compareMaps[V comparable](current, target map[string]V) (bool, string) {
+func compareMaps[V any](current, target map[string]V) (bool, string) {
 	for name, currentValue := range current {
 		targetValue, found := target[name]
 		if !found {
@@ -178,6 +183,20 @@ func normalizeVolumeMountName(mount corev1.VolumeMount) string {
 	return name
 }
 
+// normalizeCommand drops the instance manager flag that Pods created before
+// 1.31 pass and that the current one no longer sets. Their PodSpec annotation
+// still records it, so comparing the command verbatim reports a spec difference
+// and rolls every existing instance, even when
+// ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES would otherwise upgrade them without
+// recreating the Pod.
+//
+// TODO: delete this function after minor version 1.30 is discontinued
+func normalizeCommand(command []string) []string {
+	return slices.DeleteFunc(slices.Clone(command), func(arg string) bool {
+		return arg == "--status-port-tls"
+	})
+}
+
 func compareVolumes(currentVolumes, targetVolumes []corev1.Volume) (bool, string) {
 	current := make(map[string]corev1.Volume)
 	target := make(map[string]corev1.Volume)
@@ -231,7 +250,10 @@ func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool
 			return reflect.DeepEqual(currentContainer.StartupProbe, targetContainer.StartupProbe)
 		},
 		"command": func() bool {
-			return reflect.DeepEqual(currentContainer.Command, targetContainer.Command)
+			return slices.Equal(
+				normalizeCommand(currentContainer.Command),
+				normalizeCommand(targetContainer.Command),
+			)
 		},
 		"resources": func() bool {
 			// semantic equality will compare the two objects semantically, not only numbers

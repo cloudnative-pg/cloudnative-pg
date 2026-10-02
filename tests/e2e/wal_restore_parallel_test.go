@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -50,7 +51,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 	)
 
 	var namespace string
-	var primary, standby, latestWAL, walFile1, walFile2, walFile3, walFile4, walFile5, walFile6 string
+	var primary, standby, latestWAL string
+	var walFile1, walFile2, walFile3, walFile4, walFile5, walFile6, walFile7, walFile8 string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -378,6 +380,110 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"end-of-wal-stream flag is set for #7 and #8 wal is not present")
+		})
+
+		// Generate a new wal file; the archive also contains WAL #7.
+		By("forging a new wal file, the #7 wal", func() {
+			walFile7 = "0000000100000000000000F7"
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
+				walFile7)).
+				ShouldNot(HaveOccurred())
+		})
+
+		// listSpoolContents returns the exact content of the spool directory,
+		// one file name per line. The TestFileExist/TestDirectoryEmpty helpers
+		// cannot express "the spool contains no WAL files": kubectl exec runs
+		// the command with no shell, so glob patterns are never expanded.
+		listSpoolContents := func() (string, error) {
+			stdout, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"ls", "-A", SpoolDirectory)
+			return strings.TrimSpace(stdout), err
+		}
+
+		// Invoke the wal-restore command in rewind mode requesting the #7 file,
+		// with the end-of-wal-stream flag still set.
+		// Expected outcome:
+		//		exit code 0, #7 is in the output location, nothing is prefetched
+		//		into the spool directory, and the flag is neither consumed nor unset.
+		By("invoking the wal-restore command in rewind mode with a stale end-of-wal-stream flag", func() {
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", "--rewind", walFile7, PgWalPath+"/"+walFile7)
+			Expect(err).ToNot(HaveOccurred(),
+				"exit code should be 0: in rewind mode a stale flag must not abort the restore")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile7) }).
+				WithTimeout(RetryTimeout).
+				Should(BeTrue(),
+					"#7 wal is in the output location")
+			Eventually(listSpoolContents).
+				WithTimeout(RetryTimeout).
+				Should(Equal("end-of-wal-stream"),
+					"the spool directory contains the untouched end-of-wal-stream flag "+
+						"and no prefetched wals")
+		})
+
+		// Reset state for the next scenario: this plain (non-rewind) invocation
+		// clears the stale flag from the step above. It does not fetch
+		// walFile8 itself; #8 is forged onto the archive and restored below.
+		// Expected outcome:
+		//		exit code 1, the flag is consumed and unset.
+		By("consuming the end-of-wal-stream flag with a regular invocation", func() {
+			walFile8 = "0000000100000000000000F8"
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile8, PgWalPath+"/"+walFile8)
+			Expect(err).To(HaveOccurred(), "exit code should be 1 since the flag is set")
+			Eventually(listSpoolContents).
+				WithTimeout(RetryTimeout).
+				Should(BeEmpty(),
+					"end-of-wal-stream flag is consumed and unset")
+		})
+
+		// Generate a new wal file; the archive also contains WAL #8.
+		By("forging a new wal file, the #8 wal", func() {
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
+				walFile8)).
+				ShouldNot(HaveOccurred())
+		})
+
+		// Invoke the wal-restore command in rewind mode requesting the #8 file,
+		// while #9 and #10 are not in the archive.
+		// Expected outcome:
+		//		exit code 0, #8 is in the output location, no files in the spool directory.
+		//		The flag is not set, while a regular invocation would have set it.
+		By("invoking the wal-restore command in rewind mode does not set the flag", func() {
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", "--rewind", walFile8, PgWalPath+"/"+walFile8)
+			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile8) }).
+				WithTimeout(RetryTimeout).
+				Should(BeTrue(),
+					"#8 wal is in the output location")
+			Eventually(listSpoolContents).
+				WithTimeout(RetryTimeout).
+				Should(BeEmpty(),
+					"the spool directory is empty: no prefetched wals, and no "+
+						"end-of-wal-stream flag set by the rewind mode")
 		})
 	})
 })

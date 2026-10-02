@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -189,7 +190,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 
 	By("setting the TargetPrimary to node2 to trigger a switchover", func() {
 		targetPrimary = clusterName + "-2"
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Status.TargetPrimary = targetPrimary

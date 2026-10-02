@@ -123,7 +123,7 @@ func assertSwitchoverWithHistory(
 	})
 
 	By(fmt.Sprintf("setting the TargetPrimary node to trigger a switchover to %s", targetPrimary), func() {
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Status.TargetPrimary = targetPrimary
@@ -416,8 +416,14 @@ func AssertClusterDefault(
 
 		validator := webhookv1.ClusterCustomValidator{}
 		validationWarn, validationErr := validator.ValidateCreate(env.Ctx, cluster)
-		Expect(validationWarn).To(BeEmpty())
 		Expect(validationErr).ToNot(HaveOccurred())
+		// The fixtures used by this test intentionally omit synchronous
+		// replication, so the only warning they can legitimately raise is
+		// the one about that.
+		Expect(validationWarn).To(Or(
+			BeEmpty(),
+			HaveEach(ContainSubstring("no synchronous replication configured")),
+		))
 	})
 }
 

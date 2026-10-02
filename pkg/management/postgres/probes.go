@@ -619,7 +619,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 			wal_sync,
 			wal_write_time,
 			wal_sync_time,
-			stats_reset
+			COALESCE(stats_reset, '-infinity')
 			FROM pg_catalog.pg_stat_wal`)
 		if err := row.Scan(
 			&pgWalStat.WalRecords,
@@ -643,7 +643,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 		wal_fpi,
 		wal_bytes,
 		wal_buffers_full,
-		stats_reset
+		COALESCE(stats_reset, '-infinity')
 	    FROM pg_catalog.pg_stat_wal`)
 		if err := row.Scan(
 			&pgWalStat.WalRecords,

@@ -261,9 +261,13 @@ builtinLocale
     `localeProvider` to be set to `builtin`. Available from PostgreSQL 17.
 
 dataChecksums
-:   When `dataChecksums` is set to `true`, CloudNativePG invokes the `-k` option in
-    `initdb` to enable checksums on data pages and help detect corruption by the
-    I/O system - that would otherwise be silent (default: `false`).
+:   Data checksums help detect corruption of data pages that would otherwise
+    be silent. From PostgreSQL 18, where data checksums are enabled by default,
+    setting `dataChecksums` to `false` makes CloudNativePG pass the
+    `--no-data-checksums` option to `initdb` to disable them. On PostgreSQL
+    versions before 18, setting `dataChecksums` to `true` makes CloudNativePG
+    pass the `--data-checksums` option to `initdb` to enable them. When unset,
+    the `initdb` default of the PostgreSQL version in use applies.
 
 encoding
 :   When `encoding` set to a value, CloudNativePG passes it to the `--encoding`
@@ -624,7 +628,7 @@ file on the source PostgreSQL instance:
 host replication streaming_replica all md5
 ```
 
-The following manifest creates a new PostgreSQL 18.4 cluster,
+The following manifest creates a new PostgreSQL 18.6 cluster,
 called `target-db`, using the `pg_basebackup` bootstrap method
 to clone an external PostgreSQL cluster defined as `source-db`
 (in the `externalClusters` array). As you can see, the `source-db`
@@ -639,7 +643,7 @@ metadata:
   name: target-db
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   bootstrap:
     pg_basebackup:
@@ -659,7 +663,7 @@ spec:
 ```
 
 All the requirements must be met for the clone operation to work, including
-the same PostgreSQL version (in our case 18.4).
+the same PostgreSQL version (in our case 18.6).
 
 #### TLS certificate authentication
 
@@ -675,7 +679,7 @@ in the same Kubernetes cluster.
     outside the Kubernetes cluster.
 :::
 
-The manifest defines a new PostgreSQL 18.4 cluster called `cluster-clone-tls`,
+The manifest defines a new PostgreSQL 18.6 cluster called `cluster-clone-tls`,
 which is bootstrapped using the `pg_basebackup` method from the `cluster-example`
 external cluster. The host is identified by the read/write service
 in the same cluster, while the `streaming_replica` user is authenticated
@@ -690,7 +694,7 @@ metadata:
   name: cluster-clone-tls
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   bootstrap:
     pg_basebackup:

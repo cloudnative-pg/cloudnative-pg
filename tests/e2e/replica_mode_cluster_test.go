@@ -21,9 +21,9 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
@@ -113,7 +114,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			assertReplicaClusterTopology(replicaNamespace, replicaName)
 
 			By("increasing max_connections to 120 on the replica cluster", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, replicaNamespace, replicaName)
 					if err != nil {
 						return err
@@ -151,7 +152,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("decreasing max_connections to 110 on the replica cluster", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, replicaNamespace, replicaName)
 					if err != nil {
 						return err
@@ -514,16 +515,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName        = "replica_mode_snapshot"
 			)
 
-			DeferCleanup(func() error {
-				err := os.Unsetenv(snapshotDataEnv)
-				if err != nil {
-					return err
-				}
-				err = os.Unsetenv(snapshotWalEnv)
-				if err != nil {
-					return err
-				}
-				return nil
+			DeferCleanup(func() {
+				config.UnsetTemplateVariable(snapshotDataEnv)
+				config.UnsetTemplateVariable(snapshotWalEnv)
 			})
 
 			var backup *apiv1.Backup
@@ -566,11 +560,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-				envVars := storage.EnvVarsForSnapshots{
+				templateVars := storage.SnapshotTemplateVariables{
 					DataSnapshot: snapshotDataEnv,
 					WalSnapshot:  snapshotWalEnv,
 				}
-				err = storage.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
+				err = storage.SetSnapshotTemplateVariables(&snapshotList, backup, templateVars)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -588,6 +582,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
+//
+//nolint:dupl
 var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.LabelBackupRestore), Ordered, func() {
 	const (
 		replicaSwitchoverClusterDir = "/replica_mode_cluster/"
@@ -674,8 +670,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				// Since we use multiple times the same cluster names for the same object store instance, we need to clean it up
-				// between tests
+				// The object store isn't wiped between runs, so leftover files from a
+				// previous run of this test need cleaning up here
 				_, err = objectstore.CleanFiles(objectStoreEnv, path.Join("cluster-backups", clusterAName))
 				if err != nil {
 					return err
@@ -688,7 +684,11 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			})
 
 			stopLoad := make(chan struct{})
-			DeferCleanup(func() { close(stopLoad) })
+			var loadWG sync.WaitGroup
+			DeferCleanup(func() {
+				close(stopLoad)
+				loadWG.Wait()
+			})
 
 			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
@@ -724,7 +724,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				)
 				Expect(err).ToNot(HaveOccurred())
 
+				loadWG.Add(1)
 				go func() {
+					defer GinkgoRecover()
+					defer loadWG.Done()
 					for {
 						_, _, _ = exec.QueryInInstancePod(
 							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -809,6 +812,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			By("forging an invalid token", func() {
 				tokenContent, err := utils.ParsePgControldataToken(token)
 				Expect(err).ToNot(HaveOccurred())
+				// A REDO location behind the replica's actual position is rejected outright
+				// (PhaseUnrecoverable); one ahead of it is retried instead, as "not yet caught up".
 				tokenContent.LatestCheckpointREDOLocation = "0/0"
 				Expect(tokenContent.IsValid()).To(Succeed())
 				invalidToken, err = tokenContent.Encode()
@@ -873,6 +878,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				validateReplication(namespace, clusterAName, clusterBName)
 			})
 		},
+		// B's own promotion is one timeline switch, common to both entries. Leaving
+		// replica-cluster mode then flips B's archive_mode GUC, forcing a primary restart:
+		// "restart" applies it in place (timeline 2); "switchover" instead promotes a
+		// different instance to apply it, costing a second switch (timeline 3).
 		Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
 		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
 	)

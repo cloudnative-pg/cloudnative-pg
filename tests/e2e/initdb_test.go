@@ -180,13 +180,14 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			// function has been invoked in the application database. The query
 			// is fully schema-qualified so it cannot itself trigger the shadow.
 			shadowCalls := func() string {
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := exec.EventuallyExecQueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "app",
-					"SELECT pg_catalog.count(*)::text FROM public.shadow_calls")
+					"SELECT pg_catalog.count(*)::text FROM public.shadow_calls",
+					RetryTimeout, PollingTime)
 				Expect(err).ToNot(HaveOccurred())
 				return strings.TrimSpace(stdout)
 			}

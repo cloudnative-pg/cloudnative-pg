@@ -21,10 +21,12 @@ package postgres
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -335,5 +338,62 @@ var _ = Describe("selectAdditionalExtensions", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(exts).To(BeNil())
 		Expect(baseDir).To(Equal("/extensions"))
+	})
+})
+
+var _ = Describe("the override.conf file writers", func() {
+	var pgData string
+	const primaryConnInfo = "host=cluster-example-rw user=streaming_replica"
+
+	readOverrideConf := func() string {
+		content, err := fileutils.ReadFile(filepath.Join(pgData, constants.PostgresqlOverrideConfigurationFile))
+		Expect(err).ToNot(HaveOccurred())
+		return string(content)
+	}
+
+	BeforeEach(func() {
+		pgData = GinkgoT().TempDir()
+	})
+
+	It("writes the replica restore_command and the replication slot", func() {
+		changed, err := configurePostgresOverrideConfFile(pgData, primaryConnInfo, "_cnpg_test")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(changed).To(BeTrue())
+
+		content := readOverrideConf()
+		Expect(content).To(ContainSubstring("wal-restore"))
+		Expect(content).ToNot(ContainSubstring("--rewind"))
+		Expect(content).To(ContainSubstring("primary_slot_name = '_cnpg_test'"))
+		Expect(content).To(ContainSubstring(primaryConnInfo))
+	})
+
+	It("omits the replication slot when the slot name is empty", func() {
+		_, err := configurePostgresOverrideConfFile(pgData, primaryConnInfo, "")
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(readOverrideConf()).ToNot(ContainSubstring("primary_slot_name"))
+	})
+
+	It("writes a rewind-mode restore_command with no replication slot", func() {
+		changed, err := configurePostgresOverrideConfFileForRewind(pgData, primaryConnInfo)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(changed).To(BeTrue())
+
+		content := readOverrideConf()
+		Expect(content).To(ContainSubstring("--rewind %f %p"))
+		Expect(content).ToNot(ContainSubstring("primary_slot_name"))
+	})
+
+	It("removes the rewind-mode restore_command when demoting after a rewind", func() {
+		_, err := configurePostgresOverrideConfFileForRewind(pgData, primaryConnInfo)
+		Expect(err).ToNot(HaveOccurred())
+
+		changed, err := UpdateReplicaConfiguration(pgData, primaryConnInfo, "_cnpg_test")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(changed).To(BeTrue())
+
+		content := readOverrideConf()
+		Expect(content).ToNot(ContainSubstring("--rewind"))
+		Expect(content).To(ContainSubstring("primary_slot_name = '_cnpg_test'"))
 	})
 })

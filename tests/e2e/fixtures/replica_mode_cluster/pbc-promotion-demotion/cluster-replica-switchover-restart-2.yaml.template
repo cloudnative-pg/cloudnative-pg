@@ -1,0 +1,40 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: replica-switchover-restart-b
+spec:
+  instances: 3
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: restart
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: replica-cluster-backups
+
+  bootstrap:
+    recovery:
+      source: replica-switchover-restart-a
+
+  replica:
+    primary: replica-switchover-restart-a
+    source: replica-switchover-restart-a
+
+  externalClusters:
+  - name: replica-switchover-restart-a
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: replica-cluster-backups
+        serverName: replica-switchover-restart-a
+  - name: replica-switchover-restart-b
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: replica-cluster-backups
+        serverName: replica-switchover-restart-b

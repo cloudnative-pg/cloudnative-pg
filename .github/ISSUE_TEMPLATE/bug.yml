@@ -48,11 +48,10 @@ body:
       label: Version
       description: What is the version of CloudNativePG you are running?
       options:
-        - "1.30.0"
-        - "1.29 (latest patch)"
+        - "1.30 (latest patch)"
         - "1.28 (latest patch)"
         - "trunk (main)"
-        - "older in 1.29.x"
+        - "older in 1.30.x"
         - "older in 1.28.x"
         - "older minor (unsupported)"
     validations:
@@ -62,6 +61,7 @@ body:
     attributes:
       label: What version of Kubernetes are you using?
       options:
+        - "1.37"
         - "1.36"
         - "1.35"
         - "1.34"

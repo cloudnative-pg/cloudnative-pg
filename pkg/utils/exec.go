@@ -28,6 +28,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -109,15 +110,7 @@ func ExecCommand(
 		"container", containerName,
 	)
 
-	targetContainer := -1
-	for i, cr := range pod.Spec.Containers {
-		if cr.Name == containerName {
-			targetContainer = i
-			break
-		}
-	}
-
-	if targetContainer < 0 {
+	if !PodSpecHasContainer(&pod.Spec, containerName) {
 		return "", "", ErrorContainerNotFound
 	}
 
@@ -147,7 +140,7 @@ func ExecCommand(
 		func() error {
 			stdout, stderr, execErr = execCommandOnce(
 				execCtx, client, config, pod,
-				targetContainer, timeout, command...,
+				containerName, timeout, command...,
 			)
 
 			// Don't retry if context was cancelled or timed out
@@ -184,13 +177,32 @@ func shouldFallbackToSPDY(err error) bool {
 	return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
 }
 
+// PodSpecContainerNames returns the names of every container (init, then
+// regular) defined in spec.
+func PodSpecContainerNames(spec *corev1.PodSpec) []string {
+	names := make([]string, 0, len(spec.InitContainers)+len(spec.Containers))
+	for _, cr := range spec.InitContainers {
+		names = append(names, cr.Name)
+	}
+	for _, cr := range spec.Containers {
+		names = append(names, cr.Name)
+	}
+	return names
+}
+
+// PodSpecHasContainer reports whether spec defines a container (regular or
+// init) with the given name.
+func PodSpecHasContainer(spec *corev1.PodSpec, containerName string) bool {
+	return slices.Contains(PodSpecContainerNames(spec), containerName)
+}
+
 // execCommandOnce performs a single kubectl exec operation without retries
 func execCommandOnce(
 	ctx context.Context,
 	client kubernetes.Interface,
 	config *rest.Config,
 	pod corev1.Pod,
-	targetContainer int,
+	containerName string,
 	timeout *time.Duration,
 	command ...string,
 ) (string, string, error) {
@@ -199,7 +211,7 @@ func execCommandOnce(
 		Name(pod.Name).
 		Namespace(pod.Namespace).
 		SubResource("exec").
-		Param("container", pod.Spec.Containers[targetContainer].Name)
+		Param("container", containerName)
 
 	newConfig := *config // local copy avoids modifying the passed config arg
 	if timeout != nil {
@@ -208,7 +220,7 @@ func execCommandOnce(
 	}
 
 	req.VersionedParams(&corev1.PodExecOptions{
-		Container: pod.Spec.Containers[targetContainer].Name,
+		Container: containerName,
 		Command:   command,
 		Stdout:    true,
 		Stderr:    true,

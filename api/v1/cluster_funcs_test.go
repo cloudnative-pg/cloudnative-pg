@@ -2018,3 +2018,24 @@ var _ = Describe("IsInitialized", func() {
 		Expect(cluster.IsInitialized()).To(BeFalse())
 	})
 })
+
+var _ = Describe("FailureDomainKeys", func() {
+	It("returns nil when no failure domain keys are configured", func() {
+		sync := &SynchronousReplicaConfiguration{}
+		Expect(sync.FailureDomainKeys()).To(BeNil())
+	})
+
+	It("returns the pod failure domain keys when only they are set", func() {
+		sync := &SynchronousReplicaConfiguration{
+			PodFailureDomainKeys: []string{"topology.kubernetes.io/zone"},
+		}
+		Expect(sync.FailureDomainKeys()).To(Equal([]string{"topology.kubernetes.io/zone"}))
+	})
+
+	It("returns the node failure domain keys when only they are set", func() {
+		sync := &SynchronousReplicaConfiguration{
+			NodeFailureDomainKeys: []string{"topology.kubernetes.io/zone"},
+		}
+		Expect(sync.FailureDomainKeys()).To(Equal([]string{"topology.kubernetes.io/zone"}))
+	})
+})

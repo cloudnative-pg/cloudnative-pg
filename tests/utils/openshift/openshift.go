@@ -86,7 +86,7 @@ func PatchStatusCondition(
 ) error {
 	cluster := &apiv1.Cluster{}
 	var err error
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err = retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 		cluster, err = clusterutils.Get(ctx, crudClient, namespace, clusterName)
 		if err != nil {
 			return err

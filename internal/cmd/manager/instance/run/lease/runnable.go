@@ -90,7 +90,7 @@ func defaultConfig() Config {
 // It starts idle and enters the acquisition/renewal loop only after Acquire is called.
 type Runnable struct {
 	instance *postgres.Instance
-	lock     *resourcelock.LeaseLock
+	lock     resourcelock.Interface
 
 	// config holds the lease timings. It is initialised to the defaults by New
 	// and overwritten by the first Acquire call before the runnable activates.
@@ -193,6 +193,12 @@ func (r *Runnable) Release(ctx context.Context) error {
 		return nil
 	}
 
+	// Unlike tryTakeOver/runLeaderElection, this Get is deliberately not
+	// bounded at all: Release makes no retry of its own, so any deadline here
+	// could return before the Update below ever runs. The caller in cmd.go
+	// avoids a timeout on the whole call for the same reason: giving up early
+	// would abandon the release and force replicas onto the slow TTL-expiry
+	// path instead of the fast empty-holder hand-over.
 	record, _, err := r.lock.Get(ctx)
 	if errors.IsNotFound(err) {
 		contextLogger.Debug("Primary lease does not exist, nothing to release")
@@ -201,7 +207,7 @@ func (r *Runnable) Release(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if record.HolderIdentity != r.lock.LockConfig.Identity {
+	if record.HolderIdentity != r.lock.Identity() {
 		contextLogger.Debug("Primary lease held by another identity, nothing to release",
 			"holder", record.HolderIdentity)
 		return nil
@@ -293,7 +299,16 @@ func classifyLeaseAfterRun(
 // clock (the same limitation client-go's elector has); it only adds latency in
 // the rare case of a restart mid-take-over, never correctness.
 func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
-	record, _, err := r.lock.Get(ctx)
+	// Bounded so a Get against an unreachable API server fails instead of
+	// blocking the whole take-over loop for however long the underlying
+	// transport takes to give up on its own. The budget is RenewDeadline, not
+	// the RetryPeriod cadence at which the caller polls: an API server that
+	// answers, but more slowly than that cadence, has to be able to answer,
+	// otherwise every attempt times out here, the observation window never
+	// starts and the take-over never happens.
+	getCtx, cancel := context.WithTimeout(ctx, r.config.RenewDeadline)
+	record, _, err := r.lock.Get(getCtx)
+	cancel()
 	if errors.IsNotFound(err) {
 		// The cluster controller owns lease creation; nothing to take over yet.
 		r.observedRecord = nil
@@ -303,7 +318,7 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	identity := r.lock.LockConfig.Identity
+	identity := r.lock.Identity()
 
 	// Already ours: nothing to do here, le.Run will refresh the RenewTime.
 	if record.HolderIdentity == identity {
@@ -348,7 +363,7 @@ func sameHolder(a, b *resourcelock.LeaderElectionRecord) bool {
 func (r *Runnable) claim(ctx context.Context, current *resourcelock.LeaderElectionRecord) (bool, error) {
 	now := metav1.NewTime(time.Now())
 	if err := r.lock.Update(ctx, resourcelock.LeaderElectionRecord{
-		HolderIdentity:       r.lock.LockConfig.Identity,
+		HolderIdentity:       r.lock.Identity(),
 		LeaseDurationSeconds: int(r.config.LeaseDuration / time.Second),
 		RenewTime:            now,
 		AcquireTime:          now,
@@ -490,7 +505,7 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 		record, _, checkErr := r.lock.Get(checkCtx)
 		checkCancel()
 
-		switch classifyLeaseAfterRun(checkErr, record, r.lock.LockConfig.Identity) {
+		switch classifyLeaseAfterRun(checkErr, record, r.lock.Identity()) {
 		case leaseMissing:
 			// The lease object is gone (e.g. someone deleted it). The cluster
 			// controller will recreate it on its next reconcile; loop and let

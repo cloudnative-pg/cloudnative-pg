@@ -128,7 +128,10 @@ func (se *Reconciler) enrichSnapshot(
 	vs.Labels[utils.BackupDateLabelName] = now.Format("20060102")
 	vs.Labels[utils.BackupMonthLabelName] = now.Format("200601")
 	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(now.Year())
-	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
+	// backup.Status.Online is only set once the backup is finalized, which happens
+	// after the snapshots have been created: the effective online setting has to be
+	// taken from the configuration, as Status.Online is still empty at this point
+	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.GetOnlineOrDefault(cluster))
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
@@ -203,9 +206,7 @@ func (se *Reconciler) internalReconcile(
 	if err != nil {
 		return nil, err
 	}
-	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-
-	exec := se.newExecutor(volumeSnapshotConfig.GetOnline())
+	exec := se.newExecutor(backup.GetOnlineOrDefault(cluster))
 
 	// Step 1: backup preparation.
 	// This will set PostgreSQL in backup mode for hot snapshots, or fence the Pods for cold snapshots.
@@ -267,14 +268,13 @@ func (se *Reconciler) finalizeSnapshotBackupStep(
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
-	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
 
 	if res, err := exec.finalize(ctx, cluster, backup, targetPod); res != nil || err != nil {
 		return res, err
 	}
 
 	backup.Status.SetAsFinalizing()
-	backup.Status.Online = ptr.To(volumeSnapshotConfig.GetOnline())
+	backup.Status.Online = ptr.To(backup.GetOnlineOrDefault(cluster))
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
 	if err != nil {
 		return nil, err

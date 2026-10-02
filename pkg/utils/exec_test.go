@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,6 +32,25 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("PodSpecHasContainer", func() {
+	spec := corev1.PodSpec{
+		InitContainers: []corev1.Container{{Name: "bootstrap-instance"}},
+		Containers:     []corev1.Container{{Name: "postgres"}},
+	}
+
+	It("finds a regular container", func() {
+		Expect(PodSpecHasContainer(&spec, "postgres")).To(BeTrue())
+	})
+
+	It("finds an init container", func() {
+		Expect(PodSpecHasContainer(&spec, "bootstrap-instance")).To(BeTrue())
+	})
+
+	It("returns false for a container the pod does not have", func() {
+		Expect(PodSpecHasContainer(&spec, "does-not-exist")).To(BeFalse())
+	})
+})
 
 var _ = Describe("isRetryableExecError", func() {
 	Context("when error is nil", func() {

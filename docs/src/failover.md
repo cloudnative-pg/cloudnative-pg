@@ -45,6 +45,15 @@ During the time the failing primary is being shut down:
 2. If the fast shutdown fails, or its timeout is exceeded, a PostgreSQL's
    *immediate shutdown* is initiated.
 
+The sequence above assumes PostgreSQL is reachable. If it is not (it does not
+answer `pg_isready`), the instance manager issues the immediate shutdown right
+away, without the fast shutdown and therefore without any attempt to archive
+pending WALs. Any `.ready` WAL segments left behind are archived when the
+instance starts again, before it rejoins the cluster as a replica.
+
+`.spec.switchoverDelay` does not apply to this path: it is the timeout of the
+fast shutdown, which is skipped.
+
 :::info
     "Fast" mode does not wait for PostgreSQL clients to disconnect and will
     terminate an online backup in progress. All active transactions are rolled back
@@ -94,13 +103,21 @@ The two mechanisms are complementary and both are enabled by default:
 
 * The lease prevents *premature* promotion: a replica cannot promote
   while the former primary still holds the lease.
-* The isolation check stops an *isolated* primary from continuing to
-  accept writes.
+* The isolation check reports an isolated primary as unhealthy, which
+  the kubelet then restarts through its normal container-termination
+  path. That path is a *smart* shutdown: it refuses new connections
+  but lets sessions that are already open keep committing until
+  `.spec.smartShutdownTimeout` elapses (180 seconds by default), so
+  it narrows the write window during a partition rather than closing
+  it outright.
 
 Keep both enabled. Disabling the isolation check leaves the lease
 alone responsible for primary safety, and the lease alone cannot
 prevent split-brain when the former primary cannot reach the API
-server but remains otherwise healthy.
+server but remains otherwise healthy. If that write window matters
+for your workload, set `.spec.smartShutdownTimeout: 0` so the
+restart goes straight to a fast shutdown instead of waiting out the
+full window.
 
 ### Inspecting the primary lease
 
@@ -192,7 +209,9 @@ and/or data being lost ([RPO](before_you_start.md#postgresql-terminology)):
    accept connections, so service will be impacted but no data
    will be lost.
 3. If the fast shutdown fails, the immediate shutdown will stop any pending
-   processes, including WAL writing. Data may be lost.
+   processes, including WAL writing. Data may be lost. The same applies when the
+   old primary is unreachable: the fast shutdown step is skipped entirely, and the
+   immediate shutdown is issued right away.
 4. During the time the primary is shutting down and a new primary hasn't yet
    started, the cluster will operate without a primary and thus be impaired - but
    with no data loss.
@@ -264,14 +283,17 @@ mechanism, driven by `tolerationSeconds` on the
 `node.kubernetes.io/unreachable` `NoExecute` taint (`300s` by default). That
 timer does not hold up the operator's failover decision; CloudNativePG
 promotes a new primary as soon as the `Ready` condition flips. By that point
-the kubelet on the isolated node has already stopped the old PostgreSQL
-container locally: with the default
-`.spec.probes.liveness.isolationCheck.enabled: true`, the instance manager
-fails its own liveness probe once it can reach neither the API server nor
-the rest of the cluster, and the kubelet kills the container within
-approximately three probe periods (`~30s`). Full high availability
-(recreation of the old primary on a healthy node by the operator) is still
-gated on the taint-based eviction actually deleting the pod.
+the kubelet on the isolated node has already noticed the problem: with the
+default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
+manager fails its own liveness probe once it can reach neither the API
+server nor the rest of the cluster, and the kubelet restarts the container
+within approximately three probe periods (`~30s`). That restart goes
+through the normal termination path, a smart shutdown that lets sessions
+already open on the isolated primary keep committing until
+`.spec.smartShutdownTimeout` elapses (180 seconds by default) on top of
+that ~30s detection window. Full high availability (recreation of the old
+primary on a healthy node by the operator) is still gated on the
+taint-based eviction actually deleting the pod.
 
 ## Failover Quorum (Quorum-based Failover)
 

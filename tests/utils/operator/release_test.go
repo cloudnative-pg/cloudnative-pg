@@ -25,12 +25,24 @@ import (
 	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 const releaseDirectoryPath = "../../../releases"
+
+// setBranchName injects branchName in the e2e configuration for the duration
+// of the spec
+func setBranchName(branchName string) {
+	cfg := config.NewDefault()
+	cfg.BranchName = branchName
+	config.Set(cfg)
+	DeferCleanup(func() {
+		config.Set(nil)
+	})
+}
 
 var _ = Describe("Release tag extraction", func() {
 	It("properly works with expected filename", func() {
@@ -56,7 +68,7 @@ var _ = Describe("Most recent tag", func() {
 			Skip("because we need two or more releases")
 		}
 
-		GinkgoT().Setenv("BRANCH_NAME", "release/v"+versions.Version)
+		setBranchName("release/v" + versions.Version)
 
 		tag, err := GetMostRecentReleaseTag(releasesDir)
 		Expect(err).ToNot(HaveOccurred())
@@ -74,7 +86,7 @@ var _ = Describe("Most recent tag", func() {
 		DeferCleanup(func() { headExactReleaseTag = original })
 		headExactReleaseTag = func() string { return "" }
 
-		GinkgoT().Setenv("BRANCH_NAME", "dev/"+versions.Version)
+		setBranchName("dev/" + versions.Version)
 
 		tag, err := GetMostRecentReleaseTag(releasesDir)
 		Expect(err).ToNot(HaveOccurred())
@@ -93,7 +105,7 @@ var _ = Describe("Most recent tag when HEAD is on a release tag", func() {
 
 	BeforeEach(func() {
 		// a dev branch, so the release-branch path is not taken
-		GinkgoT().Setenv("BRANCH_NAME", "dev/test")
+		setBranchName("dev/test")
 
 		tmpDir = GinkgoT().TempDir()
 		for _, file := range []string{

@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -51,8 +50,6 @@ import (
 // archiving keeps working after a Postgres major version upgrade. Here the
 // archiver is plugin-barman-cloud rather than the in-core barmanObjectStore. The
 // in-core variant (and the other upgrade scenarios it covers) is left in place.
-// Runs on kind/k3d only, where the plugin and the shared object store are
-// installed.
 var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 	Label(tests.LabelPluginBarmanCloud, tests.LabelPostgresMajorUpgrade, tests.LabelBackupRestore), func() {
 		const (
@@ -63,9 +60,6 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 		BeforeEach(func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
-			}
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
 			}
 		})
 
@@ -110,7 +104,7 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 
 			setupPluginObjectStore(namespace, clusterName)
 
-			storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+			storageClass := env.DefaultStorageClass
 			Expect(storageClass).ToNot(BeEmpty())
 
 			By("creating a cluster on the starting major that archives through the plugin", func() {
@@ -159,7 +153,8 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 					},
 				}
 				clusterutils.AddTopologySpreadConstraint(cluster)
-				Expect(env.Client.Create(env.Ctx, cluster)).To(Succeed())
+				_, err := objects.Create(env.Ctx, env.Client, cluster)
+				Expect(err).To(Succeed())
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			})
 

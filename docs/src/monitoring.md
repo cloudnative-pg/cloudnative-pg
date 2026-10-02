@@ -265,7 +265,7 @@ cnpg_collector_up{cluster="cluster-example"} 1
 
 # HELP cnpg_collector_postgres_version Postgres version
 # TYPE cnpg_collector_postgres_version gauge
-cnpg_collector_postgres_version{cluster="cluster-example",full="18.4"} 18.4
+cnpg_collector_postgres_version{cluster="cluster-example",full="18.6"} 18.6
 
 # HELP cnpg_collector_last_failed_backup_timestamp The last failed backup as a unix timestamp (Deprecated)
 # TYPE cnpg_collector_last_failed_backup_timestamp gauge
@@ -1004,7 +1004,7 @@ metadata:
 spec:
   containers:
   - name: curl
-    image: curlimages/curl:8.21.0
+    image: curlimages/curl:8.22.0
     command: ['sleep', '3600']
 EOF
 ```

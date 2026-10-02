@@ -666,3 +666,53 @@ var _ = Describe("EnrichMetricsConnError", func() {
 		Expect(EnrichMetricsConnError(original)).To(Equal(original))
 	})
 })
+
+var _ = Describe("pgRewindShouldRetry", func() {
+	It("retries regardless of the error while the context is live", func() {
+		ctx := context.Background()
+		Expect(pgRewindShouldRetry(ctx, nil)).To(BeTrue())
+		Expect(pgRewindShouldRetry(ctx, errors.New("could not restore file from archive"))).To(BeTrue())
+		Expect(pgRewindShouldRetry(ctx, errors.New("connection refused"))).To(BeTrue())
+	})
+
+	It("stops retrying once the context is cancelled, regardless of the error", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		Expect(pgRewindShouldRetry(ctx, nil)).To(BeFalse())
+		Expect(pgRewindShouldRetry(ctx, errors.New("could not restore file from archive"))).To(BeFalse())
+	})
+})
+
+var _ = Describe("TryRequestImmediateShutdown", func() {
+	It("declines the request when the lifecycle manager is not receiving", func() {
+		instance := NewInstance()
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+	})
+
+	It("leaves nothing on the channel when it declines", func() {
+		instance := NewInstance()
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+
+		// A declined send must not be observable later: the channel is
+		// unbuffered, so a receiver arriving afterwards has to find it empty.
+		var received InstanceCommand
+		select {
+		case received = <-instance.instanceCommandChan:
+			Fail(fmt.Sprintf("a declined request was delivered anyway: %s", received))
+		default:
+		}
+	})
+
+	It("delivers the immediate shutdown request when the lifecycle manager is receiving, "+
+		"then declines again once that receiver is gone", func() {
+		instance := NewInstance()
+		received := make(chan InstanceCommand, 1)
+		go func() {
+			received <- <-instance.instanceCommandChan
+		}()
+
+		Eventually(instance.TryRequestImmediateShutdown).Should(BeTrue())
+		Expect(<-received).To(Equal(shutDownImmediate))
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+	})
+})

@@ -122,7 +122,8 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 					},
 					Key: catalogKey,
 				})
-				Expect(env.Client.Create(env.Ctx, pooler)).To(Succeed())
+				_, err := objects.Create(env.Ctx, env.Client, pooler)
+				Expect(err).To(Succeed())
 			})
 
 			By("verifying the pooler status reflects the catalog image", func() {
@@ -223,7 +224,8 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 					},
 					Key: catalogKey,
 				})
-				Expect(env.Client.Create(env.Ctx, pooler)).To(Succeed())
+				_, err := objects.Create(env.Ctx, env.Client, pooler)
+				Expect(err).To(Succeed())
 			})
 
 			By("verifying the pooler status reflects the cluster catalog image", func() {
@@ -288,7 +290,8 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 					},
 					Key: "nonexistent-key",
 				})
-				Expect(env.Client.Create(env.Ctx, pooler)).To(Succeed())
+				_, err := objects.Create(env.Ctx, env.Client, pooler)
+				Expect(err).To(Succeed())
 			})
 
 			By("verifying the pooler phase is set to failed", func() {

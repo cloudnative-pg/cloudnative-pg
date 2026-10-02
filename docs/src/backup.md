@@ -382,7 +382,7 @@ Status:
 CloudNativePG currently supports the following backup methods for scheduled
 and on-demand backups:
 
-- `plugin` – Uses a CNPG-I plugin (requires `.spec.pluginConfiguration`)
+- `plugin` – Uses a CNPG-I plugin (requires `.spec.plugins`)
 - `volumeSnapshot` – Uses native [Kubernetes volume snapshots](appendixes/backup_volumesnapshot.md#how-to-configure-volume-snapshot-backups)
 - `barmanObjectStore` – Uses [Barman Cloud for object storage](appendixes/backup_barmanobjectstore.md)
   *(deprecated starting with v1.26 in favor of the

@@ -23,10 +23,12 @@ import (
 	"context"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -217,6 +219,33 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+	})
+
+	It("skips reconciliation and does not create owned resources when the Pooler has a DeletionTimestamp", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+
+		// Simulate an external finalizer (e.g. ArgoCD foreground pruning)
+		// keeping the Pooler around after deletion is requested.
+		pooler.Finalizers = []string{"cnpg.io/test-finalizer"}
+		Expect(env.client.Update(ctx, pooler)).To(Succeed())
+		Expect(env.client.Delete(ctx, pooler)).To(Succeed())
+
+		result, err := env.poolerReconciler.Reconcile(ctx, ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		var deployments appsv1.DeploymentList
+		Expect(env.client.List(ctx, &deployments, client.InNamespace(namespace))).To(Succeed())
+		Expect(deployments.Items).To(BeEmpty())
+
+		var services corev1.ServiceList
+		Expect(env.client.List(ctx, &services, client.InNamespace(namespace))).To(Succeed())
+		Expect(services.Items).To(BeEmpty())
 	})
 
 	It("should make sure that isOwnedByPoolerKind works correctly", func() {
