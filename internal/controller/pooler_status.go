@@ -99,13 +99,18 @@ func (r *PoolerReconciler) updatePoolerStatus(
 		r.Recorder.Event(pooler, "Warning", "ImageCatalogError", err.Error())
 		updatedStatus.Phase = apiv1.PoolerPhaseFailed
 		updatedStatus.PhaseReason = err.Error()
-	case isPgBouncerPaused(pooler):
+	case isPgBouncerPaused(pooler) || pooler.Status.PausedForSwitchover:
 		// The deployment still runs while paused; the manager calls PgBouncer's
 		// PAUSE command so existing connections are kept open and new clients
 		// are queued. Paused is a deliberate operational state, distinct from
-		// Inactive (which means a prerequisite is missing).
+		// Inactive (which means a prerequisite is missing). This covers both a
+		// user-requested pause (spec) and an automatic switchover pause (status).
 		updatedStatus.Phase = apiv1.PoolerPhasePaused
-		updatedStatus.PhaseReason = "pgbouncer is paused"
+		if pooler.Status.PausedForSwitchover {
+			updatedStatus.PhaseReason = "pgbouncer is paused for switchover"
+		} else {
+			updatedStatus.PhaseReason = "pgbouncer is paused"
+		}
 		updatedStatus.Image = image
 	default:
 		updatedStatus.Phase = apiv1.PoolerPhaseActive
