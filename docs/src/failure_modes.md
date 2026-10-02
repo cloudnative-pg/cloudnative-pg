@@ -58,6 +58,21 @@ may be required.
     Do not perform manual operations without [professional support](https://cloudnative-pg.io/support/).
 :::
 
+### Rebuilding a Diverged Replica
+
+After a failover to a replica that was not the most up to date, another
+replica can hold data the new primary never received, and can no longer
+follow it. CloudNativePG removes such a replica from the `-r` and `-ro`
+services, never promotes it, fences it, sets the `ReplicasHealthy` condition
+of the `Cluster` to `False`, and raises a `ReplicaDiverged` event.
+
+To recover, rebuild the instance from the current primary with the
+[`cnpg` plugin](kubectl-plugin.md#destroy):
+
+```sh
+kubectl cnpg destroy CLUSTER INSTANCE
+```
+
 ### Disabling Reconciliation
 
 The `cnpg.io/reconciliationLoop` annotation allows you to temporarily disable
