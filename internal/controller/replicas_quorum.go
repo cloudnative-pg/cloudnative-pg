@@ -45,7 +45,8 @@ func (r *ClusterReconciler) evaluateQuorumCheck(
 	contextLogger := log.FromContext(ctx).WithValues("tag", "quorumCheck")
 
 	var failoverQuorum apiv1.FailoverQuorum
-	if err := r.Get(ctx, client.ObjectKeyFromObject(cluster), &failoverQuorum); err != nil {
+	// A cached value may predate a synchronous replication configuration change.
+	if err := r.apiReader.Get(ctx, client.ObjectKeyFromObject(cluster), &failoverQuorum); err != nil {
 		if apierrs.IsNotFound(err) {
 			contextLogger.Warning(
 				"Quorum check failed because no synchronous metadata is available. Denying the failover request")
