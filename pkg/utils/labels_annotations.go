@@ -216,6 +216,11 @@ const (
 	// The status can be "initializing", "ready" or "detached"
 	PVCStatusAnnotationName = MetadataNamespace + "/pvcStatus"
 
+	// BootstrapPendingAnnotationName is the name of the annotation the operator
+	// sets to "true" on an instance Pod created with the bootstrap init
+	// container, and removes once that container has terminated successfully
+	BootstrapPendingAnnotationName = MetadataNamespace + "/bootstrapPending"
+
 	// LegacyBackupAnnotationName is the name of the annotation represents whether taking a backup without passing
 	// the name argument even on barman version 3.3.0+. The value can be "true" or "false"
 	LegacyBackupAnnotationName = MetadataNamespace + "/forceLegacyBackup"
