@@ -85,6 +85,11 @@ const (
 	// the instance-bootstrap command (init/join/restore/restoresnapshot/pgbasebackup)
 	BootstrapWorkContainerName = "bootstrap-instance"
 
+	// BootstrapPendingEnvName is the environment variable through which the
+	// bootstrap init container sees the utils.BootstrapPendingAnnotationName
+	// annotation of its Pod
+	BootstrapPendingEnvName = "BOOTSTRAP_PENDING"
+
 	// PgDataPath is the path to PGDATA variable
 	PgDataPath = "/var/lib/postgresql/data/pgdata"
 
@@ -650,6 +655,20 @@ func AddBootstrapInitContainer(pod *corev1.Pod, cluster apiv1.Cluster, bootstrap
 		}
 		break
 	}
+
+	// Kubernetes runs the init container again whenever the Pod is recreated
+	// as it was, e.g. by a backup tool restoring it together with its PVCs.
+	// The operator removes this annotation once the bootstrap succeeded, so
+	// the container finds it only while the bootstrap still has to run.
+	pod.Annotations[utils.BootstrapPendingAnnotationName] = "true"
+	initContainer.Container.Env = append(initContainer.Container.Env, corev1.EnvVar{
+		Name: BootstrapPendingEnvName,
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: fmt.Sprintf("metadata.annotations['%s']", utils.BootstrapPendingAnnotationName),
+			},
+		},
+	})
 
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer.Container)
 	pod.Spec.Volumes = append(pod.Spec.Volumes, initContainer.Volumes...)

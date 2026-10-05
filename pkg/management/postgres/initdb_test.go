@@ -27,8 +27,20 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+)
+
+var _ = DescribeTable("IsBootstrapCompleted",
+	func(ctx SpecContext, value string, expected bool) {
+		GinkgoT().Setenv(specs.BootstrapPendingEnvName, value)
+		Expect(IsBootstrapCompleted(ctx)).To(Equal(expected))
+	},
+	Entry("pending, as the operator creates the Pod", "true", false),
+	Entry("no longer pending", "", true),
+	Entry("any other value", "false", true),
 )
 
 var _ = Describe("EnsureTargetDirectoriesDoNotExist", func() {

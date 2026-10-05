@@ -57,15 +57,20 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "pgbasebackup",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
-				Name:      clusterName,
-				Namespace: namespace,
-			})
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			contextLogger := log.FromContext(ctx)
+
+			if postgres.IsBootstrapCompleted(ctx) {
+				return nil
+			}
+
+			if err := management.WaitForGetCluster(ctx, ctrl.ObjectKey{
+				Name:      clusterName,
+				Namespace: namespace,
+			}); err != nil {
+				return err
+			}
 
 			client, err := management.NewControllerRuntimeClient()
 			if err != nil {

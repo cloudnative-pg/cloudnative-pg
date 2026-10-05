@@ -48,6 +48,10 @@ func NewCmd() *cobra.Command {
 		Use: "join [options]",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			if postgres.IsBootstrapCompleted(ctx) {
+				return nil
+			}
+
 			// The fields in the instance are needed to correctly
 			// download the secret containing the TLS
 			// certificates
