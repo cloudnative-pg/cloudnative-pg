@@ -21,13 +21,16 @@ package e2e
 
 import (
 	coordinationv1 "k8s.io/api/coordination/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -131,6 +134,47 @@ var _ = Describe("Primary lease", Label(tests.LabelSelfHealing), func() {
 				g.Expect(lease.Spec.HolderIdentity).ToNot(BeNil())
 				g.Expect(*lease.Spec.HolderIdentity).To(Equal(newPrimary))
 			}, testTimeouts[timeouts.NewPrimaryAfterSwitchover]).Should(Succeed())
+		})
+	})
+
+	It("adopts the Lease left behind by a Cluster deleted with orphan propagation", func() {
+		var err error
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "primary-lease-adopt")
+		Expect(err).ToNot(HaveOccurred())
+
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+
+		By("deleting the Cluster while orphaning its PVCs, Pods and Lease", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(objects.Delete(env.Ctx, env.Client, cluster,
+				ctrlclient.PropagationPolicy(metav1.DeletePropagationOrphan))).To(Succeed())
+
+			Eventually(func() bool {
+				_, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				return apierrs.IsNotFound(err)
+			}, 120).Should(BeTrue())
+
+			// The garbage collector strips the ownerReferences before the Cluster
+			// goes away, so the recreated Cluster has to adopt the Lease.
+			Expect(metav1.GetControllerOf(getLease(Default))).To(BeNil())
+		})
+
+		By("recreating the Cluster from the same manifest", func() {
+			resources.CreateResourceFromFile(env, namespace, sampleFile)
+		})
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+
+		By("owning the existing Lease via the recreated Cluster", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				owner := metav1.GetControllerOf(getLease(g))
+				g.Expect(owner).ToNot(BeNil())
+				g.Expect(owner.UID).To(Equal(cluster.UID))
+			}, testTimeouts[timeouts.Short]).Should(Succeed())
 		})
 	})
 })
