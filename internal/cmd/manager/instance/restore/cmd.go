@@ -55,6 +55,10 @@ func NewCmd() *cobra.Command {
 		Use:           "restore [flags]",
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if postgres.IsBootstrapCompleted(cmd.Context()) {
+				return nil
+			}
+
 			contextLogger := log.FromContext(cmd.Context())
 
 			// Canceling this context

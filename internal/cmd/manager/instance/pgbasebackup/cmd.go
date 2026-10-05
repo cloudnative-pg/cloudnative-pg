@@ -60,19 +60,24 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "pgbasebackup",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
-				Name:      clusterName,
-				Namespace: namespace,
-			})
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			contextLogger := log.FromContext(ctx)
 
+			if postgres.IsBootstrapCompleted(ctx) {
+				return nil
+			}
+
 			additionalArgs, err := shellquote.Split(pgBaseBackupAdditionalArgsString)
 			if err != nil {
 				contextLogger.Error(err, "Error while parsing pgbasebackup additional args")
+				return err
+			}
+
+			if err := management.WaitForGetCluster(ctx, ctrl.ObjectKey{
+				Name:      clusterName,
+				Namespace: namespace,
+			}); err != nil {
 				return err
 			}
 
