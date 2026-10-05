@@ -333,9 +333,17 @@ func hasPod(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
 // treated as already bootstrapped: this is the normal case when reattaching
 // a Pod to a PVC that was already ready (no bootstrap needed), or for
 // PVC roles (e.g. WAL, tablespaces) that never require one of their own.
+// The Pod spec decides whether the container is there: its status stays
+// empty until the kubelet first reports on the Pod, and the bootstrap has
+// not run yet.
 func podBootstrapComplete(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
 	for _, pod := range podList {
 		if !podUsesPVC(pod, pvc) {
+			continue
+		}
+		if !slices.ContainsFunc(pod.Spec.InitContainers, func(container corev1.Container) bool {
+			return container.Name == specs.BootstrapWorkContainerName
+		}) {
 			continue
 		}
 		for _, containerStatus := range pod.Status.InitContainerStatuses {
@@ -344,6 +352,7 @@ func podBootstrapComplete(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod
 			}
 			return containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 0
 		}
+		return false
 	}
 	return true
 }
