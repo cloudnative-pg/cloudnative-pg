@@ -1,9 +1,9 @@
 # Setting up Google Cloud for the E2E tests
 
-This guide prepares your own Google Cloud project so that the `gke` E2E job
-can run on your fork.
+This guide prepares your own Google Cloud project so that the `gke` and
+`openshift` E2E jobs can run on your fork.
 
-The job creates a real cluster and costs money. Use a project that is only for
+The jobs create real clusters and cost money. Use a project that is only for
 the tests, and set a budget alert.
 
 ## Before you start
@@ -14,11 +14,21 @@ shell: later steps use variables from earlier ones.
 
 ## What the tests create
 
-The `gke` job creates a regional GKE cluster with one node per zone (3 nodes,
-`e2-standard-4` by default, 80 GB disks). It is deleted at the end of the job.
+- `gke`: a regional GKE cluster with one node per zone (3 nodes,
+  `e2-standard-4` by default, 80 GB disks). It is deleted at the end of the
+  job.
+- `openshift`: an OpenShift cluster with 3 control plane and 3 worker VMs
+  (`e2-standard-8`), plus a bootstrap VM that is deleted after the
+  installation. At peak that is 7 VMs and 56 vCPUs. It also creates load
+  balancers, firewall rules, service accounts and a private DNS zone, and uses
+  the public DNS zone of your domain.
 
-Check the quotas of the region you use (`GKE_REGION`, `europe-west4` by
-default), including `E2 CPUs`.
+Check the quotas of the region you use (`GCP_REGION`, `europe-west4` by
+default), including `E2 CPUs`. A new project often has too few vCPUs, SSD
+space and static addresses for OpenShift. Red Hat lists what a default
+cluster needs in
+[Google Cloud account limits](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/installing_on_google_cloud/installing-gcp-account#installation-gcp-limits_installing-gcp-account).
+The machine types used here are larger than the defaults in that table.
 
 ## 1. Enable the APIs
 
@@ -27,9 +37,14 @@ export PROJECT_ID=<your-project-id>
 
 gcloud services enable --project=$PROJECT_ID \
   compute.googleapis.com container.googleapis.com \
-  cloudresourcemanager.googleapis.com iam.googleapis.com \
-  iamcredentials.googleapis.com serviceusage.googleapis.com
+  cloudresourcemanager.googleapis.com dns.googleapis.com \
+  iam.googleapis.com iamcredentials.googleapis.com \
+  serviceusage.googleapis.com
 ```
+
+`container.googleapis.com` is only needed for GKE. The others are the APIs
+that the OpenShift installer requires, see
+[Enabling API services](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/installing_on_google_cloud/installing-gcp-account#installation-gcp-enabling-api-services_installing-gcp-account).
 
 ## 2. Create the service account
 
@@ -41,17 +56,26 @@ export SA_EMAIL=e2e-tests@$PROJECT_ID.iam.gserviceaccount.com
 gcloud iam service-accounts create e2e-tests --project=$PROJECT_ID \
   --display-name="E2E tests"
 
-for role in roles/container.admin roles/compute.admin \
-  roles/iam.serviceAccountUser; do
+for role in \
+  roles/compute.admin roles/container.admin roles/dns.admin \
+  roles/storage.admin roles/iam.securityAdmin roles/iam.roleAdmin \
+  roles/iam.serviceAccountAdmin roles/iam.serviceAccountKeyAdmin \
+  roles/iam.serviceAccountUser roles/iam.serviceAccountTokenCreator \
+  roles/serviceusage.serviceUsageAdmin roles/servicemanagement.admin \
+  roles/servicemanagement.quotaAdmin roles/cloudquotas.admin \
+  roles/orgpolicy.policyViewer; do
   gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SA_EMAIL" --role="$role" --condition=None
 done
 ```
 
-The job creates and deletes GKE clusters and disks, and the cluster nodes run
-as a service account, so the account needs the Kubernetes Engine, Compute
-Engine and service account permissions. These roles are a working example,
-not a minimal set.
+This set is tested with both jobs. The GKE job needs the Kubernetes Engine,
+Compute Engine and service account permissions. The OpenShift installer needs
+the rest: it creates custom roles and service accounts, checks quotas and
+reads organization policies, and it signs a URL as the service account, which
+needs `serviceAccountTokenCreator`. Do not trim the set for OpenShift.
+These roles let the account grant itself any permission in the project, so
+the project must hold nothing else.
 
 ## 3. Let GitHub Actions use the service account
 
@@ -98,13 +122,32 @@ gcloud iam workload-identity-pools providers describe github-provider \
   --workload-identity-pool=github-actions-pool --format="value(name)"
 ```
 
-## 4. Set the repository variables
+## 4. Create the DNS zone (OpenShift only)
+
+OpenShift needs a public Cloud DNS zone in the same project, authoritative for
+the base domain of the cluster (the cluster name is added in front of it). See
+[Configuring DNS for Google Cloud](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/installing_on_google_cloud/installing-gcp-account#installation-gcp-dns_installing-gcp-account).
+
+```bash
+gcloud dns managed-zones create e2e-openshift --project=$PROJECT_ID \
+  --dns-name="<your-base-domain>." --visibility=public \
+  --description="OpenShift E2E tests"
+
+gcloud dns managed-zones describe e2e-openshift --project=$PROJECT_ID \
+  --format="value(nameServers)"
+```
+
+Set those name servers at the registrar of the domain (or as `NS` records in
+the parent zone, if the domain is a subdomain). Check the delegation with
+`dig NS <your-base-domain>` before the first run.
+
+## 5. Set the repository variables
 
 Set these under *Settings, Secrets and variables, Actions* of your fork.
 Variables:
 
 - `GKE_ENABLED`: set it to `true` to enable the `gke` job.
-- `GKE_REGION` and `GKE_MACHINE_TYPE`: optional, they default to
+- `GCP_REGION` and `GKE_MACHINE_TYPE`: optional, they default to
   `europe-west4` and `e2-standard-4`.
 - `GCP_WORKLOAD_IDENTITY_PROVIDER`: the full name of the Workload Identity
   Provider,
@@ -119,6 +162,17 @@ Secrets:
   the variable above but holds something else. Never put the key in the
   variable, variables are not encrypted.
 
+For the `openshift` job on Google Cloud also set:
+
+- `OPENSHIFT_ENABLED`: set it to `true` to enable the job.
+- `OPENSHIFT_PLATFORM`: set it to `gcp`. The default is `aws`.
+- `OPENSHIFT_BASE_DOMAIN`: the base domain, the domain of the public Cloud
+  DNS zone.
+- the `REDHAT_PULL` secret with your Red Hat pull secret.
+
+The `openshift` job does not need `GKE_ENABLED`, but it reuses the project,
+`GCP_REGION` and the authentication settings of the `gke` job.
+
 For example:
 
 ```bash
@@ -129,12 +183,22 @@ gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER -R $GITHUB_REPO \
   --body "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
 ```
 
-## 5. Run a test
+For the `openshift` job also:
+
+```bash
+gh variable set OPENSHIFT_ENABLED --body true -R $GITHUB_REPO
+gh variable set OPENSHIFT_PLATFORM --body gcp -R $GITHUB_REPO
+gh variable set OPENSHIFT_BASE_DOMAIN --body <your-base-domain> -R $GITHUB_REPO
+gh secret set REDHAT_PULL < pull-secret.txt -R $GITHUB_REPO
+```
+
+## 6. Run a test
 
 In a pull request of your fork, as a user with `write` permission:
 
 ```text
 /test limit=gke type=smoke d=pull_request
+/test limit=openshift type=smoke d=pull_request
 ```
 
 Read the code of a pull request before you comment `/test`: the tests run it
@@ -144,9 +208,9 @@ The `push` depth creates no cloud jobs. You can also start the
 `continuous-delivery` workflow by hand from the Actions tab, with the same
 inputs.
 
-## 6. After a run
+## 7. After a run
 
-The job deletes its cluster at the end, also when tests fail. After an
+A job deletes its cluster at the end, also when tests fail. After an
 interrupted run, or when a job is cancelled, look for leftovers and delete
 them, they cost money:
 
@@ -154,7 +218,11 @@ them, they cost money:
 gcloud container clusters list --project=$PROJECT_ID
 gcloud compute instances list --project=$PROJECT_ID
 gcloud compute disks list --project=$PROJECT_ID
+gcloud compute forwarding-rules list --project=$PROJECT_ID
+gcloud compute addresses list --project=$PROJECT_ID
+gcloud dns managed-zones list --project=$PROJECT_ID
 ```
 
 Sometimes a disk named `pvc-...` stays behind after a GKE cluster is deleted.
-Delete it.
+Delete it. An OpenShift cluster is named after the infrastructure ID of its
+installation, delete everything that carries it.

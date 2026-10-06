@@ -1977,7 +1977,7 @@ jobs:
       E2E_CSI_STORAGE_CLASS: standard-rwo
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: pd-csi-snapclass
 
-      REGION: ${{ vars.GKE_REGION || 'europe-west4' }}
+      REGION: ${{ vars.GCP_REGION || 'europe-west4' }}
       MACHINE_TYPE: ${{ vars.GKE_MACHINE_TYPE || 'e2-standard-4' }}
       TEST_CLOUD_VENDOR: "gke"
 
@@ -2259,6 +2259,10 @@ jobs:
   # secrets.AWS_EKS_ADMIN_IAM_ROLES
   # secrets.AWS_ACCESS_KEY_ID
   # secrets.AWS_SECRET_ACCESS_KEY
+  # The platform is selected by vars.OPENSHIFT_PLATFORM ('aws' by default, or 'gcp').
+  # Both need vars.OPENSHIFT_BASE_DOMAIN, the base domain of a public DNS zone.
+  # 'gcp' also requires secrets.GCP_PROJECT_ID and the GCP authentication
+  # described in the GKE section above.
 
   e2e-openshift:
     name: Run E2E on OpenShift
@@ -2279,6 +2283,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -2299,18 +2304,25 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
-      E2E_DEFAULT_STORAGE_CLASS: gp3-csi
-      E2E_CSI_STORAGE_CLASS: gp3-csi
-      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-aws-vsc
+
+      # OPENSHIFT_PLATFORM selects where the cluster is created: aws (default) or gcp
+      OPENSHIFT_PLATFORM: ${{ vars.OPENSHIFT_PLATFORM || 'aws' }}
+      BASE_DOMAIN: ${{ vars.OPENSHIFT_BASE_DOMAIN }}
+      E2E_DEFAULT_STORAGE_CLASS: ${{ vars.OPENSHIFT_PLATFORM == 'gcp' && 'standard-csi' || 'gp3-csi' }}
+      E2E_CSI_STORAGE_CLASS: ${{ vars.OPENSHIFT_PLATFORM == 'gcp' && 'standard-csi' || 'gp3-csi' }}
+      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: ${{ vars.OPENSHIFT_PLATFORM == 'gcp' && 'csi-gce-pd-vsc' || 'csi-aws-vsc' }}
 
       TEST_CLOUD_VENDOR: "ocp"
 
       # AWS configuration
-      AWS_BASE_DOMAIN: ${{ secrets.AWS_BASE_DOMAIN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: eu-central-1
       AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES }}
+
+      # GCP configuration
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'europe-west4' }}
 
       REDHAT_PULL: ${{ secrets.REDHAT_PULL }}
       SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
@@ -2372,10 +2384,25 @@ jobs:
           openshift-install: ${{ env.K8S_VERSION }}
           oc: ${{ env.K8S_VERSION }}
       -
+        name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: ${{ env.OPENSHIFT_PLATFORM == 'gcp' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' }}
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      -
+        # Used when Workload Identity Federation is not configured. It reads the
+        # secret GCP_SERVICE_ACCOUNT (the JSON key), not the variable of that name.
+        name: Authenticate to Google Cloud (service account key)
+        if: ${{ env.OPENSHIFT_PLATFORM == 'gcp' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER == '' }}
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
+      -
         name: Install OpenShift Cluster ${{ env.K8S_VERSION }}
         timeout-minutes: 60
         run: |
-          envsubst < hack/install-config.yaml.template > hack/install-config.yaml
+          envsubst < "hack/install-config.${OPENSHIFT_PLATFORM}.yaml.template" > hack/install-config.yaml
           # The installer prints the password of the kubeadmin user, hide it
           openshift-install create cluster --dir hack/ --log-level debug 2>&1 |
             sed -u -E 's/(password: ")[^"]*"/\1***"/'
