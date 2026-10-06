@@ -2357,7 +2357,11 @@ jobs:
         timeout-minutes: 60
         run: |
           envsubst < hack/install-config.yaml.template > hack/install-config.yaml
-          openshift-install create cluster --dir hack/ --log-level debug
+          # The installer prints the password of the kubeadmin user, hide it
+          openshift-install create cluster --dir hack/ --log-level debug 2>&1 |
+            sed -u -E 's/(password: ")[^"]*"/\1***"/'
+          # Nothing uses the kubeadmin user, the tests connect with the kubeconfig
+          KUBECONFIG=$(pwd)/hack/auth/kubeconfig oc delete secret kubeadmin -n kube-system --ignore-not-found
       -
         name: Install operator-sdk
         run: |
