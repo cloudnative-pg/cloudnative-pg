@@ -2325,7 +2325,7 @@ jobs:
       GCP_REGION: ${{ vars.GCP_REGION || 'europe-west4' }}
 
       REDHAT_PULL: ${{ secrets.REDHAT_PULL }}
-      SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+      SSH_PUBLIC_KEY: ${{ vars.OPENSHIFT_SSH_PUBLIC_KEY }}
 
     steps:
       -
