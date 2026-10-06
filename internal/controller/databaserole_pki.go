@@ -167,42 +167,43 @@ func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
 
 	origSecret := certSecret.DeepCopy()
 
-	// Set to why the certificate must be re-issued rather than renewed in
-	// place: RenewLeafCertificate alone doesn't handle a CA rotation, or a
-	// certificate that can't be read or renewed.
-	var reissueReason string
-
 	signedByCurrentCA, readErr := clientCertSignedByCurrentCA(ctx, caSecret, certSecret)
-	renewed, renewErr := false, error(nil)
+	var renewed bool
+	var renewErr error
 	if readErr == nil && signedByCurrentCA {
 		renewed, renewErr = certs.RenewLeafCertificate(caSecret, certSecret, nil)
 	}
 
+	// RenewLeafCertificate alone doesn't handle a CA rotation, or a certificate
+	// that can't be read or renewed: those are re-issued instead. The reason
+	// is recorded on the event below.
+	reissue := true
+	var reason string
 	switch {
 	case readErr != nil:
 		contextLogger.Warning("client cert is unreadable, re-issuing",
 			"secret", secretKey.Name, "err", readErr)
-		reissueReason = "it could not be read"
+		reason = "it could not be read"
 
 	case !signedByCurrentCA:
 		contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
-		reissueReason = "the client CA of the cluster was rotated"
+		reason = "the client CA of the cluster was rotated"
 
 	case renewErr != nil:
 		contextLogger.Warning("client cert renewal failed, re-issuing",
 			"secret", secretKey.Name, "err", renewErr)
-		reissueReason = "it could not be renewed"
+		reason = "it could not be renewed"
 
 	case !renewed:
 		// The certificate is still the one the role should present.
 		return true, nil
+
+	default:
+		reissue = false
+		reason = "it was approaching its expiration"
 	}
 
-	// The reason recorded on the event below: a renewal, a re-issue after a CA
-	// rotation, or a replacement of an unreadable certificate.
-	reason := "it was approaching its expiration"
-	if reissueReason != "" {
-		reason = reissueReason
+	if reissue {
 		newSecret, err := generateCertificateFromCA(caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey)
 		if err != nil {
 			return false, fmt.Errorf("while re-signing client cert for role %q: %w", role.Spec.Name, err)

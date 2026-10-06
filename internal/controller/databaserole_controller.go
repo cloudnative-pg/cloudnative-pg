@@ -82,9 +82,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// The instance manager clears the deleteRole finalizer on its own.
 	// Re-issuing the client certificate Secret here would block an external
 	// finalizer waiting on garbage collection, for example ArgoCD's
-	// foreground pruning.
-	// A deleted role is waiting for the instance manager to resolve its
-	// finalizer, so generating a secret or rotating a password for it is pointless.
+	// foreground pruning. Generating or rotating its password is pointless too.
 	if !role.DeletionTimestamp.IsZero() {
 		contextLogger.Debug("DatabaseRole is being deleted, skipping reconciliation")
 		return ctrl.Result{}, nil
