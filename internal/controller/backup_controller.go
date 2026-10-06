@@ -340,6 +340,13 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 	// This backup can be started. The SessionID from podStatus is used to detect
 	// if the instance manager was restarted during the backup.
 	if err := startInstanceManagerBackup(ctx, r.Client, backup, pod, &cluster, podStatus.SessionID); err != nil {
+		if apierrs.IsConflict(err) {
+			return &ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		// The start patch failed before anything ran, so retrying is safe
+		if errors.Is(err, errMarkingBackupAsStarted) {
+			return nil, err
+		}
 		r.Recorder.Eventf(backup, "Warning", "Error", "Backup exit with error %v", err)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, &cluster,
 			fmt.Errorf("encountered an error while taking the backup: %w", err))
@@ -969,7 +976,7 @@ func getPostgresContainer(pod *corev1.Pod) (*corev1.Container, error) {
 // identity, which allows detecting if the instance manager was restarted during the backup.
 func startInstanceManagerBackup(
 	ctx context.Context,
-	client client.Client,
+	cli client.Client,
 	backup *apiv1.Backup,
 	pod *corev1.Pod,
 	cluster *apiv1.Cluster,
@@ -980,30 +987,26 @@ func startInstanceManagerBackup(
 		return fmt.Errorf("cannot get postgres container status: %w", err)
 	}
 
-	// This backup has been started
-	status := backup.GetStatus()
-	status.SetAsStarted(pod.Name, pgContainerStatus.ContainerID, sessionID, backup.Spec.Method)
-
-	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
-		return err
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		return fmt.Errorf("cannot get major version from cluster: %w", err)
 	}
-	config := ctrl.GetConfigOrDie()
-	clientInterface := kubernetes.NewForConfigOrDie(config)
+
+	// This backup has been started
+	origBackup := backup.DeepCopy()
+	backup.Status.MajorVersion = majorVersion
+	backup.Status.SetAsStarted(pod.Name, pgContainerStatus.ContainerID, sessionID, backup.Spec.Method)
+
+	// Conflicts when a stale read let another reconciliation start it first
+	if err := cli.Status().Patch(ctx, backup,
+		client.MergeFromWithOptions(origBackup, client.MergeFromWithOptimisticLock{})); err != nil {
+		return fmt.Errorf("%w: %w", errMarkingBackupAsStarted, err)
+	}
 
 	var stdout, stderr string
 	err = retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
 		var execErr error
-		stdout, stderr, execErr = utils.ExecCommand(
-			ctx,
-			clientInterface,
-			config,
-			*pod,
-			specs.PostgresContainerName,
-			nil,
-			"/controller/manager",
-			"backup",
-			backup.GetName(),
-		)
+		stdout, stderr, execErr = execInstanceBackup(ctx, pod, backup.GetName())
 		return execErr
 	})
 	if err != nil {
@@ -1011,10 +1014,21 @@ func startInstanceManagerBackup(
 		setCommandErr := func(backup *apiv1.Backup) {
 			backup.Status.CommandError = fmt.Sprintf("with stderr: %s, with stdout: %s", stderr, stdout)
 		}
-		return resourcestatus.FlagBackupAsFailed(ctx, client, backup, cluster, err, setCommandErr)
+		return resourcestatus.FlagBackupAsFailed(ctx, cli, backup, cluster, err, setCommandErr)
 	}
 
 	return nil
+}
+
+// errMarkingBackupAsStarted wraps the failures of the patch that starts a backup
+var errMarkingBackupAsStarted = errors.New("cannot mark the backup as started")
+
+// execInstanceBackup runs the backup command in the Pod. Replaced in tests.
+var execInstanceBackup = func(ctx context.Context, pod *corev1.Pod, backupName string) (string, string, error) {
+	config := ctrl.GetConfigOrDie()
+
+	return utils.ExecCommand(ctx, kubernetes.NewForConfigOrDie(config), config, *pod,
+		specs.PostgresContainerName, nil, "/controller/manager", "backup", backupName)
 }
 
 // SetupWithManager sets up this controller given a controller manager
@@ -1160,6 +1174,13 @@ func (r *BackupReconciler) reconcileMajorVersion(
 		return nil
 	}
 
+	// The start patch stores it for instance-managed backups. Patching here
+	// would refresh the Backup and defeat its optimistic lock.
+	if backup.Spec.Method.IsManagedByInstance() {
+		return nil
+	}
+
 	backup.Status.MajorVersion = majorVersion
+
 	return postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }
