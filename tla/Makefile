@@ -19,18 +19,21 @@ TLA_VERSION ?= v1.7.4
 TLA_SHA1 ?= bee4a54f3ee3d4afc347c3240ec2d9e93b075104
 TLA_DOWNLOAD_URL = https://github.com/tlaplus/tlaplus/releases/download/$(TLA_VERSION)/tla2tools.jar
 
-TLA2TOOLS ?= $(HOME)/.cache/tlaplus/tla2tools.jar
+TLA2TOOLS ?= $(HOME)/.cache/tlaplus/$(TLA_VERSION)/tla2tools.jar
 JAVA ?= java
 
 MODELS := $(basename $(wildcard */*.tla))
 
 .PHONY: all check translate clean check-java $(addprefix check-,$(MODELS))
 
+# Drop a partially downloaded tla2tools.jar instead of reusing it next run.
+.DELETE_ON_ERROR:
+
 all: check
 
-check: translate $(addprefix check-,$(MODELS))
+check: $(addprefix check-,$(MODELS))
 
-$(addprefix check-,$(MODELS)): check-%: check-java $(TLA2TOOLS) %.tla %.cfg
+$(addprefix check-,$(MODELS)): check-%: translate %.tla %.cfg
 	$(JAVA) -cp "$(TLA2TOOLS)" tlc2.TLC -workers auto -config $*.cfg $*.tla
 
 translate: check-java $(TLA2TOOLS)
@@ -50,7 +53,11 @@ $(TLA2TOOLS):
 		echo "error: need curl to download tla2tools.jar"; exit 1; \
 	fi
 	if command -v sha1sum >/dev/null 2>&1; then \
-		echo "$(TLA_SHA1)  $@" | sha1sum -c - || { rm -f "$@"; exit 1; }; \
+		echo "$(TLA_SHA1)  $@" | sha1sum -c -; \
+	elif command -v shasum >/dev/null 2>&1; then \
+		echo "$(TLA_SHA1)  $@" | shasum -a 1 -c -; \
+	else \
+		echo "error: need sha1sum or shasum to verify tla2tools.jar"; exit 1; \
 	fi
 
 clean:

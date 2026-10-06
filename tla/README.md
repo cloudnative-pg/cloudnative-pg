@@ -21,7 +21,7 @@ model.
 
 Preferred entry point, from `tla/` (ensures a Java runtime is present,
 fetches `tla2tools.jar` from the pinned TLA+ release when missing,
-translates PlusCal if needed, then checks every model with
+re-translates PlusCal, then checks every model with
 `-workers auto`):
 
 ```sh
