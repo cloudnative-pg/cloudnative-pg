@@ -31,6 +31,7 @@ import (
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -71,12 +72,13 @@ var errInvalidPasswordCriteria = errors.New("cannot generate a password matching
 
 // reconcilePassword is the top-level entry point for the lifecycle of a
 // generated password. It either generates and rotates it, or deletes the Secret
-// holding it, depending on whether password generation is enabled.
+// holding it, depending on whether password generation is enabled. It returns
+// the resourceVersion the password Secret was left at, when it reached it.
 func (r *DatabaseRoleReconciler) reconcilePassword(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	cluster *apiv1.Cluster,
-) error {
+) (string, error) {
 	// The status is the only record of where the password was generated: the name
 	// may have changed, or have disappeared from the specification altogether.
 	generatedSecretName := ""
@@ -87,7 +89,7 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 	// When generation is disabled we only need to clean up the Secret we
 	// generated; the cluster is not required for that.
 	if !role.IsPasswordGenerationEnabled() {
-		return r.stopGeneratingPassword(ctx, role, generatedSecretName)
+		return "", r.stopGeneratingPassword(ctx, role, generatedSecretName)
 	}
 
 	secretKey := client.ObjectKey{
@@ -99,24 +101,32 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 		if reason != "" {
 			role.SetPasswordMessage(reason)
 		}
-		return nil
+		return "", nil
 	}
 
 	// The password moved to a different Secret name: clean up the old one only
 	// once a new one can actually be generated, so a missing or non-primary
-	// cluster doesn't cost the role its only Secret in the meantime.
+	// cluster doesn't cost the role its only Secret in the meantime. The
+	// password state is left for ensurePasswordSecret to rewrite: a role read
+	// from before the rename has nothing it can record about the new Secret,
+	// and clearing the state would lift the VALID UNTIL of the role.
 	if generatedSecretName != "" && generatedSecretName != secretKey.Name {
-		if err := r.deleteOwnedPasswordSecret(ctx, role, client.ObjectKey{
+		deleted, err := r.deleteOwnedSecret(ctx, role, client.ObjectKey{
 			Namespace: role.Namespace,
 			Name:      generatedSecretName,
-		}); err != nil {
-			return err
+		})
+		if err != nil {
+			return "", err
+		}
+		if !deleted {
+			role.SetPasswordMessage(fmt.Sprintf(secretNotDeletableMessage, generatedSecretName))
 		}
 	}
 
-	if err := r.ensurePasswordSecret(ctx, role, secretKey); err != nil {
+	secretVersion, err := r.ensurePasswordSecret(ctx, role, secretKey)
+	if err != nil {
 		if !errors.Is(err, errInvalidPasswordCriteria) {
-			return err
+			return "", err
 		}
 		// The criteria cannot be satisfied: say so and wait for the role to be
 		// fixed, instead of retrying a generation that will never succeed.
@@ -125,7 +135,7 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 		role.SetPasswordMessage(err.Error())
 	}
 
-	return nil
+	return secretVersion, nil
 }
 
 // passwordGenerationBlocked reports whether something stops the operator from
@@ -215,13 +225,14 @@ func (r *DatabaseRoleReconciler) stopGeneratingPassword(
 }
 
 // ensurePasswordSecret makes sure the Secret holding the generated password
-// exists and is up to date. It modifies role.Status.Password in memory; the
-// caller is responsible for persisting the status.
+// exists and is up to date, and returns the resourceVersion it left it at. It
+// modifies role.Status.Password in memory; the caller is responsible for
+// persisting the status.
 func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	secretKey client.ObjectKey,
-) error {
+) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
 	var secret corev1.Secret
@@ -236,22 +247,39 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 			contextLogger.Warning("password secret exists but is not owned by this DatabaseRole, skipping generation",
 				"secret", secretKey.Name)
 			role.SetPasswordMessage(fmt.Sprintf(passwordSecretNotOwnedMessage, secretKey.Name))
-			return nil
+			return secret.ResourceVersion, nil
 		}
 
-		issuedAt, err = r.ensureOwnedPasswordSecretUpToDate(ctx, role, &secret)
+		// Both the role and the Secret come from the cache, which can still be
+		// missing the last write of this controller to either of them. Every
+		// write to the Secret is recorded in the PasswordSecretChange condition,
+		// together with the issue time of the password it holds: a condition that
+		// does not match the Secret means the role may predate that write, and an
+		// issue time or rotation request read from it would rotate a password
+		// that was just rotated. Such a loop only repairs what the Secret itself
+		// shows to be missing, and records nothing about the password it holds;
+		// the next loop reads a role the cache has caught up with. A change made
+		// to the Secret by anybody else looks the same, and costs one loop.
+		recorded := passwordSecretChangeRecorded(role, &secret)
+		var rotated bool
+		issuedAt, rotated, err = r.ensureOwnedPasswordSecretUpToDate(ctx, role, &secret, recorded)
 		if err != nil {
-			return err
+			return "", err
+		}
+		if !recorded && !rotated {
+			return secret.ResourceVersion, nil
 		}
 
 	case apierrs.IsNotFound(err):
-		issuedAt, err = r.createPasswordSecret(ctx, role, secretKey)
+		var created *corev1.Secret
+		created, issuedAt, err = r.createPasswordSecret(ctx, role, secretKey)
 		if err != nil {
-			return err
+			return "", err
 		}
+		secret = *created
 
 	default:
-		return fmt.Errorf("while getting password secret %q: %w", secretKey.Name, err)
+		return "", fmt.Errorf("while getting password secret %q: %w", secretKey.Name, err)
 	}
 
 	var issuedAtString, expiration string
@@ -269,25 +297,35 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 		IssuedAt:   issuedAtString,
 		Expiration: expiration,
 	})
-	return nil
+	return secret.ResourceVersion, nil
+}
+
+// passwordSecretChangeRecorded reports whether the PasswordSecretChange
+// condition of the role records the given version of its password Secret.
+func passwordSecretChangeRecorded(role *apiv1.DatabaseRole, secret *corev1.Secret) bool {
+	condition := meta.FindStatusCondition(role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
+	return condition != nil && condition.Message == secret.ResourceVersion
 }
 
 // createPasswordSecret generates the password of the role into a Secret of its
-// own, and returns the time it was issued at.
+// own, and returns that Secret together with the time it was issued at.
 func (r *DatabaseRoleReconciler) createPasswordSecret(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	secretKey client.ObjectKey,
-) (time.Time, error) {
+) (*corev1.Secret, time.Time, error) {
 	secret, err := generatePasswordSecret(role, secretKey)
 	if err != nil {
-		return time.Time{}, err
+		return nil, time.Time{}, err
 	}
 	if err := ctrl.SetControllerReference(role, secret, r.Scheme); err != nil {
-		return time.Time{}, fmt.Errorf("while setting owner reference on password secret %q: %w", secretKey.Name, err)
+		return nil, time.Time{}, fmt.Errorf("while setting owner reference on password secret %q: %w",
+			secretKey.Name, err)
 	}
+	// AlreadyExists means a Secret the cache has not seen yet: the caller
+	// requeues rather than generating over it.
 	if err := r.Create(ctx, secret); err != nil {
-		return time.Time{}, fmt.Errorf("while creating password secret %q: %w", secretKey.Name, err)
+		return nil, time.Time{}, fmt.Errorf("while creating password secret %q: %w", secretKey.Name, err)
 	}
 	issuedAt := time.Now()
 
@@ -296,27 +334,32 @@ func (r *DatabaseRoleReconciler) createPasswordSecret(
 	r.Recorder.Eventf(role, "Normal", "PasswordGenerated",
 		"Generated the password of role %q into Secret %q", role.Spec.Name, secretKey.Name)
 
-	return issuedAt, nil
+	return secret, issuedAt, nil
 }
 
 // ensureOwnedPasswordSecretUpToDate generates a new password when the current
 // one is gone or due for rotation, and keeps the username in sync with the
 // role. It returns the current password's issue time (zero when rotation is
-// disabled), for the caller to record in the role's status.
+// disabled), for the caller to record in the role's status, and whether it
+// generated a new password. Unless roleIsCurrent, the role may predate the last
+// write to the Secret, and only a password missing from the Secret is
+// generated.
 func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	secret *corev1.Secret,
-) (time.Time, error) {
+	roleIsCurrent bool,
+) (time.Time, bool, error) {
 	origSecret := secret.DeepCopy()
 
 	var issuedAt time.Time
 	rotated := false
 	switch {
-	case passwordNeedsRotation(ctx, role, secret):
+	case len(secret.Data[corev1.BasicAuthPasswordKey]) == 0 ||
+		roleIsCurrent && passwordNeedsRotation(ctx, role, secret):
 		generated, err := generatePassword(role)
 		if err != nil {
-			return time.Time{}, err
+			return time.Time{}, false, err
 		}
 		secret.Data = passwordSecretData(role, generated)
 		issuedAt = time.Now()
@@ -324,6 +367,10 @@ func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 		// The rotation this reconciliation just performed satisfies any
 		// pending manual request: it is a one-shot ask, not a standing one.
 		delete(role.Annotations, utils.RotatePasswordAnnotationName)
+
+	case !roleIsCurrent:
+		// The issue time the role carries may belong to the password before
+		// the one in the Secret: the caller records nothing.
 
 	case !role.IsPasswordRotationEnabled():
 		// Nothing to expire: issuedAt is left at the zero time, so the status
@@ -353,11 +400,15 @@ func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 	// resourceVersion of the Secret on every loop, and that is exactly the signal
 	// that makes the instance manager re-apply the password.
 	if reflect.DeepEqual(origSecret.Data, secret.Data) {
-		return issuedAt, nil
+		return issuedAt, rotated, nil
 	}
 
-	if err := r.Patch(ctx, secret, client.MergeFrom(origSecret)); err != nil {
-		return time.Time{}, fmt.Errorf("while patching password secret %q: %w", secret.Name, err)
+	// The lock refuses the patch when the Secret changed since the cache read
+	// it: the rotation was decided on a password that may already be gone, and
+	// the caller requeues instead.
+	if err := r.Patch(ctx, secret,
+		client.MergeFromWithOptions(origSecret, client.MergeFromWithOptimisticLock{})); err != nil {
+		return time.Time{}, false, fmt.Errorf("while patching password secret %q: %w", secret.Name, err)
 	}
 
 	// A rotation invalidates the password every consumer of the Secret is
@@ -367,7 +418,7 @@ func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 		r.Recorder.Eventf(role, "Normal", "PasswordRotated",
 			"Generated a new password for role %q into Secret %q", role.Spec.Name, secret.Name)
 	}
-	return issuedAt, nil
+	return issuedAt, rotated, nil
 }
 
 // deleteOwnedPasswordSecret deletes the password Secret if it exists and is

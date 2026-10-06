@@ -102,7 +102,15 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// The password Secret is reconciled before the condition that tracks it, so
 	// that a freshly generated password is picked up by the instance manager in
 	// this same loop.
-	if err := r.reconcilePassword(ctx, &role, cluster); err != nil {
+	secretVersion, err := r.reconcilePassword(ctx, &role, cluster)
+	if err != nil {
+		// The password Secret changed since the cache read it, or was created
+		// before the cache saw it: nothing was written, and the watch is about to
+		// catch the cache up.
+		if apierrs.IsConflict(err) || apierrs.IsAlreadyExists(err) {
+			contextLogger.Info("The password Secret changed since it was read, requeueing", "err", err.Error())
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -113,7 +121,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.Recorder.Event(&role, "Warning", "PasswordGenerationSkipped", message)
 	}
 
-	if err := r.reconcilePasswordCondition(ctx, &role); err != nil {
+	if err := r.reconcilePasswordCondition(ctx, &role, secretVersion); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -139,7 +147,11 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if !reflect.DeepEqual(origRole.Status, role.Status) {
-		if err := r.patchRoleStatus(ctx, &role); err != nil {
+		if err := r.patchRoleStatus(ctx, origRole, &role); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Info("Optimistic locking conflict while patching the role status, requeueing")
+				return ctrl.Result{RequeueAfter: time.Second}, nil
+			}
 			return ctrl.Result{}, err
 		}
 	}
@@ -154,19 +166,36 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-// patchRoleStatus persists the part of the role status this controller owns:
-// `status.password`, `status.clientCertificate` and the PasswordSecretChange
-// condition. It uses an optimistic-lock patch rather than a merge patch, since
-// a merge patch would replace `status.conditions` wholesale instead of merging it.
-func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv1.DatabaseRole) error {
+// patchRoleStatus persists what this loop changed, from origRole to role, in the
+// part of the role status this controller owns: `status.password`,
+// `status.clientCertificate` and the PasswordSecretChange condition. It uses an
+// optimistic-lock patch rather than a merge patch, since a merge patch would
+// replace `status.conditions` wholesale instead of merging it. Only the changes
+// are applied to the latest status: a value this loop merely read from a stale
+// cache would otherwise overwrite a newer one, such as the issue time of a
+// password the previous loop rotated.
+func (r *DatabaseRoleReconciler) patchRoleStatus(
+	ctx context.Context,
+	origRole *apiv1.DatabaseRole,
+	role *apiv1.DatabaseRole,
+) error {
+	origPassword := origRole.Status.Password
 	password := role.Status.Password
 	clientCertificate := role.Status.ClientCertificate
+	clientCertificateChanged := !reflect.DeepEqual(origRole.Status.ClientCertificate, clientCertificate)
 	secretChange := meta.FindStatusCondition(role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
+	secretChangeChanged := !reflect.DeepEqual(secretChange,
+		meta.FindStatusCondition(origRole.Status.Conditions, string(apiv1.ConditionPasswordSecretChange)))
 
 	transaction := func(latest *apiv1.DatabaseRole) {
-		latest.SetGeneratedPasswordState(password)
-		latest.Status.ClientCertificate = clientCertificate
+		applyPasswordStateChanges(latest, origPassword, password)
+		if clientCertificateChanged {
+			latest.Status.ClientCertificate = clientCertificate
+		}
 
+		if !secretChangeChanged {
+			return
+		}
 		if secretChange != nil {
 			meta.SetStatusCondition(&latest.Status.Conditions, *secretChange)
 			return
@@ -185,6 +214,44 @@ func (r *DatabaseRoleReconciler) patchRoleStatus(ctx context.Context, role *apiv
 		return fmt.Errorf("while patching role status: %w", err)
 	}
 	return nil
+}
+
+// applyPasswordStateChanges applies to the latest role the fields of the
+// password state that changed from orig to next, leaving every other field as
+// the latest role has it, AppliedExpiration included: the instance manager
+// writes that one, and clears PendingRevocation once it acted on it.
+func applyPasswordStateChanges(latest *apiv1.DatabaseRole, orig, next *apiv1.GeneratedPasswordState) {
+	if reflect.DeepEqual(orig, next) {
+		return
+	}
+	if next == nil {
+		latest.Status.Password = nil
+		return
+	}
+
+	var before apiv1.GeneratedPasswordState
+	if orig != nil {
+		before = *orig
+	}
+	if latest.Status.Password == nil {
+		latest.Status.Password = &apiv1.GeneratedPasswordState{}
+	}
+	current := latest.Status.Password
+	if next.SecretName != before.SecretName {
+		current.SecretName = next.SecretName
+	}
+	if next.IssuedAt != before.IssuedAt {
+		current.IssuedAt = next.IssuedAt
+	}
+	if next.Expiration != before.Expiration {
+		current.Expiration = next.Expiration
+	}
+	if next.Message != before.Message {
+		current.Message = next.Message
+	}
+	if next.PendingRevocation != before.PendingRevocation {
+		current.PendingRevocation = next.PendingRevocation
+	}
 }
 
 // nextRoleSecretReconcile returns how long from now the role's client
@@ -249,9 +316,13 @@ func untilPasswordRenewal(role *apiv1.DatabaseRole) time.Duration {
 // the condition is set with the secret's ResourceVersion so the instance manager can
 // detect when the password changed. The condition is only updated in memory: the caller
 // persists it together with the rest of the status the operator owns.
+// secretVersion is the ResourceVersion the password Secret was left at by this loop,
+// when known: the cache is behind a write this loop just made, and reading the version
+// back from it would record the one before.
 func (r *DatabaseRoleReconciler) reconcilePasswordCondition(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
+	secretVersion string,
 ) error {
 	secretName := role.GetPasswordSecretName()
 	if secretName == "" {
@@ -261,23 +332,26 @@ func (r *DatabaseRoleReconciler) reconcilePasswordCondition(
 		return nil
 	}
 
-	var secret corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{
-		Namespace: role.Namespace,
-		Name:      secretName,
-	}, &secret); err != nil {
-		// There's no need to fill the operator log with errors
-		// if the secret still doesn't exist.
-		if apierrs.IsNotFound(err) {
-			return nil
-		}
+	if secretVersion == "" {
+		var secret corev1.Secret
+		if err := r.Get(ctx, types.NamespacedName{
+			Namespace: role.Namespace,
+			Name:      secretName,
+		}, &secret); err != nil {
+			// There's no need to fill the operator log with errors
+			// if the secret still doesn't exist.
+			if apierrs.IsNotFound(err) {
+				return nil
+			}
 
-		return fmt.Errorf(
-			"while getting secret %q referred by role %q: %w",
-			secretName,
-			role.Name,
-			err,
-		)
+			return fmt.Errorf(
+				"while getting secret %q referred by role %q: %w",
+				secretName,
+				role.Name,
+				err,
+			)
+		}
+		secretVersion = secret.ResourceVersion
 	}
 
 	// The instance manager, which runs the controller that applies the Role spec
@@ -296,7 +370,7 @@ func (r *DatabaseRoleReconciler) reconcilePasswordCondition(
 		Type:    string(apiv1.ConditionPasswordSecretChange),
 		Status:  metav1.ConditionTrue,
 		Reason:  "ChangeDetected",
-		Message: secret.ResourceVersion,
+		Message: secretVersion,
 	})
 
 	return nil

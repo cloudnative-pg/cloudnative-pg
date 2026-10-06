@@ -126,6 +126,19 @@ var _ = Describe("DatabaseRole password generation", func() {
 		return &got
 	}
 
+	// recordSecretChange stands in for an earlier loop of the operator, which
+	// recorded the current version of the password Secret in the role.
+	recordSecretChange := func(cli client.Client, role *apiv1.DatabaseRole) {
+		stored := getRole(cli, role)
+		meta.SetStatusCondition(&stored.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionPasswordSecretChange),
+			Status:  metav1.ConditionTrue,
+			Reason:  "ChangeDetected",
+			Message: getSecret(cli, stored.GetGeneratedPasswordSecretName()).ResourceVersion,
+		})
+		Expect(cli.Status().Update(ctx, stored)).To(Succeed())
+	}
+
 	It("generates a basic-auth secret the instance manager can consume", func() {
 		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
 		r, cli := buildReconciler(role, newCluster(false))
@@ -438,6 +451,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 				},
 			}
 			r, cli := buildReconciler(role, newCluster(false), stale)
+			recordSecretChange(cli, role)
 
 			_, err := r.Reconcile(ctx, requestFor(role))
 			Expect(err).NotTo(HaveOccurred())
@@ -468,6 +482,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 				},
 			}
 			r, cli := buildReconciler(role, newCluster(false), fresh)
+			recordSecretChange(cli, role)
 
 			_, err := r.Reconcile(ctx, requestFor(role))
 			Expect(err).NotTo(HaveOccurred())
@@ -634,7 +649,10 @@ var _ = Describe("DatabaseRole password generation", func() {
 		landed.Status.Password.AppliedExpiration = expiration
 		Expect(cli.Status().Update(ctx, landed)).To(Succeed())
 
-		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		// The loop read the role before recording the password state.
+		read := role.DeepCopy()
+		read.Status.Password = nil
+		Expect(r.patchRoleStatus(ctx, read, role)).To(Succeed())
 		Expect(getRole(cli, role).Status.Password.AppliedExpiration).To(Equal(expiration))
 	})
 
@@ -1306,6 +1324,223 @@ var _ = Describe("DatabaseRole password generation", func() {
 		rotated := getSecret(cli, "role-dante-password")
 		Expect(rotated.Data[corev1.BasicAuthPasswordKey]).NotTo(
 			Equal(first.Data[corev1.BasicAuthPasswordKey]))
+	})
+})
+
+var _ = Describe("DatabaseRole password rotation from a lagging cache", func() {
+	ctx := context.Background()
+
+	const secretName = "role-dante-password"
+
+	// cachedView stands in for an informer cache that has not caught up yet:
+	// while set, it is what reading the role, or its password Secret, returns.
+	type cachedView struct {
+		role   *apiv1.DatabaseRole
+		secret *corev1.Secret
+		// secretMissing has the cache not see the password Secret at all.
+		secretMissing bool
+		// roleReads, when positive, limits how many reads of the role return
+		// the stale one, after which the cache has caught up.
+		roleReads int
+	}
+
+	var (
+		r     *DatabaseRoleReconciler
+		cli   client.Client
+		cache *cachedView
+		req   ctrl.Request
+	)
+
+	BeforeEach(func() {
+		role := &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-dante", Namespace: "default"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{Name: "dante", Login: true},
+				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+				Password: &apiv1.PasswordConfiguration{
+					Mode:        apiv1.PasswordModeGenerate,
+					Duration:    &metav1.Duration{Duration: 5 * time.Minute},
+					RenewBefore: &metav1.Duration{Duration: 2 * time.Minute},
+				},
+			},
+		}
+		cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster-example", Namespace: "default"}}
+		req = ctrl.Request{NamespacedName: client.ObjectKeyFromObject(role)}
+
+		cache = &cachedView{}
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		cli = fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			WithObjects(role, cluster).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(
+					ctx context.Context, c client.WithWatch, key client.ObjectKey,
+					obj client.Object, opts ...client.GetOption,
+				) error {
+					switch typed := obj.(type) {
+					case *apiv1.DatabaseRole:
+						if cache.role != nil {
+							cache.role.DeepCopyInto(typed)
+							if cache.roleReads--; cache.roleReads == 0 {
+								cache.role = nil
+							}
+							return nil
+						}
+					case *corev1.Secret:
+						if key.Name != secretName {
+							break
+						}
+						if cache.secretMissing {
+							return apierrs.NewNotFound(corev1.Resource("secrets"), key.Name)
+						}
+						if cache.secret != nil {
+							cache.secret.DeepCopyInto(typed)
+							return nil
+						}
+					}
+					return c.Get(ctx, key, obj, opts...)
+				},
+			}).
+			Build()
+		r = &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}
+
+		_, err := r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	getRole := func() *apiv1.DatabaseRole {
+		var role apiv1.DatabaseRole
+		Expect(cli.Get(ctx, req.NamespacedName, &role)).To(Succeed())
+		return &role
+	}
+	getSecret := func() *corev1.Secret {
+		var secret corev1.Secret
+		Expect(cli.Get(ctx, client.ObjectKey{Namespace: "default", Name: secretName}, &secret)).To(Succeed())
+		return &secret
+	}
+
+	// pastDeadline moves the issue time of the password back into its renewal
+	// window.
+	pastDeadline := func() {
+		role := getRole()
+		role.Status.Password.IssuedAt = time.Now().Add(-4 * time.Minute).UTC().Format(time.RFC3339)
+		Expect(cli.Status().Update(ctx, role)).To(Succeed())
+	}
+	// rotationRequested asks for a rotation through the annotation.
+	rotationRequested := func() {
+		role := getRole()
+		role.Annotations = map[string]string{utils.RotatePasswordAnnotationName: "requested"}
+		Expect(cli.Update(ctx, role)).To(Succeed())
+	}
+
+	DescribeTable("does not rotate again when the role read predates the rotation",
+		func(dueForRotation func()) {
+			dueForRotation()
+			before := getRole()
+			beforeSecret := getSecret()
+
+			_, err := r.Reconcile(ctx, req)
+			Expect(err).NotTo(HaveOccurred())
+			rotated := getSecret()
+			Expect(rotated.Data).NotTo(Equal(beforeSecret.Data))
+			recorded := getRole().Status.Password.IssuedAt
+
+			// The rotation wakes the controller up again through the Secret it
+			// owns, before the cache has seen the role it recorded the rotation in.
+			cache.role = before
+			_, err = r.Reconcile(ctx, req)
+			cache.role = nil
+
+			Expect(getSecret().Data).To(Equal(rotated.Data))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(getRole().Status.Password.IssuedAt).To(Equal(recorded))
+		},
+		Entry("past its deadline", pastDeadline),
+		Entry("on request", rotationRequested),
+	)
+
+	It("does not rotate a password the cache has not seen rotated yet", func() {
+		pastDeadline()
+		before := getRole()
+		beforeSecret := getSecret()
+
+		_, err := r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+		rotated := getSecret()
+		Expect(rotated.Data).NotTo(Equal(beforeSecret.Data))
+
+		// Both the role and the Secret are read as they were before the rotation.
+		cache.role, cache.secret = before, beforeSecret
+		result, err := r.Reconcile(ctx, req)
+		cache.role, cache.secret = nil, nil
+
+		Expect(getSecret().Data).To(Equal(rotated.Data))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(time.Second))
+	})
+
+	It("requeues, rather than failing, when the cache has not seen the Secret it generated", func() {
+		generated := getSecret()
+
+		// The role and the Secret are read as they were before the Secret was
+		// generated.
+		cache.role = getRole()
+		cache.role.Status = apiv1.DatabaseRoleStatus{}
+		cache.secretMissing = true
+		result, err := r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(time.Second))
+		cache.role, cache.secretMissing = nil, false
+
+		Expect(getSecret().Data).To(Equal(generated.Data))
+	})
+
+	It("keeps the password state of a renamed Secret when the role read predates the rename", func() {
+		// The fake client numbers the versions of each object from one, while
+		// the API server never gives two objects the same one: move the old
+		// Secret past the first version the new one gets.
+		old := getSecret()
+		old.Labels = map[string]string{"touched": "true"}
+		Expect(cli.Update(ctx, old)).To(Succeed())
+		_, err := r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+
+		role := getRole()
+		role.Spec.Password.Secret = "dante-renamed"
+		Expect(cli.Update(ctx, role)).To(Succeed())
+		before := getRole()
+
+		_, err = r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+		recorded := getRole().Status.Password
+		Expect(recorded.SecretName).To(Equal("dante-renamed"))
+
+		// Clearing the state along with the old Secret would leave the role
+		// with no expiration, and lift its VALID UNTIL, until the next loop.
+		// The cache catches up before the status is patched.
+		cache.role, cache.roleReads = before, 1
+		_, err = r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(getRole().Status.Password).To(Equal(recorded))
+	})
+
+	It("records the version of the Secret it wrote, not the one the cache still holds", func() {
+		pastDeadline()
+		beforeSecret := getSecret()
+
+		cache.secret = beforeSecret
+		_, err := r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+		cache.secret = nil
+
+		rotated := getSecret()
+		Expect(rotated.ResourceVersion).NotTo(Equal(beforeSecret.ResourceVersion))
+		condition := meta.FindStatusCondition(getRole().Status.Conditions,
+			string(apiv1.ConditionPasswordSecretChange))
+		Expect(condition).NotTo(BeNil())
+		Expect(condition.Message).To(Equal(rotated.ResourceVersion))
 	})
 })
 
