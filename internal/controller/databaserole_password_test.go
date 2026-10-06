@@ -1460,6 +1460,40 @@ var _ = Describe("DatabaseRole password rotation from a lagging cache", func() {
 		Entry("on request", rotationRequested),
 	)
 
+	It("records nothing about the password from a role read before its rotation", func() {
+		pastDeadline()
+		before := getRole()
+
+		_, err := r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+		recorded := getRole().Status.Password
+
+		// The lifetime changed before the role was read, the rotation not yet:
+		// an expiration computed from it would pair the old issue time with the
+		// new lifetime. The cache catches up before the status is patched.
+		before.Spec.Password.Duration = &metav1.Duration{Duration: 10 * time.Minute}
+		cache.role, cache.roleReads = before, 1
+		_, err = r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(getRole().Status.Password).To(Equal(recorded))
+	})
+
+	It("records the issue time of a password it regenerates after an edit it had not seen", func() {
+		pastDeadline()
+		emptied := getSecret()
+		emptied.Data[corev1.BasicAuthPasswordKey] = nil
+		Expect(cli.Update(ctx, emptied)).To(Succeed())
+
+		_, err := r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(getSecret().Data[corev1.BasicAuthPasswordKey]).NotTo(BeEmpty())
+		issuedAt, err := time.Parse(time.RFC3339, getRole().Status.Password.IssuedAt)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(issuedAt).To(BeTemporally("~", time.Now(), 2*time.Second))
+	})
+
 	It("does not rotate a password the cache has not seen rotated yet", func() {
 		pastDeadline()
 		before := getRole()
