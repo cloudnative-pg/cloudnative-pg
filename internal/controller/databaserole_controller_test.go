@@ -317,7 +317,7 @@ var _ = Describe("DatabaseRole status patch retry", func() {
 			SecretName: "role-a-password",
 			IssuedAt:   "2026-08-20T10:00:00Z",
 		}
-		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(r.patchRoleStatus(ctx, newRole(), role)).To(Succeed())
 		Expect(attempts).To(Equal(3))
 
 		got := &apiv1.DatabaseRole{}
@@ -344,7 +344,7 @@ var _ = Describe("DatabaseRole status patch retry", func() {
 		role := newRole()
 		role.Status.Password = &apiv1.GeneratedPasswordState{SecretName: "role-a-password"}
 
-		Expect(r.patchRoleStatus(ctx, role)).To(MatchError(ContainSubstring("apiserver is down")))
+		Expect(r.patchRoleStatus(ctx, newRole(), role)).To(MatchError(ContainSubstring("apiserver is down")))
 	})
 
 	It("stops without an error when the role is deleted while being reconciled", func() {
@@ -354,7 +354,7 @@ var _ = Describe("DatabaseRole status patch retry", func() {
 
 		role := newRole()
 		role.Status.Password = &apiv1.GeneratedPasswordState{SecretName: "role-a-password"}
-		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(r.patchRoleStatus(ctx, newRole(), role)).To(Succeed())
 	})
 })
 
@@ -393,7 +393,7 @@ var _ = Describe("DatabaseRole status patch condition ownership", func() {
 			Reason:  "SecretChanged",
 			Message: "42",
 		})
-		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(r.patchRoleStatus(ctx, stored, role)).To(Succeed())
 
 		got := &apiv1.DatabaseRole{}
 		Expect(cli.Get(ctx, client.ObjectKeyFromObject(role), got)).To(Succeed())
@@ -456,7 +456,7 @@ var _ = Describe("DatabaseRole status patch condition ownership", func() {
 			Reason:  "SecretChanged",
 			Message: "42",
 		})
-		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(r.patchRoleStatus(ctx, stored, role)).To(Succeed())
 		Expect(concurrentWrites).To(Equal(1))
 
 		got := &apiv1.DatabaseRole{}
@@ -464,6 +464,46 @@ var _ = Describe("DatabaseRole status patch condition ownership", func() {
 		Expect(meta.FindStatusCondition(got.Status.Conditions, "SomebodyElsesCondition")).NotTo(BeNil())
 		Expect(meta.FindStatusCondition(got.Status.Conditions,
 			string(apiv1.ConditionPasswordSecretChange))).NotTo(BeNil())
+	})
+
+	It("does not roll back an issue time this loop only read", func() {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		stored := &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-a", Namespace: "default"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{Name: "role-a"},
+				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+			},
+			Status: apiv1.DatabaseRoleStatus{
+				Password: &apiv1.GeneratedPasswordState{
+					SecretName: "role-a-password",
+					IssuedAt:   "2026-08-20T10:05:00Z",
+				},
+			},
+		}
+		cli := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			WithObjects(stored).
+			Build()
+		r := &DatabaseRoleReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(eventBufferSize)}
+
+		// The loop read the role from a cache still missing the rotation the
+		// previous loop recorded, and changed something else.
+		read := stored.DeepCopy()
+		read.Status.Password.IssuedAt = "2026-08-20T10:00:00Z"
+		role := read.DeepCopy()
+		meta.SetStatusCondition(&role.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionPasswordSecretChange),
+			Status:  metav1.ConditionTrue,
+			Reason:  "ChangeDetected",
+			Message: "42",
+		})
+		Expect(r.patchRoleStatus(ctx, read, role)).To(Succeed())
+
+		got := &apiv1.DatabaseRole{}
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Status.Password.IssuedAt).To(Equal("2026-08-20T10:05:00Z"))
 	})
 
 	It("keeps the expiration the instance manager applied while the patch was in flight", func() {
@@ -511,7 +551,7 @@ var _ = Describe("DatabaseRole status patch condition ownership", func() {
 
 		role := stored.DeepCopy()
 		role.Status.Password.IssuedAt = "2026-08-20T10:00:00Z"
-		Expect(r.patchRoleStatus(ctx, role)).To(Succeed())
+		Expect(r.patchRoleStatus(ctx, stored, role)).To(Succeed())
 		Expect(concurrentWrites).To(Equal(1))
 
 		got := &apiv1.DatabaseRole{}

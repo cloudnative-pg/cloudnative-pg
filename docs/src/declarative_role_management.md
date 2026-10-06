@@ -331,6 +331,15 @@ lifetime the password already had, from the creation of its Secret: one older
 than the requested duration is rotated at once. Removing `duration` stops
 rotation and clears the recorded deadline, keeping the current password.
 
+The issue time of a new password is recorded in the status right after the
+password is written to its Secret. When recording it fails, for instance
+because the API server cannot be reached or the operator restarts in between,
+the operator has no way to tell that the password in the Secret is new, and
+measures its lifetime from the previous issue time: it expires, and is
+rotated, earlier than planned, possibly a few seconds later. Consumers that
+already read the first new password then have to read the Secret again. A
+failure of this kind never skips or postpones a rotation.
+
 #### Manual rotation
 
 To rotate a generated password immediately, regardless of its renewal
