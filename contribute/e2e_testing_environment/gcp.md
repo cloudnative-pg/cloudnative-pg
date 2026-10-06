@@ -169,6 +169,8 @@ For the `openshift` job on Google Cloud also set:
 - `OPENSHIFT_BASE_DOMAIN`: the base domain, the domain of the public Cloud
   DNS zone.
 - the `REDHAT_PULL` secret with your Red Hat pull secret.
+- `OPENSHIFT_SSH_PUBLIC_KEY`: optional, a public SSH key to install on the
+  nodes, to debug an installation over SSH.
 
 The `openshift` job does not need `GKE_ENABLED`, but it reuses the project,
 `GCP_REGION` and the authentication settings of the `gke` job.
