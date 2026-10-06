@@ -534,8 +534,10 @@ Options supported are:
   Available engines: `kind`, `k3d`, `eks`, `aks`, `gke`, `openshift`.
   Multiple engines can be specified as a comma-separated list.
   Note that `eks`, `aks`, `gke`, and `openshift` require additional
-  secrets that are not available in the main repository and will be
-  silently skipped when those secrets are not configured.
+  secrets and variables that are not available in the main repository
+  and will be silently skipped when those are not configured. To set up
+  Google Cloud for `gke`, see
+  [Setting up Google Cloud for the E2E tests](gcp.md).
 
 - feature_type (`type` or `ft` for short)
   A label to select a subset of E2E tests to be run, divided by functionality.
