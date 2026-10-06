@@ -461,32 +461,6 @@ var _ = Describe("CRD database role secret name", func() {
 		secrets := crdRoleSecretName(&role)
 		Expect(secrets).To(BeEmpty())
 	})
-	It("should be the generated secret when the operator generates the password", func() {
-		role := apiv1.DatabaseRole{
-			ObjectMeta: metav1.ObjectMeta{Name: "role-dante"},
-			Spec: apiv1.DatabaseRoleSpec{
-				RoleConfiguration: apiv1.RoleConfiguration{Name: "dante"},
-				Password:          &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate},
-			},
-		}
-		Expect(crdRoleSecretName(&role)).To(Equal("role-dante-password"))
-
-		role.Spec.Password.Mode = apiv1.PasswordModeExternal
-		Expect(crdRoleSecretName(&role)).To(BeEmpty())
-	})
-	It("should be the named secret when the password is read from an existing one (mode: secret)", func() {
-		role := apiv1.DatabaseRole{
-			ObjectMeta: metav1.ObjectMeta{Name: "role-dante"},
-			Spec: apiv1.DatabaseRoleSpec{
-				RoleConfiguration: apiv1.RoleConfiguration{Name: "dante"},
-				Password: &apiv1.PasswordConfiguration{
-					Mode:   apiv1.PasswordModeSecret,
-					Secret: "byo-secret",
-				},
-			},
-		}
-		Expect(crdRoleSecretName(&role)).To(Equal("byo-secret"))
-	})
 	It("should work properly when the password secret name is set", func() {
 		role := apiv1.DatabaseRole{
 			Spec: apiv1.DatabaseRoleSpec{

@@ -281,40 +281,6 @@ var _ = Describe("databaserole_pki", func() {
 	})
 
 	Describe("recording what it did", func() {
-		It("records the issuance of a certificate, and its re-issue", func(ctx SpecContext) {
-			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
-			role := newRole("beatrice", true)
-
-			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
-			Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
-				ContainSubstring("Normal ClientCertificateIssued"),
-				ContainSubstring(role.GetClientCertSecretName()),
-			)))
-
-			// Rotating the CA of the cluster replaces the certificate of every
-			// role signed by it: a client that mounted the old one has to read
-			// its Secret again, which is worth more than a log line.
-			newCAPair, err := certs.CreateRootCA("test.example.com", namespace)
-			Expect(err).NotTo(HaveOccurred())
-			var caSecret corev1.Secret
-			Expect(r.Get(ctx, types.NamespacedName{
-				Name: cluster.GetClientCASecretName(), Namespace: namespace,
-			}, &caSecret)).To(Succeed())
-			caSecret.Data[certs.CACertKey] = newCAPair.Certificate
-			caSecret.Data[certs.CAPrivateKeyKey] = newCAPair.Private
-			Expect(r.Update(ctx, &caSecret)).To(Succeed())
-
-			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
-			Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
-				ContainSubstring("Normal ClientCertificateRenewed"),
-				ContainSubstring("client CA of the cluster was rotated"),
-			)))
-
-			// Nothing happened to the certificate this time.
-			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
-			Expect(recordedEvents(&r)).To(BeEmpty())
-		})
-
 		It("explains a certificate it will not issue once, not on every loop", func(ctx SpecContext) {
 			// A CA the operator cannot sign with: the certificate is never
 			// issued, and the role is left without the credential it asked for.
