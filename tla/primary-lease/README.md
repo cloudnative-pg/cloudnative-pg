@@ -26,7 +26,7 @@ checking, not production timings):
 | `LeaseDuration` | `5` | Owned lease must be observed unchanged for `> LeaseDuration` before take-over |
 | `RenewDeadline` | `2` | Holder that has not renewed within this is treated as having lost the lease |
 | `RenewPeriod` | `1` | Minimum spacing between holder renewals |
-| `LivenessThreshold` | `2` | `IsAlive(n)` iff `tick - watchdogTick[n] <= threshold` |
+| `LivenessThreshold` | `2` | `IsAlive(n)` iff `tick - watchdogTick[n] <= threshold`; must not exceed `LeaseDuration - RenewDeadline` (see below) |
 
 Production defaults live under `.spec.primaryLease`
 (`leaseDurationSeconds`, `renewDeadlineSeconds`, `retryPeriodSeconds`);
@@ -78,10 +78,22 @@ Per instance (stale reads + local timers):
 * `TypeOK` — typing invariant over the shared state (holder, renew tick,
   watchdog ticks, `leading`, `lookingForLease`, clock).
 
-The spec also `ASSUME`s the timing relations enforced on the
-implementation side by the admission webhook
-(`LeaseDuration > RenewDeadline > RenewPeriod > 0`), so a misconfigured
-timing set fails fast instead of being silently checked.
+The spec also `ASSUME`s `LeaseDuration > RenewDeadline > RenewPeriod > 0`,
+so a misconfigured timing set fails fast instead of being silently
+checked. The admission webhook enforces `leaseDurationSeconds >
+renewDeadlineSeconds` and the stricter `renewDeadlineSeconds >
+1.2 * retryPeriodSeconds`.
+
+`NoTwoLeaders` holds only while `LivenessThreshold <= LeaseDuration -
+RenewDeadline`. A holder can pet its watchdog `RenewDeadline` ticks
+after its last renewal, even while a candidate contests, and then stop
+acting while `leading` is still set. A candidate can claim the lease
+`LeaseDuration + 1` ticks after that renewal. With a larger
+`LivenessThreshold` the old holder is still alive at that point, so both
+nodes are alive leaders. This is the model's counterpart of the
+requirement that an isolated primary stops before a replica may promote.
+The relation is not `ASSUME`d, so raising `LivenessThreshold` past the
+bound shows the counterexample.
 
 ## Assumptions and limits
 
@@ -99,8 +111,17 @@ timing set fails fast instead of being silently checked.
   only safety (`NoTwoLeaders`) is checked.
 * Network/API-server failures are abstracted as "renew does not land"
   plus watchdog liveness, not as explicit partitions.
-* Clean-release fast path (empty holder) vs. expiry slow path are both
-  modeled.
+* The three `PrimaryInstanceLostLease*` actions stand for the outcomes
+  of the peer probe, not for the probe itself. `lookingForLease` stands
+  for the target primary that peers report through the `/failsafe`
+  endpoint, and the old primary reads it atomically. The probe and
+  shutdown latency is the time an old primary may delay its step-down:
+  past the deadline it cannot pet its watchdog while a candidate
+  contests, so that delay is bounded by `LivenessThreshold`.
+* The lease starts with an empty holder, and claiming it is the only
+  use of the empty-holder fast path. No action releases the lease, so the
+  clean hand-over after a graceful shutdown is not modeled: after the
+  first claim every take-over goes through the expiry slow path.
 * Fencing and the primary isolation check are not modeled as mechanisms:
   there is no connectivity probing, no liveness-probe failure, and no
   kubelet-driven restart/shutdown in the spec. Their effect is assumed
