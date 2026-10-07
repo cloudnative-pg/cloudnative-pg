@@ -929,7 +929,15 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: goc
 			return nil, err
 		}
 
-		if !podHasLatestMajorImage(&pod) {
+		// Block backup only when a major-version upgrade is in progress; the
+		// primary's data directory is incompatible with the new image until
+		// pg_upgrade completes. During a minor image update with
+		// primaryUpdateStrategy=supervised the primary may still run the old
+		// minor image while cluster.Status.Image has already advanced; minor
+		// version differences do not affect backup correctness because the
+		// PostgreSQL data format is compatible within the same major version.
+		if cluster.Status.PGDataImageInfo != nil &&
+			cluster.Status.Image != cluster.Status.PGDataImageInfo.Image {
 			return nil, ErrPrimaryImageNeedsUpdate
 		}
 		targetPod = &pod
