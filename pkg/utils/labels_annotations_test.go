@@ -101,13 +101,37 @@ var _ = Describe("Label management", func() {
 	It("must inherit labels to be inherited", func() {
 		pod := &corev1.Pod{}
 		InheritLabels(&pod.ObjectMeta, toBeMatchedMap, nil, config)
-		Expect(pod.Labels).To(Equal(map[string]string{"alpha": "1", "beta": "2"}))
+		Expect(pod.Labels).To(Equal(map[string]string{
+			"alpha":                         "1",
+			"beta":                          "2",
+			KubernetesAppManagedByLabelName: ManagerName,
+		}))
 	})
 	It("must inherit labels to be inherited with fixed ones passed", func() {
 		pod := &corev1.Pod{}
 		InheritLabels(&pod.ObjectMeta, toBeMatchedMap,
 			fixedMap, config)
-		Expect(pod.Labels).To(Equal(map[string]string{"alpha": "1", "beta": "2", "delta": "4", "epsilon": "5"}))
+		Expect(pod.Labels).To(Equal(map[string]string{
+			"alpha":                         "1",
+			"beta":                          "2",
+			"delta":                         "4",
+			"epsilon":                       "5",
+			KubernetesAppManagedByLabelName: ManagerName,
+		}))
+	})
+	It("must never inherit the managed-by label and always force the operator value", func() {
+		config := &fakeInhericanceController{
+			labels: []string{"alpha", KubernetesAppManagedByLabelName},
+		}
+		pod := &corev1.Pod{}
+		InheritLabels(&pod.ObjectMeta,
+			map[string]string{"alpha": "1", KubernetesAppManagedByLabelName: "Helm"},
+			map[string]string{KubernetesAppManagedByLabelName: "Helm"},
+			config)
+		Expect(pod.Labels).To(Equal(map[string]string{
+			"alpha":                         "1",
+			KubernetesAppManagedByLabelName: ManagerName,
+		}))
 	})
 })
 
