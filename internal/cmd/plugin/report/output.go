@@ -109,10 +109,10 @@ func writeZippedReport(sections []zipFileWriter, file, folder string) (err error
 
 type namedObject struct {
 	Name   string
-	Object interface{}
+	Object any
 }
 
-func addContentToZip(c interface{}, name, folder string, format plugin.OutputFormat, zipper *zip.Writer) error {
+func addContentToZip(c any, name, folder string, format plugin.OutputFormat, zipper *zip.Writer) error {
 	var writer io.Writer
 	fileName := filepath.Join(folder, name) + "." + string(format)
 	writer, err := zipper.Create(fileName)
