@@ -377,6 +377,8 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 					}
 				})
 
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterBName, testTimeouts[timeouts.ClusterIsReady])
+
 				By("verifying replication from new primary works everywhere", func() {
 					validateReplication(namespace, clusterAName, clusterBName)
 				})

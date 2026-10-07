@@ -874,6 +874,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				}
 			})
 
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterBName, testTimeouts[timeouts.ClusterIsReady])
+
 			By("verifying replication from new primary works everywhere", func() {
 				validateReplication(namespace, clusterAName, clusterBName)
 			})
