@@ -54,6 +54,9 @@ type PostgresqlStatus struct {
 	// Hash of the current PostgreSQL configuration
 	LoadedConfigurationHash string `json:"loadedConfigurationHash,omitempty"`
 
+	// PostgreSQL Version
+	PostgreSQLVersion string `json:"postgresqlVersion"`
+
 	// Archiver status
 	LastArchivedWAL     string `json:"lastArchivedWAL,omitempty"`
 	LastArchivedWALTime string `json:"lastArchivedWALTime,omitempty"`
@@ -61,7 +64,6 @@ type PostgresqlStatus struct {
 	LastFailedWALTime   string `json:"lastFailedWALTime,omitempty"`
 
 	// WAL Status
-
 	CurrentWAL string `json:"currentWAL,omitempty"`
 
 	// Is the number of '.ready' wal files contained in the wal archive folder
