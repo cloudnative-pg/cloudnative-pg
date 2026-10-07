@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -54,7 +53,7 @@ func (backupStatus *BackupStatus) SetAsFailed(
 		backupStatus.Error = ""
 	}
 
-	backupStatus.ReconciliationTerminatedAt = ptr.To(metav1.Now())
+	backupStatus.ReconciliationTerminatedAt = new(metav1.Now())
 }
 
 // SetAsFinalizing marks a certain backup as finalizing
@@ -67,7 +66,7 @@ func (backupStatus *BackupStatus) SetAsFinalizing() {
 func (backupStatus *BackupStatus) SetAsCompleted() {
 	backupStatus.Phase = BackupPhaseCompleted
 	backupStatus.Error = ""
-	backupStatus.ReconciliationTerminatedAt = ptr.To(metav1.Now())
+	backupStatus.ReconciliationTerminatedAt = new(metav1.Now())
 }
 
 // SetAsStarted marks a certain backup as started
@@ -80,7 +79,7 @@ func (backupStatus *BackupStatus) SetAsStarted(podName, containerID, sessionID s
 		SessionID:   sessionID,
 	}
 	backupStatus.Method = method
-	backupStatus.ReconciliationStartedAt = ptr.To(metav1.Now())
+	backupStatus.ReconciliationStartedAt = new(metav1.Now())
 }
 
 // SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot

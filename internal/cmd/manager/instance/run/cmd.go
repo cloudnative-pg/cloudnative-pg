@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -239,7 +238,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		Logger:           contextLogger.WithValues("logging_pod", os.Getenv("POD_NAME")).GetLogger(),
 		PprofBindAddress: getPprofServerAddress(pprofServer),
 		Controller: ctrlconfig.Controller{
-			SkipNameValidation: ptr.To(skipNameValidation),
+			SkipNameValidation: new(skipNameValidation),
 		},
 	})
 	if err != nil {

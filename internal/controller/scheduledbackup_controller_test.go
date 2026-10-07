@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -310,7 +309,7 @@ var _ = Describe("scheduledbackup reconcileScheduledBackup immediate", func() {
 			Spec: apiv1.ScheduledBackupSpec{
 				Schedule:  "0 0 0 * * *",
 				Cluster:   apiv1.LocalObjectReference{Name: "cluster-x"},
-				Immediate: ptr.To(true),
+				Immediate: new(true),
 			},
 		}
 		Expect(cli.Create(ctx, sb)).To(Succeed())
@@ -368,7 +367,7 @@ var _ = Describe("scheduledbackup Reconcile suspend", func() {
 			Spec: apiv1.ScheduledBackupSpec{
 				Schedule: "0 0 0 * * *",
 				Cluster:  apiv1.LocalObjectReference{Name: "cluster-x"},
-				Suspend:  ptr.To(true),
+				Suspend:  new(true),
 			},
 			Status: apiv1.ScheduledBackupStatus{
 				LastCheckTime: &metav1.Time{Time: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
@@ -402,7 +401,7 @@ var _ = Describe("scheduledbackup Reconcile suspend", func() {
 
 		By("resuming Backup creation once unsuspended", func() {
 			Expect(cli.Get(ctx, sbNamespacedName, sb)).To(Succeed())
-			sb.Spec.Suspend = ptr.To(false)
+			sb.Spec.Suspend = new(false)
 			Expect(cli.Update(ctx, sb)).To(Succeed())
 
 			result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: sbNamespacedName})

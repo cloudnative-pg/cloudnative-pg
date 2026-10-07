@@ -24,7 +24,6 @@ import (
 	"errors"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
@@ -49,7 +48,7 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 	var (
 		config = apiv1.ReplicationSlotsConfiguration{
 			HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-				Enabled:    ptr.To(true),
+				Enabled:    new(true),
 				SlotPrefix: "_cnpg_",
 			},
 		}
@@ -263,11 +262,11 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 	It("drops a stale user slot only once when synchronizeReplicas is disabled", func(ctx SpecContext) {
 		configNoUserSlots := apiv1.ReplicationSlotsConfiguration{
 			HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-				Enabled:    ptr.To(true),
+				Enabled:    new(true),
 				SlotPrefix: "_cnpg_",
 			},
 			SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-				Enabled: ptr.To(false),
+				Enabled: new(false),
 			},
 		}
 		userSlot := "userslot"

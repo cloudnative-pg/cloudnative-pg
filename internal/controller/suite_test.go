@@ -36,7 +36,6 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -149,7 +148,7 @@ func newFakePooler(k8sClient client.Client, cluster *apiv1.Cluster) *apiv1.Poole
 				Name: cluster.Name,
 			},
 			Type:      "rw",
-			Instances: ptr.To(int32(1)),
+			Instances: new(int32(1)),
 			PgBouncer: &apiv1.PgBouncerSpec{
 				PoolMode: apiv1.PgBouncerPoolModeSession,
 			},

@@ -25,7 +25,6 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/Masterminds/semver/v3"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -124,7 +123,7 @@ var _ = Describe("updateResultForDecrease", func() {
 				instance.SetCluster(&apiv1.Cluster{
 					Spec: apiv1.ClusterSpec{
 						ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-							Enabled: ptr.To(true),
+							Enabled: new(true),
 							Source:  "cluster-example",
 						},
 					},

@@ -24,7 +24,6 @@ import (
 	"fmt"
 
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
@@ -99,7 +98,7 @@ var _ = Describe("Function isStreamingAvailable", func() {
 					},
 				},
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "clusterSource",
 				},
 			},
@@ -120,7 +119,7 @@ var _ = Describe("Function isStreamingAvailable", func() {
 					},
 				},
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "clusterSource",
 				},
 			},
@@ -141,7 +140,7 @@ var _ = Describe("Function isStreamingAvailable", func() {
 					},
 				},
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "clusterSource",
 				},
 			},

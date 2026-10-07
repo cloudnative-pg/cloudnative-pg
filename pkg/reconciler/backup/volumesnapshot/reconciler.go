@@ -34,7 +34,6 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -274,7 +273,7 @@ func (se *Reconciler) finalizeSnapshotBackupStep(
 	}
 
 	backup.Status.SetAsFinalizing()
-	backup.Status.Online = ptr.To(backup.GetOnlineOrDefault(cluster))
+	backup.Status.Online = new(backup.GetOnlineOrDefault(cluster))
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
 	if err != nil {
 		return nil, err

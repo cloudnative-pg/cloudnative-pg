@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -131,7 +130,7 @@ var _ = Describe("PVC classification with a bootstrap init container", func() {
 		EnrichStatus(
 			ctx,
 			cluster,
-			[]corev1.Pod{podWithBootstrapInitContainer("1", ptr.To(int32(1)))},
+			[]corev1.Pod{podWithBootstrapInitContainer("1", new(int32(1)))},
 			nil,
 			pvcs,
 		)
@@ -149,7 +148,7 @@ var _ = Describe("PVC classification with a bootstrap init container", func() {
 		EnrichStatus(
 			ctx,
 			cluster,
-			[]corev1.Pod{podWithBootstrapInitContainer("1", ptr.To(int32(0)))},
+			[]corev1.Pod{podWithBootstrapInitContainer("1", new(int32(0)))},
 			nil,
 			pvcs,
 		)
@@ -391,7 +390,7 @@ var _ = Describe("MarkPVCReadyForCompletedJobs", func() {
 				Namespace: "default",
 			},
 			Spec: batchv1.JobSpec{
-				Completions: ptr.To(int32(1)),
+				Completions: new(int32(1)),
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
@@ -449,7 +448,7 @@ var _ = Describe("MarkPVCReadyForCompletedJobs", func() {
 				Namespace: "default",
 			},
 			Spec: batchv1.JobSpec{
-				Completions: ptr.To(int32(1)),
+				Completions: new(int32(1)),
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Volumes: []corev1.Volume{
@@ -496,7 +495,7 @@ var _ = Describe("MarkPVCReadyForCompletedJobs", func() {
 				Namespace: "default",
 			},
 			Spec: batchv1.JobSpec{
-				Completions: ptr.To(int32(1)),
+				Completions: new(int32(1)),
 			},
 			Status: batchv1.JobStatus{
 				Succeeded: 0,
@@ -535,7 +534,7 @@ var _ = Describe("MarkPVCReadyForCompletedJobs", func() {
 				Namespace: "default",
 			},
 			Spec: batchv1.JobSpec{
-				Completions: ptr.To(int32(1)),
+				Completions: new(int32(1)),
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Volumes: []corev1.Volume{
@@ -598,7 +597,7 @@ var _ = Describe("MarkPVCReadyForCompletedJobs", func() {
 				Namespace: "default",
 			},
 			Spec: batchv1.JobSpec{
-				Completions: ptr.To(int32(1)),
+				Completions: new(int32(1)),
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
@@ -630,7 +629,7 @@ var _ = Describe("MarkPVCReadyForCompletedJobs", func() {
 				Namespace: "default",
 			},
 			Spec: batchv1.JobSpec{
-				Completions: ptr.To(int32(1)),
+				Completions: new(int32(1)),
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{

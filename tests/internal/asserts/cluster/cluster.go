@@ -357,7 +357,7 @@ func assertClusterHasSequentialPods(
 
 	// Build expected sequential serials [1, 2, 3, ..., expectedInstances]
 	expectedSerials := make([]int, expectedInstances)
-	for i := 0; i < expectedInstances; i++ {
+	for i := range expectedInstances {
 		expectedSerials[i] = i + 1
 	}
 

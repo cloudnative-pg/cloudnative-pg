@@ -33,7 +33,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -419,7 +418,7 @@ func AssertDetachReplicaModeCluster(
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, replicaClusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 			original := cluster.DeepCopy()
-			cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+			cluster.Spec.ReplicaCluster.Enabled = new(false)
 			g.Expect(env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(original))).To(Succeed())
 		}, 60, 5).Should(Succeed())
 	})

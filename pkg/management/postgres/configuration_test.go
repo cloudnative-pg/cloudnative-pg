@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
@@ -222,7 +221,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 
 		Spec: apiv1.ClusterSpec{
 			ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-				Enabled: ptr.To(false),
+				Enabled: new(false),
 				MinApplyDelay: &metav1.Duration{
 					Duration: 1 * time.Hour,
 				},
@@ -238,7 +237,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 
 		Spec: apiv1.ClusterSpec{
 			ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 				MinApplyDelay: &metav1.Duration{
 					Duration: 1 * time.Hour,
 				},
@@ -254,7 +253,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 
 		Spec: apiv1.ClusterSpec{
 			ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			},
 		},
 	}

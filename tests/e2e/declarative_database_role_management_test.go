@@ -31,7 +31,6 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -703,7 +702,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 							ClusterRef:    corev1.LocalObjectReference{Name: clusterName},
 							ReclaimPolicy: apiv1.DatabaseRoleReclaimRetain,
 							ClientCertificate: &apiv1.ClientCertificateConfiguration{
-								Enabled: ptr.To(true),
+								Enabled: new(true),
 							},
 						},
 					}
@@ -770,7 +769,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 										{Name: "secret-volume-tls", MountPath: "/etc/secrets/tls"},
 									},
 									SecurityContext: &corev1.SecurityContext{
-										AllowPrivilegeEscalation: ptr.To(false),
+										AllowPrivilegeEscalation: new(false),
 										SeccompProfile:           seccompProfile,
 									},
 								},
@@ -788,7 +787,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					roleKey := types.NamespacedName{Namespace: namespace, Name: roleCRName}
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
-					role.Spec.ClientCertificate.Enabled = ptr.To(false)
+					role.Spec.ClientCertificate.Enabled = new(false)
 					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					Eventually(func(g Gomega) {
@@ -808,7 +807,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					roleKey := types.NamespacedName{Namespace: namespace, Name: roleCRName}
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
-					role.Spec.ClientCertificate.Enabled = ptr.To(true)
+					role.Spec.ClientCertificate.Enabled = new(true)
 					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					Eventually(func(g Gomega) {

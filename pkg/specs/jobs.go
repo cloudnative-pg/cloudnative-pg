@@ -27,7 +27,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -362,7 +361,7 @@ func createInstanceInitContainer(config InstanceInitContainerConfig) InstanceIni
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{Name: cluster.GetApplicationSecretName()},
 					Key:                  "username",
-					Optional:             ptr.To(false),
+					Optional:             new(false),
 				},
 			},
 		})
@@ -469,7 +468,7 @@ func CreatePrimaryJob(
 					Affinity:                     CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:                  cluster.Spec.Affinity.Tolerations,
 					ServiceAccountName:           cluster.GetServiceAccountName(),
-					AutomountServiceAccountToken: ptr.To(false),
+					AutomountServiceAccountToken: new(false),
 					RestartPolicy:                corev1.RestartPolicyNever,
 					NodeSelector:                 cluster.Spec.Affinity.NodeSelector,
 					TopologySpreadConstraints:    cluster.Spec.TopologySpreadConstraints,

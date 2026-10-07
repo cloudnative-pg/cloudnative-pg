@@ -326,7 +326,7 @@ func (cmd *command) generateDeployment() *appsv1.Deployment {
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{
 									Medium:    corev1.StorageMediumMemory,
-									SizeLimit: ptr.To(resource.MustParse("100Mi")),
+									SizeLimit: new(resource.MustParse("100Mi")),
 								},
 							},
 						},

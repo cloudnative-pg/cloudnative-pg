@@ -22,7 +22,6 @@ package majorupgrade
 import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -100,7 +99,7 @@ func createMajorUpgradeJobDefinition(
 	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, nil)
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 	// A failed pg_upgrade will not succeed on retry.
-	job.Spec.BackoffLimit = ptr.To(int32(0))
+	job.Spec.BackoffLimit = new(int32(0))
 
 	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
 		specs.CreateExtensionVolumes(oldExtensions)...)

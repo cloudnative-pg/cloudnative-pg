@@ -26,7 +26,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -148,7 +147,7 @@ func ImportDatabasesMonolith(
 		Spec: apiv1.ClusterSpec{
 			Instances:             3,
 			ImageName:             imageName,
-			EnableSuperuserAccess: ptr.To(true),
+			EnableSuperuserAccess: new(true),
 
 			StorageConfiguration: apiv1.StorageConfiguration{
 				Size:         "1Gi",

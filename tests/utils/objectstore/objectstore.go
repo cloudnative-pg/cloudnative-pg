@@ -38,7 +38,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -168,7 +167,7 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: ptr.To(int32(1)),
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "object-store"},
 			},
@@ -217,7 +216,7 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: ptr.To(false),
+								AllowPrivilegeEscalation: new(false),
 								SeccompProfile:           seccompProfile,
 							},
 						},
@@ -295,7 +294,7 @@ func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv
 								InitialDelaySeconds: 30,
 							},
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: ptr.To(false),
+								AllowPrivilegeEscalation: new(false),
 								SeccompProfile:           seccompProfile,
 							},
 						},
@@ -440,7 +439,7 @@ func defaultClient(namespace string) appsv1.Deployment {
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: ptr.To(int32(1)),
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -483,7 +482,7 @@ func defaultClient(namespace string) appsv1.Deployment {
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: ptr.To(false),
+								AllowPrivilegeEscalation: new(false),
 								SeccompProfile:           seccompProfile,
 							},
 							Command: []string{"sleep", "infinity"},

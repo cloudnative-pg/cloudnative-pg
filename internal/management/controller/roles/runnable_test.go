@@ -34,7 +34,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -339,7 +338,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:            "role_to_test1",
 						Superuser:       true,
-						Inherit:         ptr.To(true),
+						Inherit:         new(true),
 						Comment:         "This is a role to test with",
 						ConnectionLimit: -1,
 						PasswordSecret: &api.LocalObjectReference{
@@ -382,7 +381,7 @@ var _ = Describe("Role synchronizer tests", func() {
 						{
 							Name:            "role_to_test1",
 							Superuser:       true,
-							Inherit:         ptr.To(true),
+							Inherit:         new(true),
 							Comment:         "This is a role to test with",
 							ConnectionLimit: -1,
 							PasswordSecret: &api.LocalObjectReference{
@@ -424,7 +423,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:            "role_to_test1",
 						Superuser:       true,
-						Inherit:         ptr.To(true),
+						Inherit:         new(true),
 						Comment:         "This is a role to test with",
 						ConnectionLimit: -1,
 						PasswordSecret: &api.LocalObjectReference{
@@ -468,7 +467,7 @@ var _ = Describe("Role synchronizer tests", func() {
 						{
 							Name:            "role_to_test1",
 							Superuser:       true,
-							Inherit:         ptr.To(true),
+							Inherit:         new(true),
 							Comment:         "This is a role to test with",
 							ConnectionLimit: -1,
 							PasswordSecret: &api.LocalObjectReference{
@@ -512,7 +511,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:    "role_with_pass",
 						Ensure:  apiv1.EnsurePresent,
-						Inherit: ptr.To(true),
+						Inherit: new(true),
 						PasswordSecret: &api.LocalObjectReference{
 							Name: secretInDBName,
 						},
@@ -541,7 +540,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:            "role_to_test1",
 						Superuser:       true,
-						Inherit:         ptr.To(true),
+						Inherit:         new(true),
 						Comment:         "This is a role to test with",
 						ConnectionLimit: -1,
 						PasswordSecret: &api.LocalObjectReference{
@@ -569,7 +568,7 @@ var _ = Describe("Role synchronizer tests", func() {
 						{
 							Name:            "role_to_test1",
 							Superuser:       true,
-							Inherit:         ptr.To(true),
+							Inherit:         new(true),
 							Comment:         "This is a role to test with",
 							ConnectionLimit: -1,
 							PasswordSecret: &api.LocalObjectReference{
@@ -614,7 +613,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:      "role_to_test1",
 						Superuser: true,
-						Inherit:   ptr.To(true),
+						Inherit:   new(true),
 						InRoles: []string{
 							"role1",
 							"role2",
@@ -654,7 +653,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:            "role_to_test2",
 						Superuser:       true,
-						Inherit:         ptr.To(true),
+						Inherit:         new(true),
 						InRoles:         []string{},
 						Comment:         "This is a role to test with",
 						ConnectionLimit: -1,
@@ -688,7 +687,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:            "role_to_test1",
 						Superuser:       true,
-						Inherit:         ptr.To(true),
+						Inherit:         new(true),
 						Comment:         "my comment",
 						ConnectionLimit: -1,
 					},
@@ -712,7 +711,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:            "role_to_test1",
 						Superuser:       true,
-						Inherit:         ptr.To(true),
+						Inherit:         new(true),
 						Comment:         "This is a role to test with",
 						ConnectionLimit: -1,
 					},
@@ -751,7 +750,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:            "role_to_test1",
 						Superuser:       false,
-						Inherit:         ptr.To(false),
+						Inherit:         new(false),
 						Comment:         "This is a role to test with",
 						BypassRLS:       true,
 						CreateRole:      true,
@@ -791,7 +790,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					{
 						Name:      "role_to_test1",
 						Superuser: true,
-						Inherit:   ptr.To(true),
+						Inherit:   new(true),
 						InRoles: []string{
 							"role1",
 							"role2",

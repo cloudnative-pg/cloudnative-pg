@@ -22,7 +22,6 @@ package persistentvolumeclaim
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -71,7 +70,7 @@ var _ = Describe("GetTerminatingInstancePVCName", func() {
 	pvc := func(name string, terminating bool) corev1.PersistentVolumeClaim {
 		p := corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: name}}
 		if terminating {
-			p.DeletionTimestamp = ptr.To(metav1.Now())
+			p.DeletionTimestamp = new(metav1.Now())
 		}
 		return p
 	}

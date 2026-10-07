@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"google.golang.org/grpc"
@@ -108,9 +109,7 @@ func (f *fakeLifecycleClient) LifecycleHook(
 		if instance.Labels == nil {
 			instance.Labels = map[string]string{}
 		}
-		for key, value := range f.labelInjector {
-			instance.Labels[key] = value
-		}
+		maps.Copy(instance.Labels, f.labelInjector)
 
 		res, err := createJSONPatchForLabels(originalInstance, &instance)
 		return &lifecycle.OperatorLifecycleResponse{JsonPatch: res}, err

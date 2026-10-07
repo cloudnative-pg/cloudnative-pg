@@ -1002,7 +1002,7 @@ var _ = Describe("configuration change validation", func() {
 			Spec: apiv1.ClusterSpec{
 				Instances: 1,
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
@@ -2098,8 +2098,8 @@ var _ = Describe("validatePrimaryLease", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					LeaseDurationSeconds: ptr.To(int32(10)),
-					RenewDeadlineSeconds: ptr.To(int32(10)),
+					LeaseDurationSeconds: new(int32(10)),
+					RenewDeadlineSeconds: new(int32(10)),
 				},
 			},
 		}
@@ -2112,14 +2112,14 @@ var _ = Describe("validatePrimaryLease", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					RenewDeadlineSeconds: ptr.To(int32(8)),
+					RenewDeadlineSeconds: new(int32(8)),
 				},
 			},
 		}
 		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
 
 		// A renew deadline at or above the default lease duration is rejected.
-		cluster.Spec.PrimaryLease.RenewDeadlineSeconds = ptr.To(int32(20))
+		cluster.Spec.PrimaryLease.RenewDeadlineSeconds = new(int32(20))
 		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
 	})
 
@@ -2131,9 +2131,9 @@ var _ = Describe("validatePrimaryLease", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					LeaseDurationSeconds: ptr.To(int32(15)),
-					RenewDeadlineSeconds: ptr.To(int32(10)),
-					RetryPeriodSeconds:   ptr.To(int32(10)),
+					LeaseDurationSeconds: new(int32(15)),
+					RenewDeadlineSeconds: new(int32(10)),
+					RetryPeriodSeconds:   new(int32(10)),
 				},
 			},
 		}
@@ -2146,9 +2146,9 @@ var _ = Describe("validatePrimaryLease", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					LeaseDurationSeconds: ptr.To(int32(15)),
-					RenewDeadlineSeconds: ptr.To(int32(11)),
-					RetryPeriodSeconds:   ptr.To(int32(10)),
+					LeaseDurationSeconds: new(int32(15)),
+					RenewDeadlineSeconds: new(int32(11)),
+					RetryPeriodSeconds:   new(int32(10)),
 				},
 			},
 		}
@@ -2160,9 +2160,9 @@ var _ = Describe("validatePrimaryLease", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					LeaseDurationSeconds: ptr.To(int32(15)),
-					RenewDeadlineSeconds: ptr.To(int32(13)),
-					RetryPeriodSeconds:   ptr.To(int32(10)),
+					LeaseDurationSeconds: new(int32(15)),
+					RenewDeadlineSeconds: new(int32(13)),
+					RetryPeriodSeconds:   new(int32(10)),
 				},
 			},
 		}
@@ -2174,10 +2174,10 @@ var _ = Describe("validatePrimaryLease", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					LeaseDurationSeconds:         ptr.To(int32(60)),
-					RenewDeadlineSeconds:         ptr.To(int32(40)),
-					RetryPeriodSeconds:           ptr.To(int32(15)),
-					ReleasedLeaseDurationSeconds: ptr.To(int32(2)),
+					LeaseDurationSeconds:         new(int32(60)),
+					RenewDeadlineSeconds:         new(int32(40)),
+					RetryPeriodSeconds:           new(int32(15)),
+					ReleasedLeaseDurationSeconds: new(int32(2)),
 				},
 			},
 		}
@@ -2825,7 +2825,7 @@ var _ = Describe("validate anti-affinity", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Affinity: apiv1.AffinityConfiguration{
-					EnablePodAntiAffinity: ptr.To(true),
+					EnablePodAntiAffinity: new(true),
 					PodAntiAffinityType:   "required",
 				},
 			},
@@ -2838,7 +2838,7 @@ var _ = Describe("validate anti-affinity", func() {
 		recoveryCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Affinity: apiv1.AffinityConfiguration{
-					EnablePodAntiAffinity: ptr.To(false),
+					EnablePodAntiAffinity: new(false),
 					PodAntiAffinityType:   "required",
 				},
 			},
@@ -2851,7 +2851,7 @@ var _ = Describe("validate anti-affinity", func() {
 		recoveryCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Affinity: apiv1.AffinityConfiguration{
-					EnablePodAntiAffinity: ptr.To(true),
+					EnablePodAntiAffinity: new(true),
 					PodAntiAffinityType:   "preferred",
 				},
 			},
@@ -2863,7 +2863,7 @@ var _ = Describe("validate anti-affinity", func() {
 		recoveryCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Affinity: apiv1.AffinityConfiguration{
-					EnablePodAntiAffinity: ptr.To(true),
+					EnablePodAntiAffinity: new(true),
 					PodAntiAffinityType:   "",
 				},
 			},
@@ -2876,7 +2876,7 @@ var _ = Describe("validate anti-affinity", func() {
 		recoveryCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Affinity: apiv1.AffinityConfiguration{
-					EnablePodAntiAffinity: ptr.To(false),
+					EnablePodAntiAffinity: new(false),
 					PodAntiAffinityType:   "error",
 				},
 			},
@@ -2889,7 +2889,7 @@ var _ = Describe("validate anti-affinity", func() {
 		recoveryCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Affinity: apiv1.AffinityConfiguration{
-					EnablePodAntiAffinity: ptr.To(true),
+					EnablePodAntiAffinity: new(true),
 					PodAntiAffinityType:   "error",
 				},
 			},
@@ -3032,7 +3032,7 @@ var _ = Describe("promotion token validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled:        ptr.To(false),
+					Enabled:        new(false),
 					Source:         "test",
 					PromotionToken: "this-is-a-wrong-token",
 				},
@@ -3055,7 +3055,7 @@ var _ = Describe("promotion token validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled:        ptr.To(false),
+					Enabled:        new(false),
 					Source:         "test",
 					PromotionToken: base64.StdEncoding.EncodeToString([]byte("{}")),
 				},
@@ -3089,7 +3089,7 @@ var _ = Describe("promotion token validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled:        ptr.To(false),
+					Enabled:        new(false),
 					Source:         "test",
 					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
 				},
@@ -3123,7 +3123,7 @@ var _ = Describe("promotion token validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled:        ptr.To(true),
+					Enabled:        new(true),
 					Source:         "test",
 					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
 				},
@@ -3231,7 +3231,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "test",
 				},
 				ExternalClusters: []apiv1.ExternalCluster{
@@ -3248,7 +3248,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "test",
 				},
 				Bootstrap: &apiv1.BootstrapConfiguration{
@@ -3271,7 +3271,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "test",
 				},
 				Bootstrap: &apiv1.BootstrapConfiguration{
@@ -3295,7 +3295,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "test",
 				},
 				Bootstrap: &apiv1.BootstrapConfiguration{
@@ -3320,7 +3320,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(false),
+					Enabled: new(false),
 					Source:  "test",
 				},
 				Bootstrap: &apiv1.BootstrapConfiguration{
@@ -3349,7 +3349,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "test",
 				},
 				Bootstrap: &apiv1.BootstrapConfiguration{
@@ -3370,7 +3370,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "test",
 				},
 				Bootstrap: &apiv1.BootstrapConfiguration{
@@ -3391,7 +3391,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Primary: "toast",
 					Source:  "test",
 				},
@@ -3464,7 +3464,7 @@ var _ = Describe("validate the replica cluster external clusters", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Source:  "test",
 				},
 				Bootstrap: &apiv1.BootstrapConfiguration{
@@ -3838,7 +3838,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -3888,10 +3888,10 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(false),
+						Enabled: new(false),
 					},
 					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-						Enabled: ptr.To(false),
+						Enabled: new(false),
 					},
 				},
 			},
@@ -3901,11 +3901,11 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster := oldCluster.DeepCopy()
 		newCluster.Spec.ReplicationSlots = &apiv1.ReplicationSlotsConfiguration{
 			HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-				Enabled:    ptr.To(true),
+				Enabled:    new(true),
 				SlotPrefix: "_test_",
 			},
 			SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			},
 		}
 
@@ -3918,7 +3918,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled:    ptr.To(true),
+						Enabled:    new(true),
 						SlotPrefix: "_test_",
 					},
 				},
@@ -3937,11 +3937,11 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled:    ptr.To(true),
+						Enabled:    new(true),
 						SlotPrefix: "_test_",
 					},
 					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-						Enabled: ptr.To(false),
+						Enabled: new(false),
 					},
 				},
 			},
@@ -3959,10 +3959,10 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(false),
+						Enabled: new(false),
 					},
 					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 				},
 			},
@@ -3980,11 +3980,11 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled:    ptr.To(true),
+						Enabled:    new(true),
 						SlotPrefix: "_test_",
 					},
 					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 				},
 			},
@@ -4002,7 +4002,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled:    ptr.To(true),
+						Enabled:    new(true),
 						SlotPrefix: "_test_",
 					},
 				},
@@ -4011,7 +4011,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		oldCluster.Default()
 
 		newCluster := oldCluster.DeepCopy()
-		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(false)
+		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = new(false)
 		Expect(v.validateReplicationSlotsChange(newCluster, oldCluster)).To(BeEmpty())
 	})
 
@@ -4065,10 +4065,10 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(false),
+						Enabled: new(false),
 					},
 					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 				},
 			},
@@ -4089,10 +4089,10 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(false),
+						Enabled: new(false),
 					},
 					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 				},
 			},
@@ -4100,7 +4100,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		oldCluster.Default()
 
 		newCluster := oldCluster.DeepCopy()
-		newCluster.Spec.ReplicationSlots.SynchronizeReplicas.Enabled = ptr.To(false)
+		newCluster.Spec.ReplicationSlots.SynchronizeReplicas.Enabled = new(false)
 		Expect(v.validateReplicationSlotsChange(newCluster, oldCluster)).To(BeEmpty())
 	})
 
@@ -4110,10 +4110,10 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(false),
+						Enabled: new(false),
 					},
 					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-						Enabled: ptr.To(false),
+						Enabled: new(false),
 					},
 				},
 			},
@@ -4531,7 +4531,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: apiv1.ClusterSpec{
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -4550,7 +4550,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: apiv1.ClusterSpec{
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -4596,7 +4596,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: apiv1.ClusterSpec{
 				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 					},
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -4652,7 +4652,7 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 						},
 						VolumeSnapshots: &apiv1.DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(""),
+								APIGroup: new(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgdata",
 							},
@@ -4790,12 +4790,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 			VolumeSnapshots: &apiv1.DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: ptr.To(""),
+					APIGroup: new(""),
 					Kind:     "Secret",
 					Name:     "pgdata",
 				},
 				WalStorage: &corev1.TypedLocalObjectReference{
-					APIGroup: ptr.To(""),
+					APIGroup: new(""),
 					Kind:     "ConfigMap",
 					Name:     "pgwal",
 				},
@@ -5681,13 +5681,13 @@ var _ = Describe("validatePluginConfiguration", func() {
 	var cluster *apiv1.Cluster
 	walPlugin1 := apiv1.PluginConfiguration{
 		Name:          "walArchiverPlugin1",
-		Enabled:       ptr.To(true),
-		IsWALArchiver: ptr.To(true),
+		Enabled:       new(true),
+		IsWALArchiver: new(true),
 	}
 	walPlugin2 := apiv1.PluginConfiguration{
 		Name:          "walArchiverPlugin2",
-		Enabled:       ptr.To(true),
-		IsWALArchiver: ptr.To(true),
+		Enabled:       new(true),
+		IsWALArchiver: new(true),
 	}
 
 	BeforeEach(func() {
@@ -7207,7 +7207,7 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				Instances: 3,
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 				},
 			},
 		}

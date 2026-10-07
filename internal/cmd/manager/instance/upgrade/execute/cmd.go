@@ -42,7 +42,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -200,7 +199,7 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 	newDataDir := fmt.Sprintf("%s-new", specs.PgDataPath)
 	var newWalDir *string
 	if cluster.ShouldCreateWalArchiveVolume() {
-		newWalDir = ptr.To(fmt.Sprintf("%s-new", specs.PgWalVolumePgWalPath))
+		newWalDir = new(fmt.Sprintf("%s-new", specs.PgWalVolumePgWalPath))
 	}
 
 	contextLogger.Info("Ensuring the new data directory does not exist", "directory", newDataDir)

@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -227,7 +226,7 @@ func ToggleHAReplicationSlots(
 		clusterToggle.Spec.ReplicationSlots.HighAvailability = &apiv1.ReplicationSlotsHAConfiguration{}
 	}
 
-	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(enable)
+	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = new(enable)
 	err = objects.Patch(ctx, crudClient, clusterToggle, client.MergeFrom(cluster))
 	if err != nil {
 		return err
@@ -255,7 +254,7 @@ func ToggleSynchronizeReplicationSlots(
 		clusterToggle.Spec.ReplicationSlots.SynchronizeReplicas = &apiv1.SynchronizeReplicasConfiguration{}
 	}
 
-	clusterToggle.Spec.ReplicationSlots.SynchronizeReplicas.Enabled = ptr.To(enable)
+	clusterToggle.Spec.ReplicationSlots.SynchronizeReplicas.Enabled = new(enable)
 	err = objects.Patch(ctx, crudClient, clusterToggle, client.MergeFrom(cluster))
 	if err != nil {
 		return err

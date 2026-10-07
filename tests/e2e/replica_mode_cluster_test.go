@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -259,7 +258,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterOneName)
 				Expect(err).ToNot(HaveOccurred())
 				updateTime := time.Now().Truncate(time.Second)
-				cluster.Spec.ReplicaCluster.Enabled = ptr.To(true)
+				cluster.Spec.ReplicaCluster.Enabled = new(true)
 				err = objects.Update(ctx, env.Client, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func(g Gomega) {
@@ -286,7 +285,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("disabling the replica mode on the dst cluster", func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterTwoName)
 				Expect(err).ToNot(HaveOccurred())
-				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+				cluster.Spec.ReplicaCluster.Enabled = new(false)
 				err = objects.Update(ctx, env.Client, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterTwoName, testTimeouts[timeouts.ClusterIsReady])
