@@ -1,0 +1,23 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-managed-services-template
+spec:
+  instances: 1
+  imageName: "${POSTGRES_IMG}"
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  managed:
+    services:
+      serviceTemplate:
+        metadata:
+          labels:
+            template-label: "true"
+          annotations:
+            template-annotation: "true"
+        spec:
+          ipFamilyPolicy: PreferDualStack
+          ipFamilies:
+            - IPv4
+            - IPv6
