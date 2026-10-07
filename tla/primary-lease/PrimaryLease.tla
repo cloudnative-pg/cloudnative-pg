@@ -214,9 +214,9 @@ variable observedLeaseRenewTick = 0,
 }
 
 } *)
-\* BEGIN TRANSLATION (chksum(pcal) = "37827916" /\ chksum(tla) = "47725d48")
-VARIABLES pc, leaseHolder, leaseRenewTick, watchdogTick, leading, 
-          lookingForLease, tick
+\* BEGIN TRANSLATION (chksum(pcal) = "8ccf0d7b" /\ chksum(tla) = "5c5fd406")
+VARIABLES leaseHolder, leaseRenewTick, watchdogTick, leading, lookingForLease, 
+          tick, pc
 
 (* define statement *)
 IsAlive(n) == tick - watchdogTick[n] <= LivenessThreshold
@@ -235,9 +235,10 @@ TypeOK ==
 VARIABLES observedLeaseRenewTick, observedLeaseHolder, lastRenew, 
           lastLeaseChange, lastLeaseRenewTick
 
-vars == << pc, leaseHolder, leaseRenewTick, watchdogTick, leading, 
-           lookingForLease, tick, observedLeaseRenewTick, observedLeaseHolder, 
-           lastRenew, lastLeaseChange, lastLeaseRenewTick >>
+vars == << leaseHolder, leaseRenewTick, watchdogTick, leading, 
+           lookingForLease, tick, pc, observedLeaseRenewTick, 
+           observedLeaseHolder, lastRenew, lastLeaseChange, 
+           lastLeaseRenewTick >>
 
 ProcSet == {"tick"} \cup (Nodes)
 
