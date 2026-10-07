@@ -739,8 +739,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 						case <-stopLoad:
 							GinkgoWriter.Println("Terminating load")
 							return
-						default:
-							continue
+						case <-time.After(switchoverLoadInterval):
 						}
 					}
 				}()

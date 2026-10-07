@@ -97,6 +97,11 @@ var _ = Describe("plugin-barman-cloud replica cluster from backup",
 		})
 	})
 
+// switchoverLoadInterval is the pause between two inserts of the load.
+// Without it, the load fills the small volumes with WAL and WAL restore
+// fails with "No space left on device".
+const switchoverLoadInterval = 500 * time.Millisecond
+
 // Plugin port of the "Replica switchover" scenario:
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
@@ -242,7 +247,7 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 							case <-stopLoad:
 								GinkgoWriter.Println("Terminating load")
 								return
-							case <-time.After(100 * time.Millisecond):
+							case <-time.After(switchoverLoadInterval):
 							}
 						}
 					}()
