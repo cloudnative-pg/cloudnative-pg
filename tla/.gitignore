@@ -1,0 +1,6 @@
+# TLC model-checker output (e.g. `states/<timestamp>/` from local runs)
+states/
+
+# PlusCal translator / editor backups
+*.old
+*~
