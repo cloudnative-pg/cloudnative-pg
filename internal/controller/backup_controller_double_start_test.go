@@ -205,14 +205,11 @@ var _ = Describe("backup_controller starting a backup", func() {
 			Scheme:               scheme,
 			Recorder:             record.NewFakeRecorder(120),
 			instanceStatusClient: &fakeInstanceStatusClient{sessionID: "session"},
+			execInstanceBackup: func(_ context.Context, _ *corev1.Pod, name string) (string, string, error) {
+				starts = append(starts, name)
+				return "", "", nil
+			},
 		}
-
-		original := execInstanceBackup
-		execInstanceBackup = func(_ context.Context, _ *corev1.Pod, name string) (string, string, error) {
-			starts = append(starts, name)
-			return "", "", nil
-		}
-		DeferCleanup(func() { execInstanceBackup = original })
 	})
 
 	It("starts the backup once when the cache has observed the first start", func(ctx context.Context) {
