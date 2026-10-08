@@ -23,6 +23,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -103,9 +104,10 @@ var _ = Describe("backup_controller starting a backup", func() {
 		reconcil *BackupReconciler
 	)
 
-	reconcileOnce := func(ctx context.Context) {
-		_, err := reconcil.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+	reconcileOnce := func(ctx context.Context) ctrl.Result {
+		res, err := reconcil.Reconcile(ctx, ctrl.Request{NamespacedName: key})
 		Expect(err).ToNot(HaveOccurred())
+		return res
 	}
 
 	expectStartedOnce := func(ctx context.Context) {
@@ -118,7 +120,9 @@ var _ = Describe("backup_controller starting a backup", func() {
 
 		var startingEvents int
 		for len(recorder.Events) > 0 {
-			if strings.HasPrefix(<-recorder.Events, "Normal Starting ") {
+			event := <-recorder.Events
+			Expect(event).ToNot(HavePrefix("Warning "))
+			if strings.HasPrefix(event, "Normal Starting ") {
 				startingEvents++
 			}
 		}
@@ -236,8 +240,9 @@ var _ = Describe("backup_controller starting a backup", func() {
 		// runs before the cache observes the status written by the first one.
 		lagging.freeze(ctx, key)
 		reconcileOnce(ctx)
-		reconcileOnce(ctx)
+		res := reconcileOnce(ctx)
 
+		Expect(res.RequeueAfter).To(Equal(time.Second))
 		expectStartedOnce(ctx)
 	})
 
@@ -249,8 +254,22 @@ var _ = Describe("backup_controller starting a backup", func() {
 		Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: podName}, &pod)).To(Succeed())
 		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse}}
 		Expect(store.Status().Update(ctx, &pod)).To(Succeed())
+		res := reconcileOnce(ctx)
+
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+		expectStartedOnce(ctx)
+	})
+
+	It("keeps the backup started when a stale reconciliation does not find the target", func(ctx context.Context) {
+		lagging.freeze(ctx, key)
 		reconcileOnce(ctx)
 
+		var pod corev1.Pod
+		Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: podName}, &pod)).To(Succeed())
+		Expect(store.Delete(ctx, &pod)).To(Succeed())
+		res := reconcileOnce(ctx)
+
+		Expect(res.RequeueAfter).To(Equal(time.Second))
 		expectStartedOnce(ctx)
 	})
 

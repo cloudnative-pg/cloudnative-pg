@@ -300,11 +300,18 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 	if apierrs.IsNotFound(err) ||
 		errors.Is(err, ErrPrimaryImageNeedsUpdate) ||
 		errors.Is(err, ErrInstanceStatusUnavailable) {
-		r.Recorder.Eventf(backup, "Warning", "FindingPod",
-			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
 			cluster.Status.TargetPrimary)
-		return r.retryBackupAsPending(ctx, backup, 30*time.Second)
+		if err := r.markBackupAsPending(ctx, backup); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Debug("Backup changed since it was read, retrying")
+				return &ctrl.Result{RequeueAfter: time.Second}, nil
+			}
+			return nil, err
+		}
+		r.Recorder.Eventf(backup, "Warning", "FindingPod",
+			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if err != nil {
@@ -319,9 +326,16 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	if !utils.IsPodReady(*pod) {
 		contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
+		if err := r.markBackupAsPending(ctx, backup); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Debug("Backup changed since it was read, retrying")
+				return &ctrl.Result{RequeueAfter: time.Second}, nil
+			}
+			return nil, err
+		}
 		r.Recorder.Eventf(backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 			cluster.Status.TargetPrimary)
-		return r.retryBackupAsPending(ctx, backup, 30*time.Second)
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	// This backup can be started. The SessionID from podStatus is used to detect
@@ -343,24 +357,14 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 	return nil, nil
 }
 
-// retryBackupAsPending marks the backup as pending and retries after the given
-// delay. The patch is locked on the version this reconciliation read, so a
-// stale read cannot regress a backup that has started or completed since.
-func (r *BackupReconciler) retryBackupAsPending(
-	ctx context.Context,
-	backup *apiv1.Backup,
-	after time.Duration,
-) (*ctrl.Result, error) {
+// markBackupAsPending sets the backup phase to pending. The patch is locked on
+// the version this reconciliation read, so a stale read cannot regress a backup
+// that has started or completed since.
+func (r *BackupReconciler) markBackupAsPending(ctx context.Context, backup *apiv1.Backup) error {
 	origBackup := backup.DeepCopy()
 	backup.Status.SetAsPending()
-	if err := r.Status().Patch(ctx, backup,
-		client.MergeFromWithOptions(origBackup, client.MergeFromWithOptimisticLock{})); err != nil {
-		if apierrs.IsConflict(err) {
-			return &ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-		return nil, err
-	}
-	return &ctrl.Result{RequeueAfter: after}, nil
+	return r.Status().Patch(ctx, backup,
+		client.MergeFromWithOptions(origBackup, client.MergeFromWithOptimisticLock{}))
 }
 
 func (r *BackupReconciler) isCurrentBackupRunning(
@@ -1162,12 +1166,15 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 			"A backup is already in progress or waiting to be started, retrying",
 			"targetBackup", backup.Name,
 		)
-		res, err := r.retryBackupAsPending(ctx, backup, 10*time.Second)
-		if err != nil {
+		if err := r.markBackupAsPending(ctx, backup); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Debug("Backup changed since it was read, retrying")
+				return ctrl.Result{RequeueAfter: time.Second}, nil
+			}
 			contextLogger.Error(err, "while setting backup as pending")
 			return ctrl.Result{}, err
 		}
-		return *res, nil
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	return ctrl.Result{}, nil
