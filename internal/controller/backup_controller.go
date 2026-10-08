@@ -334,17 +334,11 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	contextLogger.Info("Starting backup",
-		"cluster", cluster.Name,
-		"pod", pod.Name)
-
-	r.Recorder.Eventf(backup, "Normal", "Starting",
-		"Starting backup for cluster %v", cluster.Name)
-
 	// This backup can be started. The SessionID from podStatus is used to detect
 	// if the instance manager was restarted during the backup.
 	if err := r.startInstanceManagerBackup(ctx, backup, pod, &cluster, podStatus.SessionID); err != nil {
 		if apierrs.IsConflict(err) {
+			contextLogger.Debug("Backup changed since it was read, retrying", "pod", pod.Name)
 			return &ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 		// The start patch failed before anything ran, so retrying is safe
@@ -1005,6 +999,13 @@ func (r *BackupReconciler) startInstanceManagerBackup(
 		client.MergeFromWithOptions(origBackup, client.MergeFromWithOptimisticLock{})); err != nil {
 		return fmt.Errorf("%w: %w", errMarkingBackupAsStarted, err)
 	}
+
+	log.FromContext(ctx).Info("Starting backup",
+		"cluster", cluster.Name,
+		"pod", pod.Name)
+
+	r.Recorder.Eventf(backup, "Normal", "Starting",
+		"Starting backup for cluster %v", cluster.Name)
 
 	var stdout, stderr string
 	err = retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {

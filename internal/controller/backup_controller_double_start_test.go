@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -98,6 +99,7 @@ var _ = Describe("backup_controller starting a backup", func() {
 		backup   *apiv1.Backup
 		key      client.ObjectKey
 		starts   []string
+		recorder *record.FakeRecorder
 		reconcil *BackupReconciler
 	)
 
@@ -113,6 +115,14 @@ var _ = Describe("backup_controller starting a backup", func() {
 		Expect(lagging.Client.Get(ctx, key, &stored)).To(Succeed())
 		Expect(string(stored.Status.Phase)).To(Equal(apiv1.BackupPhaseStarted))
 		Expect(stored.Status.MajorVersion).To(Equal(18))
+
+		var startingEvents int
+		for len(recorder.Events) > 0 {
+			if strings.HasPrefix(<-recorder.Events, "Normal Starting ") {
+				startingEvents++
+			}
+		}
+		Expect(startingEvents).To(Equal(1))
 	}
 
 	BeforeEach(func(ctx context.Context) {
@@ -200,10 +210,11 @@ var _ = Describe("backup_controller starting a backup", func() {
 		Expect(store.Create(ctx, backup)).To(Succeed())
 		key = client.ObjectKeyFromObject(backup)
 
+		recorder = record.NewFakeRecorder(120)
 		reconcil = &BackupReconciler{
 			Client:               lagging,
 			Scheme:               scheme,
-			Recorder:             record.NewFakeRecorder(120),
+			Recorder:             recorder,
 			instanceStatusClient: &fakeInstanceStatusClient{sessionID: "session"},
 			execInstanceBackup: func(_ context.Context, _ *corev1.Pod, name string) (string, string, error) {
 				starts = append(starts, name)
