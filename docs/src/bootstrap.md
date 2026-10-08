@@ -790,12 +790,18 @@ In this example:
   copy (PostgreSQL 17 and later only)
 
 :::warning
-The operator does not validate these options, and certain flags may
-interfere with its intended functionality, for example those that change the
-target directory, the output format, the WAL method or the connection
-parameters. You are responsible for the arguments and for their compatibility
-with the PostgreSQL version in use. The project does not test combinations of
-`pg_basebackup` options.
+The operator rejects the options it relies on: the target directory and output
+format (`-D`/`--pgdata`, `-F`/`--format`, `-R`/`--write-recovery-conf`,
+`-X`/`--wal-method`, `--waldir`, `-t`/`--target`), the connection parameters
+(`-d`/`--dbname`, `-h`/`--host`, `-p`/`--port`, `-U`/`--username`,
+`-w`/`--no-password`, `-W`/`--password`, taken from `externalClusters`), the
+tablespace relocation (`-T`/`--tablespace-mapping`), and `--help` and
+`--version`. Abbreviated long options that match one of them are rejected too.
+
+All the other options are passed as they are, and some of them may still
+interfere with the operator. You are responsible for the arguments and for
+their compatibility with the PostgreSQL version in use. The project does not
+test combinations of `pg_basebackup` options.
 :::
 
 This setting only applies to the bootstrap of the cluster. It does not affect
