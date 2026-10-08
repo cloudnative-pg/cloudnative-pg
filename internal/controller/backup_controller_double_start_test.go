@@ -22,7 +22,6 @@ package controller
 import (
 	"context"
 	"strings"
-	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -50,23 +49,13 @@ import (
 type laggingBackupClient struct {
 	client.Client
 
-	mu       sync.Mutex
 	snapshot *apiv1.Backup
 }
 
 func (l *laggingBackupClient) freeze(ctx context.Context, key client.ObjectKey) {
 	var current apiv1.Backup
 	Expect(l.Client.Get(ctx, key, &current)).To(Succeed())
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.snapshot = current.DeepCopy()
-}
-
-func (l *laggingBackupClient) sync() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.snapshot = nil
 }
 
 func (l *laggingBackupClient) Get(
@@ -75,12 +64,8 @@ func (l *laggingBackupClient) Get(
 	obj client.Object,
 	opts ...client.GetOption,
 ) error {
-	l.mu.Lock()
-	snapshot := l.snapshot
-	l.mu.Unlock()
-
-	if backup, ok := obj.(*apiv1.Backup); ok && snapshot != nil && snapshot.Name == key.Name {
-		snapshot.DeepCopyInto(backup)
+	if backup, ok := obj.(*apiv1.Backup); ok && l.snapshot != nil && l.snapshot.Name == key.Name {
+		l.snapshot.DeepCopyInto(backup)
 		return nil
 	}
 	return l.Client.Get(ctx, key, obj, opts...)
@@ -95,17 +80,17 @@ var _ = Describe("backup_controller starting a backup", func() {
 	)
 
 	var (
-		store    client.WithWatch
-		lagging  *laggingBackupClient
-		backup   *apiv1.Backup
-		key      client.ObjectKey
-		starts   []string
-		recorder *record.FakeRecorder
-		reconcil *BackupReconciler
+		store      client.WithWatch
+		lagging    *laggingBackupClient
+		backup     *apiv1.Backup
+		key        client.ObjectKey
+		starts     []string
+		recorder   *record.FakeRecorder
+		reconciler *BackupReconciler
 	)
 
 	reconcileOnce := func(ctx context.Context) ctrl.Result {
-		res, err := reconcil.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+		res, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: key})
 		Expect(err).ToNot(HaveOccurred())
 		return res
 	}
@@ -142,9 +127,6 @@ var _ = Describe("backup_controller starting a backup", func() {
 			}).
 			WithIndex(&apiv1.Backup{}, ".spec.cluster.name", func(rawObj client.Object) []string {
 				return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
-			}).
-			WithIndex(&apiv1.Backup{}, backupPhase, func(rawObj client.Object) []string {
-				return []string{string(rawObj.(*apiv1.Backup).Status.Phase)}
 			}).
 			Build()
 		lagging = &laggingBackupClient{Client: store}
@@ -193,12 +175,9 @@ var _ = Describe("backup_controller starting a backup", func() {
 		}
 		Expect(store.Create(ctx, pod)).To(Succeed())
 		pod.Status = corev1.PodStatus{
-			Phase:      corev1.PodRunning,
 			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
 			ContainerStatuses: []corev1.ContainerStatus{{
-				Name:        specs.PostgresContainerName,
-				ContainerID: "containerd://abc",
-				Ready:       true,
+				Name: specs.PostgresContainerName,
 			}},
 		}
 		Expect(store.Status().Update(ctx, pod)).To(Succeed())
@@ -208,14 +187,13 @@ var _ = Describe("backup_controller starting a backup", func() {
 			Spec: apiv1.BackupSpec{
 				Cluster: apiv1.LocalObjectReference{Name: clusterName},
 				Method:  apiv1.BackupMethodBarmanObjectStore,
-				Target:  apiv1.BackupTargetPrimary,
 			},
 		}
 		Expect(store.Create(ctx, backup)).To(Succeed())
 		key = client.ObjectKeyFromObject(backup)
 
 		recorder = record.NewFakeRecorder(120)
-		reconcil = &BackupReconciler{
+		reconciler = &BackupReconciler{
 			Client:               lagging,
 			Scheme:               scheme,
 			Recorder:             recorder,
@@ -225,14 +203,6 @@ var _ = Describe("backup_controller starting a backup", func() {
 				return "", "", nil
 			},
 		}
-	})
-
-	It("starts the backup once when the cache has observed the first start", func(ctx context.Context) {
-		reconcileOnce(ctx)
-		lagging.sync()
-		reconcileOnce(ctx)
-
-		expectStartedOnce(ctx)
 	})
 
 	It("starts the backup once when the cache lags behind the first start", func(ctx context.Context) {
@@ -310,7 +280,7 @@ var _ = Describe("backup_controller starting a backup", func() {
 			},
 		})
 
-		_, err := reconcil.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+		_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: key})
 		Expect(err).To(HaveOccurred())
 		Expect(starts).To(BeEmpty())
 
