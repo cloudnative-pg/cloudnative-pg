@@ -87,6 +87,9 @@ type BackupReconciler struct {
 	instanceStatusClient remote.InstanceClient
 	vsr                  *volumesnapshot.Reconciler
 
+	// execInstanceBackup runs the backup command in the target Pod
+	execInstanceBackup func(ctx context.Context, pod *corev1.Pod, backupName string) (string, string, error)
+
 	admission *guard.Admission[*apiv1.Backup]
 }
 
@@ -110,6 +113,7 @@ func NewBackupReconciler(
 		Plugins:              plugins,
 		vsr:                  volumesnapshot.NewReconcilerBuilder(cli, recorder).Build(),
 		admission:            admission,
+		execInstanceBackup:   execInstanceBackup,
 	}
 }
 
@@ -339,7 +343,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	// This backup can be started. The SessionID from podStatus is used to detect
 	// if the instance manager was restarted during the backup.
-	if err := startInstanceManagerBackup(ctx, r.Client, backup, pod, &cluster, podStatus.SessionID); err != nil {
+	if err := r.startInstanceManagerBackup(ctx, backup, pod, &cluster, podStatus.SessionID); err != nil {
 		if apierrs.IsConflict(err) {
 			return &ctrl.Result{RequeueAfter: time.Second}, nil
 		}
@@ -974,9 +978,8 @@ func getPostgresContainer(pod *corev1.Pod) (*corev1.Container, error) {
 // startInstanceManagerBackup request a backup in a Pod and marks the backup started
 // or failed if needed. The sessionID parameter is used to track the instance manager
 // identity, which allows detecting if the instance manager was restarted during the backup.
-func startInstanceManagerBackup(
+func (r *BackupReconciler) startInstanceManagerBackup(
 	ctx context.Context,
-	cli client.Client,
 	backup *apiv1.Backup,
 	pod *corev1.Pod,
 	cluster *apiv1.Cluster,
@@ -998,7 +1001,7 @@ func startInstanceManagerBackup(
 	backup.Status.SetAsStarted(pod.Name, pgContainerStatus.ContainerID, sessionID, backup.Spec.Method)
 
 	// Conflicts when a stale read let another reconciliation start it first
-	if err := cli.Status().Patch(ctx, backup,
+	if err := r.Status().Patch(ctx, backup,
 		client.MergeFromWithOptions(origBackup, client.MergeFromWithOptimisticLock{})); err != nil {
 		return fmt.Errorf("%w: %w", errMarkingBackupAsStarted, err)
 	}
@@ -1006,7 +1009,7 @@ func startInstanceManagerBackup(
 	var stdout, stderr string
 	err = retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
 		var execErr error
-		stdout, stderr, execErr = execInstanceBackup(ctx, pod, backup.GetName())
+		stdout, stderr, execErr = r.execInstanceBackup(ctx, pod, backup.GetName())
 		return execErr
 	})
 	if err != nil {
@@ -1014,7 +1017,7 @@ func startInstanceManagerBackup(
 		setCommandErr := func(backup *apiv1.Backup) {
 			backup.Status.CommandError = fmt.Sprintf("with stderr: %s, with stdout: %s", stderr, stdout)
 		}
-		return resourcestatus.FlagBackupAsFailed(ctx, cli, backup, cluster, err, setCommandErr)
+		return resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster, err, setCommandErr)
 	}
 
 	return nil
@@ -1023,8 +1026,8 @@ func startInstanceManagerBackup(
 // errMarkingBackupAsStarted wraps the failures of the patch that starts a backup
 var errMarkingBackupAsStarted = errors.New("cannot mark the backup as started")
 
-// execInstanceBackup runs the backup command in the Pod. Replaced in tests.
-var execInstanceBackup = func(ctx context.Context, pod *corev1.Pod, backupName string) (string, string, error) {
+// execInstanceBackup runs the backup command in the Pod
+func execInstanceBackup(ctx context.Context, pod *corev1.Pod, backupName string) (string, string, error) {
 	config := ctrl.GetConfigOrDie()
 
 	return utils.ExecCommand(ctx, kubernetes.NewForConfigOrDie(config), config, *pod,
