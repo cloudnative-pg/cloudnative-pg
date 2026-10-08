@@ -50,7 +50,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	postgresStatus "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/backup/volumesnapshot"
@@ -235,12 +234,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// When the instance manager is working we have to wait for it to finish
 	if isRunning && backup.Spec.Method.IsManagedByInstance() {
 		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
-	}
-
-	// The backup is ready to start, and before starting it we store
-	// the major version inside the Backup resource.
-	if err := r.reconcileMajorVersion(ctx, &backup, &cluster); err != nil {
-		return ctrl.Result{}, fmt.Errorf("error setting major version for backup: %w", err)
 	}
 
 	switch {
@@ -481,14 +474,16 @@ func (r *BackupReconciler) getCluster(
 	}
 
 	if apierrs.IsNotFound(err) {
-		r.Recorder.Eventf(backup, "Warning", "FindingCluster",
-			"Unknown cluster %v, will retry in 30 seconds", clusterName)
-		origBackup := backup.DeepCopy()
-		backup.Status.SetAsPending()
-		if patchErr := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); patchErr != nil {
+		if patchErr := r.markBackupAsPending(ctx, backup); patchErr != nil {
+			if apierrs.IsConflict(patchErr) {
+				contextLogger.Debug("Backup changed since it was read, retrying")
+				return &ctrl.Result{RequeueAfter: time.Second}, nil
+			}
 			contextLogger.Error(patchErr, "while setting backup as pending")
 			return nil, patchErr
 		}
+		r.Recorder.Eventf(backup, "Warning", "FindingCluster",
+			"Unknown cluster %v, will retry in 30 seconds", clusterName)
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -673,6 +668,19 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 
 	targetPod, err := r.getSnapshotTargetPod(ctx, cluster, backup)
 	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
+		contextLogger.Info(
+			"Couldn't find target pod, will retry in 30 seconds",
+			"target",
+			cluster.Status.TargetPrimary,
+		)
+		// TODO: shouldn't this be a failed backup?
+		if err := r.markBackupAsPending(ctx, backup); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Debug("Backup changed since it was read, retrying")
+				return &ctrl.Result{RequeueAfter: time.Second}, nil
+			}
+			return nil, err
+		}
 		r.Recorder.Eventf(
 			backup,
 			"Warning",
@@ -680,17 +688,6 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 			"Couldn't find target pod %s, will retry in 30 seconds",
 			cluster.Status.TargetPrimary,
 		)
-		contextLogger.Info(
-			"Couldn't find target pod, will retry in 30 seconds",
-			"target",
-			cluster.Status.TargetPrimary,
-		)
-		// TODO: shouldn't this be a failed backup?
-		origBackup := backup.DeepCopy()
-		backup.Status.SetAsPending()
-		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
-			return nil, err
-		}
 
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -711,24 +708,11 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	}
 
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
-		pgContainerStatus, err := getPostgresContainerStatus(targetPod)
-		if err != nil {
-			return nil, fmt.Errorf("cannot get postgres container status: %w", err)
-		}
-
-		// For volume snapshot backups, SessionID is not relevant since the backup
-		// is managed by the operator, not the instance manager
-		backup.Status.SetAsStarted(
-			targetPod.Name,
-			pgContainerStatus.ContainerID,
-			"", // SessionID not used for operator-managed backups
-			apiv1.BackupMethodVolumeSnapshot,
-		)
-		// given that we use only kubernetes resources we can use the backup name as ID
-		backup.Status.BackupID = backup.Name
-		backup.Status.BackupName = backup.Name
-		backup.Status.StartedAt = backup.Status.ReconciliationStartedAt.DeepCopy()
-		if err := postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup); err != nil {
+		if err := r.startSnapshotBackup(ctx, cluster, backup, targetPod); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Debug("Backup changed since it was read, retrying")
+				return &ctrl.Result{RequeueAfter: time.Second}, nil
+			}
 			return nil, err
 		}
 	}
@@ -778,6 +762,44 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	}
 
 	return nil, nil
+}
+
+// startSnapshotBackup marks a volume snapshot backup as started. The patch is
+// locked on the version this reconciliation read, so it conflicts when a stale
+// read let another reconciliation start the backup first.
+func (r *BackupReconciler) startSnapshotBackup(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	targetPod *corev1.Pod,
+) error {
+	pgContainerStatus, err := getPostgresContainerStatus(targetPod)
+	if err != nil {
+		return fmt.Errorf("cannot get postgres container status: %w", err)
+	}
+
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		return fmt.Errorf("cannot get major version from cluster: %w", err)
+	}
+
+	origBackup := backup.DeepCopy()
+	backup.Status.MajorVersion = majorVersion
+	// For volume snapshot backups, SessionID is not relevant since the backup
+	// is managed by the operator, not the instance manager
+	backup.Status.SetAsStarted(
+		targetPod.Name,
+		pgContainerStatus.ContainerID,
+		"", // SessionID not used for operator-managed backups
+		apiv1.BackupMethodVolumeSnapshot,
+	)
+	// given that we use only kubernetes resources we can use the backup name as ID
+	backup.Status.BackupID = backup.Name
+	backup.Status.BackupName = backup.Name
+	backup.Status.StartedAt = backup.Status.ReconciliationStartedAt.DeepCopy()
+
+	return r.Status().Patch(ctx, backup,
+		client.MergeFromWithOptions(origBackup, client.MergeFromWithOptimisticLock{}))
 }
 
 func (r *BackupReconciler) getSnapshotTargetPod(
@@ -1179,29 +1201,4 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func (r *BackupReconciler) reconcileMajorVersion(
-	ctx context.Context,
-	backup *apiv1.Backup,
-	cluster *apiv1.Cluster,
-) error {
-	majorVersion, err := cluster.GetPostgresqlMajorVersion()
-	if err != nil {
-		return fmt.Errorf("cannot get major version from cluster: %w", err)
-	}
-
-	if backup.Status.MajorVersion == majorVersion {
-		return nil
-	}
-
-	// The start patch stores it for instance-managed backups. Patching here
-	// would bump the resourceVersion, and the start patch, which is locked on
-	// the version this reconciliation read, would conflict with our own write.
-	if backup.Spec.Method.IsManagedByInstance() {
-		return nil
-	}
-
-	backup.Status.MajorVersion = majorVersion
-	return postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }

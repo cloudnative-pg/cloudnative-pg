@@ -37,7 +37,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/backup/volumesnapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -260,6 +262,78 @@ var _ = Describe("backup_controller starting a backup", func() {
 			Expect(store.Get(ctx, key, &stored)).To(Succeed())
 			Expect(string(stored.Status.Phase)).To(Equal(apiv1.BackupPhaseCompleted))
 		})
+
+	It("keeps the backup started when a stale reconciliation does not find the cluster", func(ctx context.Context) {
+		lagging.freeze(ctx, key)
+		reconcileOnce(ctx)
+
+		var cluster apiv1.Cluster
+		Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: clusterName}, &cluster)).To(Succeed())
+		Expect(store.Delete(ctx, &cluster)).To(Succeed())
+		res := reconcileOnce(ctx)
+
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+		expectStartedOnce(ctx)
+	})
+
+	Context("with a volume snapshot backup", func() {
+		BeforeEach(func(ctx context.Context) {
+			utils.SetVolumeSnapshot(true)
+			DeferCleanup(utils.SetVolumeSnapshot, false)
+
+			var cluster apiv1.Cluster
+			Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: clusterName}, &cluster)).To(Succeed())
+			cluster.Spec.Backup.VolumeSnapshot = &apiv1.VolumeSnapshotConfiguration{}
+			Expect(store.Update(ctx, &cluster)).To(Succeed())
+
+			reconciler.vsr = volumesnapshot.NewReconcilerBuilder(lagging, recorder).Build()
+
+			backup.Spec.Method = apiv1.BackupMethodVolumeSnapshot
+			Expect(store.Update(ctx, backup)).To(Succeed())
+		})
+
+		It("stores the major version when it starts", func(ctx context.Context) {
+			reconcileOnce(ctx)
+
+			var stored apiv1.Backup
+			Expect(store.Get(ctx, key, &stored)).To(Succeed())
+			Expect(stored.Status.InstanceID).ToNot(BeNil())
+			Expect(stored.Status.MajorVersion).To(Equal(18))
+		})
+
+		It("does not start the backup again when a stale reconciliation sees it unstarted", func(ctx context.Context) {
+			lagging.freeze(ctx, key)
+
+			var stored apiv1.Backup
+			Expect(store.Get(ctx, key, &stored)).To(Succeed())
+			stored.Status.SetAsStarted(podName, "containerd://abc", "", apiv1.BackupMethodVolumeSnapshot)
+			Expect(store.Status().Update(ctx, &stored)).To(Succeed())
+			res := reconcileOnce(ctx)
+
+			Expect(res.RequeueAfter).To(Equal(time.Second))
+			Expect(store.Get(ctx, key, &stored)).To(Succeed())
+			Expect(string(stored.Status.Phase)).To(Equal(apiv1.BackupPhaseStarted))
+		})
+
+		It("does not move the backup back to pending when a stale reconciliation does not find the target",
+			func(ctx context.Context) {
+				lagging.freeze(ctx, key)
+				reconcileOnce(ctx)
+
+				var pod corev1.Pod
+				Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: podName}, &pod)).To(Succeed())
+				Expect(store.Delete(ctx, &pod)).To(Succeed())
+				res := reconcileOnce(ctx)
+
+				Expect(res.RequeueAfter).To(Equal(time.Second))
+				var stored apiv1.Backup
+				Expect(store.Get(ctx, key, &stored)).To(Succeed())
+				Expect(string(stored.Status.Phase)).ToNot(Equal(apiv1.BackupPhasePending))
+				for len(recorder.Events) > 0 {
+					Expect(<-recorder.Events).ToNot(HavePrefix("Warning FindingPod "))
+				}
+			})
+	})
 
 	It("retries instead of failing the backup when the start patch fails", func(ctx context.Context) {
 		failOnce := true
