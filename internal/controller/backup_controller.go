@@ -1175,7 +1175,8 @@ func (r *BackupReconciler) reconcileMajorVersion(
 	}
 
 	// The start patch stores it for instance-managed backups. Patching here
-	// would refresh the Backup and defeat its optimistic lock.
+	// would bump the resourceVersion, and the start patch, which is locked on
+	// the version this reconciliation read, would conflict with our own write.
 	if backup.Spec.Method.IsManagedByInstance() {
 		return nil
 	}
