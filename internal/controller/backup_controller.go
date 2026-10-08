@@ -113,7 +113,7 @@ func NewBackupReconciler(
 		Plugins:              plugins,
 		vsr:                  volumesnapshot.NewReconcilerBuilder(cli, recorder).Build(),
 		admission:            admission,
-		execInstanceBackup:   execInstanceBackup,
+		execInstanceBackup:   execBackupCommand,
 	}
 }
 
@@ -1041,8 +1041,8 @@ func (r *BackupReconciler) startInstanceManagerBackup(
 // errMarkingBackupAsStarted wraps the failures of the patch that starts a backup
 var errMarkingBackupAsStarted = errors.New("cannot mark the backup as started")
 
-// execInstanceBackup runs the backup command in the Pod
-func execInstanceBackup(ctx context.Context, pod *corev1.Pod, backupName string) (string, string, error) {
+// execBackupCommand runs the backup command in the Pod
+func execBackupCommand(ctx context.Context, pod *corev1.Pod, backupName string) (string, string, error) {
 	config := ctrl.GetConfigOrDie()
 
 	return utils.ExecCommand(ctx, kubernetes.NewForConfigOrDie(config), config, *pod,
