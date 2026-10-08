@@ -70,6 +70,10 @@ func ClonePgData(
 
 	options = append(options, additionalArgs...)
 
+	// The connection string references a password file, so it doesn't
+	// contain any secret and the options are safe to log
+	log.Info("Executing pg_basebackup", "command", pgBaseBackupName, "options", options)
+
 	pgBaseBackupCmd := exec.Command(pgBaseBackupName, options...) // #nosec
 	err = execlog.RunStreaming(pgBaseBackupCmd, pgBaseBackupName)
 	if err != nil {
