@@ -185,6 +185,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateName,
 		v.validateTablespaceNames,
 		v.validateBootstrapPgBaseBackupSource,
+		v.validateBootstrapPgBaseBackupAdditionalArgs,
 		v.validateTablespaceBackupSnapshot,
 		v.validateBootstrapRecoverySource,
 		v.validateBootstrapRecoveryDataSource,
@@ -646,6 +647,105 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cl
 				field.NewPath("spec", "bootstrap", "pg_basebackup", "source"),
 				r.Spec.Bootstrap.PgBaseBackup.Source,
 				fmt.Sprintf("External cluster %v not found", r.Spec.Bootstrap.PgBaseBackup.Source)))
+	}
+
+	return result
+}
+
+const (
+	// pgBaseBackupForbiddenShortOptions lists the short options of pg_basebackup
+	// that cannot be used in `additionalArgs`: target and format (-D, -F, -R, -X,
+	// -t, -T), connection (-d, -h, -p, -U, -w, -W) and the options that
+	// terminate the execution (-V, -?)
+	pgBaseBackupForbiddenShortOptions = "DFRXtTdhpUwWV?"
+
+	// pgBaseBackupShortOptionsWithValue lists the short options of pg_basebackup
+	// that consume a value. Whatever follows one of them, in the same argument,
+	// is its value and not a list of options.
+	pgBaseBackupShortOptionsWithValue = "DFirtTXZclSdhpsU"
+)
+
+// pgBaseBackupForbiddenLongOptions lists the long options of pg_basebackup
+// that cannot be used in `additionalArgs`, as the operator relies on them
+var pgBaseBackupForbiddenLongOptions = []string{
+	"pgdata",
+	"format",
+	"write-recovery-conf",
+	"wal-method",
+	"waldir",
+	"target",
+	"tablespace-mapping",
+	"dbname",
+	"host",
+	"port",
+	"username",
+	"no-password",
+	"password",
+	"help",
+	"version",
+}
+
+// forbiddenPgBaseBackupOption checks whether a single entry of `additionalArgs`
+// is, or could be parsed by pg_basebackup as, an option that the operator
+// doesn't allow. It returns the offending option and the reason.
+//
+// The entries that don't start with a dash are considered values of the
+// previous option and are not inspected.
+func forbiddenPgBaseBackupOption(arg string) (option string, reason string, found bool) {
+	switch {
+	case arg == "--":
+		return "", "", false
+
+	case strings.HasPrefix(arg, "--"):
+		// getopt_long accepts any unambiguous abbreviation of a long option
+		name, _, _ := strings.Cut(strings.TrimPrefix(arg, "--"), "=")
+		if name == "" {
+			return "", "", false
+		}
+		for _, forbidden := range pgBaseBackupForbiddenLongOptions {
+			if name == forbidden {
+				return "--" + forbidden, "is managed by the operator", true
+			}
+			if strings.HasPrefix(forbidden, name) {
+				return "--" + name,
+					fmt.Sprintf("is an abbreviation of --%s, which is managed by the operator; "+
+						"use the full name of the options", forbidden),
+					true
+			}
+		}
+
+	case strings.HasPrefix(arg, "-") && len(arg) > 1:
+		// Short options can be grouped (e.g. `-vP`), and the value
+		// of the last one can be attached to it (e.g. `-r50M`)
+		for _, c := range arg[1:] {
+			if strings.ContainsRune(pgBaseBackupForbiddenShortOptions, c) {
+				return "-" + string(c), "is managed by the operator", true
+			}
+			if strings.ContainsRune(pgBaseBackupShortOptionsWithValue, c) {
+				break
+			}
+		}
+	}
+
+	return "", "", false
+}
+
+// validateBootstrapPgBaseBackupAdditionalArgs rejects the pg_basebackup
+// options that the operator relies on, and that would break the bootstrap
+func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupAdditionalArgs(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.PgBaseBackup == nil {
+		return result
+	}
+
+	argsPath := field.NewPath("spec", "bootstrap", "pg_basebackup", "additionalArgs")
+	for idx, arg := range r.Spec.Bootstrap.PgBaseBackup.AdditionalArgs {
+		if option, reason, found := forbiddenPgBaseBackupOption(arg); found {
+			result = append(result, field.Forbidden(
+				argsPath.Index(idx),
+				fmt.Sprintf("the pg_basebackup option %s %s", option, reason)))
+		}
 	}
 
 	return result
