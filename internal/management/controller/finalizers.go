@@ -27,26 +27,31 @@ import (
 )
 
 type finalizerReconciler[T client.Object] struct {
-	cli           client.Client
-	finalizerName string
-	onRemoveFunc  func(ctx context.Context, resource T) error
+	cli                  client.Client
+	finalizerName        string
+	onRemoveFunc         func(ctx context.Context, resource T) error
+	shouldAddFinalizer   func(resource T) bool
 }
 
 func newFinalizerReconciler[T client.Object](
 	cli client.Client,
 	finalizerName string,
 	onRemoveFunc func(ctx context.Context, resource T) error,
+	shouldAddFinalizer func(resource T) bool,
 ) *finalizerReconciler[T] {
 	return &finalizerReconciler[T]{
-		cli:           cli,
-		finalizerName: finalizerName,
-		onRemoveFunc:  onRemoveFunc,
+		cli:                cli,
+		finalizerName:      finalizerName,
+		onRemoveFunc:       onRemoveFunc,
+		shouldAddFinalizer: shouldAddFinalizer,
 	}
 }
 
 func (f finalizerReconciler[T]) reconcile(ctx context.Context, resource T) error {
-	// add finalizer in non-deleted publications if not present
 	if resource.GetDeletionTimestamp().IsZero() {
+		if f.shouldAddFinalizer != nil && !f.shouldAddFinalizer(resource) {
+			return nil
+		}
 		if !controllerutil.AddFinalizer(resource, f.finalizerName) {
 			return nil
 		}
