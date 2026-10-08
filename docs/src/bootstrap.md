@@ -765,8 +765,11 @@ completed**:
 
 #### Passing additional options to `pg_basebackup`
 
-You can pass custom options to the `pg_basebackup` invocation with
-`additionalArgs`:
+This is an advanced option. You can append custom options to the
+`pg_basebackup` command built by the operator with
+`.spec.bootstrap.pg_basebackup.additionalArgs`, for example to reduce the
+impact on the source server or to speed up the copy of a very large data
+directory:
 
 ```yaml
 spec:
@@ -774,13 +777,29 @@ spec:
     pg_basebackup:
       source: cluster-example
       additionalArgs:
+        - --max-rate=50M
         - --checkpoint=fast
+        - --sync-method=syncfs
 ```
+
+In this example:
+
+- `--max-rate=50M` limits the transfer rate, reducing the load on the source
+- `--checkpoint=fast` avoids waiting for a spread checkpoint on the source
+- `--sync-method=syncfs` avoids a slow per-file `fsync` phase at the end of the
+  copy (PostgreSQL 17 and later only)
 
 :::warning
 The operator does not validate these options, and certain flags may
-interfere with its intended functionality. Use with caution.
+interfere with its intended functionality, for example those that change the
+target directory, the output format, the WAL method or the connection
+parameters. You are responsible for the arguments and for their compatibility
+with the PostgreSQL version in use. The project does not test combinations of
+`pg_basebackup` options.
 :::
+
+This setting only applies to the bootstrap of the cluster. It does not affect
+the `pg_basebackup` executions used to join new replicas.
 
 #### Current limitations
 
