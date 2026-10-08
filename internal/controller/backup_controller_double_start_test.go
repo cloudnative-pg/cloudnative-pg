@@ -241,6 +241,37 @@ var _ = Describe("backup_controller starting a backup", func() {
 		expectStartedOnce(ctx)
 	})
 
+	It("keeps the backup started when a stale reconciliation finds the target not ready", func(ctx context.Context) {
+		lagging.freeze(ctx, key)
+		reconcileOnce(ctx)
+
+		var pod corev1.Pod
+		Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: podName}, &pod)).To(Succeed())
+		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse}}
+		Expect(store.Status().Update(ctx, &pod)).To(Succeed())
+		reconcileOnce(ctx)
+
+		expectStartedOnce(ctx)
+	})
+
+	It("keeps the backup completed when the cache catches up during a stale reconciliation",
+		func(ctx context.Context) {
+			lagging.freeze(ctx, key)
+			reconcileOnce(ctx)
+
+			var stored apiv1.Backup
+			Expect(store.Get(ctx, key, &stored)).To(Succeed())
+			stored.Status.Phase = apiv1.BackupPhaseCompleted
+			Expect(store.Status().Update(ctx, &stored)).To(Succeed())
+
+			// The Backup is read stale, while the later List of the cluster
+			// backups already sees it completed
+			reconcileOnce(ctx)
+
+			Expect(store.Get(ctx, key, &stored)).To(Succeed())
+			Expect(string(stored.Status.Phase)).To(Equal(apiv1.BackupPhaseCompleted))
+		})
+
 	It("retries instead of failing the backup when the start patch fails", func(ctx context.Context) {
 		failOnce := true
 		lagging.Client = interceptor.NewClient(store, interceptor.Funcs{

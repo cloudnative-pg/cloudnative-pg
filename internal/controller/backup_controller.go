@@ -295,8 +295,6 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 ) (*ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
-	origBackup := backup.DeepCopy()
-
 	// If no good running backups are found we elect a pod for the backup
 	podStatus, err := r.getBackupTargetPod(ctx, &cluster, backup)
 	if apierrs.IsNotFound(err) ||
@@ -306,11 +304,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
 			cluster.Status.TargetPrimary)
-		backup.Status.SetAsPending()
-		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
-			return nil, err
-		}
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return r.retryBackupAsPending(ctx, backup, 30*time.Second)
 	}
 
 	if err != nil {
@@ -325,13 +319,9 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	if !utils.IsPodReady(*pod) {
 		contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
-		backup.Status.SetAsPending()
 		r.Recorder.Eventf(backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 			cluster.Status.TargetPrimary)
-		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
-			return nil, err
-		}
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return r.retryBackupAsPending(ctx, backup, 30*time.Second)
 	}
 
 	// This backup can be started. The SessionID from podStatus is used to detect
@@ -351,6 +341,26 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 	return nil, nil
+}
+
+// retryBackupAsPending marks the backup as pending and retries after the given
+// delay. The patch is locked on the version this reconciliation read, so a
+// stale read cannot regress a backup that has started or completed since.
+func (r *BackupReconciler) retryBackupAsPending(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	after time.Duration,
+) (*ctrl.Result, error) {
+	origBackup := backup.DeepCopy()
+	backup.Status.SetAsPending()
+	if err := r.Status().Patch(ctx, backup,
+		client.MergeFromWithOptions(origBackup, client.MergeFromWithOptimisticLock{})); err != nil {
+		if apierrs.IsConflict(err) {
+			return &ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		return nil, err
+	}
+	return &ctrl.Result{RequeueAfter: after}, nil
 }
 
 func (r *BackupReconciler) isCurrentBackupRunning(
@@ -1152,13 +1162,12 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 			"A backup is already in progress or waiting to be started, retrying",
 			"targetBackup", backup.Name,
 		)
-		origBackup := backup.DeepCopy()
-		backup.Status.SetAsPending()
-		if patchErr := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); patchErr != nil {
-			contextLogger.Error(patchErr, "while setting backup as pending")
-			return ctrl.Result{}, patchErr
+		res, err := r.retryBackupAsPending(ctx, backup, 10*time.Second)
+		if err != nil {
+			contextLogger.Error(err, "while setting backup as pending")
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		return *res, nil
 	}
 
 	return ctrl.Result{}, nil
