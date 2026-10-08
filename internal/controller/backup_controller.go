@@ -1005,8 +1005,9 @@ func (r *BackupReconciler) startInstanceManagerBackup(
 
 	// This backup has been started
 	origBackup := backup.DeepCopy()
-	backup.Status.MajorVersion = majorVersion
-	backup.Status.SetAsStarted(pod.Name, pgContainerStatus.ContainerID, sessionID, backup.Spec.Method)
+	status := backup.GetStatus()
+	status.MajorVersion = majorVersion
+	status.SetAsStarted(pod.Name, pgContainerStatus.ContainerID, sessionID, backup.Spec.Method)
 
 	// Conflicts when a stale read let another reconciliation start it first
 	if err := r.Status().Patch(ctx, backup,
@@ -1166,13 +1167,13 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 			"A backup is already in progress or waiting to be started, retrying",
 			"targetBackup", backup.Name,
 		)
-		if err := r.markBackupAsPending(ctx, backup); err != nil {
-			if apierrs.IsConflict(err) {
+		if patchErr := r.markBackupAsPending(ctx, backup); patchErr != nil {
+			if apierrs.IsConflict(patchErr) {
 				contextLogger.Debug("Backup changed since it was read, retrying")
 				return ctrl.Result{RequeueAfter: time.Second}, nil
 			}
-			contextLogger.Error(err, "while setting backup as pending")
-			return ctrl.Result{}, err
+			contextLogger.Error(patchErr, "while setting backup as pending")
+			return ctrl.Result{}, patchErr
 		}
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
@@ -1202,6 +1203,5 @@ func (r *BackupReconciler) reconcileMajorVersion(
 	}
 
 	backup.Status.MajorVersion = majorVersion
-
 	return postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }
