@@ -1086,6 +1086,18 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 	namespace := cluster.Namespace
 	clusterName := cluster.Name
+	// The instance manager creates a tablespace only after its PVCs are
+	// healthy in every instance, so it can lag behind the cluster being ready.
+	By("waiting for the tablespaces to be reconciled", func() {
+		Eventually(func(g Gomega) {
+			current, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(current.Status.TablespacesStatus).To(HaveLen(len(cluster.Spec.Tablespaces)))
+			for _, tbs := range current.Status.TablespacesStatus {
+				g.Expect(tbs.State).To(Equal(apiv1.TablespaceStatusReconciled), "tablespace %s", tbs.Name)
+			}
+		}, testTimeouts[timeouts.PodRollout]).Should(Succeed())
+	})
 	By("checking the expected tablespaces are in the database", func() {
 		Eventually(func(g Gomega) {
 			instances, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
