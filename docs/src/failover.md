@@ -96,28 +96,21 @@ primary did not finish archiving are lost.
 
 ### Relationship with the primary isolation check
 
-The lease does not fence a primary that has lost connectivity to the
-Kubernetes API server but is still running; that is the job of the
-[primary isolation](instance_manager.md#primary-isolation) check.
+Holding the lease is not on its own enough to stop a primary that has lost
+connectivity to the Kubernetes API server but is still running: stopping it is
+the job of the [primary isolation](instance_manager.md#primary-isolation) check,
+which watches how long the lease has gone without a successful renewal.
 The two mechanisms are complementary and both are enabled by default:
 
 * The lease prevents *premature* promotion: a replica cannot promote
   while the former primary still holds the lease.
-* The isolation check reports an isolated primary as unhealthy, which
-  the kubelet then restarts through its normal container-termination
-  path. That path is a *smart* shutdown: it refuses new connections
-  but lets sessions that are already open keep committing until
-  `.spec.smartShutdownTimeout` elapses (180 seconds by default), so
-  it narrows the write window during a partition rather than closing
-  it outright.
+* The isolation check stops an *isolated* primary from continuing to
+  accept writes, by shutting PostgreSQL down immediately.
 
 Keep both enabled. Disabling the isolation check leaves the lease
 alone responsible for primary safety, and the lease alone cannot
 prevent split-brain when the former primary cannot reach the API
-server but remains otherwise healthy. If that write window matters
-for your workload, set `.spec.smartShutdownTimeout: 0` so the
-restart goes straight to a fast shutdown instead of waiting out the
-full window.
+server but remains otherwise healthy.
 
 ### Inspecting the primary lease
 
@@ -175,6 +168,13 @@ admission webhook: `leaseDurationSeconds` must be greater than
 `renewDeadlineSeconds`, and `renewDeadlineSeconds` must be greater than
 `retryPeriodSeconds` multiplied by `1.2`. Both mirror the requirements of the
 underlying Kubernetes leader election.
+
+With the [primary isolation](instance_manager.md#primary-isolation) check
+enabled, keep `renewDeadlineSeconds` plus `retryPeriodSeconds` plus the
+isolation check `requestTimeout` below `leaseDurationSeconds`. That sum is how
+long an isolated primary can take to request its own shutdown, while a replica
+may promote once the lease has gone `leaseDurationSeconds` without a renewal.
+The admission webhook warns when this margin is missing.
 :::
 
 :::note
@@ -283,17 +283,17 @@ mechanism, driven by `tolerationSeconds` on the
 `node.kubernetes.io/unreachable` `NoExecute` taint (`300s` by default). That
 timer does not hold up the operator's failover decision; CloudNativePG
 promotes a new primary as soon as the `Ready` condition flips. By that point
-the kubelet on the isolated node has already noticed the problem: with the
+PostgreSQL on the isolated node has already been stopped locally: with the
 default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
-manager fails its own liveness probe once it can reach neither the API
-server nor the rest of the cluster, and the kubelet restarts the container
-within approximately three probe periods (`~30s`). That restart goes
-through the normal termination path, a smart shutdown that lets sessions
-already open on the isolated primary keep committing until
-`.spec.smartShutdownTimeout` elapses (180 seconds by default) on top of
-that ~30s detection window. Full high availability (recreation of the old
-primary on a healthy node by the operator) is still gated on the
-taint-based eviction actually deleting the pod.
+manager shuts PostgreSQL down once its primary lease has gone past the renew
+deadline without a successful renewal and it can reach neither the API server
+nor at least one of the other instances, which with the default lease timings is
+roughly 12 seconds. The
+instance manager then terminates along with PostgreSQL, so the container still
+ends up being restarted by the kubelet, but the shutdown no longer waits for a
+liveness probe to fail. Full high availability
+(recreation of the old primary on a healthy node by the operator) is still
+gated on the taint-based eviction actually deleting the pod.
 
 ## Failover Quorum (Quorum-based Failover)
 

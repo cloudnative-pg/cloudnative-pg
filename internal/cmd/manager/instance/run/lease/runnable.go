@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
@@ -111,6 +113,17 @@ type Runnable struct {
 	// they need no synchronisation.
 	observedRecord *resourcelock.LeaderElectionRecord
 	observedTime   time.Time
+
+	// lastConfirmed is the unix-nanosecond time of the last lease write that
+	// named this pod as the holder, stamped by the confirmingLock wrapping
+	// r.lock. It is how monitorLeaseAge measures how stale our hold is.
+	lastConfirmed atomic.Int64
+
+	// checkStepDown reports whether this primary should stop believing it is
+	// still the legitimate primary. It is a field (defaulting to
+	// shouldStepDown) rather than a direct call so the step-down decision in
+	// monitorLeaseAge can be unit-tested without real network calls.
+	checkStepDown func(cluster *apiv1.Cluster, ourIdentity string) (bool, error)
 }
 
 // New creates a new Runnable.
@@ -118,10 +131,19 @@ func New(
 	kubeClient kubernetes.Interface,
 	instance *postgres.Instance,
 ) *Runnable {
-	return &Runnable{
-		instance: instance,
-		config:   defaultConfig(),
-		lock: &resourcelock.LeaseLock{
+	result := &Runnable{
+		instance:      instance,
+		config:        defaultConfig(),
+		activateCh:    make(chan struct{}),
+		heldCh:        make(chan struct{}),
+		checkStepDown: shouldStepDown,
+	}
+
+	// Every lease write the elector makes goes through le.config.Lock, which is
+	// this same lock, so wrapping it here is enough for no confirmed renewal to
+	// bypass the timestamp monitorLeaseAge reads.
+	result.lock = &confirmingLock{
+		Interface: &resourcelock.LeaseLock{
 			LeaseMeta: metav1.ObjectMeta{
 				Namespace: instance.GetNamespaceName(),
 				Name:      instance.GetClusterName(),
@@ -135,9 +157,10 @@ func New(
 				Identity: instance.GetPodName(),
 			},
 		},
-		activateCh: make(chan struct{}),
-		heldCh:     make(chan struct{}),
+		lastConfirmed: &result.lastConfirmed,
 	}
+
+	return result
 }
 
 // Acquire signals the runnable to start competing for the lease using the
@@ -249,8 +272,8 @@ const (
 	// controller recreates it on its deletion watch, so we retry.
 	leaseMissing leaseCheckOutcome = iota
 	// leaseUnverifiable means the lease could not be read (e.g. the API server is
-	// unreachable). We have no evidence of preemption, so we retry and rely on
-	// the liveness probe to fence us if we are genuinely isolated.
+	// unreachable). We have no evidence of preemption, so we retry; whether we
+	// have to step down anyway is monitorLeaseAge's decision, not this one.
 	leaseUnverifiable
 	// leasePreempted means the lease is held by a different (or empty) identity:
 	// we no longer own it. This is terminal: the primary must stop.
@@ -382,6 +405,11 @@ func (r *Runnable) claim(ctx context.Context, current *resourcelock.LeaderElecti
 // released lease on the first poll instead of waiting out an observation
 // window, so a graceful failover stays quick without having to inflate
 // LeaseDuration.
+//
+// Whether this primary should step down while the lease stays unverifiable is
+// not decided here: monitorLeaseAge watches the age of the last confirmed lease
+// write on its own cadence, which also covers the case where the elector never
+// gets far enough for this loop to run at all.
 func (r *Runnable) preAcquire(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
 
@@ -438,14 +466,12 @@ func (r *Runnable) preAcquire(ctx context.Context) error {
 //     different (or empty) holder. We return a fatal error so controller-runtime
 //     shuts down the manager and stops PostgreSQL.
 //
-// If the post-exit read itself fails (API server still unreachable), we log a
-// warning and loop: we have no evidence of preemption, and the liveness probe
-// isolation checker will fence us if we are genuinely isolated. A retryPeriod-
-// sized timeout is used for the check to avoid blocking indefinitely.
-//
-// This design keeps the lease as a pure promotion synchronization mechanism.
-// Network isolation fencing is left entirely to the liveness probe, which has
-// access to replica connectivity information the lease mechanism lacks.
+// If the post-exit read itself fails (API server still unreachable), we have no
+// evidence of preemption and simply retry; a retryPeriod-sized timeout is used
+// for the lease-verification read to avoid blocking indefinitely. Whether this
+// primary has to step down anyway is decided elsewhere, by monitorLeaseAge,
+// which watches the age of the last confirmed lease write on its own cadence
+// (see monitorLeaseAge for why the trigger cannot hang off this control flow).
 //
 // Instance-level fencing (cnpg.io/fencedInstances) does not release the lease
 // either: the operator deliberately skips switchover while the current primary
@@ -453,6 +479,18 @@ func (r *Runnable) preAcquire(ctx context.Context) error {
 // Unfencing resumes the same primary without any lease transition.
 func (r *Runnable) runLeaderElection(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
+	// Carry the "primary-lease" name into the context handed to the elector
+	// below: client-go's leaderelection package logs through klog.FromContext,
+	// which reads this same context, not the contextLogger local variable. It
+	// would otherwise log its acquire/renew bookkeeping under the ambient
+	// logger name (e.g. "instance-manager"), reading as an unrelated,
+	// still-in-progress lease race rather than what it is: confirmation of a
+	// lease preAcquire has already taken.
+	ctx = log.IntoContext(ctx, contextLogger)
+
+	// The step-down monitor lives as long as this loop does.
+	monitorCtx, stopMonitor := context.WithCancel(ctx)
+	defer stopMonitor()
 
 	for {
 		if err := r.preAcquire(ctx); err != nil {
@@ -462,7 +500,16 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 		r.heldOnce.Do(func() {
 			contextLogger.Info("Acquired primary lease")
 			close(r.heldCh)
+			go r.monitorLeaseAge(monitorCtx)
 		})
+
+		// preAcquire has just confirmed (or re-confirmed) that we hold the
+		// lease. The elector we hand off to next re-runs its own
+		// acquire-then-renew cycle regardless, so the "Attempting to acquire
+		// leader lease..." / "Successfully acquired lease" pair it logs below
+		// is expected renewal bookkeeping for the lease we already hold, not a
+		// new election. Logged at Info to sit next to those Info-level lines.
+		contextLogger.Info("Handing off to the leader-election renewal loop for the lease we already hold")
 
 		le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 			Lock:            r.lock,
@@ -512,10 +559,11 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			// le.Run re-acquire it once it reappears.
 			contextLogger.Warning("Primary lease object missing, waiting for it to be recreated")
 		case leaseUnverifiable:
-			// Cannot reach the API server to verify the holder. We have no evidence
-			// of preemption, so loop back and let le.Run retry. If we are genuinely
-			// isolated, the liveness probe isolation checker will fence us.
-			contextLogger.Warning("Primary lease lost, cannot verify holder, retrying", "error", checkErr)
+			// We have no evidence of preemption, but also can't confirm we
+			// still hold the lease. We don't check the step-down condition
+			// here: monitorLeaseAge is already watching the age of the last
+			// confirmed write on its own cadence, for as long as this persists.
+			contextLogger.Warning("Primary lease object unverifiable, will retry take-over", "error", checkErr)
 		case leasePreempted:
 			// A different identity holds the lease: we have been preempted. This is
 			// a terminal event: the returned error shuts down the manager and stops
