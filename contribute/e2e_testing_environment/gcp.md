@@ -30,6 +30,10 @@ cluster needs in
 [Google Cloud account limits](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/installing_on_google_cloud/installing-gcp-account#installation-gcp-limits_installing-gcp-account).
 The machine types used here are larger than the defaults in that table.
 
+Scheduled runs can launch more than one configured GKE and OpenShift version concurrently,
+see `k8s_versions_scope.json`, `openshift_versions.json` and `gke_versions.json` for the versions
+that can be launched concurrently.
+
 ## 1. Enable the APIs
 
 ```bash
