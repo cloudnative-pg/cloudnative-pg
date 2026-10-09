@@ -446,6 +446,20 @@ func isPodNeedingRollout(
 		return rollout{}
 	}
 
+	// The operator never sets Pod.Spec.ImagePullSecrets itself (only the
+	// ServiceAccount's), so this drift is never captured by the PodSpec
+	// annotation and has to be checked explicitly, regardless of whether
+	// the pod has a valid stored PodSpec. We only know the secret name is
+	// present on the Pod, not that it works, which is a weaker reason to
+	// force a rollout against an explicit opt-out than the checks above,
+	// so this respects `cnpg.io/reconcilePodSpec: disabled` too.
+	podRollout = applyCheckers(map[string]rolloutChecker{
+		"pod image pull secrets are outdated": checkPodImagePullSecretsOutdated,
+	})
+	if podRollout.required {
+		return podRollout
+	}
+
 	// If the pod has a valid PodSpec annotation, that's the final check.
 	// If not, we should perform additional legacy checks
 	if hasValidPodSpec(pod) {
@@ -616,6 +630,43 @@ func checkClusterHasDifferentRestartAnnotation(
 			return rollout{
 				required: true,
 				reason:   "cluster has been explicitly restarted via annotation",
+			}, nil
+		}
+	}
+
+	return rollout{}, nil
+}
+
+// checkPodImagePullSecretsOutdated checks if the Pod is missing one or more of the
+// image pull secrets configured on the cluster.
+//
+// The operator never sets Pod.Spec.ImagePullSecrets directly: it relies on the
+// ServiceAccount's imagePullSecrets being injected into the Pod by Kubernetes at
+// creation time (see pkg/specs/serviceaccount.go). Because Pod.spec.imagePullSecrets
+// is immutable, a Pod created before a secret was added to the cluster will never
+// pick it up unless it is recreated, so we need to explicitly request a rollout
+// here (see issue #8370).
+//
+// When the cluster references a user-provided ServiceAccount, the operator does
+// not manage its imagePullSecrets, so recreating the Pod would not change
+// anything: skip the check to avoid an endless rollout loop.
+func checkPodImagePullSecretsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
+	if len(cluster.Spec.ImagePullSecrets) == 0 || cluster.Spec.ServiceAccountName != "" {
+		return rollout{}, nil
+	}
+
+	podPullSecrets := make(map[string]bool, len(pod.Spec.ImagePullSecrets))
+	for _, secret := range pod.Spec.ImagePullSecrets {
+		podPullSecrets[secret.Name] = true
+	}
+
+	for _, secret := range cluster.Spec.ImagePullSecrets {
+		if !podPullSecrets[secret.Name] {
+			return rollout{
+				required: true,
+				reason: fmt.Sprintf(
+					"pod '%s' is missing the '%s' image pull secret configured on the cluster",
+					pod.Name, secret.Name),
 			}, nil
 		}
 	}
