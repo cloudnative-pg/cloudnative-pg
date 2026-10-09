@@ -398,6 +398,7 @@ _Appears in:_
 | `database` _string_ | Name of the database used by the application. Default: `app`. |  |  |  |
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
+| `additionalArgs` _string array_ | List of custom options to pass to the `pg_basebackup` command.<br />IMPORTANT: Use with caution. The operator rejects the options it relies on<br />(target directory, output format, WAL method, connection parameters,<br />tablespace mapping), but it does not validate the others, and some of<br />them may still interfere with its intended functionality or design.<br />You are responsible for ensuring that the provided options are compatible<br />with your environment and PostgreSQL version. |  |  |  |
 
 
 #### BootstrapRecovery

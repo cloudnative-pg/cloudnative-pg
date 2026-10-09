@@ -243,6 +243,13 @@ func BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster apiv1.Cluster) *Instanc
 		"pgbasebackup",
 	)
 
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil &&
+		len(cluster.Spec.Bootstrap.PgBaseBackup.AdditionalArgs) > 0 {
+		initCommand = append(initCommand,
+			"--pgbasebackup-additional-args",
+			shellquote.Join(cluster.Spec.Bootstrap.PgBaseBackup.AdditionalArgs...))
+	}
+
 	initCommand = append(initCommand, commonFlags...)
 
 	return &InstanceBootstrapCommand{Role: jobRolePGBaseBackup, Command: initCommand}

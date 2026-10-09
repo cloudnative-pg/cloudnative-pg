@@ -763,6 +763,50 @@ completed**:
    password for the application user (the `app` user in this case) will be
    updated to the `password` value in the secret.
 
+#### Passing additional options to `pg_basebackup`
+
+This is an advanced option. You can append custom options to the
+`pg_basebackup` command built by the operator with
+`.spec.bootstrap.pg_basebackup.additionalArgs`, for example to reduce the
+impact on the source server or to speed up the copy of a very large data
+directory:
+
+```yaml
+spec:
+  bootstrap:
+    pg_basebackup:
+      source: cluster-example
+      additionalArgs:
+        - --max-rate=50M
+        - --checkpoint=fast
+        - --sync-method=syncfs
+```
+
+In this example:
+
+- `--max-rate=50M` limits the transfer rate, reducing the load on the source
+- `--checkpoint=fast` avoids waiting for a spread checkpoint on the source
+- `--sync-method=syncfs` avoids a slow per-file `fsync` phase at the end of the
+  copy (PostgreSQL 17 and later only)
+
+:::warning
+The operator rejects the options it relies on: the target directory and output
+format (`-D`/`--pgdata`, `-F`/`--format`, `-R`/`--write-recovery-conf`,
+`-X`/`--wal-method`, `--waldir`, `-t`/`--target`), the connection parameters
+(`-d`/`--dbname`, `-h`/`--host`, `-p`/`--port`, `-U`/`--username`,
+`-w`/`--no-password`, `-W`/`--password`, taken from `externalClusters`), the
+tablespace relocation (`-T`/`--tablespace-mapping`), and `--help` and
+`--version`. Abbreviated long options that match one of them are rejected too.
+
+All the other options are passed as they are, and some of them may still
+interfere with the operator. You are responsible for the arguments and for
+their compatibility with the PostgreSQL version in use. The project does not
+test combinations of `pg_basebackup` options.
+:::
+
+This setting only applies to the bootstrap of the cluster. It does not affect
+the `pg_basebackup` executions used to join new replicas.
+
 #### Current limitations
 
 ##### Snapshot copy

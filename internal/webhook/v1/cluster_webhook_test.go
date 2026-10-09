@@ -2630,6 +2630,72 @@ var _ = Describe("bootstrap base backup validation", func() {
 	})
 })
 
+var _ = Describe("pg_basebackup additionalArgs validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	clusterWithArgs := func(args ...string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:         "test",
+						AdditionalArgs: args,
+					},
+				},
+			},
+		}
+	}
+
+	It("doesn't complain when pg_basebackup is not used or there are no arguments", func() {
+		Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(&apiv1.Cluster{})).To(BeEmpty())
+		Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs())).To(BeEmpty())
+	})
+
+	DescribeTable("accepts the arguments that don't interfere with the operator",
+		func(args ...string) {
+			Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs(args...))).To(BeEmpty())
+		},
+		Entry("long options, with an attached or a separate value",
+			"--max-rate=50M", "--checkpoint", "fast", "--sync-method=syncfs", "--no-estimate-size"),
+		Entry("grouped short flags", "-vP"),
+		Entry("short options, with an attached or a separate value", "-r50M", "-c", "fast"),
+		Entry("a forbidden letter inside the value of an option", "-lbackup-D", "--label=my-D-backup"),
+		Entry("an abbreviation of an allowed option", "--check=fast"),
+	)
+
+	DescribeTable("rejects the options managed by the operator, however they are spelled",
+		func(arg string, expectedOption string) {
+			result := v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs(arg))
+			Expect(result).To(HaveLen(1))
+			Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+			Expect(result[0].Detail).To(ContainSubstring(expectedOption))
+		},
+		Entry("short option", "-D", "-D"),
+		Entry("short option with an attached value", "-D/tmp/pgdata", "-D"),
+		Entry("long option with a value", "--pgdata=/tmp/pgdata", "--pgdata"),
+		Entry("long option without a value", "--help", "--help"),
+		Entry("short option grouped with allowed ones", "-nNPR", "-R"),
+	)
+
+	// getopt_long accepts any unambiguous abbreviation of a long option
+	It("rejects the abbreviations of the options managed by the operator", func() {
+		result := v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs("--pgd=/tmp/pgdata"))
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Detail).To(ContainSubstring("abbreviation of --pgdata"))
+	})
+
+	It("reports every forbidden argument, and only those", func() {
+		result := v.validateBootstrapPgBaseBackupAdditionalArgs(
+			clusterWithArgs("--host=foo", "--max-rate=50M", "-D", "/tmp"))
+		Expect(result).To(HaveLen(2))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[0]"))
+		Expect(result[1].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[2]"))
+	})
+})
+
 var _ = Describe("bootstrap recovery validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
