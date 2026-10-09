@@ -216,9 +216,13 @@ Both methods provide automated reconciliation of role attributes (e.g.,
 `login`, `superuser`, `connectionLimit`) and secure, versioned password
 management via Kubernetes Secrets. Passwords are SCRAM-SHA-256 encoded
 operator-side before they are sent to PostgreSQL, so the cleartext value never
-reaches the server log or extensions. A `DatabaseRole` can additionally request
-a TLS client certificate that the operator generates and renews automatically,
-enabling password-free `cert` authentication.
+reaches the server log or extensions.
+
+A `DatabaseRole` states how the password is managed through a single
+`password.mode` field, and can have the operator generate it into a Secret it
+owns and rotate it on a schedule. It can also request a TLS client certificate
+that the operator generates and renews automatically, enabling password-free
+`cert` authentication.
 
 ### Configuration of Postgres extensions
 

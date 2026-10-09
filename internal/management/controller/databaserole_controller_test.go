@@ -22,11 +22,13 @@ package controller
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -111,6 +113,26 @@ func markDeleting(role *apiv1.DatabaseRole) {
 	role.Generation++
 }
 
+var _ = Describe("DatabaseRole generatedPasswordValidUntil", func() {
+	It("has nothing to say about a role that does not generate a password", func() {
+		validUntil, err := generatedPasswordValidUntil(newTestDatabaseRole())
+		Expect(err).NotTo(HaveOccurred())
+		Expect(validUntil.Valid).To(BeFalse())
+	})
+
+	It("reports an expiration it cannot read instead of leaving the role unexpiring", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 90 * 24 * time.Hour},
+		}
+		role.Status.Password = &apiv1.GeneratedPasswordState{Expiration: "not-a-timestamp"}
+		validUntil, err := generatedPasswordValidUntil(role)
+		Expect(err).To(HaveOccurred())
+		Expect(validUntil.Valid).To(BeFalse())
+	})
+})
+
 var _ = Describe("DatabaseRole shouldDropRole", func() {
 	DescribeTable("decides whether a deleted role must be dropped",
 		func(policy apiv1.DatabaseRoleReclaimPolicy, reconciled bool,
@@ -159,6 +181,43 @@ var _ = Describe("DatabaseRole isAlreadyReconciled", func() {
 		Expect(r.isAlreadyReconciled(role)).To(BeFalse())
 	})
 
+	It("is false while a generated password is left to revoke", func() {
+		// The operator records the revocation after the role stopped generating
+		// a password, which can be after that same generation was applied:
+		// going by the generation alone would leave the password in place for
+		// good.
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
+		role.Status.ObservedGeneration = role.Generation
+		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
+		Expect(r.isAlreadyReconciled(role)).To(BeFalse())
+
+		role.Status.Password.PendingRevocation = false
+		Expect(r.isAlreadyReconciled(role)).To(BeTrue())
+	})
+
+	It("is reconciled once the applied expiration matches the recorded one", func() {
+		// Applied already: the generation it observed, and the version of the
+		// password Secret the condition announces.
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 1008 * time.Hour},
+		}
+		role.Status.ObservedGeneration = role.Generation
+		role.Status.SecretResourceVersion = "100"
+		meta.SetStatusCondition(&role.Status.Conditions, metav1.Condition{
+			Type: string(apiv1.ConditionPasswordSecretChange), Status: metav1.ConditionTrue,
+			Reason: "ChangeDetected", Message: "100",
+		})
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName:        "role-cr-password",
+			Expiration:        "2026-11-16T09:12:44Z",
+			AppliedExpiration: "2026-11-16T09:12:44Z",
+		}
+		Expect(r.isAlreadyReconciled(role)).To(BeTrue())
+	})
+
 	When("a password secret is configured", func() {
 		newRoleWithSecret := func() *apiv1.DatabaseRole {
 			role := newTestDatabaseRole()
@@ -189,6 +248,31 @@ var _ = Describe("DatabaseRole isAlreadyReconciled", func() {
 			role.Status.SecretResourceVersion = "rv-1"
 			Expect(r.isAlreadyReconciled(role)).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("DatabaseRole succeededReconciliation", func() {
+	It("acknowledges the revocation the apply it reports has just carried out", func() {
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
+		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(role).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			Build()
+		r := &DatabaseRoleReconciler{Client: fakeClient, instance: &fakeRoleInstance{}}
+
+		_, err := r.succeededReconciliation(context.Background(), role, "")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Without this the password would be set to NULL again on every loop,
+		// and the operator would never retire the record of the revocation.
+		var updated apiv1.DatabaseRole
+		Expect(fakeClient.Get(context.Background(), client.ObjectKeyFromObject(role), &updated)).To(Succeed())
+		Expect(updated.Status.Password).NotTo(BeNil())
+		Expect(updated.Status.Password.PendingRevocation).To(BeFalse())
+		Expect(updated.Status.Applied).To(HaveValue(BeTrue()))
 	})
 })
 
@@ -358,6 +442,66 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		got := &apiv1.DatabaseRole{}
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
 		Expect(got.Status.Applied).To(BeNil())
+	})
+})
+
+var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
+	It("sets VALID UNTIL from the expiration of the generated password", func() {
+		var statements []string
+		recorder := sqlmock.QueryMatcherFunc(func(_, actualSQL string) error {
+			statements = append(statements, actualSQL)
+			return nil
+		})
+		db, dbMock, err := sqlmock.New(sqlmock.QueryMatcherOption(recorder))
+		Expect(err).NotTo(HaveOccurred())
+		// No rows from pg_authid, so reconcileRole takes the create path.
+		dbMock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{
+			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword",
+			"rolvaliduntil", "rolbypassrls", "comment", "xmin", "inroles",
+		}))
+		dbMock.ExpectBegin()
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+		dbMock.ExpectCommit()
+
+		expiration := time.Now().Add(1008 * time.Hour).UTC().Truncate(time.Second)
+		role := newTestDatabaseRole()
+		role.Spec.Password = &apiv1.PasswordConfiguration{
+			Mode:     apiv1.PasswordModeGenerate,
+			Duration: &metav1.Duration{Duration: 1008 * time.Hour},
+		}
+		role.Status.Password = &apiv1.GeneratedPasswordState{
+			SecretName: "role-cr-password",
+			Expiration: expiration.Format(time.RFC3339),
+		}
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "role-cr-password", Namespace: testNamespace},
+			Type:       corev1.SecretTypeBasicAuth,
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte(testRoleName),
+				corev1.BasicAuthPasswordKey: []byte("0mA3nCe0f6THe1dIvIne"),
+			},
+		}
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(role, secret).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			Build()
+		r := &DatabaseRoleReconciler{Client: cli, instance: &fakeRoleInstance{db: db}}
+
+		_, err = r.reconcileRole(context.Background(), role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+
+		// The clause has to reach PostgreSQL, not just the DatabaseRole the
+		// reconciler builds: the lifetime is only a deadline if the database
+		// enforces it.
+		Expect(statements).To(ContainElement(SatisfyAll(
+			HavePrefix("CREATE ROLE"),
+			ContainSubstring("VALID UNTIL '"+expiration.Format("2006-01-02 15:04:05")),
+		)))
 	})
 })
 

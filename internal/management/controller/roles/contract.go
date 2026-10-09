@@ -133,33 +133,44 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
 }
 
-// ApplyPassword updates a database role with the password located in the Secret,
-// and it returns the resource version of the Secret
+// ApplyPassword updates a database role with the password held by the named
+// Secret, the one the role refers to through `passwordSecret` or the one the
+// operator generated for it, and returns that Secret's resource version.
+// Without a Secret the password is set to NULL when disablePassword says so,
+// and left untouched otherwise.
 func (d *DatabaseRole) ApplyPassword(
 	ctx context.Context,
 	cl client.Client,
-	config *apiv1.RoleConfiguration,
+	secretName string,
+	disablePassword bool,
 	namespace string,
 ) (string, error) {
 	switch {
-	case config.GetRoleSecretName() == "" && !config.DisablePassword:
+	case secretName == "" && !disablePassword:
 		d.ignorePassword = true
 		return "", nil
-	case config.GetRoleSecretName() == "" && config.DisablePassword:
+	case secretName == "" && disablePassword:
+		// Overrides the "leave the password alone" default, the same way
+		// reading one from a Secret does below.
+		d.ignorePassword = false
 		d.password = sql.NullString{}
 		return "", nil
-	case config.GetRoleSecretName() != "" && config.DisablePassword:
+	case secretName != "" && disablePassword:
 		// For DatabaseRole CRDs this is prevented by CEL validation.
 		// For inline managed roles this is a runtime error.
 		return "",
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
-				config.GetRoleSecretName())
+				secretName)
 	default:
-		passwordSecret, err := getPassword(ctx, cl, config, namespace)
+		passwordSecret, err := getPassword(ctx, cl, d.Name, secretName, namespace)
 		if err != nil {
 			return "", err
 		}
 
+		// A role built from a RoleConfiguration carrying no `passwordSecret`
+		// defaults to ignoring the password, which is what a generated password
+		// looks like: now that one has been read, it must be applied.
+		d.ignorePassword = false
 		d.password = sql.NullString{Valid: true, String: passwordSecret.password}
 		d.passwordPassthrough = passwordSecret.passthrough
 		return passwordSecret.version, nil
