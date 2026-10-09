@@ -1119,3 +1119,49 @@ var _ = Describe("instance probes", func() {
 		}
 	})
 })
+
+var _ = Describe("AddBootstrapInitContainer", func() {
+	It("lets the bootstrap see whether it still has to run in this Pod", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+			Spec:       apiv1.ClusterSpec{ImageName: "postgres:18.0"},
+		}
+		pod, err := NewInstance(ctx, cluster, 1)
+		Expect(err).NotTo(HaveOccurred())
+		storedPodSpec := pod.Annotations[utils.PodSpecAnnotationName]
+
+		AddBootstrapInitContainer(pod, cluster, BuildReplicaBootstrapCommandViaJoin(cluster))
+
+		Expect(pod.Spec.InitContainers).To(ContainElement(SatisfyAll(
+			HaveField("Name", BootstrapWorkContainerName),
+			HaveField("Env", ContainElement(corev1.EnvVar{
+				Name: BootstrapPendingEnvName,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.annotations['cnpg.io/bootstrapPending']",
+					},
+				},
+			})),
+		)))
+		Expect(pod.Annotations).To(HaveKeyWithValue("cnpg.io/bootstrapPending", "true"))
+		// The Pod spec the operator compares to decide on a rollout is stored
+		// before the bootstrap container is added, so the variable rolls out
+		// no running instance.
+		Expect(pod.Annotations[utils.PodSpecAnnotationName]).To(Equal(storedPodSpec))
+		Expect(storedPodSpec).ToNot(ContainSubstring(BootstrapPendingEnvName))
+	})
+
+	It("marks nothing when the instance needs no bootstrap", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+			Spec:       apiv1.ClusterSpec{ImageName: "postgres:18.0"},
+		}
+		pod, err := NewInstance(ctx, cluster, 1)
+		Expect(err).NotTo(HaveOccurred())
+
+		AddBootstrapInitContainer(pod, cluster, nil)
+
+		Expect(pod.Annotations).ToNot(HaveKey(utils.BootstrapPendingAnnotationName))
+		Expect(pod.Spec.InitContainers).ToNot(ContainElement(HaveField("Name", BootstrapWorkContainerName)))
+	})
+})

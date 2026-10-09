@@ -50,6 +50,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
 
@@ -125,6 +126,22 @@ type InitInfo struct {
 
 	// TablespaceMapFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
 	TablespaceMapFile []byte
+}
+
+// IsBootstrapCompleted tells whether the bootstrap init container is running
+// again in a Pod where it already succeeded. The operator attaches it only to
+// a Pod whose PGDATA PVC is not ready, marking the Pod as pending, and removes
+// the mark once it succeeds, but Kubernetes runs it again whenever the Pod is
+// recreated as it was, as a backup tool does when it restores the Pod together
+// with its PVCs: the volumes then already hold the instance and must be left
+// untouched.
+func IsBootstrapCompleted(ctx context.Context) bool {
+	if os.Getenv(specs.BootstrapPendingEnvName) == "true" {
+		return false
+	}
+
+	log.FromContext(ctx).Info("The bootstrap already succeeded in this Pod, leaving the volumes untouched")
+	return true
 }
 
 // EnsureTargetDirectoriesDoNotExist ensures that the target data and WAL directories do not exist.
