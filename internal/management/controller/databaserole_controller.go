@@ -491,9 +491,7 @@ func updateExistingRole(
 	dbRole roles.DatabaseRole,
 	existingDBRole *roles.DatabaseRole,
 ) error {
-	toGrant, toRevoke, err := roles.GetRoleMembershipDiff(
-		ctx, db, dbRole.InRoles, dbRole,
-	)
+	toGrant, toRevoke, err := roles.GetRoleMembershipDiff(ctx, db, dbRole)
 	if err != nil {
 		return fmt.Errorf("while getting the membership updates required: %w", err)
 	}
@@ -553,12 +551,16 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 		return "", fmt.Errorf("while getting the role password: %w", err)
 	}
 
-	if existingDBRole != nil {
+	if existingDBRole == nil {
+		if err := roles.Create(ctx, db, dbRole); err != nil {
+			return "", err
+		}
+		// update roleGrants with a second iteration
+		return r.reconcileRole(ctx, role)
+	} else {
 		if err := updateExistingRole(ctx, db, dbRole, existingDBRole); err != nil {
 			return "", err
 		}
-	} else if err := roles.Create(ctx, db, dbRole); err != nil {
-		return "", err
 	}
 
 	return passwordVersion, nil
