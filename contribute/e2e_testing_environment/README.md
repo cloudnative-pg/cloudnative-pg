@@ -536,7 +536,7 @@ Options supported are:
   Note that `eks`, `aks`, `gke`, and `openshift` require additional
   secrets and variables that are not available in the main repository
   and will be silently skipped when those are not configured. To set up
-  Google Cloud for `gke`, see
+  Google Cloud for `gke`, and for `openshift` on Google Cloud, see
   [Setting up Google Cloud for the E2E tests](gcp.md).
 
 - feature_type (`type` or `ft` for short)
