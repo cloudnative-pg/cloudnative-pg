@@ -33,4 +33,4 @@ platform:
     region: ${GCP_REGION}
 publish: External
 pullSecret: '${REDHAT_PULL}'
-sshKey: ${SSH_PUBLIC_KEY}
+sshKey: '${SSH_PUBLIC_KEY}'
