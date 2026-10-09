@@ -156,6 +156,47 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 		Expect(res.IsZero()).To(BeTrue())
 	})
 
+	It("drops a parked diverged replica's slot even though its instance is still in the cluster", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...).
+			AddRow(newRepSlot("instance2", true, "lsn2")...).
+			AddRow(newRepSlot("instance3", false, "lsn2")...)
+
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").
+			WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance3").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2", "instance3"}, "instance1")
+		cluster.Status.DivergedInstances = map[apiv1.PodName]apiv1.DivergedInstanceStatus{
+			"instance3": {Parked: true},
+		}
+
+		_, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+
+	It("keeps a diverged replica's slot expected until it is actually parked", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...).
+			AddRow(newRepSlot("instance2", true, "lsn2")...).
+			AddRow(newRepSlot("instance3", false, "lsn2")...)
+
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").
+			WillReturnRows(rows)
+
+		// no drop expected: the instance is not fenced, as when fencing it
+		// would break the synchronous quorum
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2", "instance3"}, "instance1")
+		cluster.Status.DivergedInstances = map[apiv1.PodName]apiv1.DivergedInstanceStatus{
+			"instance3": {Parked: false},
+		}
+
+		_, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+
 	It("continues dropping the remaining stale slots after a drop failure", func(ctx SpecContext) {
 		rows := sqlmock.NewRows(repSlotColumns).
 			AddRow(newRepSlot("instance2", true, "lsn2")...).

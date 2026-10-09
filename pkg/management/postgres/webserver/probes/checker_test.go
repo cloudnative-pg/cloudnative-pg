@@ -20,14 +20,34 @@ SPDX-License-Identifier: Apache-2.0
 package probes
 
 import (
+	"context"
+	"errors"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+type fixedRunner struct {
+	err error
+}
+
+func (r fixedRunner) IsHealthy(context.Context, *postgres.Instance) error {
+	return r.err
+}
+
+var _ = Describe("notDivergedChecker", func() {
+	It("fails as the wrapped probe does, without querying the instance", func(ctx SpecContext) {
+		errNotReady := errors.New("not ready")
+		Expect(notDivergedChecker{inner: fixedRunner{err: errNotReady}}.IsHealthy(ctx, postgres.NewInstance())).
+			To(MatchError(errNotReady))
+	})
+})
 
 var _ = Describe("getProbeRunnerFromCluster", func() {
 	startupTolerantChecker := startupPgIsReadyChecker{inner: pgIsReadyChecker{}}

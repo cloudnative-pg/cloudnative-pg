@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -450,6 +451,46 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		condition := meta.FindStatusCondition(persisted.Status.Conditions, string(apiv1.ConditionConsistentSystemID))
 		Expect(condition).ToNot(BeNil())
 		Expect(condition.Message).To(Equal("No instances are present in the cluster to report a system ID."))
+	})
+
+	// A second pass over the same instances, where the in-place deletion from
+	// the DivergedInstances map is the only change the persist gate can see.
+	It("persists the removal of a divergence once the replica no longer reports it", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "primary", Namespace: cluster.Namespace}},
+				IsPrimary:  true,
+				IsPodReady: true,
+				TimeLineID: 2,
+			},
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-healed", Namespace: cluster.Namespace}},
+				TimeLineID: 2,
+			},
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-diverged", Namespace: cluster.Namespace}},
+				TimeLineID: 1,
+				Divergence: &postgres.TimelineDivergence{
+					TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/7000110", ReplayLSN: "0/7500000",
+				},
+			},
+		}}
+		Expect(env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)).To(Succeed())
+
+		// a stale entry left over from before the replica was rebuilt
+		cluster.Status.DivergedInstances["replica-healed"] = apiv1.DivergedInstanceStatus{
+			TimeLineID: 1, PrimaryTimeLineID: 2,
+		}
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		var fresh apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
+		Expect(fresh.Status.DivergedInstances).ToNot(HaveKey(apiv1.PodName("replica-healed")))
+		Expect(fresh.Status.DivergedInstances).To(HaveKey(apiv1.PodName("replica-diverged")))
 	})
 
 	Context("Pod termination reason detection", func() {

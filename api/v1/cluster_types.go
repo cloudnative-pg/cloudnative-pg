@@ -1069,6 +1069,17 @@ type ClusterStatus struct {
 	// +optional
 	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 
+	// DivergedInstances reports the non-primary instances that replayed WAL
+	// past the point where the current primary's timeline forked away from
+	// theirs, so they can never follow the current primary again. Each
+	// instance detects this itself from its own pg_wal. A diverged instance
+	// is also fenced and excluded from the primary's replication slots.
+	// An entry is cleared once its instance reports it is no
+	// longer diverged, or once a fenced instance's data is rebuilt from a
+	// fresh clone (for example with `kubectl cnpg destroy`).
+	// +optional
+	DivergedInstances map[PodName]DivergedInstanceStatus `json:"divergedInstances,omitempty"`
+
 	// The timestamp when the last request for a new primary has occurred
 	// +optional
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
@@ -1166,6 +1177,47 @@ type InstanceReportedState struct {
 	IP string `json:"ip,omitempty"`
 }
 
+// DivergedInstanceStatus describes a non-primary instance that replayed WAL
+// past the point where the current primary's timeline forked away from its
+// own. See ClusterStatus.DivergedInstances. The details are those of the
+// first report and are not updated afterwards.
+type DivergedInstanceStatus struct {
+	// TimeLineID is the timeline of the WAL the instance held when the
+	// divergence was first reported.
+	// +kubebuilder:validation:Minimum=1
+	TimeLineID int `json:"timeLineID"`
+
+	// PrimaryTimeLineID is the newest timeline the instance had learned
+	// about from the primary, and could not switch to, when the divergence
+	// was first reported.
+	// +kubebuilder:validation:Minimum=1
+	PrimaryTimeLineID int `json:"primaryTimeLineID"`
+
+	// ForkLSN is where PrimaryTimeLineID forked away from TimeLineID. Empty
+	// when TimeLineID is not an ancestor of PrimaryTimeLineID at all.
+	// +optional
+	ForkLSN string `json:"forkLSN,omitempty"`
+
+	// ReplayLSN is how far the instance had replayed when the divergence
+	// was first reported. Together with ForkLSN it bounds the WAL
+	// (ForkLSN, ReplayLSN] the instance held that the primary did not.
+	ReplayLSN string `json:"replayLSN"`
+
+	// DetectedAt is when the divergence was first reported.
+	DetectedAt string `json:"detectedAt"`
+
+	// Parked is true once the instance has been fenced as containment.
+	// +optional
+	Parked bool `json:"parked,omitempty"`
+
+	// PVCUID is the UID of the instance's PGDATA PersistentVolumeClaim when
+	// it was fenced. Containment is lifted only once that PVC is replaced,
+	// for example by `kubectl cnpg destroy`, and not when the Pod is merely
+	// recreated over the same, still diverged data.
+	// +optional
+	PVCUID string `json:"pvcUID,omitempty"`
+}
+
 // ClusterConditionType defines types of cluster conditions
 type ClusterConditionType string
 
@@ -1192,6 +1244,11 @@ const (
 	// or .spec.postgresql.synchronous.nodeFailureDomainKeys.
 	// Only set when one of those fields is configured.
 	ConditionSyncReplicationTopologySatisfied ClusterConditionType = "SyncReplicationTopologySatisfied"
+
+	// ConditionReplicasHealthy is False when at least one non-primary
+	// instance is reported in ClusterStatus.DivergedInstances, and True
+	// otherwise.
+	ConditionReplicasHealthy ClusterConditionType = "ReplicasHealthy"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1261,6 +1318,16 @@ const (
 	// are set but no synchronous replica in a different failure domain than
 	// the primary exists.
 	ConditionReasonInsufficientCrossDomainReplicas ConditionReason = "InsufficientCrossDomainReplicas"
+
+	// ConditionReasonAllReplicasHealthy is the reason set on
+	// ConditionReplicasHealthy=True when no instance is reported in
+	// ClusterStatus.DivergedInstances.
+	ConditionReasonAllReplicasHealthy ConditionReason = "AllReplicasHealthy"
+
+	// ConditionReasonReplicasDiverged is the reason set on
+	// ConditionReplicasHealthy=False when at least one instance is reported
+	// in ClusterStatus.DivergedInstances.
+	ConditionReasonReplicasDiverged ConditionReason = "ReplicasDiverged"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster

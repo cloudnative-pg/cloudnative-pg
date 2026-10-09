@@ -25,6 +25,7 @@ import (
 	"net/http"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -104,6 +105,9 @@ func (e *executor) IsHealthy(
 	}
 
 	probeRunner := getProbeRunnerFromCluster(e.probeType, cluster)
+	if e.probeType == probeTypeReadiness {
+		probeRunner = notDivergedChecker{inner: probeRunner}
+	}
 	if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
 		contextLogger.Warning(fmt.Sprintf("%s probe failing", e.probeType), "err", err.Error())
 		http.Error(
@@ -146,6 +150,43 @@ func getProbeRunnerFromCluster(probeType probeType, cluster apiv1.Cluster) runne
 	}
 
 	return newPgIsReadyChecker(probeType)
+}
+
+// notDivergedChecker fails the readiness of a standby that can never follow
+// the primary's timeline (see postgres.DetectTimelineDivergence): it holds
+// writes the primary discarded and receives no new ones, so it must not
+// serve reads.
+type notDivergedChecker struct {
+	inner runner
+}
+
+func (c notDivergedChecker) IsHealthy(ctx context.Context, instance *postgres.Instance) error {
+	if err := c.inner.IsHealthy(ctx, instance); err != nil {
+		return err
+	}
+
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while getting superuser connection pool: %w", err)
+	}
+
+	var replayLSN types.LSN
+	if err := superUserDB.QueryRowContext(ctx,
+		"SELECT COALESCE(pg_catalog.pg_last_wal_replay_lsn()::varchar, '')").Scan(&replayLSN); err != nil {
+		return fmt.Errorf("while reading the replay position: %w", err)
+	}
+
+	divergence, err := instance.DetectTimelineDivergence(replayLSN)
+	if err != nil {
+		return fmt.Errorf("while checking for a timeline divergence: %w", err)
+	}
+	if divergence != nil {
+		return fmt.Errorf("replayed up to %s on timeline %d, past the point (%s) where the primary's timeline %d "+
+			"forked away from it", divergence.ReplayLSN, divergence.TimeLineID, divergence.ForkLSN,
+			divergence.PrimaryTimeLineID)
+	}
+
+	return nil
 }
 
 // newPgIsReadyChecker creates the pg_isready strategy runner for the passed

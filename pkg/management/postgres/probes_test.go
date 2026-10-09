@@ -21,6 +21,8 @@ package postgres
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -33,6 +35,51 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("DetectTimelineDivergence", func() {
+	var instance *Instance
+
+	BeforeEach(func() {
+		instance = NewInstance()
+		instance.PgData = GinkgoT().TempDir()
+		Expect(os.Mkdir(filepath.Join(instance.PgData, pgWalDirectory), 0o700)).To(Succeed())
+	})
+
+	writeWalFile := func(name, content string) {
+		Expect(os.WriteFile(filepath.Join(instance.PgData, pgWalDirectory, name), []byte(content), 0o600)).
+			To(Succeed())
+	}
+
+	It("detects a standby left behind on its own timeline", func() {
+		writeWalFile("000000010000000000000003", "")
+		writeWalFile("000000010000000000000004", "")
+		writeWalFile("00000002.history", "1\t0/4000000\tno recovery target specified\n")
+
+		divergence, err := instance.DetectTimelineDivergence("0/46210C8")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(divergence).ToNot(BeNil())
+		Expect(divergence.ForkLSN).To(BeEquivalentTo("0/4000000"))
+	})
+
+	It("does not read any history when the standby follows the newest timeline", func() {
+		writeWalFile("000000010000000000000004", "")
+		writeWalFile("000000020000000000000004", "")
+		// unreadable on purpose: reading it would fail the probe
+		Expect(os.Mkdir(filepath.Join(instance.PgData, pgWalDirectory, "00000002.history"), 0o700)).
+			To(Succeed())
+
+		divergence, err := instance.DetectTimelineDivergence("0/46210C8")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(divergence).To(BeNil())
+	})
+
+	It("fails when pg_wal cannot be listed", func() {
+		Expect(os.RemoveAll(filepath.Join(instance.PgData, pgWalDirectory))).To(Succeed())
+
+		_, err := instance.DetectTimelineDivergence("0/46210C8")
+		Expect(err).To(HaveOccurred())
+	})
+})
 
 var _ = Describe("areAllParamsUpdated", func() {
 	It("should return true when all params match", func() {

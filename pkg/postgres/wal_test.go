@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package postgres
 
 import (
+	"github.com/cloudnative-pg/machinery/pkg/types"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -385,4 +387,46 @@ var _ = Describe("Timeline history filename parsing", func() {
 			}
 		}
 	})
+})
+
+var _ = Describe("Timeline divergence detection", func() {
+	// the history of timeline 4, which descends from 1 through 3: timeline 2
+	// is a sibling branch, not an ancestor
+	const history = "# comment\n\n1\t0/4000000\tno recovery target specified\n" +
+		"3 0/9000000 no recovery target specified\n"
+
+	It("takes the newest timeline of the segments and of the history files in pg_wal", func() {
+		// the pg_wal of a standby left behind on timeline 1, as observed on PostgreSQL 16
+		segmentTLI, historyTLI := LatestTimelines([]string{
+			"000000010000000000000004",
+			"00000002.history",
+			"000000030000000000000005.partial",
+			"000000010000000000000002.00000028.backup",
+			"archive_status",
+		})
+		Expect(segmentTLI).To(Equal(1))
+		Expect(historyTLI).To(Equal(2))
+	})
+
+	It("reports a standby that replayed past the fork point", func() {
+		// the diverged standby observed on PostgreSQL 16
+		Expect(DetectTimelineDivergence(1, 2, "1\t0/4000000\tno recovery target specified\n", "0/46210C8")).
+			To(Equal(&TimelineDivergence{
+				TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/4000000", ReplayLSN: "0/46210C8",
+			}))
+	})
+
+	DescribeTable("reports a standby",
+		func(segmentTLI int, replayLSN string, diverged bool) {
+			Expect(DetectTimelineDivergence(segmentTLI, 4, history, types.LSN(replayLSN)) != nil).
+				To(Equal(diverged))
+		},
+		Entry("past its timeline's fork point", 3, "0/9500000", true),
+		Entry("on a sibling branch", 2, "0/1000000", true),
+		Entry("not at the fork point", 1, "0/4000000", false),
+		Entry("not behind the fork point", 3, "0/8000000", false),
+		Entry("not on the newest timeline", 4, "0/9500000", false),
+		Entry("not without a replay position", 1, "", false),
+		Entry("not without a known timeline", 0, "0/9500000", false),
+	)
 })
