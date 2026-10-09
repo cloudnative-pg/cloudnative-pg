@@ -153,20 +153,13 @@ Set these under *Settings, Secrets and variables, Actions* of your fork.
 Variables:
 
 - `GKE_ENABLED`: set it to `true` to enable the `gke` job.
+- `GCP_PROJECT_ID`: the ID of the Google Cloud project.
 - `GCP_REGION` and `GKE_MACHINE_TYPE`: optional, they default to
   `europe-west4` and `e2-standard-4`.
 - `GCP_WORKLOAD_IDENTITY_PROVIDER`: the full name of the Workload Identity
   Provider,
   `projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`.
 - `GCP_SERVICE_ACCOUNT`: the email of the service account to impersonate.
-
-Secrets:
-
-- `GCP_PROJECT_ID`: the ID of the Google Cloud project.
-- `GCP_SERVICE_ACCOUNT`: the JSON key of a service account. It is only used
-  when `GCP_WORKLOAD_IDENTITY_PROVIDER` is not set. It has the same name as
-  the variable above but holds something else. Never put the key in the
-  variable, variables are not encrypted.
 
 For the `openshift` job on Google Cloud also set:
 
@@ -185,7 +178,7 @@ For example:
 
 ```bash
 gh variable set GKE_ENABLED --body true -R $GITHUB_REPO
-gh secret set GCP_PROJECT_ID --body $PROJECT_ID -R $GITHUB_REPO
+gh variable set GCP_PROJECT_ID --body $PROJECT_ID -R $GITHUB_REPO
 gh variable set GCP_SERVICE_ACCOUNT --body $SA_EMAIL -R $GITHUB_REPO
 gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER -R $GITHUB_REPO \
   --body "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
