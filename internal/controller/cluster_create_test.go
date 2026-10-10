@@ -804,7 +804,41 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 	})
 
-	It("should NOT remove the PodMonitor if it is not owned by a cluster", func() {
+	It("should remove the PodMonitor if it is disabled and is owned by a pooler", func() {
+		pooler := apiv1.Pooler{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       apiv1.PoolerKind,
+				APIVersion: apiSGVString,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pooler",
+				Namespace: "default",
+				UID:       "pooler-uid",
+			},
+		}
+		utils.SetAsOwnedBy(&manager.podMonitor.ObjectMeta, pooler.ObjectMeta, pooler.TypeMeta)
+
+		err := fakeCli.Create(ctx, manager.podMonitor)
+		Expect(err).ToNot(HaveOccurred())
+
+		manager.isEnabled = false
+		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
+		Expect(err).ToNot(HaveOccurred())
+
+		podMonitor := &monitoringv1.PodMonitor{}
+		err = fakeCli.Get(
+			ctx,
+			types.NamespacedName{
+				Name:      manager.podMonitor.Name,
+				Namespace: manager.podMonitor.Namespace,
+			},
+			podMonitor,
+		)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("should NOT remove the PodMonitor if it is not owned by a cluster or pooler", func() {
 		unownedPodMonitor := &monitoringv1.PodMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
