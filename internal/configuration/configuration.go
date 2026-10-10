@@ -35,6 +35,10 @@ import (
 var configurationLog = log.WithName("configuration")
 
 const (
+	// DefaultOperatorDeploymentLabelSelector is the default value
+	// for the label selector used to get the operators deployment
+	DefaultOperatorDeploymentLabelSelector = "app.kubernetes.io/name=cloudnative-pg"
+
 	// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
 	DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
 
@@ -98,6 +102,10 @@ type Data struct {
 	// is configurable via environment variables in the OpenShift console.
 	// Multiple namespaces can be specified separated by comma
 	WatchNamespace string `json:"watchNamespace" env:"WATCH_NAMESPACE"`
+
+	// The labelSelector to be used to get the operators deployment,
+	// e.g. "app.kubernetes.io/name=cloudnative-pg"
+	OperatorDeploymentLabelSelector string `json:"deploymentLabelSelector" env:"DEPLOYMENT_LABEL_SELECTOR"`
 
 	// OperatorNamespace is the namespace where the operator is installed
 	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
@@ -200,18 +208,19 @@ var Current = NewConfiguration()
 // newDefaultConfig creates a configuration holding the defaults
 func newDefaultConfig() *Data {
 	return &Data{
-		OperatorPullSecretName:      DefaultOperatorPullSecretName,
-		OperatorImageName:           versions.DefaultOperatorImageName,
-		PostgresImageName:           versions.DefaultImageName,
-		PgbouncerImageName:          versions.DefaultPgbouncerImage,
-		PluginSocketDir:             DefaultPluginSocketDir,
-		CreateAnyService:            false,
-		CertificateDuration:         CertificateDuration,
-		ExpiringCheckThreshold:      ExpiringCheckThreshold,
-		StandbyTCPUserTimeout:       nil,
-		KubernetesClusterDomain:     DefaultKubernetesClusterDomain,
-		DrainTaints:                 DefaultDrainTaints,
-		ManageWebhookConfigurations: true,
+		OperatorDeploymentLabelSelector: DefaultOperatorDeploymentLabelSelector,
+		OperatorPullSecretName:          DefaultOperatorPullSecretName,
+		OperatorImageName:               versions.DefaultOperatorImageName,
+		PostgresImageName:               versions.DefaultImageName,
+		PgbouncerImageName:              versions.DefaultPgbouncerImage,
+		PluginSocketDir:                 DefaultPluginSocketDir,
+		CreateAnyService:                false,
+		CertificateDuration:             CertificateDuration,
+		ExpiringCheckThreshold:          ExpiringCheckThreshold,
+		StandbyTCPUserTimeout:           nil,
+		KubernetesClusterDomain:         DefaultKubernetesClusterDomain,
+		DrainTaints:                     DefaultDrainTaints,
+		ManageWebhookConfigurations:     true,
 	}
 }
 
@@ -313,7 +322,8 @@ func evaluateGlobPatterns(patterns []string, value string) (result bool) {
 		if result, err = path.Match(pattern, value); err != nil {
 			configurationLog.Info(
 				"Skipping invalid glob pattern during labels/annotations inheritance",
-				"pattern", pattern)
+				"pattern", pattern,
+			)
 			continue
 		}
 

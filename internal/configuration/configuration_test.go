@@ -172,6 +172,18 @@ var _ = Describe("Annotation and label inheritance", func() {
 	})
 })
 
+var _ = Describe("Operator Deployment Label Selector", func() {
+	It("should have the correct default value", func() {
+		config := newDefaultConfig()
+		Expect(config.OperatorDeploymentLabelSelector).To(Equal(DefaultOperatorDeploymentLabelSelector))
+	})
+
+	It("should allow overriding the field", func() {
+		config := Data{OperatorDeploymentLabelSelector: "custom"}
+		Expect(config.OperatorDeploymentLabelSelector).To(Equal("custom"))
+	})
+})
+
 var _ = Describe("Webhook configuration names", func() {
 	It("uses default names when suffix is disabled", func() {
 		config := &Data{}
@@ -185,9 +197,11 @@ var _ = Describe("Webhook configuration names", func() {
 			OperatorNamespace:            "cnpg-team-a",
 		}
 		Expect(config.GetMutatingWebhookConfigurationName()).To(
-			Equal(DefaultMutatingWebhookConfigurationName + "-cnpg-team-a"))
+			Equal(DefaultMutatingWebhookConfigurationName + "-cnpg-team-a"),
+		)
 		Expect(config.GetValidatingWebhookConfigurationName()).To(
-			Equal(DefaultValidatingWebhookConfigurationName + "-cnpg-team-a"))
+			Equal(DefaultValidatingWebhookConfigurationName + "-cnpg-team-a"),
+		)
 	})
 
 	It("getter falls back to default names when suffix is enabled but OperatorNamespace is empty", func() {
