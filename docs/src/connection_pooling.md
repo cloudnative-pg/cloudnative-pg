@@ -944,15 +944,97 @@ service defined in the `Pooler` resource.
     [`PAUSE` in the PgBouncer documentation](https://www.pgbouncer.org/usage.html#pause-db).
 :::
 
-:::info[Important]
-    In future versions, the switchover operation will be fully integrated
-    with the PgBouncer pooler and take advantage of the `PAUSE`/`RESUME`
-    features to reduce the perceived downtime by client applications.
-    Currently, you can achieve the same results by setting the `paused`
-    attribute to `true`, issuing the switchover command through the
-    [`cnpg` plugin](kubectl-plugin.md#promote), and then restoring the `paused`
-    attribute to `false`.
-:::
+### Automatic pause during switchover/failover
+
+CloudNativePG can automatically pause and resume a pooler during
+switchover or failover operations on the referenced cluster. This reduces
+client connection errors during primary transitions by holding new connections
+at the PgBouncer layer until the new primary is ready.
+
+To enable this feature, set `pauseDuringSwitchover` to `true` in the
+`pgbouncer` section of the `Pooler` spec:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+  pgbouncer:
+    poolMode: session
+    pauseDuringSwitchover: true
+    pauseDuringSwitchoverTimeout: "120s"
+```
+
+The following options are available:
+
+- **`pauseDuringSwitchover`** (boolean, default: `false`): When `true`, the
+  operator automatically pauses the pooler when a switchover or failover is
+  detected on the referenced cluster, and resumes it once the operation
+  completes.
+
+- **`pauseDuringSwitchoverTimeout`** (duration, default: `120s`): Maximum time
+  to keep the pooler paused. If the switchover doesn't complete within this
+  time, the pooler is automatically resumed to prevent indefinite service
+  disruption. A warning event is emitted when a timeout occurs.
+
+#### How it works
+
+1. The pooler controller watches the referenced cluster for changes in
+   `currentPrimary` and `targetPrimary` status fields.
+2. When a switchover or failover is detected (`currentPrimary != targetPrimary`),
+   the pooler is paused by setting `status.pausedForSwitchover` and adding the
+   `cnpg.io/pausedDuringSwitchover` annotation. The operator never writes to the
+   pooler `spec`, so a GitOps controller has nothing to revert. The pooler
+   instance manager reads that status and issues the PgBouncer `PAUSE` command.
+3. When the operation completes (`currentPrimary == targetPrimary`), the status
+   flag and the annotation are cleared and the instance manager issues `RESUME`.
+4. Each reconcile checks if the pause duration exceeds the configured timeout,
+   and force-resumes if needed.
+
+#### Events
+
+The following Kubernetes events are emitted on the `Pooler` resource:
+
+| Event | Type | Description |
+| --- | --- | --- |
+| `PoolerPaused` | Normal | Pooler paused for switchover/failover |
+| `PoolerResumed` | Normal | Pooler resumed after switchover/failover completed |
+| `PoolerPauseTimeout` | Warning | Force resumed pooler after timeout |
+
+#### Behavior details
+
+- **Opt-in**: The feature is disabled by default. No behavior change occurs
+  without explicit configuration.
+- **Automated integration only**: Only poolers using the built-in authentication
+  integration are eligible. Poolers with a custom `authQuery`, `authQuerySecret`,
+  or `serverTLSSecret` are skipped.
+- **No spec mutation (GitOps-friendly)**: The automatic pause is driven entirely
+  by operator-owned fields (`status.pausedForSwitchover` and the annotation). The
+  user-owned `spec.pgbouncer.paused` is never changed, so tools like Argo CD or
+  Flux do not see drift and do not fight the operator during a switchover.
+- **Respects manual pause**: If a pooler is already manually paused (via
+  `spec.pgbouncer.paused`, without the `cnpg.io/pausedDuringSwitchover`
+  annotation), it is not modified by the automatic pause/resume logic.
+- **Per-pooler state**: Each pooler independently tracks its own pause state
+  via `status.pausedForSwitchover` and `status.pausedForSwitchoverTimestamp`.
+- **Safe resume**: Only poolers that were automatically paused (identified by
+  the annotation) are resumed. This preserves the intent of any manual pause.
+
+#### Limitations
+
+- Pause happens after the switchover/failover is detected, not before the
+  primary change is initiated.
+- In-flight queries on existing connections may still fail when the backend
+  connection is severed.
+- Some transient connection errors during the switchover window are expected.
+- The pooler controller relies on a watch predicate that fires on cluster
+  status changes. If the event is missed, the pooler catches up on its next
+  regular reconcile.
 
 ## Limitations
 
