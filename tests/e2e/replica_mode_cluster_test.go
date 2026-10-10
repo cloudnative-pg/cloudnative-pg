@@ -739,8 +739,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 						case <-stopLoad:
 							GinkgoWriter.Println("Terminating load")
 							return
-						default:
-							continue
+						case <-time.After(switchoverLoadInterval):
 						}
 					}
 				}()
@@ -873,6 +872,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 					pgasserts.AssertPgRecoveryMode(env, &pod, true)
 				}
 			})
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterBName, testTimeouts[timeouts.ClusterIsReady])
 
 			By("verifying replication from new primary works everywhere", func() {
 				validateReplication(namespace, clusterAName, clusterBName)
