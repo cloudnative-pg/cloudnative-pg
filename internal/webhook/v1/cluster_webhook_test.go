@@ -2678,6 +2678,8 @@ var _ = Describe("pg_basebackup additionalArgs validation", func() {
 		Entry("long option with a value", "--pgdata=/tmp/pgdata", "--pgdata"),
 		Entry("long option without a value", "--help", "--help"),
 		Entry("short option grouped with allowed ones", "-nNPR", "-R"),
+		Entry("creation of a permanent slot", "--create-slot", "--create-slot"),
+		Entry("creation of a permanent slot, grouped short option", "-vC", "-C"),
 	)
 
 	// getopt_long accepts any unambiguous abbreviation of a long option

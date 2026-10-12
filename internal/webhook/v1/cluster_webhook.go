@@ -655,9 +655,10 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cl
 const (
 	// pgBaseBackupForbiddenShortOptions lists the short options of pg_basebackup
 	// that cannot be used in `additionalArgs`: target and format (-D, -F, -R, -X,
-	// -t, -T), connection (-d, -h, -p, -U, -w, -W) and the options that
+	// -t, -T), connection (-d, -h, -p, -U, -w, -W), the creation of a permanent
+	// replication slot that nothing would consume (-C) and the options that
 	// terminate the execution (-V, -?)
-	pgBaseBackupForbiddenShortOptions = "DFRXtTdhpUwWV?"
+	pgBaseBackupForbiddenShortOptions = "DFRXtTdhpUwWCV?"
 
 	// pgBaseBackupShortOptionsWithValue lists the short options of pg_basebackup
 	// that consume a value. Whatever follows one of them, in the same argument,
@@ -675,6 +676,7 @@ var pgBaseBackupForbiddenLongOptions = []string{
 	"waldir",
 	"target",
 	"tablespace-mapping",
+	"create-slot",
 	"dbname",
 	"host",
 	"port",

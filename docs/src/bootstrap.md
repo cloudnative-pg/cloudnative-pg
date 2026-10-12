@@ -795,8 +795,10 @@ format (`-D`/`--pgdata`, `-F`/`--format`, `-R`/`--write-recovery-conf`,
 `-X`/`--wal-method`, `--waldir`, `-t`/`--target`), the connection parameters
 (`-d`/`--dbname`, `-h`/`--host`, `-p`/`--port`, `-U`/`--username`,
 `-w`/`--no-password`, `-W`/`--password`, taken from `externalClusters`), the
-tablespace relocation (`-T`/`--tablespace-mapping`), and `--help` and
-`--version`. Abbreviated long options that match one of them are rejected too.
+tablespace relocation (`-T`/`--tablespace-mapping`), the creation of a
+permanent replication slot on the source (`-C`/`--create-slot`), which the new
+cluster would never use, and `--help` and `--version`. Abbreviated long options
+that match one of them are rejected too.
 
 All the other options are passed as they are, and some of them may still
 interfere with the operator. You are responsible for the arguments and for
