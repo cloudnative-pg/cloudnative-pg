@@ -34,6 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -59,6 +60,11 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		result.IsPrimary, err = instance.IsPrimary()
 		if err != nil {
 			return
+		}
+		// The system identifier is stored in pg_control, which can be read
+		// while PostgreSQL is down, so it is still reported to the operator.
+		if pgControlData, controlDataErr := instance.GetPgControldata(); controlDataErr == nil {
+			result.SystemID = utils.ParsePgControldataOutput(pgControlData).GetDatabaseSystemIdentifier()
 		}
 	}()
 
