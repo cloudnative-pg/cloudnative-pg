@@ -218,7 +218,10 @@ const (
 
 	// BootstrapPendingAnnotationName is the name of the annotation the operator
 	// sets to "true" on an instance Pod created with the bootstrap init
-	// container, and removes once that container has terminated successfully
+	// container, and removes once that container has terminated successfully.
+	//
+	// A pending marker is used instead of a completion one so that a missing
+	// annotation, the normal and safe default, means the bootstrap is done.
 	BootstrapPendingAnnotationName = MetadataNamespace + "/bootstrapPending"
 
 	// LegacyBackupAnnotationName is the name of the annotation represents whether taking a backup without passing

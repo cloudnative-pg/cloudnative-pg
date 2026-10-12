@@ -34,13 +34,20 @@ import (
 )
 
 var _ = DescribeTable("IsBootstrapCompleted",
-	func(ctx SpecContext, value string, expected bool) {
+	func(value string, expected bool, expectError bool) {
 		GinkgoT().Setenv(specs.BootstrapPendingEnvName, value)
-		Expect(IsBootstrapCompleted(ctx)).To(Equal(expected))
+		completed, err := IsBootstrapCompleted()
+		if expectError {
+			Expect(err).To(HaveOccurred())
+			return
+		}
+		Expect(err).NotTo(HaveOccurred())
+		Expect(completed).To(Equal(expected))
 	},
-	Entry("pending, as the operator creates the Pod", "true", false),
-	Entry("no longer pending", "", true),
-	Entry("any other value", "false", true),
+	Entry("pending, as the operator creates the Pod", "true", false, false),
+	Entry("no longer pending", "", true, false),
+	Entry("explicitly not pending", "false", true, false),
+	Entry("invalid value should return an error", "not-a-bool", false, true),
 )
 
 var _ = Describe("EnsureTargetDirectoriesDoNotExist", func() {

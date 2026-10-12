@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
@@ -135,13 +136,21 @@ type InitInfo struct {
 // recreated as it was, as a backup tool does when it restores the Pod together
 // with its PVCs: the volumes then already hold the instance and must be left
 // untouched.
-func IsBootstrapCompleted(ctx context.Context) bool {
-	if os.Getenv(specs.BootstrapPendingEnvName) == "true" {
-		return false
+//
+// It returns an error when the pending marker holds an unexpected value,
+// as we cannot safely decide whether bootstrapping is needed.
+func IsBootstrapCompleted() (bool, error) {
+	rawValue := os.Getenv(specs.BootstrapPendingEnvName)
+	if rawValue == "" {
+		return true, nil
 	}
 
-	log.FromContext(ctx).Info("The bootstrap already succeeded in this Pod, leaving the volumes untouched")
-	return true
+	pending, err := strconv.ParseBool(rawValue)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s value %q: %w", specs.BootstrapPendingEnvName, rawValue, err)
+	}
+
+	return !pending, nil
 }
 
 // EnsureTargetDirectoriesDoNotExist ensures that the target data and WAL directories do not exist.
