@@ -57,15 +57,26 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "pgbasebackup",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
-				Name:      clusterName,
-				Namespace: namespace,
-			})
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			contextLogger := log.FromContext(ctx)
+
+			completed, err := postgres.IsBootstrapCompleted()
+			if err != nil {
+				contextLogger.Error(err, "Error while checking bootstrap status")
+				return err
+			}
+			if completed {
+				contextLogger.Info("The bootstrap already succeeded in this Pod, leaving the volumes untouched")
+				return nil
+			}
+
+			if err := management.WaitForGetCluster(ctx, ctrl.ObjectKey{
+				Name:      clusterName,
+				Namespace: namespace,
+			}); err != nil {
+				return err
+			}
 
 			client, err := management.NewControllerRuntimeClient()
 			if err != nil {
