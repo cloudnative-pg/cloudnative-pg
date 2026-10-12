@@ -687,30 +687,28 @@ var pgBaseBackupForbiddenLongOptions = []string{
 
 // forbiddenPgBaseBackupOption checks whether a single entry of `additionalArgs`
 // is, or could be parsed by pg_basebackup as, an option that the operator
-// doesn't allow. It returns the offending option and the reason.
+// doesn't allow. It returns why the entry is rejected, or an empty string.
 //
 // The entries that don't start with a dash are considered values of the
 // previous option and are not inspected.
-func forbiddenPgBaseBackupOption(arg string) (option string, reason string, found bool) {
+func forbiddenPgBaseBackupOption(arg string) string {
 	switch {
 	case arg == "--":
-		return "", "", false
+		return ""
 
 	case strings.HasPrefix(arg, "--"):
 		// getopt_long accepts any unambiguous abbreviation of a long option
 		name, _, _ := strings.Cut(strings.TrimPrefix(arg, "--"), "=")
 		if name == "" {
-			return "", "", false
+			return ""
 		}
 		for _, forbidden := range pgBaseBackupForbiddenLongOptions {
 			if name == forbidden {
-				return "--" + forbidden, "is managed by the operator", true
+				return fmt.Sprintf("the pg_basebackup option --%s is managed by the operator", forbidden)
 			}
 			if strings.HasPrefix(forbidden, name) {
-				return "--" + name,
-					fmt.Sprintf("is an abbreviation of --%s, which is managed by the operator; "+
-						"use the full name of the options", forbidden),
-					true
+				return fmt.Sprintf("the pg_basebackup option --%s is an abbreviation of --%s, "+
+					"which is managed by the operator; use the full name of the option", name, forbidden)
 			}
 		}
 
@@ -719,7 +717,7 @@ func forbiddenPgBaseBackupOption(arg string) (option string, reason string, foun
 		// of the last one can be attached to it (e.g. `-r50M`)
 		for _, c := range arg[1:] {
 			if strings.ContainsRune(pgBaseBackupForbiddenShortOptions, c) {
-				return "-" + string(c), "is managed by the operator", true
+				return fmt.Sprintf("the pg_basebackup option -%c is managed by the operator", c)
 			}
 			if strings.ContainsRune(pgBaseBackupShortOptionsWithValue, c) {
 				break
@@ -727,7 +725,7 @@ func forbiddenPgBaseBackupOption(arg string) (option string, reason string, foun
 		}
 	}
 
-	return "", "", false
+	return ""
 }
 
 // validateBootstrapPgBaseBackupAdditionalArgs rejects the pg_basebackup
@@ -741,10 +739,8 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupAdditionalArgs(r *
 
 	argsPath := field.NewPath("spec", "bootstrap", "pg_basebackup", "additionalArgs")
 	for idx, arg := range r.Spec.Bootstrap.PgBaseBackup.AdditionalArgs {
-		if option, reason, found := forbiddenPgBaseBackupOption(arg); found {
-			result = append(result, field.Forbidden(
-				argsPath.Index(idx),
-				fmt.Sprintf("the pg_basebackup option %s %s", option, reason)))
+		if detail := forbiddenPgBaseBackupOption(arg); detail != "" {
+			result = append(result, field.Forbidden(argsPath.Index(idx), detail))
 		}
 	}
 
