@@ -55,11 +55,17 @@ func NewCmd() *cobra.Command {
 		Use:           "restore [flags]",
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if postgres.IsBootstrapCompleted(cmd.Context()) {
+			contextLogger := log.FromContext(cmd.Context())
+
+			completed, err := postgres.IsBootstrapCompleted()
+			if err != nil {
+				contextLogger.Error(err, "Error while checking bootstrap status")
+				return err
+			}
+			if completed {
+				contextLogger.Info("The bootstrap already succeeded in this Pod, leaving the volumes untouched")
 				return nil
 			}
-
-			contextLogger := log.FromContext(cmd.Context())
 
 			// Canceling this context
 			ctx, cancel := context.WithCancel(cmd.Context())

@@ -660,7 +660,7 @@ func AddBootstrapInitContainer(pod *corev1.Pod, cluster apiv1.Cluster, bootstrap
 	// as it was, e.g. by a backup tool restoring it together with its PVCs.
 	// The operator removes this annotation once the bootstrap succeeded, so
 	// the container finds it only while the bootstrap still has to run.
-	pod.Annotations[utils.BootstrapPendingAnnotationName] = "true"
+	pod.Annotations[utils.BootstrapPendingAnnotationName] = strconv.FormatBool(true)
 	initContainer.Container.Env = append(initContainer.Container.Env, corev1.EnvVar{
 		Name: BootstrapPendingEnvName,
 		ValueFrom: &corev1.EnvVarSource{
