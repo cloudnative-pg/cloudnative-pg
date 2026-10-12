@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -313,6 +314,11 @@ var _ = Describe("backup_controller starting a backup", func() {
 			Expect(res.RequeueAfter).To(Equal(time.Second))
 			Expect(store.Get(ctx, key, &stored)).To(Succeed())
 			Expect(string(stored.Status.Phase)).To(Equal(apiv1.BackupPhaseStarted))
+
+			// The stale reconciliation stops before taking the snapshot
+			var cluster apiv1.Cluster
+			Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: clusterName}, &cluster)).To(Succeed())
+			Expect(meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionBackup))).To(BeNil())
 		})
 
 		It("does not move the backup back to pending when a stale reconciliation does not find the target",
@@ -334,6 +340,44 @@ var _ = Describe("backup_controller starting a backup", func() {
 				}
 			})
 	})
+
+	DescribeTable("does not restart the backup when a stale reconciliation sees it on an old instance",
+		func(ctx context.Context, oldPod, oldContainer string) {
+			var stored apiv1.Backup
+			Expect(store.Get(ctx, key, &stored)).To(Succeed())
+			stored.Status.SetAsStarted(oldPod, oldContainer, "session", apiv1.BackupMethodBarmanObjectStore)
+			Expect(store.Status().Update(ctx, &stored)).To(Succeed())
+			lagging.freeze(ctx, key)
+
+			// Another reconciliation already restarted it on the current container
+			Expect(store.Get(ctx, key, &stored)).To(Succeed())
+			stored.Status.SetAsStarted(podName, "", "session", apiv1.BackupMethodBarmanObjectStore)
+			Expect(store.Status().Update(ctx, &stored)).To(Succeed())
+			res := reconcileOnce(ctx)
+
+			Expect(res.RequeueAfter).To(Equal(time.Second))
+			Expect(starts).To(BeEmpty())
+			Expect(recorder.Events).To(BeEmpty())
+		},
+		Entry("restarted container", podName, "containerd://old"),
+		Entry("missing pod", "cluster-example-2", ""),
+	)
+
+	DescribeTable("restarts the backup when it runs on an old instance",
+		func(ctx context.Context, oldPod, oldContainer string) {
+			var stored apiv1.Backup
+			Expect(store.Get(ctx, key, &stored)).To(Succeed())
+			stored.Status.SetAsStarted(oldPod, oldContainer, "session", apiv1.BackupMethodBarmanObjectStore)
+			Expect(store.Status().Update(ctx, &stored)).To(Succeed())
+			reconcileOnce(ctx)
+
+			Expect(starts).To(HaveLen(1))
+			Expect(recorder.Events).To(Receive(HavePrefix("Normal ReStarting ")))
+			Expect(recorder.Events).To(Receive(HavePrefix("Normal Starting ")))
+		},
+		Entry("restarted container", podName, "containerd://old"),
+		Entry("missing pod", "cluster-example-2", ""),
+	)
 
 	It("retries instead of failing the backup when the start patch fails", func(ctx context.Context) {
 		failOnce := true

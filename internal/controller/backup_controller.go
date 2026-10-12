@@ -521,14 +521,8 @@ func (r *BackupReconciler) isValidBackupRunning(
 
 	if apierrs.IsNotFound(err) {
 		// We need to restart the backup as the previously selected instance doesn't look healthy
-		r.Recorder.Eventf(
-			backup,
-			"Normal",
-			"ReStarting",
-			"Could not find the elected backup pod. Restarting backup for cluster %v on instance %v",
-			cluster.Name,
-			backup.Status.InstanceID.PodName,
-		)
+		contextLogger.Info("restarting backup, the elected pod was not found",
+			"pod", backup.Status.InstanceID.PodName)
 		return false, nil
 	}
 
@@ -602,8 +596,6 @@ func (r *BackupReconciler) isValidBackupRunning(
 		"isPodActive", isPodActive,
 		"target", backup.Spec.Target,
 	)
-	r.Recorder.Eventf(backup, "Normal", "ReStarting",
-		"Restarted backup for cluster %v on instance %v", cluster.Name, pod.Name)
 
 	return false, nil
 }
@@ -1041,6 +1033,11 @@ func (r *BackupReconciler) startInstanceManagerBackup(
 		"cluster", cluster.Name,
 		"pod", pod.Name)
 
+	if origBackup.Status.InstanceID != nil {
+		r.Recorder.Eventf(backup, "Normal", "ReStarting",
+			"Restarting backup for cluster %v, previously on instance %v",
+			cluster.Name, origBackup.Status.InstanceID.PodName)
+	}
 	r.Recorder.Eventf(backup, "Normal", "Starting",
 		"Starting backup for cluster %v", cluster.Name)
 
