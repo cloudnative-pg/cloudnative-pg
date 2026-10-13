@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"iter"
 	"math"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -910,7 +911,8 @@ type AdditionalExtensionConfiguration struct {
 	DynamicLibraryPath []string
 }
 
-// absolutizePaths returns an iterator over paths joined to the extension's MountPath.
+// absolutizePaths returns an iterator over paths joined to the extension's MountPath,
+// skipping the ones that are not existing directories.
 func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for _, path := range paths {
@@ -923,7 +925,14 @@ func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) ite
 				continue
 			}
 
-			if !yield(filepath.Join(ext.MountPath, path)) {
+			// Images don't always ship every directory (e.g. a module
+			// with only `lib`): skip the ones missing in the mounted volume
+			absPath := filepath.Join(ext.MountPath, path)
+			if info, err := os.Stat(absPath); err != nil || !info.IsDir() {
+				continue
+			}
+
+			if !yield(absPath) {
 				break
 			}
 		}

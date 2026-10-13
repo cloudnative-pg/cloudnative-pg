@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package postgres
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -490,14 +492,19 @@ var _ = Describe("recovery_min_apply_delay", func() {
 
 var _ = Describe("PostgreSQL Extensions", func() {
 	Context("configuring extension_control_path and dynamic_library_path", func() {
-		const (
-			share1 = ExtensionsBaseDirectory + "/postgis/share"
-			share2 = ExtensionsBaseDirectory + "/pgvector/share"
-			lib1   = ExtensionsBaseDirectory + "/postgis/lib"
-			lib2   = ExtensionsBaseDirectory + "/pgvector/lib"
-		)
-		sharePaths := strings.Join([]string{share1, share2}, ":")
-		libPaths := strings.Join([]string{lib1, lib2}, ":")
+		var base string
+
+		// mkdirs creates the given directories under base, mimicking the
+		// layout of the mounted extension images
+		mkdirs := func(paths ...string) {
+			for _, path := range paths {
+				Expect(os.MkdirAll(filepath.Join(base, path), 0o750)).To(Succeed())
+			}
+		}
+
+		BeforeEach(func() {
+			base = GinkgoT().TempDir()
+		})
 
 		It("both empty when there are no Extensions defined", func() {
 			info := ConfigurationInfo{
@@ -511,21 +518,25 @@ var _ = Describe("PostgreSQL Extensions", func() {
 		})
 
 		It("configures them when an Extension is defined", func() {
+			mkdirs("postgis/share", "postgis/lib", "pgvector/share", "pgvector/lib")
 			info := ConfigurationInfo{
 				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       18,
 				IncludingMandatory: true,
 				AdditionalExtensions: []AdditionalExtensionConfiguration{
-					{MountPath: ExtensionsBaseDirectory + "/postgis"},
-					{MountPath: ExtensionsBaseDirectory + "/pgvector"},
+					{MountPath: base + "/postgis"},
+					{MountPath: base + "/pgvector"},
 				},
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config.GetConfig(ExtensionControlPath)).To(BeEquivalentTo("$system:" + sharePaths))
-			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEquivalentTo("$libdir:" + libPaths))
+			Expect(config.GetConfig(ExtensionControlPath)).
+				To(Equal("$system:" + base + "/postgis/share:" + base + "/pgvector/share"))
+			Expect(config.GetConfig(DynamicLibraryPath)).
+				To(Equal("$libdir:" + base + "/postgis/lib:" + base + "/pgvector/lib"))
 		})
 
 		It("correctly merges the configuration with UserSettings", func() {
+			mkdirs("postgis/share", "postgis/lib", "pgvector/share", "pgvector/lib")
 			info := ConfigurationInfo{
 				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       18,
@@ -535,28 +546,35 @@ var _ = Describe("PostgreSQL Extensions", func() {
 					DynamicLibraryPath:   "/my/library/path",
 				},
 				AdditionalExtensions: []AdditionalExtensionConfiguration{
-					{MountPath: ExtensionsBaseDirectory + "/postgis"},
-					{MountPath: ExtensionsBaseDirectory + "/pgvector"},
+					{MountPath: base + "/postgis"},
+					{MountPath: base + "/pgvector"},
 				},
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config.GetConfig(ExtensionControlPath)).To(BeEquivalentTo("$system:" + sharePaths + ":/my/extension/path"))
-			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEquivalentTo("$libdir:" + libPaths + ":/my/library/path"))
+			Expect(config.GetConfig(ExtensionControlPath)).
+				To(Equal("$system:" + base + "/postgis/share:" + base + "/pgvector/share:/my/extension/path"))
+			Expect(config.GetConfig(DynamicLibraryPath)).
+				To(Equal("$libdir:" + base + "/postgis/lib:" + base + "/pgvector/lib:/my/library/path"))
 		})
 
 		It("when custom paths are provided (multi-extension)", func() {
-			const (
-				geoShare1     = ExtensionsBaseDirectory + "/geo/postgis/share"
-				geoShare2     = ExtensionsBaseDirectory + "/geo/pgrouting/share"
-				geoLib1       = ExtensionsBaseDirectory + "/geo/postgis/lib"
-				geoLib2       = ExtensionsBaseDirectory + "/geo/pgrouting/lib"
-				utilityShare1 = ExtensionsBaseDirectory + "/utility/pgaudit/share"
-				utilityShare2 = ExtensionsBaseDirectory + "/utility/pg-failover-slots/share"
-				utilityLib1   = ExtensionsBaseDirectory + "/utility/pgaudit/lib"
-				utilityLib2   = ExtensionsBaseDirectory + "/utility/pg-failover-slots/lib"
+			mkdirs(
+				"geo/postgis/share", "geo/pgrouting/share", "geo/postgis/lib", "geo/pgrouting/lib",
+				"utility/pgaudit/share", "utility/pg-failover-slots/share",
+				"utility/pgaudit/lib", "utility/pg-failover-slots/lib",
 			)
-			sharePaths = strings.Join([]string{geoShare1, geoShare2, utilityShare1, utilityShare2}, ":")
-			libPaths = strings.Join([]string{geoLib1, geoLib2, utilityLib1, utilityLib2}, ":")
+			sharePaths := strings.Join([]string{
+				base + "/geo/postgis/share",
+				base + "/geo/pgrouting/share",
+				base + "/utility/pgaudit/share",
+				base + "/utility/pg-failover-slots/share",
+			}, ":")
+			libPaths := strings.Join([]string{
+				base + "/geo/postgis/lib",
+				base + "/geo/pgrouting/lib",
+				base + "/utility/pgaudit/lib",
+				base + "/utility/pg-failover-slots/lib",
+			}, ":")
 
 			info := ConfigurationInfo{
 				Settings:           CnpgConfigurationSettings,
@@ -564,43 +582,69 @@ var _ = Describe("PostgreSQL Extensions", func() {
 				IncludingMandatory: true,
 				AdditionalExtensions: []AdditionalExtensionConfiguration{
 					{
-						MountPath:            ExtensionsBaseDirectory + "/geo",
+						MountPath:            base + "/geo",
 						ExtensionControlPath: []string{"postgis/share", "./pgrouting/share"},
 						DynamicLibraryPath:   []string{"postgis/lib/", "/pgrouting/lib/"},
 					},
 					{
-						MountPath:            ExtensionsBaseDirectory + "/utility",
+						MountPath:            base + "/utility",
 						ExtensionControlPath: []string{"pgaudit/share", "./pg-failover-slots/share"},
 						DynamicLibraryPath:   []string{"pgaudit/lib/", "/pg-failover-slots/lib/"},
 					},
 				},
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config.GetConfig(ExtensionControlPath)).To(BeEquivalentTo("$system:" + sharePaths))
-			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEquivalentTo("$libdir:" + libPaths))
+			Expect(config.GetConfig(ExtensionControlPath)).To(Equal("$system:" + sharePaths))
+			Expect(config.GetConfig(DynamicLibraryPath)).To(Equal("$libdir:" + libPaths))
 		})
 
-		It("skips paths that escape the extension directory instead of including them", func() {
-			// The webhook already rejects these at admission time; this
-			// guards callers that read the Cluster spec directly, without
-			// going through admission.
+		It("skips the directories that are missing in the extension image", func() {
+			// keycloak-oauth-validator ships `lib` but no `share`, and
+			// `LICENSE` is a file, not a directory
+			mkdirs("pgvector/share", "pgvector/lib", "keycloak-oauth-validator/lib")
+			Expect(os.WriteFile(filepath.Join(base, "pgvector", "LICENSE"), nil, 0o600)).To(Succeed())
 			info := ConfigurationInfo{
 				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       18,
 				IncludingMandatory: true,
 				AdditionalExtensions: []AdditionalExtensionConfiguration{
 					{
-						MountPath:            ExtensionsBaseDirectory + "/postgis",
-						ExtensionControlPath: []string{"share", "../../etc"},
+						MountPath:          base + "/pgvector",
+						DynamicLibraryPath: []string{"lib", "LICENSE", "missing"},
+					},
+					{MountPath: base + "/keycloak-oauth-validator"},
+				},
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).
+				To(Equal("$system:" + base + "/pgvector/share"))
+			Expect(config.GetConfig(DynamicLibraryPath)).
+				To(Equal("$libdir:" + base + "/pgvector/lib:" + base + "/keycloak-oauth-validator/lib"))
+		})
+
+		It("skips paths that escape the extension directory instead of including them", func() {
+			// The webhook already rejects these at admission time; this
+			// guards callers that read the Cluster spec directly, without
+			// going through admission. The escaping targets exist, so only
+			// the escape check can reject them.
+			mkdirs("postgis/share", "postgis/lib", "mount/lib")
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+				AdditionalExtensions: []AdditionalExtensionConfiguration{
+					{
+						MountPath:            base + "/postgis",
+						ExtensionControlPath: []string{"share", ".."},
 						DynamicLibraryPath:   []string{"lib", "../mount/lib"},
 					},
 				},
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig(ExtensionControlPath)).
-				To(BeEquivalentTo("$system:" + ExtensionsBaseDirectory + "/postgis/share"))
+				To(Equal("$system:" + base + "/postgis/share"))
 			Expect(config.GetConfig(DynamicLibraryPath)).
-				To(BeEquivalentTo("$libdir:" + ExtensionsBaseDirectory + "/postgis/lib"))
+				To(Equal("$libdir:" + base + "/postgis/lib"))
 		})
 	})
 })

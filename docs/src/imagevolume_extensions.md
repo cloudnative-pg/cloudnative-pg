@@ -141,6 +141,10 @@ By default, CloudNativePG automatically manages the relevant GUCs by setting:
   PostgreSQL to locate any extension control file within `/extensions/<EXTENSION_NAME>/share/extension`
 - `dynamic_library_path` to `/extensions/<EXTENSION_NAME>/lib`
 
+A directory is added to these GUCs only if it exists in the extension image.
+For example, an image that ships only `lib` contributes nothing to
+`extension_control_path`. The same applies to custom paths (see below).
+
 :::note
 Extension names containing underscores (e.g., `pg_ivm`) are converted to use
 hyphens (e.g., `pg-ivm`) for Kubernetes volume names to comply with RFC 1123
