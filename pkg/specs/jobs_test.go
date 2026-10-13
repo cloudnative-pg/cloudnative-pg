@@ -22,6 +22,7 @@ package specs
 import (
 	"slices"
 
+	"github.com/kballard/go-shellquote"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -227,6 +228,28 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
+	})
+})
+
+var _ = Describe("Job created via pg_basebackup", func() {
+	It("passes the additional arguments to the pgbasebackup command", func() {
+		args := []string{"--max-rate=50M", "--label", "my 'quoted' label"}
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:         "source",
+						AdditionalArgs: args,
+					},
+				},
+			},
+		}
+		jobCommand := BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster).Command
+		Expect(jobCommand).Should(ContainElement("--pgbasebackup-additional-args"))
+		parsedArgs, err := shellquote.Split(
+			jobCommand[slices.Index(jobCommand, "--pgbasebackup-additional-args")+1])
+		Expect(err).ToNot(HaveOccurred())
+		Expect(parsedArgs).To(Equal(args))
 	})
 })
 
