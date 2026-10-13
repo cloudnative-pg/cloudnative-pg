@@ -236,6 +236,11 @@ type Instance struct {
 	// authentication middleware) while being written by the reconciliation loop,
 	// so access is synchronized through an atomic pointer.
 	cluster atomic.Pointer[apiv1.Cluster]
+
+	// systemID is the system identifier of the PGDATA, as stored in pg_control.
+	// It can't change for a given PGDATA, so it is cached once read.
+	systemID      string
+	systemIDMutex sync.Mutex
 }
 
 type serverCertificateHandler struct {
@@ -1448,6 +1453,28 @@ func (instance *Instance) GetPgControldata() (string, error) {
 	}
 
 	return string(out), nil
+}
+
+// GetSystemID returns the system identifier of the PGDATA, as stored in
+// pg_control, or an empty string if it is not known. It doesn't need PostgreSQL
+// to be running. The identifier can't change for a given PGDATA, so it is read
+// once and then cached. While it is unknown, each call tries reading it again,
+// as the data directory may have been repaired in the meantime.
+func (instance *Instance) GetSystemID() string {
+	instance.systemIDMutex.Lock()
+	defer instance.systemIDMutex.Unlock()
+
+	if instance.systemID != "" {
+		return instance.systemID
+	}
+
+	pgControlData, err := instance.GetPgControldata()
+	if err != nil {
+		return ""
+	}
+
+	instance.systemID = utils.ParsePgControldataOutput(pgControlData).GetDatabaseSystemIdentifier()
+	return instance.systemID
 }
 
 // GetInstanceCommandChan is the channel where the lifecycle manager will

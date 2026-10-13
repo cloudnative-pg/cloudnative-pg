@@ -34,7 +34,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -44,6 +43,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.GetPodName()}},
 		InstanceManagerVersion: versions.Version,
 		MightBeUnavailable:     instance.MightBeUnavailable(),
+		SystemID:               instance.GetSystemID(),
 	}
 
 	// this deferred function may override the error returned. Take extra care.
@@ -60,11 +60,6 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		result.IsPrimary, err = instance.IsPrimary()
 		if err != nil {
 			return
-		}
-		// The system identifier is stored in pg_control, which can be read
-		// while PostgreSQL is down, so it is still reported to the operator.
-		if pgControlData, controlDataErr := instance.GetPgControldata(); controlDataErr == nil {
-			result.SystemID = utils.ParsePgControldataOutput(pgControlData).GetDatabaseSystemIdentifier()
 		}
 	}()
 
@@ -93,12 +88,11 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 
 	row := superUserDB.QueryRow(
 		`SELECT
-			(pg_catalog.pg_control_system()).system_identifier,
 			-- True if this is a primary instance
 			NOT pg_catalog.pg_is_in_recovery() as primary,
 			-- True if at least one column requires a restart
 			EXISTS(SELECT 1 FROM pg_catalog.pg_settings WHERE pending_restart)`)
-	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart)
+	err = row.Scan(&result.IsPrimary, &result.PendingRestart)
 	if err != nil {
 		return result, err
 	}

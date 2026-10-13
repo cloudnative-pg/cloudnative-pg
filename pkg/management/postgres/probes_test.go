@@ -58,6 +58,46 @@ var _ = Describe("GetStatus", func() {
 	})
 })
 
+var _ = Describe("system ID", func() {
+	var binDir string
+	var instance *Instance
+
+	writeFakePgControldata := func(content string) {
+		fakePath := filepath.Join(binDir, pgControlDataName)
+		Expect(os.WriteFile(fakePath, []byte(content), 0o700)).To(Succeed()) //nolint:gosec // executable
+	}
+
+	BeforeEach(func() {
+		binDir = GinkgoT().TempDir()
+		GinkgoT().Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		instance = NewInstance()
+		instance.PgData = GinkgoT().TempDir()
+	})
+
+	It("is cached once loaded", func() {
+		writeFakePgControldata("#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+
+		// pg_controldata is not invoked again once the ID is known
+		writeFakePgControldata("#!/bin/sh\nexit 1\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+	})
+
+	It("is empty, and read again later, when pg_control can't be read", func() {
+		writeFakePgControldata("#!/bin/sh\nexit 1\n")
+		Expect(instance.GetSystemID()).To(BeEmpty())
+
+		// the data directory has been repaired
+		writeFakePgControldata("#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+	})
+
+	It("fails if the output doesn't contain the system ID", func() {
+		writeFakePgControldata("#!/bin/sh\necho 'pg_control version number:            1300'\n")
+		Expect(instance.GetSystemID()).To(BeEmpty())
+	})
+})
+
 var _ = Describe("areAllParamsUpdated", func() {
 	It("should return true when all params match", func() {
 		decreased := map[string]int{maxConnectionsParameter: 90, "max_worker_processes": 4}
