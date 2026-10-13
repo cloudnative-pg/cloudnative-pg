@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -42,6 +43,9 @@ import (
 type recordingLock struct {
 	identity string
 	failWith error
+	// delay is how long a write takes before it returns, standing for a slow
+	// response from the API server.
+	delay time.Duration
 }
 
 func (l *recordingLock) Get(context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
@@ -49,10 +53,12 @@ func (l *recordingLock) Get(context.Context) (*resourcelock.LeaderElectionRecord
 }
 
 func (l *recordingLock) Create(context.Context, resourcelock.LeaderElectionRecord) error {
+	time.Sleep(l.delay)
 	return l.failWith
 }
 
 func (l *recordingLock) Update(context.Context, resourcelock.LeaderElectionRecord) error {
+	time.Sleep(l.delay)
 	return l.failWith
 }
 
@@ -64,13 +70,13 @@ var _ = Describe("confirmingLock", func() {
 	const ourIdentity = "test-cluster-1"
 
 	var (
-		stamp   *atomic.Int64
+		stamp   *atomic.Pointer[time.Time]
 		inner   *recordingLock
 		decided *confirmingLock
 	)
 
 	BeforeEach(func() {
-		stamp = &atomic.Int64{}
+		stamp = &atomic.Pointer[time.Time]{}
 		inner = &recordingLock{identity: ourIdentity}
 		decided = &confirmingLock{Interface: inner, lastConfirmed: stamp}
 	})
@@ -82,26 +88,43 @@ var _ = Describe("confirmingLock", func() {
 
 	It("stamps a successful write that names us", func(ctx context.Context) {
 		Expect(decided.Update(ctx, ourRecord)).To(Succeed())
-		Expect(stamp.Load()).NotTo(BeZero())
+		Expect(stamp.Load()).NotTo(BeNil())
 	})
 
 	It("stamps a successful create that names us", func(ctx context.Context) {
 		Expect(decided.Create(ctx, ourRecord)).To(Succeed())
-		Expect(stamp.Load()).NotTo(BeZero())
+		Expect(stamp.Load()).NotTo(BeNil())
+	})
+
+	It("stamps the time the write started, not the time it returned", func(ctx context.Context) {
+		// The API server may commit the write at any point during the call, and
+		// a replica times the lease from when it sees the commit. A response
+		// stamped on arrival would make us think the lease is fresher than the
+		// replicas do.
+		const delay = 100 * time.Millisecond
+		inner.delay = delay
+
+		before := time.Now()
+		Expect(decided.Update(ctx, ourRecord)).To(Succeed())
+		after := time.Now()
+
+		Expect(after.Sub(before)).To(BeNumerically(">=", delay))
+		Expect(stamp.Load().Sub(before)).To(BeNumerically(">=", 0))
+		Expect(after.Sub(*stamp.Load())).To(BeNumerically(">=", delay))
 	})
 
 	It("does not stamp a failed write", func(ctx context.Context) {
 		inner.failWith = errors.New("api server unreachable")
 
 		Expect(decided.Update(ctx, ourRecord)).NotTo(Succeed())
-		Expect(stamp.Load()).To(BeZero())
+		Expect(stamp.Load()).To(BeNil())
 	})
 
 	It("does not stamp a write that clears the holder, which is a release", func(ctx context.Context) {
 		Expect(decided.Update(ctx, resourcelock.LeaderElectionRecord{
 			RenewTime: metav1.NewTime(time.Now()),
 		})).To(Succeed())
-		Expect(stamp.Load()).To(BeZero())
+		Expect(stamp.Load()).To(BeNil())
 	})
 
 	It("does not stamp a write that names another holder", func(ctx context.Context) {
@@ -109,7 +132,7 @@ var _ = Describe("confirmingLock", func() {
 			HolderIdentity: "test-cluster-2",
 			RenewTime:      metav1.NewTime(time.Now()),
 		})).To(Succeed())
-		Expect(stamp.Load()).To(BeZero())
+		Expect(stamp.Load()).To(BeNil())
 	})
 
 	It("does not stamp a successful read, even one that names us", func(ctx context.Context) {
@@ -117,7 +140,7 @@ var _ = Describe("confirmingLock", func() {
 		// the distinction the whole staleness measurement rests on.
 		_, _, err := decided.Get(ctx)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(stamp.Load()).To(BeZero())
+		Expect(stamp.Load()).To(BeNil())
 	})
 })
 
@@ -198,12 +221,23 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 		// Re-adopting our own lease across an in-place upgrade writes nothing, so
 		// without the seeding the very first tick would see an age of decades.
 		r.config.RenewDeadline = time.Hour
-		r.lastConfirmed.Store(0)
+		r.lastConfirmed.Store(nil)
 		verdict(true, nil)
 
 		start(ctx)
 
 		Consistently(checks.Load, 100*time.Millisecond).Should(BeEquivalentTo(0))
+	})
+
+	It("keeps the stamp of a write that was confirmed before the monitor started", func(ctx context.Context) {
+		r.config.RenewDeadline = time.Hour
+		confirmed := ptr.To(time.Now())
+		r.lastConfirmed.Store(confirmed)
+		verdict(true, nil)
+
+		start(ctx)
+
+		Consistently(r.lastConfirmed.Load, 100*time.Millisecond).Should(BeIdenticalTo(confirmed))
 	})
 
 	It("requests an immediate shutdown once the lease is stale and the peers agree", func(ctx context.Context) {

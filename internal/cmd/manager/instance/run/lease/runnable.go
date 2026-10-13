@@ -114,10 +114,11 @@ type Runnable struct {
 	observedRecord *resourcelock.LeaderElectionRecord
 	observedTime   time.Time
 
-	// lastConfirmed is the unix-nanosecond time of the last lease write that
-	// named this pod as the holder, stamped by the confirmingLock wrapping
-	// r.lock. It is how monitorLeaseAge measures how stale our hold is.
-	lastConfirmed atomic.Int64
+	// lastConfirmed is the time, with its monotonic reading, taken before the
+	// last lease write that named this pod as the holder started, stamped by
+	// the confirmingLock wrapping r.lock. It is how monitorLeaseAge measures
+	// how stale our hold is.
+	lastConfirmed atomic.Pointer[time.Time]
 
 	// checkStepDown reports whether this primary should stop believing it is
 	// still the legitimate primary. It is a field (defaulting to

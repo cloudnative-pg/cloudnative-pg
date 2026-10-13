@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/utils/ptr"
 )
 
 // confirmingLock decorates a resource lock to record when the lease was last
@@ -43,19 +44,22 @@ import (
 type confirmingLock struct {
 	resourcelock.Interface
 
-	// lastConfirmed holds the unix-nanosecond time of the last write that named
-	// us as the holder. Zero means no write has been confirmed yet.
-	lastConfirmed *atomic.Int64
+	// lastConfirmed holds the time, with its monotonic reading, taken just
+	// before the last write that named us as the holder started. Nil means no
+	// write has been confirmed yet.
+	lastConfirmed *atomic.Pointer[time.Time]
 }
 
 // Create implements resourcelock.Interface.
 func (l *confirmingLock) Create(ctx context.Context, ler resourcelock.LeaderElectionRecord) error {
-	return l.stamp(ler, l.Interface.Create(ctx, ler))
+	started := time.Now()
+	return l.stamp(ler, started, l.Interface.Create(ctx, ler))
 }
 
 // Update implements resourcelock.Interface.
 func (l *confirmingLock) Update(ctx context.Context, ler resourcelock.LeaderElectionRecord) error {
-	return l.stamp(ler, l.Interface.Update(ctx, ler))
+	started := time.Now()
+	return l.stamp(ler, started, l.Interface.Update(ctx, ler))
 }
 
 // stamp advances the clock for a successful write whose record names us as the
@@ -63,9 +67,20 @@ func (l *confirmingLock) Update(ctx context.Context, ler resourcelock.LeaderElec
 // lock's own identity, because both Release and client-go's release() write a
 // record with an empty holder: stamping those would be stamping the hand-over
 // that gives the lease away.
-func (l *confirmingLock) stamp(ler resourcelock.LeaderElectionRecord, err error) error {
+//
+// The stamp is the time the write started, not the time it returned. The API
+// server can commit the write at any point during the call, and a replica
+// starts timing the lease from the moment it sees that commit. A slow response
+// stamped on arrival would make us believe the lease is fresher than the
+// replicas do, and delay the step-down by as long as the response took.
+//
+// The time.Time is stored as is, so that time.Since measures the age on the
+// monotonic clock: a backwards wall-clock step (NTP, a VM resume) would
+// otherwise delay the step-down by the size of the step. The replicas time
+// their take-over wait on the monotonic clock as well.
+func (l *confirmingLock) stamp(ler resourcelock.LeaderElectionRecord, started time.Time, err error) error {
 	if err == nil && ler.HolderIdentity == l.Identity() {
-		l.lastConfirmed.Store(time.Now().UnixNano())
+		l.lastConfirmed.Store(&started)
 	}
 	return err
 }
@@ -88,8 +103,9 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 	// on the "already ours" branch), so an instance manager that re-adopts its
 	// own lease across an in-place upgrade would start from a zero stamp and
 	// compute an enormous age on the very first tick. We know the lease is ours
-	// right now, which is what the monitor starting means.
-	r.lastConfirmed.Store(time.Now().UnixNano())
+	// right now, which is what the monitor starting means. A stamp that a write
+	// has already set is the more accurate one and is kept.
+	r.lastConfirmed.CompareAndSwap(nil, ptr.To(time.Now()))
 
 	ticker := time.NewTicker(r.config.RetryPeriod)
 	defer ticker.Stop()
@@ -108,7 +124,7 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		}
 
 		if !stepDownDecided {
-			age := time.Since(time.Unix(0, r.lastConfirmed.Load()))
+			age := time.Since(*r.lastConfirmed.Load())
 			if age <= r.config.RenewDeadline {
 				continue
 			}
