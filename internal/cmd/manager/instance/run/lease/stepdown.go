@@ -21,7 +21,9 @@ package lease
 
 import (
 	"context"
+	"os"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -86,8 +88,9 @@ func (l *confirmingLock) stamp(ler resourcelock.LeaderElectionRecord, started ti
 }
 
 // monitorLeaseAge fences this primary once the lease has gone stale and the
-// peers agree it should step down. It runs until ctx is cancelled, or until the
-// shutdown request has been delivered, which is terminal.
+// peers agree it should step down. It runs until ctx is cancelled, which the
+// lifecycle manager does once PostgreSQL has stopped and the process is about
+// to exit, or until it has to stop PostgreSQL itself.
 //
 // The trigger is the age of the last confirmed lease write rather than a
 // failure surfacing in the election loop, because that loop is not guaranteed
@@ -115,6 +118,7 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 	// certificate pool, dialer and transport to reach a conclusion that cannot
 	// reverse, and the wait for the consumer can last minutes.
 	stepDownDecided := false
+	shutdownRequested := false
 
 	for {
 		select {
@@ -123,8 +127,8 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		case <-ticker.C:
 		}
 
+		age := time.Since(*r.lastConfirmed.Load())
 		if !stepDownDecided {
-			age := time.Since(*r.lastConfirmed.Load())
 			if age <= r.config.RenewDeadline {
 				continue
 			}
@@ -155,11 +159,44 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		// but the postmaster death that follows takes it out of that loop
 		// altogether (lifecycle.go, the postMasterErrChan branch), so there is
 		// no second receive to meet.
-		if r.instance.TryRequestImmediateShutdown() {
-			contextLogger.Info("Immediate shutdown requested, primary lease step-down complete")
+		//
+		// Delivery is not the end: the lifecycle manager returning is, and that
+		// cancels ctx. If the instance manager is still running at the last tick
+		// before a replica may claim the lease, the request was never taken or
+		// pg_ctl failed, so stop PostgreSQL here and exit.
+		if !shutdownRequested {
+			shutdownRequested = r.instance.TryRequestImmediateShutdown()
+			if shutdownRequested {
+				contextLogger.Info("Immediate shutdown requested, waiting for PostgreSQL to stop")
+			} else {
+				contextLogger.Warning(
+					"The lifecycle manager is busy, could not request the shutdown yet, retrying")
+			}
+		}
+		if age+r.config.RetryPeriod >= r.config.LeaseDuration {
+			contextLogger.Error(nil, "Primary lease about to expire with PostgreSQL still running, forcing a stop",
+				"leaseAge", age, "shutdownRequested", shutdownRequested)
+			r.hardStop()
 			return
 		}
-		contextLogger.Warning(
-			"The lifecycle manager is busy, could not request the shutdown yet, retrying")
 	}
+}
+
+// primaryLeaseLostExitCode is the exit code of the instance manager when it
+// fences itself because the primary lease is about to expire. It lets the
+// kubelet's last state tell this exit apart from a crash.
+const primaryLeaseLostExitCode = 5
+
+// killPostgresAndExit is the last resort fence. The instance manager is PID 1
+// of its container, so exiting makes the kernel SIGKILL whatever is left in the
+// PID namespace: that exit is the fence. The SIGQUIT to the postmaster, which
+// forwards it to its children, only matters when the pod shares its process
+// namespace. No SIGKILL follows it: the postmaster could die before forwarding.
+// The PID is the one the lifecycle manager holds, so nothing is read from disk
+// before the exit.
+func (r *Runnable) killPostgresAndExit() {
+	if pid := r.instance.GetPostmasterPID(); pid > 0 {
+		_ = syscall.Kill(pid, syscall.SIGQUIT)
+	}
+	os.Exit(primaryLeaseLostExitCode)
 }

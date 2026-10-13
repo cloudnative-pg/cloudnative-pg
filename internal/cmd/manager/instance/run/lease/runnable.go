@@ -125,6 +125,26 @@ type Runnable struct {
 	// shouldStepDown) rather than a direct call so the step-down decision in
 	// monitorLeaseAge can be unit-tested without real network calls.
 	checkStepDown func(cluster *apiv1.Cluster, ourIdentity string) (bool, error)
+
+	// hardStop is what monitorLeaseAge runs when the lease is about to expire
+	// and the step-down has not completed. It is a field (defaulting to
+	// killPostgresAndExit) so that tests can observe it instead of dying.
+	hardStop func()
+
+	// monitorParent bounds the life of monitorLeaseAge when it is set. The
+	// monitor then outlives the runnable's own context, which the manager
+	// cancels on any runnable's error while the lifecycle manager is still
+	// stopping PostgreSQL; see runLeaderElection. Tests leave it nil, which
+	// ties the monitor to the runnable's context.
+	monitorParent context.Context
+}
+
+// SetMonitorContext makes the step-down monitor run until ctx is done, instead
+// of until the runnable's own context is. ctx must end when the process is about
+// to exit, as the lifecycle manager's global context does. It must be called
+// before the runnable starts.
+func (r *Runnable) SetMonitorContext(ctx context.Context) {
+	r.monitorParent = ctx
 }
 
 // New creates a new Runnable.
@@ -139,6 +159,7 @@ func New(
 		heldCh:        make(chan struct{}),
 		checkStepDown: shouldStepDown,
 	}
+	result.hardStop = result.killPostgresAndExit
 
 	// Every lease write the elector makes goes through le.config.Lock, which is
 	// this same lock, so wrapping it here is enough for no confirmed renewal to
@@ -489,9 +510,14 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 	// lease preAcquire has already taken.
 	ctx = log.IntoContext(ctx, contextLogger)
 
-	// The step-down monitor lives as long as this loop does.
-	monitorCtx, stopMonitor := context.WithCancel(ctx)
-	defer stopMonitor()
+	// The monitor outlives this loop when a monitor context was set: the manager
+	// cancels ctx as soon as any runnable fails, and the lease is then no longer
+	// renewed while PostgreSQL may still take longer than the lease lasts to
+	// shut down.
+	monitorCtx := ctx
+	if r.monitorParent != nil {
+		monitorCtx = log.IntoContext(r.monitorParent, contextLogger)
+	}
 
 	for {
 		if err := r.preAcquire(ctx); err != nil {

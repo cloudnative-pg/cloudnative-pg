@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -178,8 +179,10 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 	)
 
 	var (
-		r      *Runnable
-		checks *atomic.Int32
+		r         *Runnable
+		checks    *atomic.Int32
+		hardStops *atomic.Int32
+		stoppedAt *atomic.Pointer[time.Time]
 	)
 
 	BeforeEach(func() {
@@ -190,7 +193,16 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 		r = New(fake.NewClientset(), instance)
 		r.config.RetryPeriod = retryPeriod
 		r.config.RenewDeadline = renewDeadline
+		// Far enough that the specs below never reach the last resort unless
+		// they bring the lease duration down on purpose.
+		r.config.LeaseDuration = time.Hour
 		checks = &atomic.Int32{}
+		hardStops = &atomic.Int32{}
+		stoppedAt = &atomic.Pointer[time.Time]{}
+		r.hardStop = func() {
+			stoppedAt.Store(ptr.To(time.Now()))
+			hardStops.Add(1)
+		}
 	})
 
 	// verdict installs a step-down check that counts its calls.
@@ -201,11 +213,20 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 		}
 	}
 
-	// start runs the monitor for the duration of the spec.
+	// start runs the monitor for the duration of the spec. The cleanup waits for
+	// it to return: the monitor keeps running after it delivers its request, so
+	// it would otherwise outlive the spec and race with the next BeforeEach.
 	start := func(ctx context.Context) {
 		monitorCtx, cancel := context.WithCancel(ctx)
-		DeferCleanup(cancel)
-		go r.monitorLeaseAge(monitorCtx)
+		done := make(chan struct{})
+		DeferCleanup(func() {
+			cancel()
+			<-done
+		})
+		go func() {
+			defer close(done)
+			r.monitorLeaseAge(monitorCtx)
+		}()
 	}
 
 	It("does nothing while the lease is still fresh", func(ctx context.Context) {
@@ -302,6 +323,49 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 			Consistently(received, 100*time.Millisecond).ShouldNot(Receive())
 		})
 
+	It("forces a stop before the lease expires when nobody takes the shutdown request",
+		func(ctx context.Context) {
+			// No reader: the lifecycle manager is busy with an earlier command for
+			// longer than the lease lasts. The tick is long enough that a loaded
+			// machine does not delay the monitor by more than a tick, which is the
+			// margin this spec measures.
+			r.config.RetryPeriod = 100 * time.Millisecond
+			r.config.LeaseDuration = 500 * time.Millisecond
+			verdict(true, nil)
+
+			start(ctx)
+
+			Eventually(hardStops.Load).Should(BeEquivalentTo(1))
+			// No write is confirmed, so the stamp is still the one the monitor
+			// seeded: the stop must land before the lease can have expired.
+			Expect(stoppedAt.Load().Sub(*r.lastConfirmed.Load())).To(BeNumerically("<", r.config.LeaseDuration))
+		})
+
+	It("forces a stop before the lease expires when the shutdown request does not end PostgreSQL",
+		func(ctx context.Context) {
+			// The request is taken, but the postmaster never exits, so ctx stays
+			// live. This is pg_ctl failing against a hung backend.
+			r.config.LeaseDuration = 50 * time.Millisecond
+			verdict(true, nil)
+			received := readCommands(r)
+
+			start(ctx)
+
+			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownImmediate"))))
+			Eventually(hardStops.Load).Should(BeEquivalentTo(1))
+			Consistently(received, 100*time.Millisecond).ShouldNot(Receive())
+		})
+
+	It("does not force a stop while the peers say this is still the primary", func(ctx context.Context) {
+		r.config.LeaseDuration = 50 * time.Millisecond
+		verdict(false, nil)
+
+		start(ctx)
+
+		Eventually(checks.Load).Should(BeNumerically(">", 1))
+		Consistently(hardStops.Load, 100*time.Millisecond).Should(BeEquivalentTo(0))
+	})
+
 	It("stays responsive while the shutdown request cannot be delivered", func(ctx context.Context) {
 		// With nothing reading the command channel, an unconditional send would
 		// park this goroutine inside the send and it would never see the
@@ -336,4 +400,59 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 		Eventually(stopped).Should(BeClosed())
 	})
+})
+
+var _ = Describe("Runnable.runLeaderElection", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+	)
+
+	It("keeps the step-down monitor running after the runnable's context is cancelled",
+		func(ctx context.Context) {
+			// The manager cancels the runnable's context when any runnable fails,
+			// while the lifecycle manager is still stopping PostgreSQL. From then
+			// on the lease is not renewed, and the monitor is what fences.
+			kubeClient := fake.NewClientset(&coordinationv1.Lease{
+				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+				Spec:       coordinationv1.LeaseSpec{HolderIdentity: ptr.To(thisPod)},
+			})
+			r := New(kubeClient, postgres.NewInstance().
+				WithNamespace(namespace).
+				WithPodName(thisPod).
+				WithClusterName(clusterName))
+			r.config.RetryPeriod = 5 * time.Millisecond
+			r.config.RenewDeadline = 25 * time.Millisecond
+			r.config.LeaseDuration = time.Hour
+
+			var checks atomic.Int32
+			r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) {
+				checks.Add(1)
+				return false, nil
+			}
+
+			lifecycleCtx, endLifecycle := context.WithCancel(ctx)
+			r.SetMonitorContext(lifecycleCtx)
+
+			runCtx, cancelRun := context.WithCancel(ctx)
+			returned := make(chan struct{})
+			go func() {
+				defer close(returned)
+				_ = r.runLeaderElection(runCtx)
+			}()
+			Eventually(r.heldCh).Should(BeClosed())
+
+			cancelRun()
+			Eventually(returned).Should(BeClosed())
+
+			// Nothing renews the lease any more, so it goes stale and the monitor
+			// keeps running its check.
+			seen := checks.Load()
+			Eventually(checks.Load).Should(BeNumerically(">", seen))
+
+			endLifecycle()
+			stopped := checks.Load()
+			Consistently(checks.Load, 100*time.Millisecond).Should(BeNumerically("<=", stopped+1))
+		})
 })
