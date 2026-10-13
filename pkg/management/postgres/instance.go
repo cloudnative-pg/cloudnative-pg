@@ -204,6 +204,10 @@ type Instance struct {
 	// logPipesReady becomes satisfied once the log-destination FIFOs are ready.
 	logPipesReady concurrency.MultipleExecuted
 
+	// postmasterPID is the PID of the postmaster the lifecycle manager is
+	// running, or zero when there is none.
+	postmasterPID atomic.Int64
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -303,6 +307,18 @@ func (instance *Instance) SetFencing(enabled bool) {
 	if enabled {
 		instance.SetMightBeUnavailable(true)
 	}
+}
+
+// SetPostmasterPID records the PID of the running postmaster, or zero when it
+// has exited.
+func (instance *Instance) SetPostmasterPID(pid int) {
+	instance.postmasterPID.Store(int64(pid))
+}
+
+// GetPostmasterPID returns the PID of the running postmaster, or zero when
+// there is none.
+func (instance *Instance) GetPostmasterPID() int {
+	return int(instance.postmasterPID.Load())
 }
 
 // SetCanCheckReadiness marks whether the instance should be checked for readiness
