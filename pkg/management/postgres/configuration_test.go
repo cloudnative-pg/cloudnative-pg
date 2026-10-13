@@ -21,6 +21,7 @@ package postgres
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -338,6 +339,30 @@ var _ = Describe("selectAdditionalExtensions", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(exts).To(BeNil())
 		Expect(baseDir).To(Equal("/extensions"))
+	})
+})
+
+var _ = Describe("filterExistingDirectories", func() {
+	It("keeps only the paths that are existing directories", func() {
+		// keycloak-oauth-validator ships `lib` but no `share`, and
+		// `LICENSE` is a file, not a directory
+		base := GinkgoT().TempDir()
+		Expect(os.MkdirAll(filepath.Join(base, "pgvector", "share"), 0o750)).To(Succeed())
+		Expect(os.MkdirAll(filepath.Join(base, "keycloak-oauth-validator", "lib"), 0o750)).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(base, "keycloak-oauth-validator", "LICENSE"), nil, 0o600)).To(Succeed())
+
+		paths, err := filterExistingDirectories([]string{
+			filepath.Join(base, "pgvector", "share"),
+			filepath.Join(base, "keycloak-oauth-validator", "share"),
+			filepath.Join(base, "keycloak-oauth-validator", "lib"),
+			filepath.Join(base, "keycloak-oauth-validator", "LICENSE"),
+			filepath.Join(base, "keycloak-oauth-validator", "LICENSE", "lib"),
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(paths).To(Equal([]string{
+			filepath.Join(base, "pgvector", "share"),
+			filepath.Join(base, "keycloak-oauth-validator", "lib"),
+		}))
 	})
 })
 

@@ -6267,7 +6267,7 @@ var _ = Describe("validateExtensions", func() {
 	})
 
 	It("returns an error for a path that escapes only once joined under a deeper, realistic mount point", func() {
-		// CollectBinPaths and absolutizePaths join these paths under a
+		// the Collect*Paths functions join these paths under a
 		// multi-segment mount point at runtime (e.g. "/extensions/<name>"),
 		// not a single-segment one. A containment check resolved against a
 		// shallower placeholder base would wrongly accept these.

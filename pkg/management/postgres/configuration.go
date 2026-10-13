@@ -21,12 +21,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -40,6 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 // InstallPgDataFileContent installs a file in PgData, returning true/false if
@@ -377,15 +380,21 @@ func createPostgresqlConfiguration(
 	if err != nil {
 		return "", "", err
 	}
-	for _, extension := range exts {
-		info.AdditionalExtensions = append(
-			info.AdditionalExtensions,
-			postgres.AdditionalExtensionConfiguration{
-				MountPath:            filepath.Join(baseDir, extension.Name),
-				ExtensionControlPath: extension.ExtensionControlPath,
-				DynamicLibraryPath:   extension.DynamicLibraryPath,
-			},
-		)
+	if len(exts) > 0 {
+		extensionControlPath, err := filterExistingDirectories(
+			extensions.CollectExtensionControlPaths(exts, baseDir))
+		if err != nil {
+			return "", "", err
+		}
+		dynamicLibraryPath, err := filterExistingDirectories(
+			extensions.CollectDynamicLibraryPaths(exts, baseDir))
+		if err != nil {
+			return "", "", err
+		}
+		info.AdditionalExtensions = &postgres.AdditionalExtensionConfiguration{
+			ExtensionControlPath: extensionControlPath,
+			DynamicLibraryPath:   dynamicLibraryPath,
+		}
 	}
 
 	// Setup minimum replay delay if we're on a replica cluster
@@ -418,6 +427,27 @@ func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
 		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
 		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
 		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
+}
+
+// filterExistingDirectories returns the paths that are existing directories,
+// since extension images don't always ship every directory (e.g. a module
+// with only `lib`)
+func filterExistingDirectories(paths []string) ([]string, error) {
+	result := make([]string, 0, len(paths))
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		// ENOTDIR means a parent of the path is a file: the directory is missing too
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("while checking extension directory %q: %w", path, err)
+		}
+		if info.IsDir() {
+			result = append(result, path)
+		}
+	}
+	return result, nil
 }
 
 // selectAdditionalExtensions returns the extension list and mount base

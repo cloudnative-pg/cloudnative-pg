@@ -171,6 +171,70 @@ func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir s
 	return result
 }
 
+// CollectExtensionControlPaths returns a list of paths which should be added
+// to extension_control_path given a list of extensions mounted under baseDir.
+// Extensions not declaring any path contribute their `share` directory.
+func CollectExtensionControlPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
+	result := make([]string, 0, len(extensionList))
+
+	for _, extension := range extensionList {
+		paths := extension.ExtensionControlPath
+		if len(paths) == 0 {
+			paths = []string{"share"}
+		}
+
+		for _, controlPath := range paths {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", controlPath)) {
+				log.Warning("Skipping extension ExtensionControlPath entry that escapes the extension directory",
+					"extension", extension.Name, "path", controlPath)
+				continue
+			}
+
+			result = append(
+				result,
+				filepath.Join(baseDir, extension.Name, controlPath),
+			)
+		}
+	}
+
+	return result
+}
+
+// CollectDynamicLibraryPaths returns a list of paths which should be added
+// to dynamic_library_path given a list of extensions mounted under baseDir.
+// Extensions not declaring any path contribute their `lib` directory.
+func CollectDynamicLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
+	result := make([]string, 0, len(extensionList))
+
+	for _, extension := range extensionList {
+		paths := extension.DynamicLibraryPath
+		if len(paths) == 0 {
+			paths = []string{"lib"}
+		}
+
+		for _, libraryPath := range paths {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", libraryPath)) {
+				log.Warning("Skipping extension DynamicLibraryPath entry that escapes the extension directory",
+					"extension", extension.Name, "path", libraryPath)
+				continue
+			}
+
+			result = append(
+				result,
+				filepath.Join(baseDir, extension.Name, libraryPath),
+			)
+		}
+	}
+
+	return result
+}
+
 // dedicatedEnvVars names env vars whose values come from dedicated extension
 // fields (LdLibraryPath, BinPath); custom Env entries targeting them are skipped.
 var dedicatedEnvVars = map[string]bool{
