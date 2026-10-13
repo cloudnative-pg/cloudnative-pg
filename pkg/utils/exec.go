@@ -27,6 +27,7 @@ package utils
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -55,6 +56,12 @@ var ErrorContainerNotFound = fmt.Errorf("container not found")
 // isRetryableExecError returns true for transient infrastructure errors
 func isRetryableExecError(err error) bool {
 	if err == nil {
+		return false
+	}
+
+	// The attempt timeout expired while streaming: the command may have
+	// started, so running it again is not safe
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return false
 	}
 
@@ -94,7 +101,8 @@ func isRetryableExecError(err error) bool {
 }
 
 // ExecCommand executes a command inside the pod, automatically retrying
-// transient errors like proxy failures or network issues.
+// transient errors like proxy failures or network issues. The timeout, when
+// set, applies to each attempt.
 func ExecCommand(
 	ctx context.Context,
 	client kubernetes.Interface,
@@ -114,13 +122,6 @@ func ExecCommand(
 		return "", "", ErrorContainerNotFound
 	}
 
-	execCtx := ctx
-	var cancelFunc context.CancelFunc
-	if timeout != nil {
-		execCtx, cancelFunc = context.WithTimeout(ctx, *timeout)
-		defer cancelFunc()
-	}
-
 	var stdout, stderr string
 	var execErr error
 
@@ -128,7 +129,7 @@ func ExecCommand(
 		retry.Attempts(execRetryAttempts),
 		retry.Delay(execRetryDelay),
 		retry.DelayType(retry.BackOffDelay),
-		retry.Context(execCtx),
+		retry.Context(ctx),
 		retry.LastErrorOnly(true),
 		retry.OnRetry(func(n uint, err error) {
 			contextLogger.Info("Retrying kubectl exec",
@@ -138,13 +139,22 @@ func ExecCommand(
 		}),
 	).Do(
 		func() error {
+			// The timeout applies to each attempt, so that a transient
+			// failure does not consume the budget of the following ones
+			attemptCtx := ctx
+			if timeout != nil {
+				var cancel context.CancelFunc
+				attemptCtx, cancel = context.WithTimeout(ctx, *timeout)
+				defer cancel()
+			}
+
 			stdout, stderr, execErr = execCommandOnce(
-				execCtx, client, config, pod,
+				attemptCtx, client, config, pod,
 				containerName, timeout, command...,
 			)
 
-			// Don't retry if context was cancelled or timed out
-			if execCtx.Err() != nil {
+			// Don't retry if the caller's context was cancelled or timed out
+			if ctx.Err() != nil {
 				return retry.Unrecoverable(execErr)
 			}
 
