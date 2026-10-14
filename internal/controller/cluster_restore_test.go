@@ -23,6 +23,7 @@ import (
 	"context"
 	"time"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -497,6 +498,77 @@ var _ = Describe("ensureOrphanServicesAreNotPresent", func() {
 			err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
 			Expect(err).ToNot(HaveOccurred())
 		})
+	})
+})
+
+var _ = Describe("ensureOrphanPrimaryLeaseIsDeleted", func() {
+	var cluster *apiv1.Cluster
+
+	newLease := func(name string, labelled bool, ownerReferences ...metav1.OwnerReference) *coordinationv1.Lease {
+		lease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            name,
+				Namespace:       cluster.Namespace,
+				OwnerReferences: ownerReferences,
+			},
+		}
+		if labelled {
+			lease.Labels = map[string]string{utils.ClusterLabelName: cluster.Name}
+		}
+		return lease
+	}
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+	})
+
+	build := func(objs ...k8client.Object) k8client.Client {
+		return fake.NewClientBuilder().
+			WithScheme(k8scheme.BuildWithAllKnownScheme()).
+			WithObjects(append(objs, cluster)...).
+			Build()
+	}
+
+	leaseExists := func(ctx context.Context, cli k8client.Client, name string) bool {
+		err := cli.Get(ctx, k8client.ObjectKey{Namespace: cluster.Namespace, Name: name}, &coordinationv1.Lease{})
+		if apierrs.IsNotFound(err) {
+			return false
+		}
+		Expect(err).ToNot(HaveOccurred())
+		return true
+	}
+
+	It("should do nothing when there is no lease", func(ctx SpecContext) {
+		cli := build()
+		Expect(ensureOrphanPrimaryLeaseIsDeleted(ctx, cli, cluster)).To(Succeed())
+	})
+
+	It("should delete a lease of the cluster that has no owner", func(ctx SpecContext) {
+		cli := build(newLease(cluster.Name, true))
+		Expect(ensureOrphanPrimaryLeaseIsDeleted(ctx, cli, cluster)).To(Succeed())
+		Expect(leaseExists(ctx, cli, cluster.Name)).To(BeFalse())
+	})
+
+	It("should leave a lease of the cluster that has an owner", func(ctx SpecContext) {
+		cli := build(newLease(cluster.Name, true, metav1.OwnerReference{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+			Name:       "someone-else",
+			UID:        "1234",
+		}))
+		Expect(ensureOrphanPrimaryLeaseIsDeleted(ctx, cli, cluster)).To(Succeed())
+		Expect(leaseExists(ctx, cli, cluster.Name)).To(BeTrue())
+	})
+
+	It("should leave a lease that is not labelled as belonging to the cluster", func(ctx SpecContext) {
+		cli := build(newLease(cluster.Name, false))
+		Expect(ensureOrphanPrimaryLeaseIsDeleted(ctx, cli, cluster)).To(Succeed())
+		Expect(leaseExists(ctx, cli, cluster.Name)).To(BeTrue())
 	})
 })
 

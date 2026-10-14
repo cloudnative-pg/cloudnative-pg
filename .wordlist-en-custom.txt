@@ -1679,6 +1679,7 @@ unfence
 unfencing
 unix
 unmanaged
+unowned
 unsatisfiable
 unschedulable
 unsetting

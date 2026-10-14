@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -65,6 +66,10 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 
 	if res, err := ensureClusterRestoreCanStart(ctx, r.Client, cluster); res != nil || err != nil {
 		return res, err
+	}
+
+	if err := ensureOrphanPrimaryLeaseIsDeleted(ctx, r.Client, cluster); err != nil {
+		return nil, fmt.Errorf("encountered an error while deleting an orphan primary lease: %w", err)
 	}
 
 	if err := ensureOrphanPodsAreDeleted(ctx, r.Client, cluster); err != nil {
@@ -295,6 +300,48 @@ func ensureOrphanPodsAreDeleted(ctx context.Context, c client.Client, cluster *a
 		pod := orphanPodList[idx]
 		contextLogger.Debug("Deleting orphan pod", "podName", pod.Name)
 		if err := c.Delete(ctx, &pod); err != nil && !apierrs.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ensureOrphanPrimaryLeaseIsDeleted deletes the primary Lease left behind by
+// the previous incarnation of the cluster, if it has no owner. Like the orphan
+// Pods, it belongs to instances that no longer run: its holder is whatever
+// primary was running when it was captured, and adopting it would make the
+// new primary wait a full lease duration unless it happens to be that very
+// instance. The cluster controller creates a fresh Lease, with no holder, once
+// the restore completes.
+//
+// A restored cluster has no status yet, so no instance is the primary and
+// nothing holds or renews the Lease. Like the Pods, only the Leases labelled
+// as belonging to this cluster and without owner are deleted. A Lease that has
+// an owner is left alone: it is either ours, or reconcilePrimaryLease refuses
+// it. An unowned Lease found outside of this path is adopted by
+// reconcilePrimaryLease instead.
+func ensureOrphanPrimaryLeaseIsDeleted(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx).WithName("orphan_primary_lease_cleaner")
+
+	var leaseList coordinationv1.LeaseList
+	if err := c.List(
+		ctx,
+		&leaseList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{utils.ClusterLabelName: cluster.Name},
+	); err != nil {
+		return err
+	}
+
+	for idx := range leaseList.Items {
+		lease := leaseList.Items[idx]
+		if len(lease.OwnerReferences) != 0 {
+			continue
+		}
+
+		contextLogger.Info("Found an orphan primary lease, deleting it", "leaseName", lease.Name)
+		if err := c.Delete(ctx, &lease); err != nil && !apierrs.IsNotFound(err) {
 			return err
 		}
 	}
