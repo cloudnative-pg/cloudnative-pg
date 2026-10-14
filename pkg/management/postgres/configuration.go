@@ -438,14 +438,17 @@ func filterExistingDirectories(paths []string) ([]string, error) {
 		info, err := os.Stat(path)
 		// ENOTDIR means a parent of the path is a file: the directory is missing too
 		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+			log.Debug("Skipping extension directory missing from the image", "path", path)
 			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("while checking extension directory %q: %w", path, err)
 		}
-		if info.IsDir() {
-			result = append(result, path)
+		if !info.IsDir() {
+			log.Debug("Skipping extension path that is not a directory", "path", path)
+			continue
 		}
+		result = append(result, path)
 	}
 	return result, nil
 }
