@@ -99,6 +99,13 @@ func (l *confirmingLock) stamp(ler resourcelock.LeaderElectionRecord, started ti
 // it for as long as the outage lasts and le.Run never returns. Keying on the
 // age covers both that case and the ordinary one where renewal fails and
 // preAcquire takes over the retries.
+//
+// The stop lands before a replica can claim the lease only if RenewDeadline +
+// RetryPeriod + the peer probe timeout is below LeaseDuration, which the
+// admission webhook checks. A probe that outlasts the margin delays the stop
+// past it, and the hard stop cannot make up for that. The stop comes at an age
+// in [LeaseDuration - RetryPeriod, LeaseDuration), so its margin to the earliest
+// claim by a replica depends on the tick phase and can be small.
 func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
 
@@ -156,8 +163,8 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		// duration of that command, and a second unconditional send would park
 		// it for good: handling the shutdown leaves the consumer's loop running,
 		// but the postmaster death that follows takes it out of that loop
-		// altogether (lifecycle.go, the postMasterErrChan branch), so there is
-		// no second receive to meet.
+		// altogether unless MightBeUnavailable is set (lifecycle.go, the
+		// postMasterErrChan branch), so there may be no second receive to meet.
 		//
 		// Delivery is not the end: the lifecycle manager returning is, and that
 		// cancels ctx. If the instance manager is still running at the last tick
