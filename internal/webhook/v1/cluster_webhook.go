@@ -691,10 +691,12 @@ func (v *ClusterCustomValidator) validateTablespaceMapping(r *apiv1.Cluster) fie
 				locationPath, entry.SourceLocation, "The source location must not contain the '=' character"))
 		}
 
-		if _, found := seenLocations[entry.SourceLocation]; found {
+		// pg_basebackup canonicalizes the paths before matching them
+		cleanLocation := path.Clean(entry.SourceLocation)
+		if _, found := seenLocations[cleanLocation]; found {
 			result = append(result, field.Duplicate(locationPath, entry.SourceLocation))
 		}
-		seenLocations[entry.SourceLocation] = struct{}{}
+		seenLocations[cleanLocation] = struct{}{}
 	}
 
 	return result

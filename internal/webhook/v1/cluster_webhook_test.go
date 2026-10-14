@@ -7461,6 +7461,18 @@ var _ = Describe("pg_basebackup tablespaceMapping validation", func() {
 		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
 		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].sourceLocation"))
 	})
+
+	// pg_basebackup canonicalizes the paths before matching them
+	It("rejects the same source location written in a different way", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/ts"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data//pg/./ts/"},
+		)
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].sourceLocation"))
+	})
 })
 
 var _ = Describe("getPgBaseBackupTablespaceWarnings", func() {
