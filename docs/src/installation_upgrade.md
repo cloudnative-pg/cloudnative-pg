@@ -389,10 +389,10 @@ This feature requires the operator to manage `Lease` objects in the
 chart grant the required permissions automatically. If you manage the
 operator's RBAC yourself, you must add the `create`, `delete`, `get`, `list`,
 `update` and `watch` verbs on `leases` in the `coordination.k8s.io` API group
-before upgrading, otherwise primaries will be unable to promote. The operator
-never deletes a `Lease`: the `OwnerReferencesPermissionEnforcement` admission
-plugin requires the `delete` verb to change its owner, which happens when a
-`Cluster` is recreated over the `Lease` left behind by a previous one.
+before upgrading, otherwise primaries will be unable to promote. The `delete`
+verb is used only when a `Cluster` is recreated over the resources left behind
+by a previous one, for example by a backup tool: the operator then deletes the
+unowned `Lease` along with the orphan Pods, and creates a new one.
 :::
 
 #### Operator-to-instance authentication (`GHSA-7qwx-x8ff-3px9`)
