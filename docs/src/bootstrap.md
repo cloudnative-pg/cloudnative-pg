@@ -815,7 +815,9 @@ the `pg_basebackup` executions used to join new replicas.
 
 If the source instance uses tablespaces, map each tablespace declared
 in `spec.tablespaces` to its location in the source instance with
-`tablespaceMapping`:
+`tablespaceMapping`. The name of each tablespace in `spec.tablespaces` must be
+the same as in the source instance, as `pg_basebackup` relocates tablespaces by
+path and not by name:
 
 ```yaml
 spec:
