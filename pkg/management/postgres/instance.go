@@ -249,6 +249,10 @@ type Instance struct {
 
 	// Cluster is the cluster this instance belongs to
 	Cluster *apiv1.Cluster
+
+	// systemID caches the pg_control system identifier, which never changes
+	systemID      string
+	systemIDMutex sync.Mutex
 }
 
 type serverCertificateHandler struct {
@@ -1438,6 +1442,26 @@ func (instance *Instance) GetPgControldata() (string, error) {
 	}
 
 	return string(out), nil
+}
+
+// GetSystemID returns the system identifier from pg_control, or an empty
+// string if it can't be read. It works while PostgreSQL is down.
+func (instance *Instance) GetSystemID() string {
+	instance.systemIDMutex.Lock()
+	defer instance.systemIDMutex.Unlock()
+
+	if instance.systemID != "" {
+		return instance.systemID
+	}
+
+	pgControlData, err := instance.GetPgControldata()
+	if err != nil {
+		log.Debug("Cannot read the system ID from pg_control", "err", err)
+		return ""
+	}
+
+	instance.systemID = utils.ParsePgControldataOutput(pgControlData).GetDatabaseSystemIdentifier()
+	return instance.systemID
 }
 
 // GetInstanceCommandChan is the channel where the lifecycle manager will
