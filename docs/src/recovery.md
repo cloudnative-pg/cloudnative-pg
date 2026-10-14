@@ -133,9 +133,18 @@ CloudNativePG allows you to create a new cluster from a `VolumeSnapshot` of a
 These snapshots are created using the declarative API for
 [volume snapshot backups](appendixes/backup_volumesnapshot.md).
 
-To complete the recovery process, the new cluster must also reference an
-external cluster that provides access to the WAL archive needed to reapply
-changes and finalize the recovery.
+Referencing a WAL archive is optional. Without it, the new cluster is restored
+to the state contained in the snapshot, and any change made after the snapshot
+was taken is not recovered. To replay those changes, or to perform a
+point-in-time recovery with `recoveryTarget`, the new cluster must also
+reference an external cluster that provides access to the WAL archive.
+
+:::warning
+    Without a WAL archive, recovering from an online (hot) snapshot relies on
+    PostgreSQL crash recovery. This is safe only if the storage takes
+    crash-consistent snapshots. If no WAL archive is available, we recommend
+    using cold (`online: false`) volume snapshot backups.
+:::
 
 The following example shows a cluster being recovered using both a
 `VolumeSnapshot` for the base backup and a WAL archive accessed through the
