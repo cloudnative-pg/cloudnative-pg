@@ -48,6 +48,18 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
+// Reasons of the ConsistentSystemID condition
+const (
+	// systemIDNotFoundReason is used when no instance reported a system ID
+	systemIDNotFoundReason = "NotFound"
+
+	// systemIDUniqueReason is used when all the reporting instances agree on a single system ID
+	systemIDUniqueReason = "Unique"
+
+	// systemIDMismatchReason is used when the instances report different system IDs
+	systemIDMismatchReason = "Mismatch"
+)
+
 // managedResources contains the resources that are created a cluster
 // and need to be managed by the controller
 type managedResources struct {
@@ -789,7 +801,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionConsistentSystemID),
 			Status:  metav1.ConditionFalse,
-			Reason:  "NotFound",
+			Reason:  systemIDNotFoundReason,
 			Message: message,
 		})
 
@@ -798,7 +810,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionConsistentSystemID),
 			Status:  metav1.ConditionTrue,
-			Reason:  "Unique",
+			Reason:  systemIDUniqueReason,
 			Message: "A single, unique system ID was found across reporting instances.",
 		})
 
@@ -808,7 +820,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionConsistentSystemID),
 			Status:  metav1.ConditionFalse,
-			Reason:  "Mismatch",
+			Reason:  systemIDMismatchReason,
 			Message: fmt.Sprintf("Multiple differing system IDs reported by instances: %q", detectedSystemID.ToSortedList()),
 		})
 	}
