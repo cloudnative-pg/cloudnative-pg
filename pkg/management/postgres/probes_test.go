@@ -21,6 +21,8 @@ package postgres
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -33,6 +35,67 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("GetStatus", func() {
+	It("reports the system ID from pg_control while PostgreSQL might be unavailable", func() {
+		binDir := GinkgoT().TempDir()
+		fakePgControldata := "#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n"
+		fakePath := filepath.Join(binDir, pgControlDataName)
+		Expect(os.WriteFile(fakePath, []byte(fakePgControldata), 0o700)).To(Succeed()) //nolint:gosec // executable
+		GinkgoT().Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+		instance := NewInstance().WithPodName("cluster-example-1")
+		instance.PgData = GinkgoT().TempDir()
+		instance.SocketDirectory = GinkgoT().TempDir()
+		Expect(os.WriteFile(filepath.Join(instance.PgData, "standby.signal"), nil, 0o600)).To(Succeed())
+		instance.SetMightBeUnavailable(true)
+
+		status, err := instance.GetStatus()
+		Expect(err).ToNot(HaveOccurred())
+		Expect(status.MightBeUnavailableMaskedError).ToNot(BeEmpty())
+		Expect(status.IsPrimary).To(BeFalse())
+		Expect(status.SystemID).To(Equal("7412345678901234567"))
+	})
+})
+
+var _ = Describe("system ID", func() {
+	var binDir string
+	var instance *Instance
+
+	writeFakePgControldata := func(content string) {
+		fakePath := filepath.Join(binDir, pgControlDataName)
+		Expect(os.WriteFile(fakePath, []byte(content), 0o700)).To(Succeed()) //nolint:gosec // executable
+	}
+
+	BeforeEach(func() {
+		binDir = GinkgoT().TempDir()
+		GinkgoT().Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		instance = NewInstance()
+		instance.PgData = GinkgoT().TempDir()
+	})
+
+	It("is cached once loaded", func() {
+		writeFakePgControldata("#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+
+		// pg_controldata is not invoked again once the ID is known
+		writeFakePgControldata("#!/bin/sh\nexit 1\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+	})
+
+	It("is empty, and read again later, when pg_control can't be read", func() {
+		writeFakePgControldata("#!/bin/sh\nexit 1\n")
+		Expect(instance.GetSystemID()).To(BeEmpty())
+
+		writeFakePgControldata("#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+	})
+
+	It("is empty if the output has no system ID", func() {
+		writeFakePgControldata("#!/bin/sh\necho 'pg_control version number:            1300'\n")
+		Expect(instance.GetSystemID()).To(BeEmpty())
+	})
+})
 
 var _ = Describe("areAllParamsUpdated", func() {
 	It("should return true when all params match", func() {
