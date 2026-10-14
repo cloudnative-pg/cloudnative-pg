@@ -10,7 +10,9 @@ model.
 
 * [`primary-lease`](primary-lease/) — safe primary election: what happens
   after a CloudNativePG primary loses its lease when fail-safe mode is
-  active (non-cooperative old primary).
+  active (non-cooperative old primary). The old primary is fenced by a
+  lease-age monitor with explicit time bounds and a hard stop before
+  the lease expires.
 
 ## Files
 

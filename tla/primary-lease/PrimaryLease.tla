@@ -1,20 +1,39 @@
 ---- MODULE PrimaryLease ----
-\* This models what happens after a CNPG Primary lost his lease
-\* when the fail-safe mode is active.
+\* Primary lease with the lease-age step-down monitor
+\* (monitorLeaseAge in internal/cmd/manager/instance/run/lease/stepdown.go).
 \*
+\* The invariant NoTwoLeaders counts every node, dead or alive. Fencing is a
+\* promise about time: a primary whose last confirmed lease write is
+\* older than RenewDeadline must run its peer check within StepDownDelay
+\* ticks, and a decided primary must be stopped before its lease age reaches
+\* LeaseDuration (the hard stop, killPostgresAndExit) or within DeliveryDelay
+\* ticks of the verdict (the soft stop, TryRequestImmediateShutdown),
+\* whichever comes first. The Ticker refuses to advance past a missed
+\* deadline, so the model proves: IF the code keeps those bounds, THEN no two
+\* nodes lead at once. It does not prove that the code keeps them.
+\*
+\* TLC shows NoTwoLeaders holds iff
+\*     RenewDeadline + StepDownDelay < LeaseDuration
+\* for any DeliveryDelay (see README.md for the runs). A write is atomic
+\* here, so lastRenew is both the tick the write started and the tick the
+\* candidates can see it: the code stamps the start of the write on a
+\* monotonic clock for the same reason. In production units StepDownDelay is
+\* retryPeriodSeconds plus isolationCheck.requestTimeout, and DeliveryDelay
+\* is the wait for the lifecycle manager to accept the shutdown request plus
+\* the time pg_ctl takes to deliver it; the code bounds neither part of
+\* DeliveryDelay, which is why the hard stop exists.
 
 EXTENDS Integers, TLC
 
-CONSTANTS MaxRounds, LeaseDuration, RenewDeadline, Nodes, LivenessThreshold, RenewPeriod
+CONSTANTS MaxRounds, LeaseDuration, RenewDeadline, RenewPeriod, Nodes,
+          StepDownDelay, DeliveryDelay
 
 ASSUME /\ MaxRounds > 0
-       \* Timing relations enforced on the implementation side by the
-       \* admission webhook (see docs/src/failover.md "Tuning the primary
-       \* lease"): the take-over wait must exceed the holder's give-up
-       \* deadline, which must exceed the renewal cadence.
        /\ LeaseDuration > RenewDeadline
        /\ RenewDeadline > RenewPeriod
        /\ RenewPeriod > 0
+       /\ StepDownDelay > 0
+       /\ DeliveryDelay >= 0
 
 (* --algorithm PrimaryLease {
 
@@ -22,32 +41,61 @@ variables
   leaseHolder = "",
   leaseRenewTick = 0,
 
-  watchdogTick = [n \in Nodes |-> 0],
   leading = [n \in Nodes |-> FALSE],
-
   lookingForLease = [n \in Nodes |-> FALSE],
+
+  \* tick of the last successful write naming n as holder (confirmingLock)
+  lastRenew = [n \in Nodes |-> -1],
+  \* tick of the last peer check run by n's monitor while overdue
+  lastCheck = [n \in Nodes |-> -1],
+  \* tick at which n's monitor decided to step down, -1 if undecided
+  stepDownAt = [n \in Nodes |-> -1],
 
   \* ASSUMPTION: no time rate skew
   tick = 0;
 
 define {
-  IsAlive(n) == tick - watchdogTick[n] <= LivenessThreshold
+  Max(a, b) == IF a >= b THEN a ELSE b
 
-  NoTwoLeaders == \A a, b \in Nodes :
-    leading[a] /\ leading[b] /\ IsAlive(a) /\ IsAlive(b) => a = b
+  \* The monitor trips when the last confirmed write is older than
+  \* RenewDeadline (stepdown.go: age <= RenewDeadline => continue).
+  Overdue(n) == leading[n] /\ tick - lastRenew[n] > RenewDeadline
+
+  \* Latest tick by which an overdue, undecided leader must have run a
+  \* peer check: StepDownDelay after it tripped, or after its last check.
+  CheckDue(n) == Max(lastRenew[n] + RenewDeadline, lastCheck[n]) + StepDownDelay
+
+  \* Time may reach t only if no fencing step is overdue at t. A decided
+  \* leader is stopped within DeliveryDelay of the verdict, and in any case
+  \* before its lease age reaches LeaseDuration: the hard stop runs at the
+  \* last monitor tick whose age is below it.
+  FencingOnTime(t) == \A n \in Nodes :
+    /\ (leading[n] /\ t - lastRenew[n] > RenewDeadline /\ stepDownAt[n] = -1)
+         => t <= CheckDue(n)
+    /\ stepDownAt[n] /= -1 => t <= stepDownAt[n] + DeliveryDelay
+    /\ stepDownAt[n] /= -1 => t - lastRenew[n] < LeaseDuration
+
+  \* A peer names a target primary other than n when the operator told it
+  \* to take over (it is inside its observation window) or it already holds
+  \* the lease. The /failsafe answer is abstracted to this.
+  Disagrees(m, n) == m /= n /\ (lookingForLease[m] \/ leaseHolder = m)
+
+  NoTwoLeaders == \A a, b \in Nodes : leading[a] /\ leading[b] => a = b
 
   TypeOK ==
     /\ leaseHolder \in Nodes \cup {""}
     /\ leaseRenewTick \in 0 .. MaxRounds
-    /\ watchdogTick \in [Nodes -> 0 .. MaxRounds]
     /\ leading \in [Nodes -> BOOLEAN]
     /\ lookingForLease \in [Nodes -> BOOLEAN]
+    /\ lastRenew \in [Nodes -> -1 .. MaxRounds]
+    /\ lastCheck \in [Nodes -> -1 .. MaxRounds]
+    /\ stepDownAt \in [Nodes -> -1 .. MaxRounds]
     /\ tick \in 0 .. MaxRounds
 }
 
 process (Ticker = "tick") {
     T: while (TRUE) {
-      if (tick < MaxRounds) {
+      if (tick < MaxRounds /\ FencingOnTime(tick + 1)) {
         tick := tick + 1;
       }
     }
@@ -56,23 +104,17 @@ process (Ticker = "tick") {
 process (Instance \in Nodes)
 variable observedLeaseRenewTick = 0,
   observedLeaseHolder = "",
-  lastRenew=-1,
-  lastLeaseChange=-1,
-  lastLeaseRenewTick=-1;
+  lastLeaseChange = -1,
+  lastLeaseRenewTick = -1;
 {
   InstanceLoop: while (TRUE) {
     either {
       InstanceObserveLease:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
+        await /\ tick < MaxRounds
               /\ (observedLeaseHolder /= leaseHolder \/ observedLeaseRenewTick /= leaseRenewTick);
 
         if (lastLeaseChange /= -1 /\ observedLeaseRenewTick /= leaseRenewTick) {
-          \* The holder renewed while we were watching: the observation
-          \* window is void. Abandon the contest entirely instead of merely
-          \* restarting the timer, so lookingForLease means "inside one
-          \* unbroken observation window". Re-contesting requires a fresh
-          \* CandidatePrimaryStartClaimOwnedLease.
+          \* The record changed inside the window: tryTakeOver restarts it.
           lastLeaseChange := -1;
           lastLeaseRenewTick := -1;
           lookingForLease[self] := FALSE;
@@ -81,118 +123,97 @@ variable observedLeaseRenewTick = 0,
         observedLeaseHolder := leaseHolder;
         observedLeaseRenewTick := leaseRenewTick;
     } or {
-      HolderRenewLeaseSucceeds:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
-              /\ lastRenew /= -1
-              /\ RenewPeriod <= tick - lastRenew
-              /\ tick - lastRenew <= RenewDeadline
+      HolderRenewLease:
+        \* Renewal is never forced: a wedged renewal loop is one of the
+        \* explored behaviours, and a renewal may also land late (after
+        \* RenewDeadline), as preAcquire re-adopts an "already ours" lease.
+        await /\ tick < MaxRounds
+              /\ leading[self]
+              /\ RenewPeriod <= tick - lastRenew[self]
               /\ observedLeaseHolder = self;
 
         if (observedLeaseRenewTick = leaseRenewTick /\ observedLeaseHolder = leaseHolder) {
-          lastRenew := tick;
+          lastRenew[self] := tick;
           leaseRenewTick := tick;
           observedLeaseRenewTick := tick;
-          leaseHolder := self;
-          observedLeaseHolder := self;
-
-          leading[self] := TRUE;
         };
-        watchdogTick[self] := tick;
     } or {
-      HolderRenewLeaseFail:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
-              /\ lastRenew /= -1
-              /\ RenewPeriod <= tick - lastRenew
-              /\ tick - lastRenew <= RenewDeadline
-              /\ observedLeaseHolder = self;
+      MonitorDecidesStepDown:
+        \* A peer is unreachable, or a reachable peer names another target
+        \* primary. Unreachability needs no precondition: the network may
+        \* drop any probe.
+        await /\ tick < MaxRounds
+              /\ Overdue(self)
+              /\ stepDownAt[self] = -1;
 
-        watchdogTick[self] := tick;
+        lastCheck[self] := tick;
+        stepDownAt[self] := tick;
     } or {
-      PrimaryInstanceLostLeaseAndOtherNodesUnreachable:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
-              /\ tick - observedLeaseRenewTick > RenewDeadline
-              /\ leading[self];
+      MonitorKeepsLeading:
+        \* Every peer is reachable and names us: keep leading, check again.
+        await /\ tick < MaxRounds
+              /\ Overdue(self)
+              /\ stepDownAt[self] = -1
+              /\ \A m \in Nodes : ~Disagrees(m, self);
 
-        \* When we won't reach the other nodes,
-        \* we just stop leading, but we can't unlock the lease.
-        watchdogTick[self] := tick;
+        lastCheck[self] := tick;
+    } or {
+      DeliverShutdown:
+        \* TryRequestImmediateShutdown is accepted and PostgreSQL stops. The
+        \* lease is not released: this is the non-cooperative old primary.
+        await /\ tick < MaxRounds
+              /\ stepDownAt[self] /= -1;
+
         leading[self] := FALSE;
+        stepDownAt[self] := -1;
     } or {
-      PrimaryInstanceLostLeaseAndOtherNodesAgreeOnMe:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
-              /\ leading[self]
-              /\ tick - observedLeaseRenewTick > RenewDeadline
-              /\ \A n \in Nodes : ~lookingForLease[n];
+      MonitorHardStop:
+        \* The next tick would be too late (age + RetryPeriod >= LeaseDuration
+        \* in stepdown.go): kill the postmaster and exit. The kill is instant
+        \* here. The monitor ticks every RenewPeriod in the code but may act at
+        \* every tick here, so the Ticker only forces this before the age
+        \* reaches LeaseDuration, the latest tick the code can pick.
+        await /\ tick < MaxRounds
+              /\ stepDownAt[self] /= -1
+              /\ tick - lastRenew[self] + RenewPeriod >= LeaseDuration;
 
-        \* We can reach all the other nodes, and they
-        \* believe I'm the leader, but I can't touch the lease.
-        watchdogTick[self] := tick;
-    } or {
-      PrimaryInstanceLostLeaseAndOtherNodesDoNotAgreeOnMe:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
-              /\ leading[self]
-              /\ tick - observedLeaseRenewTick > RenewDeadline
-              /\ \E n \in Nodes : lookingForLease[n];
-
-        \* We can reach all the other nodes, but at least one
-        \* of them thinks that I'm not the leader. I'll stop
-        \* leading but unfortunately I cannot unlock the lease.
-        watchdogTick[self] := tick;
         leading[self] := FALSE;
+        stepDownAt[self] := -1;
     } or {
       CandidatePrimaryClaimEmptyLease:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
+        await /\ tick < MaxRounds
               /\ observedLeaseHolder = "";
 
         if (observedLeaseRenewTick = leaseRenewTick /\ observedLeaseHolder = leaseHolder) {
-          lastRenew := tick;
+          lastRenew[self] := tick;
           leaseHolder := self;
           observedLeaseHolder := self;
           leaseRenewTick := tick;
           observedLeaseRenewTick := tick;
 
           leading[self] := TRUE;
-          watchdogTick[self] := tick;
         };
     } or {
       CandidatePrimaryStartClaimOwnedLease:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
+        await /\ tick < MaxRounds
               /\ observedLeaseHolder /= self
               /\ observedLeaseHolder /= ""
               /\ lastLeaseChange = -1;
 
-        watchdogTick[self] := tick;
         lookingForLease[self] := TRUE;
         lastLeaseChange := tick;
         lastLeaseRenewTick := observedLeaseRenewTick;
     } or {
-      CandidatePetWatchdogWhileWaitingLease:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
-              /\ observedLeaseHolder /= self
-              /\ observedLeaseHolder /= ""
-              /\ lastLeaseChange /= -1;
-
-        watchdogTick[self] := tick;
-    } or {
       CandidatePrimaryClaimOwnedLease:
-        await /\ IsAlive(self)
-              /\ tick < MaxRounds
+        await /\ tick < MaxRounds
               /\ observedLeaseHolder /= self
               /\ observedLeaseHolder /= ""
               /\ lastLeaseChange /= -1
               /\ lastLeaseRenewTick = observedLeaseRenewTick
-              /\ (tick - lastLeaseChange) > LeaseDuration;
+              /\ (tick - lastLeaseChange) >= LeaseDuration;
 
         if (observedLeaseRenewTick = leaseRenewTick /\ observedLeaseHolder = leaseHolder) {
-          lastRenew := tick;
+          lastRenew[self] := tick;
           leaseHolder := self;
           observedLeaseHolder := self;
           leaseRenewTick := tick;
@@ -202,8 +223,6 @@ variable observedLeaseRenewTick = 0,
           lastLeaseRenewTick := -1;
           lookingForLease[self] := FALSE;
           leading[self] := TRUE;
-
-          watchdogTick[self] := tick;
         };
     } or {
       \* CapStutter: the simulation finished
@@ -214,86 +233,107 @@ variable observedLeaseRenewTick = 0,
 }
 
 } *)
-\* BEGIN TRANSLATION (chksum(pcal) = "8ccf0d7b" /\ chksum(tla) = "5c5fd406")
-VARIABLES leaseHolder, leaseRenewTick, watchdogTick, leading, lookingForLease, 
-          tick, pc
+\* BEGIN TRANSLATION (chksum(pcal) = "567ba9ab" /\ chksum(tla) = "1b2a743b")
+VARIABLES leaseHolder, leaseRenewTick, leading, lookingForLease, lastRenew, 
+          lastCheck, stepDownAt, tick, pc
 
 (* define statement *)
-IsAlive(n) == tick - watchdogTick[n] <= LivenessThreshold
+Max(a, b) == IF a >= b THEN a ELSE b
 
-NoTwoLeaders == \A a, b \in Nodes :
-  leading[a] /\ leading[b] /\ IsAlive(a) /\ IsAlive(b) => a = b
+
+
+Overdue(n) == leading[n] /\ tick - lastRenew[n] > RenewDeadline
+
+
+
+CheckDue(n) == Max(lastRenew[n] + RenewDeadline, lastCheck[n]) + StepDownDelay
+
+
+
+
+
+FencingOnTime(t) == \A n \in Nodes :
+  /\ (leading[n] /\ t - lastRenew[n] > RenewDeadline /\ stepDownAt[n] = -1)
+       => t <= CheckDue(n)
+  /\ stepDownAt[n] /= -1 => t <= stepDownAt[n] + DeliveryDelay
+  /\ stepDownAt[n] /= -1 => t - lastRenew[n] < LeaseDuration
+
+
+
+
+Disagrees(m, n) == m /= n /\ (lookingForLease[m] \/ leaseHolder = m)
+
+NoTwoLeaders == \A a, b \in Nodes : leading[a] /\ leading[b] => a = b
 
 TypeOK ==
   /\ leaseHolder \in Nodes \cup {""}
   /\ leaseRenewTick \in 0 .. MaxRounds
-  /\ watchdogTick \in [Nodes -> 0 .. MaxRounds]
   /\ leading \in [Nodes -> BOOLEAN]
   /\ lookingForLease \in [Nodes -> BOOLEAN]
+  /\ lastRenew \in [Nodes -> -1 .. MaxRounds]
+  /\ lastCheck \in [Nodes -> -1 .. MaxRounds]
+  /\ stepDownAt \in [Nodes -> -1 .. MaxRounds]
   /\ tick \in 0 .. MaxRounds
 
-VARIABLES observedLeaseRenewTick, observedLeaseHolder, lastRenew, 
-          lastLeaseChange, lastLeaseRenewTick
+VARIABLES observedLeaseRenewTick, observedLeaseHolder, lastLeaseChange, 
+          lastLeaseRenewTick
 
-vars == << leaseHolder, leaseRenewTick, watchdogTick, leading, 
-           lookingForLease, tick, pc, observedLeaseRenewTick, 
-           observedLeaseHolder, lastRenew, lastLeaseChange, 
-           lastLeaseRenewTick >>
+vars == << leaseHolder, leaseRenewTick, leading, lookingForLease, lastRenew, 
+           lastCheck, stepDownAt, tick, pc, observedLeaseRenewTick, 
+           observedLeaseHolder, lastLeaseChange, lastLeaseRenewTick >>
 
 ProcSet == {"tick"} \cup (Nodes)
 
 Init == (* Global variables *)
         /\ leaseHolder = ""
         /\ leaseRenewTick = 0
-        /\ watchdogTick = [n \in Nodes |-> 0]
         /\ leading = [n \in Nodes |-> FALSE]
         /\ lookingForLease = [n \in Nodes |-> FALSE]
+        /\ lastRenew = [n \in Nodes |-> -1]
+        /\ lastCheck = [n \in Nodes |-> -1]
+        /\ stepDownAt = [n \in Nodes |-> -1]
         /\ tick = 0
         (* Process Instance *)
         /\ observedLeaseRenewTick = [self \in Nodes |-> 0]
         /\ observedLeaseHolder = [self \in Nodes |-> ""]
-        /\ lastRenew = [self \in Nodes |-> -1]
         /\ lastLeaseChange = [self \in Nodes |-> -1]
         /\ lastLeaseRenewTick = [self \in Nodes |-> -1]
         /\ pc = [self \in ProcSet |-> CASE self = "tick" -> "T"
                                         [] self \in Nodes -> "InstanceLoop"]
 
 T == /\ pc["tick"] = "T"
-     /\ IF tick < MaxRounds
+     /\ IF tick < MaxRounds /\ FencingOnTime(tick + 1)
            THEN /\ tick' = tick + 1
            ELSE /\ TRUE
                 /\ tick' = tick
      /\ pc' = [pc EXCEPT !["tick"] = "T"]
-     /\ UNCHANGED << leaseHolder, leaseRenewTick, watchdogTick, leading, 
-                     lookingForLease, observedLeaseRenewTick, 
-                     observedLeaseHolder, lastRenew, lastLeaseChange, 
-                     lastLeaseRenewTick >>
+     /\ UNCHANGED << leaseHolder, leaseRenewTick, leading, lookingForLease, 
+                     lastRenew, lastCheck, stepDownAt, observedLeaseRenewTick, 
+                     observedLeaseHolder, lastLeaseChange, lastLeaseRenewTick >>
 
 Ticker == T
 
 InstanceLoop(self) == /\ pc[self] = "InstanceLoop"
                       /\ \/ /\ pc' = [pc EXCEPT ![self] = "InstanceObserveLease"]
-                         \/ /\ pc' = [pc EXCEPT ![self] = "HolderRenewLeaseSucceeds"]
-                         \/ /\ pc' = [pc EXCEPT ![self] = "HolderRenewLeaseFail"]
-                         \/ /\ pc' = [pc EXCEPT ![self] = "PrimaryInstanceLostLeaseAndOtherNodesUnreachable"]
-                         \/ /\ pc' = [pc EXCEPT ![self] = "PrimaryInstanceLostLeaseAndOtherNodesAgreeOnMe"]
-                         \/ /\ pc' = [pc EXCEPT ![self] = "PrimaryInstanceLostLeaseAndOtherNodesDoNotAgreeOnMe"]
+                         \/ /\ pc' = [pc EXCEPT ![self] = "HolderRenewLease"]
+                         \/ /\ pc' = [pc EXCEPT ![self] = "MonitorDecidesStepDown"]
+                         \/ /\ pc' = [pc EXCEPT ![self] = "MonitorKeepsLeading"]
+                         \/ /\ pc' = [pc EXCEPT ![self] = "DeliverShutdown"]
+                         \/ /\ pc' = [pc EXCEPT ![self] = "MonitorHardStop"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "CandidatePrimaryClaimEmptyLease"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "CandidatePrimaryStartClaimOwnedLease"]
-                         \/ /\ pc' = [pc EXCEPT ![self] = "CandidatePetWatchdogWhileWaitingLease"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "CandidatePrimaryClaimOwnedLease"]
                          \/ /\ tick = MaxRounds
                             /\ TRUE
                             /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                      /\ UNCHANGED << leaseHolder, leaseRenewTick, 
-                                      watchdogTick, leading, lookingForLease, 
-                                      tick, observedLeaseRenewTick, 
-                                      observedLeaseHolder, lastRenew, 
-                                      lastLeaseChange, lastLeaseRenewTick >>
+                      /\ UNCHANGED << leaseHolder, leaseRenewTick, leading, 
+                                      lookingForLease, lastRenew, lastCheck, 
+                                      stepDownAt, tick, observedLeaseRenewTick, 
+                                      observedLeaseHolder, lastLeaseChange, 
+                                      lastLeaseRenewTick >>
 
 InstanceObserveLease(self) == /\ pc[self] = "InstanceObserveLease"
-                              /\ /\ IsAlive(self)
-                                 /\ tick < MaxRounds
+                              /\ /\ tick < MaxRounds
                                  /\ (observedLeaseHolder[self] /= leaseHolder \/ observedLeaseRenewTick[self] /= leaseRenewTick)
                               /\ IF lastLeaseChange[self] /= -1 /\ observedLeaseRenewTick[self] /= leaseRenewTick
                                     THEN /\ lastLeaseChange' = [lastLeaseChange EXCEPT ![self] = -1]
@@ -307,111 +347,85 @@ InstanceObserveLease(self) == /\ pc[self] = "InstanceObserveLease"
                               /\ observedLeaseRenewTick' = [observedLeaseRenewTick EXCEPT ![self] = leaseRenewTick]
                               /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                               /\ UNCHANGED << leaseHolder, leaseRenewTick, 
-                                              watchdogTick, leading, tick, 
-                                              lastRenew >>
+                                              leading, lastRenew, lastCheck, 
+                                              stepDownAt, tick >>
 
-HolderRenewLeaseSucceeds(self) == /\ pc[self] = "HolderRenewLeaseSucceeds"
-                                  /\ /\ IsAlive(self)
-                                     /\ tick < MaxRounds
-                                     /\ lastRenew[self] /= -1
-                                     /\ RenewPeriod <= tick - lastRenew[self]
-                                     /\ tick - lastRenew[self] <= RenewDeadline
-                                     /\ observedLeaseHolder[self] = self
-                                  /\ IF observedLeaseRenewTick[self] = leaseRenewTick /\ observedLeaseHolder[self] = leaseHolder
-                                        THEN /\ lastRenew' = [lastRenew EXCEPT ![self] = tick]
-                                             /\ leaseRenewTick' = tick
-                                             /\ observedLeaseRenewTick' = [observedLeaseRenewTick EXCEPT ![self] = tick]
-                                             /\ leaseHolder' = self
-                                             /\ observedLeaseHolder' = [observedLeaseHolder EXCEPT ![self] = self]
-                                             /\ leading' = [leading EXCEPT ![self] = TRUE]
-                                        ELSE /\ TRUE
-                                             /\ UNCHANGED << leaseHolder, 
-                                                             leaseRenewTick, 
-                                                             leading, 
-                                                             observedLeaseRenewTick, 
-                                                             observedLeaseHolder, 
-                                                             lastRenew >>
-                                  /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
-                                  /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                                  /\ UNCHANGED << lookingForLease, tick, 
-                                                  lastLeaseChange, 
-                                                  lastLeaseRenewTick >>
+HolderRenewLease(self) == /\ pc[self] = "HolderRenewLease"
+                          /\ /\ tick < MaxRounds
+                             /\ leading[self]
+                             /\ RenewPeriod <= tick - lastRenew[self]
+                             /\ observedLeaseHolder[self] = self
+                          /\ IF observedLeaseRenewTick[self] = leaseRenewTick /\ observedLeaseHolder[self] = leaseHolder
+                                THEN /\ lastRenew' = [lastRenew EXCEPT ![self] = tick]
+                                     /\ leaseRenewTick' = tick
+                                     /\ observedLeaseRenewTick' = [observedLeaseRenewTick EXCEPT ![self] = tick]
+                                ELSE /\ TRUE
+                                     /\ UNCHANGED << leaseRenewTick, lastRenew, 
+                                                     observedLeaseRenewTick >>
+                          /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
+                          /\ UNCHANGED << leaseHolder, leading, 
+                                          lookingForLease, lastCheck, 
+                                          stepDownAt, tick, 
+                                          observedLeaseHolder, lastLeaseChange, 
+                                          lastLeaseRenewTick >>
 
-HolderRenewLeaseFail(self) == /\ pc[self] = "HolderRenewLeaseFail"
-                              /\ /\ IsAlive(self)
-                                 /\ tick < MaxRounds
-                                 /\ lastRenew[self] /= -1
-                                 /\ RenewPeriod <= tick - lastRenew[self]
-                                 /\ tick - lastRenew[self] <= RenewDeadline
-                                 /\ observedLeaseHolder[self] = self
-                              /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
-                              /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                              /\ UNCHANGED << leaseHolder, leaseRenewTick, 
-                                              leading, lookingForLease, tick, 
-                                              observedLeaseRenewTick, 
-                                              observedLeaseHolder, lastRenew, 
-                                              lastLeaseChange, 
-                                              lastLeaseRenewTick >>
+MonitorDecidesStepDown(self) == /\ pc[self] = "MonitorDecidesStepDown"
+                                /\ /\ tick < MaxRounds
+                                   /\ Overdue(self)
+                                   /\ stepDownAt[self] = -1
+                                /\ lastCheck' = [lastCheck EXCEPT ![self] = tick]
+                                /\ stepDownAt' = [stepDownAt EXCEPT ![self] = tick]
+                                /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
+                                /\ UNCHANGED << leaseHolder, leaseRenewTick, 
+                                                leading, lookingForLease, 
+                                                lastRenew, tick, 
+                                                observedLeaseRenewTick, 
+                                                observedLeaseHolder, 
+                                                lastLeaseChange, 
+                                                lastLeaseRenewTick >>
 
-PrimaryInstanceLostLeaseAndOtherNodesUnreachable(self) == /\ pc[self] = "PrimaryInstanceLostLeaseAndOtherNodesUnreachable"
-                                                          /\ /\ IsAlive(self)
-                                                             /\ tick < MaxRounds
-                                                             /\ tick - observedLeaseRenewTick[self] > RenewDeadline
-                                                             /\ leading[self]
-                                                          /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
-                                                          /\ leading' = [leading EXCEPT ![self] = FALSE]
-                                                          /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                                                          /\ UNCHANGED << leaseHolder, 
-                                                                          leaseRenewTick, 
-                                                                          lookingForLease, 
-                                                                          tick, 
-                                                                          observedLeaseRenewTick, 
-                                                                          observedLeaseHolder, 
-                                                                          lastRenew, 
-                                                                          lastLeaseChange, 
-                                                                          lastLeaseRenewTick >>
+MonitorKeepsLeading(self) == /\ pc[self] = "MonitorKeepsLeading"
+                             /\ /\ tick < MaxRounds
+                                /\ Overdue(self)
+                                /\ stepDownAt[self] = -1
+                                /\ \A m \in Nodes : ~Disagrees(m, self)
+                             /\ lastCheck' = [lastCheck EXCEPT ![self] = tick]
+                             /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
+                             /\ UNCHANGED << leaseHolder, leaseRenewTick, 
+                                             leading, lookingForLease, 
+                                             lastRenew, stepDownAt, tick, 
+                                             observedLeaseRenewTick, 
+                                             observedLeaseHolder, 
+                                             lastLeaseChange, 
+                                             lastLeaseRenewTick >>
 
-PrimaryInstanceLostLeaseAndOtherNodesAgreeOnMe(self) == /\ pc[self] = "PrimaryInstanceLostLeaseAndOtherNodesAgreeOnMe"
-                                                        /\ /\ IsAlive(self)
-                                                           /\ tick < MaxRounds
-                                                           /\ leading[self]
-                                                           /\ tick - observedLeaseRenewTick[self] > RenewDeadline
-                                                           /\ \A n \in Nodes : ~lookingForLease[n]
-                                                        /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
-                                                        /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                                                        /\ UNCHANGED << leaseHolder, 
-                                                                        leaseRenewTick, 
-                                                                        leading, 
-                                                                        lookingForLease, 
-                                                                        tick, 
-                                                                        observedLeaseRenewTick, 
-                                                                        observedLeaseHolder, 
-                                                                        lastRenew, 
-                                                                        lastLeaseChange, 
-                                                                        lastLeaseRenewTick >>
+DeliverShutdown(self) == /\ pc[self] = "DeliverShutdown"
+                         /\ /\ tick < MaxRounds
+                            /\ stepDownAt[self] /= -1
+                         /\ leading' = [leading EXCEPT ![self] = FALSE]
+                         /\ stepDownAt' = [stepDownAt EXCEPT ![self] = -1]
+                         /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
+                         /\ UNCHANGED << leaseHolder, leaseRenewTick, 
+                                         lookingForLease, lastRenew, lastCheck, 
+                                         tick, observedLeaseRenewTick, 
+                                         observedLeaseHolder, lastLeaseChange, 
+                                         lastLeaseRenewTick >>
 
-PrimaryInstanceLostLeaseAndOtherNodesDoNotAgreeOnMe(self) == /\ pc[self] = "PrimaryInstanceLostLeaseAndOtherNodesDoNotAgreeOnMe"
-                                                             /\ /\ IsAlive(self)
-                                                                /\ tick < MaxRounds
-                                                                /\ leading[self]
-                                                                /\ tick - observedLeaseRenewTick[self] > RenewDeadline
-                                                                /\ \E n \in Nodes : lookingForLease[n]
-                                                             /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
-                                                             /\ leading' = [leading EXCEPT ![self] = FALSE]
-                                                             /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                                                             /\ UNCHANGED << leaseHolder, 
-                                                                             leaseRenewTick, 
-                                                                             lookingForLease, 
-                                                                             tick, 
-                                                                             observedLeaseRenewTick, 
-                                                                             observedLeaseHolder, 
-                                                                             lastRenew, 
-                                                                             lastLeaseChange, 
-                                                                             lastLeaseRenewTick >>
+MonitorHardStop(self) == /\ pc[self] = "MonitorHardStop"
+                         /\ /\ tick < MaxRounds
+                            /\ stepDownAt[self] /= -1
+                            /\ tick - lastRenew[self] + RenewPeriod >= LeaseDuration
+                         /\ leading' = [leading EXCEPT ![self] = FALSE]
+                         /\ stepDownAt' = [stepDownAt EXCEPT ![self] = -1]
+                         /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
+                         /\ UNCHANGED << leaseHolder, leaseRenewTick, 
+                                         lookingForLease, lastRenew, lastCheck, 
+                                         tick, observedLeaseRenewTick, 
+                                         observedLeaseHolder, lastLeaseChange, 
+                                         lastLeaseRenewTick >>
 
 CandidatePrimaryClaimEmptyLease(self) == /\ pc[self] = "CandidatePrimaryClaimEmptyLease"
-                                         /\ /\ IsAlive(self)
-                                            /\ tick < MaxRounds
+                                         /\ /\ tick < MaxRounds
                                             /\ observedLeaseHolder[self] = ""
                                          /\ IF observedLeaseRenewTick[self] = leaseRenewTick /\ observedLeaseHolder[self] = leaseHolder
                                                THEN /\ lastRenew' = [lastRenew EXCEPT ![self] = tick]
@@ -420,65 +434,44 @@ CandidatePrimaryClaimEmptyLease(self) == /\ pc[self] = "CandidatePrimaryClaimEmp
                                                     /\ leaseRenewTick' = tick
                                                     /\ observedLeaseRenewTick' = [observedLeaseRenewTick EXCEPT ![self] = tick]
                                                     /\ leading' = [leading EXCEPT ![self] = TRUE]
-                                                    /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
                                                ELSE /\ TRUE
                                                     /\ UNCHANGED << leaseHolder, 
                                                                     leaseRenewTick, 
-                                                                    watchdogTick, 
                                                                     leading, 
+                                                                    lastRenew, 
                                                                     observedLeaseRenewTick, 
-                                                                    observedLeaseHolder, 
-                                                                    lastRenew >>
+                                                                    observedLeaseHolder >>
                                          /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                                         /\ UNCHANGED << lookingForLease, tick, 
-                                                         lastLeaseChange, 
+                                         /\ UNCHANGED << lookingForLease, 
+                                                         lastCheck, stepDownAt, 
+                                                         tick, lastLeaseChange, 
                                                          lastLeaseRenewTick >>
 
 CandidatePrimaryStartClaimOwnedLease(self) == /\ pc[self] = "CandidatePrimaryStartClaimOwnedLease"
-                                              /\ /\ IsAlive(self)
-                                                 /\ tick < MaxRounds
+                                              /\ /\ tick < MaxRounds
                                                  /\ observedLeaseHolder[self] /= self
                                                  /\ observedLeaseHolder[self] /= ""
                                                  /\ lastLeaseChange[self] = -1
-                                              /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
                                               /\ lookingForLease' = [lookingForLease EXCEPT ![self] = TRUE]
                                               /\ lastLeaseChange' = [lastLeaseChange EXCEPT ![self] = tick]
                                               /\ lastLeaseRenewTick' = [lastLeaseRenewTick EXCEPT ![self] = observedLeaseRenewTick[self]]
                                               /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                                               /\ UNCHANGED << leaseHolder, 
                                                               leaseRenewTick, 
-                                                              leading, tick, 
+                                                              leading, 
+                                                              lastRenew, 
+                                                              lastCheck, 
+                                                              stepDownAt, tick, 
                                                               observedLeaseRenewTick, 
-                                                              observedLeaseHolder, 
-                                                              lastRenew >>
-
-CandidatePetWatchdogWhileWaitingLease(self) == /\ pc[self] = "CandidatePetWatchdogWhileWaitingLease"
-                                               /\ /\ IsAlive(self)
-                                                  /\ tick < MaxRounds
-                                                  /\ observedLeaseHolder[self] /= self
-                                                  /\ observedLeaseHolder[self] /= ""
-                                                  /\ lastLeaseChange[self] /= -1
-                                               /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
-                                               /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                                               /\ UNCHANGED << leaseHolder, 
-                                                               leaseRenewTick, 
-                                                               leading, 
-                                                               lookingForLease, 
-                                                               tick, 
-                                                               observedLeaseRenewTick, 
-                                                               observedLeaseHolder, 
-                                                               lastRenew, 
-                                                               lastLeaseChange, 
-                                                               lastLeaseRenewTick >>
+                                                              observedLeaseHolder >>
 
 CandidatePrimaryClaimOwnedLease(self) == /\ pc[self] = "CandidatePrimaryClaimOwnedLease"
-                                         /\ /\ IsAlive(self)
-                                            /\ tick < MaxRounds
+                                         /\ /\ tick < MaxRounds
                                             /\ observedLeaseHolder[self] /= self
                                             /\ observedLeaseHolder[self] /= ""
                                             /\ lastLeaseChange[self] /= -1
                                             /\ lastLeaseRenewTick[self] = observedLeaseRenewTick[self]
-                                            /\ (tick - lastLeaseChange[self]) > LeaseDuration
+                                            /\ (tick - lastLeaseChange[self]) >= LeaseDuration
                                          /\ IF observedLeaseRenewTick[self] = leaseRenewTick /\ observedLeaseHolder[self] = leaseHolder
                                                THEN /\ lastRenew' = [lastRenew EXCEPT ![self] = tick]
                                                     /\ leaseHolder' = self
@@ -489,30 +482,27 @@ CandidatePrimaryClaimOwnedLease(self) == /\ pc[self] = "CandidatePrimaryClaimOwn
                                                     /\ lastLeaseRenewTick' = [lastLeaseRenewTick EXCEPT ![self] = -1]
                                                     /\ lookingForLease' = [lookingForLease EXCEPT ![self] = FALSE]
                                                     /\ leading' = [leading EXCEPT ![self] = TRUE]
-                                                    /\ watchdogTick' = [watchdogTick EXCEPT ![self] = tick]
                                                ELSE /\ TRUE
                                                     /\ UNCHANGED << leaseHolder, 
                                                                     leaseRenewTick, 
-                                                                    watchdogTick, 
                                                                     leading, 
                                                                     lookingForLease, 
+                                                                    lastRenew, 
                                                                     observedLeaseRenewTick, 
                                                                     observedLeaseHolder, 
-                                                                    lastRenew, 
                                                                     lastLeaseChange, 
                                                                     lastLeaseRenewTick >>
                                          /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
-                                         /\ tick' = tick
+                                         /\ UNCHANGED << lastCheck, stepDownAt, 
+                                                         tick >>
 
 Instance(self) == InstanceLoop(self) \/ InstanceObserveLease(self)
-                     \/ HolderRenewLeaseSucceeds(self)
-                     \/ HolderRenewLeaseFail(self)
-                     \/ PrimaryInstanceLostLeaseAndOtherNodesUnreachable(self)
-                     \/ PrimaryInstanceLostLeaseAndOtherNodesAgreeOnMe(self)
-                     \/ PrimaryInstanceLostLeaseAndOtherNodesDoNotAgreeOnMe(self)
+                     \/ HolderRenewLease(self)
+                     \/ MonitorDecidesStepDown(self)
+                     \/ MonitorKeepsLeading(self) \/ DeliverShutdown(self)
+                     \/ MonitorHardStop(self)
                      \/ CandidatePrimaryClaimEmptyLease(self)
                      \/ CandidatePrimaryStartClaimOwnedLease(self)
-                     \/ CandidatePetWatchdogWhileWaitingLease(self)
                      \/ CandidatePrimaryClaimOwnedLease(self)
 
 Next == Ticker
@@ -520,5 +510,5 @@ Next == Ticker
 
 Spec == Init /\ [][Next]_vars
 
-\* END TRANSLATION
+\* END TRANSLATION 
 ====
