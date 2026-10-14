@@ -20,7 +20,9 @@ SPDX-License-Identifier: Apache-2.0
 package utils
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -147,6 +149,16 @@ var _ = Describe("isRetryableExecError", func() {
 
 		It("should return false for generic errors", func() {
 			err := errors.New("some other error")
+			Expect(isRetryableExecError(err)).To(BeFalse())
+		})
+
+		It("should return false when the attempt timeout expired", func() {
+			err := fmt.Errorf("cmd: [psql]\nerror: %w", context.DeadlineExceeded)
+			Expect(isRetryableExecError(err)).To(BeFalse())
+		})
+
+		It("should return false when the context was cancelled", func() {
+			err := fmt.Errorf("cmd: [psql]\nerror: %w", context.Canceled)
 			Expect(isRetryableExecError(err)).To(BeFalse())
 		})
 
