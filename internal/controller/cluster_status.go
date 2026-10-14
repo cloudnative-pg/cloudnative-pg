@@ -808,6 +808,11 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		}
 	}
 
+	// Surface any replica reporting it diverged from the current primary's
+	// timeline. Always runs; containment is handled separately, see
+	// reconcileDivergedReplicaContainment.
+	r.evaluateReplicaDivergence(cluster, statuses)
+
 	// we update the system ID field in the cluster status
 	switch detectedSystemID.Len() {
 	case 0:

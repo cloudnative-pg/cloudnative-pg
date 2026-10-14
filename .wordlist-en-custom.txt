@@ -154,11 +154,14 @@ DatabaseStatus
 DefaultAzureCredential
 DemotionToken
 DeploymentStrategy
+DetectedAt
 DevOps
 DevSecOps
 DigitalOcean
 DisablePassword
 DisabledDefaultServices
+DivergedInstanceStatus
+DivergedInstances
 DoD
 DoS
 DockerHub
@@ -201,6 +204,7 @@ FailureDomainKeys
 Fei
 Filesystem
 Fluentd
+ForkLSN
 Francesco
 GC
 GCE
@@ -366,6 +370,7 @@ PODNAME
 PPROF
 PSA
 PV
+PVCUID
 PVCs
 PascalBourdier
 PasswordState
@@ -423,6 +428,7 @@ Postgres
 PostgresCapabilities
 PostgresConfiguration
 PrimaryLeaseConfiguration
+PrimaryTimeLineID
 PrimaryUpdateMethod
 PrimaryUpdateMethodRestart
 PrimaryUpdateMethodSwitchover
@@ -465,6 +471,7 @@ RUNTIME
 ReadWriteOnce
 RedHat
 RelabelConfig
+ReplayLSN
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationSlotsConfiguration
@@ -914,6 +921,7 @@ displayName
 distro
 distroless
 distros
+divergedinstancestatus
 dl
 dn
 dns
