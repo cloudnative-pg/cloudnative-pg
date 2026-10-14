@@ -1470,6 +1470,7 @@ func (instance *Instance) GetSystemID() string {
 
 	pgControlData, err := instance.GetPgControldata()
 	if err != nil {
+		log.Debug("Cannot read the system ID from pg_control", "err", err)
 		return ""
 	}
 
