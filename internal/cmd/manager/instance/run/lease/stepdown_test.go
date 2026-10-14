@@ -239,8 +239,9 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 	})
 
 	It("does not act on a zero stamp: the monitor seeds it when it starts", func(ctx context.Context) {
-		// Re-adopting our own lease across an in-place upgrade writes nothing, so
-		// without the seeding the very first tick would see an age of decades.
+		// Every way into the held state writes the lease, which stamps it, so the
+		// seeding is a guard: without it a zero stamp would give the very first
+		// tick an age of decades.
 		r.config.RenewDeadline = time.Hour
 		r.lastConfirmed.Store(nil)
 		verdict(true, nil)

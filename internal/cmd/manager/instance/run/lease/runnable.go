@@ -332,12 +332,13 @@ func classifyLeaseAfterRun(
 // preAcquire before each renewal loop. It returns true if the lease is now
 // held by this pod (either it already was, or we just won it).
 //
-// A cleanly released lease (empty holder) is taken immediately. A lease still
-// naming another holder is taken over only after we have locally observed the
-// record unchanged for a full LeaseDuration, mirroring client-go's observedTime
-// check: a live holder renews within that window, so an unchanged record proves
-// it has stopped. The comparison is local and equality-only, so clock skew
-// between this pod and the previous holder cannot trigger a take-over.
+// Only the target primary takes a lease over; see isTargetPrimary. A cleanly
+// released lease (empty holder) is taken immediately. A lease still naming
+// another holder is taken over only after we have locally observed the record
+// unchanged for a full LeaseDuration, mirroring client-go's observedTime check:
+// a live holder renews within that window, so an unchanged record proves it has
+// stopped. The comparison is local and equality-only, so clock skew between
+// this pod and the previous holder cannot trigger a take-over.
 //
 // The window is timed in process memory, so a restart of this process re-times
 // it from scratch. That is the inherent cost of not trusting the holder's
@@ -365,15 +366,22 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 
 	identity := r.lock.Identity()
 
-	// Already ours: nothing to do here, le.Run will refresh the RenewTime.
+	// Already ours, for instance after the instance manager restarted. Refresh
+	// the record with a write that is conditional on the version just read.
+	// Holding the lease is then settled by the same compare-and-swap that a
+	// challenger's claim goes through, not by a read that a claim may have
+	// overtaken, and the monitor starts from a write that was really confirmed.
 	if record.HolderIdentity == identity {
-		return true, nil
+		return r.renew(ctx, record)
 	}
 
 	// Empty holder: the previous primary released cleanly. An empty identity is
 	// unambiguous regardless of clocks, so claim it immediately. A switchover or
 	// a clean shutdown takes this path, keeping that hand-over fast.
 	if record.HolderIdentity == "" {
+		if !r.isTargetPrimary() {
+			return false, nil
+		}
 		return r.claim(ctx, record)
 	}
 
@@ -391,7 +399,21 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 	if now.Sub(r.observedTime) < r.config.LeaseDuration {
 		return false, nil
 	}
+	if !r.isTargetPrimary() {
+		return false, nil
+	}
 	return r.claim(ctx, record)
+}
+
+// isTargetPrimary reports whether the Cluster the instance manager last
+// reconciled names this pod as target primary. The runnable polls for as long
+// as the process lives, so only the target may take the lease over: any other
+// pod would hold it as a replica and keep the real target from getting it. The
+// observation window keeps running meanwhile, and the claim follows on the
+// first poll after a reconcile stores this pod as the target. A stale cache
+// only delays that, as it delays a promotion.
+func (r *Runnable) isTargetPrimary() bool {
+	return r.instance.GetClusterOrDefault().Status.TargetPrimary == r.instance.GetPodName()
 }
 
 // sameHolder reports whether two reads describe the same un-renewed lease
@@ -399,6 +421,28 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 // means the holder has not written since we last looked.
 func sameHolder(a, b *resourcelock.LeaderElectionRecord) bool {
 	return a.HolderIdentity == b.HolderIdentity && a.RenewTime.Equal(&b.RenewTime)
+}
+
+// renew rewrites a record that already names this pod, with a fresh RenewTime
+// and without touching the transition counter or the acquire time. Like claim,
+// the Update is conditional on the ResourceVersion of the preceding Get. It is
+// bounded by RenewDeadline, as that Get is, so that an API server that does not
+// answer cannot hold the loop for longer than a renewal may take.
+func (r *Runnable) renew(ctx context.Context, current *resourcelock.LeaderElectionRecord) (bool, error) {
+	updateCtx, cancel := context.WithTimeout(ctx, r.config.RenewDeadline)
+	defer cancel()
+
+	if err := r.lock.Update(updateCtx, resourcelock.LeaderElectionRecord{
+		HolderIdentity:       current.HolderIdentity,
+		LeaseDurationSeconds: int(r.config.LeaseDuration / time.Second),
+		RenewTime:            metav1.NewTime(time.Now()),
+		AcquireTime:          current.AcquireTime,
+		LeaderTransitions:    current.LeaderTransitions,
+	}); err != nil {
+		return false, err
+	}
+	r.observedRecord = nil
+	return true, nil
 }
 
 // claim writes this pod as the lease holder, bumping the transition counter.
@@ -424,9 +468,9 @@ func (r *Runnable) claim(ctx context.Context, current *resourcelock.LeaderElecti
 // jitter) until this pod holds the primary lease or ctx is cancelled. Polling
 // without jitter keeps the take-over cadence bounded by RetryPeriod rather than
 // client-go's jittered 2.2*RetryPeriod, and tryTakeOver adopts a cleanly
-// released lease on the first poll instead of waiting out an observation
-// window, so a graceful failover stays quick without having to inflate
-// LeaseDuration.
+// released lease, when this pod is the target primary, on the first poll
+// instead of waiting out an observation window, so a graceful failover stays
+// quick without having to inflate LeaseDuration.
 //
 // Whether this primary should step down while the lease stays unverifiable is
 // not decided here: monitorLeaseAge watches the age of the last confirmed lease

@@ -37,9 +37,9 @@ import (
 // is what the step-down monitor reads.
 //
 // Only writes stamp it. A successful read proves the record still names us, not
-// that it is recent: tryTakeOver returns early on the "already ours" branch
-// without looking at RenewTime. If reads stamped it too, a state where reads
-// succeed and writes do not (separate priority-and-fairness limits for mutating
+// that it is recent: that is why tryTakeOver rewrites a record that already
+// names us instead of trusting the read. If reads stamped it too, a state where
+// reads succeed and writes do not (separate priority-and-fairness limits for mutating
 // requests, an admission policy on leases, a role granting get but not update)
 // would reset the clock on every poll while the RenewTime the replicas observe
 // stays frozen, which is precisely the situation the monitor exists to catch.
@@ -102,12 +102,11 @@ func (l *confirmingLock) stamp(ler resourcelock.LeaderElectionRecord, started ti
 func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
 
-	// Seed the clock. The re-adoption path writes nothing (tryTakeOver returns
-	// on the "already ours" branch), so an instance manager that re-adopts its
-	// own lease across an in-place upgrade would start from a zero stamp and
-	// compute an enormous age on the very first tick. We know the lease is ours
-	// right now, which is what the monitor starting means. A stamp that a write
-	// has already set is the more accurate one and is kept.
+	// Seed the clock, as a guard: every way into the held state ends in a lease
+	// write that stamps it (claim, or renew when the record is already ours), so
+	// the stamp is normally set already, and that stamp is the more accurate one
+	// and is kept. A zero stamp would otherwise give an enormous age on the very
+	// first tick.
 	r.lastConfirmed.CompareAndSwap(nil, ptr.To(time.Now()))
 
 	ticker := time.NewTicker(r.config.RetryPeriod)
