@@ -237,8 +237,7 @@ type Instance struct {
 	// so access is synchronized through an atomic pointer.
 	cluster atomic.Pointer[apiv1.Cluster]
 
-	// systemID is the system identifier of the PGDATA, as stored in pg_control.
-	// It can't change for a given PGDATA, so it is cached once read.
+	// systemID caches the pg_control system identifier, which never changes
 	systemID      string
 	systemIDMutex sync.Mutex
 }
@@ -1455,11 +1454,8 @@ func (instance *Instance) GetPgControldata() (string, error) {
 	return string(out), nil
 }
 
-// GetSystemID returns the system identifier of the PGDATA, as stored in
-// pg_control, or an empty string if it is not known. It doesn't need PostgreSQL
-// to be running. The identifier can't change for a given PGDATA, so it is read
-// once and then cached. While it is unknown, each call tries reading it again,
-// as the data directory may have been repaired in the meantime.
+// GetSystemID returns the system identifier from pg_control, or an empty
+// string if it can't be read. It works while PostgreSQL is down.
 func (instance *Instance) GetSystemID() string {
 	instance.systemIDMutex.Lock()
 	defer instance.systemIDMutex.Unlock()

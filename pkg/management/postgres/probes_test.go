@@ -87,12 +87,11 @@ var _ = Describe("system ID", func() {
 		writeFakePgControldata("#!/bin/sh\nexit 1\n")
 		Expect(instance.GetSystemID()).To(BeEmpty())
 
-		// the data directory has been repaired
 		writeFakePgControldata("#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n")
 		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
 	})
 
-	It("fails if the output doesn't contain the system ID", func() {
+	It("is empty if the output has no system ID", func() {
 		writeFakePgControldata("#!/bin/sh\necho 'pg_control version number:            1300'\n")
 		Expect(instance.GetSystemID()).To(BeEmpty())
 	})
