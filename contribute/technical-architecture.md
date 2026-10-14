@@ -134,8 +134,9 @@ The Instance Manager provides a database-aware HTTP server for Kubelet probes:
 
 - **Startup Probe:** Prevents restarts during `initdb`, recovery, or WAL
   replay.
-- **Liveness Probe:** Ensures the instance manager process itself is
-  operating correctly.
+- **Liveness Probe:** Always succeeds while the instance manager's status web
+  server answers. Primary isolation fencing lives in the primary lease
+  (`internal/cmd/manager/instance/run/lease`), not here.
 - **Readiness Probe:** Ensures `pg_isready` succeeds on the primary and
   validates replication lag/hot-standby status on replicas before allowing
   traffic.

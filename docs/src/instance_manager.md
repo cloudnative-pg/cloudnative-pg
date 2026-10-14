@@ -168,7 +168,9 @@ probes:
 
 The liveness probe begins after the startup probe successfully completes. Its
 primary role is to ensure the PostgreSQL instance manager is operating
-correctly.
+correctly: it only checks that the instance manager's status web server
+answers. Primary isolation is not handled by this probe, but by the primary
+lease (see [Primary Isolation](#primary-isolation)).
 
 Following Kubernetes standards, if the liveness probe fails, the kubelet will
 terminate the container, which will then be restarted.
@@ -227,12 +229,14 @@ spec:
 
 A primary that cannot reach the Kubernetes API server and has also lost contact
 with part of its cluster has lost the ability to tell a network partition from a
-cluster in which it has already been replaced. CloudNativePG **shuts such a
-primary down** so that it stops accepting writes, if **both** of the following
+cluster in which it has already been replaced. CloudNativePG **stops such a
+primary** so that it stops accepting writes, if **both** of the following
 conditions are met:
 
-1. The instance manager cannot renew the [primary lease](failover.md#safe-primary-election),
-   because it cannot reach the Kubernetes API server
+1. The instance manager has not managed to renew the
+   [primary lease](failover.md#safe-primary-election) for longer than its renew
+   deadline, typically because it cannot reach the Kubernetes API server, but
+   whatever the cause
 2. The instance manager cannot reach **at least one** of the other instances via
    the instance manager's REST API, or an instance it can reach reports a
    different instance as the target primary
@@ -241,10 +245,21 @@ The second condition is deliberately conservative: a single instance the primary
 can no longer reach is enough, because a primary that has lost both the API
 server and a peer cannot rule out having been replaced.
 
-The check is driven by the primary lease. Once the lease has gone longer than
-its renew deadline without a successful renewal, the instance manager probes the
-other instances and, if they confirm the isolation, shuts PostgreSQL down
-immediately.
+The check is driven by the primary lease. The instance manager keeps track of
+the last time it renewed the lease successfully. On its first retry-period tick
+after that time is older than the renew deadline, it probes the other instances
+and, if they confirm the isolation, requests an immediate PostgreSQL shutdown.
+Open transactions are aborted and the next start runs crash recovery. The
+decision is taken once, and the request is retried until the instance manager
+accepts it. The step-down is logged under the `primary-lease` logger.
+
+The instance manager may be busy with another command, for example a restart,
+or the immediate shutdown may fail. If the instance manager is still running on
+the last retry-period tick before the lease goes stale, it sends `SIGQUIT` to
+the PostgreSQL postmaster and exits with code `5`. The kubelet restarts the
+container. If the pod is still the target primary, it waits for the lease before
+it starts PostgreSQL again, otherwise it rejoins as a replica. The check never
+acts when it is disabled or when the cluster has a single instance.
 
 It is **enabled by default** and can be disabled by adding the following:
 
@@ -258,9 +273,25 @@ spec:
 
 :::info[Important]
     The reaction time is set by the primary lease timings
-    (`.spec.primaryLease`), not by the liveness probe settings: with the
-    defaults the shutdown is requested within roughly 12 seconds of the last
-    successful lease renewal. The liveness probe periods have no effect on it.
+    (`.spec.primaryLease`) and by `isolationCheck.requestTimeout`, not by the
+    liveness probe periods: with the defaults the shutdown is requested between
+    10 and 13 seconds after the last successful lease renewal. `periodSeconds`,
+    `failureThreshold` and `livenessProbeTimeout` have no effect on it. Keep
+    `renewDeadlineSeconds` plus `retryPeriodSeconds` plus `requestTimeout` below
+    `leaseDurationSeconds`; the admission webhook warns otherwise.
+:::
+
+:::info[Upgrading from 1.30 and earlier]
+    Up to CloudNativePG 1.30, an isolated primary was stopped through the
+    kubelet: the liveness probe failed, and the container ended with a smart
+    shutdown bounded by `.spec.smartShutdownTimeout`. The liveness probe
+    periods set the reaction time. Neither applies any more. The shutdown is
+    immediate, and `.spec.smartShutdownTimeout: 0` is no longer needed for this
+    purpose. Open sessions on an isolated primary are terminated instead of
+    being allowed to finish. The condition changed too: it no longer depends on
+    the liveness probe seeing the API server fail, but on the age of the last
+    lease renewal, and it also holds when a reachable instance names a
+    different target primary.
 :::
 
 The spec also accepts two optional network settings: `requestTimeout`
