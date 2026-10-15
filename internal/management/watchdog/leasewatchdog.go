@@ -38,20 +38,41 @@ import (
 type LeaseWatchdog struct {
 	lastAttempt atomic.Int64 // unix nano
 	acquired    atomic.Bool
-	maxSilence  time.Duration
+	maxSilence  atomic.Int64 // nanoseconds
+	inFlight    atomic.Int32 // lock calls currently running
 }
 
 // NewLeaseWatchdog creates a watchdog that considers the loop stuck once
-// maxSilence has elapsed since the last recorded lock attempt.
+// maxSilence has elapsed since the last lock call started or returned, with no
+// call still running.
 func NewLeaseWatchdog(maxSilence time.Duration) *LeaseWatchdog {
-	w := &LeaseWatchdog{maxSilence: maxSilence}
+	w := &LeaseWatchdog{}
+	w.SetMaxSilence(maxSilence)
 	w.Beat()
 	return w
 }
 
-// Beat records that a lock operation was just attempted.
+// SetMaxSilence changes the silence limit. It only needs to cover the pause
+// between two lock calls: a call still running counts as activity, because
+// how long it may block is the API client's business, not a sign of a wedged
+// loop.
+func (w *LeaseWatchdog) SetMaxSilence(maxSilence time.Duration) {
+	w.maxSilence.Store(int64(maxSilence))
+}
+
+// Beat records lock activity: a call starting or returning.
 func (w *LeaseWatchdog) Beat() {
 	w.lastAttempt.Store(time.Now().UnixNano())
+}
+
+// enter marks a lock call as running and returns the function that ends it.
+func (w *LeaseWatchdog) enter() func() {
+	w.inFlight.Add(1)
+	w.Beat()
+	return func() {
+		w.Beat()
+		w.inFlight.Add(-1)
+	}
 }
 
 // MarkAcquired records that the primary lease has been held by this instance
@@ -66,22 +87,25 @@ func (w *LeaseWatchdog) MarkAcquired() {
 // IsHealthy reports whether the loop has attempted work recently enough.
 // It always reports healthy until MarkAcquired has been called at least once.
 func (w *LeaseWatchdog) IsHealthy() error {
-	if !w.acquired.Load() {
+	if !w.acquired.Load() || w.inFlight.Load() > 0 {
 		return nil
 	}
 	last := time.Unix(0, w.lastAttempt.Load())
-	if silence := time.Since(last); silence > w.maxSilence {
-		return fmt.Errorf("primary lease loop has not attempted any lock operation in %s (limit %s)",
-			silence.Round(time.Second), w.maxSilence)
+	limit := time.Duration(w.maxSilence.Load())
+	if silence := time.Since(last); silence > limit {
+		return fmt.Errorf("primary lease loop has not made any lock call in %s (limit %s)",
+			silence.Round(time.Second), limit)
 	}
 	return nil
 }
 
-// WrapLock returns a resourcelock.Interface that calls Beat() before
-// delegating every method call to lock. Get and Update are the only methods
-// actually invoked at runtime by this elector configuration (the cluster
-// controller owns lease creation, so Create is never called), but all
-// methods are wrapped for interface completeness.
+// WrapLock returns a resourcelock.Interface that beats before and after
+// delegating every method call to lock and reports the watchdog healthy while
+// a call is running, so an API server that does not answer is never mistaken
+// for a wedged loop. Get and Update are the only methods actually invoked at
+// runtime by this elector configuration (the cluster controller owns lease
+// creation, so Create is never called), but all methods are wrapped for
+// interface completeness.
 func (w *LeaseWatchdog) WrapLock(lock resourcelock.Interface) resourcelock.Interface {
 	return &watchedLock{inner: lock, watchdog: w}
 }
@@ -92,17 +116,17 @@ type watchedLock struct {
 }
 
 func (l *watchedLock) Get(ctx context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
-	l.watchdog.Beat()
+	defer l.watchdog.enter()()
 	return l.inner.Get(ctx)
 }
 
 func (l *watchedLock) Create(ctx context.Context, ler resourcelock.LeaderElectionRecord) error {
-	l.watchdog.Beat()
+	defer l.watchdog.enter()()
 	return l.inner.Create(ctx, ler)
 }
 
 func (l *watchedLock) Update(ctx context.Context, ler resourcelock.LeaderElectionRecord) error {
-	l.watchdog.Beat()
+	defer l.watchdog.enter()()
 	return l.inner.Update(ctx, ler)
 }
 

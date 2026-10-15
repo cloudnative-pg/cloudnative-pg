@@ -60,13 +60,13 @@ const (
 	// second before the TTL expires and it can take the lease.
 	defaultReleasedLeaseDuration = 1 * time.Second
 
-	// defaultWatchdogMaxSilence is how long the lease loop can go without
-	// attempting a lock operation before the watchdog considers it stuck.
-	// It only needs to absorb jitter internal to the loop itself (scheduling
-	// delays, a GC pause) between Beat() calls spaced defaultRetryPeriod
-	// apart — the liveness probe's own failure-threshold debounce separately
-	// covers transient probe-call flakiness on top of this.
-	defaultWatchdogMaxSilence = 5 * defaultRetryPeriod
+	// defaultWatchdogMaxSilence is how long the lease loop can go between two
+	// lock calls before the watchdog considers it stuck. The loop pauses at
+	// most about RetryPeriod between calls (client-go jitters it by up to
+	// 20%); the rest is margin for scheduling delays. A call that is still
+	// running never counts as silence, however long the API server takes to
+	// answer.
+	defaultWatchdogMaxSilence = defaultRenewDeadline + 2*defaultRetryPeriod
 )
 
 // Config holds the tunable timings of the primary lease. They mirror the
@@ -225,6 +225,7 @@ func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 		// Set the config before closing activateCh: the channel close
 		// establishes the happens-before edge that lets Start read it safely.
 		r.config = config
+		r.watchdog.SetMaxSilence(config.RenewDeadline + 2*config.RetryPeriod)
 		contextLogger.Info("Acquiring primary lease")
 		close(r.activateCh)
 	})
