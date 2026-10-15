@@ -656,23 +656,18 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cl
 }
 
 // validateTablespaceMapping validates the tablespace mapping of the
-// pg_basebackup bootstrap: every name must be declared in `spec.tablespaces`
-// and be unique, and every source location must be an absolute path, free of
-// `=` (the separator used by `pg_basebackup`), and unique.
+// pg_basebackup bootstrap: every name must be declared in `spec.tablespaces`,
+// and every source location must be an absolute path, free of `=` (the
+// separator used by `pg_basebackup`), and unique. Unique names and non-empty
+// values are enforced by the CRD.
 func (v *ClusterCustomValidator) validateTablespaceMapping(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	basePath := field.NewPath("spec", "bootstrap", "pg_basebackup", "tablespaceMapping")
-	seenNames := make(map[string]struct{})
 	seenLocations := make(map[string]struct{})
 
 	for i, entry := range r.Spec.Bootstrap.PgBaseBackup.TablespaceMapping {
 		entryPath := basePath.Index(i)
-
-		if _, found := seenNames[entry.Name]; found {
-			result = append(result, field.Duplicate(entryPath.Child("name"), entry.Name))
-		}
-		seenNames[entry.Name] = struct{}{}
 
 		if r.GetTablespaceConfiguration(entry.Name) == nil {
 			result = append(result, field.Invalid(
