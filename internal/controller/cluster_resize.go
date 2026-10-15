@@ -66,7 +66,11 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 
 		patchedPod := pod.DeepCopy()
 		applyContainerResourceDrifts(&patchedPod.Spec, drifts)
-		if err := r.SubResource("resize").Patch(ctx, patchedPod, client.MergeFrom(pod)); err != nil {
+		// A strategic merge patch carries only the drifted containers. A
+		// merge patch would carry the whole containers list, reverting any
+		// container whose resources changed after the cache was populated,
+		// including those injected by other actors, such as a service mesh.
+		if err := r.SubResource("resize").Patch(ctx, patchedPod, client.StrategicMergeFrom(pod)); err != nil {
 			if apierrs.IsInvalid(err) || apierrs.IsBadRequest(err) || apierrs.IsForbidden(err) {
 				r.Recorder.Eventf(cluster, "Warning", "InPlaceResizeFailed",
 					"In-place resize of pod %s rejected, falling back to a rolling update: %v", pod.Name, err)
