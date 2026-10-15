@@ -175,16 +175,30 @@ func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir s
 // to extension_control_path given a list of extensions mounted under baseDir.
 // Extensions not declaring any path contribute their `share` directory.
 func CollectExtensionControlPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
-	return collectPaths(extensionList, baseDir, "ExtensionControlPath", "share",
-		func(ext apiv1.ExtensionConfiguration) []string { return ext.ExtensionControlPath })
+	return collectPaths(
+		extensionList,
+		baseDir,
+		"ExtensionControlPath",
+		"share",
+		func(ext apiv1.ExtensionConfiguration) []string {
+			return ext.ExtensionControlPath
+		},
+	)
 }
 
 // CollectDynamicLibraryPaths returns a list of paths which should be added
 // to dynamic_library_path given a list of extensions mounted under baseDir.
 // Extensions not declaring any path contribute their `lib` directory.
 func CollectDynamicLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
-	return collectPaths(extensionList, baseDir, "DynamicLibraryPath", "lib",
-		func(ext apiv1.ExtensionConfiguration) []string { return ext.DynamicLibraryPath })
+	return collectPaths(
+		extensionList,
+		baseDir,
+		"DynamicLibraryPath",
+		"lib",
+		func(ext apiv1.ExtensionConfiguration) []string {
+			return ext.DynamicLibraryPath
+		},
+	)
 }
 
 // collectPaths joins under baseDir the paths selected by `field` for each
@@ -209,6 +223,12 @@ func collectPaths(
 			// The webhook rejects escaping paths at admission time; this is a
 			// second, independent check for callers that read the Cluster
 			// spec directly without going through admission (e.g. a Job).
+			//
+			// The check is purely lexical: it does not resolve symbolic links
+			// that may exist inside the extension image. This is acceptable
+			// because the image is already trusted (it provides the libraries
+			// Postgres loads) and the result is only a path handed to Postgres,
+			// never one the operator reads or writes through.
 			if !filepath.IsLocal(filepath.Join(".", entry)) {
 				log.Warning("Skipping extension path that escapes the extension directory",
 					"extension", extension.Name, "field", fieldName, "path", entry)
