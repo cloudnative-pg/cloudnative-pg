@@ -1950,11 +1950,11 @@ spec:
                           description: |-
                             TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
                             location of the same tablespace in the source instance of a `pg_basebackup`
-                            bootstrap
+                            bootstrap.
                           properties:
                             name:
                               description: Name of the tablespace, as declared in
-                                `spec.tablespaces`
+                                `spec.tablespaces`.
                               minLength: 1
                               type: string
                             sourceLocation:

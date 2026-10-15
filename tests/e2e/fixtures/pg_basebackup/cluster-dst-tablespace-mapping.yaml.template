@@ -24,6 +24,7 @@ spec:
       owner: appuser
       source: pg-basebackup-src
       tablespaceMapping:
+        # Next to PGDATA on purpose: a path outside the CloudNativePG layout
         - name: moved
           sourceLocation: /var/lib/postgresql/data/moved
 

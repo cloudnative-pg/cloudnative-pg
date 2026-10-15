@@ -2286,9 +2286,9 @@ type BootstrapPgBaseBackup struct {
 
 // TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
 // location of the same tablespace in the source instance of a `pg_basebackup`
-// bootstrap
+// bootstrap.
 type TablespaceMappingEntry struct {
-	// Name of the tablespace, as declared in `spec.tablespaces`
+	// Name of the tablespace, as declared in `spec.tablespaces`.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 

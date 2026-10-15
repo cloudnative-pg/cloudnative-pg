@@ -656,10 +656,8 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cl
 }
 
 // validateTablespaceMapping validates the tablespace mapping of the
-// pg_basebackup bootstrap: every name must be declared in `spec.tablespaces`,
-// and every source location must be an absolute path, free of `=` (the
-// separator used by `pg_basebackup`) and `\` (its escape character), and
-// unique. Unique names and non-empty values are enforced by the CRD.
+// pg_basebackup bootstrap. Locations can't contain `=` or `\`, which
+// pg_basebackup uses as separator and escape character.
 func (v *ClusterCustomValidator) validateTablespaceMapping(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 

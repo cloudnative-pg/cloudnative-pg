@@ -851,13 +851,13 @@ resulting tablespace layout will work correctly.
 :::
 
 :::warning
-The operator cannot know which tablespaces the source instance has, as the
-connection used by `pg_basebackup` only supports replication commands. Make
+The operator does not check which tablespaces the source instance has. Make
 sure that every tablespace of the source instance is declared in
 `spec.tablespaces`, and mapped through `tablespaceMapping` unless the source
 already uses the CloudNativePG location. A tablespace that is not mapped is
-restored under the path it has in the source instance, inside the Pod, and the
-bootstrap may fail or write to an unexpected location.
+restored under the path it has in the source instance, inside the Pod. If that
+path is not writable, the bootstrap fails. If it is, the data ends up in an
+unexpected location.
 :::
 
 :::warning
