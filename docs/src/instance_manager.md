@@ -168,9 +168,11 @@ probes:
 
 The liveness probe begins after the startup probe successfully completes. Its
 primary role is to ensure the PostgreSQL instance manager is operating
-correctly: it only checks that the instance manager's status web server
-answers. Primary isolation is not handled by this probe, but by the primary
-lease (see [Primary Isolation](#primary-isolation)).
+correctly. It fails when the primary lease loop has stopped attempting to renew
+or take over the lease, and when PostgreSQL is still running after
+`.spec.immediateShutdownTimeout` seconds from an immediate shutdown request.
+Primary isolation itself is not handled by this probe, but by the primary lease
+(see [Primary Isolation](#primary-isolation)).
 
 Following Kubernetes standards, if the liveness probe fails, the kubelet will
 terminate the container, which will then be restarted.
