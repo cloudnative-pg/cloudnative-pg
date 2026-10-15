@@ -2275,6 +2275,27 @@ type BootstrapPgBaseBackup struct {
 	//
 	// +optional
 	AdditionalArgs []string `json:"additionalArgs,omitempty"`
+
+	// Maps each tablespace declared in `spec.tablespaces` to its location
+	// in the source instance.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	TablespaceMapping []TablespaceMappingEntry `json:"tablespaceMapping,omitempty"`
+}
+
+// TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+// location of the same tablespace in the source instance of a `pg_basebackup`
+// bootstrap.
+type TablespaceMappingEntry struct {
+	// Name of the tablespace, as declared in `spec.tablespaces`.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Absolute path of the tablespace in the source instance. It must not
+	// contain the `=` or `\` characters and must be unique among the entries.
+	// +kubebuilder:validation:MinLength=1
+	SourceLocation string `json:"sourceLocation"`
 }
 
 // RecoveryTarget allows to configure the moment where the recovery process

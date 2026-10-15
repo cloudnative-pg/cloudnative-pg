@@ -399,6 +399,7 @@ _Appears in:_
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 | `additionalArgs` _string array_ | List of custom options to pass to the `pg_basebackup` command.<br />IMPORTANT: Use with caution. The operator rejects the options it relies on,<br />as listed in the bootstrap documentation, but it does not validate the<br />others, and some of them may still interfere with its intended<br />functionality or design.<br />You are responsible for ensuring that the provided options are compatible<br />with your environment and PostgreSQL version. |  |  |  |
+| `tablespaceMapping` _[TablespaceMappingEntry](#tablespacemappingentry) array_ | Maps each tablespace declared in `spec.tablespaces` to its location<br />in the source instance. |  |  |  |
 
 
 #### BootstrapRecovery
@@ -3218,6 +3219,26 @@ _Appears in:_
 | `storage` _[StorageConfiguration](#storageconfiguration)_ | The storage configuration for the tablespace | True |  |  |
 | `owner` _[DatabaseRoleRef](#databaseroleref)_ | Owner is the PostgreSQL user owning the tablespace |  |  |  |
 | `temporary` _boolean_ | When set to true, the tablespace will be added as a `temp_tablespaces`<br />entry in PostgreSQL, and will be available to automatically house temp<br />database objects, or other temporary files. Please refer to PostgreSQL<br />documentation for more information on the `temp_tablespaces` GUC. |  | false |  |
+
+
+#### TablespaceMappingEntry
+
+
+
+TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+location of the same tablespace in the source instance of a `pg_basebackup`
+bootstrap.
+
+
+
+_Appears in:_
+
+- [BootstrapPgBaseBackup](#bootstrappgbasebackup)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the tablespace, as declared in `spec.tablespaces`. | True |  | MinLength: 1 <br /> |
+| `sourceLocation` _string_ | Absolute path of the tablespace in the source instance. It must not<br />contain the `=` or `\` characters and must be unique among the entries. | True |  | MinLength: 1 <br /> |
 
 
 #### TablespaceState
