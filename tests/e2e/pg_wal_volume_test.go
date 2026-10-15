@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -105,10 +105,9 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
-			WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 			cluster.Spec.WalStorage = &apiv1.StorageConfiguration{
 				Size:         "1Gi",
-				StorageClass: &WalStorageClass,
+				StorageClass: ptr.To(env.DefaultStorageClass),
 			}
 			return env.Client.Update(env.Ctx, cluster)
 		})

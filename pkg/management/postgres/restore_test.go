@@ -23,11 +23,14 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 
+	barmanApi "github.com/cloudnative-pg/barman-cloud/pkg/api"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/thoas/go-funk"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -208,70 +211,190 @@ var _ = Describe("testing restore InitInfo methods", func() {
 	})
 })
 
+var _ = Describe("buildRestoreDataDirOptions", func() {
+	baseBackup := &apiv1.Backup{
+		Status: apiv1.BackupStatus{
+			DestinationPath: "s3://bucket/path",
+			ServerName:      "server-a",
+			BackupID:        "20230101T000000",
+		},
+	}
+	info := InitInfo{PgData: "/pgdata"}
+
+	DescribeTable("building the barman-cloud-restore options",
+		func(
+			ctx SpecContext,
+			backup *apiv1.Backup,
+			barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
+			expected string,
+		) {
+			options, err := info.buildRestoreDataDirOptions(ctx, backup, barmanConfiguration)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(strings.Join(options, " ")).To(Equal(expected))
+		},
+		Entry("nil barman configuration",
+			baseBackup, nil,
+			"s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("barman configuration with nil data",
+			baseBackup, &apiv1.BarmanObjectStoreConfiguration{},
+			"s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("barman configuration with data set but no restore additional args",
+			baseBackup, &apiv1.BarmanObjectStoreConfiguration{
+				Data: &apiv1.DataBackupConfiguration{},
+			},
+			"s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("barman configuration with restore additional args, placed after the positional arguments",
+			baseBackup, &apiv1.BarmanObjectStoreConfiguration{
+				Data: &apiv1.DataBackupConfiguration{
+					RestoreAdditionalCommandArgs: []string{"--read-timeout=60"},
+				},
+			},
+			"s3://bucket/path server-a 20230101T000000 --read-timeout=60 /pgdata"),
+		Entry("endpoint URL placement is unchanged",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: "s3://bucket/path",
+					ServerName:      "server-a",
+					BackupID:        "20230101T000000",
+					EndpointURL:     "https://example.com",
+				},
+			},
+			nil,
+			"--endpoint-url https://example.com s3://bucket/path server-a 20230101T000000 /pgdata"),
+		Entry("a user-supplied duplicate of the endpoint URL is dropped",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: "s3://bucket/path",
+					ServerName:      "server-a",
+					BackupID:        "20230101T000000",
+					EndpointURL:     "https://example.com",
+				},
+			},
+			&apiv1.BarmanObjectStoreConfiguration{
+				Data: &apiv1.DataBackupConfiguration{
+					RestoreAdditionalCommandArgs: []string{"--endpoint-url=https://attacker.example.com", "--read-timeout=60"},
+				},
+			},
+			"--endpoint-url https://example.com s3://bucket/path server-a 20230101T000000 --read-timeout=60 /pgdata"),
+		Entry("a user-supplied duplicate of a cloud-provider option is dropped",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: "s3://bucket/path",
+					ServerName:      "server-a",
+					BackupID:        "20230101T000000",
+					BarmanCredentials: barmanApi.BarmanCredentials{
+						AWS: &barmanApi.S3Credentials{},
+					},
+				},
+			},
+			&apiv1.BarmanObjectStoreConfiguration{
+				Data: &apiv1.DataBackupConfiguration{
+					RestoreAdditionalCommandArgs: []string{"--cloud-provider=aws-s3", "--read-timeout=60"},
+				},
+			},
+			"s3://bucket/path server-a 20230101T000000 --cloud-provider aws-s3 --read-timeout=60 /pgdata"),
+	)
+})
+
 var _ = Describe("getRestoreWalConfig", func() {
-	It("escapes quotes and backslashes across both shell and config layers",
-		func(ctx SpecContext) {
-			backup := &apiv1.Backup{
-				Status: apiv1.BackupStatus{
-					DestinationPath: "s3://bucket/has'quote",
-					ServerName:      `server\name`,
+	It("delegates WAL recovery to the instance manager wal-restore command", func() {
+		out := getRestoreWalConfig()
+
+		// restore_command must invoke the in-tree controller rather than
+		// barman-cloud directly: the recovery source store and credentials are
+		// provided through the local webserver cache instead of being embedded
+		// in (and shell-quoted into) the command line.
+		Expect(out).To(ContainSubstring("/controller/manager wal-restore"))
+		Expect(out).To(ContainSubstring("%f"))
+		Expect(out).To(ContainSubstring("%p"))
+		Expect(out).To(ContainSubstring("recovery_target_action"))
+		Expect(out).To(ContainSubstring("promote"))
+		Expect(out).ToNot(ContainSubstring("barman-cloud-wal-restore"))
+	})
+})
+
+var _ = Describe("setupBootstrapWALRestoreCache", func() {
+	AfterEach(func() {
+		cache.Delete(cache.WALRestoreKey)
+		cache.Delete(cache.WALRestoreConfigKey)
+	})
+
+	backup := func() *apiv1.Backup {
+		return &apiv1.Backup{
+			Status: apiv1.BackupStatus{
+				BarmanCredentials: apiv1.BarmanCredentials{AWS: &apiv1.S3Credentials{}},
+				EndpointURL:       "https://source-endpoint",
+				DestinationPath:   "s3://source/path",
+				ServerName:        "source-server",
+			},
+		}
+	}
+
+	loadCachedStore := func() *apiv1.BarmanObjectStoreConfiguration {
+		cached, err := cache.Load(cache.WALRestoreConfigKey)
+		Expect(err).ToNot(HaveOccurred())
+		store, ok := cached.(*apiv1.BarmanObjectStoreConfiguration)
+		Expect(ok).To(BeTrue())
+		return store
+	}
+
+	It("caches the recovery source store and credentials for a recovery.backup reference", func() {
+		// recovery.backup: no Source, so no Wal config is available.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						Backup: &apiv1.BackupSource{
+							LocalObjectReference: apiv1.LocalObjectReference{Name: "a-backup"},
+						},
+					},
 				},
-			}
-			out, err := getRestoreWalConfig(ctx, backup)
-			Expect(err).ToNot(HaveOccurred())
+			},
+		}
+		env := []string{"AWS_ACCESS_KEY_ID=source-key"}
 
-			// shellQuote wraps the value as has\'quote (escape).
-			// configfile.EscapePostgresConfLiteral then doubles every ' and \,
-			// yielding the exact form below at the config-file layer.
-			Expect(out).To(ContainSubstring(`s3://bucket/has\\''quote`))
-			// shellQuote quotes `\` to `\\` — config layer doubles the
-			// backslash.
-			Expect(out).To(ContainSubstring(`server\\\\name`))
+		setupBootstrapWALRestoreCache(cluster, backup(), env)
 
-			// Raw unescaped forms must not appear — either would let the user
-			// break out of the config-file string literal.
-			Expect(out).NotTo(ContainSubstring("has'quote"))
-			Expect(out).NotTo(MatchRegexp(`server\\[^\\]name`),
-				"backslash in server name must be doubled")
-		})
+		cachedEnv, err := cache.LoadEnv(cache.WALRestoreKey)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cachedEnv).To(Equal(env))
 
-	It("shell-quotes cmd args so whitespace in user-controlled fields does not word-split",
-		func(ctx SpecContext) {
-			backup := &apiv1.Backup{
-				Status: apiv1.BackupStatus{
-					DestinationPath: "s3://my bucket/wal",
-					ServerName:      "server-a",
+		// The cached store must target the recovery SOURCE, not the cluster's own
+		// backup store, and carries no Wal config for a recovery.backup reference.
+		store := loadCachedStore()
+		Expect(store.DestinationPath).To(Equal("s3://source/path"))
+		Expect(store.ServerName).To(Equal("source-server"))
+		Expect(store.EndpointURL).To(Equal("https://source-endpoint"))
+		Expect(store.Wal).To(BeNil())
+	})
+
+	It("carries the source store's Wal config for a recovery.source", func() {
+		// recovery.source: the source store's Wal config lives in the external
+		// cluster definition and must be carried over, just like the plugin does.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{Source: "origin"},
 				},
-			}
-			out, err := getRestoreWalConfig(ctx, backup)
-			Expect(err).ToNot(HaveOccurred())
-			// After shell-quoting, the DestinationPath is wrapped in single quotes.
-			// The outer configfile.EscapePostgresConfLiteral layer then doubles
-			// each of those single quotes, so the value appears as ''...'' in
-			// the config file.
-			Expect(out).To(ContainSubstring("''s3://my bucket/wal''"))
-
-			// PostgreSQL will replace %f %p with proper quoting when needed.
-			Expect(out).To(ContainSubstring("%f"))
-			Expect(out).To(ContainSubstring("%p"))
-		})
-
-	It("nests an obvious shell-injection payload inside both quoting layers",
-		func(ctx SpecContext) {
-			backup := &apiv1.Backup{
-				Status: apiv1.BackupStatus{
-					DestinationPath: `s3://bucket"; rm -rf /; "`,
-					ServerName:      "server-a",
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name: "origin",
+						BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+							Wal: &apiv1.WalBackupConfiguration{
+								MaxParallel:                  2,
+								RestoreAdditionalCommandArgs: []string{"--read-timeout=60"},
+							},
+						},
+					},
 				},
-			}
-			out, err := getRestoreWalConfig(ctx, backup)
-			Expect(err).ToNot(HaveOccurred())
+			},
+		}
 
-			// shellquote.Join wraps the whole arg in single quotes (because
-			// of the embedded `;` and spaces); EscapePostgresConfLiteral
-			// then doubles each of those quotes. The payload must arrive at
-			// the shell as one argument, not as a `;`-separated command.
-			Expect(out).To(ContainSubstring(
-				`''s3://bucket"; rm -rf /; "''`))
-		})
+		setupBootstrapWALRestoreCache(cluster, backup(), []string{"X=y"})
+
+		store := loadCachedStore()
+		Expect(store.Wal).ToNot(BeNil())
+		Expect(store.Wal.MaxParallel).To(Equal(2))
+		Expect(store.Wal.RestoreAdditionalCommandArgs).To(ContainElement("--read-timeout=60"))
+	})
 })

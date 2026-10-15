@@ -51,6 +51,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -134,7 +135,7 @@ var (
 	// ErrPgRejectingConnection postgres is alive, but rejecting connections
 	ErrPgRejectingConnection = fmt.Errorf("server is alive but rejecting connections")
 
-	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
+	// ErrNoConnectionEstablished no response was received from postgres
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
 
 	// ErrNoFreeWALSpace is returned when there isn't enough disk space
@@ -200,6 +201,9 @@ type Instance struct {
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool
 
+	// logPipesReady becomes satisfied once the log-destination FIFOs are ready.
+	logPipesReady concurrency.MultipleExecuted
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -221,9 +225,6 @@ type Instance struct {
 	// tablespaceSynchronizerChan is used to send tablespace configuration to the tablespace synchronizer
 	tablespaceSynchronizerChan chan map[string]apiv1.TablespaceConfiguration
 
-	// StatusPortTLS enables TLS on the status port used to communicate with the operator
-	StatusPortTLS bool
-
 	// MetricsPortTLS enables TLS on the port used to publish metrics over HTTP/HTTPS
 	MetricsPortTLS bool
 
@@ -235,6 +236,10 @@ type Instance struct {
 	// authentication middleware) while being written by the reconciliation loop,
 	// so access is synchronized through an atomic pointer.
 	cluster atomic.Pointer[apiv1.Cluster]
+
+	// systemID caches the pg_control system identifier, which never changes
+	systemID      string
+	systemIDMutex sync.Mutex
 }
 
 type serverCertificateHandler struct {
@@ -303,6 +308,17 @@ func (instance *Instance) SetFencing(enabled bool) {
 // SetCanCheckReadiness marks whether the instance should be checked for readiness
 func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
+}
+
+// SetLogPipesReadyCondition records the conditions that indicate when the log-destination
+// FIFOs are ready.
+func (instance *Instance) SetLogPipesReadyCondition(conditions concurrency.MultipleExecuted) {
+	instance.logPipesReady = conditions
+}
+
+// WaitForLogPipesReady waits until the log-destination FIFOs are ready.
+func (instance *Instance) WaitForLogPipesReady() {
+	instance.logPipesReady.Wait()
 }
 
 // GetClusterOrDefault returns the cached cluster, or an empty cluster if not set.
@@ -440,6 +456,11 @@ const (
 	// shutDownFastImmediate means the instance has to be shut down by first
 	// issuing a fast shut down and in case of errors an immediate one
 	shutDownFastImmediate InstanceCommand = "ShutDownFastImmediate"
+
+	// shutDownImmediate means the instance has to be shut down by
+	// skipping straight to an immediate shutdown, with no checkpoint
+	// and no fast-shutdown attempt beforehand
+	shutDownImmediate InstanceCommand = "ShutDownImmediate"
 )
 
 // NewInstance creates a new Instance object setting the defaults
@@ -651,6 +672,11 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 			shutdownOptions{
 				Mode: shutdownModeFast,
 				Wait: true,
+				// Without an explicit timeout pg_ctl would fall back to its own implicit 60
+				// seconds, give up, and let us exit while PostgreSQL is still shutting down.
+				// stopDelay is the Pod's termination grace period, so waiting for it leaves
+				// the decision to terminate to the kubelet.
+				Timeout: &maxStopDelay,
 			},
 		)
 	}
@@ -692,6 +718,25 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 		)
 	}
 	return err
+}
+
+// TryShuttingDownImmediate skips straight to an "immediate" shutdown request, with no
+// checkpoint and no "fast" attempt beforehand.
+// This is meant for a former primary whose PostgreSQL is unreachable: the checkpoint needs
+// a working connection we don't have, and a postmaster that stopped answering pg_isready is
+// not expected to complete the graceful shutdown that "fast" asks for.
+// Note: an immediate shutdown may lead to data loss.
+func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Requesting immediate shutdown of the PostgreSQL instance")
+	return instance.Shutdown(
+		ctx,
+		shutdownOptions{
+			Mode: shutdownModeImmediate,
+			Wait: true,
+		},
+	)
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status
@@ -856,6 +901,15 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 		rawPipe.GetExitedCondition().Wait()
 		jsonPipe.GetExitedCondition().Wait()
 	}()
+
+	// Wait for every reader to have its FIFO created here.
+	// To avoid the archive/restore command win the race and create
+	// a regular file at the log path first.
+	concurrency.MultipleExecuted{
+		csvPipe.GetInitializedCondition(),
+		rawPipe.GetInitializedCondition(),
+		jsonPipe.GetInitializedCondition(),
+	}.Wait()
 
 	err := instance.Startup()
 	if err != nil {
@@ -1400,6 +1454,26 @@ func (instance *Instance) GetPgControldata() (string, error) {
 	return string(out), nil
 }
 
+// GetSystemID returns the system identifier from pg_control, or an empty
+// string if it can't be read. It works while PostgreSQL is down.
+func (instance *Instance) GetSystemID() string {
+	instance.systemIDMutex.Lock()
+	defer instance.systemIDMutex.Unlock()
+
+	if instance.systemID != "" {
+		return instance.systemID
+	}
+
+	pgControlData, err := instance.GetPgControldata()
+	if err != nil {
+		log.Debug("Cannot read the system ID from pg_control", "err", err)
+		return ""
+	}
+
+	instance.systemID = utils.ParsePgControldataOutput(pgControlData).GetDatabaseSystemIdentifier()
+	return instance.systemID
+}
+
 // GetInstanceCommandChan is the channel where the lifecycle manager will
 // wait for the operations requested on the instance
 func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
@@ -1430,6 +1504,23 @@ func (instance *Instance) GetArchitecture() string {
 // PostgreSQL using the fast strategy and then the immediate strategy.
 func (instance *Instance) RequestFastImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownFastImmediate
+}
+
+// TryRequestImmediateShutdown asks the lifecycle manager to run
+// TryShuttingDownImmediate, without blocking. If the lifecycle manager's
+// command loop isn't immediately ready to receive (e.g. because it is
+// itself shutting PostgreSQL down), the request is dropped rather than
+// waited on. It reports whether the request was actually delivered. The
+// command channel is unbuffered and a send on it cannot be interrupted by
+// a context cancellation, so a caller that must not be parked has no other
+// way to ask.
+func (instance *Instance) TryRequestImmediateShutdown() bool {
+	select {
+	case instance.instanceCommandChan <- shutDownImmediate:
+		return true
+	default:
+		return false
+	}
 }
 
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
@@ -1593,6 +1684,11 @@ func (instance *Instance) HandleInstanceCommandRequests(
 		return true, instance.TryShuttingDownSmartFast(ctx)
 	case shutDownFastImmediate:
 		if err := instance.TryShuttingDownFastImmediate(ctx); err != nil {
+			contextLogger.Error(err, "error shutting down instance, proceeding")
+		}
+		return false, nil
+	case shutDownImmediate:
+		if err := instance.TryShuttingDownImmediate(ctx); err != nil {
 			contextLogger.Error(err, "error shutting down instance, proceeding")
 		}
 		return false, nil

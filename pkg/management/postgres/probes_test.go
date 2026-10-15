@@ -21,6 +21,8 @@ package postgres
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -33,6 +35,67 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("GetStatus", func() {
+	It("reports the system ID from pg_control while PostgreSQL might be unavailable", func() {
+		binDir := GinkgoT().TempDir()
+		fakePgControldata := "#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n"
+		fakePath := filepath.Join(binDir, pgControlDataName)
+		Expect(os.WriteFile(fakePath, []byte(fakePgControldata), 0o700)).To(Succeed()) //nolint:gosec // executable
+		GinkgoT().Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+		instance := NewInstance().WithPodName("cluster-example-1")
+		instance.PgData = GinkgoT().TempDir()
+		instance.SocketDirectory = GinkgoT().TempDir()
+		Expect(os.WriteFile(filepath.Join(instance.PgData, "standby.signal"), nil, 0o600)).To(Succeed())
+		instance.SetMightBeUnavailable(true)
+
+		status, err := instance.GetStatus()
+		Expect(err).ToNot(HaveOccurred())
+		Expect(status.MightBeUnavailableMaskedError).ToNot(BeEmpty())
+		Expect(status.IsPrimary).To(BeFalse())
+		Expect(status.SystemID).To(Equal("7412345678901234567"))
+	})
+})
+
+var _ = Describe("system ID", func() {
+	var binDir string
+	var instance *Instance
+
+	writeFakePgControldata := func(content string) {
+		fakePath := filepath.Join(binDir, pgControlDataName)
+		Expect(os.WriteFile(fakePath, []byte(content), 0o700)).To(Succeed()) //nolint:gosec // executable
+	}
+
+	BeforeEach(func() {
+		binDir = GinkgoT().TempDir()
+		GinkgoT().Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		instance = NewInstance()
+		instance.PgData = GinkgoT().TempDir()
+	})
+
+	It("is cached once loaded", func() {
+		writeFakePgControldata("#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+
+		// pg_controldata is not invoked again once the ID is known
+		writeFakePgControldata("#!/bin/sh\nexit 1\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+	})
+
+	It("is empty, and read again later, when pg_control can't be read", func() {
+		writeFakePgControldata("#!/bin/sh\nexit 1\n")
+		Expect(instance.GetSystemID()).To(BeEmpty())
+
+		writeFakePgControldata("#!/bin/sh\necho 'Database system identifier:           7412345678901234567'\n")
+		Expect(instance.GetSystemID()).To(Equal("7412345678901234567"))
+	})
+
+	It("is empty if the output has no system ID", func() {
+		writeFakePgControldata("#!/bin/sh\necho 'pg_control version number:            1300'\n")
+		Expect(instance.GetSystemID()).To(BeEmpty())
+	})
+})
 
 var _ = Describe("areAllParamsUpdated", func() {
 	It("should return true when all params match", func() {
@@ -156,6 +219,75 @@ var _ = Describe("updateResultForDecrease", func() {
 })
 
 var _ = Describe("probes", func() {
+	Context("pg_stat_wal", func() {
+		// A never-reset instance (or PostgreSQL 18+, where stats_reset starts as
+		// NULL) is coalesced to '-infinity' in the query, so the value always
+		// scans into the plain string field instead of failing on a NULL.
+		DescribeTable("scans the coalesced stats_reset",
+			func(isPG18OrNewer bool) {
+				db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() {
+					_ = db.Close()
+				})
+
+				const query = "SELECT pg_stat_wal"
+				var walStat PgStatWal
+				var rows *sqlmock.Rows
+				var scanArgs []any
+
+				if isPG18OrNewer {
+					rows = sqlmock.NewRows([]string{
+						"wal_records",
+						"wal_fpi",
+						"wal_bytes",
+						"wal_buffers_full",
+						"stats_reset",
+					}).AddRow(int64(1), int64(2), int64(3), int64(4), "-infinity")
+					scanArgs = []any{
+						&walStat.WalRecords,
+						&walStat.WalFpi,
+						&walStat.WalBytes,
+						&walStat.WALBuffersFull,
+						&walStat.StatsReset,
+					}
+				} else {
+					rows = sqlmock.NewRows([]string{
+						"wal_records",
+						"wal_fpi",
+						"wal_bytes",
+						"wal_buffers_full",
+						"wal_write",
+						"wal_sync",
+						"wal_write_time",
+						"wal_sync_time",
+						"stats_reset",
+					}).AddRow(int64(1), int64(2), int64(3), int64(4), int64(5), int64(6), 7.5, 8.5, "-infinity")
+					scanArgs = []any{
+						&walStat.WalRecords,
+						&walStat.WalFpi,
+						&walStat.WalBytes,
+						&walStat.WALBuffersFull,
+						&walStat.WalWrite,
+						&walStat.WalSync,
+						&walStat.WalWriteTime,
+						&walStat.WalSyncTime,
+						&walStat.StatsReset,
+					}
+				}
+
+				mock.ExpectQuery(query).WillReturnRows(rows)
+
+				err = db.QueryRow(query).Scan(scanArgs...)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(walStat.StatsReset).To(Equal("-infinity"))
+				Expect(mock.ExpectationsWereMet()).To(Succeed())
+			},
+			Entry("before PostgreSQL 18", false),
+			Entry("from PostgreSQL 18", true),
+		)
+	})
+
 	It("fillWalStatus should properly handle errors", func() {
 		instance := &Instance{}
 		status := &postgres.PostgresqlStatus{

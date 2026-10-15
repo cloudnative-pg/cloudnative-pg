@@ -31,7 +31,7 @@ env:
 jobs:
 
   check-public-clouds-k8s-versions:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       EOL_FILTER: '
         def ver: split(".") | map(tonumber);
@@ -44,7 +44,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       -
         name: Get updated EKS versions
         run: |
@@ -92,7 +92,7 @@ jobs:
           # and write them to a file, starting from the MINIMAL_K8S
           for baseversion in $(seq $MINIMAL_K8S 0.01 99); do
             URL="https://registry.hub.docker.com/v2/repositories/kindest/node/tags?name=${baseversion}&ordering=last_updated"
-            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | grep -v "alpha" | sort -Vr | head -n1) || RC=$?
+            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | grep -vE "alpha|beta|rc" | sort -Vr | head -n1) || RC=$?
             if [[ -z "${v}" ]]; then
                break
             fi

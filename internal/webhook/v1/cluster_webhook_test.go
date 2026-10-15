@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -2626,6 +2627,74 @@ var _ = Describe("bootstrap base backup validation", func() {
 		}
 		result := v.validateBootstrapPgBaseBackupSource(recoveryCluster)
 		Expect(result).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("pg_basebackup additionalArgs validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	clusterWithArgs := func(args ...string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:         "test",
+						AdditionalArgs: args,
+					},
+				},
+			},
+		}
+	}
+
+	It("doesn't complain when pg_basebackup is not used or there are no arguments", func() {
+		Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(&apiv1.Cluster{})).To(BeEmpty())
+		Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs())).To(BeEmpty())
+	})
+
+	DescribeTable("accepts the arguments that don't interfere with the operator",
+		func(args ...string) {
+			Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs(args...))).To(BeEmpty())
+		},
+		Entry("long options, with an attached or a separate value",
+			"--max-rate=50M", "--checkpoint", "fast", "--sync-method=syncfs", "--no-estimate-size"),
+		Entry("grouped short flags", "-vP"),
+		Entry("short options, with an attached or a separate value", "-r50M", "-c", "fast"),
+		Entry("a forbidden letter inside the value of an option", "-lbackup-D", "--label=my-D-backup"),
+		Entry("an abbreviation of an allowed option", "--check=fast"),
+	)
+
+	DescribeTable("rejects the options managed by the operator, however they are spelled",
+		func(arg string, expectedOption string) {
+			result := v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs(arg))
+			Expect(result).To(HaveLen(1))
+			Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+			Expect(result[0].Detail).To(ContainSubstring(expectedOption))
+		},
+		Entry("short option", "-D", "-D"),
+		Entry("short option with an attached value", "-D/tmp/pgdata", "-D"),
+		Entry("long option with a value", "--pgdata=/tmp/pgdata", "--pgdata"),
+		Entry("long option without a value", "--help", "--help"),
+		Entry("short option grouped with allowed ones", "-nNPR", "-R"),
+		Entry("creation of a permanent slot", "--create-slot", "--create-slot"),
+		Entry("creation of a permanent slot, grouped short option", "-vC", "-C"),
+	)
+
+	// getopt_long accepts any unambiguous abbreviation of a long option
+	It("rejects the abbreviations of the options managed by the operator", func() {
+		result := v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs("--pgd=/tmp/pgdata"))
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Detail).To(ContainSubstring("abbreviation of --pgdata"))
+	})
+
+	It("reports every forbidden argument, and only those", func() {
+		result := v.validateBootstrapPgBaseBackupAdditionalArgs(
+			clusterWithArgs("--host=foo", "--max-rate=50M", "-D", "/tmp"))
+		Expect(result).To(HaveLen(2))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[0]"))
+		Expect(result[1].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[2]"))
 	})
 })
 
@@ -6124,6 +6193,111 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[3].Field).To(ContainSubstring("bin_path[0]"))
 	})
 
+	It("returns an error for an absolute path with embedded traversal that escapes", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/a/../../../../etc",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
+	It("returns no error for a path traversal that does not escape", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/opt/custom/share",
+							},
+							DynamicLibraryPath: []string{
+								"a/b/../../share",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
+	It("returns an error for a relative path that escapes via leading traversal", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../../mount-evil",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
+	It("returns an error for a path that escapes only once joined under a deeper, realistic mount point", func() {
+		// CollectBinPaths and absolutizePaths join these paths under a
+		// multi-segment mount point at runtime (e.g. "/extensions/<name>"),
+		// not a single-segment one. A containment check resolved against a
+		// shallower placeholder base would wrongly accept these.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../mount/lib",
+							},
+							DynamicLibraryPath: []string{
+								"../../../mount/x",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+		Expect(err[1].Field).To(ContainSubstring("dynamic_library_path[0]"))
+	})
+
 	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -7038,5 +7212,165 @@ var _ = Describe("ServiceAccount configuration validation", func() {
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.serviceAccountName"))
 		Expect(result[0].Detail).To(ContainSubstring("mutually exclusive"))
+	})
+})
+
+var _ = Describe("getSynchronousReplicationWarnings", func() {
+	It("returns no warning for a single-instance cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 1},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a multi-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning when the current synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method: apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number: 1,
+					},
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the legacy synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MinSyncReplicas: 1,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when only maxSyncReplicas is set", func() {
+		// minSyncReplicas is the floor that self-healing can't erase: with it
+		// left at zero, a transient shortfall of ready replicas collapses the
+		// effective synchronous requirement to zero (see getSyncReplicasData
+		// in pkg/postgres/replication/legacy.go), so maxSyncReplicas alone does
+		// not guarantee durability.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: 2,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning for a replica cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a two-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 2},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("is raised on both creation and update", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		v := &ClusterCustomValidator{}
+
+		createWarnings, _ := v.ValidateCreate(context.Background(), cluster)
+		Expect(createWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
+
+		updateWarnings, _ := v.ValidateUpdate(context.Background(), cluster, cluster)
+		Expect(updateWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
+	})
+})
+
+var _ = Describe("getFailureDomainTopologyWarnings", func() {
+	makeCluster := func(failureDomainKeys []string, conditions []metav1.Condition) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{}
+		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+			Method:                apiv1.SynchronousReplicaConfigurationMethodAny,
+			Number:                1,
+			NodeFailureDomainKeys: failureDomainKeys,
+		}
+		cluster.Status.Conditions = conditions
+		return cluster
+	}
+
+	It("returns no warning when no failure domain keys are set", func() {
+		cluster := makeCluster(nil, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+				Message: "No cross-domain replica exists.",
+			},
+		})
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the condition is True", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionTrue,
+				Reason:  string(apiv1.ConditionReasonTopologySatisfied),
+				Message: "Enough electable synchronous standbys are in a different failure domain than the primary.",
+			},
+		})
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the condition is absent", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, nil)
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when the condition is False due to insufficient cross-domain replicas", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+				Message: "Not enough electable synchronous standbys in a different failure domain than the primary.",
+			},
+		})
+		warnings := getFailureDomainTopologyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
+		Expect(warnings[0]).To(ContainSubstring("Not enough electable synchronous standbys"))
+	})
+
+	It("returns a warning when the condition is False due to topology not extracted", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonTopologyNotExtracted),
+				Message: "Topology labels could not be extracted from pods or nodes.",
+			},
+		})
+		warnings := getFailureDomainTopologyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
+		Expect(warnings[0]).To(ContainSubstring("Topology labels could not be extracted"))
 	})
 })

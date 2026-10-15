@@ -27,6 +27,7 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
+source "${ROOT_DIR}/hack/e2e/generate-e2e-config.sh"
 CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-image)}
 CONTROLLER_IMG_DIGEST=${CONTROLLER_IMG_DIGEST:-""}
 CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
@@ -46,7 +47,8 @@ if [ -n "${PGBOUNCER_IMG_REPOSITORY:-}" ]; then
   PGBOUNCER_IMG="${PGBOUNCER_IMG_REPOSITORY}:${PGBOUNCER_VERSION}"
 fi
 
-# variable need export otherwise be invisible in e2e test case
+# exported so that run-e2e-suite.sh sees them when it generates the e2e
+# configuration file
 export DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
 export DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
 export DOCKER_PASSWORD=${DOCKER_PASSWORD:-${REGISTRY_PASSWORD:-}}
@@ -85,17 +87,12 @@ if notinpath "${go_bin}"; then
 fi
 
 # renovate: datasource=github-releases depName=onsi/ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.0
 
 # Build kubectl-cnpg and export its path
 make build-plugin
 export PATH=${ROOT_DIR}/bin/:${PATH}
 
-LABEL_FILTERS=""
-if [ "${FEATURE_TYPE-}" ]; then
-  LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
-fi
-echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 RC=0
 RC_GINKGO1=0
 if [[ "${CNPG_DEPLOYMENT_METHOD}" == "helm" ]]; then
@@ -135,11 +132,13 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
-  unset TEST_SKIP_UPGRADE
+  generate_e2e_config false
   cd "${ROOT_DIR}/tests"
-  ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
+  ginkgo --nodes=1 --timeout 2h --poll-progress-after=1200s --poll-progress-interval=150s \
    --github-output --force-newlines \
-   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" \
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_plugin_barman_cloud_test.go" \
+   --output-dir "${ROOT_DIR}/tests/e2e/out" \
    --json-report  "upgrade_report.json" -v ./e2e/... || RC_GINKGO1=$?
 
   # Report if there are any tests that failed
@@ -166,17 +165,8 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
     deploy_operator_from_source
   fi
 
-  # Install plugin-barman-cloud for the plugin-based backup tests. Restricted to
-  # local engines (kind/k3d) for now; cloud-vendor coverage will follow with the
-  # backup test ports.
-  case "${TEST_CLOUD_VENDOR:-}" in
-    kind | k3d)
-      install_barman_cloud_plugin
-      ;;
-    *)
-      echo "Skipping plugin-barman-cloud install on '${TEST_CLOUD_VENDOR:-}' (only kind/k3d for now)."
-      ;;
-  esac
+  # Install plugin-barman-cloud for the plugin-based backup tests.
+  install_barman_cloud_plugin
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

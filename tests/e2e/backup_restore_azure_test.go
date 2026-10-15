@@ -45,7 +45,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 	const (
 		tableName = "to_restore"
 	)
-	AzureConfiguration := backups.NewAzureConfigurationFromEnv()
+	var AzureConfiguration backups.AzureConfiguration
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(tests.High) {
@@ -54,6 +54,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 		if !IsAKS() {
 			Skip("This test is only run on AKS clusters")
 		}
+		AzureConfiguration = backups.NewAzureConfiguration()
 	})
 
 	Context("using azure blobs as object storage with storage account access authentication", Ordered, func() {
@@ -232,7 +233,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 	)
 
 	currentTimestamp := new(string)
-	AzureConfiguration := backups.NewAzureConfigurationFromEnv()
+	var AzureConfiguration backups.AzureConfiguration
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -241,6 +242,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 		if !IsAKS() {
 			Skip("This test is only executed on AKS clusters")
 		}
+		AzureConfiguration = backups.NewAzureConfiguration()
 	})
 
 	// Restore cluster using a recovery object store, that is a backup of another cluster,

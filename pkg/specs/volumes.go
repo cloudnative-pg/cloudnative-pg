@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -34,6 +35,14 @@ import (
 
 // PgWalVolumePath is the path used by the WAL volume when present
 const PgWalVolumePath = "/var/lib/postgresql/wal"
+
+// kubeAPIAccessVolumeName is the name of the volume projecting the
+// ServiceAccount token when the automatic mount is disabled
+const kubeAPIAccessVolumeName = "kube-api-access"
+
+// kubeAPIAccessMountPath is the canonical path where Kubernetes clients
+// expect the ServiceAccount credentials to be mounted
+const kubeAPIAccessMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 
 // PgWalVolumePgWalPath is the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
@@ -156,6 +165,8 @@ func createPostgresVolumes(
 		result = append(result, createProjectedVolume(cluster))
 	}
 
+	result = append(result, createKubeAPIAccessVolume())
+
 	result = append(result, CreateExtensionVolumes(extensions)...)
 
 	return result
@@ -233,9 +244,25 @@ func createVolumesAndVolumeMountsForSQLRefs(
 	return volumes, volumeMounts
 }
 
+// VolumeMountsConfig holds all parameters for CreatePostgresVolumeMounts.
+type VolumeMountsConfig struct {
+	// Cluster is the cluster whose spec drives which volumes are created.
+	Cluster apiv1.Cluster
+	// Extensions is the list of extension configurations whose binaries
+	// require dedicated volume mounts.
+	Extensions []apiv1.ExtensionConfiguration
+	// NeedsKubeAPIAccess controls whether the kube-api-access projected volume
+	// mount is included. Set to false for containers that do not need
+	// Kubernetes API access (e.g. the bootstrap init container).
+	NeedsKubeAPIAccess bool
+}
+
 // CreatePostgresVolumeMounts creates the volume mounts that are used
 // by PostgreSQL Pods
-func CreatePostgresVolumeMounts(cluster apiv1.Cluster, extensions []apiv1.ExtensionConfiguration) []corev1.VolumeMount {
+func CreatePostgresVolumeMounts(cfg VolumeMountsConfig) []corev1.VolumeMount {
+	cluster := cfg.Cluster
+	extensions := cfg.Extensions
+
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      pgdataVolumeName,
@@ -269,6 +296,16 @@ func CreatePostgresVolumeMounts(cluster apiv1.Cluster, extensions []apiv1.Extens
 			corev1.VolumeMount{
 				Name:      "projected",
 				MountPath: postgres.ProjectedVolumeDirectory,
+			},
+		)
+	}
+
+	if cfg.NeedsKubeAPIAccess {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      kubeAPIAccessVolumeName,
+				MountPath: kubeAPIAccessMountPath,
+				ReadOnly:  true,
 			},
 		)
 	}
@@ -324,6 +361,56 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 		Name: "projected",
 		VolumeSource: corev1.VolumeSource{
 			Projected: cluster.Spec.ProjectedVolumeTemplate.DeepCopy(),
+		},
+	}
+}
+
+// createKubeAPIAccessVolume replicates the `kube-api-access-*` projected
+// volume that the ServiceAccount admission controller would have injected
+// if the token automount were not disabled (see TokenVolumeSource in
+// kubernetes/plugin/pkg/admission/serviceaccount), keeping the instance
+// manager able to reach the Kubernetes API.
+func createKubeAPIAccessVolume() corev1.Volume {
+	return corev1.Volume{
+		Name: kubeAPIAccessVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				DefaultMode: ptr.To(corev1.ProjectedVolumeSourceDefaultMode),
+				Sources: []corev1.VolumeProjection{
+					{
+						ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+							Path:              "token",
+							ExpirationSeconds: ptr.To[int64](3607),
+						},
+					},
+					{
+						ConfigMap: &corev1.ConfigMapProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "kube-root-ca.crt",
+							},
+							Items: []corev1.KeyToPath{
+								{
+									Key:  "ca.crt",
+									Path: "ca.crt",
+								},
+							},
+						},
+					},
+					{
+						DownwardAPI: &corev1.DownwardAPIProjection{
+							Items: []corev1.DownwardAPIVolumeFile{
+								{
+									Path: "namespace",
+									FieldRef: &corev1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.namespace",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }

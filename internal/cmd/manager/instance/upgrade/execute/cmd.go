@@ -155,23 +155,21 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 	}
 
 	clusterObjectKey := ctrl.ObjectKey{Name: instance.GetClusterName(), Namespace: instance.GetNamespaceName()}
-	if err = management.WaitForGetClusterWithClient(ctx, client, clusterObjectKey); err != nil {
-		return err
-	}
 
-	// Download the cluster definition from the API server
-	var cluster apiv1.Cluster
-	if err := client.Get(ctx, clusterObjectKey, &cluster); err != nil {
-		contextLogger.Error(err, "Error while getting cluster")
-		return err
+	// This runs in the major upgrade Job, which may start before the operator
+	// writes the certificate status. Use the Cluster this call returns; see
+	// WaitForClusterCertificates for why.
+	cluster, err := management.WaitForClusterCertificates(ctx, client, clusterObjectKey)
+	if err != nil {
+		return fmt.Errorf("error while waiting for the certificate status: %w", err)
 	}
-	instance.SetCluster(&cluster)
+	instance.SetCluster(cluster)
 
-	if err := setupExtensionEnvironment(&cluster); err != nil {
+	if err := setupExtensionEnvironment(cluster); err != nil {
 		return fmt.Errorf("error while setting up extension environment: %w", err)
 	}
 
-	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
+	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, cluster); err != nil {
 		return fmt.Errorf("error while downloading secrets: %w", err)
 	}
 
@@ -235,7 +233,7 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 	}
 
 	contextLogger.Info("Preparing configuration files", "directory", newDataDir)
-	if err := prepareConfigurationFiles(ctx, cluster, newDataDir); err != nil {
+	if err := prepareConfigurationFiles(ctx, *cluster, newDataDir); err != nil {
 		return err
 	}
 
@@ -392,15 +390,12 @@ func tryAddDataChecksums(
 		return nil, err
 	}
 
-	if dataPageChecksumVersion != "1" {
-		// In postgres 18 we will have to set "--no-data-checksums" if checksums are disabled (they are enabled by default)
-		if targetMajorVersion >= 18 {
-			return append(options, "--no-data-checksums"), nil
-		}
-		return options, nil
+	enabled := dataPageChecksumVersion != "0"
+	if flag := postgresConfig.DataChecksumsInitdbFlag(targetMajorVersion, enabled); flag != "" {
+		return append(options, flag), nil
 	}
 
-	return append(options, "--data-checksums"), nil
+	return options, nil
 }
 
 func tryAddWalSegmentSize(pgControlData utils.PgControlData, options []string) ([]string, error) {

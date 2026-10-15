@@ -376,27 +376,27 @@ func ensureInitContainersAreCompleted(
 		return nil, err
 	}
 
-	// Get all pods with non-sidecar init containers
-	podsWithInitContainers := getPodsWithNonSidecarInitContainers(podList)
-	if len(podsWithInitContainers) == 0 {
+	// Get all pods with foreign init containers
+	podsWithForeignInitContainers := getPodsWithForeignInitContainers(podList)
+	if len(podsWithForeignInitContainers) == 0 {
 		return nil, nil
 	}
 
 	// Check all pods and their init containers
-	for _, pod := range podsWithInitContainers {
-		// Check all non-sidecar init containers in this pod
-		nonSidecarStatuses := getNonSidecarInitContainerStatuses(
+	for _, pod := range podsWithForeignInitContainers {
+		// Check all foreign init containers in this pod
+		foreignStatuses := getForeignInitContainerStatuses(
 			pod.Status.InitContainerStatuses,
 			pod.Spec.InitContainers,
 		)
 
-		if len(nonSidecarStatuses) == 0 {
+		if len(foreignStatuses) == 0 {
 			contextLogger.Info("waiting for init containers to start", "podName", pod.Name)
 			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 
-		// Check if any non-sidecar init container is still running or hasn't started
-		for _, status := range nonSidecarStatuses {
+		// Check if any foreign init container is still running or hasn't started
+		for _, status := range foreignStatuses {
 			if status.State.Terminated == nil {
 				contextLogger.Info("init container running, waiting for completion",
 					"podName", pod.Name,
@@ -405,8 +405,8 @@ func ensureInitContainersAreCompleted(
 			}
 		}
 
-		// Check if any non-sidecar init container failed
-		for _, status := range nonSidecarStatuses {
+		// Check if any foreign init container failed
+		for _, status := range foreignStatuses {
 			if status.State.Terminated.ExitCode != 0 {
 				contextLogger.Info("init container failed",
 					"podName", pod.Name,
@@ -423,20 +423,20 @@ func ensureInitContainersAreCompleted(
 	return nil, nil
 }
 
-func getPodsWithNonSidecarInitContainers(podList corev1.PodList) []*corev1.Pod {
-	var podsWithInitContainers []*corev1.Pod
+func getPodsWithForeignInitContainers(podList corev1.PodList) []*corev1.Pod {
+	var podsWithForeignInitContainers []*corev1.Pod
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
-		if hasNonSidecarInitContainers(&pod) {
-			podsWithInitContainers = append(podsWithInitContainers, &pod)
+		if hasForeignInitContainers(&pod) {
+			podsWithForeignInitContainers = append(podsWithForeignInitContainers, &pod)
 		}
 	}
-	return podsWithInitContainers
+	return podsWithForeignInitContainers
 }
 
-func hasNonSidecarInitContainers(pod *corev1.Pod) bool {
+func hasForeignInitContainers(pod *corev1.Pod) bool {
 	for _, initContainer := range pod.Spec.InitContainers {
-		if isSidecarInitContainer(&initContainer) {
+		if !isForeignInitContainer(&initContainer) {
 			continue
 		}
 		return true
@@ -449,7 +449,24 @@ func isSidecarInitContainer(initContainer *corev1.Container) bool {
 	return initContainer.RestartPolicy != nil && *initContainer.RestartPolicy == corev1.ContainerRestartPolicyAlways
 }
 
-func getNonSidecarInitContainerStatuses(
+// isForeignInitContainer tells whether the restore gate has to wait for the
+// given init container. The gate exists for the init containers a backup tool
+// adds to copy the PVC content back before the Pod is replaced. Sidecars never
+// terminate, and the operator's own bootstrap init containers were baked into
+// the Pod when it was first created: on a restored Pod they rerun on a volume
+// that already holds live data and never complete. Neither is waited on.
+func isForeignInitContainer(initContainer *corev1.Container) bool {
+	if isSidecarInitContainer(initContainer) {
+		return false
+	}
+	switch initContainer.Name {
+	case specs.BootstrapControllerContainerName, specs.BootstrapWorkContainerName:
+		return false
+	}
+	return true
+}
+
+func getForeignInitContainerStatuses(
 	statuses []corev1.ContainerStatus,
 	initContainers []corev1.Container,
 ) []corev1.ContainerStatus {
@@ -459,8 +476,8 @@ func getNonSidecarInitContainerStatuses(
 		initContainerSpecMap[initContainers[i].Name] = &initContainers[i]
 	}
 
-	// Collect all non-sidecar init container statuses
-	nonSidecarStatuses := make([]corev1.ContainerStatus, 0, len(statuses))
+	// Collect all foreign init container statuses
+	foreignStatuses := make([]corev1.ContainerStatus, 0, len(statuses))
 	for i := range statuses {
 		status := statuses[i]
 		initContainerSpec, exists := initContainerSpecMap[status.Name]
@@ -468,10 +485,10 @@ func getNonSidecarInitContainerStatuses(
 			continue
 		}
 
-		if !isSidecarInitContainer(initContainerSpec) {
-			nonSidecarStatuses = append(nonSidecarStatuses, status)
+		if isForeignInitContainer(initContainerSpec) {
+			foreignStatuses = append(foreignStatuses, status)
 		}
 	}
 
-	return nonSidecarStatuses
+	return foreignStatuses
 }

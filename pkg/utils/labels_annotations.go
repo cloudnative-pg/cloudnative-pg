@@ -469,16 +469,6 @@ func InheritLabels(
 }
 
 func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) map[string]string {
-	containsContainerWithName := func(name string, containers ...corev1.Container) bool {
-		for _, container := range containers {
-			if container.Name == name {
-				return true
-			}
-		}
-
-		return false
-	}
-
 	appArmorAnnotations := make(map[string]string)
 	for annotation, value := range annotations {
 		if strings.HasPrefix(annotation, AppArmorAnnotationPrefix) {
@@ -488,7 +478,7 @@ func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) 
 			}
 
 			containerName := appArmorSplit[1]
-			if containsContainerWithName(containerName, append(spec.Containers, spec.InitContainers...)...) {
+			if PodSpecHasContainer(spec, containerName) {
 				appArmorAnnotations[annotation] = value
 			}
 		}

@@ -81,7 +81,7 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 
 // BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
 func BelongToInstance(cluster *apiv1.Cluster, instanceName, pvcName string) bool {
-	expectedPVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
+	expectedPVCs := GetExpectedInstancePVCNamesFromCluster(cluster, instanceName)
 	return slices.Contains(expectedPVCs, pvcName)
 }
 
@@ -114,7 +114,7 @@ func filterByInstanceExpectedPVCs(
 	instanceName string,
 	pvcs []corev1.PersistentVolumeClaim,
 ) []corev1.PersistentVolumeClaim {
-	expectedInstancePVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
+	expectedInstancePVCs := GetExpectedInstancePVCNamesFromCluster(cluster, instanceName)
 	var belongingPVCs []corev1.PersistentVolumeClaim
 	for i := range pvcs {
 		pvc := pvcs[i]
@@ -137,7 +137,7 @@ func getNamesFromPVCList(pvcs []corev1.PersistentVolumeClaim) []string {
 
 // InstanceHasMissingMounts returns true if the instance has expected PVCs that are not mounted
 func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool {
-	for _, pvcName := range getExpectedInstancePVCNamesFromCluster(cluster, instance.Name) {
+	for _, pvcName := range GetExpectedInstancePVCNamesFromCluster(cluster, instance.Name) {
 		if !IsUsedByPodSpec(instance.Spec, pvcName) {
 			return true
 		}
@@ -178,8 +178,8 @@ func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []e
 	return buildExpectedPVCs(instanceName, roles)
 }
 
-// getExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
-func getExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName string) []string {
+// GetExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
+func GetExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName string) []string {
 	expectedPVCs := getExpectedPVCsFromCluster(cluster, instanceName)
 	expectedPVCNames := make([]string, len(expectedPVCs))
 	for idx, mount := range expectedPVCs {

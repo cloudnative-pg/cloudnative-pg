@@ -21,6 +21,7 @@ package execute
 
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -57,5 +58,44 @@ var _ = Describe("setupExtensionEnvironment", func() {
 			},
 		}
 		Expect(setupExtensionEnvironment(cluster)).To(Succeed())
+	})
+})
+
+var _ = Describe("tryAddDataChecksums", func() {
+	checksumsEnabled := utils.ParsePgControldataOutput("Data page checksum version:1\n")
+	checksumsDisabled := utils.ParsePgControldataOutput("Data page checksum version:0\n")
+
+	It("sets --data-checksums when checksums are enabled and target version is before 18", func() {
+		options, err := tryAddDataChecksums(checksumsEnabled, 17, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(options).To(ContainElement("--data-checksums"))
+	})
+
+	It("does not set --data-checksums when checksums are enabled and target version is 18+", func() {
+		options, err := tryAddDataChecksums(checksumsEnabled, 18, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(options).ToNot(ContainElement("--data-checksums"))
+		Expect(options).ToNot(ContainElement("--no-data-checksums"))
+	})
+
+	It("does not set --no-data-checksums when checksums are disabled and target version is before 18", func() {
+		options, err := tryAddDataChecksums(checksumsDisabled, 17, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(options).ToNot(ContainElement("--no-data-checksums"))
+		Expect(options).ToNot(ContainElement("--data-checksums"))
+	})
+
+	It("sets --no-data-checksums when checksums are disabled and target version is 18+", func() {
+		options, err := tryAddDataChecksums(checksumsDisabled, 18, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(options).To(ContainElement("--no-data-checksums"))
+	})
+
+	It("treats an unrecognized checksum version as enabled rather than disabled", func() {
+		checksumsUnknown := utils.ParsePgControldataOutput("Data page checksum version:2\n")
+
+		options, err := tryAddDataChecksums(checksumsUnknown, 18, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(options).ToNot(ContainElement("--no-data-checksums"))
 	})
 })

@@ -261,9 +261,13 @@ builtinLocale
     `localeProvider` to be set to `builtin`. Available from PostgreSQL 17.
 
 dataChecksums
-:   When `dataChecksums` is set to `true`, CloudNativePG invokes the `-k` option in
-    `initdb` to enable checksums on data pages and help detect corruption by the
-    I/O system - that would otherwise be silent (default: `false`).
+:   Data checksums help detect corruption of data pages that would otherwise
+    be silent. From PostgreSQL 18, where data checksums are enabled by default,
+    setting `dataChecksums` to `false` makes CloudNativePG pass the
+    `--no-data-checksums` option to `initdb` to disable them. On PostgreSQL
+    versions before 18, setting `dataChecksums` to `true` makes CloudNativePG
+    pass the `--data-checksums` option to `initdb` to enable them. When unset,
+    the `initdb` default of the PostgreSQL version in use applies.
 
 encoding
 :   When `encoding` set to a value, CloudNativePG passes it to the `--encoding`
@@ -624,7 +628,7 @@ file on the source PostgreSQL instance:
 host replication streaming_replica all md5
 ```
 
-The following manifest creates a new PostgreSQL 18.4 cluster,
+The following manifest creates a new PostgreSQL 18.6 cluster,
 called `target-db`, using the `pg_basebackup` bootstrap method
 to clone an external PostgreSQL cluster defined as `source-db`
 (in the `externalClusters` array). As you can see, the `source-db`
@@ -639,7 +643,7 @@ metadata:
   name: target-db
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   bootstrap:
     pg_basebackup:
@@ -659,7 +663,7 @@ spec:
 ```
 
 All the requirements must be met for the clone operation to work, including
-the same PostgreSQL version (in our case 18.4).
+the same PostgreSQL version (in our case 18.6).
 
 #### TLS certificate authentication
 
@@ -675,7 +679,7 @@ in the same Kubernetes cluster.
     outside the Kubernetes cluster.
 :::
 
-The manifest defines a new PostgreSQL 18.4 cluster called `cluster-clone-tls`,
+The manifest defines a new PostgreSQL 18.6 cluster called `cluster-clone-tls`,
 which is bootstrapped using the `pg_basebackup` method from the `cluster-example`
 external cluster. The host is identified by the read/write service
 in the same cluster, while the `streaming_replica` user is authenticated
@@ -690,7 +694,7 @@ metadata:
   name: cluster-clone-tls
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   bootstrap:
     pg_basebackup:
@@ -758,6 +762,52 @@ completed**:
 4. If the `username` value matches the `owner` value in the secret, the
    password for the application user (the `app` user in this case) will be
    updated to the `password` value in the secret.
+
+#### Passing additional options to `pg_basebackup`
+
+This is an advanced option. You can append custom options to the
+`pg_basebackup` command built by the operator with
+`.spec.bootstrap.pg_basebackup.additionalArgs`, for example to reduce the
+impact on the source server or to speed up the copy of a very large data
+directory:
+
+```yaml
+spec:
+  bootstrap:
+    pg_basebackup:
+      source: cluster-example
+      additionalArgs:
+        - --max-rate=50M
+        - --checkpoint=fast
+        - --sync-method=syncfs
+```
+
+In this example:
+
+- `--max-rate=50M` limits the transfer rate, reducing the load on the source
+- `--checkpoint=fast` avoids waiting for a spread checkpoint on the source
+- `--sync-method=syncfs` avoids a slow per-file `fsync` phase at the end of the
+  copy (PostgreSQL 17 and later only)
+
+:::warning
+The operator rejects the options it relies on: the target directory and output
+format (`-D`/`--pgdata`, `-F`/`--format`, `-R`/`--write-recovery-conf`,
+`-X`/`--wal-method`, `--waldir`, `-t`/`--target`), the connection parameters
+(`-d`/`--dbname`, `-h`/`--host`, `-p`/`--port`, `-U`/`--username`,
+`-w`/`--no-password`, `-W`/`--password`, taken from `externalClusters`), the
+tablespace relocation (`-T`/`--tablespace-mapping`), the creation of a
+permanent replication slot on the source (`-C`/`--create-slot`), which the new
+cluster would never use, and `--help` and `--version`. Abbreviated long options
+that match one of them are rejected too.
+
+All the other options are passed as they are, and some of them may still
+interfere with the operator. You are responsible for the arguments and for
+their compatibility with the PostgreSQL version in use. The project does not
+test combinations of `pg_basebackup` options.
+:::
+
+This setting only applies to the bootstrap of the cluster. It does not affect
+the `pg_basebackup` executions used to join new replicas.
 
 #### Current limitations
 

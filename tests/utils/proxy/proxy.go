@@ -82,9 +82,8 @@ func RetrievePgStatusFromInstance(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	pod corev1.Pod,
-	tlsEnabled bool,
 ) (string, error) {
-	body, err := runProxyRequest(ctx, kubeInterface, &pod, tlsEnabled, url.PathPgStatus, int(url.StatusPort))
+	body, err := runProxyRequest(ctx, kubeInterface, &pod, true, url.PathPgStatus, int(url.StatusPort))
 	return string(body), err
 }
 
@@ -94,7 +93,6 @@ func RetrievePgControlDataFromInstance(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	pod corev1.Pod,
-	tlsEnabled bool,
 ) ([]byte, error) {
-	return runProxyRequest(ctx, kubeInterface, &pod, tlsEnabled, url.PathPGControlData, int(url.StatusPort))
+	return runProxyRequest(ctx, kubeInterface, &pod, true, url.PathPGControlData, int(url.StatusPort))
 }

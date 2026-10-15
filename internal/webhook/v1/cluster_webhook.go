@@ -39,7 +39,9 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
@@ -183,6 +185,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateName,
 		v.validateTablespaceNames,
 		v.validateBootstrapPgBaseBackupSource,
+		v.validateBootstrapPgBaseBackupAdditionalArgs,
 		v.validateTablespaceBackupSnapshot,
 		v.validateBootstrapRecoverySource,
 		v.validateBootstrapRecoveryDataSource,
@@ -644,6 +647,103 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cl
 				field.NewPath("spec", "bootstrap", "pg_basebackup", "source"),
 				r.Spec.Bootstrap.PgBaseBackup.Source,
 				fmt.Sprintf("External cluster %v not found", r.Spec.Bootstrap.PgBaseBackup.Source)))
+	}
+
+	return result
+}
+
+const (
+	// pgBaseBackupForbiddenShortOptions lists the short options of pg_basebackup
+	// that cannot be used in `additionalArgs`: target and format (-D, -F, -R, -X,
+	// -t, -T), connection (-d, -h, -p, -U, -w, -W), the creation of a permanent
+	// replication slot that nothing would consume (-C) and the options that
+	// terminate the execution (-V, -?)
+	pgBaseBackupForbiddenShortOptions = "DFRXtTdhpUwWCV?"
+
+	// pgBaseBackupShortOptionsWithValue lists the short options of pg_basebackup
+	// that consume a value. Whatever follows one of them, in the same argument,
+	// is its value and not a list of options.
+	pgBaseBackupShortOptionsWithValue = "DFirtTXZclSdhpsU"
+)
+
+// pgBaseBackupForbiddenLongOptions lists the long options of pg_basebackup
+// that cannot be used in `additionalArgs`, as the operator relies on them
+var pgBaseBackupForbiddenLongOptions = []string{
+	"pgdata",
+	"format",
+	"write-recovery-conf",
+	"wal-method",
+	"waldir",
+	"target",
+	"tablespace-mapping",
+	"create-slot",
+	"dbname",
+	"host",
+	"port",
+	"username",
+	"no-password",
+	"password",
+	"help",
+	"version",
+}
+
+// forbiddenPgBaseBackupOption checks whether a single entry of `additionalArgs`
+// is, or could be parsed by pg_basebackup as, an option that the operator
+// doesn't allow. It returns why the entry is rejected, or an empty string.
+//
+// The entries that don't start with a dash are considered values of the
+// previous option and are not inspected.
+func forbiddenPgBaseBackupOption(arg string) string {
+	switch {
+	case arg == "--":
+		return ""
+
+	case strings.HasPrefix(arg, "--"):
+		// getopt_long accepts any unambiguous abbreviation of a long option
+		name, _, _ := strings.Cut(strings.TrimPrefix(arg, "--"), "=")
+		if name == "" {
+			return ""
+		}
+		for _, forbidden := range pgBaseBackupForbiddenLongOptions {
+			if name == forbidden {
+				return fmt.Sprintf("the pg_basebackup option --%s is managed by the operator", forbidden)
+			}
+			if strings.HasPrefix(forbidden, name) {
+				return fmt.Sprintf("the pg_basebackup option --%s is an abbreviation of --%s, "+
+					"which is managed by the operator; use the full name of the option", name, forbidden)
+			}
+		}
+
+	case strings.HasPrefix(arg, "-") && len(arg) > 1:
+		// Short options can be grouped (e.g. `-vP`), and the value
+		// of the last one can be attached to it (e.g. `-r50M`)
+		for _, c := range arg[1:] {
+			if strings.ContainsRune(pgBaseBackupForbiddenShortOptions, c) {
+				return fmt.Sprintf("the pg_basebackup option -%c is managed by the operator", c)
+			}
+			if strings.ContainsRune(pgBaseBackupShortOptionsWithValue, c) {
+				break
+			}
+		}
+	}
+
+	return ""
+}
+
+// validateBootstrapPgBaseBackupAdditionalArgs rejects the pg_basebackup
+// options that the operator relies on, and that would break the bootstrap
+func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupAdditionalArgs(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.PgBaseBackup == nil {
+		return result
+	}
+
+	argsPath := field.NewPath("spec", "bootstrap", "pg_basebackup", "additionalArgs")
+	for idx, arg := range r.Spec.Bootstrap.PgBaseBackup.AdditionalArgs {
+		if detail := forbiddenPgBaseBackupOption(arg); detail != "" {
+			result = append(result, field.Forbidden(argsPath.Index(idx), detail))
+		}
 	}
 
 	return result
@@ -2662,7 +2762,9 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getStorageWarnings(r)...)
 	list = append(list, getSharedBuffersWarnings(r)...)
 	list = append(list, getMonitoringFieldsWarnings(r)...)
-	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+	list = append(list, getSynchronousReplicationWarnings(r)...)
+	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
 
 func getMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {
@@ -2867,7 +2969,6 @@ func (v *ClusterCustomValidator) validatePodPatchAnnotation(r *apiv1.Cluster) fi
 		context.Background(),
 		*r,
 		1,
-		true,
 	); err != nil {
 		return field.ErrorList{
 			field.Invalid(
@@ -2973,7 +3074,15 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				continue
 			}
 
-			if strings.HasPrefix(filepath.Clean(path), "..") {
+			// filepath.IsLocal reports whether the path, after joining it under
+			// "." and resolving "..", would stay within that base. Joining
+			// under "." first (rather than a placeholder mount point) makes
+			// this independent of the extension mount point's actual depth:
+			// CollectBinPaths and absolutizePaths join these paths under a
+			// real, multi-segment mount point at runtime, and a placeholder
+			// base shallower than that real path would wrongly accept some
+			// escaping paths (e.g. "../mount/lib").
+			if !filepath.IsLocal(filepath.Join(".", path)) {
 				result = append(result, field.Invalid(
 					fieldPath.Index(j),
 					path,
@@ -3133,4 +3242,51 @@ func (v *ClusterCustomValidator) validateServiceAccountConfig(r *apiv1.Cluster) 
 		}
 	}
 	return nil
+}
+
+func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
+	if r.Spec.Instances < 2 {
+		return nil
+	}
+
+	// A replica cluster replays data from another cluster: losing its
+	// designated primary doesn't lose data from the topology
+	if r.IsReplica() {
+		return nil
+	}
+
+	if r.Spec.PostgresConfiguration.Synchronous != nil {
+		return nil
+	}
+
+	if r.Spec.MinSyncReplicas > 0 {
+		return nil
+	}
+
+	return admission.Warnings{
+		"This cluster has no synchronous replication configured. " +
+			"A primary failure can cause data loss for transactions not yet replicated. " +
+			"Consider configuring .spec.postgresql.synchronous to protect against data loss.",
+	}
+}
+
+func getFailureDomainTopologyWarnings(r *apiv1.Cluster) admission.Warnings {
+	sync := r.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
+		return nil
+	}
+
+	condition := meta.FindStatusCondition(
+		r.Status.Conditions,
+		string(apiv1.ConditionSyncReplicationTopologySatisfied),
+	)
+	if condition == nil || condition.Status != metav1.ConditionFalse {
+		return nil
+	}
+
+	return admission.Warnings{
+		"failure domain keys are configured but the topology constraint is not currently satisfied: " +
+			condition.Message +
+			" Check that replicas exist in different failure domains and that the topology labels are set.",
+	}
 }

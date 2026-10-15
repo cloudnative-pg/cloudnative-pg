@@ -58,8 +58,7 @@ func (c *backupClientImpl) StatusWithErrors(
 	ctx context.Context,
 	pod *corev1.Pod,
 ) (*webserver.Response[webserver.BackupResultData], error) {
-	scheme := GetStatusSchemeFromPod(pod)
-	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
+	httpURL := url.Build("https", pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, httpURL, nil)
 	if err != nil {
 		return nil, err
@@ -74,8 +73,7 @@ func (c *backupClientImpl) Start(
 	pod *corev1.Pod,
 	sbq webserver.StartBackupRequest,
 ) (*webserver.Response[webserver.BackupResultData], error) {
-	scheme := GetStatusSchemeFromPod(pod)
-	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
+	httpURL := url.Build("https", pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
@@ -98,8 +96,7 @@ func (c *backupClientImpl) Stop(
 	pod *corev1.Pod,
 	sbq webserver.StopBackupRequest,
 ) (*webserver.Response[webserver.BackupResultData], error) {
-	scheme := GetStatusSchemeFromPod(pod)
-	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
+	httpURL := url.Build("https", pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {
