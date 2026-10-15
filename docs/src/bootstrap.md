@@ -518,7 +518,10 @@ The primary use cases for this method include:
     thoroughly tested. The CloudNativePG community does not endorse this approach
     for such use cases, and recommends using logical import instead. It is
     exceedingly rare that all requirements for physical replication are met in a
-    way that seamlessly works with CloudNativePG.
+    way that seamlessly works with CloudNativePG. If you still need to go down
+    this path, we strongly recommend relying on one of the
+    [professional support companies](https://cloudnative-pg.io/support/)
+    listed on the CloudNativePG website.
 :::
 
 :::warning
@@ -556,8 +559,9 @@ The following requirements apply to the `pg_basebackup` bootstrap method:
 
 - target and source must have the same hardware architecture
 - target and source must have the same major PostgreSQL version
-- target and source must have the same tablespaces, with the locations in the
-  source mapped through `tablespaceMapping` (see
+- target and source must have the same tablespaces (same names), with the
+  locations in the source mapped through `tablespaceMapping` when they differ
+  from the CloudNativePG ones (see
   [Mapping tablespaces from the source](#mapping-tablespaces-from-the-source))
 - source must be configured with enough `max_wal_senders` to grant
   access from the target for this one-off operation by providing at least
@@ -813,11 +817,12 @@ the `pg_basebackup` executions used to join new replicas.
 
 #### Mapping tablespaces from the source
 
-If the source instance uses tablespaces, map each tablespace declared
-in `spec.tablespaces` to its location in the source instance with
-`tablespaceMapping`. The name of each tablespace in `spec.tablespaces` must be
-the same as in the source instance, as `pg_basebackup` relocates tablespaces by
-path and not by name:
+If the source instance uses tablespaces, declare each of them in
+`spec.tablespaces`, using the same name it has in the source instance.
+`pg_basebackup` relocates tablespaces by path and not by name, so if the source
+does not already use the CloudNativePG location for a tablespace, map it with
+`tablespaceMapping`, which associates the name of the tablespace with its
+location in the source instance:
 
 ```yaml
 spec:
@@ -827,15 +832,21 @@ spec:
         size: 1Gi
   bootstrap:
     pg_basebackup:
-      source: cluster-example
+      source: external-postgres
       tablespaceMapping:
         - name: data_ts
-          sourceLocation: /var/lib/postgresql/source-tablespaces/data_ts
+          sourceLocation: /data/pg/data_ts
 ```
 
 :::warning
-Use `tablespaceMapping` with caution when the source cluster is not
-managed by CloudNativePG. The operator does not validate that the
+Use `tablespaceMapping` with caution, as it is meant for sources that are not
+managed by CloudNativePG, such as an instance running outside Kubernetes. As
+explained in the [introduction of this method](#bootstrap-from-a-live-cluster-pg_basebackup),
+the CloudNativePG community does not endorse that kind of migration, and
+recommends logical import instead. If you still need it, we strongly
+recommend relying on one of the
+[professional support companies](https://cloudnative-pg.io/support/)
+listed on the CloudNativePG website. The operator does not validate that the
 resulting tablespace layout will work correctly.
 :::
 
@@ -851,10 +862,11 @@ the tablespaces declared in `spec.tablespaces` without a mapping.
 :::
 
 :::warning
-Do not run `CREATE TABLESPACE` on the source between the start of the base
-backup and the promotion of the target. WAL replay carries the source path
-unmodified, so replaying such a record fails on the target. This also applies to
-replica clusters, for as long as they follow the source.
+Do not run `CREATE TABLESPACE` on the source from the start of the base backup
+until the target stops following the source. For a standalone cluster, that is
+the end of the cloning operation; for a replica cluster, it is the promotion of
+the cluster. WAL replay carries the source path unmodified, so replaying such a
+record fails on the target.
 :::
 
 #### Current limitations
