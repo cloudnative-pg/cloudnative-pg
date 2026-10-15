@@ -256,6 +256,9 @@ func TestE2ESuite(t *testing.T) {
 		suiteConfig.LabelFilter = cfg.LabelFilter
 	}
 
+	defer keepWorkerCrashOutput(suiteConfig.ParallelProcess)()
+	defer trackCurrentSpec(suiteConfig.ParallelProcess)()
+
 	RunSpecs(t, "CloudNativePG Operator E2E", suiteConfig, reporterConfig)
 }
 

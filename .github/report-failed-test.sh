@@ -83,4 +83,31 @@ function failure_summary {
   echo
 }
 
+# A Ginkgo worker that dies reports nothing, so the job fails with no spec
+# failure. Show what the workers left behind (see tests/e2e/worker_diagnostics_test.go).
+function worker_diagnostics {
+  # Set by failure_summary
+  if [ "${cnt}" -ne 0 ]; then
+    return
+  fi
+
+  if [ -f tests/e2e/out/report.json ]; then
+    printf "${colorBoldRed}%s\n\n" "No spec failure was reported: a Ginkgo worker probably died before reporting."
+  else
+    printf "${colorBoldRed}%s\n\n" "No Ginkgo report found: the test suite did not run to completion."
+  fi
+  for f in tests/e2e/out/crash-proc*.log tests/e2e/out/current-proc*.txt; do
+    if [ -s "${f}" ]; then
+      echo "::group::${f}"
+      cat "${f}"
+      echo "::endgroup::"
+    fi
+  done
+
+  echo "::group::Kernel OOM messages"
+  sudo -n dmesg 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' | tail -n 20 || true
+  echo "::endgroup::"
+}
+
 failure_summary
+worker_diagnostics
