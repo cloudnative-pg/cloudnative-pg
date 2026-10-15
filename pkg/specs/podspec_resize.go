@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 // ContainerResourceDrift describes a container whose resources differ
@@ -70,8 +71,8 @@ func GetContainerResourceDrifts(current, target *corev1.PodSpec) []ContainerReso
 			if !found {
 				continue
 			}
-			if resourceListsEqual(currentContainers[i].Resources.Requests, targetContainer.Resources.Requests) &&
-				resourceListsEqual(currentContainers[i].Resources.Limits, targetContainer.Resources.Limits) {
+			if equality.Semantic.DeepEqual(currentContainers[i].Resources.Requests, targetContainer.Resources.Requests) &&
+				equality.Semantic.DeepEqual(currentContainers[i].Resources.Limits, targetContainer.Resources.Limits) {
 				continue
 			}
 			drifts = append(drifts, ContainerResourceDrift{
@@ -250,21 +251,6 @@ func canResizeResourceList(containerName, listName string, current, target corev
 	}
 
 	return true, ""
-}
-
-// resourceListsEqual compares two resource lists semantically, treating nil
-// and empty lists as equal
-func resourceListsEqual(current, target corev1.ResourceList) bool {
-	if len(current) != len(target) {
-		return false
-	}
-	for name, currentValue := range current {
-		targetValue, found := target[name]
-		if !found || currentValue.Cmp(targetValue) != 0 {
-			return false
-		}
-	}
-	return true
 }
 
 func isNativeSidecar(initContainers []corev1.Container, name string) bool {
