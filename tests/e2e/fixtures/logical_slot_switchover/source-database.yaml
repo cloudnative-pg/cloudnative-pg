@@ -1,0 +1,10 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: source-db
+spec:
+  name: testdb
+  owner: app
+  databaseReclaimPolicy: delete
+  cluster:
+    name: logical-slot-source
