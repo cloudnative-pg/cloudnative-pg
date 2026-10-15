@@ -658,8 +658,8 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cl
 // validateTablespaceMapping validates the tablespace mapping of the
 // pg_basebackup bootstrap: every name must be declared in `spec.tablespaces`,
 // and every source location must be an absolute path, free of `=` (the
-// separator used by `pg_basebackup`), and unique. Unique names and non-empty
-// values are enforced by the CRD.
+// separator used by `pg_basebackup`) and `\` (its escape character), and
+// unique. Unique names and non-empty values are enforced by the CRD.
 func (v *ClusterCustomValidator) validateTablespaceMapping(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
@@ -681,9 +681,9 @@ func (v *ClusterCustomValidator) validateTablespaceMapping(r *apiv1.Cluster) fie
 		case !path.IsAbs(entry.SourceLocation):
 			result = append(result, field.Invalid(
 				locationPath, entry.SourceLocation, "The source location must be an absolute path"))
-		case strings.Contains(entry.SourceLocation, "="):
+		case strings.ContainsAny(entry.SourceLocation, `=\`):
 			result = append(result, field.Invalid(
-				locationPath, entry.SourceLocation, "The source location must not contain the '=' character"))
+				locationPath, entry.SourceLocation, "The source location must not contain the '=' or '\\' characters"))
 		}
 
 		// pg_basebackup canonicalizes the paths before matching them

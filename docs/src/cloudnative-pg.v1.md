@@ -3238,7 +3238,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `name` _string_ | Name of the tablespace, as declared in `spec.tablespaces` | True |  | MinLength: 1 <br /> |
-| `sourceLocation` _string_ | Absolute path of the tablespace in the source instance. It must not<br />contain the `=` character and must be unique among the entries. | True |  | MinLength: 1 <br /> |
+| `sourceLocation` _string_ | Absolute path of the tablespace in the source instance. It must not<br />contain the `=` or `\` characters and must be unique among the entries. | True |  | MinLength: 1 <br /> |
 
 
 #### TablespaceState

@@ -1960,7 +1960,7 @@ spec:
                             sourceLocation:
                               description: |-
                                 Absolute path of the tablespace in the source instance. It must not
-                                contain the `=` character and must be unique among the entries.
+                                contain the `=` or `\` characters and must be unique among the entries.
                               minLength: 1
                               type: string
                           required:

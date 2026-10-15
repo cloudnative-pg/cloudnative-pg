@@ -2293,7 +2293,7 @@ type TablespaceMappingEntry struct {
 	Name string `json:"name"`
 
 	// Absolute path of the tablespace in the source instance. It must not
-	// contain the `=` character and must be unique among the entries.
+	// contain the `=` or `\` characters and must be unique among the entries.
 	// +kubebuilder:validation:MinLength=1
 	SourceLocation string `json:"sourceLocation"`
 }

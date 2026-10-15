@@ -7435,6 +7435,14 @@ var _ = Describe("pg_basebackup tablespaceMapping validation", func() {
 		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
 	})
 
+	It("rejects a source location containing a backslash", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: `/data/pg\fast`})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
 	It("rejects a duplicated source location", func() {
 		cluster := clusterWithMapping(
 			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/ts"},
