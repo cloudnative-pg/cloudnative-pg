@@ -132,6 +132,30 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		Expect(recorder.Events).To(Receive(ContainSubstring("InPlaceResize")))
 	})
 
+	It("leaves alone the containers it does not resize", func(ctx SpecContext) {
+		pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
+			Name: "istio-proxy",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{"cpu": resource.MustParse("100m")},
+			},
+		})
+		// the cached copy of the pod predates a resize of the injected
+		// container issued by another actor
+		cachedPod := pod.DeepCopy()
+		pod.Spec.Containers[len(pod.Spec.Containers)-1].Resources.Limits["cpu"] = resource.MustParse("300m")
+		r := newReconciler(interceptor.Funcs{})
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		Expect(r.resizeInstanceInPlace(ctx, cluster, cachedPod, "unit test")).To(Succeed())
+
+		var currentPod corev1.Pod
+		Expect(r.Get(ctx, k8client.ObjectKeyFromObject(pod), &currentPod)).To(Succeed())
+		Expect(getPostgresResources(&currentPod.Spec).Limits["cpu"]).To(Equal(resource.MustParse("2")))
+		injected := currentPod.Spec.Containers[len(currentPod.Spec.Containers)-1]
+		Expect(injected.Name).To(Equal("istio-proxy"))
+		Expect(injected.Resources.Limits["cpu"]).To(Equal(resource.MustParse("300m")))
+	})
+
 	It("only repairs the annotation when the live resources already match", func(ctx SpecContext) {
 		// Make the stored annotation stale while the live spec matches the target
 		var storedPodSpec corev1.PodSpec
