@@ -34,10 +34,12 @@ type countingLock struct {
 	getCalls    int
 	updateCalls int
 	getErr      error
+	getDelay    time.Duration
 }
 
 func (l *countingLock) Get(_ context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
 	l.getCalls++
+	time.Sleep(l.getDelay)
 	if l.getErr != nil {
 		return nil, nil, l.getErr
 	}
@@ -84,6 +86,13 @@ var _ = Describe("LeaseWatchdog", func() {
 		Eventually(w.IsHealthy).Should(MatchError(ContainSubstring("primary lease loop")))
 	})
 
+	It("uses the silence limit set after construction", func() {
+		w := NewLeaseWatchdog(time.Hour)
+		w.MarkAcquired()
+		w.SetMaxSilence(20 * time.Millisecond)
+		Eventually(w.IsHealthy).Should(MatchError(ContainSubstring("primary lease loop")))
+	})
+
 	Describe("WrapLock", func() {
 		It("beats on Get, even when the underlying call fails", func() {
 			w := NewLeaseWatchdog(20 * time.Millisecond)
@@ -97,6 +106,39 @@ var _ = Describe("LeaseWatchdog", func() {
 			// Even though the attempt failed, the watchdog stays healthy: it
 			// measures whether work is being attempted, not whether it succeeds.
 			time.Sleep(15 * time.Millisecond)
+			Expect(w.IsHealthy()).To(Succeed())
+		})
+
+		It("stays healthy while a call is blocked, however long", func() {
+			// An API server that does not answer must not make the loop look
+			// wedged.
+			w := NewLeaseWatchdog(50 * time.Millisecond)
+			w.MarkAcquired()
+			inner := &countingLock{getDelay: 200 * time.Millisecond}
+			wrapped := w.WrapLock(inner)
+
+			done := make(chan struct{})
+			go func() {
+				defer GinkgoRecover()
+				defer close(done)
+				_, _, err := wrapped.Get(context.Background())
+				Expect(err).ToNot(HaveOccurred())
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+			Expect(w.IsHealthy()).To(Succeed())
+			<-done
+		})
+
+		It("does not count the time a call was blocked as silence after it returns", func() {
+			w := NewLeaseWatchdog(200 * time.Millisecond)
+			w.MarkAcquired()
+			inner := &countingLock{getDelay: 150 * time.Millisecond}
+			wrapped := w.WrapLock(inner)
+
+			_, _, err := wrapped.Get(context.Background())
+			Expect(err).ToNot(HaveOccurred())
+			time.Sleep(100 * time.Millisecond)
 			Expect(w.IsHealthy()).To(Succeed())
 		})
 
