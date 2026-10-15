@@ -866,10 +866,35 @@ func (p *PgConfiguration) setUserSharedPreloadLibraries(info ConfigurationInfo) 
 }
 
 // CreatePostgresqlConfFile creates the contents of the postgresql.conf file
+// and returns them with the hash identifying the configuration
 func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
-	// Split the parameters into the regular PostgreSQL section (whose hash
-	// defines the identity of the configuration) and the cnpg.* section (which
-	// carries operator-internal state and must not contribute to the hash).
+	pgPart, _ := renderPostgresqlConfSections(configuration)
+	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(pgPart)))
+
+	return CreatePostgresqlConfFileWithHash(configuration, sha256sum), sha256sum
+}
+
+// CreatePostgresqlConfFileWithHash creates the contents of the postgresql.conf
+// file, identifying the configuration with the passed hash
+func CreatePostgresqlConfFileWithHash(configuration *PgConfiguration, sha256sum string) string {
+	pgPart, cnpgPart := renderPostgresqlConfSections(configuration)
+
+	// Emit the cnpg.* keys (sorted), then always emit the sha256 line LAST.
+	// The sha256-last layout is legacy behaviour; preserving it prevents a
+	// byte-level diff in postgresql.conf (and an avoidable pg_reload_conf())
+	// on operator upgrade for clusters that already have other cnpg.* keys
+	// such as cnpg.synchronous_standby_names_metadata.
+	sha256Line := configfile.RenderPostgresConfiguration(map[string]string{
+		CNPGConfigSha256: sha256sum,
+	})
+
+	return pgPart + cnpgPart + sha256Line
+}
+
+// renderPostgresqlConfSections renders the regular PostgreSQL section (whose
+// hash defines the identity of the configuration) and the cnpg.* section
+// (which carries operator-internal state and must not contribute to the hash)
+func renderPostgresqlConfSections(configuration *PgConfiguration) (string, string) {
 	pgOptions := map[string]string{}
 	cnpgOptions := map[string]string{}
 	for name, value := range configuration.configs {
@@ -880,20 +905,7 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 		}
 	}
 
-	pgPart := configfile.RenderPostgresConfiguration(pgOptions)
-	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(pgPart)))
-
-	// Emit the cnpg.* keys (sorted), then always emit the sha256 line LAST.
-	// The sha256-last layout is legacy behaviour; preserving it prevents a
-	// byte-level diff in postgresql.conf (and an avoidable pg_reload_conf())
-	// on operator upgrade for clusters that already have other cnpg.* keys
-	// such as cnpg.synchronous_standby_names_metadata.
-	cnpgPart := configfile.RenderPostgresConfiguration(cnpgOptions)
-	sha256Line := configfile.RenderPostgresConfiguration(map[string]string{
-		CNPGConfigSha256: sha256sum,
-	})
-
-	return pgPart + cnpgPart + sha256Line, sha256sum
+	return configfile.RenderPostgresConfiguration(pgOptions), configfile.RenderPostgresConfiguration(cnpgOptions)
 }
 
 // AdditionalExtensionConfiguration holds the directories, inside the

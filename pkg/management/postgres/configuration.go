@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -381,19 +382,9 @@ func createPostgresqlConfiguration(
 		return "", "", err
 	}
 	if len(exts) > 0 {
-		extensionControlPaths, err := filterExistingDirectories(
-			extensions.CollectExtensionControlPaths(exts, baseDir))
-		if err != nil {
-			return "", "", err
-		}
-		dynamicLibraryPaths, err := filterExistingDirectories(
-			extensions.CollectDynamicLibraryPaths(exts, baseDir))
-		if err != nil {
-			return "", "", err
-		}
 		info.AdditionalExtensions = &postgres.AdditionalExtensionConfiguration{
-			ExtensionControlPath: extensionControlPaths,
-			DynamicLibraryPath:   dynamicLibraryPaths,
+			ExtensionControlPath: extensions.CollectExtensionControlPaths(exts, baseDir),
+			DynamicLibraryPath:   extensions.CollectDynamicLibraryPaths(exts, baseDir),
 		}
 	}
 
@@ -418,8 +409,23 @@ func createPostgresqlConfiguration(
 		return "", "", err
 	}
 
-	file, sha := postgres.CreatePostgresqlConfFile(config)
-	return file, sha, nil
+	// The hash identifies the configuration requested by the Cluster: every
+	// Pod must report the same one for a rollout to proceed, including the
+	// Pods that don't mount the extension images yet. The directories missing
+	// from the images mounted in this Pod are only removed from the file.
+	_, sha := postgres.CreatePostgresqlConfFile(config)
+	if info.AdditionalExtensions != nil {
+		if err := removeMissingDirectories(
+			config, postgres.ExtensionControlPath, info.AdditionalExtensions.ExtensionControlPath); err != nil {
+			return "", "", err
+		}
+		if err := removeMissingDirectories(
+			config, postgres.DynamicLibraryPath, info.AdditionalExtensions.DynamicLibraryPath); err != nil {
+			return "", "", err
+		}
+	}
+
+	return postgres.CreatePostgresqlConfFileWithHash(config, sha), sha, nil
 }
 
 func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
@@ -427,6 +433,27 @@ func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
 		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
 		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
 		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
+}
+
+// removeMissingDirectories removes from the path-like parameter named key
+// the candidate directories that are not existing directories
+func removeMissingDirectories(config *postgres.PgConfiguration, key string, candidates []string) error {
+	value, ok := config.GetConfigurationParameters()[key]
+	if !ok {
+		return nil
+	}
+
+	existing, err := filterExistingDirectories(candidates)
+	if err != nil {
+		return err
+	}
+
+	paths := slices.DeleteFunc(strings.Split(value, ":"), func(path string) bool {
+		return slices.Contains(candidates, path) && !slices.Contains(existing, path)
+	})
+	config.OverwriteConfig(key, strings.Join(paths, ":"))
+
+	return nil
 }
 
 // filterExistingDirectories returns the paths that are existing directories,

@@ -37,6 +37,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	pgconfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -339,6 +340,80 @@ var _ = Describe("selectAdditionalExtensions", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(exts).To(BeNil())
 		Expect(baseDir).To(Equal("/extensions"))
+	})
+})
+
+var _ = Describe("image volume extensions configuration", func() {
+	defaultVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
+	Expect(err).ToNot(HaveOccurred())
+	defaultMajor := int(defaultVersion.Major())
+
+	clusterWithExtensions := func(extensions ...apiv1.ExtensionConfiguration) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "configurationTest", Namespace: "default"},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{Extensions: extensions},
+			},
+		}
+	}
+
+	// A Pod whose extension images are not mounted yet, like one waiting for
+	// its rollout, must report the same hash as a Pod that mounts them,
+	// otherwise the rollout waits forever for the configuration to be uniform
+	It("hashes the extension directories requested by the Cluster, even when missing", func(ctx SpecContext) {
+		oneExtension, oneExtensionSha, err := createPostgresqlConfiguration(
+			ctx, clusterWithExtensions(apiv1.ExtensionConfiguration{Name: "first"}), true, defaultMajor,
+			postgres.OperationType_TYPE_UNSPECIFIED,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		twoExtensions, twoExtensionsSha, err := createPostgresqlConfiguration(
+			ctx,
+			clusterWithExtensions(
+				apiv1.ExtensionConfiguration{Name: "first"},
+				apiv1.ExtensionConfiguration{Name: "second"},
+			),
+			true, defaultMajor,
+			postgres.OperationType_TYPE_UNSPECIFIED,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		// No extension directory exists here, so both files skip them all and
+		// differ only in the hash, which identifies the requested configuration
+		Expect(twoExtensions).ToNot(ContainSubstring("/extensions/"))
+		Expect(twoExtensions).To(ContainSubstring(fmt.Sprintf("cnpg.config_sha256 = '%s'", twoExtensionsSha)))
+		Expect(twoExtensionsSha).ToNot(Equal(oneExtensionSha))
+		Expect(twoExtensions).To(Equal(strings.ReplaceAll(oneExtension, oneExtensionSha, twoExtensionsSha)))
+	})
+})
+
+var _ = Describe("removeMissingDirectories", func() {
+	It("removes only the candidates that are missing", func() {
+		base := GinkgoT().TempDir()
+		Expect(os.MkdirAll(filepath.Join(base, "pgvector", "share"), 0o750)).To(Succeed())
+		config := &pgconfig.PgConfiguration{}
+		config.OverwriteConfig(pgconfig.ExtensionControlPath, strings.Join([]string{
+			"$system",
+			filepath.Join(base, "pgvector", "share"),
+			filepath.Join(base, "keycloak-oauth-validator", "share"),
+			"/user/defined",
+		}, ":"))
+
+		Expect(removeMissingDirectories(config, pgconfig.ExtensionControlPath, []string{
+			filepath.Join(base, "pgvector", "share"),
+			filepath.Join(base, "keycloak-oauth-validator", "share"),
+		})).To(Succeed())
+		Expect(config.GetConfig(pgconfig.ExtensionControlPath)).To(Equal(strings.Join([]string{
+			"$system",
+			filepath.Join(base, "pgvector", "share"),
+			"/user/defined",
+		}, ":")))
+	})
+
+	It("doesn't add a parameter that is not set", func() {
+		config := &pgconfig.PgConfiguration{}
+		Expect(removeMissingDirectories(config, pgconfig.DynamicLibraryPath, []string{"/missing/lib"})).To(Succeed())
+		Expect(config.GetConfigurationParameters()).ToNot(HaveKey(pgconfig.DynamicLibraryPath))
 	})
 })
 
