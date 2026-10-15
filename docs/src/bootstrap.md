@@ -857,8 +857,7 @@ sure that every tablespace of the source instance is declared in
 `spec.tablespaces`, and mapped through `tablespaceMapping` unless the source
 already uses the CloudNativePG location. A tablespace that is not mapped is
 restored under the path it has in the source instance, inside the Pod, and the
-bootstrap may fail or write to an unexpected location. The webhook warns about
-the tablespaces declared in `spec.tablespaces` without a mapping.
+bootstrap may fail or write to an unexpected location.
 :::
 
 :::warning

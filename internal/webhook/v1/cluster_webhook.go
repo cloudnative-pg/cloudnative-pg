@@ -2814,7 +2814,6 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getMonitoringFieldsWarnings(r)...)
 	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 	list = append(list, getSynchronousReplicationWarnings(r)...)
-	list = append(list, getPgBaseBackupTablespaceWarnings(r)...)
 	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
 
@@ -2919,35 +2918,6 @@ func getRetentionPolicyWarnings(r *apiv1.Cluster) admission.Warnings {
 				"in-tree barman-cloud support, which is not being used in this cluster. "+
 				"Please use a backup plugin and migrate this configuration to the plugin configuration",
 		)
-	}
-
-	return result
-}
-
-// getPgBaseBackupTablespaceWarnings warns about the tablespaces declared in
-// `spec.tablespaces` that are not mapped when bootstrapping via pg_basebackup
-func getPgBaseBackupTablespaceWarnings(r *apiv1.Cluster) admission.Warnings {
-	var result admission.Warnings
-
-	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.PgBaseBackup == nil {
-		return result
-	}
-
-	mapped := make(map[string]struct{}, len(r.Spec.Bootstrap.PgBaseBackup.TablespaceMapping))
-	for _, entry := range r.Spec.Bootstrap.PgBaseBackup.TablespaceMapping {
-		mapped[entry.Name] = struct{}{}
-	}
-
-	for _, tablespace := range r.Spec.Tablespaces {
-		if _, found := mapped[tablespace.Name]; found {
-			continue
-		}
-		result = append(result, fmt.Sprintf(
-			"Tablespace %q is declared in .spec.tablespaces but has no entry in "+
-				".spec.bootstrap.pg_basebackup.tablespaceMapping: the source instance must use "+
-				"the CloudNativePG location for it. Tablespaces of the source instance that are "+
-				"not declared in .spec.tablespaces are not detected",
-			tablespace.Name))
 	}
 
 	return result
