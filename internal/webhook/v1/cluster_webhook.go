@@ -1099,6 +1099,40 @@ func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv
 				"total number of instances and the provided standby names.",
 		)
 		result = append(result, err)
+		return result
+	}
+
+	// When data durability is strictly enforced (the default), the number of
+	// local cluster pods that can appear in synchronous_standby_names is
+	// additionally capped by maxStandbyNamesFromCluster. The generator honours
+	// that cap but keeps NumSync equal to number, so a number larger than the
+	// capped list produces a synchronous_standby_names that PostgreSQL accepts
+	// yet can never satisfy, blocking every synchronous commit indefinitely.
+	// The "preferred" path clamps NumSync to the number of available standby
+	// names, so this check only applies to "required".
+	durability := cfg.DataDurability
+	if durability == "" {
+		durability = apiv1.DataDurabilityLevelRequired
+	}
+	if durability == apiv1.DataDurabilityLevelRequired && cfg.MaxStandbyNamesFromCluster != nil {
+		// Cluster pods that may be listed, excluding the primary, then capped.
+		availableFromCluster := r.Spec.Instances - 1
+		if *cfg.MaxStandbyNamesFromCluster < availableFromCluster {
+			availableFromCluster = *cfg.MaxStandbyNamesFromCluster
+		}
+		maxSyncNames := availableFromCluster + len(cfg.StandbyNamesPre) + len(cfg.StandbyNamesPost)
+		if cfg.Number > maxSyncNames {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "postgresql", "synchronous", "number"),
+				cfg.Number,
+				fmt.Sprintf("Invalid synchronous configuration: number (%d) cannot exceed the number of "+
+					"standby names that will be listed (%d). maxStandbyNamesFromCluster (%d) caps the "+
+					"cluster-derived standby names, and with dataDurability=required the number of "+
+					"synchronous replicas is not reduced to match, so synchronous_standby_names would "+
+					"never be satisfiable.",
+					cfg.Number, maxSyncNames, *cfg.MaxStandbyNamesFromCluster),
+			))
+		}
 	}
 
 	return result
