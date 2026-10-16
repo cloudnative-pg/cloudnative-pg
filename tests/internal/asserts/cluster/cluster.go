@@ -43,7 +43,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	testsutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -332,22 +331,6 @@ func AssertClusterIsReady(
 	})
 }
 
-// AssertClusterReadyConditionIsCurrent checks that the Ready condition refers to
-// the Cluster's current spec generation, whatever its status. Call it once the
-// condition has settled, to catch one carried over from an earlier generation.
-func AssertClusterReadyConditionIsCurrent(
-	env *environment.TestingEnvironment,
-	namespace, clusterName string,
-) {
-	GinkgoHelper()
-	cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-	Expect(err).ToNot(HaveOccurred())
-
-	cond := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionClusterReady))
-	Expect(cond).ToNot(BeNil(), "the Ready condition is not reported")
-	Expect(cond.ObservedGeneration).To(Equal(cluster.Generation), "the Ready condition is stale")
-}
-
 // assertClusterHasSequentialPods verifies that pod serial numbers are
 // sequential starting from 1. Non-sequential numbering on a freshly created
 // cluster suggests pods were recreated during initial creation, indicating
@@ -497,9 +480,11 @@ func AssertNewPrimary(env *environment.TestingEnvironment, namespace, clusterNam
 	})
 }
 
-// AssertClusterReadinessStatusIsReached waits until the cluster's
-// ConditionClusterReady condition reaches the provided status.
-func AssertClusterReadinessStatusIsReached(
+// AssertClusterReadinessConditionIsReached waits until the cluster's
+// ConditionClusterReady condition reaches the provided status for the
+// current spec generation, so a condition carried over from an earlier
+// generation is not accepted.
+func AssertClusterReadinessConditionIsReached(
 	env *environment.TestingEnvironment,
 	namespace, clusterName string,
 	conditionStatus apiv1.ConditionStatus,
@@ -507,16 +492,14 @@ func AssertClusterReadinessStatusIsReached(
 ) {
 	GinkgoHelper()
 	By(fmt.Sprintf("waiting for cluster condition status in cluster '%v'", clusterName), func() {
-		Eventually(func() (string, error) {
-			clusterCondition, err := backups.GetConditionsInClusterStatus(
-				env.Ctx, env.Client,
-				namespace, clusterName, apiv1.ConditionClusterReady,
-			)
-			if err != nil {
-				return "", err
-			}
-			return string(clusterCondition.Status), nil
-		}, timeout, 2).Should(BeEquivalentTo(conditionStatus))
+		Eventually(func(g Gomega) {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			cond := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionClusterReady))
+			g.Expect(cond).ToNot(BeNil(), "the Ready condition is not reported")
+			g.Expect(cond.Status).To(BeEquivalentTo(conditionStatus))
+			g.Expect(cond.ObservedGeneration).To(Equal(cluster.Generation), "the Ready condition is stale")
+		}, timeout, 2).Should(Succeed())
 	})
 }
 
