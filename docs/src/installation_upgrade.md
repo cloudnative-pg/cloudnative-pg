@@ -387,9 +387,12 @@ requires no configuration; the lease timings can optionally be tuned via
 This feature requires the operator to manage `Lease` objects in the
 `coordination.k8s.io` API group. The bundled operator manifest and the Helm
 chart grant the required permissions automatically. If you manage the
-operator's RBAC yourself, you must add the `create`, `get`, `list`, `update`
-and `watch` verbs on `leases` in the `coordination.k8s.io` API group before
-upgrading, otherwise primaries will be unable to promote.
+operator's RBAC yourself, you must add the `create`, `delete`, `get`, `list`,
+`update` and `watch` verbs on `leases` in the `coordination.k8s.io` API group
+before upgrading, otherwise primaries will be unable to promote. The `delete`
+verb is used only when a `Cluster` is recreated over the resources left behind
+by a previous one, for example by a backup tool: the operator then deletes the
+unowned `Lease` along with the orphan Pods, and creates a new one.
 :::
 
 #### Operator-to-instance authentication (`GHSA-7qwx-x8ff-3px9`)
