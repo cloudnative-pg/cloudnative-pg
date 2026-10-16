@@ -284,19 +284,6 @@ spec:
     `leaseDurationSeconds`; the admission webhook warns otherwise.
 :::
 
-:::info[Upgrading from 1.30 and earlier]
-    Up to CloudNativePG 1.30, an isolated primary was stopped through the
-    kubelet: the liveness probe failed, and the container ended with a smart
-    shutdown bounded by `.spec.smartShutdownTimeout`. The liveness probe
-    periods set the reaction time. Neither applies any more. The shutdown is
-    immediate, and `.spec.smartShutdownTimeout: 0` is no longer needed for this
-    purpose. Open sessions on an isolated primary are terminated instead of
-    being allowed to finish. The condition changed too: it no longer depends on
-    the liveness probe seeing the API server fail, but on the age of the last
-    lease renewal, and it also holds when a reachable instance names a
-    different target primary.
-:::
-
 The spec also accepts two optional network settings: `requestTimeout`
 and `connectionTimeout`, both defaulting to `1000` (in milliseconds).
 In cloud environments, you may need to increase these values.

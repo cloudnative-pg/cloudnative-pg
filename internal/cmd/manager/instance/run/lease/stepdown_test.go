@@ -98,10 +98,6 @@ var _ = Describe("confirmingLock", func() {
 	})
 
 	It("stamps the time the write started, not the time it returned", func(ctx context.Context) {
-		// The API server may commit the write at any point during the call, and
-		// a replica times the lease from when it sees the commit. A response
-		// stamped on arrival would make us think the lease is fresher than the
-		// replicas do.
 		const delay = 100 * time.Millisecond
 		inner.delay = delay
 
@@ -137,8 +133,6 @@ var _ = Describe("confirmingLock", func() {
 	})
 
 	It("does not stamp a successful read, even one that names us", func(ctx context.Context) {
-		// A read proves the record still names us, not that it is fresh. This is
-		// the distinction the whole staleness measurement rests on.
 		_, _, err := decided.Get(ctx)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stamp.Load()).To(BeNil())
@@ -297,23 +291,18 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 	It("evaluates the step-down condition only once, then retries the delivery alone",
 		func(ctx context.Context) {
-			// No reader on the command channel: every send is declined, exactly as
-			// it is while the lifecycle manager runs an earlier command.
+			// No reader on the command channel: every send is declined, as it is
+			// while the lifecycle manager runs an earlier command.
 			verdict(true, nil)
 
 			start(ctx)
 
 			// Several ticks worth of declined sends, and the verdict is not
-			// re-derived: re-reading the CA and rebuilding the TLS stack on every
-			// tick would be pure waste for the same conclusion.
+			// re-derived.
 			Eventually(checks.Load).Should(BeEquivalentTo(1))
 			Consistently(checks.Load, 100*time.Millisecond).Should(BeEquivalentTo(1))
 
 			// The monitor is still alive and delivers as soon as a reader appears.
-			// The reader has to be a real blocking receive: a non-blocking send
-			// can only meet a receiver already waiting on the channel, so polling
-			// it (as Eventually does on a channel) would never see the command and
-			// a declined send would be indistinguishable from one never attempted.
 			received := readCommands(r)
 
 			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownImmediate"))))
@@ -326,8 +315,7 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 	It("withdraws an undelivered request when a renewal makes the lease fresh again",
 		func(ctx context.Context) {
-			// No reader: the request is declined, as it is while the lifecycle
-			// manager runs an earlier command.
+			// No reader: the request is declined.
 			verdict(true, nil)
 
 			start(ctx)
@@ -413,11 +401,8 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 	})
 
 	It("stays responsive while the shutdown request cannot be delivered", func(ctx context.Context) {
-		// With nothing reading the command channel, an unconditional send would
-		// park this goroutine inside the send and it would never see the
-		// cancellation. That a declined send leaves the monitor free to return is
-		// the only externally observable difference between declining and
-		// blocking, so it is what this asserts.
+		// Nothing reads the command channel. Returning on cancellation is the
+		// only observable difference between a declined send and a blocking one.
 		verdict(true, nil)
 		monitorCtx, cancel := context.WithCancel(ctx)
 		stopped := make(chan struct{})

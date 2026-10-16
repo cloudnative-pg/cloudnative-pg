@@ -172,13 +172,9 @@ underlying Kubernetes leader election.
 :::
 
 :::warning
-With the [primary isolation](instance_manager.md#primary-isolation) check
-enabled, keep `renewDeadlineSeconds` plus `retryPeriodSeconds` plus the
-isolation check `requestTimeout` below `leaseDurationSeconds`. That sum is how
-long an isolated primary can take to request its own shutdown, counted from its
-last confirmed lease renewal, while a replica may promote once the lease has
-gone `leaseDurationSeconds` without a renewal. The admission webhook warns when
-this margin is missing.
+These timings also set how fast an isolated primary stops. See
+[Primary Isolation](instance_manager.md#primary-isolation) for the margin to
+keep between them and the isolation check `requestTimeout`.
 :::
 
 :::note
@@ -292,12 +288,11 @@ PostgreSQL on the isolated node has already been stopped locally: with the
 default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
 manager requests an immediate PostgreSQL shutdown once its last successful lease
 renewal is older than the renew deadline and either at least one other instance
-is unreachable or a reachable one names a different target primary. With the
-default lease timings the request is made between 10 and 13 seconds after the
-last renewal. When PostgreSQL stops, the instance manager exits and the kubelet
-restarts the container. The step-down is logged by the instance manager under
-the `primary-lease` logger and shows up as a container restart, not as a
-liveness probe failure. Full high availability (recreation of the old primary on
+is unreachable or a reachable one names a different target primary, within the
+timings described under [Primary Isolation](instance_manager.md#primary-isolation).
+When PostgreSQL stops, the instance manager exits and the kubelet restarts the
+container, so the step-down shows up as a container restart, not as a liveness
+probe failure. Full high availability (recreation of the old primary on
 a healthy node by the operator) is still gated on the taint-based eviction
 actually deleting the pod.
 

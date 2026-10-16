@@ -114,10 +114,8 @@ type Runnable struct {
 	observedRecord *resourcelock.LeaderElectionRecord
 	observedTime   time.Time
 
-	// lastConfirmed is the time, with its monotonic reading, taken before the
-	// last lease write that named this pod as the holder started, stamped by
-	// the confirmingLock wrapping r.lock. It is how monitorLeaseAge measures
-	// how stale our hold is.
+	// lastConfirmed is stamped by the confirmingLock wrapping r.lock, see there.
+	// monitorLeaseAge measures the age of our hold from it.
 	lastConfirmed atomic.Pointer[time.Time]
 
 	// checkStepDown reports whether this primary should stop believing it is
@@ -476,12 +474,8 @@ func (r *Runnable) claim(ctx context.Context, current *resourcelock.LeaderElecti
 // client-go's jittered 2.2*RetryPeriod, and tryTakeOver adopts a cleanly
 // released lease, when this pod is the target primary, on the first poll
 // instead of waiting out an observation window, so a graceful failover stays
-// quick without having to inflate LeaseDuration.
-//
-// Whether this primary should step down while the lease stays unverifiable is
-// not decided here: monitorLeaseAge watches the age of the last confirmed lease
-// write on its own cadence, which also covers the case where the elector never
-// gets far enough for this loop to run at all.
+// quick without having to inflate LeaseDuration. Whether this primary should
+// step down meanwhile is decided by monitorLeaseAge, see runLeaderElection.
 func (r *Runnable) preAcquire(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
 
@@ -636,10 +630,8 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			// le.Run re-acquire it once it reappears.
 			contextLogger.Warning("Primary lease object missing, waiting for it to be recreated")
 		case leaseUnverifiable:
-			// We have no evidence of preemption, but also can't confirm we
-			// still hold the lease. We don't check the step-down condition
-			// here: monitorLeaseAge is already watching the age of the last
-			// confirmed write on its own cadence, for as long as this persists.
+			// No evidence of preemption, and no confirmation that we still hold
+			// the lease. monitorLeaseAge decides whether to step down.
 			contextLogger.Warning("Primary lease object unverifiable, will retry take-over", "error", checkErr)
 		case leasePreempted:
 			// A different identity holds the lease: we have been preempted. This is
