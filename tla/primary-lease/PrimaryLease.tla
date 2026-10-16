@@ -136,6 +136,9 @@ variable observedLeaseRenewTick = 0,
           lastRenew[self] := tick;
           leaseRenewTick := tick;
           observedLeaseRenewTick := tick;
+          \* A renewal withdraws a verdict still waiting for delivery: the
+          \* monitor sees a fresh lease and drops it.
+          stepDownAt[self] := -1;
         };
     } or {
       MonitorDecidesStepDown:
@@ -233,7 +236,7 @@ variable observedLeaseRenewTick = 0,
 }
 
 } *)
-\* BEGIN TRANSLATION (chksum(pcal) = "567ba9ab" /\ chksum(tla) = "1b2a743b")
+\* BEGIN TRANSLATION (chksum(pcal) = "9a13fe35" /\ chksum(tla) = "71ddc4cb")
 VARIABLES leaseHolder, leaseRenewTick, leading, lookingForLease, lastRenew, 
           lastCheck, stepDownAt, tick, pc
 
@@ -359,13 +362,14 @@ HolderRenewLease(self) == /\ pc[self] = "HolderRenewLease"
                                 THEN /\ lastRenew' = [lastRenew EXCEPT ![self] = tick]
                                      /\ leaseRenewTick' = tick
                                      /\ observedLeaseRenewTick' = [observedLeaseRenewTick EXCEPT ![self] = tick]
+                                     /\ stepDownAt' = [stepDownAt EXCEPT ![self] = -1]
                                 ELSE /\ TRUE
                                      /\ UNCHANGED << leaseRenewTick, lastRenew, 
+                                                     stepDownAt, 
                                                      observedLeaseRenewTick >>
                           /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                           /\ UNCHANGED << leaseHolder, leading, 
-                                          lookingForLease, lastCheck, 
-                                          stepDownAt, tick, 
+                                          lookingForLease, lastCheck, tick, 
                                           observedLeaseHolder, lastLeaseChange, 
                                           lastLeaseRenewTick >>
 

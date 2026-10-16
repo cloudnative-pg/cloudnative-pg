@@ -88,7 +88,9 @@ Holder side:
   re-adopts an "already ours" lease and `le.Run` writes again. Never
   forced, so "the renewal loop is wedged but the monitor still runs" is
   one of the explored behaviours. `lastRenew` moves only on a successful
-  CAS, as `confirmingLock` stamps only successful writes.
+  CAS, as `confirmingLock` stamps only successful writes. A successful
+  renewal also clears `stepDownAt`: the monitor sees a fresh lease and
+  withdraws a verdict that was not delivered yet.
 * `MonitorDecidesStepDown` / `MonitorKeepsLeading`: the peer check
   (`shouldStepDown`), enabled once `tick - lastRenew > RenewDeadline`.
   The first needs no precondition: any probe may fail. The second needs
@@ -98,7 +100,8 @@ Holder side:
 * `DeliverShutdown`: the soft stop: the verdict reaches the lifecycle
   manager and PostgreSQL stops. The Ticker will not pass `DeliveryDelay`
   ticks after the verdict while it is pending. The verdict is taken once
-  and only the delivery is retried, as in `monitorLeaseAge`.
+  and only the delivery is retried, as in `monitorLeaseAge`, until a
+  renewal withdraws it (see `HolderRenewLease`).
 * `MonitorHardStop`: the hard stop: once a verdict exists and `tick -
   lastRenew + RenewPeriod >= LeaseDuration` (the next monitor tick would
   be too late), the node stops leading at once, as `killPostgresAndExit`
