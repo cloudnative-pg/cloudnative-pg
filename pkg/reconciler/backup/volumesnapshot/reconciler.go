@@ -202,6 +202,15 @@ func (se *Reconciler) internalReconcile(
 		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
 	}
 
+	// Without this check the backup stays in `started` forever and no event is
+	// emitted, because an empty list is not an error for the PVC lookup.
+	if len(pvcs) == 0 {
+		return nil, fmt.Errorf(
+			"cannot execute a VolumeSnapshot without any PVC to snapshot: "+
+				"no PVC of instance %q matched the labels the operator selects on",
+			targetPod.Name)
+	}
+
 	volumeSnapshots, err := getBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
