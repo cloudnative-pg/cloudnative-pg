@@ -251,7 +251,8 @@ after that time is older than the renew deadline, it probes the other instances
 and, if they confirm the isolation, requests an immediate PostgreSQL shutdown.
 Open transactions are aborted and the next start runs crash recovery. The
 decision is taken once, and the request is retried until the instance manager
-accepts it. The step-down is logged under the `primary-lease` logger.
+accepts it, unless a lease renewal lands first and withdraws it. The step-down
+is logged under the `primary-lease` logger.
 
 The instance manager may be busy with another command, for example a restart,
 or the immediate shutdown may fail. If the instance manager is still running on

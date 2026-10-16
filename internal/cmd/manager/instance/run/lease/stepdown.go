@@ -121,8 +121,8 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 
 	// The verdict is remembered, the delivery is retried. Re-deriving the
 	// verdict on every tick would re-read the CA from disk and rebuild the
-	// certificate pool, dialer and transport to reach a conclusion that cannot
-	// reverse, and the wait for the consumer can last minutes.
+	// certificate pool, dialer and transport to reach the same conclusion, and
+	// the wait for the consumer can last minutes. Only a renewal withdraws it.
 	stepDownDecided := false
 	shutdownRequested := false
 
@@ -134,11 +134,19 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		}
 
 		age := time.Since(*r.lastConfirmed.Load())
-		if !stepDownDecided {
-			if age <= r.config.RenewDeadline {
-				continue
+		if age <= r.config.RenewDeadline {
+			// A renewal landed: drop a request still waiting for the lifecycle
+			// manager, or it would shut down a primary with a fresh lease. A
+			// delivered one cannot be withdrawn, and shutdownRequested keeps it
+			// from being sent twice.
+			if stepDownDecided {
+				contextLogger.Info("Primary lease renewed, withdrawing the step-down decision", "leaseAge", age)
+				stepDownDecided = false
 			}
+			continue
+		}
 
+		if !stepDownDecided {
 			stepDown, reason := r.checkStepDown(r.instance.GetClusterOrDefault(), r.instance.GetPodName())
 			switch {
 			case stepDown:
