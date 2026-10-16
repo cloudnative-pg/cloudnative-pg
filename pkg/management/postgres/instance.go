@@ -204,6 +204,10 @@ type Instance struct {
 	// logPipesReady becomes satisfied once the log-destination FIFOs are ready.
 	logPipesReady concurrency.MultipleExecuted
 
+	// postmasterPID is the PID of the postmaster the lifecycle manager is
+	// running, or zero when there is none.
+	postmasterPID atomic.Int64
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -215,6 +219,15 @@ type Instance struct {
 	// fenced specifies whether fencing is on for the instance
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
+
+	// immediateShutdownUnresponsive is set once an immediate shutdown request
+	// has run out its configured timeout while PostgreSQL was still running.
+	// It signals that PostgreSQL failed to honor a fencing/step-down shutdown
+	// (e.g. a backend or the postmaster stuck in an uninterruptible state, or
+	// stopped via SIGSTOP), so it is read by the liveness probe: the right
+	// recovery at that point is for the Pod to be killed and recreated, not
+	// to keep retrying, so there is no way to clear it.
+	immediateShutdownUnresponsive atomic.Bool
 
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
 	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
@@ -303,6 +316,18 @@ func (instance *Instance) SetFencing(enabled bool) {
 	if enabled {
 		instance.SetMightBeUnavailable(true)
 	}
+}
+
+// SetPostmasterPID records the PID of the running postmaster, or zero when it
+// has exited.
+func (instance *Instance) SetPostmasterPID(pid int) {
+	instance.postmasterPID.Store(int64(pid))
+}
+
+// GetPostmasterPID returns the PID of the running postmaster, or zero when
+// there is none.
+func (instance *Instance) GetPostmasterPID() int {
+	return int(instance.postmasterPID.Load())
 }
 
 // SetCanCheckReadiness marks whether the instance should be checked for readiness
@@ -710,12 +735,15 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	if errors.As(err, &exitError) {
 		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
+		immediateShutdownTimeout := instance.GetClusterOrDefault().GetImmediateShutdownTimeout()
 		err = instance.Shutdown(ctx,
 			shutdownOptions{
-				Mode: shutdownModeImmediate,
-				Wait: true,
+				Mode:    shutdownModeImmediate,
+				Wait:    true,
+				Timeout: &immediateShutdownTimeout,
 			},
 		)
+		instance.checkImmediateShutdownUnresponsive(ctx, err)
 	}
 	return err
 }
@@ -730,13 +758,42 @@ func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting immediate shutdown of the PostgreSQL instance")
-	return instance.Shutdown(
+	immediateShutdownTimeout := instance.GetClusterOrDefault().GetImmediateShutdownTimeout()
+	err := instance.Shutdown(
 		ctx,
 		shutdownOptions{
-			Mode: shutdownModeImmediate,
-			Wait: true,
+			Mode:    shutdownModeImmediate,
+			Wait:    true,
+			Timeout: &immediateShutdownTimeout,
 		},
 	)
+	instance.checkImmediateShutdownUnresponsive(ctx, err)
+	return err
+}
+
+// checkImmediateShutdownUnresponsive is called after an immediate-mode Shutdown attempt. If that
+// attempt failed and PostgreSQL is still running, its configured timeout ran out without
+// PostgreSQL honoring the shutdown request (e.g. a backend or the postmaster stuck in an
+// uninterruptible state, or stopped via SIGSTOP): mark the instance as unresponsive so the
+// liveness probe can report it. If shutdownErr is nil, or the instance is no longer running,
+// this was a slow-but-successful stop (or an unrelated failure), not the condition we track.
+func (instance *Instance) checkImmediateShutdownUnresponsive(ctx context.Context, shutdownErr error) {
+	if shutdownErr == nil {
+		return
+	}
+	if instance.isStatusRunning() {
+		log.FromContext(ctx).Error(shutdownErr,
+			"PostgreSQL did not honor the immediate shutdown request within its timeout, "+
+				"marking the instance as unresponsive")
+		instance.immediateShutdownUnresponsive.Store(true)
+	}
+}
+
+// IsImmediateShutdownUnresponsive reports whether PostgreSQL failed to stop within its configured
+// timeout after an immediate shutdown request. It never clears once set: the appropriate recovery
+// at that point is for the Pod to be killed and recreated, not for the instance manager to retry.
+func (instance *Instance) IsImmediateShutdownUnresponsive() bool {
+	return instance.immediateShutdownUnresponsive.Load()
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status

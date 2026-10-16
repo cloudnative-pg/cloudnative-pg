@@ -96,28 +96,21 @@ primary did not finish archiving are lost.
 
 ### Relationship with the primary isolation check
 
-The lease does not fence a primary that has lost connectivity to the
-Kubernetes API server but is still running; that is the job of the
-[primary isolation](instance_manager.md#primary-isolation) check.
+The lease alone does not stop a primary that has lost connectivity to the
+Kubernetes API server but is still running. Stopping it is the job of the
+[primary isolation](instance_manager.md#primary-isolation) check, which watches
+how long the lease has gone without a successful renewal.
 The two mechanisms are complementary and both are enabled by default:
 
 * The lease prevents *premature* promotion: a replica cannot promote
   while the former primary still holds the lease.
-* The isolation check reports an isolated primary as unhealthy, which
-  the kubelet then restarts through its normal container-termination
-  path. That path is a *smart* shutdown: it refuses new connections
-  but lets sessions that are already open keep committing until
-  `.spec.smartShutdownTimeout` elapses (180 seconds by default), so
-  it narrows the write window during a partition rather than closing
-  it outright.
+* The isolation check stops an *isolated* primary from continuing to
+  accept writes, by shutting PostgreSQL down immediately.
 
 Keep both enabled. Disabling the isolation check leaves the lease
 alone responsible for primary safety, and the lease alone cannot
 prevent split-brain when the former primary cannot reach the API
-server but remains otherwise healthy. If that write window matters
-for your workload, set `.spec.smartShutdownTimeout: 0` so the
-restart goes straight to a fast shutdown instead of waiting out the
-full window.
+server but remains otherwise healthy.
 
 ### Inspecting the primary lease
 
@@ -175,6 +168,16 @@ admission webhook: `leaseDurationSeconds` must be greater than
 `renewDeadlineSeconds`, and `renewDeadlineSeconds` must be greater than
 `retryPeriodSeconds` multiplied by `1.2`. Both mirror the requirements of the
 underlying Kubernetes leader election.
+:::
+
+:::warning
+With the [primary isolation](instance_manager.md#primary-isolation) check
+enabled, keep `renewDeadlineSeconds` plus `retryPeriodSeconds` plus the
+isolation check `requestTimeout` below `leaseDurationSeconds`. That sum is how
+long an isolated primary can take to request its own shutdown, counted from its
+last confirmed lease renewal, while a replica may promote once the lease has
+gone `leaseDurationSeconds` without a renewal. The admission webhook warns when
+this margin is missing.
 :::
 
 :::note
@@ -283,17 +286,18 @@ mechanism, driven by `tolerationSeconds` on the
 `node.kubernetes.io/unreachable` `NoExecute` taint (`300s` by default). That
 timer does not hold up the operator's failover decision; CloudNativePG
 promotes a new primary as soon as the `Ready` condition flips. By that point
-the kubelet on the isolated node has already noticed the problem: with the
+PostgreSQL on the isolated node has already been stopped locally: with the
 default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
-manager fails its own liveness probe once it can reach neither the API
-server nor the rest of the cluster, and the kubelet restarts the container
-within approximately three probe periods (`~30s`). That restart goes
-through the normal termination path, a smart shutdown that lets sessions
-already open on the isolated primary keep committing until
-`.spec.smartShutdownTimeout` elapses (180 seconds by default) on top of
-that ~30s detection window. Full high availability (recreation of the old
-primary on a healthy node by the operator) is still gated on the
-taint-based eviction actually deleting the pod.
+manager requests an immediate PostgreSQL shutdown once its last successful lease
+renewal is older than the renew deadline and either at least one other instance
+is unreachable or a reachable one names a different target primary. With the
+default lease timings the request is made between 10 and 13 seconds after the
+last renewal. When PostgreSQL stops, the instance manager exits and the kubelet
+restarts the container. The step-down is logged by the instance manager under
+the `primary-lease` logger and shows up as a container restart, not as a
+liveness probe failure. Full high availability (recreation of the old primary on
+a healthy node by the operator) is still gated on the taint-based eviction
+actually deleting the pod.
 
 ## Failover Quorum (Quorum-based Failover)
 

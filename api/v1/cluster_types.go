@@ -379,6 +379,15 @@ type ClusterSpec struct {
 	// +optional
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
+	// The time in seconds that is allowed for a PostgreSQL instance to stop
+	// after an immediate shutdown request (used, for example, when a primary
+	// must step down and cannot wait for a graceful shutdown). Once this time
+	// has passed with PostgreSQL still running, the instance is considered
+	// unresponsive. Default value is 30 seconds.
+	// +kubebuilder:default:=30
+	// +optional
+	ImmediateShutdownTimeout int32 `json:"immediateShutdownTimeout,omitempty"`
+
 	// The amount of time (in seconds) to wait before triggering a failover
 	// after the primary PostgreSQL instance in the cluster was detected
 	// to be unhealthy
@@ -666,21 +675,21 @@ type LivenessProbe struct {
 	// Probe is the standard probe configuration
 	Probe `json:",inline"`
 
-	// Configure the feature that extends the liveness probe for a primary
-	// instance. In addition to the basic checks, this reports whether the
-	// primary is isolated from the Kubernetes API server and from its
-	// replicas, so the kubelet restarts it through the normal
-	// container-termination path (a smart shutdown, bounded by
-	// `.spec.smartShutdownTimeout`) when a network partition or API
-	// unavailability is detected. Enabled by default.
+	// Configure the primary isolation check, which stops a primary whose
+	// primary lease has gone past its renew deadline without a successful
+	// renewal, when at least one other instance is unreachable or names a
+	// different target primary, so that it stops accepting writes it can no
+	// longer safely serve. Its reaction time is set by the `primaryLease`
+	// timings and by `requestTimeout`, not by the liveness probe settings this
+	// stanza lives under. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
 }
 
-// IsolationCheckConfiguration contains the configuration for the isolation check
-// functionality in the liveness probe
+// IsolationCheckConfiguration contains the configuration for the primary
+// isolation check
 type IsolationCheckConfiguration struct {
-	// Whether primary isolation checking is enabled for the liveness probe
+	// Whether primary isolation checking is enabled
 	// +optional
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
@@ -1472,6 +1481,10 @@ const (
 	// DefaultMaxSwitchoverDelay is the default for the pg_ctl timeout in seconds when a primary PostgreSQL instance
 	// is gracefully shutdown during a switchover.
 	DefaultMaxSwitchoverDelay = 3600
+
+	// DefaultImmediateShutdownTimeout is the default for the pg_ctl timeout in seconds when a
+	// PostgreSQL instance is shut down with an immediate shutdown request.
+	DefaultImmediateShutdownTimeout = 30
 
 	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
 	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,

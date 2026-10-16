@@ -3293,6 +3293,16 @@ spec:
                   - name
                   type: object
                 type: array
+              immediateShutdownTimeout:
+                default: 30
+                description: |-
+                  The time in seconds that is allowed for a PostgreSQL instance to stop
+                  after an immediate shutdown request (used, for example, when a primary
+                  must step down and cannot wait for a graceful shutdown). Once this time
+                  has passed with PostgreSQL still running, the instance is considered
+                  unresponsive. Default value is 30 seconds.
+                format: int32
+                type: integer
               inheritedMetadata:
                 description: Metadata that will be inherited by all objects related
                   to the Cluster
@@ -4990,13 +5000,13 @@ spec:
                         type: integer
                       isolationCheck:
                         description: |-
-                          Configure the feature that extends the liveness probe for a primary
-                          instance. In addition to the basic checks, this reports whether the
-                          primary is isolated from the Kubernetes API server and from its
-                          replicas, so the kubelet restarts it through the normal
-                          container-termination path (a smart shutdown, bounded by
-                          `.spec.smartShutdownTimeout`) when a network partition or API
-                          unavailability is detected. Enabled by default.
+                          Configure the primary isolation check, which stops a primary whose
+                          primary lease has gone past its renew deadline without a successful
+                          renewal, when at least one other instance is unreachable or names a
+                          different target primary, so that it stops accepting writes it can no
+                          longer safely serve. Its reaction time is set by the `primaryLease`
+                          timings and by `requestTimeout`, not by the liveness probe settings this
+                          stanza lives under. Enabled by default.
                         properties:
                           connectionTimeout:
                             default: 1000
@@ -5006,7 +5016,6 @@ spec:
                           enabled:
                             default: true
                             description: Whether primary isolation checking is enabled
-                              for the liveness probe
                             type: boolean
                           requestTimeout:
                             default: 1000
