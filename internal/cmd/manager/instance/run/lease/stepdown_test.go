@@ -305,7 +305,7 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 			// Several ticks worth of declined sends, and the verdict is not
 			// re-derived: re-reading the CA and rebuilding the TLS stack on every
-			// tick would be pure waste for a conclusion that cannot reverse.
+			// tick would be pure waste for the same conclusion.
 			Eventually(checks.Load).Should(BeEquivalentTo(1))
 			Consistently(checks.Load, 100*time.Millisecond).Should(BeEquivalentTo(1))
 
@@ -322,6 +322,27 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 			// so a second send would park the monitor forever. The reader above is
 			// still waiting, so a second command would be picked up here.
 			Consistently(received, 100*time.Millisecond).ShouldNot(Receive())
+		})
+
+	It("withdraws an undelivered request when a renewal makes the lease fresh again",
+		func(ctx context.Context) {
+			// No reader: the request is declined, as it is while the lifecycle
+			// manager runs an earlier command.
+			verdict(true, nil)
+
+			start(ctx)
+
+			Eventually(checks.Load).Should(BeEquivalentTo(1))
+
+			// A renewal lands before the lifecycle manager is free. Delivering the
+			// request now would shut down a primary that holds a fresh lease.
+			r.lastConfirmed.Store(ptr.To(time.Now()))
+			received := readCommands(r)
+
+			Consistently(received, renewDeadline/2).ShouldNot(Receive())
+
+			// The lease goes stale again, and the decision is taken afresh.
+			Eventually(checks.Load).Should(BeEquivalentTo(2))
 		})
 
 	It("forces a stop before the lease expires when nobody takes the shutdown request",
