@@ -227,11 +227,11 @@ spec:
 
 ### Primary Isolation
 
-A primary that cannot reach the Kubernetes API server and has also lost contact
-with part of its cluster has lost the ability to tell a network partition from a
-cluster in which it has already been replaced. CloudNativePG **stops such a
-primary** so that it stops accepting writes, if **both** of the following
-conditions are met:
+A primary that cannot renew its primary lease, typically because it cannot reach
+the Kubernetes API server, and has also lost contact with part of its cluster,
+cannot tell a network partition from a cluster in which it has already been
+replaced. CloudNativePG **stops such a primary** so that it stops accepting
+writes, if **both** of the following conditions are met:
 
 1. The instance manager has not managed to renew the
    [primary lease](failover.md#safe-primary-election) for longer than its renew
@@ -256,11 +256,12 @@ is logged under the `primary-lease` logger.
 
 The instance manager may be busy with another command, for example a restart,
 or the immediate shutdown may fail. If the instance manager is still running on
-the last retry-period tick before the lease goes stale, it sends `SIGQUIT` to
-the PostgreSQL postmaster and exits with code `5`. The kubelet restarts the
-container. If the pod is still the target primary, it waits for the lease before
-it starts PostgreSQL again, otherwise it rejoins as a replica. The check never
-acts when it is disabled or when the cluster has a single instance.
+the last retry-period tick before a replica is allowed to claim the lease, it
+sends `SIGQUIT` to the PostgreSQL postmaster and exits with code `5`. The
+kubelet restarts the container. If the pod is still the target primary, it waits
+for the lease before it starts PostgreSQL again, otherwise it rejoins as a
+replica. The check never acts when it is disabled or when the cluster has a
+single instance.
 
 It is **enabled by default** and can be disabled by adding the following:
 

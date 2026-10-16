@@ -96,10 +96,10 @@ primary did not finish archiving are lost.
 
 ### Relationship with the primary isolation check
 
-Holding the lease is not on its own enough to stop a primary that has lost
-connectivity to the Kubernetes API server but is still running: stopping it is
-the job of the [primary isolation](instance_manager.md#primary-isolation) check,
-which watches how long the lease has gone without a successful renewal.
+The lease alone does not stop a primary that has lost connectivity to the
+Kubernetes API server but is still running. Stopping it is the job of the
+[primary isolation](instance_manager.md#primary-isolation) check, which watches
+how long the lease has gone without a successful renewal.
 The two mechanisms are complementary and both are enabled by default:
 
 * The lease prevents *premature* promotion: a replica cannot promote
@@ -168,7 +168,9 @@ admission webhook: `leaseDurationSeconds` must be greater than
 `renewDeadlineSeconds`, and `renewDeadlineSeconds` must be greater than
 `retryPeriodSeconds` multiplied by `1.2`. Both mirror the requirements of the
 underlying Kubernetes leader election.
+:::
 
+:::warning
 With the [primary isolation](instance_manager.md#primary-isolation) check
 enabled, keep `renewDeadlineSeconds` plus `retryPeriodSeconds` plus the
 isolation check `requestTimeout` below `leaseDurationSeconds`. That sum is how
