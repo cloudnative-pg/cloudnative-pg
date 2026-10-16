@@ -17,23 +17,23 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package failsafe
+package url
 
 import (
 	"encoding/json"
 	"net/http"
 )
 
-// Response is the JSON body of the /failsafe endpoint. It reports the
+// FailSafeResponse is the JSON body of the PathFailSafe endpoint. It reports the
 // responding instance's view of the cluster's target primary, so a peer
 // that can't reach the API server can learn, via this instance, whether it
 // has already been superseded.
-type Response struct {
+type FailSafeResponse struct {
 	TargetPrimary string `json:"targetPrimary,omitempty"`
 }
 
-// Write encodes resp as the JSON response body for a /failsafe request.
-func Write(w http.ResponseWriter, resp Response) error {
+// WriteFailSafe encodes resp as the JSON response body for a PathFailSafe request.
+func WriteFailSafe(w http.ResponseWriter, resp FailSafeResponse) error {
 	js, err := json.Marshal(resp)
 	if err != nil {
 		return err
@@ -43,11 +43,11 @@ func Write(w http.ResponseWriter, resp Response) error {
 	return err
 }
 
-// Parse decodes a /failsafe response body. An unparseable body (e.g. a
+// ParseFailSafe decodes a PathFailSafe response body. An unparseable body (e.g. a
 // pre-upgrade peer's plain "OK" response) yields a zero Response, not an
 // error: it carries no signal.
-func Parse(body []byte) Response {
-	var resp Response
+func ParseFailSafe(body []byte) FailSafeResponse {
+	var resp FailSafeResponse
 	_ = json.Unmarshal(body, &resp)
 	return resp
 }

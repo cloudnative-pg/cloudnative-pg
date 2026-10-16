@@ -32,7 +32,6 @@ import (
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/failsafe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -113,7 +112,7 @@ func (e *pinger) ping(host, ip string) (targetPrimary string, err error) {
 	if err != nil {
 		return "", nil
 	}
-	return failsafe.Parse(body).TargetPrimary, nil
+	return url.ParseFailSafe(body).TargetPrimary, nil
 }
 
 // peer is an instance worth probing for reachability.
