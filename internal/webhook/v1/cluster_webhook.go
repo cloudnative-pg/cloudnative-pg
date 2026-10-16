@@ -2977,7 +2977,7 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 			// "." and resolving "..", would stay within that base. Joining
 			// under "." first (rather than a placeholder mount point) makes
 			// this independent of the extension mount point's actual depth:
-			// CollectBinPaths and absolutizePaths join these paths under a
+			// the Collect*Paths functions join these paths under a
 			// real, multi-segment mount point at runtime, and a placeholder
 			// base shallower than that real path would wrongly accept some
 			// escaping paths (e.g. "../mount/lib").
