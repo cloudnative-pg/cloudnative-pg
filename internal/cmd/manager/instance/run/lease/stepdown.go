@@ -126,6 +126,12 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 	stepDownDecided := false
 	shutdownRequested := false
 
+	// confirmed is the write the lease age is measured from. It stops following
+	// the renewals once the request is delivered: PostgreSQL is going down, and
+	// a restart that tolerates the postmaster being down keeps the lifecycle
+	// manager from returning, so a renewal must not postpone the stop.
+	var confirmed *time.Time
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -133,12 +139,15 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		case <-ticker.C:
 		}
 
-		age := time.Since(*r.lastConfirmed.Load())
+		if !shutdownRequested {
+			confirmed = r.lastConfirmed.Load()
+		}
+		age := time.Since(*confirmed)
 		if age <= r.config.RenewDeadline {
 			// A renewal landed: drop a request still waiting for the lifecycle
 			// manager, or it would shut down a primary with a fresh lease. A
-			// delivered one cannot be withdrawn, and shutdownRequested keeps it
-			// from being sent twice.
+			// delivered one is never withdrawn, as confirmed no longer follows
+			// the renewals.
 			if stepDownDecided {
 				contextLogger.Info("Primary lease renewed, withdrawing the step-down decision", "leaseAge", age)
 				stepDownDecided = false
@@ -176,8 +185,9 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		//
 		// Delivery is not the end: the lifecycle manager returning is, and that
 		// cancels ctx. If the instance manager is still running at the last tick
-		// before a replica may claim the lease, the request was never taken or
-		// pg_ctl failed, so stop PostgreSQL here and exit.
+		// before a replica may claim the lease, the request was never taken,
+		// pg_ctl failed, or a restart is still waiting for PostgreSQL, so stop
+		// PostgreSQL here and exit.
 		if !shutdownRequested {
 			shutdownRequested = r.instance.TryRequestImmediateShutdown()
 			if shutdownRequested {

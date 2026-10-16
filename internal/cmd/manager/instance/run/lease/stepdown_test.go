@@ -378,6 +378,28 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 			Consistently(received, 100*time.Millisecond).ShouldNot(Receive())
 		})
 
+	It("forces a stop before the lease expires even when a renewal lands after the request is taken",
+		func(ctx context.Context) {
+			// The request is taken while a restart waits for PostgreSQL to come
+			// back, so the lifecycle manager keeps running with the postmaster
+			// down. The lease is long enough that the renewal lands well before
+			// the stop is due.
+			r.config.LeaseDuration = 500 * time.Millisecond
+			verdict(true, nil)
+			received := readCommands(r)
+
+			start(ctx)
+
+			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownImmediate"))))
+			delivered := r.lastConfirmed.Load()
+			// A stamp an hour ahead keeps the lease fresh for the rest of the
+			// spec, as renewals that keep succeeding would.
+			r.lastConfirmed.Store(ptr.To(time.Now().Add(time.Hour)))
+
+			Eventually(hardStops.Load).Should(BeEquivalentTo(1))
+			Expect(stoppedAt.Load().Sub(*delivered)).To(BeNumerically("<", r.config.LeaseDuration))
+		})
+
 	It("does not force a stop while the peers say this is still the primary", func(ctx context.Context) {
 		r.config.LeaseDuration = 50 * time.Millisecond
 		verdict(false, nil)

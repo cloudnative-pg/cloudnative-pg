@@ -257,7 +257,9 @@ is logged under the `primary-lease` logger.
 The instance manager may be busy with another command, for example a restart,
 or the immediate shutdown may fail. If the instance manager is still running on
 the last retry-period tick before a replica is allowed to claim the lease, it
-sends `SIGQUIT` to the PostgreSQL postmaster and exits with code `5`. The
+sends `SIGQUIT` to the PostgreSQL postmaster and exits with code `5`. Once the
+immediate shutdown has been accepted, a later lease renewal does not postpone
+this stop. The
 kubelet restarts the container. If the pod is still the target primary, it waits
 for the lease before it starts PostgreSQL again, otherwise it rejoins as a
 replica. The check never acts when it is disabled or when the cluster has a
