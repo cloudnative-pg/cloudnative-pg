@@ -336,12 +336,14 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 			// A renewal lands before the lifecycle manager is free. Delivering the
 			// request now would shut down a primary that holds a fresh lease.
-			r.lastConfirmed.Store(ptr.To(time.Now()))
+			// A stamp an hour ahead keeps the lease fresh for the whole window.
+			r.lastConfirmed.Store(ptr.To(time.Now().Add(time.Hour)))
 			received := readCommands(r)
 
-			Consistently(received, renewDeadline/2).ShouldNot(Receive())
+			Consistently(received, 10*retryPeriod).ShouldNot(Receive())
 
 			// The lease goes stale again, and the decision is taken afresh.
+			r.lastConfirmed.Store(ptr.To(time.Now().Add(-2 * renewDeadline)))
 			Eventually(checks.Load).Should(BeEquivalentTo(2))
 		})
 
