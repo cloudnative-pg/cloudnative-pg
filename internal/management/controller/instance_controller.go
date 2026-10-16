@@ -1284,6 +1284,19 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	contextLogger := log.FromContext(ctx)
 
 	if cluster.Status.TargetPrimary != r.instance.GetPodName() || cluster.IsReplica() {
+		// A target that was replaced before it promoted must behave like a
+		// replica that was never the target, or its renewals would keep the
+		// new target from ever taking the lease. A primary that is no longer
+		// the target (a switchover) keeps renewing until Release at exit.
+		// promotionRequested covers a promotion that returned an error while
+		// PostgreSQL may still complete it, so standby.signal can be trusted.
+		isPrimary, err := r.instance.IsPrimary()
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if !isPrimary && !r.promotionRequested {
+			r.primaryLeaseAcquirer.Yield(ctx)
+		}
 		return reconcile.Result{}, nil
 	}
 
@@ -1367,6 +1380,7 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
 	// I must promote my instance here
+	r.promotionRequested = true
 	err := r.instance.PromoteAndWait(ctx)
 	if err != nil {
 		return fmt.Errorf("error promoting instance: %w", err)

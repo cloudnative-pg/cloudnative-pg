@@ -21,6 +21,8 @@ package controller
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -35,11 +37,19 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// fakeLeaseAcquirer reports whatever acquirePrimaryLease's caller should see.
-type fakeLeaseAcquirer struct{ err error }
+// fakeLeaseAcquirer reports whatever acquirePrimaryLease's caller should see
+// and counts the yields it is asked for.
+type fakeLeaseAcquirer struct {
+	err    error
+	yields int
+}
 
-func (f fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
+func (f *fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
 	return f.err
+}
+
+func (f *fakeLeaseAcquirer) Yield(context.Context) {
+	f.yields++
 }
 
 var _ = Describe("verifyPgDataCoherenceForPrimary primary lease gate", func() {
@@ -69,7 +79,7 @@ var _ = Describe("verifyPgDataCoherenceForPrimary primary lease gate", func() {
 		return &InstanceReconciler{
 			client:               fakeClient,
 			instance:             pgInstance,
-			primaryLeaseAcquirer: fakeLeaseAcquirer{err: acquireErr},
+			primaryLeaseAcquirer: &fakeLeaseAcquirer{err: acquireErr},
 		}, cluster
 	}
 
@@ -90,5 +100,63 @@ var _ = Describe("verifyPgDataCoherenceForPrimary primary lease gate", func() {
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(cluster.Status.CurrentPrimary).To(Equal(podName))
+	})
+})
+
+var _ = Describe("reconcilePrimary yielding the primary lease", func() {
+	const (
+		namespace   = "default"
+		clusterName = "cluster-example"
+		podName     = clusterName + "-1"
+		otherPod    = clusterName + "-2"
+	)
+
+	var (
+		r        *InstanceReconciler
+		acquirer *fakeLeaseAcquirer
+		cluster  *apiv1.Cluster
+	)
+
+	// standby.signal is what IsPrimary reads: with it PostgreSQL is in
+	// recovery, without it this PGDATA is a primary.
+	makeReplica := func() {
+		Expect(os.WriteFile(filepath.Join(r.instance.PgData, "standby.signal"), nil, 0o600)).To(Succeed())
+	}
+
+	BeforeEach(func() {
+		acquirer = &fakeLeaseAcquirer{}
+		pgInstance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(podName).
+			WithClusterName(clusterName)
+		pgInstance.PgData = GinkgoT().TempDir()
+		r = &InstanceReconciler{instance: pgInstance, primaryLeaseAcquirer: acquirer}
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+			Status:     apiv1.ClusterStatus{TargetPrimary: otherPod},
+		}
+	})
+
+	It("yields when this pod is a replica and not the target primary", func(ctx SpecContext) {
+		makeReplica()
+
+		_, err := r.reconcilePrimary(ctx, cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquirer.yields).To(Equal(1))
+	})
+
+	It("never yields while this pod is a primary, as during a switchover", func(ctx SpecContext) {
+		_, err := r.reconcilePrimary(ctx, cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquirer.yields).To(BeZero())
+	})
+
+	It("never yields once a promotion was requested, whatever standby.signal says", func(ctx SpecContext) {
+		makeReplica()
+		r.promotionRequested = true
+
+		_, err := r.reconcilePrimary(ctx, cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquirer.yields).To(BeZero())
 	})
 })
