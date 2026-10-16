@@ -475,23 +475,42 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 		Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(BeEmpty())
 	})
 
-	It("does not take over a stale holder while another pod is the target primary, and does as soon as it is not",
+	It("does not start the observation window while another pod is the target primary",
 		func(ctx context.Context) {
 			kubeClient := fake.NewClientset()
 			r := newRunnable(kubeClient)
 			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
 			setTarget(r, otherPod)
 
-			// The window runs while this pod is not the target, but the claim waits.
-			observe(ctx, r)
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(r.observedRecord).To(BeNil())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
+		})
+
+	It("waits a full window after becoming the target before it takes over a stale holder",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+			setTarget(r, otherPod)
+			for range 3 {
+				_, err := r.tryTakeOver(ctx)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			// Whatever the polls recorded is older than the window by now.
+			r.observedTime = time.Now().Add(-r.config.LeaseDuration - time.Second)
+
+			// A reconcile stores this pod as the target: the holder was stale long
+			// before, but the old primary may only now learn that it was replaced.
+			setTarget(r, thisPod)
 			acquired, err := r.tryTakeOver(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(acquired).To(BeFalse())
 			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
 
-			// A reconcile stores this pod as the target: the next poll claims, with
-			// no new window to wait out.
-			setTarget(r, thisPod)
+			r.observedTime = time.Now().Add(-r.config.LeaseDuration - time.Second)
 			acquired, err = r.tryTakeOver(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(acquired).To(BeTrue())

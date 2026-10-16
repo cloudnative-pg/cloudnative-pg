@@ -89,8 +89,9 @@ it. On a clean shutdown the release happens after PostgreSQL has
 flushed and archived its remaining WAL, so the replica that takes
 over sees the archive at its definitive end. If the previous primary
 cannot release the lease (crash, node failure, or the instance
-manager itself unreachable), the lease expires after
-`leaseDurationSeconds` elapses and the replica can promote. In that
+manager itself unreachable), the replica can promote once the lease has been
+unchanged for `leaseDurationSeconds` since the operator named it the target
+primary. In that
 path the archive may not have caught up, and any writes the previous
 primary did not finish archiving are lost.
 
@@ -144,7 +145,7 @@ leader-election parameters.
 
 | Field                          | Default | Description                                                                |
 | ------------------------------ | ------- | -------------------------------------------------------------------------- |
-| `leaseDurationSeconds`         | `15`    | How long the lease is valid before another instance may acquire it.        |
+| `leaseDurationSeconds`         | `15`    | How long the target primary waits on an unchanged lease before taking it.  |
 | `renewDeadlineSeconds`         | `10`    | How long the primary keeps retrying to renew the lease before giving up.   |
 | `retryPeriodSeconds`           | `2`     | How frequently a non-holder retries acquiring or renewing the lease.       |
 | `releasedLeaseDurationSeconds` | `1`     | TTL written when the primary releases the lease on a clean shutdown.       |
@@ -182,10 +183,11 @@ this margin is missing.
 
 :::note
 `leaseDurationSeconds` and `retryPeriodSeconds` govern two different timings.
-After an abrupt primary loss (the previous primary did not release the lease), a
+After an abrupt primary loss (the previous primary did not release the lease), the
 candidate must observe the lease unchanged for a full `leaseDurationSeconds`
-before it may take over: this is what holds back a premature promotion while the
-former primary may still be alive. After a clean switchover (the previous primary
+before it may take over, counted from the moment it becomes the target primary:
+this is what holds back a premature promotion while the former primary may still
+be alive. After a clean switchover (the previous primary
 released the lease), there is no such wait; the candidate simply notices the
 released lease on its next poll, so the hand-over latency is bounded by
 `retryPeriodSeconds`. Lowering `retryPeriodSeconds` speeds up switchover without

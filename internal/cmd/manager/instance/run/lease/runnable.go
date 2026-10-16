@@ -335,7 +335,8 @@ func classifyLeaseAfterRun(
 // Only the target primary takes a lease over; see isTargetPrimary. A cleanly
 // released lease (empty holder) is taken immediately. A lease still naming
 // another holder is taken over only after we have locally observed the record
-// unchanged for a full LeaseDuration, mirroring client-go's observedTime check:
+// unchanged for a full LeaseDuration, counted from the moment this pod became
+// the target, mirroring client-go's observedTime check:
 // a live holder renews within that window, so an unchanged record proves it has
 // stopped. The comparison is local and equality-only, so clock skew between
 // this pod and the previous holder cannot trigger a take-over.
@@ -385,11 +386,21 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 		return r.claim(ctx, record)
 	}
 
-	// Another pod still holds the lease. Take over only once the record has sat
-	// unchanged for a full LeaseDuration: a live holder renews well within that
-	// window, so an unchanged record means it has stopped. RenewTime is compared
-	// for equality only (did the holder write since we last looked), never
-	// ordering, so this never trusts the holder's clock.
+	// Another pod still holds the lease. The window only runs while this pod is
+	// the target primary: the flip of the target is what tells the old primary
+	// to step down, through the peers' /failsafe answers, so a window that ran
+	// before the flip would let this pod claim right after it, before the old
+	// primary can have learned that it was replaced.
+	if !r.isTargetPrimary() {
+		r.observedRecord = nil
+		return false, nil
+	}
+
+	// Take over only once the record has sat unchanged for a full
+	// LeaseDuration: a live holder renews well within that window, so an
+	// unchanged record means it has stopped. RenewTime is compared for equality
+	// only (did the holder write since we last looked), never ordering, so this
+	// never trusts the holder's clock.
 	now := time.Now()
 	if r.observedRecord == nil || !sameHolder(r.observedRecord, record) {
 		r.observedRecord = record
@@ -399,19 +410,14 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 	if now.Sub(r.observedTime) < r.config.LeaseDuration {
 		return false, nil
 	}
-	if !r.isTargetPrimary() {
-		return false, nil
-	}
 	return r.claim(ctx, record)
 }
 
 // isTargetPrimary reports whether the Cluster the instance manager last
 // reconciled names this pod as target primary. The runnable polls for as long
 // as the process lives, so only the target may take the lease over: any other
-// pod would hold it as a replica and keep the real target from getting it. The
-// observation window keeps running meanwhile, and the claim follows on the
-// first poll after a reconcile stores this pod as the target. A stale cache
-// only delays that, as it delays a promotion.
+// pod would hold it as a replica and keep the real target from getting it. A
+// stale cache only delays the claim, as it delays a promotion.
 func (r *Runnable) isTargetPrimary() bool {
 	return r.instance.GetClusterOrDefault().Status.TargetPrimary == r.instance.GetPodName()
 }
