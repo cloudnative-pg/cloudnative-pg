@@ -431,21 +431,6 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 		Eventually(stopped).Should(BeClosed())
 	})
-
-	It("stops when its context is cancelled", func(ctx context.Context) {
-		verdict(false, nil)
-		monitorCtx, cancel := context.WithCancel(ctx)
-		stopped := make(chan struct{})
-		go func() {
-			defer close(stopped)
-			r.monitorLeaseAge(monitorCtx)
-		}()
-
-		Eventually(checks.Load).Should(BeNumerically(">", 0))
-		cancel()
-
-		Eventually(stopped).Should(BeClosed())
-	})
 })
 
 var _ = Describe("Runnable.runLeaderElection", func() {

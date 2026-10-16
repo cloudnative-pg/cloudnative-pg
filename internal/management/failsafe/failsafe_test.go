@@ -26,43 +26,20 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Parse", func() {
-	It("extracts the target primary from a valid response body", func() {
-		resp := Parse([]byte(`{"targetPrimary":"cluster-example-2"}`))
-		Expect(resp.TargetPrimary).To(Equal("cluster-example-2"))
-	})
-
-	It("returns a zero Response when the field is omitted", func() {
-		resp := Parse([]byte(`{}`))
-		Expect(resp.TargetPrimary).To(BeEmpty())
-	})
-
-	It("returns a zero Response, not an error, for a pre-upgrade peer's plain body", func() {
-		resp := Parse([]byte("OK"))
-		Expect(resp.TargetPrimary).To(BeEmpty())
-	})
-
-	It("returns a zero Response for an empty body", func() {
-		resp := Parse(nil)
-		Expect(resp.TargetPrimary).To(BeEmpty())
-	})
-})
-
-var _ = Describe("Write", func() {
-	It("encodes the response as JSON with the expected content type", func() {
+var _ = DescribeTable("Parse and Write",
+	func(body string, want Response, roundTrips bool) {
+		Expect(Parse([]byte(body))).To(Equal(want))
+		if !roundTrips {
+			return
+		}
 		w := httptest.NewRecorder()
-
-		Expect(Write(w, Response{TargetPrimary: "cluster-example-1"})).To(Succeed())
-
+		Expect(Write(w, want)).To(Succeed())
 		Expect(w.Header().Get("Content-Type")).To(Equal("application/json"))
-		Expect(w.Body.String()).To(Equal(`{"targetPrimary":"cluster-example-1"}`))
-	})
-
-	It("omits the field when empty", func() {
-		w := httptest.NewRecorder()
-
-		Expect(Write(w, Response{})).To(Succeed())
-
-		Expect(w.Body.String()).To(Equal(`{}`))
-	})
-})
+		Expect(w.Body.String()).To(Equal(body))
+	},
+	Entry("a target primary", `{"targetPrimary":"cluster-example-2"}`, Response{TargetPrimary: "cluster-example-2"}, true),
+	Entry("no target primary", `{}`, Response{}, true),
+	// A pre-upgrade peer answers a plain body: it carries no signal, not an error.
+	Entry("a pre-upgrade peer's plain body", "OK", Response{}, false),
+	Entry("an empty body", "", Response{}, false),
+)

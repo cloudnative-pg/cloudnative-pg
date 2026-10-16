@@ -7237,20 +7237,20 @@ var _ = Describe("getPrimaryIsolationTimingWarnings", func() {
 		Expect(getPrimaryIsolationTimingWarnings(clusterWith(ptr.To(true), 1000, nil))).To(BeEmpty())
 	})
 
-	It("warns when the step-down bound reaches the lease duration exactly", func() {
+	DescribeTable("warns when the step-down bound is not below the lease duration",
+		func(requestTimeout int, renewDeadline int32) {
+			cluster := clusterWith(ptr.To(true), requestTimeout, &apiv1.PrimaryLeaseConfiguration{
+				RenewDeadlineSeconds: ptr.To(renewDeadline),
+			})
+			warnings := getPrimaryIsolationTimingWarnings(cluster)
+			Expect(warnings).To(HaveLen(1))
+			Expect(warnings[0]).To(ContainSubstring("15s"))
+		},
 		// 12s + 2s + 1s = 15s: a replica may promote at the same instant the
 		// isolated primary asks for its shutdown, so there is no margin left.
-		cluster := clusterWith(ptr.To(true), 1000, &apiv1.PrimaryLeaseConfiguration{
-			RenewDeadlineSeconds: ptr.To(int32(12)),
-		})
-		warnings := getPrimaryIsolationTimingWarnings(cluster)
-		Expect(warnings).To(HaveLen(1))
-		Expect(warnings[0]).To(ContainSubstring("15s"))
-	})
-
-	It("warns when only the request timeout pushes the bound past the lease duration", func() {
-		Expect(getPrimaryIsolationTimingWarnings(clusterWith(ptr.To(true), 3000, nil))).To(HaveLen(1))
-	})
+		Entry("exactly at the lease duration", 1000, int32(12)),
+		Entry("past it through the request timeout alone", 3000, int32(10)),
+	)
 
 	It("returns no warning when the isolation check is disabled", func() {
 		cluster := clusterWith(ptr.To(false), 1000, &apiv1.PrimaryLeaseConfiguration{
