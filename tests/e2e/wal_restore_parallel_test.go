@@ -48,6 +48,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		level          = tests.High
 		PgWalPath      = specs.PgWalPath
 		SpoolDirectory = walrestore.SpoolDirectory
+		// The marker is scoped by the timeline of the WAL files, which are all
+		// forged on timeline 1 in this test.
+		endOfWALStreamFlag = "end-of-wal-stream-00000001"
 	)
 
 	var namespace string
@@ -201,7 +204,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"#3 wal is in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeFalse(),
@@ -231,7 +234,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"#3 wal is in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeFalse(),
@@ -284,7 +287,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"#5 wal is in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
@@ -322,7 +325,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"no wal files exist in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
@@ -375,7 +378,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"no wals in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
@@ -427,7 +430,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"#7 wal is in the output location")
 			Eventually(listSpoolContents).
 				WithTimeout(RetryTimeout).
-				Should(Equal("end-of-wal-stream"),
+				Should(Equal(endOfWALStreamFlag),
 					"the spool directory contains the untouched end-of-wal-stream flag "+
 						"and no prefetched wals")
 		})
