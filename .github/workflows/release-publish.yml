@@ -182,7 +182,7 @@ jobs:
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
         name: Install Syft
-        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
       -
         name: Run GoReleaser
         id: goreleaser
@@ -398,7 +398,7 @@ jobs:
           make olm-catalog
 
       - name: Archive the bundle manifests
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: bundle
           path: |
@@ -429,7 +429,7 @@ jobs:
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: bundle
 
@@ -521,7 +521,7 @@ jobs:
           git config user.name "${AUTHOR_NAME}"
       -
         name: Download the bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: bundle
       -
