@@ -518,7 +518,10 @@ The primary use cases for this method include:
     thoroughly tested. The CloudNativePG community does not endorse this approach
     for such use cases, and recommends using logical import instead. It is
     exceedingly rare that all requirements for physical replication are met in a
-    way that seamlessly works with CloudNativePG.
+    way that seamlessly works with CloudNativePG. If you still need to go down
+    this path, we strongly recommend relying on one of the
+    [professional support companies](https://cloudnative-pg.io/support/)
+    listed on the CloudNativePG website.
 :::
 
 :::warning
@@ -556,7 +559,10 @@ The following requirements apply to the `pg_basebackup` bootstrap method:
 
 - target and source must have the same hardware architecture
 - target and source must have the same major PostgreSQL version
-- target and source must have the same tablespaces
+- target and source must have the same tablespaces (same names), with the
+  locations in the source mapped through `tablespaceMapping` when they differ
+  from the CloudNativePG ones (see
+  [Mapping tablespaces from the source](#mapping-tablespaces-from-the-source))
 - source must be configured with enough `max_wal_senders` to grant
   access from the target for this one-off operation by providing at least
   one *walsender* for the backup plus one for WAL streaming
@@ -808,6 +814,59 @@ test combinations of `pg_basebackup` options.
 
 This setting only applies to the bootstrap of the cluster. It does not affect
 the `pg_basebackup` executions used to join new replicas.
+
+#### Mapping tablespaces from the source
+
+If the source instance uses tablespaces, declare each of them in
+`spec.tablespaces`, using the same name it has in the source instance.
+`pg_basebackup` relocates tablespaces by path and not by name, so if the source
+does not already use the CloudNativePG location for a tablespace, map it with
+`tablespaceMapping`, which associates the name of the tablespace with its
+location in the source instance:
+
+```yaml
+spec:
+  tablespaces:
+    - name: data_ts
+      storage:
+        size: 1Gi
+  bootstrap:
+    pg_basebackup:
+      source: external-postgres
+      tablespaceMapping:
+        - name: data_ts
+          sourceLocation: /data/pg/data_ts
+```
+
+:::warning
+Use `tablespaceMapping` with caution, as it is meant for sources that are not
+managed by CloudNativePG, such as an instance running outside Kubernetes. As
+explained in the [introduction of this method](#bootstrap-from-a-live-cluster-pg_basebackup),
+the CloudNativePG community does not endorse that kind of migration, and
+recommends logical import instead. If you still need it, we strongly
+recommend relying on one of the
+[professional support companies](https://cloudnative-pg.io/support/)
+listed on the CloudNativePG website. The operator does not validate that the
+resulting tablespace layout will work correctly.
+:::
+
+:::warning
+The operator does not check which tablespaces the source instance has. Make
+sure that every tablespace of the source instance is declared in
+`spec.tablespaces`, and mapped through `tablespaceMapping` unless the source
+already uses the CloudNativePG location. A tablespace that is not mapped is
+restored under the path it has in the source instance, inside the Pod. If that
+path is not writable, the bootstrap fails. If it is, the data ends up in an
+unexpected location.
+:::
+
+:::warning
+Do not run `CREATE TABLESPACE` on the source from the start of the base backup
+until the target stops following the source. For a standalone cluster, that is
+the end of the cloning operation; for a replica cluster, it is the promotion of
+the cluster. WAL replay carries the source path unmodified, so replaying such a
+record fails on the target.
+:::
 
 #### Current limitations
 

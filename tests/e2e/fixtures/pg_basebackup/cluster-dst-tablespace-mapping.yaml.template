@@ -1,0 +1,40 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-basebackup-dst-tablespace-mapping
+spec:
+  instances: 2
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  tablespaces:
+    - name: moved
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  bootstrap:
+    pg_basebackup:
+      database: app
+      owner: appuser
+      source: pg-basebackup-src
+      tablespaceMapping:
+        # Next to PGDATA on purpose: a path outside the CloudNativePG layout
+        - name: moved
+          sourceLocation: /var/lib/postgresql/data/moved
+
+  externalClusters:
+    - name: pg-basebackup-src
+      connectionParameters:
+        host: pg-basebackup-src-rw
+        user: appuser
+        port: "5432"
+        dbname: app
+      password:
+        name: pg-basebackup-src-app
+        key: password

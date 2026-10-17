@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -647,6 +648,48 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cl
 				field.NewPath("spec", "bootstrap", "pg_basebackup", "source"),
 				r.Spec.Bootstrap.PgBaseBackup.Source,
 				fmt.Sprintf("External cluster %v not found", r.Spec.Bootstrap.PgBaseBackup.Source)))
+	}
+
+	result = append(result, v.validateTablespaceMapping(r)...)
+
+	return result
+}
+
+// validateTablespaceMapping validates the tablespace mapping of the
+// pg_basebackup bootstrap. Locations can't contain `=` or `\`, which
+// pg_basebackup uses as separator and escape character.
+func (v *ClusterCustomValidator) validateTablespaceMapping(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	basePath := field.NewPath("spec", "bootstrap", "pg_basebackup", "tablespaceMapping")
+	seenLocations := make(map[string]struct{})
+
+	for i, entry := range r.Spec.Bootstrap.PgBaseBackup.TablespaceMapping {
+		entryPath := basePath.Index(i)
+
+		if r.GetTablespaceConfiguration(entry.Name) == nil {
+			result = append(result, field.Invalid(
+				entryPath.Child("name"),
+				entry.Name,
+				fmt.Sprintf("Tablespace %v not declared in spec.tablespaces", entry.Name)))
+		}
+
+		locationPath := entryPath.Child("sourceLocation")
+		switch {
+		case !path.IsAbs(entry.SourceLocation):
+			result = append(result, field.Invalid(
+				locationPath, entry.SourceLocation, "The source location must be an absolute path"))
+		case strings.ContainsAny(entry.SourceLocation, `=\`):
+			result = append(result, field.Invalid(
+				locationPath, entry.SourceLocation, "The source location must not contain the '=' or '\\' characters"))
+		}
+
+		// pg_basebackup canonicalizes the paths before matching them
+		cleanLocation := path.Clean(entry.SourceLocation)
+		if _, found := seenLocations[cleanLocation]; found {
+			result = append(result, field.Duplicate(locationPath, entry.SourceLocation))
+		}
+		seenLocations[cleanLocation] = struct{}{}
 	}
 
 	return result
@@ -3078,7 +3121,7 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 			// "." and resolving "..", would stay within that base. Joining
 			// under "." first (rather than a placeholder mount point) makes
 			// this independent of the extension mount point's actual depth:
-			// CollectBinPaths and absolutizePaths join these paths under a
+			// the Collect*Paths functions join these paths under a
 			// real, multi-segment mount point at runtime, and a placeholder
 			// base shallower than that real path would wrongly accept some
 			// escaping paths (e.g. "../mount/lib").

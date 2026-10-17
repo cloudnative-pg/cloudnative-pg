@@ -141,6 +141,15 @@ By default, CloudNativePG automatically manages the relevant GUCs by setting:
   PostgreSQL to locate any extension control file within `/extensions/<EXTENSION_NAME>/share/extension`
 - `dynamic_library_path` to `/extensions/<EXTENSION_NAME>/lib`
 
+A directory is added to these GUCs only if it exists in the mounted extension
+image. This is the case, for example, of a module that ships only a `lib`
+directory and no `share` one: it contributes to `dynamic_library_path` but
+leaves `extension_control_path` untouched, instead of adding an entry that
+points to a missing directory. The same rule applies to the custom paths
+described in [Setting Custom Paths](#setting-custom-paths). The instance
+manager performs this check every time it generates the PostgreSQL
+configuration.
+
 :::note
 Extension names containing underscores (e.g., `pg_ivm`) are converted to use
 hyphens (e.g., `pg-ivm`) for Kubernetes volume names to comply with RFC 1123
@@ -399,6 +408,12 @@ following fields:
 - `env`: A list of `name` and `value` pairs to be set as environment variables within
   the Postgres process.
 
+Entries of `extension_control_path` and `dynamic_library_path` that do not
+exist in the extension image are skipped, as described in
+[Mounting and PostgreSQL Configuration](#mounting-and-postgresql-configuration).
+Entries of `ld_library_path` and `bin_path` are added as declared, without any
+existence check.
+
 This flexibility enables you to support complex or non-standard extension
 images while maintaining clarity and predictability.
 
@@ -431,6 +446,14 @@ CloudNativePG will configure PostgreSQL with:
 
 - `/extensions/my-extension/my/share/path` appended to `extension_control_path`
 - `/extensions/my-extension/my/lib/path` appended to `dynamic_library_path`
+
+:::note
+As with the default directories, a custom path that does not exist in the image
+is skipped without raising an error. A typo in a custom path therefore shows up
+as a missing entry in the GUC, not as a failure. To verify what was applied,
+run `SHOW extension_control_path;` or `SHOW dynamic_library_path;`. Skipped
+paths are also logged by the instance manager at `debug` level.
+:::
 
 This allows PostgreSQL to discover your extension’s control files and shared
 libraries correctly, even with a non-standard layout.

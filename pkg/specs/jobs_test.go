@@ -251,6 +251,54 @@ var _ = Describe("Job created via pg_basebackup", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(parsedArgs).To(Equal(args))
 	})
+
+	It("passes the tablespace mappings before the additional arguments", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source: "origin",
+						TablespaceMapping: []apiv1.TablespaceMappingEntry{
+							{Name: "fast", SourceLocation: "/data/pg/fast"},
+							{Name: "archive", SourceLocation: "/data/pg/my archive"},
+						},
+						AdditionalArgs: []string{"--max-rate=50M"},
+					},
+				},
+			},
+		}
+
+		command := BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster).Command
+		Expect(command).To(ContainElement("--pgbasebackup-additional-args"))
+		parsedArgs, err := shellquote.Split(
+			command[slices.Index(command, "--pgbasebackup-additional-args")+1])
+		Expect(err).ToNot(HaveOccurred())
+		Expect(parsedArgs).To(Equal([]string{
+			"--tablespace-mapping=/data/pg/fast=/var/lib/postgresql/tablespaces/fast/data",
+			"--tablespace-mapping=/data/pg/my archive=/var/lib/postgresql/tablespaces/archive/data",
+			"--max-rate=50M",
+		}))
+	})
+
+	It("doesn't pass the tablespace mapping when joining a replica", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source: "origin",
+						TablespaceMapping: []apiv1.TablespaceMappingEntry{
+							{Name: "fast", SourceLocation: "/data/pg/fast"},
+						},
+					},
+				},
+			},
+		}
+
+		command := BuildReplicaBootstrapCommandViaJoin(cluster).Command
+		for _, arg := range command {
+			Expect(arg).ToNot(ContainSubstring("--tablespace-mapping"))
+		}
+	})
 })
 
 var _ = Describe("Job service account token", func() {
