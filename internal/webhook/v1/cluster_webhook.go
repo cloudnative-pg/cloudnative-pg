@@ -47,7 +47,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -2455,10 +2454,10 @@ func (v *ClusterCustomValidator) validateReplicationSlots(r *apiv1.Cluster) fiel
 	if r.Spec.ReplicationSlots == nil {
 		r.Spec.ReplicationSlots = &apiv1.ReplicationSlotsConfiguration{
 			HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			},
 			SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			},
 		}
 	}
@@ -2710,7 +2709,7 @@ func (v *ClusterCustomValidator) validateManagedRoles(r *apiv1.Cluster) field.Er
 		return nil
 	}
 
-	managedRoles := make(map[string]interface{})
+	managedRoles := make(map[string]any)
 	for _, role := range r.Spec.Managed.Roles {
 		_, found := managedRoles[role.Name]
 		if found {

@@ -21,12 +21,11 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 )
 
 // SetAsFailed sets the database as failed with the given error
 func (db *Database) SetAsFailed(err error) {
-	db.Status.Applied = ptr.To(false)
+	db.Status.Applied = new(false)
 	db.Status.Message = err.Error()
 }
 
@@ -38,7 +37,7 @@ func (db *Database) SetAsUnknown(err error) {
 
 // SetAsReady sets the database as working correctly
 func (db *Database) SetAsReady() {
-	db.Status.Applied = ptr.To(true)
+	db.Status.Applied = new(true)
 	db.Status.Message = ""
 	db.Status.ObservedGeneration = db.Generation
 }
@@ -97,7 +96,7 @@ func (dbObject DatabaseObjectSpec) GetName() string {
 // SetAdmissionError sets the admission error status on the Database resource
 func (db *Database) SetAdmissionError(msg string) {
 	db.Status.Message = msg
-	db.Status.Applied = ptr.To(len(msg) == 0)
+	db.Status.Applied = new(len(msg) == 0)
 }
 
 // GetAdmissionError always returns an empty string: the Database reports the

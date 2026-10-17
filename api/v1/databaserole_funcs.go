@@ -26,14 +26,14 @@ import (
 
 // SetAsFailed sets the role as failed with the given error
 func (r *DatabaseRole) SetAsFailed(err error) {
-	r.Status.Applied = ptr.To(false)
+	r.Status.Applied = new(false)
 	r.Status.Message = err.Error()
 }
 
 // SetAsReady sets the role as working correctly
 func (r *DatabaseRole) SetAsReady() {
 	r.Status.Message = ""
-	r.Status.Applied = ptr.To(true)
+	r.Status.Applied = new(true)
 	r.Status.ObservedGeneration = r.Generation
 }
 

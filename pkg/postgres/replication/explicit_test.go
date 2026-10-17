@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package replication
 
 import (
-	"k8s.io/utils/ptr"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
@@ -82,7 +80,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
-				MaxStandbyNamesFromCluster: ptr.To(1),
+				MaxStandbyNamesFromCluster: new(1),
 				StandbyNamesPre:            []string{},
 				StandbyNamesPost:           []string{},
 			}
@@ -105,7 +103,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
-				MaxStandbyNamesFromCluster: ptr.To(1),
+				MaxStandbyNamesFromCluster: new(1),
 				StandbyNamesPre:            []string{"prefix", "here"},
 				StandbyNamesPost:           []string{"suffix", "there"},
 			}
@@ -128,7 +126,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
-				MaxStandbyNamesFromCluster: ptr.To(1),
+				MaxStandbyNamesFromCluster: new(1),
 			}
 			cluster.Status = apiv1.ClusterStatus{}
 
@@ -284,7 +282,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				DataDurability:             apiv1.DataDurabilityLevelPreferred,
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
-				MaxStandbyNamesFromCluster: ptr.To(1),
+				MaxStandbyNamesFromCluster: new(1),
 				StandbyNamesPre:            []string{},
 				StandbyNamesPost:           []string{},
 			}
@@ -331,7 +329,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				DataDurability:             apiv1.DataDurabilityLevelPreferred,
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
-				MaxStandbyNamesFromCluster: ptr.To(1),
+				MaxStandbyNamesFromCluster: new(1),
 			}
 			cluster.Status = apiv1.ClusterStatus{}
 

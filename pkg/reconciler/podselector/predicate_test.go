@@ -22,7 +22,6 @@ package podselector
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -58,7 +57,7 @@ var _ = Describe("ExternalPodsPredicate", func() {
 				APIVersion: apiv1.SchemeGroupVersion.String(),
 				Kind:       apiv1.ClusterKind,
 				Name:       "test-cluster",
-				Controller: ptr.To(true),
+				Controller: new(true),
 			},
 		}
 		pod := &corev1.Pod{

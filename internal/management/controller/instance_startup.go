@@ -149,8 +149,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 		// We archive every WAL that have not been archived from the latest postmaster invocation.
 		if err := archiver.ArchiveAllReadyWALs(ctx, cluster, r.instance.PgData); err != nil {
-			var missingPluginError archiver.ErrMissingWALArchiverPlugin
-			if errors.As(err, &missingPluginError) {
+			if _, ok := errors.AsType[archiver.ErrMissingWALArchiverPlugin](err); ok {
 				// The instance initialization resulted in a fatal error.
 				// We need the Pod to be rolled out to install the archiving plugin.
 				r.systemInitialization.BroadcastError(err)

@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -62,7 +61,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 			Spec: apiv1.PoolerSpec{
 				Cluster:   apiv1.LocalObjectReference{Name: clusterName},
 				Type:      apiv1.PoolerTypeRW,
-				Instances: ptr.To(int32(1)),
+				Instances: new(int32(1)),
 				PgBouncer: &apiv1.PgBouncerSpec{
 					PoolMode:        apiv1.PgBouncerPoolModeSession,
 					ImageCatalogRef: ref,

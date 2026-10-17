@@ -36,7 +36,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
@@ -203,7 +202,7 @@ func createClusterPodSpec(
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
 		ServiceAccountName:            cluster.GetServiceAccountName(),
-		AutomountServiceAccountToken:  ptr.To(false),
+		AutomountServiceAccountToken:  new(false),
 		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 		TerminationGracePeriodSeconds: &gracePeriod,
 		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
@@ -461,7 +460,7 @@ func GetPodSecurityContext(cluster *apiv1.Cluster) *corev1.PodSecurityContext {
 		SeccompProfile: cluster.GetSeccompProfile(),
 		RunAsUser:      &uid,
 		RunAsGroup:     &gid,
-		RunAsNonRoot:   ptr.To(true),
+		RunAsNonRoot:   new(true),
 		FSGroup:        &gid,
 	}
 

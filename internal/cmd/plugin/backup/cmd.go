@@ -31,7 +31,6 @@ import (
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -289,5 +288,5 @@ func parseOptionalBooleanString(rawBool string) (*bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ptr.To(value), nil
+	return new(value), nil
 }

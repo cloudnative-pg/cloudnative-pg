@@ -25,7 +25,6 @@ import (
 	"github.com/kballard/go-shellquote"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -115,7 +114,7 @@ var _ = Describe("Job created via InitDB", func() {
 				ImageName: "postgres:18.0",
 				Bootstrap: &apiv1.BootstrapConfiguration{
 					InitDB: &apiv1.BootstrapInitDB{
-						DataChecksums: ptr.To(true),
+						DataChecksums: new(true),
 					},
 				},
 			},
@@ -132,7 +131,7 @@ var _ = Describe("Job created via InitDB", func() {
 				ImageName: "postgres:18.0",
 				Bootstrap: &apiv1.BootstrapConfiguration{
 					InitDB: &apiv1.BootstrapInitDB{
-						DataChecksums: ptr.To(false),
+						DataChecksums: new(false),
 					},
 				},
 			},
@@ -149,7 +148,7 @@ var _ = Describe("Job created via InitDB", func() {
 				ImageName: "postgres:17.0",
 				Bootstrap: &apiv1.BootstrapConfiguration{
 					InitDB: &apiv1.BootstrapInitDB{
-						DataChecksums: ptr.To(true),
+						DataChecksums: new(true),
 					},
 				},
 			},
@@ -168,7 +167,7 @@ var _ = Describe("Job created via InitDB", func() {
 					ImageName: "postgres:17.0",
 					Bootstrap: &apiv1.BootstrapConfiguration{
 						InitDB: &apiv1.BootstrapInitDB{
-							DataChecksums: ptr.To(false),
+							DataChecksums: new(false),
 						},
 					},
 				},

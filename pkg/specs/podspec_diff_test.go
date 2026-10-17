@@ -23,7 +23,6 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
@@ -289,7 +288,7 @@ var _ = Describe("compareVolumeMounts migration", func() {
 var _ = Describe("automountServiceAccountToken drift detection", func() {
 	It("detects a change of the automountServiceAccountToken value", func() {
 		current := corev1.PodSpec{}
-		target := corev1.PodSpec{AutomountServiceAccountToken: ptr.To(false)}
+		target := corev1.PodSpec{AutomountServiceAccountToken: new(false)}
 
 		match, diff := ComparePodSpecs(current, target)
 		Expect(match).To(BeFalse())

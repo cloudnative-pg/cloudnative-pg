@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package resources
 
 import (
+	"maps"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -27,9 +29,7 @@ import (
 
 // mergeMap transfers the content of a giver map to a receiver
 func mergeMap(receiver, giver map[string]string) {
-	for key, value := range giver {
-		receiver[key] = value
-	}
+	maps.Copy(receiver, giver)
 }
 
 // inheritLabels puts into the object metadata the passed labels

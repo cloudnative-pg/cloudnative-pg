@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -319,7 +318,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 			if err != nil {
 				continue
 			}
-			var statusFields map[string]interface{}
+			var statusFields map[string]any
 			err = json.Unmarshal([]byte(status), &statusFields)
 			if err != nil {
 				continue
@@ -806,7 +805,7 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 					&pooler)
 				g.Expect(err).ToNot(HaveOccurred())
 
-				pooler.Spec.Instances = ptr.To(int32(0))
+				pooler.Spec.Instances = new(int32(0))
 				err = env.Client.Update(env.Ctx, &pooler)
 				g.Expect(err).ToNot(HaveOccurred())
 			}).Should(Succeed())

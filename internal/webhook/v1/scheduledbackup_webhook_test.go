@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	"k8s.io/utils/ptr"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -103,7 +101,7 @@ var _ = Describe("Validate schedule", func() {
 		scheduledBackup := &apiv1.ScheduledBackup{
 			Spec: apiv1.ScheduledBackupSpec{
 				Method:   apiv1.BackupMethodBarmanObjectStore,
-				Online:   ptr.To(true),
+				Online:   new(true),
 				Schedule: "* * * * * *",
 			},
 		}

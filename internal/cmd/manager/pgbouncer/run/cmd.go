@@ -155,8 +155,7 @@ func runSubCommand(ctx context.Context, opts runOptions) error {
 	registerSignalHandler(ctx, reconciler, pgBouncerCmd)
 
 	if err = streamingCmd.Wait(); err != nil {
-		var exitError *exec.ExitError
-		if !errors.As(err, &exitError) {
+		if exitError, ok := errors.AsType[*exec.ExitError](err); !ok {
 			contextLogger.Error(err, "Error waiting on pgbouncer process")
 		} else {
 			contextLogger.Error(exitError, "pgbouncer process exited with errors")

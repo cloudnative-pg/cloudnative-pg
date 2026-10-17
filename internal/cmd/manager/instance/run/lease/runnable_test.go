@@ -63,8 +63,8 @@ var _ = Describe("Runnable.Release", func() {
 				Name:      clusterName,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity:       ptr.To(holder),
-				LeaseDurationSeconds: ptr.To(int32(15)),
+				HolderIdentity:       new(holder),
+				LeaseDurationSeconds: new(int32(15)),
 			},
 		}
 		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, lease, metav1.CreateOptions{})
@@ -131,7 +131,7 @@ var _ = Describe("Runnable.Release", func() {
 		createLease(ctx, kubeClient, thisPod)
 
 		Expect(r.Release(ctx)).To(Succeed())
-		Expect(getDuration(ctx, kubeClient)).To(Equal(ptr.To(int32(1))))
+		Expect(getDuration(ctx, kubeClient)).To(Equal(new(int32(1))))
 	})
 
 	It("writes the configured released-lease TTL", func(ctx context.Context) {
@@ -143,7 +143,7 @@ var _ = Describe("Runnable.Release", func() {
 
 		Expect(r.Release(ctx)).To(Succeed())
 		Expect(getHolder(ctx, kubeClient)).To(BeEmpty())
-		Expect(getDuration(ctx, kubeClient)).To(Equal(ptr.To(int32(5))))
+		Expect(getDuration(ctx, kubeClient)).To(Equal(new(int32(5))))
 	})
 
 	It("preserves leaseTransitions across release", func(ctx context.Context) {
@@ -158,8 +158,8 @@ var _ = Describe("Runnable.Release", func() {
 			},
 			Spec: coordinationv1.LeaseSpec{
 				HolderIdentity:       ptr.To(thisPod),
-				LeaseDurationSeconds: ptr.To(int32(15)),
-				LeaseTransitions:     ptr.To(int32(7)),
+				LeaseDurationSeconds: new(int32(15)),
+				LeaseTransitions:     new(int32(7)),
 			},
 		}
 		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, lease, metav1.CreateOptions{})
@@ -169,7 +169,7 @@ var _ = Describe("Runnable.Release", func() {
 
 		released, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(released.Spec.LeaseTransitions).To(Equal(ptr.To(int32(7))))
+		Expect(released.Spec.LeaseTransitions).To(Equal(new(int32(7))))
 	})
 
 	It("keeps the lease held when an in-place instance-manager upgrade is in progress",
@@ -298,10 +298,10 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 				Name:      clusterName,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity:       ptr.To(holder),
-				LeaseDurationSeconds: ptr.To(ttlSeconds),
-				RenewTime:            ptr.To(metav1.NewMicroTime(renewedAt)),
-				LeaseTransitions:     ptr.To(int32(3)),
+				HolderIdentity:       new(holder),
+				LeaseDurationSeconds: new(ttlSeconds),
+				RenewTime:            new(metav1.NewMicroTime(renewedAt)),
+				LeaseTransitions:     new(int32(3)),
 			},
 		}
 		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, lease, metav1.CreateOptions{})
@@ -318,8 +318,8 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 	// live holder renewing its lease would.
 	renewLease := func(ctx context.Context, kubeClient *fake.Clientset, holder string, renewedAt time.Time) {
 		lease := getLease(ctx, kubeClient)
-		lease.Spec.HolderIdentity = ptr.To(holder)
-		lease.Spec.RenewTime = ptr.To(metav1.NewMicroTime(renewedAt))
+		lease.Spec.HolderIdentity = new(holder)
+		lease.Spec.RenewTime = new(metav1.NewMicroTime(renewedAt))
 		_, err := kubeClient.CoordinationV1().Leases(namespace).Update(ctx, lease, metav1.UpdateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	}

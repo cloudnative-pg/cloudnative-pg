@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -162,7 +161,7 @@ var _ = Describe("generate backup options", func() {
 							Compression:         "gzip",
 							Encryption:          "aes256",
 							ImmediateCheckpoint: true,
-							Jobs:                ptr.To(int32(2)),
+							Jobs:                new(int32(2)),
 						},
 					},
 				},
