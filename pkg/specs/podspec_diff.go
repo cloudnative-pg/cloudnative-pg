@@ -97,6 +97,9 @@ func ComparePodSpecs(
 		"scheduler-name": func() bool {
 			return currentPodSpec.SchedulerName == targetPodSpec.SchedulerName
 		},
+		"host-users": func() bool {
+			return ptr.Equal(currentPodSpec.HostUsers, targetPodSpec.HostUsers)
+		},
 		"hostname": func() bool {
 			return currentPodSpec.Hostname == targetPodSpec.Hostname
 		},
