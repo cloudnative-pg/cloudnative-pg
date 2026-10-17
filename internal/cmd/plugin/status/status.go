@@ -112,6 +112,34 @@ func Status(
 	verbosity int,
 	format plugin.OutputFormat,
 	timeout time.Duration,
+	watch bool,
+	watchInterval time.Duration,
+) error {
+	if watch && format == plugin.OutputFormatText {
+		for {
+			// Clear screen and move cursor to top-left (ANSI)
+			fmt.Print("\033[2J\033[H")
+			fmt.Printf("Every %v: kubectl cnpg status %s\t\t%s\n\n",
+				watchInterval, clusterName, time.Now().Format(time.RFC1123))
+			// Ignore per-iteration errors so the loop keeps running
+			_ = printStatusOnce(ctx, clusterName, verbosity, plugin.OutputFormatText, timeout)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(watchInterval):
+			}
+		}
+	}
+	return printStatusOnce(ctx, clusterName, verbosity, format, timeout)
+}
+
+// printStatusOnce fetches and prints the cluster status a single time
+func printStatusOnce(
+	ctx context.Context,
+	clusterName string,
+	verbosity int,
+	format plugin.OutputFormat,
+	timeout time.Duration,
 ) error {
 	var cluster apiv1.Cluster
 	var errs []error
