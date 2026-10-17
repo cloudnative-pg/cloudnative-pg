@@ -208,6 +208,9 @@ const (
 	// serial number of the node
 	ClusterSerialAnnotationName = MetadataNamespace + "/nodeSerial"
 
+	// PausedDuringSwitchoverAnnotationName marks poolers automatically paused during switchover
+	PausedDuringSwitchoverAnnotationName = MetadataNamespace + "/pausedDuringSwitchover"
+
 	// ClusterReloadAnnotationName is the name of the annotation containing the
 	// latest reload time trigger by external
 	ClusterReloadAnnotationName = MetadataNamespace + "/reloadedAt"
