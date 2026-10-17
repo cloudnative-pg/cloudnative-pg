@@ -185,6 +185,8 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 			WithPodName(thisPod).
 			WithClusterName(clusterName)
 		r = New(fake.NewClientset(), instance)
+		// The monitor only watches a held lease.
+		close(r.heldCh)
 		r.config.RetryPeriod = retryPeriod
 		r.config.RenewDeadline = renewDeadline
 		// Far enough that the specs below never reach the last resort unless

@@ -139,6 +139,12 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		case <-ticker.C:
 		}
 
+		// After a Yield the record goes stale on purpose, and the pod is a
+		// replica: there is nothing to step down from until the next hold.
+		if !r.held() {
+			continue
+		}
+
 		if !shutdownRequested {
 			confirmed = r.lastConfirmed.Load()
 		}
