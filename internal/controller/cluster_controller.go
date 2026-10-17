@@ -102,6 +102,7 @@ type ClusterReconciler struct {
 	Plugins            repository.Interface
 	OperatorClientCert *tls.Certificate
 
+	apiReader      client.Reader
 	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
 	admission      *guard.Admission[*apiv1.Cluster]
@@ -128,6 +129,7 @@ func NewClusterReconciler(
 			configuration.Current.GetClustersRolloutDelay(),
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
+		apiReader:   mgr.GetAPIReader(),
 		drainTaints: drainTaints,
 		admission:   admission,
 	}
