@@ -29,6 +29,27 @@ kubectl rollout status deployment \
   -n cnpg-system cnpg-controller-manager
 ```
 
+#### Troubleshooting: CRD annotation size error
+
+If you omit the `--server-side` flag during installation and use client-side apply instead, the process might fail in certain environments (such as Windows with PowerShell and newer `kubectl` versions) with the following error:
+
+```text
+metadata.annotations: Too long: may not be more than 262144 bytes
+```
+
+This prevents the operator from starting and leads to a `CrashLoopBackOff` status. The failure happens because client-side apply attempts to store the entire manifest in the `kubectl.kubernetes.io/last-applied-configuration` annotation, which has a strict size limit.
+
+To fix this issue, simply use the `--server-side` flag as shown in the installation instructions:
+
+```sh
+kubectl apply --server-side -f <cnpg-manifest>
+```
+
+:::note
+We strongly recommend always using `--server-side` apply when installing or upgrading large CRDs to prevent annotation size limit issues.
+:::
+
+
 ### Using the `cnpg` plugin for `kubectl`
 
 You can use the `cnpg` plugin to override the default configuration options
