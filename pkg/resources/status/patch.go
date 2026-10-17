@@ -56,6 +56,12 @@ func PatchWithOptimisticLock(
 		}
 
 		updatedCluster := currentCluster.DeepCopy()
+
+		// Pin Generation to the reconciled version: transactions like
+		// SetClusterReadyCondition stamp ObservedGeneration from it, and the
+		// fresh GET may already see a newer spec we haven't reconciled.
+		// Status().Patch doesn't persist metadata.generation anyway.
+		updatedCluster.Generation = cluster.Generation
 		for _, tx := range txs {
 			tx(updatedCluster)
 		}
