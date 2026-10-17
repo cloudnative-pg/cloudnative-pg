@@ -72,6 +72,7 @@ var _ = Describe("EnsureInstancePVCGroupIsDeleted", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pvcName.name,
 					Namespace: namespace,
+					Labels:    pvcName.calculator.GetLabels(instanceName),
 				},
 			}
 			err := fakeClient.Create(ctx, pvc)
