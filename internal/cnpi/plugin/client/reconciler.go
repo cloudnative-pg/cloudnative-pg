@@ -50,9 +50,8 @@ func newTerminateResult(identifier string) ReconcilerHookResult {
 
 // newReconcilerRequeueResult creates a new result instructing
 // a reconciler to schedule a loop in the passed time frame.
-// The requeue delay is optional in CNPG-I: when the plugin doesn't set it,
-// the loop is requeued after one second, as an empty RequeueAfter would
-// not requeue at all
+// The delay is optional in CNPG-I and an empty RequeueAfter does not
+// requeue, so it is at least one second
 func newReconcilerRequeueResult(identifier string, after int64) ReconcilerHookResult {
 	return ReconcilerHookResult{
 		Err:                nil,
