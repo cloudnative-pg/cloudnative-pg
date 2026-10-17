@@ -173,21 +173,25 @@ var _ = Describe("reconcilerHook", func() {
 		Expect(result.Identifier).To(Equal("test"))
 	})
 
-	It("should requeue when a plugin returns REQUEUE behavior", func() {
-		f := newFakeReconcilerHooksClient(
-			[]reconciler.ReconcilerHooksCapability_Kind{reconciler.ReconcilerHooksCapability_KIND_CLUSTER},
-			reconciler.ReconcilerHooksResult_BEHAVIOR_REQUEUE,
-			10,
-			nil,
-		)
-		f.set(plugins[0].(*fakeConnection))
+	DescribeTable("should requeue when a plugin returns REQUEUE behavior",
+		func(requeueAfter int64, expectedSeconds int) {
+			f := newFakeReconcilerHooksClient(
+				[]reconciler.ReconcilerHooksCapability_Kind{reconciler.ReconcilerHooksCapability_KIND_CLUSTER},
+				reconciler.ReconcilerHooksResult_BEHAVIOR_REQUEUE,
+				requeueAfter,
+				nil,
+			)
+			f.set(plugins[0].(*fakeConnection))
 
-		result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
-		Expect(result.StopReconciliation).To(BeTrue())
-		Expect(result.Result.RequeueAfter.Seconds()).To(BeEquivalentTo(10))
-		Expect(result.Err).ToNot(HaveOccurred())
-		Expect(result.Identifier).To(Equal("test"))
-	})
+			result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
+			Expect(result.StopReconciliation).To(BeTrue())
+			Expect(result.Result.RequeueAfter.Seconds()).To(BeEquivalentTo(expectedSeconds))
+			Expect(result.Err).ToNot(HaveOccurred())
+			Expect(result.Identifier).To(Equal("test"))
+		},
+		Entry("after the requested delay", int64(10), 10),
+		Entry("after one second when no delay is requested", int64(0), 1),
+	)
 
 	It("should return error when plugin execution fails", func() {
 		expectedErr := errors.New("plugin execution failed")
