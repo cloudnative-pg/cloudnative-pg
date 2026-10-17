@@ -1102,9 +1102,14 @@ var _ = Describe("deletePodDisruptionBudgetsIfExist", func() {
 
 	BeforeEach(func() {
 		cluster = &apiv1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: apiv1.SchemeGroupVersion.String(),
+				Kind:       apiv1.ClusterKind,
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
 				Namespace: namespace,
+				UID:       types.UID("test-cluster-uid"),
 			},
 		}
 		pdbPrimary = &policyv1.PodDisruptionBudget{
@@ -1144,6 +1149,9 @@ var _ = Describe("deletePodDisruptionBudgetsIfExist", func() {
 			},
 		}
 
+		cluster.SetInheritedDataAndOwnership(&pdbPrimary.ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+
 		fakeClient = fake.NewClientBuilder().
 			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster, pdbPrimary, pdb).
@@ -1156,7 +1164,7 @@ var _ = Describe("deletePodDisruptionBudgetsIfExist", func() {
 		}
 	})
 
-	It("should delete the existing PDBs", func(ctx SpecContext) {
+	It("should delete the existing owned PDBs", func(ctx SpecContext) {
 		err := fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
 		Expect(err).ToNot(HaveOccurred())
 
@@ -1193,6 +1201,31 @@ var _ = Describe("deletePodDisruptionBudgetsIfExist", func() {
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdb), &policyv1.PodDisruptionBudget{})
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 	})
+
+	DescribeTable("should preserve PDBs not controlled by the Cluster",
+		func(ctx SpecContext, ownerUID types.UID, controller bool) {
+			for _, budget := range []*policyv1.PodDisruptionBudget{pdbPrimary, pdb} {
+				if ownerUID == "" {
+					budget.OwnerReferences = nil
+				} else {
+					budget.OwnerReferences[0].UID = ownerUID
+					budget.OwnerReferences[0].Controller = ptr.To(controller)
+				}
+				Expect(fakeClient.Update(ctx, budget)).To(Succeed())
+			}
+
+			Expect(reconciler.deletePodDisruptionBudgetsIfExist(ctx, cluster)).To(Succeed())
+
+			for _, budget := range []*policyv1.PodDisruptionBudget{pdbPrimary, pdb} {
+				var actual policyv1.PodDisruptionBudget
+				Expect(fakeClient.Get(ctx, k8client.ObjectKeyFromObject(budget), &actual)).To(Succeed())
+				Expect(actual).To(Equal(*budget))
+			}
+		},
+		Entry("without owner references", types.UID(""), false),
+		Entry("with a different controller UID", types.UID("another-cluster-uid"), true),
+		Entry("with a non-controller owner reference", types.UID("test-cluster-uid"), false),
+	)
 })
 
 var _ = Describe("Service Reconciling", func() {
