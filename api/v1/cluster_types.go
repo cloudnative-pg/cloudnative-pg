@@ -666,21 +666,21 @@ type LivenessProbe struct {
 	// Probe is the standard probe configuration
 	Probe `json:",inline"`
 
-	// Configure the feature that extends the liveness probe for a primary
-	// instance. In addition to the basic checks, this reports whether the
-	// primary is isolated from the Kubernetes API server and from its
-	// replicas, so the kubelet restarts it through the normal
-	// container-termination path (a smart shutdown, bounded by
-	// `.spec.smartShutdownTimeout`) when a network partition or API
-	// unavailability is detected. Enabled by default.
+	// Configure the primary isolation check, which stops a primary whose
+	// primary lease has gone past its renew deadline without a successful
+	// renewal, when at least one other instance is unreachable or names a
+	// different target primary, so that it stops accepting writes it can no
+	// longer safely serve. Its reaction time is set by the `primaryLease`
+	// timings and by `requestTimeout`, not by the liveness probe settings this
+	// stanza lives under. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
 }
 
-// IsolationCheckConfiguration contains the configuration for the isolation check
-// functionality in the liveness probe
+// IsolationCheckConfiguration contains the configuration for the primary
+// isolation check
 type IsolationCheckConfiguration struct {
-	// Whether primary isolation checking is enabled for the liveness probe
+	// Whether primary isolation checking is enabled
 	// +optional
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
@@ -2263,6 +2263,39 @@ type BootstrapPgBaseBackup struct {
 	// created from scratch
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
+
+	// List of custom options to pass to the `pg_basebackup` command.
+	//
+	// IMPORTANT: Use with caution. The operator rejects the options it relies on,
+	// as listed in the bootstrap documentation, but it does not validate the
+	// others, and some of them may still interfere with its intended
+	// functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and PostgreSQL version.
+	//
+	// +optional
+	AdditionalArgs []string `json:"additionalArgs,omitempty"`
+
+	// Maps each tablespace declared in `spec.tablespaces` to its location
+	// in the source instance.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	TablespaceMapping []TablespaceMappingEntry `json:"tablespaceMapping,omitempty"`
+}
+
+// TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+// location of the same tablespace in the source instance of a `pg_basebackup`
+// bootstrap.
+type TablespaceMappingEntry struct {
+	// Name of the tablespace, as declared in `spec.tablespaces`.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Absolute path of the tablespace in the source instance. It must not
+	// contain the `=` or `\` characters and must be unique among the entries.
+	// +kubebuilder:validation:MinLength=1
+	SourceLocation string `json:"sourceLocation"`
 }
 
 // RecoveryTarget allows to configure the moment where the recovery process

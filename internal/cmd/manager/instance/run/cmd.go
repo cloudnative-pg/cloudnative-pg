@@ -354,6 +354,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	}
 
 	postgresLifecycleManager := lifecycle.NewPostgres(ctx, instance, postgresStartConditions)
+	leaseRunnable.SetMonitorContext(postgresLifecycleManager.GetGlobalContext())
 	if err = mgr.Add(postgresLifecycleManager); err != nil {
 		contextLogger.Error(err, "unable to create instance runnable")
 		return err

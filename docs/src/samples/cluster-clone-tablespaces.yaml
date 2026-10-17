@@ -1,0 +1,38 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-clone-tablespaces
+spec:
+  instances: 3
+
+  bootstrap:
+    pg_basebackup:
+      # Name of the entry in `externalClusters` to clone from
+      source: source-cluster
+      tablespaceMapping:
+        # `name` must match a tablespace defined in `spec.tablespaces` below
+        # `sourceLocation` is the absolute path of that tablespace on the source server
+        - name: first
+          sourceLocation: /data/pg/first
+        - name: second
+          sourceLocation: /data/pg/second
+
+  storage:
+    size: 1Gi
+
+  # One volume per tablespace of the source, using the same names
+  tablespaces:
+    - name: first
+      storage:
+        size: 1Gi
+    - name: second
+      storage:
+        size: 1Gi
+
+  externalClusters:
+  - name: source-cluster
+    # How to reach the source PostgreSQL server
+    connectionParameters:
+      host: source-postgres.example.com
+      # Role with the REPLICATION attribute on the source server
+      user: cnpg_import

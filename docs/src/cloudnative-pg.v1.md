@@ -398,6 +398,8 @@ _Appears in:_
 | `database` _string_ | Name of the database used by the application. Default: `app`. |  |  |  |
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
+| `additionalArgs` _string array_ | List of custom options to pass to the `pg_basebackup` command.<br />IMPORTANT: Use with caution. The operator rejects the options it relies on,<br />as listed in the bootstrap documentation, but it does not validate the<br />others, and some of them may still interfere with its intended<br />functionality or design.<br />You are responsible for ensuring that the provided options are compatible<br />with your environment and PostgreSQL version. |  |  |  |
+| `tablespaceMapping` _[TablespaceMappingEntry](#tablespacemappingentry) array_ | Maps each tablespace declared in `spec.tablespaces` to its location<br />in the source instance. |  |  |  |
 
 
 #### BootstrapRecovery
@@ -1491,8 +1493,8 @@ _Appears in:_
 
 
 
-IsolationCheckConfiguration contains the configuration for the isolation check
-functionality in the liveness probe
+IsolationCheckConfiguration contains the configuration for the primary
+isolation check
 
 
 
@@ -1502,7 +1504,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `enabled` _boolean_ | Whether primary isolation checking is enabled for the liveness probe |  | true |  |
+| `enabled` _boolean_ | Whether primary isolation checking is enabled |  | true |  |
 | `requestTimeout` _integer_ | Timeout in milliseconds for requests during the primary isolation check |  | 1000 |  |
 | `connectionTimeout` _integer_ | Timeout in milliseconds for connections during the primary isolation check |  | 1000 |  |
 
@@ -1610,7 +1612,7 @@ _Appears in:_
 | `successThreshold` _integer_ | Minimum consecutive successes for the probe to be considered successful after having failed.<br />Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1. |  |  |  |
 | `failureThreshold` _integer_ | Minimum consecutive failures for the probe to be considered failed after having succeeded.<br />Defaults to 3. Minimum value is 1. |  |  |  |
 | `terminationGracePeriodSeconds` _integer_ | Optional duration in seconds the pod needs to terminate gracefully upon probe failure.<br />The grace period is the duration in seconds after the processes running in the pod are sent<br />a termination signal and the time when the processes are forcibly halted with a kill signal.<br />Set this value longer than the expected cleanup time for your process.<br />If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this<br />value overrides the value provided by the pod spec.<br />Value must be non-negative integer. The value zero indicates stop immediately via<br />the kill signal (no opportunity to shut down).<br />This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.<br />Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset. |  |  |  |
-| `isolationCheck` _[IsolationCheckConfiguration](#isolationcheckconfiguration)_ | Configure the feature that extends the liveness probe for a primary<br />instance. In addition to the basic checks, this reports whether the<br />primary is isolated from the Kubernetes API server and from its<br />replicas, so the kubelet restarts it through the normal<br />container-termination path (a smart shutdown, bounded by<br />`.spec.smartShutdownTimeout`) when a network partition or API<br />unavailability is detected. Enabled by default. |  |  |  |
+| `isolationCheck` _[IsolationCheckConfiguration](#isolationcheckconfiguration)_ | Configure the primary isolation check, which stops a primary whose<br />primary lease has gone past its renew deadline without a successful<br />renewal, when at least one other instance is unreachable or names a<br />different target primary, so that it stops accepting writes it can no<br />longer safely serve. Its reaction time is set by the `primaryLease`<br />timings and by `requestTimeout`, not by the liveness probe settings this<br />stanza lives under. Enabled by default. |  |  |  |
 
 
 
@@ -3217,6 +3219,26 @@ _Appears in:_
 | `storage` _[StorageConfiguration](#storageconfiguration)_ | The storage configuration for the tablespace | True |  |  |
 | `owner` _[DatabaseRoleRef](#databaseroleref)_ | Owner is the PostgreSQL user owning the tablespace |  |  |  |
 | `temporary` _boolean_ | When set to true, the tablespace will be added as a `temp_tablespaces`<br />entry in PostgreSQL, and will be available to automatically house temp<br />database objects, or other temporary files. Please refer to PostgreSQL<br />documentation for more information on the `temp_tablespaces` GUC. |  | false |  |
+
+
+#### TablespaceMappingEntry
+
+
+
+TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+location of the same tablespace in the source instance of a `pg_basebackup`
+bootstrap.
+
+
+
+_Appears in:_
+
+- [BootstrapPgBaseBackup](#bootstrappgbasebackup)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the tablespace, as declared in `spec.tablespaces`. | True |  | MinLength: 1 <br /> |
+| `sourceLocation` _string_ | Absolute path of the tablespace in the source instance. It must not<br />contain the `=` or `\` characters and must be unique among the entries. | True |  | MinLength: 1 <br /> |
 
 
 #### TablespaceState

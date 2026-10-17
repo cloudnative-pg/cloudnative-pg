@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -278,10 +279,18 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			WithNamespace(namespace).
 			WithPodName(thisPod).
 			WithClusterName(clusterName)
+		// This pod is the target primary unless a spec says otherwise: only the
+		// target may take a lease over.
+		instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: thisPod}})
 		r := New(kubeClient, instance)
 		// Set a realistic lease duration so the expiry math is exercised.
 		r.config.LeaseDuration = 15 * time.Second
 		return r
+	}
+
+	// setTarget changes the target primary the instance manager has reconciled.
+	setTarget := func(r *Runnable, target string) {
+		r.instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: target}})
 	}
 
 	// putLease writes a lease object with the given holder, renew time and TTL.
@@ -347,17 +356,43 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(r.observedRecord).To(BeNil())
 		})
 
-	It("returns true and does not write when this pod is already the holder", func(ctx context.Context) {
+	It("refreshes the record with a write when this pod is already the holder", func(ctx context.Context) {
 		kubeClient := fake.NewClientset()
 		r := newRunnable(kubeClient)
-		putLease(ctx, kubeClient, thisPod, time.Now(), 15)
-		before := getLease(ctx, kubeClient).ResourceVersion
+		putLease(ctx, kubeClient, thisPod, time.Now().Add(-10*time.Second), 15)
+		before := getLease(ctx, kubeClient)
 
 		acquired, err := r.tryTakeOver(ctx)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(acquired).To(BeTrue())
-		// No write happened: ResourceVersion is unchanged.
-		Expect(getLease(ctx, kubeClient).ResourceVersion).To(Equal(before))
+
+		after := getLease(ctx, kubeClient)
+		Expect(after.Spec.RenewTime.After(before.Spec.RenewTime.Time)).To(BeTrue())
+		// Re-adopting our own record is not a transition.
+		Expect(ptr.Deref(after.Spec.HolderIdentity, "")).To(Equal(thisPod))
+		Expect(ptr.Deref(after.Spec.LeaseTransitions, 0)).To(BeEquivalentTo(3))
+		// The write is what the monitor ages the lease from.
+		Expect(r.lastConfirmed.Load()).NotTo(BeNil())
+	})
+
+	It("does not report the lease as held when a challenger claims it first", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		putLease(ctx, kubeClient, thisPod, time.Now().Add(-10*time.Second), 15)
+
+		// The challenger's claim lands between our read and our write, so our
+		// conditional write fails with a conflict.
+		kubeClient.PrependReactor("update", "leases",
+			func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewConflict(
+					schema.GroupResource{Resource: "leases"}, clusterName,
+					errors.New("the object has been modified"))
+			})
+
+		acquired, err := r.tryTakeOver(ctx)
+		Expect(apierrors.IsConflict(err)).To(BeTrue())
+		Expect(acquired).To(BeFalse())
+		Expect(r.lastConfirmed.Load()).To(BeNil())
 	})
 
 	It("refuses on the first sighting of another holder and records the observation",
@@ -427,6 +462,92 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(*lease.Spec.HolderIdentity).To(Equal(thisPod))
 			Expect(*lease.Spec.LeaseTransitions).To(Equal(int32(4)))
 		})
+
+	It("does not take over a released lease while another pod is the target primary", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		setTarget(r, otherPod)
+		putLease(ctx, kubeClient, "", time.Now(), 15)
+
+		acquired, err := r.tryTakeOver(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquired).To(BeFalse())
+		Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(BeEmpty())
+	})
+
+	It("does not start the observation window while another pod is the target primary",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+			setTarget(r, otherPod)
+
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(r.observedRecord).To(BeNil())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
+		})
+
+	It("waits a full window after becoming the target before it takes over a stale holder",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+			setTarget(r, otherPod)
+			for range 3 {
+				_, err := r.tryTakeOver(ctx)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			// Whatever the polls recorded is older than the window by now.
+			r.observedTime = time.Now().Add(-r.config.LeaseDuration - time.Second)
+
+			// A reconcile stores this pod as the target: the holder was stale long
+			// before, but the old primary may only now learn that it was replaced.
+			setTarget(r, thisPod)
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
+
+			r.observedTime = time.Now().Add(-r.config.LeaseDuration - time.Second)
+			acquired, err = r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeTrue())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(thisPod))
+		})
+
+	It("converges through the polling loop once a reconcile makes this pod the target", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		r.config.LeaseDuration = 50 * time.Millisecond
+		r.config.RenewDeadline = 40 * time.Millisecond
+		r.config.RetryPeriod = 5 * time.Millisecond
+		setTarget(r, otherPod)
+		putLease(ctx, kubeClient, otherPod, time.Now(), 15)
+
+		acquired := make(chan error, 1)
+		go func() { acquired <- r.preAcquire(ctx) }()
+
+		// Well past the window, and still no claim.
+		Consistently(acquired, 200*time.Millisecond).ShouldNot(Receive())
+
+		setTarget(r, thisPod)
+
+		Eventually(acquired).Should(Receive(BeNil()))
+		Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(thisPod))
+	})
+
+	It("keeps renewing its own lease after another pod became the target primary", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		setTarget(r, otherPod)
+		putLease(ctx, kubeClient, thisPod, time.Now().Add(-10*time.Second), 15)
+
+		acquired, err := r.tryTakeOver(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquired).To(BeTrue())
+	})
 
 	It("reports not-acquired when a competing candidate wins the take-over race",
 		func(ctx context.Context) {
@@ -567,5 +688,52 @@ var _ = Describe("classifyLeaseAfterRun", func() {
 	It("treats our own identity as still held (transient blip, retry)", func() {
 		Expect(classifyLeaseAfterRun(nil, record(ourIdentity), ourIdentity)).
 			To(Equal(leaseStillHeld))
+	})
+})
+
+var _ = Describe("shouldStepDown", func() {
+	const ourIdentity = "test-cluster-1"
+
+	newCluster := func(enabled bool, instances int) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: instances,
+				Probes: &apiv1.ProbesConfiguration{
+					Liveness: &apiv1.LivenessProbe{
+						IsolationCheck: &apiv1.IsolationCheckConfiguration{
+							Enabled:           ptr.To(enabled),
+							RequestTimeout:    1000,
+							ConnectionTimeout: 1000,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("skips the check when isolation checking is disabled", func() {
+		stepDown, err := shouldStepDown(newCluster(false, 3), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("skips the check when the cluster has a single instance", func() {
+		stepDown, err := shouldStepDown(newCluster(true, 1), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("skips the check when no probes configuration is set", func() {
+		stepDown, err := shouldStepDown(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}, ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("fails open when the reachability checker cannot be built", func() {
+		// In the test environment there is no server CA certificate on disk,
+		// so building the checker fails; this must not be reported as a step-down.
+		stepDown, err := shouldStepDown(newCluster(true, 3), ourIdentity)
+		Expect(err).To(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
 	})
 })
