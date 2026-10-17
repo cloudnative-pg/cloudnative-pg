@@ -83,8 +83,14 @@ The cache itself can be observed by the `cache_hits`, `cache_misses`
 and `last_update_timestamp` metrics.
 
 Setting the `cluster.spec.monitoring.metricsQueriesTTL` to zero will
-disable the cache, and in that case the metrics will be run on every
-metrics endpoint scrape.
+disable the collection-wide cache. Queries without their own cache
+will then run on every metrics endpoint scrape.
+
+Individual query groups can set `cache_seconds` (for example, `3600` for an
+hourly inventory refresh). Cached results remain available on every scrape,
+without database discovery or connections for that group. Unset or zero
+preserves the existing behavior. The collection-wide `metricsQueriesTTL`
+still applies; failed refreshes are retried on the next collection.
 
 ### Monitoring with the Prometheus operator
 
@@ -717,6 +723,7 @@ Here is a short description of all the available fields:
 - `<MetricName>`: the name of the Prometheus metric
     - `name`: override `<MetricName>`, if defined
     - `query`: the SQL query to run on the target database to generate the metrics
+    - `cache_seconds`: how long to cache this query group's results, in seconds
     - `primary`: whether to run the query only on the primary instance
     - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
     - `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on
@@ -810,8 +817,7 @@ If you want to disable the default set of metrics, you can:
 ### Differences with the Prometheus Postgres exporter
 
 CloudNativePG is inspired by the PostgreSQL Prometheus Exporter, but
-presents some differences. In particular, the `cache_seconds` field is not implemented
-in CloudNativePG's exporter.
+presents some differences, including its collection-wide `metricsQueriesTTL` cache.
 
 ### Manually creating the metrics exporter role
 
