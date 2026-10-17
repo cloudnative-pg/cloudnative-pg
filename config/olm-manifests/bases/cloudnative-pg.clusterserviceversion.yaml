@@ -307,6 +307,9 @@ spec:
       - path: postgresql.pg_hba[0]
         displayName: pg_hba rules
         description: PostgreSQL Host Based Authentication rules
+      - path: postgresql.pgRewind.syncMethod
+        displayName: pg_rewind Sync Method
+        description: Method used by pg_rewind to synchronize files to durable storage
       - path: postgresql.promotionTimeout
         displayName: pg_ctl Timeout
         description: maximum number of seconds to wait when promoting an instance to primary
