@@ -10,9 +10,10 @@
 This document describes the design architecture of CloudNativePG, providing the
 technical foundation for contributors and auditors to understand how the
 operator ensures high availability and security for PostgreSQL workloads.
-It focuses on core lifecycle and reconciliation; topics such as WAL archiving,
-backup/restore pipelines, the plugin system, and webhook admission controllers
-are outside its current scope.
+It focuses on core lifecycle and reconciliation, including the declarative
+management of objects that live inside PostgreSQL; topics such as WAL
+archiving, backup/restore pipelines, the plugin system, and webhook admission
+controllers are outside its current scope.
 
 ## Design Philosophy
 
@@ -127,6 +128,10 @@ container. Its responsibilities include:
   when the Operator identifies it as the new leader.
 - **Kubernetes Awareness:** Communicating directly with the K8s API to report
   status, replication lag, and LSN.
+- **Declarative Object Reconciliation:** Running its own `controller-runtime`
+  manager to apply the CRDs that describe objects *inside* PostgreSQL, as
+  described in
+  [Declarative Objects Inside PostgreSQL](#declarative-objects-inside-postgresql).
 
 ## Intelligent Probes
 
@@ -205,6 +210,29 @@ graph LR
     style Cluster fill:#f96,stroke:#333,stroke-width:2px
 ```
 
+## Declarative Objects Inside PostgreSQL
+
+The `Cluster` describes the *infrastructure* of a PostgreSQL cluster. A second
+family of CRDs describes objects living *inside* PostgreSQL, which cannot be
+applied through the Kubernetes API alone. CloudNativePG therefore runs a second
+`controller-runtime` manager inside every Instance Manager, active only on the
+primary and only for resources referencing its own `Cluster`.
+
+| CRD | Reconciled by | Where the work happens |
+| --- | --- | --- |
+| `Cluster`, `Pooler`, `Backup`, `ScheduledBackup` | Operator | Kubernetes API |
+| `Database`, `Publication`, `Subscription` | Instance Manager | SQL on the primary |
+| `DatabaseRole` | **Both** | Kubernetes API *and* SQL on the primary |
+
+[`DatabaseRole`](../api/v1/databaserole_types.go) is split because managing a
+role needs two capabilities that live in different places. The Operator
+produces the credentials in the control plane, where it owns Secrets and holds
+the client CA: it generates and rotates the password, and issues the TLS client
+certificate. The Instance Manager consumes them in the operand Pod, where the
+database connection is, and runs the `CREATE ROLE` or `ALTER ROLE`. Neither
+calls the other; they hand over through the resource, which gives its status
+two writers with a fixed split of fields between them.
+
 ## Label-Based Networking
 
 Networking is purely label-driven. The Operator manages the
@@ -231,6 +259,8 @@ the remaining entries are peripheral CRDs for specific feature areas.
 | **Core** | `Cluster` | [`cluster_types.go`](../api/v1/cluster_types.go) | [`cluster_funcs.go`](../api/v1/cluster_funcs.go) |
 | **Core** | Instance Manager | N/A | [`pkg/management/postgres/`](../pkg/management/postgres/) |
 | **Core** | Operator Controller | N/A | [`cluster_controller.go`](../internal/controller/cluster_controller.go) |
+| **Core** | Instance Manager Controllers | N/A | [`internal/management/controller/`](../internal/management/controller/) |
+| **High availability** | `FailoverQuorum` | [`failoverquorum_types.go`](../api/v1/failoverquorum_types.go) | [`replicas_quorum.go`](../internal/controller/replicas_quorum.go) |
 | **Image management** | `ClusterImageCatalog` | [`clusterimagecatalog_types.go`](../api/v1/clusterimagecatalog_types.go) | [`clusterimagecatalog_funcs.go`](../api/v1/clusterimagecatalog_funcs.go) |
 | **Image management** | `ImageCatalog` | [`imagecatalog_types.go`](../api/v1/imagecatalog_types.go) | [`imagecatalog_funcs.go`](../api/v1/imagecatalog_funcs.go) |
 | **Backup scheduling** | `Backup` | [`backup_types.go`](../api/v1/backup_types.go) | [`backup_funcs.go`](../api/v1/backup_funcs.go) |
@@ -239,3 +269,4 @@ the remaining entries are peripheral CRDs for specific feature areas.
 | **Database management** | `Database` | [`database_types.go`](../api/v1/database_types.go) | [`database_funcs.go`](../api/v1/database_funcs.go) |
 | **Database management** | `Publication` | [`publication_types.go`](../api/v1/publication_types.go) | [`publication_funcs.go`](../api/v1/publication_funcs.go) |
 | **Database management** | `Subscription` | [`subscription_types.go`](../api/v1/subscription_types.go) | [`subscription_funcs.go`](../api/v1/subscription_funcs.go) |
+| **Role management** | `DatabaseRole` | [`databaserole_types.go`](../api/v1/databaserole_types.go) | [`databaserole_funcs.go`](../api/v1/databaserole_funcs.go) |
