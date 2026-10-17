@@ -128,6 +128,7 @@ CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
 DBA
+DBAs
 DBaaS
 DISA
 DNS
@@ -270,6 +271,7 @@ KEP
 KV
 Karpenter
 KinD
+Klio
 Krew
 KubeCon
 Kubegres
@@ -906,6 +908,7 @@ datallowconn
 datasource
 datistemplate
 datname
+dba
 dbe
 dbname
 ddf
@@ -1373,6 +1376,7 @@ poolersecrets
 poolerspec
 poolerstatus
 poolertype
+portforward
 pos
 posix
 postImportApplicationSQL
@@ -1615,6 +1619,7 @@ subcommand
 subcommands
 subdirectory
 subresource
+subresources
 subscriptionReclaimPolicy
 subscriptionreclaimpolicy
 subscriptionspec

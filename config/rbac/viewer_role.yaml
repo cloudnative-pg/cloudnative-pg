@@ -1,0 +1,35 @@
+# permissions for end users to view all CloudNativePG resources, including
+# those of the Barman Cloud and Klio plugins, which are CloudNativePG projects.
+# The wildcards also cover the resources added in the future, so this role does
+# not need to be updated when a new CRD is introduced. Rules for an API group
+# that is not installed have no effect.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/managed-by: kustomize
+  name: viewer-role
+rules:
+# The operator: add the API groups owned by the operator itself here.
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - '*'
+  verbs:
+  - get
+  - list
+  - watch
+# The plugins: Barman Cloud and Klio are listed because they are CloudNativePG
+# projects (cloudnative-pg/plugin-barman-cloud and cloudnative-pg/klio). Add the
+# API groups of other CloudNativePG-maintained CNPG-I plugins here, not those of
+# third-party plugins.
+- apiGroups:
+  - barmancloud.cnpg.io
+  - klio.cnpg.io
+  resources:
+  - '*'
+  verbs:
+  - get
+  - list
+  - watch
