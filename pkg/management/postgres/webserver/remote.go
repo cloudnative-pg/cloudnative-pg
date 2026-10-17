@@ -153,7 +153,7 @@ func NewRemoteWebServer(
 	endpoints := remoteWebserverEndpoints{
 		typedClient:      typedClient,
 		instance:         instance,
-		livenessChecker:  probes.NewLivenessChecker(instance, sharedCache),
+		livenessChecker:  probes.NewLivenessChecker(),
 		readinessChecker: probes.NewReadinessChecker(instance, sharedCache),
 		startupChecker:   probes.NewStartupChecker(instance, sharedCache),
 	}
@@ -295,7 +295,10 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 
 // This is the failsafe entrypoint
 func (ws *remoteWebserverEndpoints) failSafe(w http.ResponseWriter, _ *http.Request) {
-	_, _ = fmt.Fprint(w, "OK")
+	resp := url.FailSafeResponse{TargetPrimary: ws.instance.GetClusterOrDefault().Status.TargetPrimary}
+	if err := url.WriteFailSafe(w, resp); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // This is the liveness probe
