@@ -234,9 +234,9 @@ metadata:
 spec:
   schedule: "0 0 0 * * *"  # At midnight every day
   backupOwnerReference: self
+  # method: plugin, volumeSnapshot, or barmanObjectStore (default)
   cluster:
     name: pg-backup
-  # method: plugin, volumeSnapshot, or barmanObjectStore (default)
 ```
 
 The schedule `"0 0 0 * * *"` triggers a backup every day at midnight
