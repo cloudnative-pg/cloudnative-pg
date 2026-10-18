@@ -60,6 +60,8 @@ type InstanceReconciler struct {
 	systemInitialization  *concurrency.Executed
 	firstReconcileDone    atomic.Bool
 	metricsServerExporter *metricserver.Exporter
+	// monitoringQueriesInputs is what the current queries collector was built from
+	monitoringQueriesInputs *monitoringQueriesInputs
 
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
