@@ -22,6 +22,7 @@ package status
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -35,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/logrusorgru/aurora/v4"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -218,11 +220,50 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 	return strings.Join(fencedInstances.ToList(), ", ")
 }
 
+// errExecNotPermitted is returned when the current user is not allowed to run
+// commands inside the Pods, which is needed to compute the cluster size
+var errExecNotPermitted = errors.New("not permitted: requires the pods/exec permission")
+
+// canExecInPod reports whether the current user is allowed to run commands
+// inside the given Pod
+func canExecInPod(
+	ctx context.Context,
+	client kubernetes.Interface,
+	pod *corev1.Pod,
+) (bool, error) {
+	review, err := client.AuthorizationV1().SelfSubjectAccessReviews().Create(
+		ctx,
+		&authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Namespace:   pod.Namespace,
+					Verb:        "create",
+					Resource:    "pods",
+					Subresource: "exec",
+					Name:        pod.Name,
+				},
+			},
+		},
+		metav1.CreateOptions{},
+	)
+	if err != nil {
+		return false, err
+	}
+
+	return review.Status.Allowed, nil
+}
+
 func (fullStatus *PostgresqlStatus) getClusterSize(
 	ctx context.Context,
 	client kubernetes.Interface,
 	timeout time.Duration,
 ) (string, error) {
+	// Running `du` requires `pods/exec`, which a read-only user usually lacks.
+	// If the check itself fails, try anyway and report the actual error.
+	if allowed, err := canExecInPod(ctx, client, &fullStatus.PrimaryPod); err == nil && !allowed {
+		return "", errExecNotPermitted
+	}
+
 	// Compute the disk space through `du`
 	output, _, err := utils.ExecCommand(
 		ctx,
@@ -322,6 +363,8 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(
 			summary.AddLine("Size:", "- (hibernated)")
 		case isPrimaryFenced:
 			summary.AddLine("Size:", "- (fenced)")
+		case errors.Is(clusterSizeErr, errExecNotPermitted):
+			summary.AddLine("Size:", "- ("+clusterSizeErr.Error()+")")
 		default:
 			summary.AddLine("Size:", aurora.Red(clusterSizeErr.Error()))
 		}

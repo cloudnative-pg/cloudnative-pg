@@ -20,10 +20,16 @@ SPDX-License-Identifier: Apache-2.0
 package status
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -227,5 +233,39 @@ var _ = Describe("groupInstancesByFailureDomain", func() {
 		Expect(groups).To(HaveLen(2))
 		Expect(groups[0].display).To(ContainSubstring("topology.kubernetes.io/zone=az1"))
 		Expect(groups[0].display).To(ContainSubstring("topology.kubernetes.io/region=us-east-1"))
+	})
+})
+
+var _ = Describe("getClusterSize without the pods/exec permission", func() {
+	It("reports it without running du", func() {
+		client := fake.NewSimpleClientset()
+		client.PrependReactor("create", "selfsubjectaccessreviews",
+			func(action k8stesting.Action) (bool, runtime.Object, error) {
+				review, ok := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+				Expect(ok).To(BeTrue())
+				review.Status.Allowed = false
+				return true, review, nil
+			})
+		fullStatus := &PostgresqlStatus{
+			PrimaryPod: corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-example-1"}},
+		}
+
+		size, err := fullStatus.getClusterSize(context.Background(), client, time.Second)
+
+		Expect(err).To(MatchError(errExecNotPermitted))
+		Expect(size).To(BeEmpty())
+
+		// Only the access review was issued, and it asked about exec on the primary
+		actions := client.Actions()
+		Expect(actions).To(HaveLen(1))
+		review, ok := actions[0].(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+		Expect(ok).To(BeTrue())
+		Expect(review.Spec.ResourceAttributes).To(Equal(&authorizationv1.ResourceAttributes{
+			Namespace:   "default",
+			Verb:        "create",
+			Resource:    "pods",
+			Subresource: "exec",
+			Name:        "cluster-example-1",
+		}))
 	})
 })
