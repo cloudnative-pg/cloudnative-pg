@@ -1677,7 +1677,13 @@ func (cluster *Cluster) SetAdmissionError(msg string) {
 		return
 	}
 
-	cluster.Status.PhaseReason = ""
+	// Only clear the reason recorded above. The guard runs at the start of
+	// every reconcile, and clearing the reason of any other phase (for example
+	// "Waiting for user action") makes the controllers persist an empty
+	// reason, which RegisterPhase then sets again, in a loop.
+	if cluster.Status.Phase == PhaseDefinitionInvalid {
+		cluster.Status.PhaseReason = ""
+	}
 }
 
 // GetAdmissionError always returns an empty string: the Cluster encodes the
