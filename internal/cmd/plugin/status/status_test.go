@@ -274,6 +274,17 @@ var _ = Describe("getClusterSize without the pods/exec permission", func() {
 		}))
 	})
 
+	It("skips the configuration reads", func() {
+		fullStatus := &PostgresqlStatus{
+			PrimaryPod: corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-example-1"}},
+		}
+
+		errs := fullStatus.printPostgresConfiguration(context.Background(), client, time.Second)
+
+		Expect(errs).To(BeEmpty())
+		Expect(client.Actions()).To(HaveLen(1))
+	})
+
 	It("does not blame the permission when there is no primary Pod", func() {
 		fullStatus := &PostgresqlStatus{}
 

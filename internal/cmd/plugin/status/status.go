@@ -251,18 +251,30 @@ func canExecInPod(
 	return review.Status.Allowed, nil
 }
 
+// checkExecPermission returns errExecNotPermitted when the user cannot exec
+// into the primary Pod. If the check itself fails, it returns nil so the
+// command runs and reports the actual error. Without a primary Pod the review
+// would have no namespace and run at cluster scope, so it is skipped.
+func (fullStatus *PostgresqlStatus) checkExecPermission(
+	ctx context.Context,
+	client kubernetes.Interface,
+) error {
+	if fullStatus.PrimaryPod.Name == "" {
+		return nil
+	}
+	if allowed, err := canExecInPod(ctx, client, &fullStatus.PrimaryPod); err == nil && !allowed {
+		return errExecNotPermitted
+	}
+	return nil
+}
+
 func (fullStatus *PostgresqlStatus) getClusterSize(
 	ctx context.Context,
 	client kubernetes.Interface,
 	timeout time.Duration,
 ) (string, error) {
-	// `du` needs `pods/exec`. If the check itself fails, run `du` anyway.
-	// Without a primary Pod the review would have no namespace and run at
-	// cluster scope, so skip it.
-	if fullStatus.PrimaryPod.Name != "" {
-		if allowed, err := canExecInPod(ctx, client, &fullStatus.PrimaryPod); err == nil && !allowed {
-			return "", errExecNotPermitted
-		}
+	if err := fullStatus.checkExecPermission(ctx, client); err != nil {
+		return "", err
 	}
 
 	// Compute the disk space through `du`
@@ -535,6 +547,17 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 	client kubernetes.Interface,
 	timeout time.Duration,
 ) []error {
+	if err := fullStatus.checkExecPermission(ctx, client); err != nil {
+		notPermitted := "- (" + err.Error() + ")"
+		fmt.Println(aurora.Green("PostgreSQL Configuration"))
+		fmt.Println(notPermitted)
+		fmt.Println()
+		fmt.Println(aurora.Green("PostgreSQL HBA Rules"))
+		fmt.Println(notPermitted)
+		fmt.Println()
+		return nil
+	}
+
 	var errs []error
 
 	// Read PostgreSQL configuration from custom.conf
