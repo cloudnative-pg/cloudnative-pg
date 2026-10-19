@@ -53,9 +53,11 @@ too.
 :::warning
     Kubernetes RBAC cannot select Pods by label, so these roles apply to every
     Pod in the namespace where they are bound, not only to PostgreSQL Pods. In
-    particular, `cnpg-dba-portforward` allows a tunnel to any Pod in that
-    namespace. Bind the roles only in namespaces that hold databases, and avoid
-    sharing those namespaces with unrelated workloads.
+    particular, `get` on `pods/proxy` in `cnpg-dba-viewer` allows HTTP `GET`
+    requests to any port of any Pod in that namespace, and
+    `cnpg-dba-portforward` allows a tunnel to any Pod. Bind the roles only in
+    namespaces that hold databases, and avoid sharing those namespaces with
+    unrelated workloads.
 :::
 
 `cnpg-dba-viewer` deliberately does not grant:
