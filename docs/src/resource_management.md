@@ -182,7 +182,7 @@ hot primary.
 
 HPA is also unaware of CloudNativePG's own constraints on `spec.instances`. If
 you configure synchronous replicas, a scale-down below `maxSyncReplicas + 1`
-instances is rejected by the validating webhook, and HPA keeps retrying a
+instances is rejected by the API server, and HPA keeps retrying a
 value it cannot satisfy.
 If you nonetheless drive `spec.instances` from an HPA, base it on a custom
 metric that actually reflects read replica load, and set `minReplicas` above
