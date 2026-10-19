@@ -30,6 +30,17 @@ that is not installed have no effect. The role does not cover third-party
 plugins, and it covers only custom resources, so a DBA needs more than this role
 to diagnose a Cluster.
 
+:::warning
+    `cnpg-viewer-role` comes with the operator manifest, not with the Helm
+    chart. If you install with Helm, the role does not exist in your cluster:
+    the chart ships its own `<release>-view` ClusterRole instead, which you can
+    aggregate into `view`, `edit` and `admin` with the
+    `rbac.aggregateClusterRoles` value. That role covers only the
+    `postgresql.cnpg.io` group, not the Barman Cloud and Klio plugins. To get
+    `cnpg-viewer-role` with Helm, apply it from the operator manifest. The
+    samples below do not depend on it.
+:::
+
 CloudNativePG also provides sample manifests that complete the persona. They
 are split into separate roles so that each sensitive permission can be granted
 (and revoked) on its own. Each sample contains an example `RoleBinding`.
@@ -169,6 +180,8 @@ kubectl label clusterrole cnpg-viewer-role \
 
 Everyone bound to `view` then gains read access to those resources,
 without any additional binding. This widens `view` for the whole cluster, so it
-should be a deliberate decision of the platform team. Do not apply the label to
+should be a deliberate decision of the platform team. With the Helm chart, use
+the `rbac.aggregateClusterRoles` value instead, which labels the chart's own
+`<release>-view` role. Do not apply the label to
 `cnpg-dba-viewer`, which would also give every `view` user access to
 `pods/proxy`, leases and VolumeSnapshots.
