@@ -10,7 +10,9 @@ model.
 
 * [`primary-lease`](primary-lease/) — safe primary election: what happens
   after a CloudNativePG primary loses its lease when fail-safe mode is
-  active (non-cooperative old primary).
+  active (non-cooperative old primary). The old primary is fenced by a
+  lease-age monitor with explicit time bounds and a hard stop before
+  the lease expires.
 
 ## Files
 
@@ -29,8 +31,7 @@ make check
 ```
 
 Changing a PlusCal algorithm requires re-translation before
-re-checking. See the model folders for per-model details and how to
-run a single spec manually or from the VS Code TLA+ extension.
+re-checking. See the model folders for per-model details.
 
 ## Adding a new model
 
