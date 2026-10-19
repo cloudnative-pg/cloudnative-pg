@@ -237,7 +237,7 @@ var _ = Describe("groupInstancesByFailureDomain", func() {
 	})
 })
 
-var _ = Describe("getClusterSize without the pods/exec permission", func() {
+var _ = Describe("status without the pods/exec permission", func() {
 	var client *fake.Clientset
 
 	BeforeEach(func() {

@@ -223,12 +223,19 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 // errExecNotPermitted is returned when the user lacks `pods/exec`
 var errExecNotPermitted = errors.New("not permitted: requires the pods/exec permission")
 
-// canExecInPod reports whether the user may exec into the given Pod
-func canExecInPod(
+// checkExecPermission returns errExecNotPermitted when the user cannot exec
+// into the primary Pod. If the check itself fails, it returns nil so the
+// command runs and reports the actual error. Without a primary Pod the review
+// would have no namespace and run at cluster scope, so it is skipped.
+func (fullStatus *PostgresqlStatus) checkExecPermission(
 	ctx context.Context,
 	client kubernetes.Interface,
-	pod *corev1.Pod,
-) (bool, error) {
+) error {
+	if fullStatus.PrimaryPod.Name == "" {
+		return nil
+	}
+
+	pod := &fullStatus.PrimaryPod
 	review, err := client.AuthorizationV1().SelfSubjectAccessReviews().Create(
 		ctx,
 		&authorizationv1.SelfSubjectAccessReview{
@@ -244,25 +251,7 @@ func canExecInPod(
 		},
 		metav1.CreateOptions{},
 	)
-	if err != nil {
-		return false, err
-	}
-
-	return review.Status.Allowed, nil
-}
-
-// checkExecPermission returns errExecNotPermitted when the user cannot exec
-// into the primary Pod. If the check itself fails, it returns nil so the
-// command runs and reports the actual error. Without a primary Pod the review
-// would have no namespace and run at cluster scope, so it is skipped.
-func (fullStatus *PostgresqlStatus) checkExecPermission(
-	ctx context.Context,
-	client kubernetes.Interface,
-) error {
-	if fullStatus.PrimaryPod.Name == "" {
-		return nil
-	}
-	if allowed, err := canExecInPod(ctx, client, &fullStatus.PrimaryPod); err == nil && !allowed {
+	if err == nil && !review.Status.Allowed {
 		return errExecNotPermitted
 	}
 	return nil
