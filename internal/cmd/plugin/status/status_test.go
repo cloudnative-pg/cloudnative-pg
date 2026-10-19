@@ -261,7 +261,6 @@ var _ = Describe("getClusterSize without the pods/exec permission", func() {
 		Expect(err).To(MatchError(errExecNotPermitted))
 		Expect(size).To(BeEmpty())
 
-		// Only the access review was issued, and it asked about exec on the primary
 		actions := client.Actions()
 		Expect(actions).To(HaveLen(1))
 		review, ok := actions[0].(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)

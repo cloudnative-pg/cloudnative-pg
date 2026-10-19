@@ -220,12 +220,10 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 	return strings.Join(fencedInstances.ToList(), ", ")
 }
 
-// errExecNotPermitted is returned when the current user is not allowed to run
-// commands inside the Pods, which is needed to compute the cluster size
+// errExecNotPermitted is returned when the user lacks `pods/exec`
 var errExecNotPermitted = errors.New("not permitted: requires the pods/exec permission")
 
-// canExecInPod reports whether the current user is allowed to run commands
-// inside the given Pod
+// canExecInPod reports whether the user may exec into the given Pod
 func canExecInPod(
 	ctx context.Context,
 	client kubernetes.Interface,
@@ -258,10 +256,9 @@ func (fullStatus *PostgresqlStatus) getClusterSize(
 	client kubernetes.Interface,
 	timeout time.Duration,
 ) (string, error) {
-	// Running `du` requires `pods/exec`, which a read-only user usually lacks.
-	// If the check itself fails, try anyway and report the actual error.
-	// Without a primary Pod there is nothing to check: the review would have
-	// no namespace and be evaluated at cluster scope.
+	// `du` needs `pods/exec`. If the check itself fails, run `du` anyway.
+	// Without a primary Pod the review would have no namespace and run at
+	// cluster scope, so skip it.
 	if fullStatus.PrimaryPod.Name != "" {
 		if allowed, err := canExecInPod(ctx, client, &fullStatus.PrimaryPod); err == nil && !allowed {
 			return "", errExecNotPermitted
