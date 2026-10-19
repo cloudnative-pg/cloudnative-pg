@@ -83,7 +83,7 @@ The table below is derived from the Kubernetes API calls made by each
 
 | Command | `cnpg-dba-viewer` | Notes |
 | ------- | :---------------: | ----- |
-| `kubectl cnpg status` | Yes, with one gap | Needs `get` on `pods/proxy`. The database `Size` line is computed with `kubectl exec`, so it needs `pods/exec`: without it, that line shows an error and the rest of the output is unaffected. |
+| `kubectl cnpg status` | Yes, with gaps | Needs `get` on `pods/proxy`. Two parts of the output run `kubectl exec`, so they need `pods/exec`: the database `Size` line, and, with `-v -v`, the PostgreSQL configuration and HBA rules. Without it, those parts show an error and the rest of the output is unaffected. |
 | `kubectl cnpg logs cluster` | Yes | |
 | `kubectl cnpg report cluster` | Yes | Includes events, Pods, Jobs and PVCs. |
 | `kubectl cnpg psql` | No | It runs `kubectl exec`, which needs `create` on `pods/exec`. |
