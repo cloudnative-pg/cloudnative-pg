@@ -146,6 +146,7 @@ The answer is `yes` for the first command, and `no` for the other two.
     allowed when it is not: run a real request, as above, instead.
 :::
 
+## Kubernetes RBAC and PostgreSQL authentication
 
 For this persona, Kubernetes RBAC decides who can inspect a Cluster and who can
 open a tunnel to it. It does not decide who can do what inside PostgreSQL. Once
