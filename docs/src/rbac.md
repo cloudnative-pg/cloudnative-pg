@@ -88,7 +88,7 @@ The table below is derived from the Kubernetes API calls made by each
 | `kubectl cnpg report cluster` | Yes | Includes events, Pods, Jobs and PVCs. |
 | `kubectl cnpg psql` | No | It runs `kubectl exec`, which needs `create` on `pods/exec`. |
 | `kubectl cnpg backup` | No | It creates a `Backup` resource, which is a write operation. |
-| `kubectl cnpg report operator` | Partial | It targets the operator namespace and cluster-scoped objects, which a namespaced binding does not cover. It collects on a best-effort basis only what the role allows. |
+| `kubectl cnpg report operator` | No | It first lists the operator `Deployment` in the operator namespace, and fails without `list` on `deployments` there, which this role does not grant. With that permission, it collects the rest (Pods, ConfigMaps, events, webhook configurations) on a best-effort basis, skipping what is not allowed. |
 | `kubectl exec` (Pod shell) | No | Needs `create` on `pods/exec`. |
 | `kubectl port-forward` | With `cnpg-dba-portforward` | Then connect with any PostgreSQL client. |
 
