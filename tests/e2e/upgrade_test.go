@@ -500,9 +500,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 	assertClustersWorkAfterOperatorUpgrade := func(upgradeNamespace, operatorManifest string, online bool) {
 		databaseName := "appdb"
-		// generate random serverNames for the clusters each time
-		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
-		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
+		// Derive the serverNames from the namespace, unique for each run: the
+		// object store is shared and the assertions search it across buckets.
+		serverName1 := fmt.Sprintf("%s-%s", clusterName1, upgradeNamespace)
+		serverName2 := fmt.Sprintf("%s-%s", clusterName2, upgradeNamespace)
 		// Create the secrets used by the clusters and the object store
 		By("creating the postgres secrets", func() {
 			resources.CreateResourceFromFile(env, upgradeNamespace, pgSecrets)

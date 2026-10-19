@@ -498,9 +498,10 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 
 	assertClustersWorkAfterOperatorUpgrade := func(upgradeNamespace, operatorManifest string, online bool) {
 		databaseName := "appdb"
-		// generate random serverNames for the clusters each time
-		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
-		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
+		// Derive the serverNames from the namespace, unique for each run: the
+		// object store is shared and the assertions search it across buckets.
+		serverName1 := fmt.Sprintf("%s-%s", clusterName1, upgradeNamespace)
+		serverName2 := fmt.Sprintf("%s-%s", clusterName2, upgradeNamespace)
 		// Both clusters share a single ObjectStore, named after the
 		// namespace (already unique) so runs never collide on the shared
 		// object store. barman-cloud keys data by serverName within the
