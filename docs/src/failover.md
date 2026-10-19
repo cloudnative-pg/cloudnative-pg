@@ -93,7 +93,11 @@ manager itself unreachable), the replica can promote once the lease has been
 unchanged for `leaseDurationSeconds` since the operator named it the target
 primary. In that
 path the archive may not have caught up, and any writes the previous
-primary did not finish archiving are lost.
+primary did not finish archiving are lost. A target primary that is replaced
+before it promotes stops renewing the lease it may hold, so the new target can
+take it over the same way. It stops from its next reconcile, so a renewal
+already in flight may still land, and a replica still waiting to acquire the
+lease cannot yield until that wait returns.
 
 ### Relationship with the primary isolation check
 
