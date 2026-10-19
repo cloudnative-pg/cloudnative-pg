@@ -32,6 +32,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -237,8 +238,10 @@ var _ = Describe("groupInstancesByFailureDomain", func() {
 })
 
 var _ = Describe("getClusterSize without the pods/exec permission", func() {
-	It("reports it without running du", func() {
-		client := fake.NewSimpleClientset()
+	var client *fake.Clientset
+
+	BeforeEach(func() {
+		client = fake.NewSimpleClientset()
 		client.PrependReactor("create", "selfsubjectaccessreviews",
 			func(action k8stesting.Action) (bool, runtime.Object, error) {
 				review, ok := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
@@ -246,6 +249,9 @@ var _ = Describe("getClusterSize without the pods/exec permission", func() {
 				review.Status.Allowed = false
 				return true, review, nil
 			})
+	})
+
+	It("reports it without running du", func() {
 		fullStatus := &PostgresqlStatus{
 			PrimaryPod: corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-example-1"}},
 		}
@@ -267,5 +273,14 @@ var _ = Describe("getClusterSize without the pods/exec permission", func() {
 			Subresource: "exec",
 			Name:        "cluster-example-1",
 		}))
+	})
+
+	It("does not blame the permission when there is no primary Pod", func() {
+		fullStatus := &PostgresqlStatus{}
+
+		_, err := fullStatus.getClusterSize(context.Background(), client, time.Second)
+
+		Expect(err).To(MatchError(utils.ErrorContainerNotFound))
+		Expect(client.Actions()).To(BeEmpty())
 	})
 })

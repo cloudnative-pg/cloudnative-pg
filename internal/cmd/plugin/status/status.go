@@ -260,8 +260,12 @@ func (fullStatus *PostgresqlStatus) getClusterSize(
 ) (string, error) {
 	// Running `du` requires `pods/exec`, which a read-only user usually lacks.
 	// If the check itself fails, try anyway and report the actual error.
-	if allowed, err := canExecInPod(ctx, client, &fullStatus.PrimaryPod); err == nil && !allowed {
-		return "", errExecNotPermitted
+	// Without a primary Pod there is nothing to check: the review would have
+	// no namespace and be evaluated at cluster scope.
+	if fullStatus.PrimaryPod.Name != "" {
+		if allowed, err := canExecInPod(ctx, client, &fullStatus.PrimaryPod); err == nil && !allowed {
+			return "", errExecNotPermitted
+		}
 	}
 
 	// Compute the disk space through `du`
