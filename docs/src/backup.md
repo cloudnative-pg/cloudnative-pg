@@ -396,9 +396,9 @@ and on-demand backups:
 :::warning
     Native Barman Cloud support, including the `barmanObjectStore` backup
     method and the `.spec.backup.barmanObjectStore` stanza, is removed starting
-    from CloudNativePG 1.32.0. Release 1.31 and its patch releases keep native
-    support for as long as they are supported. Follow
-    [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/)
+    from CloudNativePG 1.32.0. Releases up to and including 1.31, and their
+    patch releases, keep native support for as long as they are supported.
+    Follow [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/)
     to move to the Barman Cloud Plugin before upgrading to 1.32 or later.
 :::
 

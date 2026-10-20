@@ -12,9 +12,9 @@ title: Appendix B - Backup on object stores
     favor of the **Barman Cloud Plugin**. This page has been moved to the appendix
     for reference purposes. **CloudNativePG 1.31 is the last minor release that
     ships with native Barman Cloud support, which is removed starting from
-    1.32.0.** Release 1.31 and its patch releases keep native support for as
-    long as they are supported. If you are on 1.32 or later, you must have
-    migrated to the plugin before upgrading. We strongly recommend migrating to
+    1.32.0.** Releases up to and including 1.31, and their patch releases, keep
+    native support for as long as they are supported. You must migrate to the
+    plugin before upgrading to 1.32 or later. We strongly recommend migrating to
     the plugin-based interface after appropriate testing. For guidance, see
     [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/).
 :::
