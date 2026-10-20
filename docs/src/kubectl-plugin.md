@@ -1509,13 +1509,16 @@ table contains the full details:
 | report cluster  | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list<br/>PVCs: list                                                                                                                                                                                                                                                         |
 | report operator | **Required:**<br/>deployments: get<br/>**Optional (for full report):**<br/>configmaps: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/>validatingwebhookconfigurations: list[^1]<br/>**If OLM is present:**<br/>clusterserviceversions: list[^1]<br/>installplans: list[^1]<br/>subscriptions: list[^1] |
 | restart         | clusters: get,patch<br/>pods: get,delete                                                                                                                                                                                                                                                                                                              |
-| status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                                    |
+| status          | clusters: get<br/>pods: list<br/>pods/exec: create (optional)<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                         |
 | subscription    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
 | version         | none                                                                                                                                                                                                                                                                                                                                                  |
 
 [^1]: The permissions are cluster scope ClusterRole resources.
 
 ///Footnotes Go Here///
+
+Without `pods/exec`, `status` still works: the cluster size and, with
+`--verbose`, the PostgreSQL configuration are shown as not permitted.
 
 Additionally, assigning the `list` permission on the `clusters` will enable
 autocompletion for multiple commands.
