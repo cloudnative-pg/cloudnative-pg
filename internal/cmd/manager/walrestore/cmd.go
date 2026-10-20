@@ -227,7 +227,8 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 		contextLog.Info(
 			"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
 
-		err = walRestorer.SetEndOfWALStream()
+		// TODO: drop nolint once #11133 (timeline-aware markers) lands
+		err = walRestorer.SetEndOfWALStream() //nolint:staticcheck
 		if err != nil {
 			return err
 		}
@@ -294,13 +295,14 @@ func restoreWALViaPlugins(
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
 func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer) error {
-	contain, err := walRestorer.IsEndOfWALStream()
+	// TODO: drop nolint once #11133 (timeline-aware markers) lands
+	contain, err := walRestorer.IsEndOfWALStream() //nolint:staticcheck
 	if err != nil {
 		return err
 	}
 
 	if contain {
-		err := walRestorer.ResetEndOfWalStream()
+		err := walRestorer.ResetEndOfWalStream() //nolint:staticcheck
 		if err != nil {
 			return err
 		}
