@@ -31,6 +31,23 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
+type contextKey string
+
+const contextKeyReconciledGeneration contextKey = "reconciledGeneration"
+
+// WithReconciledGeneration sets the generation that PatchWithOptimisticLock
+// records in the conditions, in place of cluster.Generation.
+func WithReconciledGeneration(ctx context.Context, generation int64) context.Context {
+	return context.WithValue(ctx, contextKeyReconciledGeneration, generation)
+}
+
+func observedGeneration(ctx context.Context, cluster *apiv1.Cluster) int64 {
+	if reconciled, ok := ctx.Value(contextKeyReconciledGeneration).(int64); ok {
+		return reconciled
+	}
+	return cluster.Generation
+}
+
 // PatchWithOptimisticLock updates the status of the cluster using the passed
 // transaction functions (in the given order).
 // Important: after successfully updating the status, this
@@ -56,12 +73,7 @@ func PatchWithOptimisticLock(
 		}
 
 		updatedCluster := currentCluster.DeepCopy()
-
-		// Pin Generation to the reconciled version: transactions like
-		// SetClusterReadyCondition stamp ObservedGeneration from it, and the
-		// fresh GET may already see a newer spec we haven't reconciled.
-		// Status().Patch doesn't persist metadata.generation anyway.
-		updatedCluster.Generation = cluster.Generation
+		updatedCluster.Generation = observedGeneration(ctx, cluster)
 		for _, tx := range txs {
 			tx(updatedCluster)
 		}
