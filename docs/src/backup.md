@@ -35,7 +35,9 @@ two main ways:
 - **Natively**, with support for:
 
     - [Object storage via Barman Cloud](appendixes/backup_barmanobjectstore.md)
-      *(although deprecated from 1.26 in favor of the Barman Cloud Plugin)*
+      *(deprecated from 1.26 in favor of the Barman Cloud Plugin; 1.31 is the
+      last minor release with native support, which is removed starting from
+      1.32.0)*
     - [Kubernetes Volume Snapshots](appendixes/backup_volumesnapshot.md), if
       supported by the underlying storage class
 
@@ -128,6 +130,7 @@ CloudNativePG currently supports two main approaches for physical backups:
 - **Object store–based backups**, via the [**Barman Cloud
   Plugin**](https://cloudnative-pg.io/plugin-barman-cloud/) or the
   [**deprecated native integration**](appendixes/backup_barmanobjectstore.md)
+  (removed starting from 1.32.0)
 - [**Volume Snapshots**](appendixes/backup_volumesnapshot.md), using the
   Kubernetes CSI interface and supported storage classes
 
@@ -387,7 +390,17 @@ and on-demand backups:
 - `barmanObjectStore` – Uses [Barman Cloud for object storage](appendixes/backup_barmanobjectstore.md)
   *(deprecated starting with v1.26 in favor of the
   [Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/),
-  but still the default for backward compatibility)*
+  but still the default for backward compatibility; 1.31 is the last minor
+  release with native support, which is removed starting from 1.32.0)*
+
+:::warning
+    Native Barman Cloud support, including the `barmanObjectStore` backup
+    method and the `.spec.backup.barmanObjectStore` stanza, is removed starting
+    from CloudNativePG 1.32.0. Release 1.31 and its patch releases keep native
+    support for as long as they are supported. Follow
+    [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/)
+    to move to the Barman Cloud Plugin before upgrading to 1.32 or later.
+:::
 
 Specify the method using the `.spec.method` field (defaults to
 `barmanObjectStore`).

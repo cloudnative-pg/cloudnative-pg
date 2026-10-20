@@ -6675,6 +6675,7 @@ var _ = Describe("getInTreeBarmanWarnings", func() {
 		warnings := getInTreeBarmanWarnings(cluster)
 		Expect(warnings).To(HaveLen(1))
 		Expect(warnings[0]).To(ContainSubstring("spec.backup.barmanObjectStore"))
+		Expect(warnings[0]).To(ContainSubstring("removed in CloudNativePG 1.32.0"))
 	})
 
 	It("returns warnings for multiple external clusters with BarmanObjectStore", func() {

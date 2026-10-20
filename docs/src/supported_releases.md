@@ -127,9 +127,18 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version | Release date | End of life |
 |---------|--------------|-------------|
-| 1.31.0  | ~ Sep, 2026  | ~ Mar, 2027 |
-| 1.32.0  | ~ Dec, 2026  | ~ Jun, 2027 |
-| 1.33.0  | ~ Mar, 2027  | ~ Sep, 2027 |
+| 1.31.0  | ~ Dec, 2026  | ~ Jun, 2027 |
+| 1.32.0  | ~ Mar, 2027  | ~ Sep, 2027 |
+| 1.33.0  | ~ Jun, 2027  | ~ Dec, 2027 |
+
+:::warning
+    CloudNativePG 1.31 is the last minor release that ships with native Barman
+    Cloud support. It is removed starting from 1.32.0. Release 1.31 and its
+    patch releases keep native support for as long as they are supported. Users
+    must migrate to the
+    [Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/)
+    before upgrading to 1.32 or later.
+:::
 
 :::note
     Feature freeze occurs 1-2 weeks before the release, at which point a
