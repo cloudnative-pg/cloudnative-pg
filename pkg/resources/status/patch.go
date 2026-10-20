@@ -75,6 +75,23 @@ func PatchObjectWithOptimisticLock[T client.Object](
 	return updated, err
 }
 
+type contextKey string
+
+const contextKeyReconciledGeneration contextKey = "reconciledGeneration"
+
+// WithReconciledGeneration sets the generation that PatchWithOptimisticLock
+// records in the conditions, in place of cluster.Generation.
+func WithReconciledGeneration(ctx context.Context, generation int64) context.Context {
+	return context.WithValue(ctx, contextKeyReconciledGeneration, generation)
+}
+
+func observedGeneration(ctx context.Context, cluster *apiv1.Cluster) int64 {
+	if reconciled, ok := ctx.Value(contextKeyReconciledGeneration).(int64); ok {
+		return reconciled
+	}
+	return cluster.Generation
+}
+
 // PatchWithOptimisticLock updates the status of the cluster using the passed
 // transaction functions (in the given order).
 // Important: after successfully updating the status, this
@@ -93,7 +110,8 @@ func PatchWithOptimisticLock(
 
 	origCluster := cluster.DeepCopy()
 
-	updatedCluster, err := PatchObjectWithOptimisticLock(ctx, c, cluster, withGeneration(cluster.Generation, txs))
+	updatedCluster, err := PatchObjectWithOptimisticLock(
+		ctx, c, cluster, withGeneration(observedGeneration(ctx, cluster), txs))
 	if err != nil {
 		return fmt.Errorf("while patching status: %w", err)
 	}

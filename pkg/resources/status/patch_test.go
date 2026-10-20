@@ -109,4 +109,29 @@ var _ = Describe("PatchWithOptimisticLock", func() {
 		Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 		Expect(condition.ObservedGeneration).To(Equal(int64(1)))
 	})
+
+	It("records the reconciled generation when the cluster was reloaded mid-loop", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "cluster-example",
+				Namespace:  "default",
+				Generation: 2,
+			},
+			Status: apiv1.ClusterStatus{Phase: apiv1.PhaseHealthy},
+		}
+
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithStatusSubresource(&apiv1.Cluster{}).
+			WithObjects(cluster.DeepCopy()).
+			Build()
+
+		Expect(PatchWithOptimisticLock(
+			WithReconciledGeneration(ctx, 1), cli, cluster, SetClusterReadyCondition,
+		)).To(Succeed())
+
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionClusterReady))
+		Expect(condition).ToNot(BeNil())
+		Expect(condition.ObservedGeneration).To(Equal(int64(1)))
+	})
 })

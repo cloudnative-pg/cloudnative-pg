@@ -423,7 +423,6 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 			r.client,
 			cluster,
 			clusterstatus.SetPhase(apiv1.PhaseHealthy, "Primary instance restarted in-place"),
-			clusterstatus.SetClusterReadyCondition,
 		)
 	}
 	return false, nil
