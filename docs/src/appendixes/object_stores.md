@@ -136,6 +136,15 @@ In case you're using S3-compatible object storage, like **MinIO** or
 **Linode Object Storage**, you can specify an endpoint instead of using the
 default S3 one.
 
+:::warning
+Barman Cloud uses the Boto3 SDK and takes AWS S3 as its reference
+implementation. Issues you can reproduce on AWS S3 are treated as Barman Cloud
+defects. Issues that happen only on a third-party object store are API
+incompatibilities, and you must resolve them with your storage vendor. See the
+[Barman Cloud documentation](https://docs.pgbarman.org/release/latest/) for
+known workarounds.
+:::
+
 In this example, it will use the `bucket` of **Linode** in the region
 `us-east1`.
 
