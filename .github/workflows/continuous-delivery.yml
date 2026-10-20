@@ -1087,7 +1087,6 @@ jobs:
   # secrets.AZURE_SUBSCRIPTION
   # secrets.AZURE_RESOURCEGROUP
   # secrets.AZURE_RESOURCENAME
-  # secrets.AZURE_WORKSPACE_RESOURCE_ID
 
   e2e-aks-setup:
     name: Setup shared resources for Microsoft AKS E2Es
@@ -1254,20 +1253,10 @@ jobs:
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_AKS} \
               --tier standard \
-              --node-count 3 --node-vm-size Standard_D4s_v5 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
-              --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
+              --node-count 3 --node-vm-size Standard_D4s_v5 -k v${K8S_VERSION} --generate-ssh-keys \
               --aks-custom-headers EnableAzureDiskFileCSIDriver=true
             az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_AKS}
-
-            # create diagnostic settings for monitoring kube-apiserver logs
-            AKS_CLUSTER_RESOURCE_ID=$(az aks show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${AZURE_AKS} --query id -o tsv --only-show-errors)
-            az monitor diagnostic-settings create \
-              --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
-              --resource ${AKS_CLUSTER_RESOURCE_ID} \
-              --name diagnostic-kube-apiserver-logs \
-              --workspace ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
-              --logs '[ { "category": "kube-apiserver", "enabled": true } ]'
       -
         # Azure is slow in provisioning disks, and we can't wait two minutes
         # every time we create a pod, otherwise all the tests will time out.
@@ -1429,7 +1418,6 @@ jobs:
         if: always()
         run: |
           set +e
-          az extension add --allow-preview true --name monitor-control-service
           az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
           attempt=1
           max_attempts=3
@@ -1442,28 +1430,6 @@ jobs:
                 break
               fi
               echo "Failed deleting cluster ${{ env.AZURE_AKS }}, retrying"
-              sleep 5
-              attempt=$((attempt+1))
-          done
-          attempt=1
-          AZURE_RESOURCEGROUP_LOCATION="$( az group show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query location -o tsv --only-show-errors )"
-          DATA_COLL_RULE_NAME="MSCI-${AZURE_RESOURCEGROUP_LOCATION}-${{ env.AZURE_AKS }}"
-          while [ "${attempt}" -le "${max_attempts}" ]; do
-              echo "Deleting data-collection rule ${DATA_COLL_RULE_NAME}. Attempt ${attempt} of ${max_attempts}"
-              az monitor data-collection rule show --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query name
-              # if not found, let it go
-              status=$?
-              if [[ $status != 0 ]]; then
-                echo "AKS data-collection rule not found"
-                break
-              fi
-              az monitor data-collection rule delete -y --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }}
-              status=$?
-              if [[ $status == 0 ]]; then
-                echo "AKS data-collection rule deleted"
-                break
-              fi
-              echo "Failed deleting data-collection rule ${DATA_COLL_RULE_NAME}, retrying"
               sleep 5
               attempt=$((attempt+1))
           done
