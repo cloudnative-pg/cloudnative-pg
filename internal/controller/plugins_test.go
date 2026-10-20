@@ -25,6 +25,7 @@ import (
 	"errors"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,6 +36,7 @@ import (
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -223,6 +225,33 @@ var _ = Describe("finalizeReconciliation", func() {
 		Expect(fresh.Status.Phase).To(Equal(apiv1.PhaseHealthy))
 		Expect(fresh.Status.PluginStatus[0].Status).To(BeEquivalentTo(string(content)))
 	})
+
+	It("does not mark the cluster ready when a plugin status patch refreshes it with a newer generation",
+		func(ctx SpecContext) {
+			// The API server already stores a newer generation of the cluster.
+			// The plugin status patch decodes it into the cluster this loop is
+			// working on, so the loop did not evaluate a single generation.
+			stored := cluster.DeepCopy()
+			stored.Generation = 2
+			cluster.Generation = 1
+			cli = fake.NewClientBuilder().
+				WithObjects(stored).
+				WithScheme(scheme.BuildWithAllKnownScheme()).
+				WithStatusSubresource(&apiv1.Cluster{}).
+				Build()
+			reconciler.Client = cli
+			pluginCli.setClusterStatus = map[string]string{pluginName: `{"key":"value"}`}
+
+			_, err := reconciler.finalizeReconciliation(status.WithReconciledGeneration(ctx, 1), pluginCli, cluster)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cluster.Generation).To(Equal(int64(2)))
+
+			var fresh apiv1.Cluster
+			Expect(cli.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
+			Expect(fresh.Status.Phase).To(Equal(apiv1.PhaseHealthy))
+			Expect(meta.FindStatusCondition(fresh.Status.Conditions, string(apiv1.ConditionClusterReady))).To(BeNil())
+		})
 
 	It("does not register PhaseHealthy when post-reconcile returns an error", func(ctx SpecContext) {
 		// Regression test for #8582: when a post-reconcile plugin hook
