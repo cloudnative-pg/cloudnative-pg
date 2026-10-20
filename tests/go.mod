@@ -2,7 +2,7 @@ module github.com/cloudnative-pg/cloudnative-pg/tests
 
 go 1.26.6
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 replace github.com/cloudnative-pg/cloudnative-pg => ../
 
