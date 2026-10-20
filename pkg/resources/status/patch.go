@@ -48,6 +48,13 @@ func observedGeneration(ctx context.Context, cluster *apiv1.Cluster) int64 {
 	return cluster.Generation
 }
 
+// IsReconciledGeneration reports whether the cluster still has the generation
+// set by WithReconciledGeneration, that is no patch refreshed it with a newer
+// generation since then
+func IsReconciledGeneration(ctx context.Context, cluster *apiv1.Cluster) bool {
+	return observedGeneration(ctx, cluster) == cluster.Generation
+}
+
 // PatchWithOptimisticLock updates the status of the cluster using the passed
 // transaction functions (in the given order).
 // Important: after successfully updating the status, this
