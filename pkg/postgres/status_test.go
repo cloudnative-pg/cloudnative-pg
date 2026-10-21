@@ -312,34 +312,6 @@ var _ = Describe("PostgreSQL status", func() {
 		})
 	})
 
-	It("puts a diverged replica behind a healthy one even with a more advanced LSN", func() {
-		// the diverged replica is still Ready: the kubelet has not yet
-		// noticed its readiness probe failing
-		podList := PostgresqlStatusList{
-			Items: []PostgresqlStatus{
-				{
-					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
-					ReceivedLsn: "1/31",
-					ReplayLsn:   "1/31",
-					IsPodReady:  true,
-					Divergence: &TimelineDivergence{
-						TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "1/11", ReplayLSN: "1/31",
-					},
-				},
-				{
-					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
-					ReceivedLsn: "1/21",
-					ReplayLsn:   "1/21",
-					IsPodReady:  true,
-				},
-			},
-		}
-		sort.Sort(&podList)
-
-		Expect(podList.Items[0].Pod.Name).To(Equal("server-20"))
-		Expect(podList.Items[1].Pod.Name).To(Equal("server-10"))
-	})
-
 	Describe("in a replica cluster", func() {
 		It("puts the designated primary first among equally advanced standbys", func() {
 			// The designated primary sorts after its sibling by name: only
@@ -513,4 +485,28 @@ var _ = Describe("Configuration report", func() {
 			ptr.To(true),
 		),
 	)
+})
+
+var _ = Describe("ExcludingDiverged", func() {
+	It("drops the diverged instances, keeping the order and the list metadata", func() {
+		list := PostgresqlStatusList{
+			IsReplicaCluster: true,
+			CurrentPrimary:   "server-1",
+			Items: []PostgresqlStatus{
+				{Pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-1"}}},
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-2"}},
+					Divergence: &TimelineDivergence{TimeLineID: 1, PrimaryTimeLineID: 2},
+				},
+				{Pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-3"}}},
+			},
+		}
+
+		result := list.ExcludingDiverged()
+
+		Expect(result.GetNames()).To(Equal([]string{"server-1", "server-3"}))
+		Expect(result.IsReplicaCluster).To(BeTrue())
+		Expect(result.CurrentPrimary).To(Equal("server-1"))
+		Expect(list.Items).To(HaveLen(3), "the original list is left untouched")
+	})
 })

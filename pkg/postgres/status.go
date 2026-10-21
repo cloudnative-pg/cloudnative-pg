@@ -298,6 +298,21 @@ func (list *PostgresqlStatusList) LogStatus(ctx context.Context) {
 	)
 }
 
+// ExcludingDiverged returns the list without the instances that can never
+// follow the primary's timeline (see DetectTimelineDivergence), keeping the
+// order of the remaining ones. Those instances hold writes the primary
+// discarded, so they must not be considered for promotion.
+func (list PostgresqlStatusList) ExcludingDiverged() PostgresqlStatusList {
+	result := list
+	result.Items = make([]PostgresqlStatus, 0, len(list.Items))
+	for _, item := range list.Items {
+		if item.Divergence == nil {
+			result.Items = append(result.Items, item)
+		}
+	}
+	return result
+}
+
 // Len implements sort.Interface extracting the length of the list
 func (list *PostgresqlStatusList) Len() int {
 	return len(list.Items)
@@ -329,16 +344,6 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	case list.Items[i].IsFenced && !list.Items[j].IsFenced:
 		return false
 	case !list.Items[i].IsFenced && list.Items[j].IsFenced:
-		return true
-	}
-
-	// A diverged instance can never follow the current primary's timeline,
-	// and the WAL it replayed past the fork point makes its LSN look more
-	// advanced than it is: it always sorts after one that has not diverged.
-	switch {
-	case list.Items[i].Divergence != nil && list.Items[j].Divergence == nil:
-		return false
-	case list.Items[i].Divergence == nil && list.Items[j].Divergence != nil:
 		return true
 	}
 
