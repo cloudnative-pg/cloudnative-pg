@@ -48,11 +48,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		level          = tests.High
 		PgWalPath      = specs.PgWalPath
 		SpoolDirectory = walrestore.SpoolDirectory
-		// The marker is scoped by the timeline of the WAL files: this one
-		// belongs to timeline 1, where the numbered wals are forged.
+		// Markers are scoped by timeline; the numbered wals are on timeline 1.
 		endOfWALStreamFlag = "end-of-wal-stream-00000001"
-		// childWALFile is a forged segment on timeline 2, the child of
-		// timeline 1, and childEndOfWALStreamFlag the marker of its timeline.
+		// A forged timeline 2 segment (child of timeline 1) and its marker.
 		childWALFile            = "0000000200000000000000F9"
 		childEndOfWALStreamFlag = "end-of-wal-stream-00000002"
 	)
@@ -531,15 +529,11 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 						"set for #10 and #11 wal not present")
 		})
 
-		// At the first segment of a new timeline PostgreSQL asks for the
-		// child-timeline file and, if that fails, falls back to the
-		// parent-timeline one, which holds WAL past the switch point. The
-		// parent-timeline flag must therefore not fail the child-timeline
-		// request (cloudnative-pg/barman-cloud#276).
+		// The parent-timeline flag must not fail a child-timeline request
+		// (cloudnative-pg/barman-cloud#276).
 		// Expected outcome:
 		//		exit code 0, the child-timeline wal is in the output location.
-		//		The parent-timeline flag is untouched, and the child-timeline
-		//		flag is set because the following child-timeline segments are not present.
+		//		The parent-timeline flag is untouched, the child-timeline flag is set.
 		By("invoking the wal-restore command requesting a child-timeline wal", func() {
 			_, _, err := exec.CommandInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,

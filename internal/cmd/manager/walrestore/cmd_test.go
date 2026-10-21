@@ -21,6 +21,7 @@ package walrestore
 
 import (
 	"errors"
+	"path/filepath"
 
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	"k8s.io/utils/ptr"
@@ -164,6 +165,36 @@ var _ = Describe("Function shouldUseEndOfWALStreamFlag", func() {
 	It("follows streaming availability when not in rewind mode", func() {
 		Expect(shouldUseEndOfWALStreamFlag(&cluster, "replicaPod", false)).To(BeTrue())
 		Expect(shouldUseEndOfWALStreamFlag(&cluster, "primaryPod", false)).To(BeFalse())
+	})
+})
+
+var _ = Describe("Function checkEndOfWALStreamFlag", func() {
+	var spoolDirectory string
+	var walRestorer *barmanRestorer.WALRestorer
+
+	BeforeEach(func(ctx SpecContext) {
+		spoolDirectory = GinkgoT().TempDir()
+		var err error
+		walRestorer, err = barmanRestorer.New(ctx, nil, spoolDirectory)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, err = walRestorer.SetEndOfWALStreamFromResults([]barmanRestorer.Result{
+			{WalName: "000000010000000000000002", Err: barmanRestorer.ErrWALNotFound},
+		})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("ignores the flag of another timeline", func() {
+		Expect(checkEndOfWALStreamFlag(walRestorer, "000000020000000000000003")).To(Succeed())
+		Expect(filepath.Join(spoolDirectory, "end-of-wal-stream-00000001")).To(BeAnExistingFile())
+	})
+
+	It("fails once and removes the flag of the requested timeline", func() {
+		Expect(checkEndOfWALStreamFlag(walRestorer, "000000010000000000000003")).
+			To(MatchError(ErrEndOfWALStreamReached))
+		Expect(filepath.Join(spoolDirectory, "end-of-wal-stream-00000001")).ToNot(BeAnExistingFile())
+
+		Expect(checkEndOfWALStreamFlag(walRestorer, "000000010000000000000003")).To(Succeed())
 	})
 })
 
