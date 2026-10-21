@@ -238,10 +238,11 @@ func printNamespaceEvents(clusterInfo *tabby.Tabby, eventList *eventsv1.EventLis
 // control of testing. To make sure the forged one won't be a real WAL archive, we let the sequence in newWALName
 // to be big enough so that it can't be a real WAL archive name in an idle postgresql.
 func ForgeArchiveWalOnObjectStore(namespace, clusterName, clientRef, existingWALName, newWALName string) error {
-	// Forge a WAL archive by copying and renaming the 1st WAL archive
-	walBasePath := clusterName + "/" + clusterName + "/wals/0000000100000000"
-	existingWALPath := walBasePath + "/" + existingWALName + ".gz"
-	newWALNamePath := walBasePath + "/" + newWALName
+	// Forge a WAL archive by copying and renaming the 1st WAL archive. Barman
+	// stores each WAL file under a directory named after its timeline and log id.
+	walBasePath := clusterName + "/" + clusterName + "/wals/"
+	existingWALPath := walBasePath + existingWALName[:16] + "/" + existingWALName + ".gz"
+	newWALNamePath := walBasePath + newWALName[:16] + "/" + newWALName
 	forgeWALCmd := "aws s3 cp s3://" + existingWALPath + " s3://" + newWALNamePath
 	_, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
