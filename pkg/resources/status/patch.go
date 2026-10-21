@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -53,6 +54,15 @@ func observedGeneration(ctx context.Context, cluster *apiv1.Cluster) int64 {
 // generation since then
 func IsReconciledGeneration(ctx context.Context, cluster *apiv1.Cluster) bool {
 	return observedGeneration(ctx, cluster) == cluster.Generation
+}
+
+// KeepReconciledGeneration makes PatchWithOptimisticLock record the generation
+// of the current Ready condition, for writers that reconcile no generation
+func KeepReconciledGeneration(ctx context.Context, cluster *apiv1.Cluster) context.Context {
+	if ready := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionClusterReady)); ready != nil {
+		return WithReconciledGeneration(ctx, ready.ObservedGeneration)
+	}
+	return ctx
 }
 
 // PatchWithOptimisticLock updates the status of the cluster using the passed
