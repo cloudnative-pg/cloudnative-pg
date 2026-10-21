@@ -318,9 +318,9 @@ func ensureOrphanPodsAreDeleted(ctx context.Context, c client.Client, cluster *a
 // A restored cluster has no status yet, so no instance is the primary and
 // nothing holds or renews the Lease. Like the Pods, only the Leases labelled
 // as belonging to this cluster and without owner are deleted. A Lease that has
-// an owner is left alone: it is either ours, or reconcilePrimaryLease refuses
-// it. An unowned Lease found outside of this path is adopted by
-// reconcilePrimaryLease instead.
+// an owner is left alone, and reconcilePrimaryLease then decides whether to
+// adopt it. A Lease without owner found outside of this path is adopted by
+// reconcilePrimaryLease too.
 func ensureOrphanPrimaryLeaseIsDeleted(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx).WithName("orphan_primary_lease_cleaner")
 

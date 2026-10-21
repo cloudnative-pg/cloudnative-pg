@@ -390,9 +390,11 @@ chart grant the required permissions automatically. If you manage the
 operator's RBAC yourself, you must add the `create`, `delete`, `get`, `list`,
 `update` and `watch` verbs on `leases` in the `coordination.k8s.io` API group
 before upgrading, otherwise primaries will be unable to promote. The `delete`
-verb is used only when a `Cluster` is recreated over the resources left behind
-by a previous one, for example by a backup tool: the operator then deletes the
-unowned `Lease` along with the orphan Pods, and creates a new one.
+verb is needed when a `Cluster` is recreated over the resources left behind by
+a previous one, for example by a backup tool. The operator adopts the leftover
+`Lease`, and the API server only lets it set the owner of an object it can
+delete. If the `Cluster` is restored over orphan PVCs, the operator instead
+deletes the `Lease` along with the orphan Pods, and creates a new one.
 :::
 
 #### Operator-to-instance authentication (`GHSA-7qwx-x8ff-3px9`)
