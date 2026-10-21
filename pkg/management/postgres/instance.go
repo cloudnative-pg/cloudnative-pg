@@ -1052,8 +1052,10 @@ func (instance *Instance) ConnectionPool() pool.Pooler {
 	const applicationName = "cnpg-instance-manager"
 	if instance.pool == nil {
 		socketDir := GetSocketDir()
+		// A postmaster that stopped answering would otherwise hold every caller
+		// that needs a connection, as every query opens one.
 		dsn := fmt.Sprintf(
-			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			"host=%s port=%v user=%v sslmode=disable application_name=%v connect_timeout=5",
 			socketDir,
 			GetServerPort(),
 			"postgres",
@@ -1070,8 +1072,9 @@ func (instance *Instance) ConnectionPool() pool.Pooler {
 func (instance *Instance) metricsConnectionPool() pool.Pooler {
 	instance.initializeMetricsPool.Do(func() {
 		socketDir := GetSocketDir()
+		// connect_timeout as in ConnectionPool.
 		dsn := fmt.Sprintf(
-			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			"host=%s port=%v user=%v sslmode=disable application_name=%v connect_timeout=5",
 			socketDir,
 			GetServerPort(),
 			apiv1.MetricsExporterUserName,
