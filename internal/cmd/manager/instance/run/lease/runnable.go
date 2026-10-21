@@ -319,7 +319,7 @@ func (r *Runnable) Release(ctx context.Context) error {
 	// empty-holder fast path to the new target, which is reserved for a primary
 	// that stopped cleanly.
 	if r.yielded.Load() {
-		contextLogger.Info("Primary lease yielded earlier, leaving the record for the new target to take over")
+		contextLogger.Debug("Primary lease yielded earlier, leaving the record for the new target to take over")
 		return nil
 	}
 

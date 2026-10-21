@@ -163,8 +163,8 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.instance.SetCluster(cluster)
 
-	// Before any early return: a replica whose PostgreSQL is down or fenced
-	// must still stop renewing the lease it holds.
+	// Before the early returns for a fenced or down instance: a replica whose
+	// PostgreSQL is down or fenced must still stop renewing the lease it holds.
 	r.yieldPrimaryLeaseIfNotTarget(ctx, cluster)
 
 	// Takes care of the `.check-empty-wal-archive` file
