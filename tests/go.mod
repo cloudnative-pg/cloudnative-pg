@@ -2,7 +2,7 @@ module github.com/cloudnative-pg/cloudnative-pg/tests
 
 go 1.26.6
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 replace github.com/cloudnative-pg/cloudnative-pg => ../
 
@@ -11,7 +11,7 @@ require (
 	github.com/avast/retry-go/v5 v5.0.0
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/cloudnative-pg v0.0.0-00010101000000-000000000000
-	github.com/cloudnative-pg/machinery v0.6.0
+	github.com/cloudnative-pg/machinery v0.6.1
 	github.com/go-logr/logr v1.4.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.7.0
@@ -27,14 +27,14 @@ require (
 	k8s.io/client-go v0.37.1
 	k8s.io/streaming v0.37.1
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
-	sigs.k8s.io/controller-runtime v0.25.1
+	sigs.k8s.io/controller-runtime v0.25.2
 	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudnative-pg/barman-cloud v0.6.0 // indirect
+	github.com/cloudnative-pg/barman-cloud v0.7.0 // indirect
 	github.com/cloudnative-pg/cnpg-i v0.6.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
