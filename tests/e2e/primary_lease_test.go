@@ -141,7 +141,7 @@ var _ = Describe("Primary lease", Label(tests.LabelSelfHealing), func() {
 
 	It("replaces the Lease left behind by a Cluster deleted with orphan propagation", func() {
 		var err error
-		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "primary-lease-adopt")
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "primary-lease-orphan")
 		Expect(err).ToNot(HaveOccurred())
 
 		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
