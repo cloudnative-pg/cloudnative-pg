@@ -61,11 +61,12 @@ const (
 	defaultReleasedLeaseDuration = 1 * time.Second
 
 	// defaultWatchdogMaxSilence is how long the lease loop can go between two
-	// lock calls before the watchdog considers it stuck. The loop pauses at
-	// most about RetryPeriod between calls (client-go jitters it by up to
-	// 20%); the rest is margin for scheduling delays. A call that is still
-	// running never counts as silence, however long the API server takes to
-	// answer.
+	// lock calls before the watchdog considers it stuck. The longest pause is
+	// the retry of client-go's acquire, which jitters RetryPeriod by up to
+	// 120%. client-go refuses a RenewDeadline that is not above 1.2 times
+	// RetryPeriod, so the limit exceeds that pause by more than RetryPeriod,
+	// as margin for scheduling delays. A call that is still running never
+	// counts as silence, however long the API server takes to answer.
 	defaultWatchdogMaxSilence = defaultRenewDeadline + 2*defaultRetryPeriod
 )
 
