@@ -86,9 +86,11 @@ func (r *ClusterReconciler) evaluateQuorumCheckWithStatus(
 	}
 
 	// Step 2: detect promotable replicas
+	// A diverged replica is never promoted, and it holds writes the primary
+	// discarded rather than the latest transactions: it must not count in R
 	candidateReplicas := stringset.New()
 	for _, record := range statusList.Items {
-		if record.Error == nil && record.IsPodReady {
+		if record.Error == nil && record.IsPodReady && record.Divergence == nil {
 			candidateReplicas.Put(record.Pod.Name)
 		}
 	}
