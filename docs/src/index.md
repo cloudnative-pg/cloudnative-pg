@@ -152,7 +152,10 @@ For details and support, see the [`postgres-containers` project](https://github.
     - Continuous backup and full/PITR recovery via volume snapshots (if
       supported by the storage class).
     - Native integration with Barman Cloud for object store backups via
-      `.spec.backup.barmanObjectStore` (*deprecated since v1.26*).
+      `.spec.backup.barmanObjectStore` (*deprecated since v1.26; 1.31 is the
+      last minor release with native support, which is removed starting from
+      1.32.0; see
+      [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/)*).
 - Offline in-place major upgrades of PostgreSQL
 - Offline and online import of PostgreSQL databases, including major upgrades:
     - *Offline Import*: Direct restore from existing databases.
