@@ -36,7 +36,9 @@ import (
 // independently, whether it must step down - that is not the condition this
 // watchdog detects.
 type LeaseWatchdog struct {
-	lastAttempt atomic.Int64 // unix nano
+	// lastAttempt keeps the monotonic reading of time.Now, so that a step of
+	// the wall clock is never mistaken for silence.
+	lastAttempt atomic.Pointer[time.Time]
 	acquired    atomic.Bool
 	maxSilence  atomic.Int64 // nanoseconds
 	inFlight    atomic.Int32 // lock calls currently running
@@ -62,7 +64,8 @@ func (w *LeaseWatchdog) SetMaxSilence(maxSilence time.Duration) {
 
 // Beat records lock activity: a call starting or returning.
 func (w *LeaseWatchdog) Beat() {
-	w.lastAttempt.Store(time.Now().UnixNano())
+	now := time.Now()
+	w.lastAttempt.Store(&now)
 }
 
 // enter marks a lock call as running and returns the function that ends it.
@@ -90,9 +93,8 @@ func (w *LeaseWatchdog) IsHealthy() error {
 	if !w.acquired.Load() || w.inFlight.Load() > 0 {
 		return nil
 	}
-	last := time.Unix(0, w.lastAttempt.Load())
 	limit := time.Duration(w.maxSilence.Load())
-	if silence := time.Since(last); silence > limit {
+	if silence := time.Since(*w.lastAttempt.Load()); silence > limit {
 		return fmt.Errorf("primary lease loop has not made any lock call in %s (limit %s)",
 			silence.Round(time.Second), limit)
 	}
