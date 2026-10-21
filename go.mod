@@ -10,7 +10,7 @@ require (
 	github.com/acobaugh/osrelease v0.1.0
 	github.com/avast/retry-go/v5 v5.0.0
 	github.com/cheynewallace/tabby v1.1.1
-	github.com/cloudnative-pg/barman-cloud v0.6.0
+	github.com/cloudnative-pg/barman-cloud v0.7.0
 	github.com/cloudnative-pg/cnpg-i v0.6.0
 	github.com/cloudnative-pg/machinery v0.6.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
