@@ -95,6 +95,11 @@ func NewCmd() *cobra.Command {
 					"end-of-wal-stream flag found." +
 						"Exiting with error once to let Postgres try switching to streaming replication")
 				return err
+			case errors.Is(err, barmanRestorer.ErrConnectivity):
+				// Barman reports transient network errors with exit code 2
+				// starting from 3.20.0
+				contextLog.Info("transient connectivity issue while restoring WAL, will retry",
+					"walName", args[0], "error", err)
 			default:
 				contextLog.Info("wal-restore command failed", "error", err)
 			}
@@ -195,10 +200,14 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 	}
 
 	// Step 2: return error if the end-of-wal-stream flag is set.
+	// A restore_command failure tells PostgreSQL the WAL is not in the archive,
+	// so it can switch to streaming. Prefetch sets the flag when it exhausts the
+	// archive for a timeline, and one failure is returned per flag.
+	//
 	// We skip this step if the flag machinery does not apply to this invocation
 	useEndOfWALStreamFlag := shouldUseEndOfWALStreamFlag(cluster, podName, rewindMode)
 	if useEndOfWALStreamFlag {
-		if err := checkEndOfWALStreamFlag(walRestorer); err != nil {
+		if err := checkEndOfWALStreamFlag(walRestorer, walName); err != nil {
 			return err
 		}
 	}
@@ -226,16 +235,16 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 		return walStatus[0].Err
 	}
 
-	// Step 5: set end-of-wal-stream flag if any download job returned file-not-found
+	// Step 5: set end-of-wal-stream flag if any regular WAL download job returned file-not-found
 	// We skip this step if the flag machinery does not apply to this invocation
-	endOfWALStream := isEndOfWALStream(walStatus)
-	if useEndOfWALStreamFlag && endOfWALStream {
-		contextLog.Info(
-			"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
-
-		err = walRestorer.SetEndOfWALStream()
-		if err != nil {
+	endOfWALStream := false
+	if useEndOfWALStreamFlag {
+		if endOfWALStream, err = walRestorer.SetEndOfWALStreamFromResults(walStatus); err != nil {
 			return err
+		}
+		if endOfWALStream {
+			contextLog.Info(
+				"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
 		}
 	}
 
@@ -298,34 +307,17 @@ func restoreWALViaPlugins(
 	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName), mode)
 }
 
-// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
-func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer) error {
-	contain, err := walRestorer.IsEndOfWALStream()
+// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set for the
+// timeline of the requested WAL, and removes the flag so it fails only once.
+func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer, walName string) error {
+	contains, err := walRestorer.ConsumeEndOfWALStreamForWAL(walName)
 	if err != nil {
 		return err
 	}
-
-	if contain {
-		err := walRestorer.ResetEndOfWalStream()
-		if err != nil {
-			return err
-		}
-
+	if contains {
 		return ErrEndOfWALStreamReached
 	}
 	return nil
-}
-
-// isEndOfWALStream returns true if one of the downloads has returned
-// a file-not-found error
-func isEndOfWALStream(results []barmanRestorer.Result) bool {
-	for _, result := range results {
-		if errors.Is(result.Err, barmanRestorer.ErrWALNotFound) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // mergeEnv merges all the values inside incomingEnv into env

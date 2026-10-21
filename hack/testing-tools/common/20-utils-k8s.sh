@@ -32,7 +32,8 @@ function _curl_github() {
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     auth_header="Authorization: Bearer ${GITHUB_TOKEN}"
   fi
-  curl -H "${auth_header}" "$@"
+  # --retry alone skips connection resets; --retry-all-errors covers them.
+  curl --retry 5 --retry-delay 2 --retry-all-errors -H "${auth_header}" "$@"
 }
 
 # _apply_github: fetches a manifest from a raw.githubusercontent.com URL
@@ -42,7 +43,7 @@ function _curl_github() {
 # network errors, not the fix for 429s.
 function _apply_github() {
   local url=$1
-  _curl_github -fsSL --retry 5 --retry-delay 2 "${url}" | "${K8S_CLI}" apply -f -
+  _curl_github -fsSL "${url}" | "${K8S_CLI}" apply -f -
 }
 
 # wait_for(type, namespace, name, interval, retries)
@@ -282,7 +283,7 @@ function reset_operator_namespace() {
 # When installed via manifest or the cnpg plugin the deployment is called
 # cnpg-controller-manager; when installed via Helm it is called
 # cnpg-cloudnative-pg. See:
-# https://cloudnative-pg.io/docs/1.29/installation_upgrade#using-the-helm-chart
+# https://cloudnative-pg.io/docs/current/installation_upgrade#using-the-helm-chart
 function wait_operator_ready() {
     local deploy_name="${1:-cnpg-controller-manager}"
     ${K8S_CLI} -n cnpg-system rollout status deploy/"${deploy_name}" --timeout=5m
@@ -324,7 +325,7 @@ function deploy_operator_from_manifest() {
     fi
 
     local manifest_file="${TEMP_DIR}/cnpg-operator-manifest.yaml"
-    if ! _curl_github -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+    if ! _curl_github -fsSL -o "${manifest_file}" "${manifest_url}"; then
         printf '%bError: Manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         printf '%bInterpreted %s as a %s.%b\n' "${bright}" "${operator}" "${mode}" "${reset}" >&2
         exit 1
@@ -374,7 +375,7 @@ function deploy_csi_host_path() {
 
   ## Create a temporary file for the modified plugin deployment. This updates the image tag.
   local plugin_file="${TEMP_DIR}/csi-hostpath-plugin.yaml"
-  _curl_github -fsSL --retry 5 --retry-delay 2 "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.34/hostpath/csi-hostpath-plugin.yaml" |
+  _curl_github -fsSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.34/hostpath/csi-hostpath-plugin.yaml" |
     sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
 
   # Apply driver info and plugin deployment
@@ -540,7 +541,7 @@ function ensure_cert_manager() {
         echo -e "${bright}Installing cert-manager ${cert_manager_version}...${reset}"
         # Download once, then retry only the apply, as deploy_operator_from_manifest does.
         local manifest_file="${TEMP_DIR:-/tmp}/cert-manager-manifest.yaml"
-        if ! _curl_github -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" \
+        if ! _curl_github -fsSL -o "${manifest_file}" \
             "https://github.com/cert-manager/cert-manager/releases/download/${cert_manager_version}/cert-manager.yaml"; then
             printf '%bError: could not download the cert-manager %s manifest%b\n' \
                 "${bright}" "${cert_manager_version}" "${reset}" >&2
@@ -626,7 +627,7 @@ function install_barman_cloud_plugin() {
     # does. The retry absorbs the cert-manager webhook readiness race: the
     # plugin manifest creates cert-manager Issuer/Certificate resources.
     local manifest_file="${TEMP_DIR:-/tmp}/plugin-barman-cloud-manifest.yaml"
-    if ! _curl_github -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+    if ! _curl_github -fsSL -o "${manifest_file}" "${manifest_url}"; then
         printf '%bError: manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         return 1
     fi

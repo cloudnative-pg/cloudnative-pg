@@ -8,11 +8,15 @@ title: Appendix C - Common object stores for backups
 
 :::warning
     As of CloudNativePG 1.26, **native Barman Cloud support is deprecated** in
-    favor of the **Barman Cloud Plugin**. While the native integration remains
-    functional for now, we strongly recommend beginning a gradual migration to
-    the plugin-based interface after appropriate testing. The Barman Cloud
-    Plugin documentation describes
-    [how to use common object stores](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/).
+    favor of the **Barman Cloud Plugin**. **CloudNativePG 1.31 is the last
+    minor release that ships with native Barman Cloud support, which is removed
+    starting from 1.32.0.** Releases up to and including 1.31, and their patch
+    releases, keep native support for as long as they are supported. You must
+    migrate to the plugin before upgrading to 1.32 or later. We strongly
+    recommend migrating to the plugin-based interface after appropriate testing.
+    The Barman Cloud Plugin documentation describes
+    [how to use common object stores](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/)
+    and [how to migrate from the built-in backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/).
 :::
 
 You can store the [backup](../backup.md) files in any service that is supported
@@ -135,6 +139,15 @@ permissions to permanently delete objects.
 In case you're using S3-compatible object storage, like **MinIO** or
 **Linode Object Storage**, you can specify an endpoint instead of using the
 default S3 one.
+
+:::warning
+Barman Cloud uses the Boto3 SDK and takes AWS S3 as its reference
+implementation. Issues you can reproduce on AWS S3 are treated as Barman Cloud
+defects. Issues that happen only on a third-party object store are API
+incompatibilities, and you must resolve them with your storage vendor. See the
+[Barman Cloud documentation](https://docs.pgbarman.org/release/latest/) for
+known workarounds.
+:::
 
 In this example, it will use the `bucket` of **Linode** in the region
 `us-east1`.

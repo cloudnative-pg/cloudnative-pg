@@ -22,6 +22,7 @@ package status
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -35,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/logrusorgru/aurora/v4"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -218,11 +220,52 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 	return strings.Join(fencedInstances.ToList(), ", ")
 }
 
+// errExecNotPermitted is returned when the user lacks `pods/exec`
+var errExecNotPermitted = errors.New("not permitted: requires the pods/exec permission")
+
+// checkExecPermission returns errExecNotPermitted when the user cannot exec
+// into the primary Pod. If the check itself fails, it returns nil so the
+// command runs and reports the actual error. Without a primary Pod the review
+// would have no namespace and run at cluster scope, so it is skipped.
+func (fullStatus *PostgresqlStatus) checkExecPermission(
+	ctx context.Context,
+	client kubernetes.Interface,
+) error {
+	if fullStatus.PrimaryPod.Name == "" {
+		return nil
+	}
+
+	pod := &fullStatus.PrimaryPod
+	review, err := client.AuthorizationV1().SelfSubjectAccessReviews().Create(
+		ctx,
+		&authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Namespace:   pod.Namespace,
+					Verb:        "create",
+					Resource:    "pods",
+					Subresource: "exec",
+					Name:        pod.Name,
+				},
+			},
+		},
+		metav1.CreateOptions{},
+	)
+	if err == nil && !review.Status.Allowed {
+		return errExecNotPermitted
+	}
+	return nil
+}
+
 func (fullStatus *PostgresqlStatus) getClusterSize(
 	ctx context.Context,
 	client kubernetes.Interface,
 	timeout time.Duration,
 ) (string, error) {
+	if err := fullStatus.checkExecPermission(ctx, client); err != nil {
+		return "", err
+	}
+
 	// Compute the disk space through `du`
 	output, _, err := utils.ExecCommand(
 		ctx,
@@ -322,6 +365,8 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(
 			summary.AddLine("Size:", "- (hibernated)")
 		case isPrimaryFenced:
 			summary.AddLine("Size:", "- (fenced)")
+		case errors.Is(clusterSizeErr, errExecNotPermitted):
+			summary.AddLine("Size:", "- ("+clusterSizeErr.Error()+")")
 		default:
 			summary.AddLine("Size:", aurora.Red(clusterSizeErr.Error()))
 		}
@@ -491,6 +536,17 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 	client kubernetes.Interface,
 	timeout time.Duration,
 ) []error {
+	if err := fullStatus.checkExecPermission(ctx, client); err != nil {
+		notPermitted := "- (" + err.Error() + ")"
+		fmt.Println(aurora.Green("PostgreSQL Configuration"))
+		fmt.Println(notPermitted)
+		fmt.Println()
+		fmt.Println(aurora.Green("PostgreSQL HBA Rules"))
+		fmt.Println(notPermitted)
+		fmt.Println()
+		return nil
+	}
+
 	var errs []error
 
 	// Read PostgreSQL configuration from custom.conf

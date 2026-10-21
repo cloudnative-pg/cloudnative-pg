@@ -129,7 +129,8 @@ When configuring the external cluster, you have the following options:
       designated primary instance, initiating a WAL receiver process to connect
       to the source cluster and receive data.
 
-You still have access to the **`barmanObjectStore` section**, although deprecated:
+You still have access to the **`barmanObjectStore` section**, although
+deprecated and removed starting from CloudNativePG 1.32.0:
 
 - Enables use of the WAL archive, with CloudNativePG automatically setting
   the `restore_command` in the designated primary instance.

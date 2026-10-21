@@ -55,9 +55,9 @@ env:
   # renovate: datasource=github-releases depName=k3d-io/k3d versioning=semver
   K3D_VERSION: "v5.9.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
-  ROOK_VERSION: "v1.20.7"
+  ROOK_VERSION: "v1.21.0"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
-  EXTERNAL_SNAPSHOTTER_VERSION: "v8.6.0"
+  EXTERNAL_SNAPSHOTTER_VERSION: "v8.7.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
@@ -91,7 +91,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.28, release-1.29, release-1.30]
+        branch: [release-1.28, release-1.30]
     env:
       BRANCH: ${{ matrix.branch }}
     steps:
@@ -445,7 +445,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         with:
           distribution: goreleaser
           version: v2
@@ -471,7 +471,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -523,7 +523,7 @@ jobs:
           make generate-manifest
       -
         name: Upload the operator manifest as artifact in workflow
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
@@ -537,7 +537,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build binary for upgrade test
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         if: needs.evaluate_options.outputs.test_level == '4'
         with:
           distribution: goreleaser
@@ -612,7 +612,7 @@ jobs:
           rm -fr manifests/operator-manifest.yaml
       -
         name: Prepare the operator manifest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: operator-manifest.yaml
           path: manifests
@@ -779,7 +779,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Install Kind
-        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
         with:
           install_only: true
           version: ${{ env.KIND_VERSION }}
@@ -837,7 +837,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -863,7 +863,7 @@ jobs:
         # Archive logs for failed test cases if there are any
         name: Archive Kind logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kind-logs-${{ env.MATRIX }}
           path: kind-logs/
@@ -871,7 +871,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -882,7 +882,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -987,7 +987,7 @@ jobs:
           install /tmp/k3d /usr/local/bin/k3d
           k3d version
       - name: Install kubectl
-        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+        uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
         with:
           version: ${{ env.K8S_VERSION }}
       - name: Prepare patch for customization
@@ -1037,7 +1037,7 @@ jobs:
           fi
       - name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1058,14 +1058,14 @@ jobs:
       - # Archive logs for failed test cases if there are any
         name: Archive K3D logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: k3d-logs-${{ env.MATRIX }}
           path: k3d-logs/
           retention-days: 7
       - name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1074,7 +1074,7 @@ jobs:
           if-no-files-found: ignore
       - name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1087,7 +1087,6 @@ jobs:
   # secrets.AZURE_SUBSCRIPTION
   # secrets.AZURE_RESOURCEGROUP
   # secrets.AZURE_RESOURCENAME
-  # secrets.AZURE_WORKSPACE_RESOURCE_ID
 
   e2e-aks-setup:
     name: Setup shared resources for Microsoft AKS E2Es
@@ -1208,7 +1207,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.1
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
@@ -1224,7 +1223,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Install kubectl
-        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+        uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5
         with:
           version: v${{ env.K8S_VERSION }}
       -
@@ -1254,20 +1253,10 @@ jobs:
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_AKS} \
               --tier standard \
-              --node-count 3 --node-vm-size Standard_D4s_v5 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
-              --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
+              --node-count 3 --node-vm-size Standard_D4s_v5 -k v${K8S_VERSION} --generate-ssh-keys \
               --aks-custom-headers EnableAzureDiskFileCSIDriver=true
             az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_AKS}
-
-            # create diagnostic settings for monitoring kube-apiserver logs
-            AKS_CLUSTER_RESOURCE_ID=$(az aks show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${AZURE_AKS} --query id -o tsv --only-show-errors)
-            az monitor diagnostic-settings create \
-              --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
-              --resource ${AKS_CLUSTER_RESOURCE_ID} \
-              --name diagnostic-kube-apiserver-logs \
-              --workspace ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
-              --logs '[ { "category": "kube-apiserver", "enabled": true } ]'
       -
         # Azure is slow in provisioning disks, and we can't wait two minutes
         # every time we create a pod, otherwise all the tests will time out.
@@ -1382,7 +1371,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1407,7 +1396,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1417,7 +1406,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1429,7 +1418,6 @@ jobs:
         if: always()
         run: |
           set +e
-          az extension add --allow-preview true --name monitor-control-service
           az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
           attempt=1
           max_attempts=3
@@ -1442,28 +1430,6 @@ jobs:
                 break
               fi
               echo "Failed deleting cluster ${{ env.AZURE_AKS }}, retrying"
-              sleep 5
-              attempt=$((attempt+1))
-          done
-          attempt=1
-          AZURE_RESOURCEGROUP_LOCATION="$( az group show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query location -o tsv --only-show-errors )"
-          DATA_COLL_RULE_NAME="MSCI-${AZURE_RESOURCEGROUP_LOCATION}-${{ env.AZURE_AKS }}"
-          while [ "${attempt}" -le "${max_attempts}" ]; do
-              echo "Deleting data-collection rule ${DATA_COLL_RULE_NAME}. Attempt ${attempt} of ${max_attempts}"
-              az monitor data-collection rule show --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query name
-              # if not found, let it go
-              status=$?
-              if [[ $status != 0 ]]; then
-                echo "AKS data-collection rule not found"
-                break
-              fi
-              az monitor data-collection rule delete -y --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }}
-              status=$?
-              if [[ $status == 0 ]]; then
-                echo "AKS data-collection rule deleted"
-                break
-              fi
-              echo "Failed deleting data-collection rule ${DATA_COLL_RULE_NAME}, retrying"
               sleep 5
               attempt=$((attempt+1))
           done
@@ -1596,7 +1562,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.1
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
@@ -1683,9 +1649,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARCH: ${{ steps.arch.outputs.arch }}
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
-          VELERO_VERSION: "v1.18.3"
+          VELERO_VERSION: "v1.18.4"
           # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
-          VELERO_AWS_PLUGIN_VERSION: "v1.14.3"
+          VELERO_AWS_PLUGIN_VERSION: "v1.14.4"
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1781,7 +1747,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1806,7 +1772,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1816,7 +1782,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1921,9 +1887,10 @@ jobs:
             fi
           done < <(aws ec2 describe-volumes --region "${REGION_NAME}" --query 'Volumes[?not_null(Tags[?Key == `kubernetes.io/cluster/'"$CLUSTER_NAME"'` && Value == `owned`].Value)].VolumeId' | jq -r '.[]' || true)
 
-  # GKE Secrets required
-  # secrets.GCP_SERVICE_ACCOUNT
-  # secrets.GCP_PROJECT_ID
+  # GKE Variables required
+  # vars.GCP_PROJECT_ID
+  # vars.GCP_WORKLOAD_IDENTITY_PROVIDER
+  # vars.GCP_SERVICE_ACCOUNT
 
   e2e-gke:
     name: Run E2E on Google GKE
@@ -1941,6 +1908,10 @@ jobs:
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -1969,7 +1940,8 @@ jobs:
       E2E_CSI_STORAGE_CLASS: standard-rwo
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: pd-csi-snapclass
 
-      REGION: europe-west3
+      REGION: ${{ vars.GCP_REGION || 'europe-west4' }}
+      MACHINE_TYPE: ${{ vars.GKE_MACHINE_TYPE || 'e2-standard-4' }}
       TEST_CLOUD_VENDOR: "gke"
 
     steps:
@@ -2009,7 +1981,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.0
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.1
       -
         name: Set cluster name
         run: |
@@ -2024,12 +1996,13 @@ jobs:
         id: 'auth'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
-          credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
       -
         name: Set up Cloud SDK and kubectl
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
           install_components: 'kubectl,gke-gcloud-auth-plugin'
       -
         name: Create GKE cluster
@@ -2046,7 +2019,7 @@ jobs:
               --cluster-version=${{ env.K8S_VERSION }} \
               --region=${{ env.REGION }} \
               --disk-size=80 \
-              --machine-type=e2-standard-4 \
+              --machine-type=${{ env.MACHINE_TYPE }} \
               --labels=cluster=${{ env.CLUSTER_NAME }}
             then
               exit 0
@@ -2061,7 +2034,7 @@ jobs:
         env:
           USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
         run: |
-          gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }} --project ${{ secrets.GCP_PROJECT_ID }}
+          gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }} --project ${{ vars.GCP_PROJECT_ID }}
       -
         name: Configure Storage
         run: |
@@ -2131,7 +2104,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2156,7 +2129,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -2166,7 +2139,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -2239,6 +2212,9 @@ jobs:
   # secrets.AWS_EKS_ADMIN_IAM_ROLES
   # secrets.AWS_ACCESS_KEY_ID
   # secrets.AWS_SECRET_ACCESS_KEY
+  # The platform is selected by vars.OPENSHIFT_PLATFORM ('aws' by default, or 'gcp').
+  # Both need vars.OPENSHIFT_BASE_DOMAIN, the base domain of a public DNS zone.
+  # 'gcp' also requires the GCP authentication described in the GKE section above.
 
   e2e-openshift:
     name: Run E2E on OpenShift
@@ -2259,6 +2235,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -2279,21 +2256,25 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
-      E2E_DEFAULT_STORAGE_CLASS: gp3-csi
-      E2E_CSI_STORAGE_CLASS: gp3-csi
-      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-aws-vsc
+
+      # OPENSHIFT_PLATFORM selects where the cluster is created: aws (default) or gcp
+      OPENSHIFT_PLATFORM: ${{ vars.OPENSHIFT_PLATFORM || 'aws' }}
+      BASE_DOMAIN: ${{ vars.OPENSHIFT_BASE_DOMAIN }}
 
       TEST_CLOUD_VENDOR: "ocp"
 
       # AWS configuration
-      AWS_BASE_DOMAIN: ${{ secrets.AWS_BASE_DOMAIN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: eu-central-1
       AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES }}
 
+      # GCP configuration
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'europe-west4' }}
+
       REDHAT_PULL: ${{ secrets.REDHAT_PULL }}
-      SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+      SSH_PUBLIC_KEY: ${{ vars.OPENSHIFT_SSH_PUBLIC_KEY }}
 
     steps:
       -
@@ -2302,6 +2283,33 @@ jobs:
           MATRIX_K8S_VERSION: ${{ matrix.k8s_version }}
         run: |
           echo "CLUSTER_NAME=${E2E_SUFFIX}-ocp-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_K8S_VERSION}" | tr -d '.' )" >> $GITHUB_ENV
+      -
+        # Each cloud has its own storage classes and its own public DNS zone
+        name: Set platform defaults
+        run: |
+          case "${OPENSHIFT_PLATFORM}" in
+            aws)
+              storage_class=gp3-csi
+              snapshot_class=csi-aws-vsc
+              ;;
+            gcp)
+              storage_class=standard-csi
+              snapshot_class=csi-gce-pd-vsc
+              ;;
+            *)
+              echo "unsupported OPENSHIFT_PLATFORM: ${OPENSHIFT_PLATFORM}" >&2
+              exit 1
+              ;;
+          esac
+          if [ -z "${BASE_DOMAIN}" ]; then
+            echo "the base domain of the ${OPENSHIFT_PLATFORM} platform is not set" >&2
+            exit 1
+          fi
+          {
+            echo "E2E_DEFAULT_STORAGE_CLASS=${storage_class}"
+            echo "E2E_CSI_STORAGE_CLASS=${storage_class}"
+            echo "E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=${snapshot_class}"
+          } >> "$GITHUB_ENV"
       -
         name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -2346,17 +2354,28 @@ jobs:
           make olm-catalog
       -
         name: Install OC Installer and client
-        uses: redhat-actions/openshift-tools-installer@37eb3cfb20ac2df6f0511ffa71cd917e4d49cabf # v3
+        uses: redhat-actions/openshift-tools-installer@1f130822bb0930e0ee02a119adcc3271a22b1499 # v3
         with:
           source: "mirror"
           openshift-install: ${{ env.K8S_VERSION }}
           oc: ${{ env.K8S_VERSION }}
       -
+        name: Authenticate to Google Cloud
+        if: ${{ env.OPENSHIFT_PLATFORM == 'gcp' }}
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      -
         name: Install OpenShift Cluster ${{ env.K8S_VERSION }}
         timeout-minutes: 60
         run: |
-          envsubst < hack/install-config.yaml.template > hack/install-config.yaml
-          openshift-install create cluster --dir hack/ --log-level debug
+          envsubst < "hack/install-config.${OPENSHIFT_PLATFORM}.yaml.template" > hack/install-config.yaml
+          # The installer prints the password of the kubeadmin user, hide it
+          openshift-install create cluster --dir hack/ --log-level debug 2>&1 |
+            sed -u -E 's/(password: ")[^"]*"/\1***"/'
+          # Nothing uses the kubeadmin user, the tests connect with the kubeconfig
+          KUBECONFIG=$(pwd)/hack/auth/kubeconfig oc delete secret kubeadmin -n kube-system --ignore-not-found
       -
         name: Install operator-sdk
         run: |
@@ -2451,7 +2470,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2476,7 +2495,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -2486,7 +2505,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -2542,7 +2561,7 @@ jobs:
         run: mkdir test-artifacts
 
       - name: Download all artifacts to the directory
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: test-artifacts
           pattern: testartifacts-*
@@ -2566,7 +2585,7 @@ jobs:
 
       - name: If there is an overflow summary, archive it
         if: steps.generate-summary.outputs.Overflow
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ steps.generate-summary.outputs.Overflow }}
           path: ${{ steps.generate-summary.outputs.Overflow }}

@@ -180,14 +180,7 @@ var _ = Describe("Cluster logging tests", func() {
 		}, 2*time.Second, 10*time.Millisecond).Should(BeTrue(),
 			"streaming should capture logs")
 
-		Consistently(func() bool {
-			select {
-			case <-errChan:
-				return false
-			default:
-				return true
-			}
-		}, 200*time.Millisecond, 50*time.Millisecond).Should(BeTrue(),
+		Consistently(errChan, 200*time.Millisecond, 50*time.Millisecond).ShouldNot(Receive(),
 			"streaming should continue until cancelled")
 
 		cancel()
