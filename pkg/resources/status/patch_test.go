@@ -134,4 +134,43 @@ var _ = Describe("PatchWithOptimisticLock", func() {
 		Expect(condition).ToNot(BeNil())
 		Expect(condition.ObservedGeneration).To(Equal(int64(1)))
 	})
+
+	It("keeps the generation of the Ready condition for writers that reconcile no generation",
+		func(ctx SpecContext) {
+			// The operator marked generation 1 as not ready, then the spec
+			// changed: generation 2 has not been reconciled yet
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "cluster-example",
+					Namespace:  "default",
+					Generation: 2,
+				},
+				Status: apiv1.ClusterStatus{
+					Phase: apiv1.PhaseInplacePrimaryRestart,
+					Conditions: []metav1.Condition{{
+						Type:               string(apiv1.ConditionClusterReady),
+						Status:             metav1.ConditionFalse,
+						Reason:             string(apiv1.ClusterIsNotReady),
+						Message:            "Cluster Is Not Ready",
+						ObservedGeneration: 1,
+					}},
+				},
+			}
+
+			cli := fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithStatusSubresource(&apiv1.Cluster{}).
+				WithObjects(cluster.DeepCopy()).
+				Build()
+
+			Expect(PatchWithOptimisticLock(
+				KeepReconciledGeneration(ctx, cluster), cli, cluster,
+				SetPhase(apiv1.PhaseHealthy, ""), SetClusterReadyCondition,
+			)).To(Succeed())
+
+			condition := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionClusterReady))
+			Expect(condition).ToNot(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(condition.ObservedGeneration).To(Equal(int64(1)))
+		})
 })
