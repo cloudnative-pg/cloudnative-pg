@@ -413,6 +413,26 @@ spec:
                     - key
                     - name
                     type: object
+                  sseCustomerKey:
+                    description: |-
+                      Reference to the secret holding the key for Server-Side Encryption with
+                      Customer-provided keys (SSE-C): a base64-encoded 256-bit AES key.
+                      barman-cloud uses it to encrypt the objects it uploads and to read them
+                      back. Meant for S3-compatible providers that only support SSE-C
+                      (e.g. Hetzner Object Storage). Cannot be combined with `encryption`.
+                      Works with any authentication method. Changing the key makes the
+                      existing objects unreadable: use a new `destinationPath` or `serverName`.
+                    properties:
+                      key:
+                        description: The key to select
+                        type: string
+                      name:
+                        description: Name of the referent.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
                 type: object
               serverName:
                 description: |-
