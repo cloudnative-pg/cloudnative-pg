@@ -189,10 +189,10 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 	}
 
 	// Step 2: return error if the end-of-wal-stream flag is set.
-	// PostgreSQL treats a restore_command failure as "WAL not available from
-	// archive" and can then try streaming via primary_conninfo. When prefetch has
-	// already observed archive exhaustion for this timeline, return one failure to
-	// let PostgreSQL switch sources instead of repeatedly probing the archive.
+	// A restore_command failure tells PostgreSQL the WAL is not in the archive,
+	// so it can switch to streaming. Prefetch sets the flag when it exhausts the
+	// archive for a timeline, and one failure is returned per flag.
+	//
 	// We skip this step if the flag machinery does not apply to this invocation
 	useEndOfWALStreamFlag := shouldUseEndOfWALStreamFlag(cluster, podName, rewindMode)
 	if useEndOfWALStreamFlag {
@@ -296,7 +296,8 @@ func restoreWALViaPlugins(
 	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName), mode)
 }
 
-// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set for the requested WAL timeline.
+// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set for the
+// timeline of the requested WAL, and removes the flag so it fails only once.
 func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer, walName string) error {
 	contains, err := walRestorer.ConsumeEndOfWALStreamForWAL(walName)
 	if err != nil {

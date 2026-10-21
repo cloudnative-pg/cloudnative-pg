@@ -509,7 +509,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 
 		// Invoke the wal-restore command through exec requesting the #9 file.
 		// Expected outcome:
-		//		exit code 0, #9 is in the output location, no files in the spool directory.
+		//		exit code 0, #9 is in the output location, no prefetched wals in the spool directory.
 		//		The flag is set because #10 and #11 are not present.
 		By("invoking the wal-restore command requesting #9 wal", func() {
 			_, _, err := exec.CommandInInstancePod(
