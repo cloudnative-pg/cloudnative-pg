@@ -141,7 +141,6 @@ func updateReplicasHealthyCondition(cluster *apiv1.Cluster) {
 func (r *ClusterReconciler) reconcileDivergedReplicaContainment(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	statuses postgres.PostgresqlStatusList,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	for _, name := range slices.Collect(maps.Keys(cluster.Status.DivergedInstances)) {
@@ -159,7 +158,7 @@ func (r *ClusterReconciler) reconcileDivergedReplicaContainment(
 			continue
 		}
 
-		if err := r.parkDivergedReplica(ctx, cluster, name, statuses, pvcs); err != nil {
+		if err := r.parkDivergedReplica(ctx, cluster, name, pvcs); err != nil {
 			return err
 		}
 	}
@@ -203,14 +202,12 @@ func (r *ClusterReconciler) liftContainmentIfRebuilt(
 }
 
 // parkDivergedReplica fences name as containment for a divergence and
-// records its PGDATA PVC's UID, unless name is a primary-role instance,
-// fencing it would break synchronous quorum, or its PGDATA PVC could not be
-// found this pass.
+// records its PGDATA PVC's UID, unless name is a primary-role instance or its
+// PGDATA PVC could not be found this pass.
 func (r *ClusterReconciler) parkDivergedReplica(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	name apiv1.PodName,
-	statuses postgres.PostgresqlStatusList,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
@@ -220,14 +217,6 @@ func (r *ClusterReconciler) parkDivergedReplica(
 		// instances. Kept as a defensive backstop against ever fencing the
 		// primary.
 		contextLogger.Warning("Refusing to fence a diverged instance in a primary role", "instance", name)
-		return nil
-	}
-
-	if divergedReplicaParkWouldBreakSyncQuorum(cluster, statuses, string(name)) {
-		contextLogger.Warning(
-			"Not fencing a diverged replica because it would drop the cluster below the "+
-				"required synchronous replication quorum; the divergence remains surfaced",
-			"instance", name)
 		return nil
 	}
 
@@ -280,32 +269,4 @@ func findPgDataPVC(pvcs []corev1.PersistentVolumeClaim, instanceName string) *co
 		}
 	}
 	return nil
-}
-
-// divergedReplicaParkWouldBreakSyncQuorum reports whether fencing the named
-// instance would drop the number of available replicas below the
-// synchronous replication requirement, in which case containment must fall
-// back to surface-only.
-func divergedReplicaParkWouldBreakSyncQuorum(
-	cluster *apiv1.Cluster,
-	statuses postgres.PostgresqlStatusList,
-	excluding string,
-) bool {
-	sync := cluster.Spec.PostgresConfiguration.Synchronous
-	if sync == nil || sync.Number <= 0 {
-		return false
-	}
-
-	var available int
-	for i := range statuses.Items {
-		item := &statuses.Items[i]
-		if item.Pod == nil || item.IsPrimary || item.Pod.Name == excluding {
-			continue
-		}
-		if item.Error == nil && item.IsPodReady {
-			available++
-		}
-	}
-
-	return available < sync.Number
 }

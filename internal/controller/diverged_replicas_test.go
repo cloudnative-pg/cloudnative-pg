@@ -146,12 +146,6 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 	var env *testingEnvironment
 	var cluster *apiv1.Cluster
 
-	readyReplica := func(name string) postgres.PostgresqlStatus {
-		return postgres.PostgresqlStatus{
-			Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: cluster.Namespace}},
-			IsPodReady: true,
-		}
-	}
 	pgDataPVC := func(instanceName string, uid types.UID) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
 			Name:      instanceName,
@@ -190,7 +184,6 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 
 	It("fences a diverged replica, recording its PGDATA PVC UID", func(ctx SpecContext) {
 		Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
-			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{readyReplica("replica-1")}},
 			[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-1")})).To(Succeed())
 
 		Expect(isFenced("replica-1")).To(BeTrue())
@@ -206,7 +199,6 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
 
 		Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
-			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{readyReplica("replica-1")}},
 			[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-1")})).To(Succeed())
 
 		Expect(cluster.Status.DivergedInstances["replica-1"].Parked).To(BeTrue())
@@ -222,17 +214,11 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 			}
 
 			Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
-				postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{readyReplica(name)}},
 				claims)).To(Succeed())
 
 			Expect(isFenced(name)).To(BeFalse())
 			Expect(cluster.Status.DivergedInstances[apiv1.PodName(name)].Parked).To(BeFalse())
 		},
-		Entry("when that would break the synchronous quorum", func(context.Context) {
-			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				Method: apiv1.SynchronousReplicaConfigurationMethodAny, Number: 1,
-			}
-		}, "replica-1", []string{"replica-1"}),
 		Entry("before its PGDATA PVC is found", func(context.Context) {}, "replica-1", nil),
 		Entry("an entry naming the primary", func(ctx context.Context) {
 			setEntry(ctx, "primary", apiv1.DivergedInstanceStatus{TimeLineID: 1, PrimaryTimeLineID: 2})
@@ -248,7 +234,6 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 			fence(ctx, "replica-1")
 
 			Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
-				postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{readyReplica("replica-1")}},
 				[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", currentPVCUID)})).To(Succeed())
 
 			Expect(isFenced("replica-1")).To(Equal(!released))
@@ -264,22 +249,3 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 			types.UID("pvc-uid-old"), false),
 	)
 })
-
-var _ = DescribeTable("divergedReplicaParkWouldBreakSyncQuorum",
-	func(number int, otherReplicaReady bool, expected bool) {
-		cluster := &apiv1.Cluster{}
-		if number > 0 {
-			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				Method: apiv1.SynchronousReplicaConfigurationMethodAny, Number: number,
-			}
-		}
-		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
-			{Pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-1"}}, IsPodReady: true},
-			{Pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-2"}}, IsPodReady: otherReplicaReady},
-		}}
-		Expect(divergedReplicaParkWouldBreakSyncQuorum(cluster, statuses, "replica-1")).To(Equal(expected))
-	},
-	Entry("not without synchronous replication", 0, false, false),
-	Entry("not while enough other replicas are ready", 1, true, false),
-	Entry("when the other replica is not ready", 1, false, true),
-)
