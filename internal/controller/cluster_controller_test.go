@@ -1203,6 +1203,100 @@ var _ = Describe("Updating target primary", func() {
 		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
 	})
 
+	It("never elects a diverged replica, even when it is the most advanced one", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+
+		By("simulating a failover already in progress after the old primary disappeared", func() {
+			cluster.Status.CurrentPrimary = instances[0].Name
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+		})
+
+		divergence := &postgres.TimelineDivergence{TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/10", ReplayLSN: "0/30"}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					ReceivedLsn: cnpgTypes.LSN("0/30"),
+					ReplayLsn:   cnpgTypes.LSN("0/30"),
+					IsPodReady:  true,
+					Divergence:  divergence,
+					Pod:         &instances[1], // diverged, but the most advanced
+				},
+				{
+					ReceivedLsn: cnpgTypes.LSN("0/20"),
+					ReplayLsn:   cnpgTypes.LSN("0/20"),
+					IsPodReady:  true,
+					Pod:         &instances[2],
+				},
+			},
+		}
+		sort.Sort(&statusList)
+		Expect(statusList.Items[0].Pod.Name).To(Equal(instances[1].Name),
+			"the diverged replica must sort first for this test to be meaningful")
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(instances[2].Name))
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
+	})
+
+	It("skips the election when every remaining replica has diverged", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+
+		By("simulating a failover already in progress after the old primary disappeared", func() {
+			cluster.Status.CurrentPrimary = instances[0].Name
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+		})
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					ReceivedLsn: cnpgTypes.LSN("0/30"),
+					ReplayLsn:   cnpgTypes.LSN("0/30"),
+					IsPodReady:  true,
+					Divergence: &postgres.TimelineDivergence{
+						TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/10", ReplayLSN: "0/30",
+					},
+					Pod: &instances[1],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(BeEmpty())
+		Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
+	})
+
 	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
@@ -1688,6 +1782,28 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 
 		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
 		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+	})
+
+	It("does not wait on a diverged replica that sorts first, as it never becomes ready", func(ctx SpecContext) {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+					IsPodReady:  false,
+					ReceivedLsn: cnpgTypes.LSN("0/30"),
+					ReplayLsn:   cnpgTypes.LSN("0/30"),
+					Divergence: &postgres.TimelineDivergence{
+						TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/10", ReplayLSN: "0/30",
+					},
+				},
+			},
+		}
+
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
+		Expect(result.IsZero()).To(BeTrue())
 	})
 
 	It("emits a Warning event when the primary is Ready but /pg/status is failing", func(ctx SpecContext) {

@@ -657,20 +657,24 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 
 	contextLogger := log.FromContext(ctx)
 
-	firstInstance := instancesStatus.Items[0]
-	hasHTTPStatus := firstInstance.HasHTTPStatus()
-	isPodReady := firstInstance.IsPodReady
+	// A diverged replica is never elected, so it must not hold the guard back:
+	// it never becomes ready and its containment runs later in the reconciliation
+	if candidates := instancesStatus.ExcludingDiverged(); candidates.Len() > 0 {
+		firstInstance := candidates.Items[0]
+		hasHTTPStatus := firstInstance.HasHTTPStatus()
+		isPodReady := firstInstance.IsPodReady
 
-	if hasHTTPStatus && !isPodReady && !firstInstance.IsFenced {
-		// The readiness probe status from the kubelet has not been refreshed
-		// yet, so we wait rather than electing a primary that Kubernetes will
-		// refuse to route traffic to.
-		contextLogger.Info(
-			"Waiting for the Kubelet to refresh the readiness probe",
-			"instanceName", firstInstance.Pod.Name,
-			"hasHTTPStatus", hasHTTPStatus,
-			"isPodReady", isPodReady)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}
+		if hasHTTPStatus && !isPodReady && !firstInstance.IsFenced {
+			// The readiness probe status from the kubelet has not been refreshed
+			// yet, so we wait rather than electing a primary that Kubernetes will
+			// refuse to route traffic to.
+			contextLogger.Info(
+				"Waiting for the Kubelet to refresh the readiness probe",
+				"instanceName", firstInstance.Pod.Name,
+				"hasHTTPStatus", hasHTTPStatus,
+				"isPodReady", isPodReady)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}
+		}
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
