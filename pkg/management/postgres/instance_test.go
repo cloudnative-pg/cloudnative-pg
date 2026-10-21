@@ -239,6 +239,29 @@ var _ = Describe("checkImmediateShutdownUnresponsive", func() {
 		instance.checkImmediateShutdownUnresponsive(context.Background(), nil)
 		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
 	})
+
+	It("does not ask an unresponsive PostgreSQL to shut down immediately again", func(ctx context.Context) {
+		// "status" reports the server running and "stop" fails, as it does
+		// when the timeout runs out. Every call is recorded.
+		calls := filepath.Join(binDir, "calls")
+		script := fmt.Sprintf("#!/bin/sh\necho \"$*\" >> %s\ncase \"$*\" in\n*status*) exit 0 ;;\n*) exit 1 ;;\nesac\n",
+			calls)
+		//nolint:gosec // executable fake pg_ctl needs the execute bit
+		Expect(os.WriteFile(filepath.Join(binDir, "pg_ctl"), []byte(script), 0o700)).To(Succeed())
+		stops := func() int {
+			content, err := os.ReadFile(calls) //nolint:gosec // path under the spec's temporary directory
+			Expect(err).ToNot(HaveOccurred())
+			return strings.Count(string(content), " stop ")
+		}
+
+		instance := &Instance{}
+		Expect(instance.TryShuttingDownImmediate(ctx)).To(HaveOccurred())
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
+		Expect(stops()).To(Equal(1))
+
+		Expect(instance.TryShuttingDownImmediate(ctx)).To(MatchError(ContainSubstring("not retrying")))
+		Expect(stops()).To(Equal(1))
+	})
 })
 
 var _ = Describe("testing environment variables", func() {

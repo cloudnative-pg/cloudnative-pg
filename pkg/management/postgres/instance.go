@@ -757,6 +757,12 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
+	// Another attempt would only keep the lifecycle manager from the kubelet's
+	// termination signal for one more timeout.
+	if instance.IsImmediateShutdownUnresponsive() {
+		return errors.New("PostgreSQL was already found unresponsive to an immediate shutdown, not retrying")
+	}
+
 	contextLogger.Info("Requesting immediate shutdown of the PostgreSQL instance")
 	immediateShutdownTimeout := instance.GetClusterOrDefault().GetImmediateShutdownTimeout()
 	err := instance.Shutdown(
