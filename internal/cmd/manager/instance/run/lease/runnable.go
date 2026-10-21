@@ -103,13 +103,9 @@ func defaultConfig() Config {
 type Runnable struct {
 	instance *postgres.Instance
 
-	// lock is wrapped by watchdog.WrapLock, so every Get/Update attempt made
-	// through it - by preAcquire/claim below or by client-go's elector -
-	// beats the watchdog, whether or not the attempt succeeds.
+	// lock is wrapped by the watchdog: every Get and Update beats it.
 	lock resourcelock.Interface
 
-	// watchdog reports whether the lease loop is still attempting lock
-	// operations, independent of whether those operations succeed.
 	watchdog *watchdog.LeaseWatchdog
 
 	// config holds the lease timings. It is initialised to the defaults by New
@@ -205,10 +201,7 @@ func New(
 	return result
 }
 
-// Watchdog reports whether the lease loop is still attempting lock
-// operations. A stale watchdog means the loop has wedged; it does not mean
-// lease renewal is failing (see checkStepDown for that, separately handled,
-// expected condition).
+// Watchdog returns the heartbeat the liveness probe reads.
 func (r *Runnable) Watchdog() *watchdog.LeaseWatchdog {
 	return r.watchdog
 }

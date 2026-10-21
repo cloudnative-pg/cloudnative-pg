@@ -220,13 +220,9 @@ type Instance struct {
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
 
-	// immediateShutdownUnresponsive is set once an immediate shutdown request
-	// has run out its configured timeout while PostgreSQL was still running.
-	// It signals that PostgreSQL failed to honor a fencing/step-down shutdown
-	// (e.g. a backend or the postmaster stuck in an uninterruptible state, or
-	// stopped via SIGSTOP), so it is read by the liveness probe: the right
-	// recovery at that point is for the Pod to be killed and recreated, not
-	// to keep retrying, so there is no way to clear it.
+	// immediateShutdownUnresponsive is set when an immediate shutdown ran out
+	// its timeout with PostgreSQL still running. The liveness probe reads it.
+	// It never clears: the Pod has to be killed and recreated.
 	immediateShutdownUnresponsive atomic.Bool
 
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator

@@ -29,12 +29,9 @@ import (
 )
 
 // LeaseWatchdog reports whether the primary-lease loop is still attempting
-// work, regardless of whether those attempts succeed. A stale heartbeat means
-// the loop itself has wedged (e.g. a deadlock); it does NOT mean lease
-// renewal is failing. A primary that cannot reach the API server but keeps
-// retrying is expected to fail renewal indefinitely while it decides,
-// independently, whether it must step down - that is not the condition this
-// watchdog detects.
+// lock calls, whether or not they succeed. A stale heartbeat means the loop is
+// wedged, not that renewal fails: a primary that retries against an
+// unreachable API server is handled by the step-down monitor.
 type LeaseWatchdog struct {
 	// lastAttempt keeps the monotonic reading of time.Now, so that a step of
 	// the wall clock is never mistaken for silence.
