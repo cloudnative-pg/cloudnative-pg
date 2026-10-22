@@ -350,6 +350,14 @@ var _ = Describe("Runnable watchdog", func() {
 		outage.Store(int64(400 * time.Millisecond))
 		Consistently(r.Watchdog().IsHealthy, time.Second).Should(Succeed())
 	})
+
+	It("stays healthy after a yield, so the liveness probe never restarts the replica", func(ctx context.Context) {
+		r, stop := start(ctx)
+		defer stop()
+
+		r.Yield(ctx)
+		Consistently(r.Watchdog().IsHealthy, 500*time.Millisecond).Should(Succeed())
+	})
 })
 
 var _ = Describe("Runnable.tryTakeOver", func() {
