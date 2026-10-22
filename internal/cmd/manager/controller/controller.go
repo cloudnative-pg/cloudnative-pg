@@ -291,6 +291,11 @@ func RunController(
 		return err
 	}
 
+	if err = mgr.Add(controller.NewNativeBarmanCloudWarning(mgr)); err != nil {
+		setupLog.Error(err, "unable to add the native Barman Cloud deprecation check")
+		return err
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
