@@ -780,13 +780,14 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	phase string,
 	reason string,
 ) error {
-	return status.PatchWithOptimisticLock(
-		ctx,
-		r.Client,
-		cluster,
-		status.SetPhase(phase, reason),
-		status.SetClusterReadyCondition,
-	)
+	txs := []status.Transaction{status.SetPhase(phase, reason)}
+	// A patch that refreshed the cluster with a newer generation means part
+	// of this loop evaluated that generation: the cluster is not marked as
+	// ready, the next loop, triggered by the generation change, does it
+	if phase != apiv1.PhaseHealthy || status.IsReconciledGeneration(ctx, cluster) {
+		txs = append(txs, status.SetClusterReadyCondition)
+	}
+	return status.PatchWithOptimisticLock(ctx, r.Client, cluster, txs...)
 }
 
 // updateClusterStatusThatRequiresInstancesState updates all the cluster status fields that require the instances status
