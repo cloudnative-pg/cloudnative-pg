@@ -224,6 +224,11 @@ metadata:
 spec:
   instances: 3
 
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   bootstrap:
     recovery:
       backup:
@@ -294,6 +299,11 @@ metadata:
   name: cluster-restore-pitr
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
 
   storage:
     size: 5Gi
@@ -493,6 +503,11 @@ metadata:
   name: cluster-restore-pitr
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
 
   storage:
     size: 5Gi

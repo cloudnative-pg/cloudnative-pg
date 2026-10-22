@@ -289,6 +289,12 @@ metadata:
 spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   storage:
     size: 1Gi
 ```
@@ -316,6 +322,12 @@ metadata:
 spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:18-minimal-trixie
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   storage:
     size: 1Gi
 ```

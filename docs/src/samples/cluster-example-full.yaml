@@ -45,6 +45,9 @@ spec:
   primaryUpdateStrategy: unsupervised
 
   postgresql:
+    synchronous:
+      method: any
+      number: 1
     parameters:
       shared_buffers: 256MB
       pg_stat_statements.max: '10000'
