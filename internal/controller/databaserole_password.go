@@ -138,8 +138,7 @@ func (r *DatabaseRoleReconciler) reconcilePassword(
 
 // passwordGenerationBlocked reports whether something stops the operator from
 // generating the password of this role right now, together with the
-// explanation to record in its status. The explanation is empty when there is
-// nothing to tell the user: the cluster has simply not been read yet.
+// explanation to record in its status.
 func passwordGenerationBlocked(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) (bool, string) {
 	// The client certificate of the role lives in a Secret this same controller
 	// owns: writing the password into it would have the two reconcilers
@@ -151,7 +150,9 @@ func passwordGenerationBlocked(role *apiv1.DatabaseRole, cluster *apiv1.Cluster)
 	}
 
 	if cluster == nil {
-		return true, ""
+		return true, fmt.Sprintf(
+			"cluster %q was not found: generation will start once it appears",
+			role.Spec.ClusterRef.Name)
 	}
 
 	// On a replica cluster the role's password is owned by the primary and
