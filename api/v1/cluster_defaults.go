@@ -42,10 +42,6 @@ const (
 	// DefaultMonitoringSecretName is the name of the target secret with the default monitoring queries,
 	// if configured
 	DefaultMonitoringSecretName = DefaultMonitoringConfigMapName
-	// DefaultApplicationDatabaseName is the name of application database if not specified
-	DefaultApplicationDatabaseName = "app"
-	// DefaultApplicationUserName is the name of application database owner if not specified
-	DefaultApplicationUserName = DefaultApplicationDatabaseName
 )
 
 // Default apply the defaults to undefined values in a Cluster preserving the user settings
@@ -233,18 +229,7 @@ func (r *Cluster) defaultMonitoringQueries(config *configuration.Data) {
 // defaultInitDB enriches the initDB with defaults if not all the required arguments were passed
 func (r *Cluster) defaultInitDB() {
 	if r.Spec.Bootstrap.InitDB == nil {
-		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
-			Database: DefaultApplicationDatabaseName,
-			Owner:    DefaultApplicationUserName,
-		}
-	}
-
-	if r.Spec.Bootstrap.InitDB.Database == "" {
-		// Set the default only if not executing a monolithic import
-		if r.Spec.Bootstrap.InitDB.Import == nil ||
-			r.Spec.Bootstrap.InitDB.Import.Type != MonolithSnapshotType {
-			r.Spec.Bootstrap.InitDB.Database = DefaultApplicationDatabaseName
-		}
+		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{}
 	}
 	if r.Spec.Bootstrap.InitDB.Owner == "" {
 		r.Spec.Bootstrap.InitDB.Owner = r.Spec.Bootstrap.InitDB.Database
@@ -262,9 +247,6 @@ func (r *Cluster) defaultInitDB() {
 
 // defaultRecovery enriches the recovery with defaults if not all the required arguments were passed
 func (r *Cluster) defaultRecovery() {
-	if r.Spec.Bootstrap.Recovery.Database == "" {
-		r.Spec.Bootstrap.Recovery.Database = DefaultApplicationDatabaseName
-	}
 	if r.Spec.Bootstrap.Recovery.Owner == "" {
 		r.Spec.Bootstrap.Recovery.Owner = r.Spec.Bootstrap.Recovery.Database
 	}
@@ -272,9 +254,6 @@ func (r *Cluster) defaultRecovery() {
 
 // defaultPgBaseBackup enriches the pg_basebackup with defaults if not all the required arguments were passed
 func (r *Cluster) defaultPgBaseBackup() {
-	if r.Spec.Bootstrap.PgBaseBackup.Database == "" {
-		r.Spec.Bootstrap.PgBaseBackup.Database = DefaultApplicationDatabaseName
-	}
 	if r.Spec.Bootstrap.PgBaseBackup.Owner == "" {
 		r.Spec.Bootstrap.PgBaseBackup.Owner = r.Spec.Bootstrap.PgBaseBackup.Database
 	}
