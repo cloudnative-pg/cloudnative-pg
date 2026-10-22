@@ -21,6 +21,9 @@ package metrics
 
 import (
 	"database/sql"
+	"errors"
+	"strings"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/cloudnative-pg/cnpg-i/pkg/metrics"
@@ -33,6 +36,164 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("Per-query caching", func() {
+	const inventorySQL = "SELECT current_database() AS datname, 1 AS value"
+	const healthSQL = "SELECT 2 AS value"
+	const discoverySQL = `SELECT datname, pg_catalog.has_database_privilege(datname, 'CONNECT')
+		FROM pg_catalog.pg_database WHERE datallowconn AND NOT datistemplate`
+	var (
+		q      *QueriesCollector
+		db     *sql.DB
+		mock   sqlmock.Sqlmock
+		opened []string
+	)
+	query := UserQuery{Query: inventorySQL, CacheSeconds: 3600, Metrics: []Mapping{
+		{"datname": {Usage: LABEL}}, {"value": {Usage: GAUGE}},
+	}}
+	newCollector := func(definition UserQuery) *QueriesCollector {
+		collector := NewQueriesCollector("cache", nil, "postgres")
+		collector.InjectUserQueries(UserQueries{"inventory": definition})
+		collector.getMetricsDB = func(name string) (*sql.DB, error) {
+			opened = append(opened, name)
+			return db, nil
+		}
+		return collector
+	}
+	expectQuery := func(sql string, rows *sqlmock.Rows, queryErr error) {
+		mock.ExpectBegin()
+		mock.ExpectExec("SET LOCAL search_path = pg_catalog, public, pg_temp").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec("SET standard_conforming_strings TO on").WillReturnResult(sqlmock.NewResult(0, 0))
+		if queryErr != nil {
+			mock.ExpectQuery(sql).WillReturnError(queryErr)
+		} else {
+			mock.ExpectQuery(sql).WillReturnRows(rows)
+		}
+		mock.ExpectCommit()
+	}
+	rows := func(value int) *sqlmock.Rows {
+		return sqlmock.NewRows([]string{"datname", "value"}).AddRow("app", value)
+	}
+	values := func(name string) []float64 {
+		ch := make(chan prometheus.Metric, 20)
+		q.Collect(ch)
+		close(ch)
+		var result []float64
+		for metric := range ch {
+			if strings.Contains(metric.Desc().String(), `fqName: "`+name+`"`) {
+				var value io_prometheus_client.Metric
+				Expect(metric.Write(&value)).To(Succeed())
+				result = append(result, value.GetGauge().GetValue())
+			}
+		}
+		return result
+	}
+	BeforeEach(func() {
+		var err error
+		db, mock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).NotTo(HaveOccurred())
+		mock.MatchExpectationsInOrder(false)
+		opened = nil
+		q = newCollector(query)
+	})
+	AfterEach(func() {
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+		_ = db.Close()
+	})
+
+	It("serves cached inventory without discovery or connections while health metrics refresh", func() {
+		inventory := query
+		inventory.TargetDatabases = []string{"*"}
+		q.InjectUserQueries(UserQueries{
+			"inventory": inventory,
+			"health":    {Query: healthSQL, Metrics: []Mapping{{"value": {Usage: GAUGE}}}},
+		})
+		expectQuery(discoverySQL, sqlmock.NewRows([]string{"datname", "connect"}).
+			AddRow("app", true).AddRow("other", true), nil)
+		expectQuery(inventorySQL, rows(1), nil)
+		expectQuery(inventorySQL, rows(2), nil)
+		expectQuery(healthSQL, sqlmock.NewRows([]string{"value"}).AddRow(2), nil)
+		q.createMetricsFromUserQueries(true)
+		opened = nil
+		expectQuery(healthSQL, sqlmock.NewRows([]string{"value"}).AddRow(3), nil)
+		q.createMetricsFromUserQueries(true)
+		Expect(opened).To(Equal([]string{"postgres"}))
+		Expect(values("cache_inventory_value")).To(ConsistOf(float64(1), float64(2)))
+		Expect(values("cache_health_value")).To(ConsistOf(float64(3)))
+	})
+
+	DescribeTable("refreshes", func(cacheSeconds uint64, age time.Duration) {
+		inventory := query
+		inventory.CacheSeconds = cacheSeconds
+		q.InjectUserQueries(UserQueries{"inventory": inventory})
+		expectQuery(inventorySQL, rows(1), nil)
+		q.createMetricsFromUserQueries(true)
+		if entry, ok := q.queryCache["inventory"]; ok {
+			entry.collectedAt = time.Now().Add(-age)
+			q.queryCache["inventory"] = entry
+		}
+		expectQuery(inventorySQL, rows(2), nil)
+		q.createMetricsFromUserQueries(true)
+		Expect(values("cache_inventory_value")).To(ConsistOf(float64(2)))
+	}, Entry("when caching is disabled", uint64(0), time.Duration(0)),
+		Entry("when the cache expires", uint64(3600), time.Hour))
+
+	It("retries partial failures instead of caching them", func() {
+		inventory := query
+		inventory.TargetDatabases = []string{"app", "other"}
+		q.InjectUserQueries(UserQueries{"inventory": inventory})
+		expectQuery(inventorySQL, rows(1), nil)
+		expectQuery(inventorySQL, nil, errors.New("temporary failure"))
+		q.createMetricsFromUserQueries(true)
+		opened = nil
+		expectQuery(inventorySQL, rows(2), nil)
+		expectQuery(inventorySQL, rows(3), nil)
+		q.createMetricsFromUserQueries(true)
+		Expect(opened).To(ConsistOf("app", "other"))
+		Expect(values("cache_inventory_value")).To(ConsistOf(float64(2), float64(3)))
+	})
+
+	It("retries failed discovery", func() {
+		inventory := query
+		inventory.TargetDatabases = []string{"*"}
+		q.InjectUserQueries(UserQueries{"inventory": inventory})
+		expectQuery(discoverySQL, nil, errors.New("temporary failure"))
+		q.createMetricsFromUserQueries(true)
+		expectQuery(discoverySQL, sqlmock.NewRows([]string{"datname", "connect"}).AddRow("app", true), nil)
+		expectQuery(inventorySQL, rows(2), nil)
+		q.createMetricsFromUserQueries(true)
+		Expect(values("cache_inventory_value")).To(ConsistOf(float64(2)))
+	})
+
+	It("invalidates cached results after role transitions", func() {
+		expectQuery(inventorySQL, rows(1), nil)
+		q.createMetricsFromUserQueries(true)
+		expectQuery(inventorySQL, rows(2), nil)
+		q.createMetricsFromUserQueries(false)
+		Expect(values("cache_inventory_value")).To(ConsistOf(float64(2)))
+	})
+
+	It("retains unchanged queries across reconciliation, but not changed definitions", func() {
+		expectQuery(inventorySQL, rows(1), nil)
+		q.createMetricsFromUserQueries(true)
+		next := newCollector(query)
+		next.RestoreCache(q)
+		q = next
+		opened = nil
+		q.createMetricsFromUserQueries(true)
+		Expect(opened).To(BeEmpty())
+		Expect(values("cache_inventory_value")).To(ConsistOf(float64(1)))
+		changed := query
+		changed.Query = "SELECT current_database() AS datname, 2 AS value"
+		next = newCollector(changed)
+		next.RestoreCache(q)
+		q = next
+		expectQuery(changed.Query, rows(2), nil)
+		q.createMetricsFromUserQueries(true)
+		Expect(values("cache_inventory_value")).To(ConsistOf(float64(2)))
+	})
+})
 
 var _ = Describe("Set default queries", Ordered, func() {
 	q := NewQueriesCollector("test", nil, "db")
