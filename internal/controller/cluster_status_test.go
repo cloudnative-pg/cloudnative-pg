@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -892,7 +891,7 @@ var _ = Describe("failedBootstrapPodNames", func() {
 	It("does not flag a bootstrap that failed once but has since succeeded on a later retry", func() {
 		resources := &managedResources{
 			instances: corev1.PodList{Items: []corev1.Pod{
-				newBootstrapPod("cluster-1", 1, ptr.To(int32(0))),
+				newBootstrapPod("cluster-1", 1, new(int32(0))),
 			}},
 		}
 		Expect(resources.failedBootstrapPodNames()).To(BeEmpty())

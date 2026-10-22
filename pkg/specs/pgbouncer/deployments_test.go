@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -53,7 +52,7 @@ var _ = Describe("Deployment", func() {
 			Spec: apiv1.PoolerSpec{
 				Cluster:   apiv1.LocalObjectReference{Name: "test-cluster"},
 				Type:      apiv1.PoolerTypeRW,
-				Instances: ptr.To(int32(1)),
+				Instances: new(int32(1)),
 				Template:  &apiv1.PodTemplateSpec{},
 				PgBouncer: &apiv1.PgBouncerSpec{
 					PoolMode:  apiv1.PgBouncerPoolModeSession,
@@ -126,7 +125,7 @@ var _ = Describe("Deployment", func() {
 	})
 
 	It("sets the correct number of replicas", func() {
-		pooler.Spec.Instances = ptr.To(int32(3))
+		pooler.Spec.Instances = new(int32(3))
 		deployment, err := Deployment(pooler, cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())

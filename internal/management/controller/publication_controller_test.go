@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -285,7 +284,7 @@ var _ = Describe("Managed publication controller tests", func() {
 
 			// Demote the cluster to a replica after the finalizer was added.
 			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			}
 			Expect(fakeClient.Update(ctx, cluster)).To(Succeed())
 
@@ -435,7 +434,7 @@ var _ = Describe("Managed publication controller tests", func() {
 	It("properly signals a publication is on a replica cluster", func(ctx SpecContext) {
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
@@ -452,13 +451,13 @@ var _ = Describe("Managed publication controller tests", func() {
 	// The demotion behavior is identical across the three managed-object
 	// controllers, and so are its tests.
 	It("reports the replica condition when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
-		publication.Status.Applied = ptr.To(true)
+		publication.Status.Applied = new(true)
 		publication.Status.ObservedGeneration = publication.Generation
 		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
 
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
@@ -478,13 +477,13 @@ var _ = Describe("Managed publication controller tests", func() {
 	})
 
 	It("keeps an applied publication untouched on pods other than the designated primary", func(ctx SpecContext) {
-		publication.Status.Applied = ptr.To(true)
+		publication.Status.Applied = new(true)
 		publication.Status.ObservedGeneration = publication.Generation
 		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
 
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 		cluster.Status.CurrentPrimary = "another-pod"
@@ -508,7 +507,7 @@ var _ = Describe("Managed publication controller tests", func() {
 	// The cluster-fetch behavior is identical across the three
 	// managed-object controllers, and so are its tests.
 	It("keeps a reconciled publication status when the cluster cannot be fetched", func(ctx SpecContext) { //nolint:dupl
-		publication.Status.Applied = ptr.To(true)
+		publication.Status.Applied = new(true)
 		publication.Status.ObservedGeneration = publication.Generation
 		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
 

@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -78,10 +77,10 @@ func newSnapshotPair(namespace, backupName string, readyToUse bool) volumesnapsh
 					},
 				},
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
-					ReadyToUse:                     ptr.To(readyToUse),
+					ReadyToUse:                     new(readyToUse),
 					Error:                          nil,
-					BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backupName)),
-					CreationTime:                   ptr.To(metav1.Now()),
+					BoundVolumeSnapshotContentName: new(fmt.Sprintf("%s-content", backupName)),
+					CreationTime:                   new(metav1.Now()),
 				},
 			},
 			{
@@ -96,10 +95,10 @@ func newSnapshotPair(namespace, backupName string, readyToUse bool) volumesnapsh
 					},
 				},
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
-					ReadyToUse:                     ptr.To(readyToUse),
+					ReadyToUse:                     new(readyToUse),
 					Error:                          nil,
-					BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backupName)),
-					CreationTime:                   ptr.To(metav1.Now()),
+					BoundVolumeSnapshotContentName: new(fmt.Sprintf("%s-wal-content", backupName)),
+					CreationTime:                   new(metav1.Now()),
 				},
 			},
 		},
@@ -132,7 +131,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Backup: &apiv1.BackupConfiguration{
 					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
 						ClassName: "csi-hostpath-snapclass",
-						Online:    ptr.To(false),
+						Online:    new(false),
 					},
 				},
 			},
@@ -175,8 +174,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Method: apiv1.BackupMethodVolumeSnapshot,
 			},
 			Status: apiv1.BackupStatus{
-				StartedAt:    ptr.To(startedAt),
-				StoppedAt:    ptr.To(stoppedAt),
+				StartedAt:    new(startedAt),
+				StoppedAt:    new(stoppedAt),
 				MajorVersion: 18,
 			},
 		}
@@ -336,7 +335,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		// the cluster has no explicit online setting, which defaults to true (hot backup)
 		cluster.Spec.Backup.VolumeSnapshot.Online = nil
 		// but this specific Backup requests a cold (offline) backup
-		backup.Spec.Online = ptr.To(false)
+		backup.Spec.Online = new(false)
 
 		snapshots := newSnapshotPair(namespace, backup.Name, false)
 
@@ -367,8 +366,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 	It("should annotate the snapshots with the effective online setting", func(ctx SpecContext) {
 		// the cluster requests cold backups, but this specific Backup asks for a hot one
-		cluster.Spec.Backup.VolumeSnapshot.Online = ptr.To(false)
-		backup.Spec.Online = ptr.To(true)
+		cluster.Spec.Backup.VolumeSnapshot.Online = new(false)
+		backup.Spec.Online = new(true)
 
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
@@ -598,8 +597,8 @@ var _ = Describe("annotateSnapshotsWithBackupData", func() {
 		startedAt = metav1.Now()
 		stoppedAt = metav1.NewTime(time.Now().Add(time.Hour))
 		backupStatus = &apiv1.BackupStatus{
-			StartedAt: ptr.To(startedAt),
-			StoppedAt: ptr.To(stoppedAt),
+			StartedAt: new(startedAt),
+			StoppedAt: new(stoppedAt),
 		}
 		fakeClient = fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithLists(&snapshots).Build()
@@ -749,7 +748,7 @@ var _ = Describe("handleSnapshotErrors", func() {
 	It("requeues a message that would previously have been treated as permanent", func() {
 		snapshotErr := &volumeSnapshotError{
 			InternalError: volumesnapshotv1.VolumeSnapshotError{
-				Message: ptr.To("Failed to get snapshot class with name wrongSnapshotClass"),
+				Message: new("Failed to get snapshot class with name wrongSnapshotClass"),
 			},
 			Name:      "snapshot",
 			Namespace: backup.Namespace,
@@ -781,7 +780,7 @@ var _ = Describe("handleSnapshotErrors", func() {
 
 		snapshotErr := &volumeSnapshotError{
 			InternalError: volumesnapshotv1.VolumeSnapshotError{
-				Message: ptr.To("Failed to get snapshot class with name wrongSnapshotClass"),
+				Message: new("Failed to get snapshot class with name wrongSnapshotClass"),
 			},
 			Name:      "snapshot",
 			Namespace: backup.Namespace,

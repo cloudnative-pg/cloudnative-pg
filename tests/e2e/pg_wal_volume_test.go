@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -107,7 +106,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 			Expect(err).NotTo(HaveOccurred())
 			cluster.Spec.WalStorage = &apiv1.StorageConfiguration{
 				Size:         "1Gi",
-				StorageClass: ptr.To(env.DefaultStorageClass),
+				StorageClass: new(env.DefaultStorageClass),
 			}
 			return env.Client.Update(env.Ctx, cluster)
 		})

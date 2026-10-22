@@ -127,7 +127,7 @@ func (instance *Instance) GetPostmasterPidFromFile(pidFile string) ([]byte, int,
 
 	// Inside the PID file, the first line contain the actual postmaster
 	// PID working on the data directory
-	pidLine := strings.Split(string(pidFileContents), "\n")[0]
+	pidLine, _, _ := strings.Cut(string(pidFileContents), "\n")
 	pid, err := strconv.Atoi(strings.TrimSpace(pidLine))
 	return pidFileContents, pid, err
 }

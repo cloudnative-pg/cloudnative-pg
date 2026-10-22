@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -163,14 +162,14 @@ func (cmd *fioCommand) generateConfigMapObject() *corev1.ConfigMap {
 func getSecurityContext() *corev1.SecurityContext {
 	runAs := int64(10001)
 	sc := &corev1.SecurityContext{
-		AllowPrivilegeEscalation: ptr.To(false),
-		RunAsNonRoot:             ptr.To(true),
+		AllowPrivilegeEscalation: new(false),
+		RunAsNonRoot:             new(true),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{
 				"ALL",
 			},
 		},
-		ReadOnlyRootFilesystem: ptr.To(true),
+		ReadOnlyRootFilesystem: new(true),
 	}
 	if utils.HaveSecurityContextConstraints() {
 		return sc

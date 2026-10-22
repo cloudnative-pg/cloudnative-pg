@@ -26,7 +26,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
-	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -122,13 +121,13 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	}
 	if r.Spec.ReplicationSlots.HighAvailability == nil {
 		r.Spec.ReplicationSlots.HighAvailability = &ReplicationSlotsHAConfiguration{
-			Enabled:    ptr.To(true),
+			Enabled:    new(true),
 			SlotPrefix: "_cnpg_",
 		}
 	}
 	if r.Spec.ReplicationSlots.SynchronizeReplicas == nil {
 		r.Spec.ReplicationSlots.SynchronizeReplicas = &SynchronizeReplicasConfiguration{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		}
 	}
 
@@ -157,7 +156,7 @@ func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
 		if !foundPlugins.Has(pluginName) {
 			r.Spec.Plugins = append(r.Spec.Plugins, PluginConfiguration{
 				Name:    pluginName,
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			})
 		}
 	}
@@ -311,7 +310,7 @@ func (r *Cluster) setProbes() {
 
 	// STEP 2: set defaults.
 	r.Spec.Probes.Liveness.IsolationCheck = &IsolationCheckConfiguration{
-		Enabled:           ptr.To(true),
+		Enabled:           new(true),
 		RequestTimeout:    defaultRequestTimeout,
 		ConnectionTimeout: defaultConnectionTimeout,
 	}

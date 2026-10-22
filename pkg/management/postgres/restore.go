@@ -421,8 +421,7 @@ func (info InitInfo) restoreDataDir(
 	cmd.Env = env
 	err = execlog.RunStreaming(cmd, barmanUtils.BarmanCloudRestore)
 	if err != nil {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
+		if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 			err = barmanCommand.UnmarshalBarmanCloudRestoreExitCode(exitError.ExitCode())
 		}
 

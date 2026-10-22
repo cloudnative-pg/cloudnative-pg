@@ -25,7 +25,6 @@ import (
 	"net/http"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -140,7 +139,7 @@ func getProbeRunnerFromCluster(probeType probeType, cluster apiv1.Cluster) runne
 	case probe.Type == apiv1.ProbeStrategyStreaming:
 		result := pgStreamingChecker{}
 		if probe.MaximumLag != nil {
-			result.maximumLag = ptr.To(probe.MaximumLag.AsDec().UnscaledBig().Uint64())
+			result.maximumLag = new(probe.MaximumLag.AsDec().UnscaledBig().Uint64())
 		}
 		return result
 	}
