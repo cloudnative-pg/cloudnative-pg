@@ -906,3 +906,20 @@ You can work around this issue by setting `STANDBY_TCP_USER_TIMEOUT` in the
 the standby instances to close the TCP connection if the initial `SYN` packet
 is not acknowledged within the specified timeout, allowing them to retry the
 connection more quickly.
+
+### Accidental deletion of a cluster
+
+If you accidentally delete a cluster and you don't have an up-to-date backup, you can restore it using the `PersistentVolume` (PV) if it is still available.
+
+!!! Important
+    Make sure you configure your Kubernetes PVs with `persistentVolumeReclaimPolicy` set to `Retain` so that the PV is not deleted when the cluster is deleted.
+
+Here are the steps to restore the cluster:
+
+1. Find the `PersistentVolume` (PV) that was associated to the PostgreSQL cluster.
+2. Save the value from `spec.claimRef.name` field - the value will be later used in step 4.
+3. Remove the `claimRef` field from the PV so it can be attached to a new `PersistentVolumeClaim` (PVC). 
+4. Create a new PVC with name from `spec.claimRef.name` (step 2) and with `volumeName` equal to the name of the PV found in step 1.
+5. Once the PVC is correctly attached to the PV, you can create `VolumeSnapshot` K8S resource from the PVC by setting `persistentVolumeClaimName` equal to the name of the PVC.
+6. (Optional) After the `VolumeSnapshot` resource is created, delete the recently created PVC so CNPG Operator can recreate a new PVC from the `VolumeSnapshot` - Although this step is not required, it is recommended so the operator can create a new PVC with the same name.
+7. Finally, you can follow the instructions of [recovery from VolumeSnapshot objects](recovery.md#recovery-from-volumesnapshot-objects) to bootstrap a new cluster.
