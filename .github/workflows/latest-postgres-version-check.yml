@@ -28,7 +28,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r .github/workflow-requirements.txt
+          pip install --require-hashes -r .github/workflow-requirements.txt
 
       - name: Generate PostgreSQL JSON files
         run: |
