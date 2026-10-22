@@ -486,3 +486,27 @@ var _ = Describe("Configuration report", func() {
 		),
 	)
 })
+
+var _ = Describe("ExcludingDiverged", func() {
+	It("drops the diverged instances, keeping the order and the list metadata", func() {
+		list := PostgresqlStatusList{
+			IsReplicaCluster: true,
+			CurrentPrimary:   "server-1",
+			Items: []PostgresqlStatus{
+				{Pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-1"}}},
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-2"}},
+					Divergence: &TimelineDivergence{TimeLineID: 1, PrimaryTimeLineID: 2},
+				},
+				{Pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-3"}}},
+			},
+		}
+
+		result := list.ExcludingDiverged()
+
+		Expect(result.GetNames()).To(Equal([]string{"server-1", "server-3"}))
+		Expect(result.IsReplicaCluster).To(BeTrue())
+		Expect(result.CurrentPrimary).To(Equal("server-1"))
+		Expect(list.Items).To(HaveLen(3), "the original list is left untouched")
+	})
+})

@@ -32,6 +32,25 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// TimelineDivergence describes a standby that holds WAL past the point where
+// the primary's timeline forked away from its own, so it can never follow the
+// primary again
+type TimelineDivergence struct {
+	// TimeLineID is the timeline of the WAL the standby holds
+	TimeLineID int `json:"timeLineID"`
+
+	// PrimaryTimeLineID is the newest timeline the standby learned about
+	// from the primary
+	PrimaryTimeLineID int `json:"primaryTimeLineID"`
+
+	// ForkLSN is where PrimaryTimeLineID forked away from TimeLineID, empty
+	// when TimeLineID is not an ancestor of PrimaryTimeLineID at all
+	ForkLSN types.LSN `json:"forkLSN,omitempty"`
+
+	// ReplayLSN is how far the standby has replayed, past ForkLSN
+	ReplayLSN types.LSN `json:"replayLSN"`
+}
+
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
 	CurrentLsn                types.LSN   `json:"currentLsn,omitempty"`
@@ -70,6 +89,12 @@ type PostgresqlStatus struct {
 	// The current timeline ID
 	// SELECT timeline_id FROM pg_control_checkpoint()
 	TimeLineID int `json:"timeLineID,omitempty"`
+
+	// Divergence is set on a standby that can never follow the primary's
+	// timeline, as detected by DetectTimelineDivergence from the standby's
+	// own pg_wal. Nil when the standby is not diverged, and on an instance
+	// manager that predates this field.
+	Divergence *TimelineDivergence `json:"divergence,omitempty"`
 
 	// This field is set when there is an error while extracting the
 	// status of a Pod
@@ -271,6 +296,21 @@ func (list *PostgresqlStatusList) LogStatus(ctx context.Context) {
 		`detailed pod status`,
 		"data", list,
 	)
+}
+
+// ExcludingDiverged returns the list without the instances that can never
+// follow the primary's timeline (see DetectTimelineDivergence), keeping the
+// order of the remaining ones. Those instances hold writes the primary
+// discarded, so they must not be considered for promotion.
+func (list PostgresqlStatusList) ExcludingDiverged() PostgresqlStatusList {
+	result := list
+	result.Items = make([]PostgresqlStatus, 0, len(list.Items))
+	for _, item := range list.Items {
+		if item.Divergence == nil {
+			result.Items = append(result.Items, item)
+		}
+	}
+	return result
 }
 
 // Len implements sort.Interface extracting the length of the list
