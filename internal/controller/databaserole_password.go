@@ -256,7 +256,7 @@ func (r *DatabaseRoleReconciler) ensurePasswordSecret(
 		// nothing is recorded about a password the role knows nothing of.
 		staleRole := !passwordSecretChangeRecorded(role, &secret) &&
 			len(secret.Data[corev1.BasicAuthPasswordKey]) > 0
-		issuedAt, err = r.ensureOwnedPasswordSecretUpToDate(ctx, role, &secret)
+		issuedAt, err = r.ensureOwnedPasswordSecretUpToDate(ctx, role, &secret, staleRole)
 		if err != nil {
 			return "", err
 		}
@@ -331,11 +331,13 @@ func (r *DatabaseRoleReconciler) createPasswordSecret(
 // ensureOwnedPasswordSecretUpToDate generates a new password when the current
 // one is gone or due for rotation, and keeps the username in sync with the
 // role. It returns the current password's issue time (zero when rotation is
-// disabled), for the caller to record in the role's status.
+// disabled, or when staleRole is set), for the caller to record in the role's
+// status.
 func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	secret *corev1.Secret,
+	staleRole bool,
 ) (time.Time, error) {
 	origSecret := secret.DeepCopy()
 
@@ -359,12 +361,15 @@ func (r *DatabaseRoleReconciler) ensureOwnedPasswordSecretUpToDate(
 		// Nothing to expire: issuedAt is left at the zero time, so the status
 		// carries an empty IssuedAt and Expiration.
 
+	case staleRole:
+		// The issue time the role carries may belong to the password before
+		// the one in the Secret: the caller records nothing.
+
 	default:
 		// Rotation is enabled and the password was not rotated this loop: carry
 		// its recorded issue time forward, instead of recomputing the deadline
 		// from nothing. An unreadable issue time makes passwordNeedsRotation
-		// rotate, so getting here means it parses, unless the caller
-		// discards it for a stale role.
+		// rotate, so getting here means it parses.
 		issuedAt, _ = role.GetPasswordIssuedAt(secret.CreationTimestamp.Time)
 	}
 
