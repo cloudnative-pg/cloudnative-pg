@@ -7106,6 +7106,14 @@ spec:
             x-kubernetes-validations:
             - message: imageName and imageCatalogRef are mutually exclusive
               rule: '!(has(self.imageCatalogRef) && has(self.imageName))'
+            - message: maxSyncReplicas must be lower than the number of instances
+              rule: self.maxSyncReplicas < self.instances
+            - message: the number of synchronous replicas must be less than the total
+                number of instances and the provided standby names
+              rule: '!has(self.postgresql) || !has(self.postgresql.synchronous) ||
+                self.postgresql.synchronous.number < self.instances + (has(self.postgresql.synchronous.standbyNamesPre)
+                ? self.postgresql.synchronous.standbyNamesPre.size() : 0) + (has(self.postgresql.synchronous.standbyNamesPost)
+                ? self.postgresql.synchronous.standbyNamesPost.size() : 0)'
           status:
             description: |-
               Most recently observed status of the cluster. This data may not be up
