@@ -33,12 +33,14 @@ to diagnose a Cluster.
 :::warning
     `cnpg-viewer-role` comes with the operator manifest, not with the Helm
     chart. If you install with Helm, the role does not exist in your cluster:
-    the chart ships its own `<release>-view` ClusterRole instead, which you can
-    aggregate into `view`, `edit` and `admin` with the
-    `rbac.aggregateClusterRoles` value. That role covers only the
-    `postgresql.cnpg.io` group, not the Barman Cloud and Klio plugins. To get
-    `cnpg-viewer-role` with Helm, apply it from the operator manifest. The
-    samples below do not depend on it.
+    the chart ships its own view ClusterRole instead (for example,
+    `cnpg-cloudnative-pg-view` for a release named `cnpg`), which covers only
+    the `postgresql.cnpg.io` group, not the Barman Cloud and Klio plugins. You
+    can aggregate it into `view`, `edit` and `admin` with the
+    `rbac.aggregateClusterRoles` value, which also aggregates the chart's edit
+    role into `edit` and `admin`, giving them write access to CloudNativePG
+    resources. To get `cnpg-viewer-role` with Helm, apply it from the operator
+    manifest. The samples below do not depend on it.
 :::
 
 CloudNativePG also provides sample manifests that complete the persona. They
@@ -96,7 +98,7 @@ The table below is derived from the Kubernetes API calls made by each
 
 | Command | `cnpg-dba-viewer` | Notes |
 | ------- | :---------------: | ----- |
-| `kubectl cnpg status` | Yes, with gaps | Needs `get` on `pods/proxy`. Two parts of the output run `kubectl exec`, so they need `pods/exec`: the database `Size` line, and, with `-v -v`, the PostgreSQL configuration and HBA rules. Without it, those parts show an error and the rest of the output is unaffected. |
+| `kubectl cnpg status` | Yes, with gaps | Needs `get` on `pods/proxy`. Two parts of the output run `kubectl exec`, so they need `pods/exec`: the database `Size` line, and, with `-v -v`, the PostgreSQL configuration and HBA rules. Without it, those parts report that the permission is missing, and the rest of the output is unaffected. |
 | `kubectl cnpg logs cluster` | Yes | |
 | `kubectl cnpg report cluster` | Yes | Includes events, Pods, Jobs and PVCs. |
 | `kubectl cnpg psql` | No | It runs `kubectl exec`, which needs `create` on `pods/exec`. |
@@ -134,6 +136,13 @@ kubectl cnpg status cluster-example --as=jane --as-group=dbas
 kubectl cnpg logs cluster cluster-example --as=jane --as-group=dbas
 ```
 
+:::warning
+    Two plugin commands do not pass these flags on. `kubectl cnpg psql` runs
+    `kubectl exec` without them, and `kubectl cnpg report` collects logs (with
+    `--logs`) without them. Both run with your own identity, so they succeed
+    even when the role does not allow them: do not use them to try a role.
+:::
+
 A request that the role does not allow fails with a `Forbidden` error, for
 example:
 
@@ -148,10 +157,12 @@ To ask the API server directly, without running the command, use
 ```sh
 kubectl auth can-i get clusters.postgresql.cnpg.io -n default --as=jane --as-group=dbas
 kubectl auth can-i delete clusters.postgresql.cnpg.io -n default --as=jane --as-group=dbas
-kubectl auth can-i create pods/exec -n default --as=jane --as-group=dbas
+kubectl auth can-i create pods --subresource=exec -n default --as=jane --as-group=dbas
 ```
 
-The answer is `yes` for the first command, and `no` for the other two.
+The answer is `yes` for the first command, and `no` for the other two. Pass a
+subresource with `--subresource`: `kubectl auth can-i` reads `pods/exec` as the
+Pod named `exec`, so it checks `pods`, not the subresource.
 
 :::note
     Use `kubectl auth can-i` only for namespaced resources. For cluster-scoped
@@ -182,6 +193,7 @@ Everyone bound to `view` then gains read access to those resources,
 without any additional binding. This widens `view` for the whole cluster, so it
 should be a deliberate decision of the platform team. With the Helm chart, use
 the `rbac.aggregateClusterRoles` value instead, which labels the chart's own
-`<release>-view` role. Do not apply the label to
+view role, but also gives everyone bound to `edit` or `admin` write access to
+CloudNativePG resources through the chart's edit role. Do not apply the label to
 `cnpg-dba-viewer`, which would also give every `view` user access to
 `pods/proxy`, leases and VolumeSnapshots.
