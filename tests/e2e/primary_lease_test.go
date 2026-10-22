@@ -21,13 +21,19 @@ package e2e
 
 import (
 	coordinationv1 "k8s.io/api/coordination/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -131,6 +137,98 @@ var _ = Describe("Primary lease", Label(tests.LabelSelfHealing), func() {
 				g.Expect(lease.Spec.HolderIdentity).ToNot(BeNil())
 				g.Expect(*lease.Spec.HolderIdentity).To(Equal(newPrimary))
 			}, testTimeouts[timeouts.NewPrimaryAfterSwitchover]).Should(Succeed())
+		})
+	})
+
+	It("replaces the Lease left behind by a Cluster deleted with orphan propagation", func() {
+		var err error
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "primary-lease-orphan")
+		Expect(err).ToNot(HaveOccurred())
+
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+
+		var oldPrimary string
+		By("deleting the Cluster while orphaning its PVCs and Pods", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			oldPrimary = cluster.Status.CurrentPrimary
+
+			Expect(objects.Delete(env.Ctx, env.Client, cluster,
+				ctrlclient.PropagationPolicy(metav1.DeletePropagationOrphan))).To(Succeed())
+
+			Eventually(func() bool {
+				_, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				return apierrs.IsNotFound(err)
+			}, 120).Should(BeTrue())
+		})
+
+		By("deleting the Pods, as lost with the Kubernetes cluster", func() {
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			quickDelete := &ctrlclient.DeleteOptions{GracePeriodSeconds: &quickDeletionPeriod}
+			for idx := range podList.Items {
+				Expect(podutils.Delete(env.Ctx, env.Client, namespace, podList.Items[idx].Name,
+					quickDelete)).To(Succeed())
+			}
+			Eventually(func(g Gomega) {
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(podList.Items).To(BeEmpty())
+			}, 120).Should(Succeed())
+		})
+
+		var oldLeaseUID types.UID
+		By("leaving an orphan Lease behind, as a backup tool would", func() {
+			// The operator can adopt the Lease again while the Cluster is being
+			// deleted, and the Lease is then lost. Don't depend on the orphan
+			// propagation here.
+			Eventually(func(g Gomega) {
+				lease := &coordinationv1.Lease{}
+				err := env.Client.Get(env.Ctx,
+					ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, lease)
+				if apierrs.IsNotFound(err) {
+					lease = &coordinationv1.Lease{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      clusterName,
+							Labels:    map[string]string{utils.ClusterLabelName: clusterName},
+						},
+						Spec: coordinationv1.LeaseSpec{HolderIdentity: &oldPrimary},
+					}
+					g.Expect(env.Client.Create(env.Ctx, lease)).To(Succeed())
+				} else {
+					g.Expect(err).ToNot(HaveOccurred())
+					lease.OwnerReferences = nil
+					g.Expect(env.Client.Update(env.Ctx, lease)).To(Succeed())
+				}
+				oldLeaseUID = lease.UID
+			}, testTimeouts[timeouts.Short]).Should(Succeed())
+		})
+
+		By("recreating the Cluster from the same manifest", func() {
+			// Fail here if the orphan Lease was lost, instead of passing on a
+			// Lease that the operator would create anyway.
+			lease := getLease(Default)
+			Expect(lease.UID).To(Equal(oldLeaseUID))
+			Expect(lease.OwnerReferences).To(BeEmpty())
+
+			resources.CreateResourceFromFile(env, namespace, sampleFile)
+		})
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+
+		By("owning a new Lease via the recreated Cluster", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				// No instance is left to hold the orphan Lease, so the operator
+				// deletes it and creates a new one
+				lease := getLease(g)
+				g.Expect(lease.UID).ToNot(Equal(oldLeaseUID))
+				owner := metav1.GetControllerOf(lease)
+				g.Expect(owner).ToNot(BeNil())
+				g.Expect(owner.UID).To(Equal(cluster.UID))
+			}, testTimeouts[timeouts.Short]).Should(Succeed())
 		})
 	})
 })
