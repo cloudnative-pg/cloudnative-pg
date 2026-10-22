@@ -220,6 +220,11 @@ type Instance struct {
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
 
+	// immediateShutdownUnresponsive is set when an immediate shutdown ran out
+	// its timeout with PostgreSQL still running. The liveness probe reads it.
+	// It never clears: the Pod has to be killed and recreated.
+	immediateShutdownUnresponsive atomic.Bool
+
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
 	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
 
@@ -726,12 +731,15 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	if errors.As(err, &exitError) {
 		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
+		immediateShutdownTimeout := instance.GetClusterOrDefault().GetImmediateShutdownTimeout()
 		err = instance.Shutdown(ctx,
 			shutdownOptions{
-				Mode: shutdownModeImmediate,
-				Wait: true,
+				Mode:    shutdownModeImmediate,
+				Wait:    true,
+				Timeout: &immediateShutdownTimeout,
 			},
 		)
+		instance.checkImmediateShutdownUnresponsive(ctx, err)
 	}
 	return err
 }
@@ -745,14 +753,49 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
+	// Another attempt would only keep the lifecycle manager from the kubelet's
+	// termination signal for one more timeout.
+	if instance.IsImmediateShutdownUnresponsive() {
+		return errors.New("PostgreSQL was already found unresponsive to an immediate shutdown, not retrying")
+	}
+
 	contextLogger.Info("Requesting immediate shutdown of the PostgreSQL instance")
-	return instance.Shutdown(
+	immediateShutdownTimeout := instance.GetClusterOrDefault().GetImmediateShutdownTimeout()
+	err := instance.Shutdown(
 		ctx,
 		shutdownOptions{
-			Mode: shutdownModeImmediate,
-			Wait: true,
+			Mode:    shutdownModeImmediate,
+			Wait:    true,
+			Timeout: &immediateShutdownTimeout,
 		},
 	)
+	instance.checkImmediateShutdownUnresponsive(ctx, err)
+	return err
+}
+
+// checkImmediateShutdownUnresponsive is called after an immediate-mode Shutdown attempt. If that
+// attempt failed and PostgreSQL is still running, its configured timeout ran out without
+// PostgreSQL honoring the shutdown request (e.g. a backend or the postmaster stuck in an
+// uninterruptible state, or stopped via SIGSTOP): mark the instance as unresponsive so the
+// liveness probe can report it. If shutdownErr is nil, or the instance is no longer running,
+// this was a slow-but-successful stop (or an unrelated failure), not the condition we track.
+func (instance *Instance) checkImmediateShutdownUnresponsive(ctx context.Context, shutdownErr error) {
+	if shutdownErr == nil {
+		return
+	}
+	if instance.isStatusRunning() {
+		log.FromContext(ctx).Error(shutdownErr,
+			"PostgreSQL did not honor the immediate shutdown request within its timeout, "+
+				"marking the instance as unresponsive")
+		instance.immediateShutdownUnresponsive.Store(true)
+	}
+}
+
+// IsImmediateShutdownUnresponsive reports whether PostgreSQL failed to stop within its configured
+// timeout after an immediate shutdown request. It never clears once set: the appropriate recovery
+// at that point is for the Pod to be killed and recreated, not for the instance manager to retry.
+func (instance *Instance) IsImmediateShutdownUnresponsive() bool {
+	return instance.immediateShutdownUnresponsive.Load()
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status

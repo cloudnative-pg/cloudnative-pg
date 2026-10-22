@@ -8,7 +8,8 @@ fenced by the lease-age monitor (`monitorLeaseAge` in
 confirmed lease write is older than `RenewDeadline` it runs a peer
 check, and once it has decided to step down it is stopped before its
 lease age reaches `LeaseDuration`, by the hard stop
-(`killPostgresAndExit`) if the soft stop did not land first.
+(`killPostgresAndExit`) if the soft stop did not land first. A leader
+whose lease loop has wedged is stopped by the liveness watchdog instead.
 
 Background: `docs/src/failover.md` ("Safe primary election").
 
@@ -38,6 +39,9 @@ production timings):
 | `RenewPeriod` | `1` | Minimum spacing between holder renewals; also the monitor's tick | `retryPeriodSeconds`, default 2s |
 | `StepDownDelay` | `1` | Ticks an overdue leader may take to run one peer check | `retryPeriodSeconds` + `isolationCheck.requestTimeout` (2s + 1000ms): the ticker phase plus one parallel probe round |
 | `DeliveryDelay` | `1` | Ticks between a step-down verdict and the soft stop | `W + X`, neither bounded by the code: `W` is the wait for the lifecycle manager to accept `TryRequestImmediateShutdown` (non-blocking send, retried every `retryPeriodSeconds`), `X` the time `pg_ctl stop -m immediate` takes to deliver the signal (a failure is logged and not retried) |
+| `WatchdogMaxSilence` | `2` | Silence of the lease loop after which the liveness probe fails | `defaultWatchdogMaxSilence`, `renewDeadlineSeconds + 2 * retryPeriodSeconds`, 14s at the defaults |
+| `ProbeDelay` | `6` | Ticks from the silence bound being crossed to the kubelet kill | liveness `periodSeconds * failureThreshold`, 10s * 3 = 30s at the defaults |
+| `MonitorWorks` | `TRUE` | `FALSE` switches the lease-age monitor off | none: stands for a `monitorLeaseAge` goroutine that no longer runs |
 
 Production values live under `.spec.primaryLease` and
 `.spec.probes.liveness.isolationCheck`; see
@@ -55,6 +59,8 @@ Shared (the Kubernetes `Lease` plus the monitor's view of it):
   holder (the `confirmingLock` stamp).
 * `lastCheck[n]`: last peer check run while overdue.
 * `stepDownAt[n]`: tick of the step-down verdict, `-1` if none.
+* `stuckAt[n]`: `-1` while `n`'s lease loop is alive, else the tick of
+  its last lock attempt (the last watchdog beat).
 
 Per instance (stale reads + local timers):
 
@@ -95,6 +101,19 @@ A node stopped by either stop keeps its stale record and cannot act
 until another node claims it: the code's re-adoption of the node's own
 record, a conditional write, is not modeled.
 
+Watchdog side (see "The lease watchdog"):
+
+* `LeaseLoopStuck`: the lease loop of a leader stops attempting lock
+  operations; `stuckAt` records its last attempt. A loop that is alive
+  but cannot renew is not this fault: it beats the watchdog on every
+  attempt, and the model already covers it by never forcing a renewal.
+* `DeliverShutdown` is also enabled for a stuck leader whose silence
+  exceeds `WatchdogMaxSilence`: the probe handler asks for the immediate
+  shutdown, without any peer check.
+* `KubeletKill`: the kubelet kills a stuck leader at the latest
+  `WatchdogMaxSilence + ProbeDelay` ticks after its last attempt. The
+  Ticker will not pass that tick.
+
 Candidate side:
 
 * `InstanceObserveLease`: refresh a stale view of the lease. Observing
@@ -114,11 +133,11 @@ Candidate side:
   dead or alive.
 * `TypeOK`: typing invariant over the shared state.
 
-The spec `ASSUME`s `LeaseDuration > RenewDeadline > RenewPeriod > 0`,
-so a misconfigured timing set fails fast instead of being silently
-checked. The admission webhook enforces `leaseDurationSeconds >
-renewDeadlineSeconds` and the stricter `renewDeadlineSeconds >
-1.2 * retryPeriodSeconds`.
+The spec `ASSUME`s `LeaseDuration > RenewDeadline > RenewPeriod > 0`
+(and positive `WatchdogMaxSilence` and `ProbeDelay`), so a misconfigured
+timing set fails fast instead of being silently checked. The admission
+webhook enforces `leaseDurationSeconds > renewDeadlineSeconds` and the
+stricter `renewDeadlineSeconds > 1.2 * retryPeriodSeconds`.
 
 ## What is proved
 
@@ -128,8 +147,9 @@ TLC shows `NoTwoLeaders` holds iff
 RenewDeadline + StepDownDelay < LeaseDuration
 ```
 
-for any `DeliveryDelay`. Runs with `LeaseDuration = 5`, `RenewPeriod =
-1`, default `MaxRounds`:
+for any `DeliveryDelay`, with the watchdog on or off (see "The lease
+watchdog"). Runs with `LeaseDuration = 5`, `RenewPeriod = 1`, default
+`MaxRounds` and watchdog constants:
 
 | `RenewDeadline` | `StepDownDelay` | `DeliveryDelay` | `RD + SDD` | Result |
 |---|---|---|---|---|
@@ -249,6 +269,116 @@ case is modeled.
   of the tick, before the peer probe. That last point is why the
   relation needs the probe time inside `StepDownDelay`: see "What is
   proved".
-* The liveness probe is not modeled. It only checks that the status web
-  server answers, so it plays no part in fencing: the lease monitor and
-  its hard stop are the only fence.
+
+## The lease watchdog
+
+The liveness probe (`pkg/management/postgres/webserver/probes/liveness.go`)
+catches a leader whose lease loop has wedged, something the lease-age
+monitor cannot see when its own goroutine is the one that is stuck.
+
+How it works:
+
+* Every `Get`, `Create` and `Update` on the lease lock beats the watchdog
+  (`LeaseWatchdog.WrapLock`), whether or not the call succeeds. A call
+  that is still running counts as activity, however long the API server
+  takes to answer.
+* The probe fails once the lease was held at least once (`MarkAcquired`)
+  and the silence since the last beat exceeds `maxSilence`, set to
+  `renewDeadline + 2 * retryPeriod` when the lease is acquired.
+* A failing probe also calls `TryRequestImmediateShutdown`, without a
+  peer check. After `failureThreshold` failures the kubelet kills the
+  container.
+* The probe also fails when PostgreSQL did not stop within
+  `immediateShutdownTimeout` (30s by default) after an immediate
+  shutdown. The lifecycle manager then exits on `SIGTERM` without a new
+  shutdown attempt.
+
+In the model, `LeaseLoopStuck` is the loop that stops attempting. Once
+`tick - stuckAt > WatchdogMaxSilence` the soft stop is enabled for that
+leader (`DeliverShutdown`), and `KubeletKill` is forced by `stuckAt +
+WatchdogMaxSilence + ProbeDelay`. The default `.cfg` keeps the watchdog
+slower than the lease (`2 + 6 > 5`), the production shape. A loop that is
+alive but cannot renew keeps beating and is never flagged: that is the
+"renewal is never forced" behaviour of `HolderRenewLease`.
+
+Runs, `LeaseDuration = 5`, `RenewPeriod = 1`, `DeliveryDelay = 1`,
+`RenewDeadline = 2`, `MaxRounds = 15`:
+
+| `MonitorWorks` | `StepDownDelay` | `WatchdogMaxSilence` | `ProbeDelay` | Result | States (generated / distinct) |
+|---|---|---|---|---|---|
+| TRUE | 1 | 2 | 6 | pass (default `.cfg`) | 260,984,209 / 86,310,432 |
+| TRUE | 2 | 2 | 1 | pass | 358,556,113 / 118,389,024 |
+| TRUE | 3 | 2 | 1 | violation | |
+| TRUE | 2 | 14 | 1 | pass (watchdog off) | 287,821,585 / 95,097,600 |
+| TRUE | 3 | 14 | 1 | violation (watchdog off) | |
+| FALSE | 1 | 2 | 1 | violation | |
+
+Rows 2 to 5: the relation `RenewDeadline + StepDownDelay < LeaseDuration`
+is the same with the watchdog on or off, even with a watchdog faster than
+the lease (`2 + 1 < 5`). The watchdog only stops nodes earlier. It does
+not hide a late verdict, because the leader that is late is alive and
+keeps beating.
+
+Row 6: with the monitor off, no watchdog setting makes the model safe.
+The counterexample is a leader whose loop is alive but never lands a
+write: it beats forever and nothing stops it. To isolate what the
+watchdog alone covers, a mutation forces an alive loop to renew every
+`RenewPeriod` (Ticker guard) and lets the loop get stuck only in the tick
+of a confirmed write (`stuckAt = lastRenew`), with `MonitorWorks =
+FALSE`:
+
+| `WatchdogMaxSilence` | `ProbeDelay` | Sum | Result |
+|---|---|---|---|
+| 2 | 2 | 4 | pass |
+| 1 | 3 | 4 | pass |
+| 2 | 3 | 5 | violation |
+| 3 | 2 | 5 | violation |
+
+So under those two assumptions `NoTwoLeaders` holds iff
+
+```
+WatchdogMaxSilence + ProbeDelay < LeaseDuration
+```
+
+The kill lands at the latest at `stuckAt + WatchdogMaxSilence +
+ProbeDelay` and the candidate claims at `lastRenew + LeaseDuration`; they
+meet when the sum equals `LeaseDuration`. If the loop gets stuck later
+than its last confirmed write, the kill moves later by the same amount
+and no constant relation holds: the watchdog measures silence from the
+last attempt, not the lease age. At the production defaults the relation
+reads 14s + 30s < 15s, which is false; even the first failing probe, at
+the latest 24s after the last beat, is past `leaseDurationSeconds`. A
+stuck monitor is therefore not covered at the defaults. The watchdog is
+an availability backstop: it restarts a wedged primary, it does not set
+the fencing bound.
+
+Stuck loop with peers agreeing (single node, `Nodes = {"one"}`, the
+step-down verdict restricted to a disagreeing peer, as `shouldStepDown`
+keeps leading without probing in a one-instance cluster):
+
+| Watchdog | `NoVerdict` (`stepDownAt = -1` always) | `StaysLeading` (a node that holds the lease keeps leading) |
+|---|---|---|
+| on (2, 6) | holds | violation |
+| off (14, 1) | holds | holds |
+
+The monitor never decides, and with the watchdog off the stuck leader
+leads until `MaxRounds`. With it on, the soft stop asked by the probe
+handler, or the kill, is the only path that stops the node.
+
+Assumptions and limits of this part:
+
+* The kill is instant and lands at the latest tick. In the code the
+  kubelet sends `SIGTERM`; the lifecycle manager then runs a smart/fast
+  shutdown bounded by the Pod's termination grace period, unless
+  PostgreSQL was already found unresponsive to an immediate shutdown.
+  That delay is not in `ProbeDelay`.
+* The probe's timeout and the phase of its period are inside `ProbeDelay`
+  only as the worst case of one period.
+* A lock call that never returns counts as activity and never trips the
+  watchdog. The model has no such call: a loop that stops attempting is
+  the only stuck loop.
+* The unresponsive-PostgreSQL branch is not modeled: the soft stop stops
+  the node at once, so a postmaster that ignores `SIGQUIT` after the hard
+  stop has no counterpart.
+* A stuck monitor with a live loop is unmodeled beyond `MonitorWorks =
+  FALSE`, and nothing in the code catches it.

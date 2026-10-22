@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/watchdog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
@@ -58,6 +59,15 @@ const (
 	// treat an empty identity as immediately available, it waits at most one
 	// second before the TTL expires and it can take the lease.
 	defaultReleasedLeaseDuration = 1 * time.Second
+
+	// defaultWatchdogMaxSilence is how long the lease loop can go between two
+	// lock calls before the watchdog considers it stuck. The longest pause is
+	// the retry of client-go's acquire, which jitters RetryPeriod by up to
+	// 120%. client-go refuses a RenewDeadline that is not above 1.2 times
+	// RetryPeriod, so the limit exceeds that pause by more than RetryPeriod,
+	// as margin for scheduling delays. A call that is still running never
+	// counts as silence, however long the API server takes to answer.
+	defaultWatchdogMaxSilence = defaultRenewDeadline + 2*defaultRetryPeriod
 )
 
 // Config holds the tunable timings of the primary lease. They mirror the
@@ -92,7 +102,11 @@ func defaultConfig() Config {
 // It starts idle and enters the acquisition/renewal loop only after Acquire is called.
 type Runnable struct {
 	instance *postgres.Instance
-	lock     resourcelock.Interface
+
+	// lock is wrapped by the watchdog: every Get and Update beats it.
+	lock resourcelock.Interface
+
+	watchdog *watchdog.LeaseWatchdog
 
 	// config holds the lease timings. It is initialised to the defaults by New
 	// and overwritten by the first Acquire call before the runnable activates.
@@ -150,9 +164,12 @@ func New(
 	kubeClient kubernetes.Interface,
 	instance *postgres.Instance,
 ) *Runnable {
+	leaseWatchdog := watchdog.NewLeaseWatchdog(defaultWatchdogMaxSilence)
+
 	result := &Runnable{
 		instance:      instance,
 		config:        defaultConfig(),
+		watchdog:      leaseWatchdog,
 		activateCh:    make(chan struct{}),
 		heldCh:        make(chan struct{}),
 		checkStepDown: shouldStepDown,
@@ -161,8 +178,9 @@ func New(
 
 	// Every lease write the elector makes goes through le.config.Lock, which is
 	// this same lock, so wrapping it here is enough for no confirmed renewal to
-	// bypass the timestamp monitorLeaseAge reads.
-	result.lock = &confirmingLock{
+	// bypass the timestamp monitorLeaseAge reads, and for every lock call to
+	// beat the watchdog.
+	result.lock = leaseWatchdog.WrapLock(&confirmingLock{
 		Interface: &resourcelock.LeaseLock{
 			LeaseMeta: metav1.ObjectMeta{
 				Namespace: instance.GetNamespaceName(),
@@ -178,9 +196,14 @@ func New(
 			},
 		},
 		lastConfirmed: &result.lastConfirmed,
-	}
+	})
 
 	return result
+}
+
+// Watchdog returns the heartbeat the liveness probe reads.
+func (r *Runnable) Watchdog() *watchdog.LeaseWatchdog {
+	return r.watchdog
 }
 
 // Acquire signals the runnable to start competing for the lease using the
@@ -194,6 +217,7 @@ func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 		// Set the config before closing activateCh: the channel close
 		// establishes the happens-before edge that lets Start read it safely.
 		r.config = config
+		r.watchdog.SetMaxSilence(config.RenewDeadline + 2*config.RetryPeriod)
 		contextLogger.Info("Acquiring primary lease")
 		close(r.activateCh)
 	})
@@ -570,6 +594,7 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 		}
 		r.heldOnce.Do(func() {
 			contextLogger.Info("Acquired primary lease")
+			r.watchdog.MarkAcquired()
 			close(r.heldCh)
 			go r.monitorLeaseAge(monitorCtx)
 		})

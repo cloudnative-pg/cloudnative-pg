@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/watchdog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
@@ -138,6 +139,7 @@ func NewRemoteWebServer(
 	instance *postgres.Instance,
 	cancelFunc context.CancelFunc,
 	exitedConditions concurrency.MultipleExecuted,
+	leaseWatchdog *watchdog.LeaseWatchdog,
 ) (*Webserver, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
@@ -153,7 +155,7 @@ func NewRemoteWebServer(
 	endpoints := remoteWebserverEndpoints{
 		typedClient:      typedClient,
 		instance:         instance,
-		livenessChecker:  probes.NewLivenessChecker(),
+		livenessChecker:  probes.NewLivenessChecker(instance, leaseWatchdog),
 		readinessChecker: probes.NewReadinessChecker(instance, sharedCache),
 		startupChecker:   probes.NewStartupChecker(instance, sharedCache),
 	}

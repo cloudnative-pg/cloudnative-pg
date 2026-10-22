@@ -22,11 +22,23 @@
 \* is the wait for the lifecycle manager to accept the shutdown request plus
 \* the time pg_ctl takes to deliver it; the code bounds neither part of
 \* DeliveryDelay, which is why the hard stop exists.
+\*
+\* The lease watchdog (internal/management/watchdog) is modeled too. Every
+\* lock attempt of the lease loop, landed or not, beats it, so a loop that
+\* is alive but cannot renew never trips it. LeaseLoopStuck is the fault it
+\* catches: the loop stops attempting (stuckAt). Once a leader has been
+\* silent for more than WatchdogMaxSilence ticks the liveness probe fails:
+\* the probe handler asks for the soft stop without a verdict, and the
+\* kubelet kills the container at the latest ProbeDelay ticks after the
+\* silence bound was crossed. MonitorWorks = FALSE switches the lease-age
+\* monitor off, to check what the watchdog covers on its own. Setting
+\* WatchdogMaxSilence + ProbeDelay >= MaxRounds switches the watchdog off.
 
 EXTENDS Integers, TLC
 
 CONSTANTS MaxRounds, LeaseDuration, RenewDeadline, RenewPeriod, Nodes,
-          StepDownDelay, DeliveryDelay
+          StepDownDelay, DeliveryDelay, WatchdogMaxSilence, ProbeDelay,
+          MonitorWorks
 
 ASSUME /\ MaxRounds > 0
        /\ LeaseDuration > RenewDeadline
@@ -34,6 +46,9 @@ ASSUME /\ MaxRounds > 0
        /\ RenewPeriod > 0
        /\ StepDownDelay > 0
        /\ DeliveryDelay >= 0
+       /\ WatchdogMaxSilence > 0
+       /\ ProbeDelay > 0
+       /\ MonitorWorks \in BOOLEAN
 
 (* --algorithm PrimaryLease {
 
@@ -50,6 +65,9 @@ variables
   lastCheck = [n \in Nodes |-> -1],
   \* tick at which n's monitor decided to step down, -1 if undecided
   stepDownAt = [n \in Nodes |-> -1],
+  \* tick of the last lock attempt of n's lease loop once it got stuck, -1
+  \* while the loop is alive (and beats the watchdog on every attempt)
+  stuckAt = [n \in Nodes |-> -1],
 
   \* ASSUMPTION: no time rate skew
   tick = 0;
@@ -65,15 +83,25 @@ define {
   \* peer check: StepDownDelay after it tripped, or after its last check.
   CheckDue(n) == Max(lastRenew[n] + RenewDeadline, lastCheck[n]) + StepDownDelay
 
+  \* The liveness probe fails for a leader whose lease loop has not attempted
+  \* a lock operation for more than WatchdogMaxSilence (IsHealthy: silence >
+  \* maxSilence, only after the lease was held, which leading implies).
+  Silent(n) == leading[n] /\ stuckAt[n] /= -1 /\ tick - stuckAt[n] > WatchdogMaxSilence
+
+  \* Latest tick by which the kubelet has killed a stuck leader.
+  KillDue(n) == stuckAt[n] + WatchdogMaxSilence + ProbeDelay
+
   \* Time may reach t only if no fencing step is overdue at t. A decided
   \* leader is stopped within DeliveryDelay of the verdict, and in any case
   \* before its lease age reaches LeaseDuration: the hard stop runs at the
-  \* last monitor tick whose age is below it.
+  \* last monitor tick whose age is below it. A stuck leader is killed by
+  \* KillDue.
   FencingOnTime(t) == \A n \in Nodes :
-    /\ (leading[n] /\ t - lastRenew[n] > RenewDeadline /\ stepDownAt[n] = -1)
+    /\ (MonitorWorks /\ leading[n] /\ t - lastRenew[n] > RenewDeadline /\ stepDownAt[n] = -1)
          => t <= CheckDue(n)
     /\ stepDownAt[n] /= -1 => t <= stepDownAt[n] + DeliveryDelay
     /\ stepDownAt[n] /= -1 => t - lastRenew[n] < LeaseDuration
+    /\ (leading[n] /\ stuckAt[n] /= -1) => t <= KillDue(n)
 
   \* A peer names a target primary other than n when the operator told it
   \* to take over (it is inside its observation window) or it already holds
@@ -90,6 +118,7 @@ define {
     /\ lastRenew \in [Nodes -> -1 .. MaxRounds]
     /\ lastCheck \in [Nodes -> -1 .. MaxRounds]
     /\ stepDownAt \in [Nodes -> -1 .. MaxRounds]
+    /\ stuckAt \in [Nodes -> -1 .. MaxRounds]
     /\ tick \in 0 .. MaxRounds
 }
 
@@ -129,6 +158,7 @@ variable observedLeaseRenewTick = 0,
         \* RenewDeadline), as preAcquire re-adopts an "already ours" lease.
         await /\ tick < MaxRounds
               /\ leading[self]
+              /\ stuckAt[self] = -1
               /\ RenewPeriod <= tick - lastRenew[self]
               /\ observedLeaseHolder = self;
 
@@ -141,11 +171,23 @@ variable observedLeaseRenewTick = 0,
           stepDownAt[self] := -1;
         };
     } or {
+      LeaseLoopStuck:
+        \* The lease loop stops attempting lock operations (a deadlock). The
+        \* last attempt is at this tick. A loop that is alive but cannot
+        \* renew is not this fault: it still beats the watchdog on every
+        \* attempt and is covered by "renewal is never forced" above.
+        await /\ tick < MaxRounds
+              /\ leading[self]
+              /\ stuckAt[self] = -1;
+
+        stuckAt[self] := tick;
+    } or {
       MonitorDecidesStepDown:
         \* A peer is unreachable, or a reachable peer names another target
         \* primary. Unreachability needs no precondition: the network may
         \* drop any probe.
         await /\ tick < MaxRounds
+              /\ MonitorWorks
               /\ Overdue(self)
               /\ stepDownAt[self] = -1;
 
@@ -155,6 +197,7 @@ variable observedLeaseRenewTick = 0,
       MonitorKeepsLeading:
         \* Every peer is reachable and names us: keep leading, check again.
         await /\ tick < MaxRounds
+              /\ MonitorWorks
               /\ Overdue(self)
               /\ stepDownAt[self] = -1
               /\ \A m \in Nodes : ~Disagrees(m, self);
@@ -164,11 +207,29 @@ variable observedLeaseRenewTick = 0,
       DeliverShutdown:
         \* TryRequestImmediateShutdown is accepted and PostgreSQL stops. The
         \* lease is not released: this is the non-cooperative old primary.
+        \* The request comes from the monitor's verdict, or from the liveness
+        \* probe handler of a stuck leader (liveness.go), which asks without
+        \* any peer check.
         await /\ tick < MaxRounds
-              /\ stepDownAt[self] /= -1;
+              /\ (stepDownAt[self] /= -1 \/ Silent(self));
 
         leading[self] := FALSE;
         stepDownAt[self] := -1;
+        stuckAt[self] := -1;
+    } or {
+      KubeletKill:
+        \* The liveness probe failed failureThreshold times in a row: the
+        \* kubelet kills the container. The kill is instant here and lands
+        \* at the latest tick the Ticker allows; the soft stop above is the
+        \* early path.
+        await /\ tick < MaxRounds
+              /\ leading[self]
+              /\ stuckAt[self] /= -1
+              /\ tick >= KillDue(self);
+
+        leading[self] := FALSE;
+        stepDownAt[self] := -1;
+        stuckAt[self] := -1;
     } or {
       MonitorHardStop:
         \* The next tick would be too late (age + RetryPeriod >= LeaseDuration
@@ -182,6 +243,7 @@ variable observedLeaseRenewTick = 0,
 
         leading[self] := FALSE;
         stepDownAt[self] := -1;
+        stuckAt[self] := -1;
     } or {
       CandidatePrimaryClaimEmptyLease:
         await /\ tick < MaxRounds
@@ -189,6 +251,7 @@ variable observedLeaseRenewTick = 0,
 
         if (observedLeaseRenewTick = leaseRenewTick /\ observedLeaseHolder = leaseHolder) {
           lastRenew[self] := tick;
+          stuckAt[self] := -1;
           leaseHolder := self;
           observedLeaseHolder := self;
           leaseRenewTick := tick;
@@ -217,6 +280,7 @@ variable observedLeaseRenewTick = 0,
 
         if (observedLeaseRenewTick = leaseRenewTick /\ observedLeaseHolder = leaseHolder) {
           lastRenew[self] := tick;
+          stuckAt[self] := -1;
           leaseHolder := self;
           observedLeaseHolder := self;
           leaseRenewTick := tick;
@@ -236,9 +300,9 @@ variable observedLeaseRenewTick = 0,
 }
 
 } *)
-\* BEGIN TRANSLATION (chksum(pcal) = "9a13fe35" /\ chksum(tla) = "71ddc4cb")
+\* BEGIN TRANSLATION (chksum(pcal) = "efcd1d98" /\ chksum(tla) = "6eba7fb6")
 VARIABLES leaseHolder, leaseRenewTick, leading, lookingForLease, lastRenew, 
-          lastCheck, stepDownAt, tick, pc
+          lastCheck, stepDownAt, stuckAt, tick, pc
 
 (* define statement *)
 Max(a, b) == IF a >= b THEN a ELSE b
@@ -254,12 +318,22 @@ CheckDue(n) == Max(lastRenew[n] + RenewDeadline, lastCheck[n]) + StepDownDelay
 
 
 
+Silent(n) == leading[n] /\ stuckAt[n] /= -1 /\ tick - stuckAt[n] > WatchdogMaxSilence
+
+
+KillDue(n) == stuckAt[n] + WatchdogMaxSilence + ProbeDelay
+
+
+
+
+
 
 FencingOnTime(t) == \A n \in Nodes :
-  /\ (leading[n] /\ t - lastRenew[n] > RenewDeadline /\ stepDownAt[n] = -1)
+  /\ (MonitorWorks /\ leading[n] /\ t - lastRenew[n] > RenewDeadline /\ stepDownAt[n] = -1)
        => t <= CheckDue(n)
   /\ stepDownAt[n] /= -1 => t <= stepDownAt[n] + DeliveryDelay
   /\ stepDownAt[n] /= -1 => t - lastRenew[n] < LeaseDuration
+  /\ (leading[n] /\ stuckAt[n] /= -1) => t <= KillDue(n)
 
 
 
@@ -276,13 +350,14 @@ TypeOK ==
   /\ lastRenew \in [Nodes -> -1 .. MaxRounds]
   /\ lastCheck \in [Nodes -> -1 .. MaxRounds]
   /\ stepDownAt \in [Nodes -> -1 .. MaxRounds]
+  /\ stuckAt \in [Nodes -> -1 .. MaxRounds]
   /\ tick \in 0 .. MaxRounds
 
 VARIABLES observedLeaseRenewTick, observedLeaseHolder, lastLeaseChange, 
           lastLeaseRenewTick
 
 vars == << leaseHolder, leaseRenewTick, leading, lookingForLease, lastRenew, 
-           lastCheck, stepDownAt, tick, pc, observedLeaseRenewTick, 
+           lastCheck, stepDownAt, stuckAt, tick, pc, observedLeaseRenewTick, 
            observedLeaseHolder, lastLeaseChange, lastLeaseRenewTick >>
 
 ProcSet == {"tick"} \cup (Nodes)
@@ -295,6 +370,7 @@ Init == (* Global variables *)
         /\ lastRenew = [n \in Nodes |-> -1]
         /\ lastCheck = [n \in Nodes |-> -1]
         /\ stepDownAt = [n \in Nodes |-> -1]
+        /\ stuckAt = [n \in Nodes |-> -1]
         /\ tick = 0
         (* Process Instance *)
         /\ observedLeaseRenewTick = [self \in Nodes |-> 0]
@@ -311,17 +387,20 @@ T == /\ pc["tick"] = "T"
                 /\ tick' = tick
      /\ pc' = [pc EXCEPT !["tick"] = "T"]
      /\ UNCHANGED << leaseHolder, leaseRenewTick, leading, lookingForLease, 
-                     lastRenew, lastCheck, stepDownAt, observedLeaseRenewTick, 
-                     observedLeaseHolder, lastLeaseChange, lastLeaseRenewTick >>
+                     lastRenew, lastCheck, stepDownAt, stuckAt, 
+                     observedLeaseRenewTick, observedLeaseHolder, 
+                     lastLeaseChange, lastLeaseRenewTick >>
 
 Ticker == T
 
 InstanceLoop(self) == /\ pc[self] = "InstanceLoop"
                       /\ \/ /\ pc' = [pc EXCEPT ![self] = "InstanceObserveLease"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "HolderRenewLease"]
+                         \/ /\ pc' = [pc EXCEPT ![self] = "LeaseLoopStuck"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "MonitorDecidesStepDown"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "MonitorKeepsLeading"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "DeliverShutdown"]
+                         \/ /\ pc' = [pc EXCEPT ![self] = "KubeletKill"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "MonitorHardStop"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "CandidatePrimaryClaimEmptyLease"]
                          \/ /\ pc' = [pc EXCEPT ![self] = "CandidatePrimaryStartClaimOwnedLease"]
@@ -331,7 +410,8 @@ InstanceLoop(self) == /\ pc[self] = "InstanceLoop"
                             /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                       /\ UNCHANGED << leaseHolder, leaseRenewTick, leading, 
                                       lookingForLease, lastRenew, lastCheck, 
-                                      stepDownAt, tick, observedLeaseRenewTick, 
+                                      stepDownAt, stuckAt, tick, 
+                                      observedLeaseRenewTick, 
                                       observedLeaseHolder, lastLeaseChange, 
                                       lastLeaseRenewTick >>
 
@@ -351,11 +431,12 @@ InstanceObserveLease(self) == /\ pc[self] = "InstanceObserveLease"
                               /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                               /\ UNCHANGED << leaseHolder, leaseRenewTick, 
                                               leading, lastRenew, lastCheck, 
-                                              stepDownAt, tick >>
+                                              stepDownAt, stuckAt, tick >>
 
 HolderRenewLease(self) == /\ pc[self] = "HolderRenewLease"
                           /\ /\ tick < MaxRounds
                              /\ leading[self]
+                             /\ stuckAt[self] = -1
                              /\ RenewPeriod <= tick - lastRenew[self]
                              /\ observedLeaseHolder[self] = self
                           /\ IF observedLeaseRenewTick[self] = leaseRenewTick /\ observedLeaseHolder[self] = leaseHolder
@@ -369,12 +450,26 @@ HolderRenewLease(self) == /\ pc[self] = "HolderRenewLease"
                                                      observedLeaseRenewTick >>
                           /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                           /\ UNCHANGED << leaseHolder, leading, 
-                                          lookingForLease, lastCheck, tick, 
-                                          observedLeaseHolder, lastLeaseChange, 
-                                          lastLeaseRenewTick >>
+                                          lookingForLease, lastCheck, stuckAt, 
+                                          tick, observedLeaseHolder, 
+                                          lastLeaseChange, lastLeaseRenewTick >>
+
+LeaseLoopStuck(self) == /\ pc[self] = "LeaseLoopStuck"
+                        /\ /\ tick < MaxRounds
+                           /\ leading[self]
+                           /\ stuckAt[self] = -1
+                        /\ stuckAt' = [stuckAt EXCEPT ![self] = tick]
+                        /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
+                        /\ UNCHANGED << leaseHolder, leaseRenewTick, leading, 
+                                        lookingForLease, lastRenew, lastCheck, 
+                                        stepDownAt, tick, 
+                                        observedLeaseRenewTick, 
+                                        observedLeaseHolder, lastLeaseChange, 
+                                        lastLeaseRenewTick >>
 
 MonitorDecidesStepDown(self) == /\ pc[self] = "MonitorDecidesStepDown"
                                 /\ /\ tick < MaxRounds
+                                   /\ MonitorWorks
                                    /\ Overdue(self)
                                    /\ stepDownAt[self] = -1
                                 /\ lastCheck' = [lastCheck EXCEPT ![self] = tick]
@@ -382,7 +477,7 @@ MonitorDecidesStepDown(self) == /\ pc[self] = "MonitorDecidesStepDown"
                                 /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                                 /\ UNCHANGED << leaseHolder, leaseRenewTick, 
                                                 leading, lookingForLease, 
-                                                lastRenew, tick, 
+                                                lastRenew, stuckAt, tick, 
                                                 observedLeaseRenewTick, 
                                                 observedLeaseHolder, 
                                                 lastLeaseChange, 
@@ -390,6 +485,7 @@ MonitorDecidesStepDown(self) == /\ pc[self] = "MonitorDecidesStepDown"
 
 MonitorKeepsLeading(self) == /\ pc[self] = "MonitorKeepsLeading"
                              /\ /\ tick < MaxRounds
+                                /\ MonitorWorks
                                 /\ Overdue(self)
                                 /\ stepDownAt[self] = -1
                                 /\ \A m \in Nodes : ~Disagrees(m, self)
@@ -397,17 +493,18 @@ MonitorKeepsLeading(self) == /\ pc[self] = "MonitorKeepsLeading"
                              /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                              /\ UNCHANGED << leaseHolder, leaseRenewTick, 
                                              leading, lookingForLease, 
-                                             lastRenew, stepDownAt, tick, 
-                                             observedLeaseRenewTick, 
+                                             lastRenew, stepDownAt, stuckAt, 
+                                             tick, observedLeaseRenewTick, 
                                              observedLeaseHolder, 
                                              lastLeaseChange, 
                                              lastLeaseRenewTick >>
 
 DeliverShutdown(self) == /\ pc[self] = "DeliverShutdown"
                          /\ /\ tick < MaxRounds
-                            /\ stepDownAt[self] /= -1
+                            /\ (stepDownAt[self] /= -1 \/ Silent(self))
                          /\ leading' = [leading EXCEPT ![self] = FALSE]
                          /\ stepDownAt' = [stepDownAt EXCEPT ![self] = -1]
+                         /\ stuckAt' = [stuckAt EXCEPT ![self] = -1]
                          /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                          /\ UNCHANGED << leaseHolder, leaseRenewTick, 
                                          lookingForLease, lastRenew, lastCheck, 
@@ -415,12 +512,28 @@ DeliverShutdown(self) == /\ pc[self] = "DeliverShutdown"
                                          observedLeaseHolder, lastLeaseChange, 
                                          lastLeaseRenewTick >>
 
+KubeletKill(self) == /\ pc[self] = "KubeletKill"
+                     /\ /\ tick < MaxRounds
+                        /\ leading[self]
+                        /\ stuckAt[self] /= -1
+                        /\ tick >= KillDue(self)
+                     /\ leading' = [leading EXCEPT ![self] = FALSE]
+                     /\ stepDownAt' = [stepDownAt EXCEPT ![self] = -1]
+                     /\ stuckAt' = [stuckAt EXCEPT ![self] = -1]
+                     /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
+                     /\ UNCHANGED << leaseHolder, leaseRenewTick, 
+                                     lookingForLease, lastRenew, lastCheck, 
+                                     tick, observedLeaseRenewTick, 
+                                     observedLeaseHolder, lastLeaseChange, 
+                                     lastLeaseRenewTick >>
+
 MonitorHardStop(self) == /\ pc[self] = "MonitorHardStop"
                          /\ /\ tick < MaxRounds
                             /\ stepDownAt[self] /= -1
                             /\ tick - lastRenew[self] + RenewPeriod >= LeaseDuration
                          /\ leading' = [leading EXCEPT ![self] = FALSE]
                          /\ stepDownAt' = [stepDownAt EXCEPT ![self] = -1]
+                         /\ stuckAt' = [stuckAt EXCEPT ![self] = -1]
                          /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
                          /\ UNCHANGED << leaseHolder, leaseRenewTick, 
                                          lookingForLease, lastRenew, lastCheck, 
@@ -433,6 +546,7 @@ CandidatePrimaryClaimEmptyLease(self) == /\ pc[self] = "CandidatePrimaryClaimEmp
                                             /\ observedLeaseHolder[self] = ""
                                          /\ IF observedLeaseRenewTick[self] = leaseRenewTick /\ observedLeaseHolder[self] = leaseHolder
                                                THEN /\ lastRenew' = [lastRenew EXCEPT ![self] = tick]
+                                                    /\ stuckAt' = [stuckAt EXCEPT ![self] = -1]
                                                     /\ leaseHolder' = self
                                                     /\ observedLeaseHolder' = [observedLeaseHolder EXCEPT ![self] = self]
                                                     /\ leaseRenewTick' = tick
@@ -443,6 +557,7 @@ CandidatePrimaryClaimEmptyLease(self) == /\ pc[self] = "CandidatePrimaryClaimEmp
                                                                     leaseRenewTick, 
                                                                     leading, 
                                                                     lastRenew, 
+                                                                    stuckAt, 
                                                                     observedLeaseRenewTick, 
                                                                     observedLeaseHolder >>
                                          /\ pc' = [pc EXCEPT ![self] = "InstanceLoop"]
@@ -465,7 +580,8 @@ CandidatePrimaryStartClaimOwnedLease(self) == /\ pc[self] = "CandidatePrimarySta
                                                               leading, 
                                                               lastRenew, 
                                                               lastCheck, 
-                                                              stepDownAt, tick, 
+                                                              stepDownAt, 
+                                                              stuckAt, tick, 
                                                               observedLeaseRenewTick, 
                                                               observedLeaseHolder >>
 
@@ -478,6 +594,7 @@ CandidatePrimaryClaimOwnedLease(self) == /\ pc[self] = "CandidatePrimaryClaimOwn
                                             /\ (tick - lastLeaseChange[self]) >= LeaseDuration
                                          /\ IF observedLeaseRenewTick[self] = leaseRenewTick /\ observedLeaseHolder[self] = leaseHolder
                                                THEN /\ lastRenew' = [lastRenew EXCEPT ![self] = tick]
+                                                    /\ stuckAt' = [stuckAt EXCEPT ![self] = -1]
                                                     /\ leaseHolder' = self
                                                     /\ observedLeaseHolder' = [observedLeaseHolder EXCEPT ![self] = self]
                                                     /\ leaseRenewTick' = tick
@@ -492,6 +609,7 @@ CandidatePrimaryClaimOwnedLease(self) == /\ pc[self] = "CandidatePrimaryClaimOwn
                                                                     leading, 
                                                                     lookingForLease, 
                                                                     lastRenew, 
+                                                                    stuckAt, 
                                                                     observedLeaseRenewTick, 
                                                                     observedLeaseHolder, 
                                                                     lastLeaseChange, 
@@ -501,10 +619,10 @@ CandidatePrimaryClaimOwnedLease(self) == /\ pc[self] = "CandidatePrimaryClaimOwn
                                                          tick >>
 
 Instance(self) == InstanceLoop(self) \/ InstanceObserveLease(self)
-                     \/ HolderRenewLease(self)
+                     \/ HolderRenewLease(self) \/ LeaseLoopStuck(self)
                      \/ MonitorDecidesStepDown(self)
                      \/ MonitorKeepsLeading(self) \/ DeliverShutdown(self)
-                     \/ MonitorHardStop(self)
+                     \/ KubeletKill(self) \/ MonitorHardStop(self)
                      \/ CandidatePrimaryClaimEmptyLease(self)
                      \/ CandidatePrimaryStartClaimOwnedLease(self)
                      \/ CandidatePrimaryClaimOwnedLease(self)

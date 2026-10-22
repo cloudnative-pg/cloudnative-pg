@@ -22,6 +22,7 @@ package lease
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -264,6 +265,91 @@ var _ = Describe("Runnable.Acquire", func() {
 
 			Expect(r.Acquire(acquireCtx, first)).To(MatchError(context.DeadlineExceeded))
 		})
+})
+
+var _ = Describe("Runnable watchdog", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+	)
+
+	// Short timings give the specs many lock calls, under a silence limit of
+	// 140ms that a busy test host does not stall the loop past.
+	config := Config{
+		LeaseDuration:         time.Hour,
+		RenewDeadline:         100 * time.Millisecond,
+		RetryPeriod:           20 * time.Millisecond,
+		ReleasedLeaseDuration: time.Second,
+	}
+
+	// outage, when not zero, makes every lease call fail after that long, as
+	// an API server that is down or does not answer would.
+	var outage atomic.Int64
+
+	// start runs the lease loop the way the instance manager does, through
+	// Start and Acquire, and returns the function that stops it.
+	start := func(ctx context.Context) (*Runnable, func()) {
+		kubeClient := fake.NewClientset(&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: ptr.To(thisPod)},
+		})
+		kubeClient.PrependReactor("*", "leases", func(k8stesting.Action) (bool, runtime.Object, error) {
+			delay := time.Duration(outage.Load())
+			if delay == 0 {
+				return false, nil, nil
+			}
+			time.Sleep(delay)
+			return true, nil, errors.New("API server unavailable")
+		})
+		r := New(kubeClient, postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName))
+		r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) { return false, nil }
+
+		runCtx, cancelRun := context.WithCancel(ctx)
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			_ = r.Start(runCtx)
+		}()
+		Expect(r.Acquire(ctx, config)).To(Succeed())
+
+		return r, func() {
+			cancelRun()
+			Eventually(returned).Should(BeClosed())
+		}
+	}
+
+	BeforeEach(func() {
+		outage.Store(0)
+	})
+
+	It("stays healthy while the loop renews the lease, and reports it stuck once the loop stops",
+		func(ctx context.Context) {
+			r, stop := start(ctx)
+			Consistently(r.Watchdog().IsHealthy, 500*time.Millisecond).Should(Succeed())
+
+			stop()
+			Eventually(r.Watchdog().IsHealthy).Should(MatchError(ContainSubstring("primary lease loop")))
+		})
+
+	It("stays healthy while every lease call fails", func(ctx context.Context) {
+		r, stop := start(ctx)
+		defer stop()
+
+		outage.Store(int64(time.Millisecond))
+		Consistently(r.Watchdog().IsHealthy, 500*time.Millisecond).Should(Succeed())
+	})
+
+	It("stays healthy while lease calls take longer than the silence limit to fail", func(ctx context.Context) {
+		r, stop := start(ctx)
+		defer stop()
+
+		outage.Store(int64(400 * time.Millisecond))
+		Consistently(r.Watchdog().IsHealthy, time.Second).Should(Succeed())
+	})
 })
 
 var _ = Describe("Runnable.tryTakeOver", func() {

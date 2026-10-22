@@ -143,6 +143,13 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 					"signal", sig,
 					"smartShutdownTimeout", i.instance.GetClusterOrDefault().GetSmartShutdownTimeout(),
 				)
+				// Another attempt would wait out the same wedged postmaster:
+				// leave it to the kubelet.
+				if i.instance.IsImmediateShutdownUnresponsive() {
+					contextLogger.Info(
+						"PostgreSQL was already found unresponsive to an immediate shutdown, exiting without retrying")
+					return nil
+				}
 				if err := i.instance.TryShuttingDownSmartFast(ctx); err != nil {
 					contextLogger.Error(err, "error while shutting down instance, proceeding")
 				}
