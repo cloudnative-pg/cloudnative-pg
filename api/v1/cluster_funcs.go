@@ -856,6 +856,14 @@ func (cluster *Cluster) GetPgCtlTimeoutForPromotion() int32 {
 	return timeout
 }
 
+// GetSyncMethod returns the configured pg_rewind synchronization method.
+func (configuration *PgRewindConfiguration) GetSyncMethod() PgRewindSyncMethod {
+	if configuration == nil || configuration.SyncMethod == "" {
+		return PgRewindSyncMethodFsync
+	}
+	return configuration.SyncMethod
+}
+
 // IsReusePVCEnabled check if in a maintenance window we should reuse PVCs
 func (cluster *Cluster) IsReusePVCEnabled() bool {
 	reusePVC := true
