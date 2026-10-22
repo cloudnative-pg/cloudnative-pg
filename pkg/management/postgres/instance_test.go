@@ -806,7 +806,7 @@ var _ = Describe("TryRequestImmediateShutdown", func() {
 	})
 })
 
-var _ = Describe("local connection pools", func() {
+var _ = Describe("local connections", func() {
 	// A stopped postmaster (SIGSTOP, or stuck in the kernel) still has its
 	// socket listening: the kernel completes the connection, and the startup
 	// message is never answered. A listener that never accepts does the same.
@@ -834,6 +834,9 @@ var _ = Describe("local connection pools", func() {
 		Entry("superuser", (*Instance).GetSuperUserDB),
 		Entry("metrics exporter", func(instance *Instance) (*sql.DB, error) {
 			return instance.GetMetricsDB("postgres")
+		}),
+		Entry("WAL archive check", func(*Instance) (*sql.DB, error) {
+			return newWalArchiveBootstrapperForPrimary().dbFactory()
 		}),
 	)
 })

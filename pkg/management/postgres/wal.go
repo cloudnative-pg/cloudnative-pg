@@ -127,8 +127,9 @@ func newWalArchiveBootstrapperForPrimary() *walArchiveBootstrapper {
 	return &walArchiveBootstrapper{
 		walArchiveAnalyzer: walArchiveAnalyzer{
 			dbFactory: func() (*sql.DB, error) {
+				// connect_timeout as in Instance.ConnectionPool.
 				db, openErr := pool.NewDBConnection(
-					fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
+					fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable connect_timeout=5",
 						GetSocketDir(),
 						GetServerPort(),
 					),
