@@ -270,6 +270,7 @@ KEP
 KV
 Karpenter
 KinD
+Konnectivity
 Krew
 KubeCon
 Kubegres
