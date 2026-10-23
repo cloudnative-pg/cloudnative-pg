@@ -133,6 +133,8 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	// Step 1: the current primary just became unhealthy. Mark the failover as
 	// pending and stop here: the status was snapshotted while the old primary
 	// may still be streaming, so we elect only once its lease is gone (step 2).
+	// The error makes the caller requeue, as a nil one would read as a
+	// healthy primary and reset the failover delay.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
 		contextLogger.Info("Current primary isn't healthy, initiating a failover")
 		status.LogStatus(ctx)
@@ -163,7 +165,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
 				"oldPrimary", cluster.Status.CurrentPrimary)
 		}
-		return "", nil
+		return "", ErrPrimaryLeaseHeld
 	}
 
 	// Step 2: before (re-)electing, the old primary must be gone, so that the
