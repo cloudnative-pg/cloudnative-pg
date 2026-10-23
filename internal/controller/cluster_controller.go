@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -102,9 +103,11 @@ type ClusterReconciler struct {
 	Plugins            repository.Interface
 	OperatorClientCert *tls.Certificate
 
-	drainTaints    []string
-	rolloutManager *rolloutManager.Manager
-	admission      *guard.Admission[*apiv1.Cluster]
+	drainTaints       []string
+	rolloutManager    *rolloutManager.Manager
+	leaseMu           sync.Mutex
+	leaseObservations map[client.ObjectKey]leaseObservation
+	admission         *guard.Admission[*apiv1.Cluster]
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
@@ -128,8 +131,9 @@ func NewClusterReconciler(
 			configuration.Current.GetClustersRolloutDelay(),
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
-		drainTaints: drainTaints,
-		admission:   admission,
+		leaseObservations: map[client.ObjectKey]leaseObservation{},
+		drainTaints:       drainTaints,
+		admission:         admission,
 	}
 }
 
@@ -180,6 +184,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster == nil || cluster.GetDeletionTimestamp() != nil {
+		r.forgetPrimaryLease(req.NamespacedName)
 		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
 			contextLogger.Error(
 				err,
@@ -760,8 +765,8 @@ func (r *ClusterReconciler) handleSwitchover(
 			contextLogger.Info("Waiting for the failover delay to expire")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
-		if errors.Is(err, ErrWalReceiversRunning) {
-			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
+		if errors.Is(err, ErrPrimaryLeaseHeld) {
+			contextLogger.Info("Waiting for the primary lease to be released or expire")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		if errors.Is(err, ErrQuorumCheckFailed) {

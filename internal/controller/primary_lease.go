@@ -22,11 +22,13 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -92,6 +94,76 @@ func (r *ClusterReconciler) reconcilePrimaryLease(ctx context.Context, cluster *
 		contextLogger.Info("Adopted orphan primary lease", "leaseName", existing.Name)
 	}
 	return nil
+}
+
+// leaseObservation is the primary Lease record of a cluster as the controller
+// first saw it, and when. RenewTime is the holder's clock and is compared for
+// equality only; the window is timed on observedAt, the controller's clock,
+// which keeps the monotonic reading of time.Now so that a step of the wall
+// clock cannot move it.
+type leaseObservation struct {
+	holder     string
+	renewTime  time.Time
+	observedAt time.Time
+}
+
+// livePrimaryLeaseHolder returns the holder of the cluster's primary Lease
+// while the record has been seen unchanged for less than the lease duration,
+// and "" when the Lease is missing, released or has gone unrenewed that long.
+// A fresh record always counts as live: the first sight starts the window.
+func (r *ClusterReconciler) livePrimaryLeaseHolder(ctx context.Context, cluster *apiv1.Cluster) (string, error) {
+	key := client.ObjectKeyFromObject(cluster)
+	var lease coordinationv1.Lease
+	if err := r.Get(ctx, key, &lease); err != nil {
+		if apierrs.IsNotFound(err) {
+			r.forgetPrimaryLease(key)
+			return "", nil
+		}
+		return "", err
+	}
+	holder := ptr.Deref(lease.Spec.HolderIdentity, "")
+	if holder == "" {
+		r.forgetPrimaryLease(key)
+		return "", nil
+	}
+	var renewTime time.Time
+	if lease.Spec.RenewTime != nil {
+		renewTime = lease.Spec.RenewTime.Time
+	}
+
+	now := time.Now()
+	r.leaseMu.Lock()
+	defer r.leaseMu.Unlock()
+	prev, seen := r.leaseObservations[key]
+	if !seen || prev.holder != holder || !prev.renewTime.Equal(renewTime) {
+		r.leaseObservations[key] = leaseObservation{holder: holder, renewTime: renewTime, observedAt: now}
+		return holder, nil
+	}
+	if now.Sub(prev.observedAt) >= cluster.GetPrimaryLeaseDuration() {
+		return "", nil
+	}
+	return holder, nil
+}
+
+// checkOldPrimaryLease returns ErrPrimaryLeaseHeld while the old primary may
+// still be sending WAL: its lease is held, or cannot be read. A lease held by
+// anyone else is that of a target that was never promoted, and waiting for it
+// would stall the failover for as long as that target keeps renewing.
+func (r *ClusterReconciler) checkOldPrimaryLease(ctx context.Context, cluster *apiv1.Cluster) error {
+	holder, err := r.livePrimaryLeaseHolder(ctx, cluster)
+	if err != nil || (holder != "" && holder == cluster.Status.CurrentPrimary) {
+		log.FromContext(ctx).Info("Primary lease still held by the old primary or unreadable, deferring election",
+			"holder", holder, "err", err)
+		return ErrPrimaryLeaseHeld
+	}
+	return nil
+}
+
+// forgetPrimaryLease drops the lease observation of a cluster.
+func (r *ClusterReconciler) forgetPrimaryLease(key client.ObjectKey) {
+	r.leaseMu.Lock()
+	defer r.leaseMu.Unlock()
+	delete(r.leaseObservations, key)
 }
 
 // leaseAdoption is the decision made about an existing Lease named after the

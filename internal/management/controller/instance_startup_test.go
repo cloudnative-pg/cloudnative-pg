@@ -53,6 +53,7 @@ func (f *fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
 func (f *fakeLeaseAcquirer) Yield(context.Context) {
 	f.yields++
 }
+func (f *fakeLeaseAcquirer) Observe() {}
 
 var _ = Describe("verifyPgDataCoherenceForPrimary primary lease gate", func() {
 	const (
@@ -189,16 +190,13 @@ var _ = Describe("yielding the primary lease when not the target", func() {
 	It("marks the promotion as requested before promoting, and keeps it when the promotion fails",
 		func(ctx SpecContext) {
 			makeReplica()
-			// The pod is already the current primary, so handlePromotion does
-			// not wait for the WAL receiver through a database connection.
-			cluster.Status.CurrentPrimary = podName
 			var seenAtPromote bool
 			r.promoteInstance = func(context.Context) error {
 				seenAtPromote = r.promotionRequested
 				return errors.New("pg_ctl promote failed")
 			}
 
-			Expect(r.handlePromotion(ctx, cluster)).To(MatchError(ContainSubstring("pg_ctl promote failed")))
+			Expect(r.handlePromotion(ctx)).To(MatchError(ContainSubstring("pg_ctl promote failed")))
 			Expect(seenAtPromote).To(BeTrue())
 			Expect(r.promotionRequested).To(BeTrue())
 		})

@@ -22,17 +22,18 @@ failing. This will be picked up in the controller's reconciliation loop. The
 controller will initiate the failover process, in two steps:
 
 1. First, it will mark the `TargetPrimary` as `pending`. This change of state will
-   force the primary pod to shutdown, to ensure the WAL receivers on the replicas
-   will stop. The cluster will be marked in failover phase ("Failing over").
-2. Once all WAL receivers are stopped, there will be a leader election, and a
-   new primary will be named. The chosen instance will initiate promotion to
+   force the primary pod to shutdown, to ensure it stops sending WAL to the
+   replicas. The cluster will be marked in failover phase ("Failing over").
+2. Once the [primary lease](#safe-primary-election) has been released or has
+   expired, there will be a leader election, and a new primary will be named. The chosen instance will initiate promotion to
    primary, and, after this is completed, the cluster will resume normal operations.
    Meanwhile, the former primary pod will restart, detect that it is no longer
    the primary, and become a replica node.
 
 :::info[Important]
-    The two-phase procedure helps ensure the WAL receivers can stop in an orderly
-    fashion, and that the failing primary will not start streaming WALs again upon
+    The two-phase procedure helps ensure the failing primary has stopped sending
+    WAL before the new primary is chosen, so that the choice is made on final WAL
+    positions, and that the failing primary will not start streaming WALs again upon
     restart. These safeguards prevent timeline discrepancies between the new primary
     and the replicas.
 :::
@@ -90,8 +91,8 @@ flushed and archived its remaining WAL, so the replica that takes
 over sees the archive at its definitive end. If the previous primary
 cannot release the lease (crash, node failure, or the instance
 manager itself unreachable), the replica can promote once the lease has been
-unchanged for `leaseDurationSeconds` since the operator named it the target
-primary. In that
+unchanged for `leaseDurationSeconds` since the operator marked the failover as
+`pending`. In that
 path the archive may not have caught up, and any writes the previous
 primary did not finish archiving are lost. A target primary that is replaced
 before it promotes stops renewing the lease it may hold, so the new target can

@@ -36,10 +36,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// ErrWalReceiversRunning is raised when a new primary server can't be elected
-// because there is a WAL receiver running in our Pod list
-var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
-
 // ErrWaitingOnFailOverDelay is raised when the primary server can't be elected because the .spec.failoverDelay hasn't
 // elapsed yet
 var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
@@ -47,6 +43,10 @@ var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiti
 // ErrQuorumCheckFailed is raised when a failover can't complete because the quorum check no
 // longer guarantees that the elected candidate holds every acknowledged transaction
 var ErrQuorumCheckFailed = fmt.Errorf("quorum check failed, cannot complete the failover")
+
+// ErrPrimaryLeaseHeld is raised when a new primary cannot be elected yet
+// because the old primary may still be sending WAL.
+var ErrPrimaryLeaseHeld = fmt.Errorf("primary lease is still held or unverifiable, waiting before electing a new primary") //nolint: lll
 
 // reconcileTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion.
@@ -130,11 +130,11 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		}
 	}
 
-	// The current primary is not correctly working, and we need to elect a new one
-	// but before doing that we need to wait for all the WAL receivers to be
-	// terminated. To make sure they eventually terminate we signal the old primary
-	// (if is still alive) to shut down by setting the apiv1.PendingFailoverMarker as
-	// target primary.
+	// Step 1: the current primary just became unhealthy. Mark the failover as
+	// pending and stop here: the status was snapshotted while the old primary
+	// may still be streaming, so we elect only once its lease is gone (step 2).
+	// The error makes the caller requeue, as a nil one would read as a
+	// healthy primary and reset the failover delay.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
 		contextLogger.Info("Current primary isn't healthy, initiating a failover")
 		status.LogStatus(ctx)
@@ -165,17 +165,18 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
 				"oldPrimary", cluster.Status.CurrentPrimary)
 		}
+		return "", ErrPrimaryLeaseHeld
 	}
 
-	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
-	// data that is being received (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
-		return "", ErrWalReceiversRunning
+	// Step 2: before (re-)electing, the old primary must be gone, so that the
+	// status snapshot is final.
+	if err := r.checkOldPrimaryLease(ctx, cluster); err != nil {
+		return "", err
 	}
 
 	// Re-verify quorum safety right before failing over: the set of
 	// promotable replicas may have degraded since we committed to a failover,
-	// while we were waiting for the WAL receivers to go down.
+	// while we were waiting for the primary lease to be released.
 	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker && cluster.IsFailoverQuorumActive() {
 		safe, err := r.evaluateQuorumCheck(ctx, cluster, status)
 		if err != nil {
@@ -383,14 +384,6 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 
 	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
 		return "", err
-	}
-
-	// The designated primary is not correctly working, and we need to elect a new one
-	// but before doing that we need to wait for all the WAL receivers to be
-	// terminated. This is needed to avoid losing the WAL data that is being received
-	// (think about a switchover).
-	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
-		return "", ErrWalReceiversRunning
 	}
 
 	if status.Items[0].IsFenced {
