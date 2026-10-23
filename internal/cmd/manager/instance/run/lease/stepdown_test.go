@@ -279,6 +279,31 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 			Expect(received).NotTo(Receive())
 		})
 
+	It("drops a verdict that comes back after it was stopped", func(ctx context.Context) {
+		// The check reaches the peers and can take seconds. A Yield during it
+		// stops the monitor, and what is now a replica must not be shut down.
+		r.config.LeaseDuration = 2 * renewDeadline
+		checking := make(chan struct{}, 1)
+		release := make(chan struct{})
+		r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) {
+			checking <- struct{}{}
+			<-release
+			return true, nil
+		}
+		received := readCommands(r)
+		monitorCtx, cancel := context.WithCancel(ctx)
+
+		start(monitorCtx)
+
+		Eventually(checking).Should(Receive())
+		cancel()
+		// Old enough for the forced stop by the time the check returns.
+		time.Sleep(r.config.LeaseDuration)
+		close(release)
+		Consistently(hardStops.Load, 50*time.Millisecond).Should(BeZero())
+		Expect(received).NotTo(Receive())
+	})
+
 	It("fails open when the step-down check itself errors", func(ctx context.Context) {
 		verdict(false, errors.New("failed to read CA certificate"))
 		received := readCommands(r)

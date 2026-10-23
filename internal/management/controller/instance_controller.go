@@ -163,6 +163,10 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.instance.SetCluster(cluster)
 
+	// Before the early returns for a fenced or down instance: a replica whose
+	// PostgreSQL is down or fenced must still stop renewing the lease it holds.
+	r.yieldPrimaryLeaseIfNotTarget(ctx, cluster)
+
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
 		return reconcile.Result{}, err
@@ -1279,6 +1283,33 @@ func (r *InstanceReconciler) acquirePrimaryLease(ctx context.Context, cluster *a
 	return r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig)
 }
 
+// yieldPrimaryLeaseIfNotTarget makes a replica stop renewing the primary
+// lease when it is not the target primary, or the cluster is a replica
+// cluster. A target that was replaced before it promoted must behave like a
+// replica that was never the target, or its renewals would keep the new
+// target from ever taking the lease. A primary that is no longer the target
+// (a switchover) keeps renewing until Release at exit. promotionRequested
+// covers a promotion that failed while PostgreSQL may still complete it:
+// standby.signal alone cannot be trusted then.
+func (r *InstanceReconciler) yieldPrimaryLeaseIfNotTarget(ctx context.Context, cluster *apiv1.Cluster) {
+	if cluster.Status.TargetPrimary == r.instance.GetPodName() && !cluster.IsReplica() {
+		return
+	}
+
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil {
+		log.FromContext(ctx).Error(err, "Cannot tell if this instance is a primary, not yielding the primary lease")
+		return
+	}
+
+	// Yield only a replica that never tried to promote: it is in recovery and
+	// no pg_ctl promote was issued by this process. A promotion that failed may
+	// still complete in PostgreSQL, so in that case the lease is kept.
+	if !isPrimary && !r.promotionRequested {
+		r.primaryLeaseAcquirer.Yield(ctx)
+	}
+}
+
 // Reconciler primary logic. DB needed.
 func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -1352,6 +1383,9 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	return reconcile.Result{}, nil
 }
 
+// handlePromotion promotes this instance. The caller must have acquired the
+// primary lease first (reconcilePrimary does, via acquirePrimaryLease): the
+// lease is what gates pg_ctl promote, and promotionRequested relies on it.
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
@@ -1366,9 +1400,16 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	}
 
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
+
 	// I must promote my instance here
-	err := r.instance.PromoteAndWait(ctx)
-	if err != nil {
+	r.promotionRequested = true
+
+	// PromoteAndWait is replaced by a stub in the unit tests
+	promote := r.promoteInstance
+	if promote == nil {
+		promote = r.instance.PromoteAndWait
+	}
+	if err := promote(ctx); err != nil {
 		return fmt.Errorf("error promoting instance: %w", err)
 	}
 	return nil

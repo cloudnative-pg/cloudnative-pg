@@ -116,9 +116,25 @@ type Runnable struct {
 	activateCh   chan struct{}
 	activateOnce sync.Once
 
-	// heldCh is closed once the lease has been successfully acquired for the first time.
-	heldCh   chan struct{}
-	heldOnce sync.Once
+	// mu guards heldCh, cancelElector and cancelMonitor. The run loop closes
+	// heldCh and sets the cancel funcs; Yield replaces heldCh and calls them;
+	// Acquire reads heldCh from the reconciler's goroutine.
+	mu sync.Mutex
+
+	// heldCh is closed while the lease is held. Yield replaces it with an open
+	// channel, so a later Acquire blocks until the lease is really held again.
+	heldCh chan struct{}
+
+	// cancelElector stops the renewal loop of the current hold.
+	cancelElector context.CancelFunc
+
+	// cancelMonitor stops the step-down monitor of the current hold.
+	cancelMonitor context.CancelFunc
+
+	// yielded is set by Yield and cleared by Acquire. While set, the record is
+	// left alone even when it still names this pod, so that it goes stale for
+	// the new target.
+	yielded atomic.Bool
 
 	// observedRecord is the lease state tryTakeOver is timing for liveness and
 	// observedTime is when it first saw that state; see tryTakeOver for how they
@@ -213,6 +229,10 @@ func (r *Runnable) Watchdog() *watchdog.LeaseWatchdog {
 func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 	contextLogger := log.FromContext(ctx)
 
+	// Cleared before the run loop can start, so a Yield that lands while it
+	// takes the lease is never erased by this call.
+	r.yielded.Store(false)
+
 	r.activateOnce.Do(func() {
 		// Set the config before closing activateCh: the channel close
 		// establishes the happens-before edge that lets Start read it safely.
@@ -222,11 +242,46 @@ func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 		close(r.activateCh)
 	})
 
+	r.mu.Lock()
+	heldCh := r.heldCh
+	r.mu.Unlock()
+
 	select {
-	case <-r.heldCh:
+	case <-heldCh:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+// Yield stops renewing the lease without stopping PostgreSQL, so that a pod
+// that was named target primary and then replaced before it promoted does not
+// keep the new target from taking the lease. The record is not blanked: it
+// keeps naming this pod and the new target takes it over once it has seen it
+// unchanged for a full LeaseDuration, as for any holder that stopped renewing.
+// At most one write already in flight can still land after this returns. The
+// empty-holder fast path stays reserved for a primary that stopped cleanly.
+//
+// The caller decides when yielding is safe: the instance reconciler calls it
+// from the goroutine that promotes, only for a pod whose PostgreSQL is in
+// recovery and was never asked to promote. The next Acquire undoes it.
+func (r *Runnable) Yield(ctx context.Context) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.yielded.Store(true)
+	select {
+	case <-r.heldCh:
+		log.FromContext(ctx).Info(
+			"No longer renewing the primary lease: this pod is a replica and no longer the target primary")
+		r.heldCh = make(chan struct{})
+	default:
+	}
+	if r.cancelElector != nil {
+		r.cancelElector()
+	}
+	if r.cancelMonitor != nil {
+		r.cancelMonitor()
 	}
 }
 
@@ -257,6 +312,14 @@ func (r *Runnable) Release(ctx context.Context) error {
 
 	if r.instance.InstanceManagerIsUpgrading.Load() {
 		contextLogger.Info("Instance manager is upgrading in place, keeping the primary lease held")
+		return nil
+	}
+
+	// A yielded pod never promoted. Blanking its stale record would open the
+	// empty-holder fast path to the new target, which is reserved for a primary
+	// that stopped cleanly.
+	if r.yielded.Load() {
+		contextLogger.Debug("Primary lease yielded earlier, leaving the record for the new target to take over")
 		return nil
 	}
 
@@ -385,6 +448,14 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 	}
 	if err != nil {
 		return false, err
+	}
+
+	// After a Yield the record is left alone (see yielded). Checked after the
+	// Get, which can take up to RenewDeadline, so that a Yield that came
+	// meanwhile is honoured.
+	if r.yielded.Load() {
+		r.observedRecord = nil
+		return false, nil
 	}
 
 	identity := r.lock.Identity()
@@ -556,6 +627,9 @@ func (r *Runnable) preAcquire(ctx context.Context) error {
 //     different (or empty) holder. We return a fatal error so controller-runtime
 //     shuts down the manager and stops PostgreSQL.
 //
+// A Yield is none of these: it cancels only the elector's context, and the
+// loop goes back to polling without reading the lease.
+//
 // If the post-exit read itself fails (API server still unreachable), we have no
 // evidence of preemption and simply retry; a retryPeriod-sized timeout is used
 // for the lease-verification read to avoid blocking indefinitely. Whether this
@@ -592,20 +666,6 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			// preAcquire only returns ctx.Err(); treat as clean shutdown.
 			return nil
 		}
-		r.heldOnce.Do(func() {
-			contextLogger.Info("Acquired primary lease")
-			r.watchdog.MarkAcquired()
-			close(r.heldCh)
-			go r.monitorLeaseAge(monitorCtx)
-		})
-
-		// preAcquire has just confirmed (or re-confirmed) that we hold the
-		// lease. The elector we hand off to next re-runs its own
-		// acquire-then-renew cycle regardless, so the "Attempting to acquire
-		// leader lease..." / "Successfully acquired lease" pair it logs below
-		// is expected renewal bookkeeping for the lease we already hold, not a
-		// new election. Logged at Info to sit next to those Info-level lines.
-		contextLogger.Info("Handing off to the leader-election renewal loop for the lease we already hold")
 
 		le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 			Lock:            r.lock,
@@ -634,11 +694,49 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			return err
 		}
 
-		le.Run(ctx)
+		electorCtx, cancelElector := context.WithCancel(ctx)
+		r.mu.Lock()
+		r.cancelElector = cancelElector
+		// A Yield that came while the lease was being taken is honoured here,
+		// before the hold is published: the record is left to go stale.
+		if r.yielded.Load() {
+			r.mu.Unlock()
+			cancelElector()
+			continue
+		}
+		select {
+		case <-r.heldCh:
+		default:
+			contextLogger.Info("Acquired primary lease")
+			r.watchdog.MarkAcquired()
+			close(r.heldCh)
+			// One monitor per hold: a Yield cancels it, and the next hold
+			// starts a new one with no verdict carried over.
+			var holdCtx context.Context
+			holdCtx, r.cancelMonitor = context.WithCancel(monitorCtx)
+			go r.monitorLeaseAge(holdCtx)
+		}
+		r.mu.Unlock()
+
+		// preAcquire has just confirmed (or re-confirmed) that we hold the
+		// lease. The elector we hand off to next re-runs its own
+		// acquire-then-renew cycle regardless, so the "Attempting to acquire
+		// leader lease..." / "Successfully acquired lease" pair it logs below
+		// is expected renewal bookkeeping for the lease we already hold, not a
+		// new election. Logged at Info to sit next to those Info-level lines.
+		contextLogger.Info("Handing off to the leader-election renewal loop for the lease we already hold")
+
+		le.Run(electorCtx)
+		cancelElector()
 
 		// Scenario 1: clean shutdown.
 		if ctx.Err() != nil {
 			return nil
+		}
+		// Yielded: nothing writes the record any more. Back to polling, where
+		// tryTakeOver leaves the record alone until the next Acquire.
+		if r.yielded.Load() {
+			continue
 		}
 
 		// le.Run exited unexpectedly. Read the lease to distinguish a transient

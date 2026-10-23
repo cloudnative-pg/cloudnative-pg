@@ -43,7 +43,14 @@ import (
 
 // PrimaryLeaseAcquirer is the interface the primary lease runnable exposes to the reconciler.
 type PrimaryLeaseAcquirer interface {
+	// Acquire blocks until this pod holds the primary lease, or ctx is done.
+	// It also undoes a previous Yield.
 	Acquire(ctx context.Context, config lease.Config) error
+
+	// Yield stops renewing the primary lease, without stopping PostgreSQL and
+	// without releasing the lease record, so that a new target primary can take
+	// it over once it goes stale. The next Acquire takes the lease back.
+	Yield(ctx context.Context)
 }
 
 // InstanceReconciler reconciles the status of the Cluster resource with
@@ -64,6 +71,16 @@ type InstanceReconciler struct {
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
 	primaryLeaseAcquirer  PrimaryLeaseAcquirer
+
+	// promotionRequested is set before the first pg_ctl promote of this
+	// process. Once set, this pod may be or become a primary whatever
+	// standby.signal says, so the lease is never yielded. Written and read
+	// only by Reconcile. Never reset: a stale true only means never yield.
+	promotionRequested bool
+
+	// promoteInstance is what handlePromotion runs to promote PostgreSQL. Nil
+	// means instance.PromoteAndWait; tests set a stub.
+	promoteInstance func(ctx context.Context) error
 
 	admission *guard.Admission[*apiv1.Cluster]
 }

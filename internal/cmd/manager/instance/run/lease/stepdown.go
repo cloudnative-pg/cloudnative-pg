@@ -88,9 +88,9 @@ func (l *confirmingLock) stamp(ler resourcelock.LeaderElectionRecord, started ti
 }
 
 // monitorLeaseAge fences this primary once the lease has gone stale and the
-// peers agree it should step down. It runs until ctx is cancelled, which the
-// lifecycle manager does once PostgreSQL has stopped and the process is about
-// to exit, or until it has to stop PostgreSQL itself.
+// peers agree it should step down. It runs until ctx is cancelled (by Yield, or
+// by the lifecycle manager once PostgreSQL has stopped and the process is about
+// to exit) or until it has to stop PostgreSQL itself.
 //
 // The trigger is the age of the last confirmed lease write rather than a
 // failure surfacing in the election loop, because that loop is not guaranteed
@@ -157,6 +157,11 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 
 		if !stepDownDecided {
 			stepDown, reason := r.checkStepDown(r.instance.GetClusterOrDefault(), r.instance.GetPodName())
+			// The check reaches the peers and can take seconds: a Yield during
+			// it leaves a replica that must not be stopped on its verdict.
+			if ctx.Err() != nil {
+				return
+			}
 			switch {
 			case stepDown:
 				contextLogger.Warning("Primary should step down, requesting an immediate shutdown",
