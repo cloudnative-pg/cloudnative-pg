@@ -1889,6 +1889,11 @@ func (in *Import) DeepCopyInto(out *Import) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.PreImportApplicationSQL != nil {
+		in, out := &in.PreImportApplicationSQL, &out.PreImportApplicationSQL
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.PostImportApplicationSQL != nil {
 		in, out := &in.PostImportApplicationSQL, &out.PostImportApplicationSQL
 		*out = make([]string, len(*in))
