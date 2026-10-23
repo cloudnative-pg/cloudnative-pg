@@ -269,18 +269,18 @@ func (ds *databaseSnapshotter) databaseExists(
 	return exists, nil
 }
 
-func (ds *databaseSnapshotter) executePostImportQueries(
+func (ds *databaseSnapshotter) executeImportQueries(
 	ctx context.Context,
 	target pool.Pooler,
 	database string,
+	queries []string,
 ) error {
-	postImportQueries := ds.cluster.Spec.Bootstrap.InitDB.Import.PostImportApplicationSQL
-	if len(postImportQueries) == 0 {
+	if len(queries) == 0 {
 		return nil
 	}
 
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("executing post import user defined queries")
+	contextLogger.Info("executing user defined import queries")
 
 	db, err := target.Connection(database)
 	if err != nil {
@@ -309,7 +309,7 @@ func (ds *databaseSnapshotter) executePostImportQueries(
 		return fmt.Errorf("setting search_path before post-import queries: %w", err)
 	}
 
-	for _, query := range postImportQueries {
+	for _, query := range queries {
 		if _, err := conn.ExecContext(ctx, query); err != nil {
 			return err
 		}

@@ -97,7 +97,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 		})
 	})
 
-	Context("executePostImportQueries testing", func() {
+	Context("executeImportQueries testing", func() {
 		const createQuery = "CREATE TABLE test (id int)"
 		BeforeEach(func() {
 			ds.cluster.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
@@ -117,7 +117,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			mock.ExpectExec(createQuery).WillReturnResult(sqlmock.NewResult(0, 0))
 			mock.ExpectExec(`RESET search_path`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			err := ds.executePostImportQueries(ctx, fp, "test")
+			err := ds.executeImportQueries(ctx, fp, "test", ds.cluster.Spec.Bootstrap.InitDB.Import.PostImportApplicationSQL)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -129,7 +129,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			// RESET runs even when the query fails
 			mock.ExpectExec(`RESET search_path`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			err := ds.executePostImportQueries(ctx, fp, "test")
+			err := ds.executeImportQueries(ctx, fp, "test", ds.cluster.Spec.Bootstrap.InitDB.Import.PostImportApplicationSQL)
 			Expect(err).To(Equal(expectedErr))
 			Expect(mock.ExpectationsWereMet()).To(Succeed())
 		})

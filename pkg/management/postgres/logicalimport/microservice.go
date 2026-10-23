@@ -78,10 +78,11 @@ func Microservice(
 		return err
 	}
 
-	if err := ds.executePostImportQueries(
+	if err := ds.executeImportQueries(
 		ctx,
 		destination,
 		initDB.Database,
+		initDB.Import.PostImportApplicationSQL,
 	); err != nil {
 		return err
 	}
