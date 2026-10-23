@@ -1295,11 +1295,16 @@ func (r *InstanceReconciler) yieldPrimaryLeaseIfNotTarget(ctx context.Context, c
 	if cluster.Status.TargetPrimary == r.instance.GetPodName() && !cluster.IsReplica() {
 		return
 	}
+
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		log.FromContext(ctx).Error(err, "Cannot tell if this instance is a primary, not yielding the primary lease")
 		return
 	}
+
+	// Yield only a replica that never tried to promote: it is in recovery and
+	// no pg_ctl promote was issued by this process. A promotion that failed may
+	// still complete in PostgreSQL, so in that case the lease is kept.
 	if !isPrimary && !r.promotionRequested {
 		r.primaryLeaseAcquirer.Yield(ctx)
 	}
@@ -1378,6 +1383,9 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	return reconcile.Result{}, nil
 }
 
+// handlePromotion promotes this instance. The caller must have acquired the
+// primary lease first (reconcilePrimary does, via acquirePrimaryLease): the
+// lease is what gates pg_ctl promote, and promotionRequested relies on it.
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
@@ -1392,8 +1400,11 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	}
 
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
+
 	// I must promote my instance here
 	r.promotionRequested = true
+
+	// PromoteAndWait is replaced by a stub in the unit tests
 	promote := r.promoteInstance
 	if promote == nil {
 		promote = r.instance.PromoteAndWait

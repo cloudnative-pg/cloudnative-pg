@@ -43,7 +43,13 @@ import (
 
 // PrimaryLeaseAcquirer is the interface the primary lease runnable exposes to the reconciler.
 type PrimaryLeaseAcquirer interface {
+	// Acquire blocks until this pod holds the primary lease, or ctx is done.
+	// It also undoes a previous Yield.
 	Acquire(ctx context.Context, config lease.Config) error
+
+	// Yield stops renewing the primary lease, without stopping PostgreSQL and
+	// without releasing the lease record, so that a new target primary can take
+	// it over once it goes stale. The next Acquire takes the lease back.
 	Yield(ctx context.Context)
 }
 
