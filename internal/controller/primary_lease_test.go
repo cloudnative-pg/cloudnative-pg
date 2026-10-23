@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -302,4 +303,70 @@ var _ = Describe("classifyLeaseAdoption", func() {
 		differentName.UID = "other-cluster-uid"
 		Expect(classifyLeaseAdoption(leaseWithOwner(differentName), cluster)).To(Equal(adoptRefuseForeign))
 	})
+})
+
+var _ = Describe("livePrimaryLeaseHolder", func() {
+	const (
+		clusterName = "test-cluster"
+		namespace   = "default"
+		duration    = 15 * time.Second
+	)
+	key := client.ObjectKey{Namespace: namespace, Name: clusterName}
+	cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace}}
+
+	newReconciler := func(lease *coordinationv1.Lease) *ClusterReconciler {
+		b := fake.NewClientBuilder().WithScheme(k8scheme.BuildWithAllKnownScheme())
+		if lease != nil {
+			lease.Name, lease.Namespace = clusterName, namespace
+			b = b.WithObjects(lease)
+		}
+		return &ClusterReconciler{Client: b.Build(), leaseObservations: map[client.ObjectKey]leaseObservation{}}
+	}
+	heldBy := func(holder string, renewTime time.Time) *coordinationv1.Lease {
+		return &coordinationv1.Lease{Spec: coordinationv1.LeaseSpec{
+			HolderIdentity: ptr.To(holder),
+			RenewTime:      ptr.To(metav1.NewMicroTime(renewTime)),
+		}}
+	}
+	// backdate moves the start of the window so that the next read sees it elapsed.
+	backdate := func(r *ClusterReconciler) {
+		o := r.leaseObservations[key]
+		o.observedAt = o.observedAt.Add(-duration)
+		r.leaseObservations[key] = o
+	}
+
+	DescribeTable("is free when the record is missing or released",
+		func(ctx SpecContext, lease *coordinationv1.Lease) {
+			Expect(newReconciler(lease).livePrimaryLeaseHolder(ctx, cluster)).To(BeEmpty())
+		},
+		Entry("no lease", nil),
+		Entry("empty holder", heldBy("", time.Now())),
+	)
+
+	It("counts a held record as live on first sight, whatever its RenewTime says", func(ctx SpecContext) {
+		r := newReconciler(heldBy("pod-1", time.Now().Add(-time.Hour)))
+		Expect(r.livePrimaryLeaseHolder(ctx, cluster)).To(Equal("pod-1"))
+	})
+
+	It("is free once the record sat unchanged for the lease duration on our clock", func(ctx SpecContext) {
+		r := newReconciler(heldBy("pod-1", time.Now().Add(time.Hour)))
+		Expect(r.livePrimaryLeaseHolder(ctx, cluster)).To(Equal("pod-1"))
+		backdate(r)
+		Expect(r.livePrimaryLeaseHolder(ctx, cluster)).To(BeEmpty())
+	})
+
+	DescribeTable("restarts the window when the record changes",
+		func(ctx SpecContext, holder string) {
+			r := newReconciler(heldBy("pod-1", time.Now()))
+			Expect(r.livePrimaryLeaseHolder(ctx, cluster)).To(Equal("pod-1"))
+			backdate(r)
+			lease := &coordinationv1.Lease{}
+			Expect(r.Get(ctx, key, lease)).To(Succeed())
+			lease.Spec = heldBy(holder, time.Now()).Spec
+			Expect(r.Update(ctx, lease)).To(Succeed())
+			Expect(r.livePrimaryLeaseHolder(ctx, cluster)).To(Equal(holder))
+		},
+		Entry("the holder renews", "pod-1"),
+		Entry("another holder takes over", "pod-2"),
+	)
 })

@@ -43,7 +43,6 @@ import (
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/controller/leaseobserver"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -108,11 +107,11 @@ func buildTestEnvironment() *testingEnvironment {
 	Expect(err).ToNot(HaveOccurred())
 
 	clusterReconciler := &ClusterReconciler{
-		Client:          k8sClient,
-		Scheme:          scheme,
-		Recorder:        record.NewFakeRecorder(120),
-		DiscoveryClient: discoveryClient,
-		leaseObserver:   leaseobserver.NewTracker(),
+		Client:            k8sClient,
+		Scheme:            scheme,
+		Recorder:          record.NewFakeRecorder(120),
+		DiscoveryClient:   discoveryClient,
+		leaseObservations: map[client.ObjectKey]leaseObservation{},
 	}
 
 	poolerReconciler := &PoolerReconciler{

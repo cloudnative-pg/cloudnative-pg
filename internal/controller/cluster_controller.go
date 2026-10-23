@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -56,7 +57,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/controller/leaseobserver"
 	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -103,10 +103,11 @@ type ClusterReconciler struct {
 	Plugins            repository.Interface
 	OperatorClientCert *tls.Certificate
 
-	drainTaints    []string
-	rolloutManager *rolloutManager.Manager
-	leaseObserver  *leaseobserver.Tracker
-	admission      *guard.Admission[*apiv1.Cluster]
+	drainTaints       []string
+	rolloutManager    *rolloutManager.Manager
+	leaseMu           sync.Mutex
+	leaseObservations map[client.ObjectKey]leaseObservation
+	admission         *guard.Admission[*apiv1.Cluster]
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
@@ -130,9 +131,9 @@ func NewClusterReconciler(
 			configuration.Current.GetClustersRolloutDelay(),
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
-		leaseObserver: leaseobserver.NewTracker(),
-		drainTaints:   drainTaints,
-		admission:     admission,
+		leaseObservations: map[client.ObjectKey]leaseObservation{},
+		drainTaints:       drainTaints,
+		admission:         admission,
 	}
 }
 
@@ -183,7 +184,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster == nil || cluster.GetDeletionTimestamp() != nil {
-		r.leaseObserver.Forget(req.NamespacedName)
+		r.forgetPrimaryLease(req.NamespacedName)
 		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
 			contextLogger.Error(
 				err,
