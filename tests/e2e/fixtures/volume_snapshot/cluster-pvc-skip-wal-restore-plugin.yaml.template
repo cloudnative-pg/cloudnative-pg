@@ -1,0 +1,36 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-skip-wal-restore
+spec:
+  instances: 1
+  primaryUpdateStrategy: unsupervised
+  imageName: "${POSTGRES_IMG}"
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  # The backup has no WAL storage snapshot: the WAL volume is created empty,
+  # and the WALs are fetched through plugin-barman-cloud from the ObjectStore
+  # the source archived to.
+  bootstrap:
+    recovery:
+      source: cluster-skip-wal-snapshot
+      volumeSnapshots:
+        storage:
+          name: ${SNAPSHOT_PLUGIN_SKIP_WAL_PGDATA}
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+
+  externalClusters:
+    - name: cluster-skip-wal-snapshot
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cluster-skip-wal-snapshot
+          serverName: cluster-skip-wal-snapshot

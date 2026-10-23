@@ -1,0 +1,35 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-skip-wal-snapshot
+spec:
+  instances: 1
+  primaryUpdateStrategy: unsupervised
+  imageName: "${POSTGRES_IMG}"
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  backup:
+    # Online (hot) volume-snapshot base backups leaving the WAL storage out:
+    # the WALs come from the plugin-barman-cloud archive below.
+    volumeSnapshot:
+      className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}
+      online: true
+      onlineConfiguration:
+        immediateCheckpoint: true
+        waitForArchive: true
+        skipWalSnapshot: true
+
+  # Use plugin-barman-cloud as the WAL archiver. The referenced ObjectStore is
+  # created by the test.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: cluster-skip-wal-snapshot

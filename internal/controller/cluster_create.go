@@ -1868,12 +1868,18 @@ func (r *ClusterReconciler) checkReadyForRecovery(
 				"backupPhase", backup.Status.Phase)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
+		if backup.Status.BackupSnapshotStatus.WalSnapshotSkipped && cluster.Spec.Bootstrap.Recovery.Source == "" {
+			contextLogger.Info("The source backup has no WAL storage snapshot, a recovery source "+
+				"is required to fetch the WAL files from the archive, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
 	}
 
 	volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
 	if volumeSnapshotsRecovery != nil {
 		status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
-			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
+			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery, cluster.ShouldCreateWalArchiveVolume())
 		if err != nil {
 			return ctrl.Result{}, err
 		}

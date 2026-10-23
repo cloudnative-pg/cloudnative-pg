@@ -597,18 +597,25 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 							Kind:     apiv1.VolumeSnapshotKind,
 							Name:     "current-bootstrap-snapshot",
 						},
+						WalStorage: &corev1.TypedLocalObjectReference{
+							APIGroup: ptr.To(volumesnapshotv1.GroupName),
+							Kind:     apiv1.VolumeSnapshotKind,
+							Name:     "current-bootstrap-snapshot-wal",
+						},
 					},
 				},
 			}
 		})
 
-		currentSnapshot := &volumesnapshotv1.VolumeSnapshot{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "current-bootstrap-snapshot",
-				Namespace: namespace,
-			},
+		for _, name := range []string{"current-bootstrap-snapshot", "current-bootstrap-snapshot-wal"} {
+			currentSnapshot := &volumesnapshotv1.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}
+			Expect(env.client.Create(ctx, currentSnapshot)).To(Succeed())
 		}
-		Expect(env.client.Create(ctx, currentSnapshot)).To(Succeed())
 
 		primaryName := specs.GetInstanceName(cluster.Name, 1)
 		cluster.Status.Instances = 1

@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"slices"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -510,6 +511,17 @@ var _ = Describe("check if bootstrap recovery can proceed", func() {
 			true),
 		Entry("when bootstrapping a backup that is not there",
 			nil, true),
+		Entry(
+			"when bootstrapping without a recovery source from a backup taken without the WAL storage",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					Phase: apiv1.BackupPhaseCompleted,
+					BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
+						WalSnapshotSkipped: true,
+					},
+				},
+			},
+			true),
 	)
 })
 
@@ -652,6 +664,35 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 		res, err := newClusterReconciler.checkReadyForRecovery(ctx, nil, cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res).ToNot(BeNil())
+		Expect(res).ToNot(Equal(reconcile.Result{}))
+	})
+
+	It("should requeue if the WAL storage snapshot is missing for a backup that has it", func(ctx SpecContext) {
+		cluster.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		snapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pgdata",
+				Namespace: namespace,
+				Labels: map[string]string{
+					utils.BackupNameLabelName: "backup-one",
+				},
+				Annotations: map[string]string{
+					utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+				},
+			},
+		}
+		newClusterReconciler := &ClusterReconciler{
+			Client: fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithObjects(snapshot).
+				Build(),
+			Scheme:          env.scheme,
+			Recorder:        record.NewFakeRecorder(120),
+			DiscoveryClient: env.discoveryClient,
+		}
+
+		res, err := newClusterReconciler.checkReadyForRecovery(ctx, nil, cluster)
+		Expect(err).ToNot(HaveOccurred())
 		Expect(res).ToNot(Equal(reconcile.Result{}))
 	})
 })

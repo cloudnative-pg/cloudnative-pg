@@ -42,6 +42,11 @@ type BackupResultData struct {
 	SpcmapFile []byte                `json:"spcmapFile,omitempty"`
 	BackupName string                `json:"backupName,omitempty"`
 	Phase      BackupConnectionPhase `json:"phase,omitempty"`
+	// StopWaitsForArchive is true when the backup runs on a primary with
+	// WAL archiving enabled, where pg_backup_stop waits for the archiver.
+	// pg_backup_stop fails after a promotion, and archive_mode only changes
+	// with a restart, which ends the backup.
+	StopWaitsForArchive bool `json:"stopWaitsForArchive,omitempty"`
 }
 
 // BackupConnectionPhase a connection phase of the backup
@@ -139,14 +144,18 @@ func (bc *backupConnection) startBackup(ctx context.Context, sync *sync.Mutex) {
 
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
-		row = bc.conn.QueryRowContext(ctx, "SELECT pg_catalog.pg_start_backup($1, $2, false);", bc.data.BackupName,
-			bc.immediateCheckpoint)
+		row = bc.conn.QueryRowContext(ctx,
+			"SELECT pg_catalog.pg_start_backup($1, $2, false), "+
+				"NOT pg_catalog.pg_is_in_recovery() AND pg_catalog.current_setting('archive_mode') <> 'off';",
+			bc.data.BackupName, bc.immediateCheckpoint)
 	} else {
-		row = bc.conn.QueryRowContext(ctx, "SELECT pg_catalog.pg_backup_start(label => $1, fast => $2);", bc.data.BackupName,
-			bc.immediateCheckpoint)
+		row = bc.conn.QueryRowContext(ctx,
+			"SELECT pg_catalog.pg_backup_start(label => $1, fast => $2), "+
+				"NOT pg_catalog.pg_is_in_recovery() AND pg_catalog.current_setting('archive_mode') <> 'off';",
+			bc.data.BackupName, bc.immediateCheckpoint)
 	}
 
-	if err := row.Scan(&bc.data.BeginLSN); err != nil {
+	if err := row.Scan(&bc.data.BeginLSN, &bc.data.StopWaitsForArchive); err != nil {
 		bc.err = fmt.Errorf("while scanning backup start: %w", err)
 		return
 	}

@@ -170,7 +170,10 @@ spec:
 ```
 
 In case the backed-up cluster was using a separate PVC to store the WAL files,
-the recovery must include that too:
+the recovery must include that too, unless the backup was taken
+[skipping the snapshot of the WAL volume](appendixes/backup_volumesnapshot.md#skipping-the-snapshot-of-the-wal-volume):
+in that case the WAL files are fetched from the archive defined in the
+`source` of the recovery, which is required:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -385,7 +388,8 @@ recovery target.
 
 :::note
     If the backed-up cluster had `walStorage` enabled, you also must specify
-    the volume snapshot containing the `PGWAL` directory, as mentioned in
+    the volume snapshot containing the `PGWAL` directory, unless the backup
+    was taken without it, as mentioned in
     [Recovery from VolumeSnapshot objects](#recovery-from-volumesnapshot-objects).
 :::
 

@@ -103,6 +103,9 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		if err := info.writeBackupLabelAndTablespaceMap(); err != nil {
 			return err
 		}
+		if _, err := info.restoreCustomWalDir(ctx); err != nil {
+			return err
+		}
 
 		// If the instance starts as a primary, we will enter in the
 		// same logic attaching an old primary back after a failover.
@@ -350,14 +353,15 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 	pgDataWal := path.Join(info.PgData, pgWalDirectory)
 
+	// The WAL volume is empty when restoring a snapshot taken without it
+	if err := fileutils.EnsureDirectoryExists(info.PgWal); err != nil {
+		return false, err
+	}
+
 	// if the link is already present we have nothing to do.
 	if linkInfo, _ := os.Readlink(pgDataWal); linkInfo == info.PgWal {
 		contextLogger.Info("symlink to the WAL volume already present, skipping the custom wal dir restore")
 		return false, nil
-	}
-
-	if err := fileutils.EnsureDirectoryExists(info.PgWal); err != nil {
-		return false, err
 	}
 
 	contextLogger.Info("restoring WAL volume symlink and transferring data")

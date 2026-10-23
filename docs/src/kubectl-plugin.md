@@ -1057,8 +1057,8 @@ However, you can override this policy with the `--backup-target` option.
 
 In the case of volume snapshot backups, you can also use the `--online` option
 to request an online/hot backup or an offline/cold one: additionally, you can
-also tune online backups by explicitly setting the `--immediate-checkpoint` and
-`--wait-for-archive` options.
+also tune online backups by explicitly setting the `--immediate-checkpoint`,
+`--wait-for-archive` and `--skip-wal-snapshot` options.
 
 You can use the `--dry-run` option to preview the `Backup` resource that would
 be created, without actually submitting it to the API server:
