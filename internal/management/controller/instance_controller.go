@@ -27,6 +27,7 @@ import (
 	"math"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -1036,6 +1037,20 @@ func (r *InstanceReconciler) reconcileMetrics(
 	}
 }
 
+// monitoringQueriesSource is the content of one key of a ConfigMap or Secret
+// holding custom monitoring queries
+type monitoringQueriesSource struct {
+	kind      string
+	reference any
+	data      []byte
+}
+
+// monitoringQueriesInputs is everything the queries collector is built from
+type monitoringQueriesInputs struct {
+	dbname  string
+	sources []monitoringQueriesSource
+}
+
 // reconcileMonitoringQueries applies the custom monitoring queries to the
 // web server
 func (r *InstanceReconciler) reconcileMonitoringQueries(
@@ -1045,17 +1060,45 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Debug("Reconciling custom monitoring queries")
 
-	dbname := "postgres"
-	if len(cluster.GetApplicationDatabaseName()) != 0 {
-		dbname = cluster.GetApplicationDatabaseName()
+	inputs := r.getMonitoringQueriesInputs(ctx, cluster)
+
+	// This runs on every change of the Cluster, status updates included.
+	// A new collector starts with an empty cache, so only replace it when
+	// the queries it is built from actually changed.
+	if r.monitoringQueriesInputs != nil && reflect.DeepEqual(*r.monitoringQueriesInputs, inputs) {
+		contextLogger.Debug("Custom monitoring queries unchanged, keeping the current collector")
+		return
 	}
 
-	queriesCollector := metrics.NewQueriesCollector("cnpg", r.instance, dbname)
+	queriesCollector := metrics.NewQueriesCollector("cnpg", r.instance, inputs.dbname)
 	queriesCollector.InjectUserQueries(metricserver.DefaultQueries)
+	for _, source := range inputs.sources {
+		if err := queriesCollector.ParseQueries(source.data); err != nil {
+			contextLogger.Warning("Error while parsing custom queries in "+source.kind,
+				"reference", source.reference,
+				"error", err.Error())
+		}
+	}
+
+	r.metricsServerExporter.SetCustomQueries(queriesCollector)
+	r.monitoringQueriesInputs = &inputs
+}
+
+// getMonitoringQueriesInputs reads the database name and the content of the
+// ConfigMaps and Secrets the custom monitoring queries are defined in
+func (r *InstanceReconciler) getMonitoringQueriesInputs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) monitoringQueriesInputs {
+	contextLogger := log.FromContext(ctx)
+
+	inputs := monitoringQueriesInputs{dbname: "postgres"}
+	if len(cluster.GetApplicationDatabaseName()) != 0 {
+		inputs.dbname = cluster.GetApplicationDatabaseName()
+	}
 
 	if cluster.Spec.Monitoring == nil {
-		r.metricsServerExporter.SetCustomQueries(queriesCollector)
-		return
+		return inputs
 	}
 
 	for _, reference := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
@@ -1078,13 +1121,8 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			continue
 		}
 
-		err = queriesCollector.ParseQueries([]byte(data))
-		if err != nil {
-			contextLogger.Warning("Error while parsing custom queries in ConfigMap",
-				"reference", reference,
-				"error", err.Error())
-			continue
-		}
+		inputs.sources = append(inputs.sources,
+			monitoringQueriesSource{kind: "ConfigMap", reference: reference, data: []byte(data)})
 	}
 
 	for _, reference := range cluster.Spec.Monitoring.CustomQueriesSecret {
@@ -1109,16 +1147,11 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			continue
 		}
 
-		err = queriesCollector.ParseQueries(data)
-		if err != nil {
-			contextLogger.Warning("Error while parsing custom queries in Secret",
-				"reference", reference,
-				"error", err.Error())
-			continue
-		}
+		inputs.sources = append(inputs.sources,
+			monitoringQueriesSource{kind: "Secret", reference: reference, data: data})
 	}
 
-	r.metricsServerExporter.SetCustomQueries(queriesCollector)
+	return inputs
 }
 
 // PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
