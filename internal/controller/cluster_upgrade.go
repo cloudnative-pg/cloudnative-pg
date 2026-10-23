@@ -469,14 +469,53 @@ func isPodNeedingRollout(
 	return rollout{}
 }
 
-// check if the pod has a valid podSpec
-func hasValidPodSpec(pod *corev1.Pod) bool {
+// recordedPodSpec returns the PodSpec the operator rendered for this Pod, as
+// stored in the `cnpg.io/podSpec` annotation when the Pod was created, and
+// whether such a record is available and parseable.
+//
+// The record is written by specs.NewInstance before the Pod is submitted to the
+// API server, so it holds the operator's own intent, untouched by any mutating
+// admission webhook that rewrote the persisted Pod afterwards.
+func recordedPodSpec(pod *corev1.Pod) (*corev1.PodSpec, bool) {
 	podSpecAnnotation, hasStoredPodSpec := pod.Annotations[utils.PodSpecAnnotationName]
 	if !hasStoredPodSpec {
-		return false
+		return nil, false
 	}
-	err := json.Unmarshal([]byte(podSpecAnnotation), &corev1.PodSpec{})
-	return err == nil
+
+	var storedPodSpec corev1.PodSpec
+	if err := json.Unmarshal([]byte(podSpecAnnotation), &storedPodSpec); err != nil {
+		return nil, false
+	}
+
+	return &storedPodSpec, true
+}
+
+// check if the pod has a valid podSpec
+func hasValidPodSpec(pod *corev1.Pod) bool {
+	_, ok := recordedPodSpec(pod)
+	return ok
+}
+
+// renderedImage extracts a container image from the PodSpec the operator
+// rendered for this Pod, falling back to the live Pod when no record is
+// available (Pods created by an operator version that predates the
+// `cnpg.io/podSpec` annotation).
+//
+// Image drift must be evaluated against the rendered spec rather than the live
+// one: a mutating admission webhook (a registry mirror or pull-through cache,
+// for instance) rewrites container images on the persisted Pod, and comparing
+// that rewritten value against the operator's target can never match. The
+// operator would then delete the Pod on every pass, the webhook would rewrite
+// its replacement, and the cluster would never converge.
+//
+// This mirrors what checkPodSpecIsOutdated already does for every other field:
+// ComparePodSpecs diffs the recorded spec, not the live one.
+func renderedImage(pod *corev1.Pod, extract func(corev1.Pod) (string, error)) (string, error) {
+	if storedPodSpec, ok := recordedPodSpec(pod); ok {
+		return extract(corev1.Pod{Spec: *storedPodSpec})
+	}
+
+	return extract(*pod)
 }
 
 func checkPodNeedsUpdatedTopology(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
@@ -554,7 +593,7 @@ func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVol
 func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
 	targetImageName := cluster.Status.Image
 
-	pgCurrentImageName, err := specs.GetPostgresImageName(*pod)
+	pgCurrentImageName, err := renderedImage(pod, specs.GetPostgresImageName)
 	if err != nil {
 		return rollout{}, err
 	}
@@ -576,7 +615,7 @@ func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster
 		return rollout{}, nil
 	}
 
-	opCurrentImageName, err := specs.GetBootstrapControllerImageName(*pod)
+	opCurrentImageName, err := renderedImage(pod, specs.GetBootstrapControllerImageName)
 	if err != nil {
 		return rollout{}, err
 	}
@@ -717,7 +756,7 @@ func checkPodSpecIsOutdated(
 
 	// the bootstrap init-container could change image after an operator upgrade.
 	// If in-place upgrades of the instance manager are enabled, we don't need rollout.
-	opCurrentImageName, err := specs.GetBootstrapControllerImageName(*pod)
+	opCurrentImageName, err := renderedImage(pod, specs.GetBootstrapControllerImageName)
 	if err != nil {
 		return rollout{}, err
 	}
