@@ -89,10 +89,15 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when running a different image name", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1)
+		// Render the Pod from an older operand image, then move the cluster
+		// forward: this is how an image change actually reaches the operator,
+		// and the recorded `cnpg.io/podSpec` annotation carries the old image.
+		oldCluster := cluster.DeepCopy()
+		oldCluster.Spec.ImageName = "postgres:13.10"
+		oldCluster.Status.Image = "postgres:13.10"
+		pod, err := specs.NewInstance(ctx, *oldCluster, 1)
 		Expect(err).ToNot(HaveOccurred())
 
-		pod.Spec.Containers[0].Image = "postgres:13.10"
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
 			IsPodReady:     true,
@@ -144,8 +149,14 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.required).To(BeFalse())
 		Expect(rollout.reason).To(BeEmpty())
 
-		// Set a different image to trigger a full rollout
-		pod.Spec.Containers[0].Image = "postgres:13.10"
+		// Render a Pod from an older operand image to trigger a full rollout:
+		// the recorded `cnpg.io/podSpec` annotation carries the old image, which
+		// is what the image check compares against.
+		oldCluster := cluster.DeepCopy()
+		oldCluster.Spec.ImageName = "postgres:13.10"
+		oldCluster.Status.Image = "postgres:13.10"
+		pod, err = specs.NewInstance(ctx, *oldCluster, 1)
+		Expect(err).ToNot(HaveOccurred())
 
 		// Set pending restart to true in the status
 		status = postgres.PostgresqlStatus{
@@ -779,6 +790,119 @@ var _ = Describe("hasValidPodSpec", func() {
 				Expect(hasValidPodSpec(pod)).To(BeFalse())
 			})
 		})
+	})
+})
+
+var _ = Describe("Pod image mutated by an admission webhook", func() {
+	// A mutating admission webhook (registry mirror, pull-through cache,
+	// air-gapped relocation) rewrites container images on the persisted Pod.
+	// The operator must compare its own rendered spec, kept in the
+	// `cnpg.io/podSpec` annotation, rather than the rewritten live Pod:
+	// comparing the latter can never match, so the operator would delete the
+	// Pod on every pass while the webhook rewrites every replacement.
+	const mirrorPrefix = "registry.internal.example/mirror/"
+
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.11",
+			},
+			Status: apiv1.ClusterStatus{
+				Image: "postgres:13.11",
+			},
+		}
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	// rewriteImages simulates the admission webhook: it prefixes every
+	// container image on the persisted Pod, leaving the `cnpg.io/podSpec`
+	// annotation written at render time untouched.
+	rewriteImages := func(pod *corev1.Pod) {
+		for i := range pod.Spec.Containers {
+			pod.Spec.Containers[i].Image = mirrorPrefix + pod.Spec.Containers[i].Image
+		}
+		for i := range pod.Spec.InitContainers {
+			pod.Spec.InitContainers[i].Image = mirrorPrefix + pod.Spec.InitContainers[i].Image
+		}
+	}
+
+	It("does not require a rollout when only the live images were rewritten", func(ctx SpecContext) {
+		pod, err := specs.NewInstance(ctx, cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		rewriteImages(pod)
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeFalse(), "reason: %s", rollout.reason)
+	})
+
+	It("still requires a rollout when the operand image actually changes", func(ctx SpecContext) {
+		pod, err := specs.NewInstance(ctx, cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		rewriteImages(pod)
+
+		cluster := cluster.DeepCopy()
+		cluster.Spec.ImageName = "postgres:13.12"
+		cluster.Status.Image = "postgres:13.12"
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("the instance is using a different image"))
+		Expect(rollout.needsToChangeOperandImage).To(BeTrue())
+	})
+
+	It("still requires a rollout when the operator image actually changes", func(ctx SpecContext) {
+		pod, err := specs.NewInstance(ctx, cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		rewriteImages(pod)
+
+		configuration.Current.OperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
+		configuration.Current.EnableInstanceManagerInplaceUpdates = false
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("old bootstrap container image"))
+		Expect(rollout.needsToChangeOperatorImage).To(BeTrue())
+	})
+
+	It("falls back to the live Pod when no podSpec annotation is recorded", func(ctx SpecContext) {
+		pod, err := specs.NewInstance(ctx, cluster, 1)
+		Expect(err).ToNot(HaveOccurred())
+		delete(pod.Annotations, utils.PodSpecAnnotationName)
+		pod.Spec.Containers[0].Image = "postgres:13.10"
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("the instance is using a different image"))
 	})
 })
 
