@@ -983,8 +983,9 @@ func (instance *Instance) ConnectionPool() pool.Pooler {
 	const applicationName = "cnpg-instance-manager"
 	if instance.pool == nil {
 		socketDir := GetSocketDir()
+		// A stuck postmaster accepts connections but never answers; every query opens one.
 		dsn := fmt.Sprintf(
-			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			"host=%s port=%v user=%v sslmode=disable application_name=%v connect_timeout=5",
 			socketDir,
 			GetServerPort(),
 			"postgres",
@@ -1002,7 +1003,7 @@ func (instance *Instance) metricsConnectionPool() pool.Pooler {
 	instance.initializeMetricsPool.Do(func() {
 		socketDir := GetSocketDir()
 		dsn := fmt.Sprintf(
-			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			"host=%s port=%v user=%v sslmode=disable application_name=%v connect_timeout=5",
 			socketDir,
 			GetServerPort(),
 			apiv1.MetricsExporterUserName,
