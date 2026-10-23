@@ -267,6 +267,23 @@ func BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster apiv1.Cluster) *Instanc
 	return &InstanceBootstrapCommand{Role: jobRolePGBaseBackup, Command: initCommand}
 }
 
+// BuildPrimaryBootstrapCommandViaPgCreateSubscriber builds the bootstrap command
+// for a new primary instance cloned from an external server and converted into
+// a logical subscriber of it
+func BuildPrimaryBootstrapCommandViaPgCreateSubscriber(cluster apiv1.Cluster) *InstanceBootstrapCommand {
+	commonFlags := buildCommonInitJobFlags(cluster)
+	initCommand := make([]string, 0, 3+len(commonFlags))
+	initCommand = append(initCommand,
+		"/controller/manager",
+		"instance",
+		"pgcreatesubscriber",
+	)
+
+	initCommand = append(initCommand, commonFlags...)
+
+	return &InstanceBootstrapCommand{Role: jobRolePgCreateSubscriber, Command: initCommand}
+}
+
 // BuildReplicaBootstrapCommandViaJoin builds the bootstrap command for a new
 // replica instance, copying the contents from another Pod
 func BuildReplicaBootstrapCommandViaJoin(cluster apiv1.Cluster) *InstanceBootstrapCommand {
@@ -315,12 +332,13 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 type jobRole string
 
 const (
-	jobRoleImport           jobRole = "import"
-	jobRoleInitDB           jobRole = "initdb"
-	jobRolePGBaseBackup     jobRole = "pgbasebackup"
-	jobRoleFullRecovery     jobRole = "full-recovery"
-	jobRoleJoin             jobRole = "join"
-	jobRoleSnapshotRecovery jobRole = "snapshot-recovery"
+	jobRoleImport             jobRole = "import"
+	jobRoleInitDB             jobRole = "initdb"
+	jobRolePGBaseBackup       jobRole = "pgbasebackup"
+	jobRolePgCreateSubscriber jobRole = "pgcreatesubscriber"
+	jobRoleFullRecovery       jobRole = "full-recovery"
+	jobRoleJoin               jobRole = "join"
+	jobRoleSnapshotRecovery   jobRole = "snapshot-recovery"
 )
 
 // getJobName returns a string indicating the job name

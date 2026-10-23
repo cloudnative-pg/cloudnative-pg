@@ -2010,6 +2010,29 @@ spec:
                     required:
                     - source
                     type: object
+                  pg_createsubscriber:
+                    description: Bootstrap the cluster using pg_createsubscriber
+                    properties:
+                      parameters:
+                        description: Optional parameters for pg_createsubscriber
+                        properties:
+                          databases:
+                            description: List of databases to replicate
+                            items:
+                              type: string
+                            type: array
+                          recoveryTimeout:
+                            description: Timeout in seconds for recovery to finish
+                            minimum: 0
+                            type: integer
+                        type: object
+                      source:
+                        description: The name of the external cluster to use as source
+                        minLength: 1
+                        type: string
+                    required:
+                    - source
+                    type: object
                   recovery:
                     description: Bootstrap the cluster from a backup
                     properties:
