@@ -524,6 +524,7 @@ ScheduledBackupList
 ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
+SchemaPermissionsSpec
 SchemaSpec
 Scorsolini
 Seccomp
@@ -1514,6 +1515,7 @@ scheduledbackupspec
 scheduledbackupstatus
 schedulerName
 schemaOnly
+schemapermissionsspec
 schemas
 schemaspec
 sdk
