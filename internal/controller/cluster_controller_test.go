@@ -1231,7 +1231,7 @@ var _ = Describe("Updating target primary", func() {
 		By("marking the failover as pending without electing anyone yet", func() {
 			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
 				ctx, cluster, statusList, managedResources)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(MatchError(ErrPrimaryLeaseHeld))
 			Expect(selectedPrimary).To(Equal(""))
 			Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
 		})
@@ -1296,6 +1296,26 @@ var _ = Describe("Updating target primary", func() {
 			ctx, cluster, statusList, managedResources)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
+	})
+
+	It("elects on the pass after the pending marker without waiting the failover delay again", func(ctx SpecContext) {
+		cluster, instances, statusList, managedResources := failoverCase(1, 2)
+		cluster.Spec.FailoverDelay = 1
+		cluster.Status.TargetPrimary = instances[0].Name
+
+		var requeued bool
+		Eventually(func(g Gomega) {
+			result, err := env.clusterReconciler.handleSwitchover(ctx, cluster, managedResources, statusList)
+			g.Expect(err).ToNot(HaveOccurred())
+			requeued = result != nil
+			g.Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
+		}).WithTimeout(5 * time.Second).Should(Succeed())
+		Expect(requeued).To(BeTrue())
+
+		result, err := env.clusterReconciler.handleSwitchover(ctx, cluster, managedResources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+		Expect(cluster.Status.TargetPrimary).To(Equal(statusList.Items[0].Pod.Name))
 	})
 
 	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func(ctx SpecContext) {
