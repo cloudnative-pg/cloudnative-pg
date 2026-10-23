@@ -4814,6 +4814,32 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		Expect(v.validateBootstrapRecoveryDataSource(cluster)).To(BeEmpty())
 	})
 
+	Context("without a WAL storage snapshot", func() {
+		var cluster *apiv1.Cluster
+
+		BeforeEach(func() {
+			cluster = clusterFromRecovery(&apiv1.BootstrapRecovery{
+				VolumeSnapshots: &apiv1.DataSource{
+					Storage: corev1.TypedLocalObjectReference{
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
+						Kind:     apiv1.VolumeSnapshotKind,
+						Name:     "pgdata",
+					},
+				},
+			})
+		})
+
+		It("requires a source for the WALs on creation", func() {
+			Expect(v.validateBootstrapRecoveryWalSource(cluster)).To(ConsistOf(
+				HaveField("Field", "spec.bootstrap.recovery.source")))
+		})
+
+		It("accepts a WAL storage added once the cluster is bootstrapped", func() {
+			Expect(v.validate(cluster)).ToNot(ContainElement(
+				HaveField("Field", "spec.bootstrap.recovery.source")))
+		})
+	})
+
 	When("using an nil apiGroup", func() {
 		It("accepts recovery from a PersistentVolumeClaim", func() {
 			cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{

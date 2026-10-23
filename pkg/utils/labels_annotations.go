@@ -266,6 +266,10 @@ const (
 	// BackupTablespaceMapFileAnnotationName is the name of the annotation where the `tablespace_map` file is kept
 	BackupTablespaceMapFileAnnotationName = MetadataNamespace + "/backupTablespaceMapFile"
 
+	// WalSnapshotSkippedAnnotationName is the name of the annotation telling that the snapshots
+	// of a backup don't include the WAL storage, whose content has to be fetched from the WAL archive
+	WalSnapshotSkippedAnnotationName = MetadataNamespace + "/walSnapshotSkipped"
+
 	// BackupVolumeSnapshotDeadlineAnnotationName is the annotation for the snapshot backup failure deadline in minutes.
 	// It is only applied to snapshot retryable errors
 	BackupVolumeSnapshotDeadlineAnnotationName = MetadataNamespace + "/volumeSnapshotDeadline"

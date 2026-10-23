@@ -49,25 +49,46 @@ type backupCommandOptions struct {
 	online              *bool
 	immediateCheckpoint *bool
 	waitForArchive      *bool
+	skipWalSnapshot     *bool
+	clusterOnlineConfig apiv1.OnlineConfiguration
 	pluginName          string
 	pluginParameters    pluginParameters
 	dryRun              bool
 }
 
 func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfiguration {
-	var onlineConfiguration *apiv1.OnlineConfiguration
-	if options.immediateCheckpoint != nil || options.waitForArchive != nil {
-		onlineConfiguration = &apiv1.OnlineConfiguration{
-			WaitForArchive:      options.waitForArchive,
-			ImmediateCheckpoint: options.immediateCheckpoint,
-		}
+	if options.immediateCheckpoint == nil && options.waitForArchive == nil && options.skipWalSnapshot == nil {
+		return nil
+	}
+
+	// The online configuration of the Backup replaces the one of the cluster
+	// as a whole, so it starts from it to keep the options that are not set
+	onlineConfiguration := options.clusterOnlineConfig.DeepCopy()
+	if options.immediateCheckpoint != nil {
+		onlineConfiguration.ImmediateCheckpoint = options.immediateCheckpoint
+	}
+	if options.waitForArchive != nil {
+		onlineConfiguration.WaitForArchive = options.waitForArchive
+	}
+	if options.skipWalSnapshot != nil {
+		onlineConfiguration.SkipWalSnapshot = options.skipWalSnapshot
 	}
 	return onlineConfiguration
 }
 
+// getClusterOnlineConfiguration returns the online configuration of the
+// volume snapshot backups of the cluster
+func getClusterOnlineConfiguration(cluster *apiv1.Cluster) apiv1.OnlineConfiguration {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		return apiv1.OnlineConfiguration{}
+	}
+	return cluster.Spec.Backup.VolumeSnapshot.OnlineConfiguration
+}
+
 // NewCmd creates the new "backup" subcommand
 func NewCmd() *cobra.Command {
-	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive, pluginName string
+	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive, skipWalSnapshot,
+		pluginName string
 	var pluginParameters pluginParameters
 	var dryRun bool
 
@@ -156,6 +177,10 @@ func NewCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("while parsing the wait-for-archive value: %w", err)
 			}
+			parsedSkipWalSnapshot, err := parseOptionalBooleanString(skipWalSnapshot)
+			if err != nil {
+				return fmt.Errorf("while parsing the skip-wal-snapshot value: %w", err)
+			}
 
 			return createBackup(
 				cmd.Context(),
@@ -167,6 +192,8 @@ func NewCmd() *cobra.Command {
 					online:              parsedOnline,
 					immediateCheckpoint: parsedImmediateCheckpoint,
 					waitForArchive:      parsedWaitForArchive,
+					skipWalSnapshot:     parsedSkipWalSnapshot,
+					clusterOnlineConfig: getClusterOnlineConfiguration(&cluster),
 					pluginName:          pluginName,
 					pluginParameters:    pluginParameters,
 					dryRun:              dryRun,
@@ -216,6 +243,13 @@ func NewCmd() *cobra.Command {
 
 	backupSubcommand.Flags().StringVar(&waitForArchive, "wait-for-archive", "",
 		"Set the '.spec.onlineConfiguration.waitForArchive' field of the "+
+			"Backup resource. If not specified, the value in the "+
+			"'.spec.backup.volumeSnapshot.onlineConfiguration' field will be used. "+
+			optionalAcceptedValues,
+	)
+
+	backupSubcommand.Flags().StringVar(&skipWalSnapshot, "skip-wal-snapshot", "",
+		"Set the '.spec.onlineConfiguration.skipWalSnapshot' field of the "+
 			"Backup resource. If not specified, the value in the "+
 			"'.spec.backup.volumeSnapshot.onlineConfiguration' field will be used. "+
 			optionalAcceptedValues,

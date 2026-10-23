@@ -24,7 +24,9 @@ import (
 	"os"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -121,4 +123,57 @@ var _ = Describe("createBackup", func() {
 		)).To(Succeed())
 		Expect(created.Spec.Cluster.Name).To(Equal(clusterName))
 	})
+})
+
+var _ = Describe("backup command", func() {
+	const (
+		clusterName = "cluster-example"
+		namespace   = "test-ns"
+	)
+
+	BeforeEach(func() {
+		plugin.Namespace = namespace
+	})
+
+	DescribeTable("keeps the online configuration of the cluster for the options not set",
+		func(ctx SpecContext, option string, expected *apiv1.OnlineConfiguration) {
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+				Spec: apiv1.ClusterSpec{
+					Backup: &apiv1.BackupConfiguration{
+						VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
+							OnlineConfiguration: apiv1.OnlineConfiguration{
+								WaitForArchive:  ptr.To(false),
+								SkipWalSnapshot: ptr.To(true),
+							},
+						},
+					},
+				},
+			}
+			plugin.Client = fake.NewClientBuilder().
+				WithScheme(scheme.BuildWithAllKnownScheme()).
+				WithObjects(cluster).
+				Build()
+
+			cmd := NewCmd()
+			cmd.SetArgs([]string{clusterName, "--method=volumeSnapshot", option})
+			captureStdout(func() {
+				Expect(cmd.ExecuteContext(ctx)).To(Succeed())
+			})
+
+			var backups apiv1.BackupList
+			Expect(plugin.Client.List(ctx, &backups)).To(Succeed())
+			Expect(backups.Items).To(HaveLen(1))
+			Expect(backups.Items[0].Spec.OnlineConfiguration).To(Equal(expected))
+		},
+		Entry("when requesting an immediate checkpoint", "--immediate-checkpoint=true", &apiv1.OnlineConfiguration{
+			WaitForArchive:      ptr.To(false),
+			ImmediateCheckpoint: ptr.To(true),
+			SkipWalSnapshot:     ptr.To(true),
+		}),
+		Entry("when keeping the WAL snapshot", "--skip-wal-snapshot=false", &apiv1.OnlineConfiguration{
+			WaitForArchive:  ptr.To(false),
+			SkipWalSnapshot: ptr.To(false),
+		}),
+	)
 })
