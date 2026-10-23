@@ -1,0 +1,76 @@
+# Read-only operational access for a human DBA persona.
+#
+# Grants visibility on every CloudNativePG resource and on the Kubernetes
+# objects needed to diagnose a Cluster (including `kubectl cnpg status`,
+# `kubectl cnpg logs cluster` and `kubectl cnpg report cluster`).
+#
+# It deliberately grants NO access to Secrets, `pods/exec`, `pods/attach` or
+# `pods/portforward`, and no write verbs. See `rbac-dba-portforward.yaml` and
+# `rbac-dba-app-secret.yaml` for optional, separately grantable permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-dba-viewer
+rules:
+  # Every CloudNativePG custom resource, including future ones, read-only
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  # Barman Cloud plugin resources, including the object stores shown by
+  # `kubectl cnpg status`
+  - apiGroups: ["barmancloud.cnpg.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  # Klio resources (Server and PluginConfiguration) and the StatefulSet that
+  # runs each Klio server. Only needed when the Klio plugin is used. A Klio
+  # Server may live in a different namespace than the Cluster: in that case,
+  # bind this role in that namespace too.
+  - apiGroups: ["klio.cnpg.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch"]
+  # Kubernetes objects needed to diagnose a Cluster
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - events
+      - persistentvolumeclaims
+      - pods
+      - pods/log
+      - services
+    verbs: ["get", "list", "watch"]
+  # Used by `kubectl cnpg status` to query the instance manager of each Pod
+  - apiGroups: [""]
+    resources: ["pods/proxy"]
+    verbs: ["get"]
+  # Primary lease, to inspect failover status
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "watch"]
+---
+# Example: grant the role to a group of DBAs in a single namespace.
+# Replace the namespace and the group name with your own.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cnpg-dba-viewer
+  namespace: default
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: dbas
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cnpg-dba-viewer
