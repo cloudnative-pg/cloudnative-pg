@@ -100,6 +100,8 @@ func defaultConfig() Config {
 
 // Runnable manages the primary lease for this instance.
 // It starts idle and enters the acquisition/renewal loop only after Acquire is called.
+// Observe lets it time the lease record, without writing it, while a failover is
+// pending, so that the window a new target needs has already been running.
 type Runnable struct {
 	instance *postgres.Instance
 
@@ -110,7 +112,13 @@ type Runnable struct {
 
 	// config holds the lease timings. It is initialised to the defaults by New
 	// and overwritten by the first Acquire call before the runnable activates.
+	// The observe loop never reads it.
 	config Config
+
+	// observeCh is closed by the first Observe call to make Start time the lease
+	// record while it waits for Acquire.
+	observeCh   chan struct{}
+	observeOnce sync.Once
 
 	// activateCh is closed by the first Acquire call to unblock Start.
 	activateCh   chan struct{}
@@ -139,8 +147,9 @@ type Runnable struct {
 	// observedRecord is the lease state tryTakeOver is timing for liveness and
 	// observedTime is when it first saw that state; see tryTakeOver for how they
 	// detect a holder that has stopped renewing without comparing against the
-	// holder's clock. Accessed only from the single preAcquire goroutine, so
-	// they need no synchronisation.
+	// holder's clock. observedTime keeps the monotonic reading of time.Now, so a
+	// step of the wall clock cannot move the window. Accessed only from the
+	// single preAcquire goroutine, so they need no synchronisation.
 	observedRecord *resourcelock.LeaderElectionRecord
 	observedTime   time.Time
 
@@ -187,6 +196,7 @@ func New(
 		config:        defaultConfig(),
 		watchdog:      leaseWatchdog,
 		activateCh:    make(chan struct{}),
+		observeCh:     make(chan struct{}),
 		heldCh:        make(chan struct{}),
 		checkStepDown: shouldStepDown,
 	}
@@ -285,6 +295,15 @@ func (r *Runnable) Yield(ctx context.Context) {
 	}
 }
 
+// Observe makes the runnable time the lease record while the Cluster names the
+// pending failover marker or this pod as target primary, without ever writing
+// it, so that the window a new target needs starts when the old primary is told
+// it was replaced, not when the new target is elected. It returns at once and is
+// a no-op after the first call and once Acquire has been called.
+func (r *Runnable) Observe() {
+	r.observeOnce.Do(func() { close(r.observeCh) })
+}
+
 // Release explicitly releases the lease so that a replica can promote without
 // waiting for the TTL to expire. It is a no-op if this pod is not the current
 // holder (including if the lease does not exist yet).
@@ -359,15 +378,67 @@ func (r *Runnable) Release(ctx context.Context) error {
 
 // Start implements controller-runtime's Runnable interface.
 // The runnable stays idle until Acquire is called, then enters the
-// lease acquisition/renewal loop.
+// lease acquisition/renewal loop. After Observe, it times the lease record
+// while it waits.
 func (r *Runnable) Start(ctx context.Context) error {
 	select {
 	case <-r.activateCh:
 		// proceed to active mode
+	case <-r.observeCh:
+		if !r.observe(ctx) {
+			return nil
+		}
 	case <-ctx.Done():
 		return nil
 	}
 	return r.runLeaderElection(ctx)
+}
+
+// observe times the lease record until Acquire activates the runnable, and
+// reports false when ctx ended first. It runs in the goroutine that runs
+// preAcquire next, so the observation carries over without synchronisation.
+func (r *Runnable) observe(ctx context.Context) bool {
+	// Acquire may write r.config at any time: the loop runs on the defaults.
+	// The window length is checked at claim time, with the cluster's timings.
+	cfg := defaultConfig()
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-r.activateCh:
+			return true
+		case <-ctx.Done():
+			return false
+		case <-timer.C:
+		}
+
+		r.observeLease(ctx, cfg.RenewDeadline)
+		timer.Reset(cfg.RetryPeriod)
+	}
+}
+
+// observeLease reads the lease and times it as tryTakeOver does, but never
+// writes. There is nothing to time for a released record or one naming this pod.
+func (r *Runnable) observeLease(ctx context.Context, timeout time.Duration) {
+	if !r.mayObserve() {
+		r.observedRecord = nil
+		return
+	}
+
+	getCtx, cancel := context.WithTimeout(ctx, timeout)
+	record, _, err := r.lock.Get(getCtx)
+	cancel()
+	switch {
+	case errors.IsNotFound(err):
+		r.observedRecord = nil
+	case err != nil:
+		// A failed read is no evidence of anything: keep the observation.
+	case record.HolderIdentity == "" || record.HolderIdentity == r.lock.Identity():
+		r.observedRecord = nil
+	default:
+		r.trackRecord(record)
+	}
 }
 
 // leaseCheckOutcome is the result of inspecting the primary lease after the
@@ -420,10 +491,10 @@ func classifyLeaseAfterRun(
 // Only the target primary takes a lease over; see isTargetPrimary. A cleanly
 // released lease (empty holder) is taken immediately. A lease still naming
 // another holder is taken over only after we have locally observed the record
-// unchanged for a full LeaseDuration, counted from the moment this pod became
-// the target, mirroring client-go's observedTime check:
-// a live holder renews within that window, so an unchanged record proves it has
-// stopped. The comparison is local and equality-only, so clock skew between
+// unchanged for a full LeaseDuration, counted from the moment the Cluster named
+// the pending failover marker or this pod as target (see mayObserve), mirroring
+// client-go's observedTime check: a live holder renews within that window, so an
+// unchanged record proves it has stopped. The comparison is local and equality-only, so clock skew between
 // this pod and the previous holder cannot trigger a take-over.
 //
 // The window is timed in process memory, so a restart of this process re-times
@@ -479,31 +550,41 @@ func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
 		return r.claim(ctx, record)
 	}
 
-	// Another pod still holds the lease. The window only runs while this pod is
-	// the target primary: the flip of the target is what tells the old primary
-	// to step down, through the peers' /failsafe answers, so a window that ran
-	// before the flip would let this pod claim right after it, before the old
-	// primary can have learned that it was replaced.
-	if !r.isTargetPrimary() {
+	// Another pod still holds the lease. The window runs only from the flip
+	// (the pending marker or this pod as target), which is what tells the old
+	// primary to step down through the peers' /failsafe answers. Any other
+	// target drops it, so a window of an aborted or moved failover is not reused.
+	if !r.mayObserve() {
 		r.observedRecord = nil
 		return false, nil
 	}
 
 	// Take over only once the record has sat unchanged for a full
 	// LeaseDuration: a live holder renews well within that window, so an
-	// unchanged record means it has stopped. RenewTime is compared for equality
-	// only (did the holder write since we last looked), never ordering, so this
-	// never trusts the holder's clock.
-	now := time.Now()
-	if r.observedRecord == nil || !sameHolder(r.observedRecord, record) {
-		r.observedRecord = record
-		r.observedTime = now
-		return false, nil
-	}
-	if now.Sub(r.observedTime) < r.config.LeaseDuration {
+	// unchanged record means it has stopped.
+	if !r.trackRecord(record) || time.Since(r.observedTime) < r.config.LeaseDuration || !r.isTargetPrimary() {
 		return false, nil
 	}
 	return r.claim(ctx, record)
+}
+
+// trackRecord times record and reports whether it was already being timed in
+// this state. RenewTime is compared for equality only (did the holder write
+// since we last looked), never ordering, so this never trusts the holder's clock.
+func (r *Runnable) trackRecord(record *resourcelock.LeaderElectionRecord) bool {
+	if r.observedRecord == nil || !sameHolder(r.observedRecord, record) {
+		r.observedRecord = record
+		r.observedTime = time.Now()
+		return false
+	}
+	return true
+}
+
+// mayObserve reports whether the cached target primary is the pending failover
+// marker or this pod, i.e. whether the lease record may be timed for a take-over.
+func (r *Runnable) mayObserve() bool {
+	target := r.instance.GetClusterOrDefault().Status.TargetPrimary
+	return target == apiv1.PendingFailoverMarker || target == r.instance.GetPodName()
 }
 
 // isTargetPrimary reports whether the Cluster the instance manager last

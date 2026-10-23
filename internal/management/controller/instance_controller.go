@@ -155,6 +155,11 @@ func (r *InstanceReconciler) Reconcile(
 	// Before the early returns for a fenced or down instance: a replica whose
 	// PostgreSQL is down or fenced must still stop renewing the lease it holds.
 	r.yieldPrimaryLeaseIfNotTarget(ctx, cluster)
+	// While a failover is pending, time the primary lease, so that the new
+	// target finds the window it needs already running when it is elected.
+	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
+		r.primaryLeaseAcquirer.Observe()
+	}
 
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
@@ -1258,18 +1263,20 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 // RenewDeadline; callers must treat context.DeadlineExceeded as a benign
 // retry, not a failure.
 func (r *InstanceReconciler) acquirePrimaryLease(ctx context.Context, cluster *apiv1.Cluster) error {
-	leaseDuration := cluster.GetPrimaryLeaseDuration()
-	retryPeriod := cluster.GetPrimaryLeaseRetryPeriod()
-	acquireTimeout := leaseDuration + 3*retryPeriod
+	acquireTimeout := cluster.GetPrimaryLeaseDuration() + 3*cluster.GetPrimaryLeaseRetryPeriod()
 	acquireCtx, acquireCancel := context.WithTimeout(ctx, acquireTimeout)
 	defer acquireCancel()
-	leaseConfig := lease.Config{
-		LeaseDuration:         leaseDuration,
+	return r.primaryLeaseAcquirer.Acquire(acquireCtx, primaryLeaseConfig(cluster))
+}
+
+// primaryLeaseConfig returns the primary lease timings of the cluster.
+func primaryLeaseConfig(cluster *apiv1.Cluster) lease.Config {
+	return lease.Config{
+		LeaseDuration:         cluster.GetPrimaryLeaseDuration(),
 		RenewDeadline:         cluster.GetPrimaryLeaseRenewDeadline(),
-		RetryPeriod:           retryPeriod,
+		RetryPeriod:           cluster.GetPrimaryLeaseRetryPeriod(),
 		ReleasedLeaseDuration: cluster.GetPrimaryLeaseReleasedDuration(),
 	}
-	return r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig)
 }
 
 // yieldPrimaryLeaseIfNotTarget makes a replica stop renewing the primary

@@ -53,6 +53,7 @@ func (f *fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
 func (f *fakeLeaseAcquirer) Yield(context.Context) {
 	f.yields++
 }
+func (f *fakeLeaseAcquirer) Observe() {}
 
 var _ = Describe("verifyPgDataCoherenceForPrimary primary lease gate", func() {
 	const (
