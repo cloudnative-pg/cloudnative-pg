@@ -33,7 +33,7 @@ production timings):
 | Constant | Default | Meaning | Production counterpart |
 |---|---|---|---|
 | `Nodes` | `{"one", "two"}` | Checked instances | |
-| `MaxRounds` | `15` | Bound on global `tick`; makes the state space finite | |
+| `MaxRounds` | `12` | Bound on global `tick`; makes the state space finite | |
 | `LeaseDuration` | `5` | Owned lease must be observed unchanged for `>= LeaseDuration` before take-over | `leaseDurationSeconds`, default 15s |
 | `RenewDeadline` | `2` | Holder whose last confirmed write is older than this is overdue | `renewDeadlineSeconds`, default 10s |
 | `RenewPeriod` | `1` | Minimum spacing between holder renewals; also the monitor's tick | `retryPeriodSeconds`, default 2s |
@@ -52,7 +52,10 @@ Production values live under `.spec.primaryLease` and
 Shared (the Kubernetes `Lease` plus the monitor's view of it):
 
 * `leaseHolder`, `leaseRenewTick`: current holder and last renewal tick.
-* `leading[n]`: `n` is acting as PostgreSQL primary.
+* `held[n]`: `n` holds the lease: its renewal loop and monitor run.
+* `leading[n]`: `n`'s PostgreSQL is writable.
+* `promoReq[n]`: `n` asked PostgreSQL to promote (`promotionRequested`).
+* `yielded[n]`: `n` stopped renewing a record that still names it.
 * `lookingForLease[n]`: `n` is inside the take-over observation window.
 * `tick`: single global discrete clock. Assumption: **no clock skew**.
 * `lastRenew[n]`: tick of the last successful write naming `n` as
@@ -99,7 +102,7 @@ Holder side:
 
 A node stopped by either stop keeps its stale record and cannot act
 until another node claims it: the code's re-adoption of the node's own
-record, a conditional write, is not modeled.
+record, a conditional write, is modeled only after a yield.
 
 Watchdog side (see "The lease watchdog"):
 
@@ -127,6 +130,24 @@ Candidate side:
   unchanged for `>= LeaseDuration` (CAS against concurrent writers), the
   same comparison `tryTakeOver` makes.
 
+Both claims make the node hold the lease (`held`), not lead:
+
+* `StartPromotion`: a holder asks PostgreSQL to promote. The operator is
+  not modeled, so any holder may be the target at any time.
+* `PromoteComplete`: `pg_promote` finished. Never forced.
+* `YieldLease` (`Runnable.Yield`): a holder that stopped being the
+  target before asking to promote stops its renewal loop and its
+  monitor and writes nothing: the record goes stale and the new target
+  takes it over through the observation window. The `~promoReq` guard
+  (`promotionRequested` in `yieldPrimaryLeaseIfNotTarget`) is needed: a
+  promotion once asked may still complete, so that node must keep its
+  monitor. Without the guard `NoTwoLeaders` fails.
+* `ReacquireOwn`: a yielded node that is the target again refreshes the
+  record it still owns, with no window (the "already ours" CAS of
+  `tryTakeOver`).
+
+The stops also clear `held` and `promoReq`.
+
 ## Checked properties
 
 * `NoTwoLeaders`: no two nodes have `leading = TRUE`. Every node counts,
@@ -149,7 +170,8 @@ RenewDeadline + StepDownDelay < LeaseDuration
 
 for any `DeliveryDelay`, with the watchdog on or off (see "The lease
 watchdog"). Runs with `LeaseDuration = 5`, `RenewPeriod = 1`, default
-`MaxRounds` and watchdog constants:
+watchdog constants and `MaxRounds = 15`, before promotion and yield
+were modeled:
 
 | `RenewDeadline` | `StepDownDelay` | `DeliveryDelay` | `RD + SDD` | Result |
 |---|---|---|---|---|
@@ -188,6 +210,21 @@ and only a fast soft stop hides it. The last two are `W` unbounded: the
 hard stop must not wait for the lifecycle manager. A hard stop that waits
 is only caught when the Ticker's age bound waits with it, as that bound
 stands for the monitor's tick.
+
+With promotion and yield, default constants unless noted:
+
+| `StepDownDelay` | `MaxRounds` | Checked | Result | States (generated / distinct) |
+|---|---|---|---|---|
+| 1 | 12 | `NoTwoLeaders`, `TypeOK` | pass (default `.cfg`) | 471,579,457 / 154,022,144 |
+| 1 | 11 | same | pass | 273,512,737 / 89,344,000 |
+| 3 | 11 | same | violation | |
+| 1 | 11 | same, `~promoReq` guard dropped from `YieldLease` | violation | |
+| 1 | 11 | probe: a node other than a yielder leads | reachable | |
+
+The guard row: a holder asks to promote, yields and stops its monitor,
+the other node claims after the window and promotes, then the first
+promotion completes. The probe row is what #11677 needs: after a yield
+the other node leads through the observation window.
 
 In production units the relation reads `renewDeadlineSeconds +
 retryPeriodSeconds + isolationCheck.requestTimeout <
@@ -254,8 +291,9 @@ case is modeled.
   use of the empty-holder fast path. No action releases the lease, so the
   clean hand-over after a graceful shutdown is not modeled: after the
   first claim every take-over goes through the expiry slow path.
-* No operator and no `pg_promote` time: a claim makes the node lead at
-  once, which is the worst case for the old primary.
+* A claim gives the lease, not leadership, and the promotion may never
+  complete. The renewal loop and the monitor run from the claim, as in
+  the code, so a holder that never promoted is fenced like a leader.
 * Every node may contest the lease. The code lets only the target
   primary contest; letting all nodes contest only adds behaviours, so it
   cannot hide a violation.
@@ -302,11 +340,12 @@ alive but cannot renew keeps beating and is never flagged: that is the
 "renewal is never forced" behaviour of `HolderRenewLease`.
 
 Runs, `LeaseDuration = 5`, `RenewPeriod = 1`, `DeliveryDelay = 1`,
-`RenewDeadline = 2`, `MaxRounds = 15`:
+`RenewDeadline = 2`, `MaxRounds = 15`, before promotion and yield were
+modeled:
 
 | `MonitorWorks` | `StepDownDelay` | `WatchdogMaxSilence` | `ProbeDelay` | Result | States (generated / distinct) |
 |---|---|---|---|---|---|
-| TRUE | 1 | 2 | 6 | pass (default `.cfg`) | 260,984,209 / 86,310,432 |
+| TRUE | 1 | 2 | 6 | pass (default `.cfg` then) | 260,984,209 / 86,310,432 |
 | TRUE | 2 | 2 | 1 | pass | 358,556,113 / 118,389,024 |
 | TRUE | 3 | 2 | 1 | violation | |
 | TRUE | 2 | 14 | 1 | pass (watchdog off) | 287,821,585 / 95,097,600 |
