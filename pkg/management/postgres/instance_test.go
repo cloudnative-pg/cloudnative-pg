@@ -21,11 +21,14 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -801,4 +804,39 @@ var _ = Describe("TryRequestImmediateShutdown", func() {
 		Expect(<-received).To(Equal(shutDownImmediate))
 		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
 	})
+})
+
+var _ = Describe("local connections", func() {
+	// A stopped postmaster (SIGSTOP, or stuck in the kernel) still has its
+	// socket listening: the kernel completes the connection, and the startup
+	// message is never answered. A listener that never accepts does the same.
+	BeforeEach(func() {
+		// Short enough for the Unix socket path limit on every platform.
+		socketDir, err := os.MkdirTemp("/tmp", "pgsock")
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(os.RemoveAll, socketDir)
+		GinkgoT().Setenv("PGHOST", socketDir)
+
+		listener, err := net.Listen("unix", filepath.Join(socketDir, fmt.Sprintf(".s.PGSQL.%d", GetServerPort())))
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(listener.Close)
+	})
+
+	DescribeTable("give up on a postmaster that does not answer",
+		func(getDB func(*Instance) (*sql.DB, error)) {
+			db, err := getDB(&Instance{})
+			Expect(err).ToNot(HaveOccurred())
+
+			pinged := make(chan error, 1)
+			go func() { pinged <- db.Ping() }()
+			Eventually(pinged, 10*time.Second).Should(Receive(HaveOccurred()))
+		},
+		Entry("superuser", (*Instance).GetSuperUserDB),
+		Entry("metrics exporter", func(instance *Instance) (*sql.DB, error) {
+			return instance.GetMetricsDB("postgres")
+		}),
+		Entry("WAL archive check", func(*Instance) (*sql.DB, error) {
+			return newWalArchiveBootstrapperForPrimary().dbFactory()
+		}),
+	)
 })
