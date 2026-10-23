@@ -2072,7 +2072,13 @@ type Import struct {
 	Roles []string `json:"roles,omitempty"`
 
 	// List of SQL queries to be executed as a superuser in the application
-	// database right after is imported - to be used with extreme care
+	// database right before it is imported - to be used with extreme care
+	// (by default empty). Only available in microservice type.
+	// +optional
+	PreImportApplicationSQL []string `json:"preImportApplicationSQL,omitempty"`
+
+	// List of SQL queries to be executed as a superuser in the application
+	// database right after it is imported - to be used with extreme care
 	// (by default empty). Only available in microservice type.
 	// +optional
 	PostImportApplicationSQL []string `json:"postImportApplicationSQL,omitempty"`

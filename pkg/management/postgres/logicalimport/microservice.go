@@ -63,6 +63,15 @@ func Microservice(
 		return err
 	}
 
+	if err := ds.executeImportQueries(
+		ctx,
+		destination,
+		initDB.Database,
+		initDB.Import.PreImportApplicationSQL,
+	); err != nil {
+		return err
+	}
+
 	if err := ds.importDatabaseContent(
 		ctx,
 		destination,
