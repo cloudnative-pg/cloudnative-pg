@@ -322,7 +322,19 @@ Both `usage` and `create` items accept the following fields:
     so one granted or revoked directly in the database is not brought back to
     the declared state until the spec is modified. Removing an entry from
     `usage` or `create` likewise revokes nothing: to remove a privilege, set its
-    `type` field to `revoke`.
+    `type` field to `revoke`. For example, deleting the entry that grants
+    `USAGE` to `app-rw` leaves that privilege in place, while changing it to
+    `type: revoke` removes it. Keep the `revoke` entry in the spec for as long
+    as you want the privilege to stay removed.
+:::
+
+:::note
+    `USAGE` on a schema only allows a role to look up objects in it. To read or
+    modify a table, the role also needs privileges on the table itself, such as
+    `SELECT` or `INSERT`. These are not managed by the `Database` resource, nor
+    are default privileges for objects created in the future, so grant them
+    separately with SQL, for example in the application's migrations. Likewise,
+    `CREATE` on a schema only lets a role create objects in it.
 :::
 
 ## Managing Foreign Data Wrappers (FDWs) in a Database
