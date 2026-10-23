@@ -1204,23 +1204,28 @@ var _ = Describe("Updating target primary", func() {
 		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
 	})
 
-	It("defers election until the primary lease is confirmed released, then elects", func(ctx SpecContext) {
+	// failoverCase sets up a cluster whose first instance is the unhealthy
+	// primary, with the given replicas ready.
+	failoverCase := func(
+		readyReplicas ...int,
+	) (*apiv1.Cluster, []corev1.Pod, postgres.PostgresqlStatusList, *managedResources) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
-
 		instances := generateFakeClusterPods(env.client, cluster, true)
 		generateFakeInitDBJobs(env.client, cluster)
 		generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
 
-		managedResources := &managedResources{instances: corev1.PodList{Items: instances}}
-		statusList := postgres.PostgresqlStatusList{
-			Items: []postgres.PostgresqlStatus{
-				{IsPodReady: true, Pod: &instances[1]},
-				{IsPodReady: true, Pod: &instances[2]},
-				{IsPodReady: false, Pod: &instances[0]},
-			},
+		var statusList postgres.PostgresqlStatusList
+		for _, i := range readyReplicas {
+			statusList.Items = append(statusList.Items, postgres.PostgresqlStatus{IsPodReady: true, Pod: &instances[i]})
 		}
+		statusList.Items = append(statusList.Items, postgres.PostgresqlStatus{IsPodReady: false, Pod: &instances[0]})
 		cluster.Status.CurrentPrimary = instances[0].Name
+		return cluster, instances, statusList, &managedResources{instances: corev1.PodList{Items: instances}}
+	}
+
+	It("defers election until the primary lease is confirmed released, then elects", func(ctx SpecContext) {
+		cluster, instances, statusList, managedResources := failoverCase(1, 2)
 		cluster.Status.TargetPrimary = instances[0].Name
 
 		By("marking the failover as pending without electing anyone yet", func() {
@@ -1231,8 +1236,11 @@ var _ = Describe("Updating target primary", func() {
 			Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
 		})
 
-		By("still deferring while the primary lease is held", func() {
+		By("still deferring while the primary lease is held by the old primary", func() {
+			// The test never persisted the status: the real CurrentPrimary survives.
+			cluster.Status.CurrentPrimary = instances[0].Name
 			leaseDuration := int32(1)
+			cluster.Spec.PrimaryLease = &apiv1.PrimaryLeaseConfiguration{LeaseDurationSeconds: &leaseDuration}
 			lease := &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{Name: cluster.Name, Namespace: cluster.Namespace},
 				Spec: coordinationv1.LeaseSpec{
@@ -1259,31 +1267,35 @@ var _ = Describe("Updating target primary", func() {
 		})
 	})
 
-	It("elects immediately once the primary lease has been gracefully released", func(ctx SpecContext) {
-		namespace := newFakeNamespace(env.client)
-		cluster := newFakeCNPGCluster(env.client, namespace)
-
-		instances := generateFakeClusterPods(env.client, cluster, true)
-		generateFakeInitDBJobs(env.client, cluster)
-		generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
-
-		managedResources := &managedResources{instances: corev1.PodList{Items: instances}}
-		statusList := postgres.PostgresqlStatusList{
-			Items: []postgres.PostgresqlStatus{
-				{IsPodReady: true, Pod: &instances[1]},
-				{IsPodReady: true, Pod: &instances[2]},
-				{IsPodReady: false, Pod: &instances[0]},
+	It("does not wait for a lease held by a target that was never promoted", func(ctx SpecContext) {
+		// The target took the lease and keeps renewing it, but it is unhealthy
+		// and was never promoted: the old primary is long gone.
+		cluster, instances, statusList, managedResources := failoverCase(2)
+		cluster.Status.TargetPrimary = instances[1].Name
+		leaseDuration := int32(15)
+		Expect(env.client.Create(ctx, &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Name: cluster.Name, Namespace: cluster.Namespace},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity:       ptr.To(instances[1].Name),
+				RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
+				LeaseDurationSeconds: &leaseDuration,
 			},
-		}
-		cluster.Status.CurrentPrimary = instances[0].Name
+		})).To(Succeed())
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(instances[2].Name))
+	})
+
+	It("elects immediately when there is no primary lease", func(ctx SpecContext) {
+		cluster, _, statusList, managedResources := failoverCase(1, 2)
 		cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
 
-		By("having no primary lease at all (e.g. still being created)", func() {
-			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
-				ctx, cluster, statusList, managedResources)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
-		})
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 	})
 
 	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func(ctx SpecContext) {

@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/controller/leaseobserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -46,9 +45,7 @@ var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiti
 var ErrQuorumCheckFailed = fmt.Errorf("quorum check failed, cannot complete the failover")
 
 // ErrPrimaryLeaseHeld is raised when a new primary cannot be elected yet
-// because the primary lease is still actively held (or its state could not
-// be verified), so the LSN snapshot used for the election might still be
-// stale.
+// because the old primary may still be sending WAL.
 var ErrPrimaryLeaseHeld = fmt.Errorf("primary lease is still held or unverifiable, waiting before electing a new primary") //nolint: lll
 
 // reconcileTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
@@ -110,11 +107,6 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		return "", nil
 	}
 	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
-		// Steady state: no failover/switchover is in progress. Drop any
-		// leftover observation so a future failover starts from a clean
-		// window rather than one computed for an unrelated, already-resolved
-		// event.
-		r.leaseObserver.Forget(client.ObjectKeyFromObject(cluster))
 		return "", nil
 	}
 
@@ -139,13 +131,8 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	}
 
 	// Step 1: the current primary just became unhealthy. Mark the failover as
-	// pending and STOP — do not elect in this same pass. status was
-	// snapshotted moments ago; the old primary (and every other replica) may
-	// still be alive and independently streaming right now, so committing to
-	// mostAdvancedInstance here could promote a replica that's already stale
-	// by the time it actually takes over. We wait for the primary lease to
-	// confirm the old primary is actually gone before picking anyone (step 2
-	// below).
+	// pending and stop here: the status was snapshotted while the old primary
+	// may still be streaming, so we elect only once its lease is gone (step 2).
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
 		contextLogger.Info("Current primary isn't healthy, initiating a failover")
 		status.LogStatus(ctx)
@@ -176,30 +163,14 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
 				"oldPrimary", cluster.Status.CurrentPrimary)
 		}
-
-		// A brand-new failover window: forget any stale lease observation
-		// left over from a previous, unrelated hand-over.
-		r.leaseObserver.Forget(client.ObjectKeyFromObject(cluster))
 		return "", nil
 	}
 
-	// Step 2: we've already committed to a failover (TargetPrimary is either
-	// apiv1.PendingFailoverMarker, or a previously-chosen target that has
-	// itself since become unhealthy before ever being promoted). Before
-	// (re-)electing mostAdvancedInstance we must confirm the primary lease is
-	// no longer held, so the LSN snapshot we're about to commit to is taken
-	// as close as possible to the actual promotion.
-	leaseState := r.observePrimaryLease(ctx, cluster)
-	if leaseState.Outcome == leaseobserver.Held || leaseState.Outcome == leaseobserver.Unverifiable {
-		contextLogger.Info("Primary lease still held or unverifiable, deferring election",
-			"leaseObservation", leaseState)
-		return "", ErrPrimaryLeaseHeld
+	// Step 2: before (re-)electing, the old primary must be gone, so that the
+	// status snapshot is final.
+	if err := r.checkOldPrimaryLease(ctx, cluster); err != nil {
+		return "", err
 	}
-
-	// Outcome is NotHeld or Expired: safe to elect using this pass's status.
-	contextLogger.Info("Primary lease confirmed not held, proceeding with election",
-		"leaseObservation", leaseState)
-	r.leaseObserver.Forget(client.ObjectKeyFromObject(cluster))
 
 	// Re-verify quorum safety right before failing over: the set of
 	// promotable replicas may have degraded since we committed to a failover,

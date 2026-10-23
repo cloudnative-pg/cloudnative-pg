@@ -200,8 +200,8 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// We wait until the operator knows that the primary is dead.
-			// At this point the promotion is waiting for all the walreceivers
-			// to be disconnected. We can send the SIGCONT now.
+			// The paused replica is behind the third one, so it can't be
+			// elected. We can send the SIGCONT now.
 			Eventually(func() (int, error) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				return cluster.Status.ReadyInstances, err
@@ -253,9 +253,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 	// that has received/applied more WALs is promoted.
 	// To make sure that we know which instance is promoted, we pause the
 	// second instance walreceiver via a SIGSTOP signal, create WALs and then
-	// delete the primary pod. We need to make sure to SIGCONT the walreceiver,
-	// otherwise the operator will wait forever for the walreceiver to die
-	// before deciding which instance to promote (which should be the third).
+	// delete the primary pod. The paused instance is behind, so the operator
+	// should promote the third one. We SIGCONT the walreceiver afterwards so
+	// that the paused instance can catch up.
 	It("reacts to primary failure", func() {
 		const (
 			sampleFile      = fixturesDir + "/failover/cluster-failover.yaml.template"
