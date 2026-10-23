@@ -99,6 +99,15 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	// We're creating a new replica of an existing cluster, and the PVCs
 	// have been initialized by a set of VolumeSnapshots.
 	if immediate {
+		// The operator passes the backup label only for a snapshot taken
+		// without the WAL storage, whose WAL volume starts empty
+		if err := info.writeBackupLabelFiles(); err != nil {
+			return err
+		}
+		if _, err := info.restoreCustomWalDir(ctx); err != nil {
+			return err
+		}
+
 		// If the instance starts as a primary, we will enter in the
 		// same logic attaching an old primary back after a failover.
 		// We don't need that as this instance has never diverged.
@@ -129,18 +138,8 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	contextLogger.Info("Recovering from volume snapshot",
 		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
 
-	if len(info.BackupLabelFile) > 0 {
-		filePath := filepath.Join(info.PgData, constants.BackupLabelFile)
-		if _, err := fileutils.WriteFileAtomic(filePath, info.BackupLabelFile, 0o666); err != nil {
-			return err
-		}
-	}
-
-	if len(info.TablespaceMapFile) > 0 {
-		filePath := filepath.Join(info.PgData, constants.TablespaceMapFile)
-		if _, err := fileutils.WriteFileAtomic(filePath, info.TablespaceMapFile, 0o666); err != nil {
-			return err
-		}
+	if err := info.writeBackupLabelFiles(); err != nil {
+		return err
 	}
 
 	var envs []string
@@ -156,6 +155,26 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	}
 
 	return info.concludeRestore(ctx, cli, cluster, getRestoreWalConfig(), envs)
+}
+
+// writeBackupLabelFiles writes the backup label and the tablespace map,
+// when given, into PGDATA
+func (info InitInfo) writeBackupLabelFiles() error {
+	if len(info.BackupLabelFile) > 0 {
+		filePath := filepath.Join(info.PgData, constants.BackupLabelFile)
+		if _, err := fileutils.WriteFileAtomic(filePath, info.BackupLabelFile, 0o666); err != nil {
+			return err
+		}
+	}
+
+	if len(info.TablespaceMapFile) > 0 {
+		filePath := filepath.Join(info.PgData, constants.TablespaceMapFile)
+		if _, err := fileutils.WriteFileAtomic(filePath, info.TablespaceMapFile, 0o666); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (info InitInfo) concludeRestore(
@@ -335,14 +354,15 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 	pgDataWal := path.Join(info.PgData, pgWalDirectory)
 
+	// The WAL volume is empty when restoring a snapshot taken without it
+	if err := fileutils.EnsureDirectoryExists(info.PgWal); err != nil {
+		return false, err
+	}
+
 	// if the link is already present we have nothing to do.
 	if linkInfo, _ := os.Readlink(pgDataWal); linkInfo == info.PgWal {
 		contextLogger.Info("symlink to the WAL volume already present, skipping the custom wal dir restore")
 		return false, nil
-	}
-
-	if err := fileutils.EnsureDirectoryExists(info.PgWal); err != nil {
-		return false, err
 	}
 
 	contextLogger.Info("restoring WAL volume symlink and transferring data")

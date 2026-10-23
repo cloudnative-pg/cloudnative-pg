@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"slices"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -510,6 +511,17 @@ var _ = Describe("check if bootstrap recovery can proceed", func() {
 			true),
 		Entry("when bootstrapping a backup that is not there",
 			nil, true),
+		Entry(
+			"when bootstrapping without a recovery source from a backup taken without the WAL storage",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					Phase: apiv1.BackupPhaseCompleted,
+					BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
+						WalSnapshotSkipped: true,
+					},
+				},
+			},
+			true),
 	)
 })
 
@@ -654,6 +666,87 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 		Expect(res).ToNot(BeNil())
 		Expect(res).ToNot(Equal(reconcile.Result{}))
 	})
+
+	It("should requeue if the WAL storage snapshot is missing for a backup that has it", func(ctx SpecContext) {
+		cluster.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		snapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pgdata",
+				Namespace: namespace,
+				Labels: map[string]string{
+					utils.BackupNameLabelName: "backup-one",
+				},
+				Annotations: map[string]string{
+					utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+				},
+			},
+		}
+		newClusterReconciler := &ClusterReconciler{
+			Client: fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithObjects(snapshot).
+				Build(),
+			Scheme:          env.scheme,
+			Recorder:        record.NewFakeRecorder(120),
+			DiscoveryClient: env.discoveryClient,
+		}
+
+		res, err := newClusterReconciler.checkReadyForRecovery(ctx, nil, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).ToNot(Equal(reconcile.Result{}))
+	})
+})
+
+var _ = Describe("replica bootstrap command", func() {
+	const namespace = "default"
+	snapshotSource := &corev1.TypedLocalObjectReference{
+		APIGroup: ptr.To(volumesnapshotv1.GroupName),
+		Kind:     apiv1.VolumeSnapshotKind,
+		Name:     "backup-example",
+	}
+	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-example", Namespace: namespace},
+	}
+
+	DescribeTable("restores the snapshot the PGDATA PVC comes from",
+		func(
+			ctx SpecContext,
+			dataSource *corev1.TypedLocalObjectReference,
+			walSnapshotSkipped bool,
+			expectedSubcommand string,
+			expectBackupLabel bool,
+		) {
+			snapshot := &volumesnapshotv1.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      snapshotSource.Name,
+					Namespace: namespace,
+					Annotations: map[string]string{
+						utils.BackupLabelFileAnnotationName: "YmFja3VwX2xhYmVs",
+					},
+				},
+			}
+			if walSnapshotSkipped {
+				snapshot.Annotations[utils.WalSnapshotSkippedAnnotationName] = "true"
+			}
+			r := &ClusterReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+					WithObjects(snapshot).
+					Build(),
+			}
+
+			cmd, err := r.buildReplicaBootstrapCommand(ctx, cluster, dataSource)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cmd.Command).To(ContainElement(expectedSubcommand))
+			Expect(slices.Contains(cmd.Command, "--backuplabel=YmFja3VwX2xhYmVs")).To(Equal(expectBackupLabel))
+		},
+		Entry("passing the backup label for a snapshot taken without the WAL storage",
+			snapshotSource, true, "restoresnapshot", true),
+		Entry("relying on the WAL storage snapshot otherwise",
+			snapshotSource, false, "restoresnapshot", false),
+		Entry("joining the primary without a snapshot",
+			nil, true, "join", false),
+	)
 })
 
 var _ = Describe("Set cluster metadata of service account", func() {

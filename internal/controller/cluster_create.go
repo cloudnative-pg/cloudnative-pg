@@ -1462,12 +1462,15 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	cmd := specs.BuildReplicaBootstrapCommandViaJoin(*cluster)
-
 	// If we can bootstrap this replica from a pre-existing source, we do it
 	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, r.Client, cluster, backupList)
+	var dataSource *corev1.TypedLocalObjectReference
 	if storageSource != nil {
-		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster)
+		dataSource = &storageSource.DataSource
+	}
+	cmd, err := r.buildReplicaBootstrapCommand(ctx, cluster, dataSource)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial)
@@ -1558,9 +1561,9 @@ func (r *ClusterReconciler) attachReplicaBootstrapInitContainer(
 		}
 	}
 
-	cmd := specs.BuildReplicaBootstrapCommandViaJoin(*cluster)
-	if pgdataDataSource != nil {
-		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster)
+	cmd, err := r.buildReplicaBootstrapCommand(ctx, cluster, pgdataDataSource)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	log.FromContext(ctx).Info("Resuming bootstrap for a replica whose PVCs are not ready",
@@ -1580,6 +1583,27 @@ func (r *ClusterReconciler) attachReplicaBootstrapInitContainer(
 	specs.AddBootstrapInitContainer(instanceToCreate, *cluster, cmd)
 
 	return ctrl.Result{}, nil
+}
+
+// buildReplicaBootstrapCommand builds the bootstrap command of a replica,
+// restoring the snapshot its PGDATA PVC is created from, or joining the
+// primary when there's no snapshot to restore
+func (r *ClusterReconciler) buildReplicaBootstrapCommand(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	dataSource *corev1.TypedLocalObjectReference,
+) (*specs.InstanceBootstrapCommand, error) {
+	if dataSource == nil {
+		return specs.BuildReplicaBootstrapCommandViaJoin(*cluster), nil
+	}
+
+	// The snapshot metadata tells whether it was taken without the WAL storage
+	metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(ctx, r.Client, cluster.Namespace, *dataSource)
+	if err != nil {
+		return nil, err
+	}
+
+	return specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster, metadata), nil
 }
 
 // ensureInstancesAreCreated recreates any missing instance
@@ -1853,12 +1877,18 @@ func (r *ClusterReconciler) checkReadyForRecovery(
 				"backupPhase", backup.Status.Phase)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
+		if backup.Status.BackupSnapshotStatus.WalSnapshotSkipped && cluster.Spec.Bootstrap.Recovery.Source == "" {
+			contextLogger.Info("The source backup has no WAL storage snapshot, a recovery source "+
+				"is required to fetch the WAL files from the archive, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
 	}
 
 	volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
 	if volumeSnapshotsRecovery != nil {
 		status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
-			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
+			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery, cluster.ShouldCreateWalArchiveVolume())
 		if err != nil {
 			return ctrl.Result{}, err
 		}
