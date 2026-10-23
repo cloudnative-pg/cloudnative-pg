@@ -128,7 +128,7 @@ func newWalArchiveBootstrapperForPrimary() *walArchiveBootstrapper {
 		walArchiveAnalyzer: walArchiveAnalyzer{
 			dbFactory: func() (*sql.DB, error) {
 				db, openErr := pool.NewDBConnection(
-					fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
+					fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable connect_timeout=5",
 						GetSocketDir(),
 						GetServerPort(),
 					),
