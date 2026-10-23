@@ -381,7 +381,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		// the snapshots are created before the backup is finalized, so the backup
 		// status is still empty at this point
 		Expect(backup.Status.Online).To(BeNil())
-		Expect(executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])).To(Succeed())
+		Expect(executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0], false)).To(Succeed())
 
 		var snapshotList volumesnapshotv1.VolumeSnapshotList
 		err := mockClient.List(ctx, &snapshotList)
@@ -449,7 +449,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
 
-		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0], false)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -471,7 +471,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
 
-		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0], false)
 		Expect(apierrs.IsAlreadyExists(err)).To(BeTrue())
 		Expect(err.Error()).To(ContainSubstring("is not owned by backup"))
 	})
@@ -506,7 +506,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
 
-		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0], false)
 		Expect(err).ToNot(HaveOccurred())
 	})
 })

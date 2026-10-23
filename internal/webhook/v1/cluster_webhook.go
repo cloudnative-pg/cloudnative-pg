@@ -115,7 +115,10 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv
 	clusterLog.Debug("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
-	allErrs := v.validate(cluster)
+	allErrs := append(
+		v.validate(cluster),
+		v.validateBootstrapRecoveryWalSource(cluster)...,
+	)
 	allWarnings := v.getAdmissionWarnings(cluster)
 
 	if len(allErrs) == 0 {
@@ -885,6 +888,28 @@ func (v *ClusterCustomValidator) validateBootstrapRecoveryDataSource(r *apiv1.Cl
 	}
 
 	return result
+}
+
+// validateBootstrapRecoveryWalSource ensures that a recovery from volume
+// snapshots without a WAL storage snapshot can fetch the WAL files from the
+// WAL archive. As a WAL storage can be added once the cluster is bootstrapped,
+// this is checked only when the cluster is created.
+func (v *ClusterCustomValidator) validateBootstrapRecoveryWalSource(r *apiv1.Cluster) field.ErrorList {
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+		return nil
+	}
+
+	recoverySection := r.Spec.Bootstrap.Recovery
+	if recoverySection.VolumeSnapshots.WalStorage != nil || r.Spec.WalStorage == nil || recoverySection.Source != "" {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Required(
+			field.NewPath("spec", "bootstrap", "recovery", "source"),
+			"A recovery source is required to fetch the WAL files when recovering "+
+				"without a WAL storage snapshot"),
+	}
 }
 
 // validateVolumeSnapshotSource validates a source of a recovery snapshot.

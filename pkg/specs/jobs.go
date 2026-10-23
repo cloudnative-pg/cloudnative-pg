@@ -21,6 +21,7 @@ package specs
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/kballard/go-shellquote"
@@ -196,25 +197,35 @@ func BuildPrimaryBootstrapCommandViaRestoreSnapshot(
 	cluster apiv1.Cluster,
 	object *metav1.ObjectMeta,
 ) *InstanceBootstrapCommand {
-	initCommand := []string{
-		"/controller/manager",
-		"instance",
-		"restoresnapshot",
-	}
+	initCommand := slices.Concat(
+		[]string{
+			"/controller/manager",
+			"instance",
+			"restoresnapshot",
+		},
+		buildBackupLabelFlags(object),
+		buildCommonInitJobFlags(cluster),
+	)
+
+	return &InstanceBootstrapCommand{Role: jobRoleSnapshotRecovery, Command: initCommand}
+}
+
+// buildBackupLabelFlags passes the backup label and the tablespace map
+// stored in the annotations of a snapshot to the restoresnapshot command
+func buildBackupLabelFlags(object *metav1.ObjectMeta) []string {
+	var flags []string
 
 	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
 		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
-		initCommand = append(initCommand, flag)
+		flags = append(flags, flag)
 	}
 
 	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
 		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
-		initCommand = append(initCommand, flag)
+		flags = append(flags, flag)
 	}
 
-	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
-
-	return &InstanceBootstrapCommand{Role: jobRoleSnapshotRecovery, Command: initCommand}
+	return flags
 }
 
 // BuildPrimaryBootstrapCommandViaRecovery builds the bootstrap command for a
@@ -286,17 +297,24 @@ func BuildReplicaBootstrapCommandViaJoin(cluster apiv1.Cluster) *InstanceBootstr
 
 // BuildReplicaBootstrapCommandViaRestoreSnapshot builds the bootstrap command
 // for a new replica instance, starting from a volume snapshot backup
-func BuildReplicaBootstrapCommandViaRestoreSnapshot(cluster apiv1.Cluster) *InstanceBootstrapCommand {
-	commonFlags := buildCommonInitJobFlags(cluster)
-	initCommand := make([]string, 0, 4+len(commonFlags))
-	initCommand = append(initCommand,
+func BuildReplicaBootstrapCommandViaRestoreSnapshot(
+	cluster apiv1.Cluster,
+	object *metav1.ObjectMeta,
+) *InstanceBootstrapCommand {
+	initCommand := []string{
 		"/controller/manager",
 		"instance",
 		"restoresnapshot",
 		"--immediate",
-	)
+	}
 
-	initCommand = append(initCommand, commonFlags...)
+	// Without the WAL storage, PostgreSQL needs the backup label to fetch
+	// the WAL files from the archive, as crash recovery only reads pg_wal
+	if object != nil && object.Annotations[utils.WalSnapshotSkippedAnnotationName] == "true" {
+		initCommand = append(initCommand, buildBackupLabelFlags(object)...)
+	}
+
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	return &InstanceBootstrapCommand{Role: jobRoleSnapshotRecovery, Command: initCommand}
 }
