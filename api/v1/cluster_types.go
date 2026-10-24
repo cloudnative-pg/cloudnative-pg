@@ -2829,18 +2829,21 @@ type RoleConfiguration struct {
 	// restrictions within the database - superuser status is dangerous and
 	// should be used only when really needed. You must yourself be a
 	// superuser to create a new superuser. Defaults is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	Superuser bool `json:"superuser,omitempty"`
 
 	// When set to `true`, the role being defined will be allowed to create
 	// new databases. Specifying `false` (default) will deny a role the
 	// ability to create databases.
+	// +kubebuilder:default:=false
 	// +optional
 	CreateDB bool `json:"createdb,omitempty"`
 
 	// Whether the role will be permitted to create, alter, drop, comment
 	// on, change the security label for, and grant or revoke membership in
 	// other roles. Default is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	CreateRole bool `json:"createrole,omitempty"`
 
@@ -2848,6 +2851,7 @@ type RoleConfiguration struct {
 	// attribute can be thought of as a user. Roles without this attribute
 	// are useful for managing database privileges, but are not users in
 	// the usual sense of the word. Default is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	Login bool `json:"login,omitempty"`
 
@@ -2858,11 +2862,13 @@ type RoleConfiguration struct {
 	// the `replication` attribute is a very highly privileged role, and
 	// should only be used on roles actually used for replication. Default
 	// is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	Replication bool `json:"replication,omitempty"`
 
 	// Whether a role bypasses every row-level security (RLS) policy.
 	// Default is `false`.
+	// +kubebuilder:default:=false
 	// +optional
 	BypassRLS bool `json:"bypassrls,omitempty"` // Row-Level Security
 }
