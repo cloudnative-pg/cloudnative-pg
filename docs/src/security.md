@@ -338,15 +338,27 @@ per namespace with Kubernetes RBAC, relying on
 [Namespace Isolation](#namespace-isolation) to bound the impact.
 
 The RBAC discussed here governs access to CloudNativePG's own custom resources.
-The next section covers the complementary side: the RBAC that the operator
-itself relies on to manage Kubernetes resources on your behalf.
+The next sections cover two complementary topics: the permissions to grant to
+a read-only Database Administrator (detailed in [RBAC for Users](rbac.md)), and
+the RBAC that the operator itself relies on to manage Kubernetes resources on
+your behalf.
+
+### RBAC for Database Administrators
+
+Human users, such as Database Administrators (DBAs), should not need
+`cluster-admin` to inspect Clusters and connect to PostgreSQL. The
+[RBAC for Users](rbac.md) page describes a read-only persona, with the
+`cnpg-viewer-role` shipped with the operator and sample roles for the
+additional permissions a DBA needs, and shows which `kubectl cnpg` commands
+each one enables.
 
 ### Role Based Access Control (RBAC)
 
 This section covers the operator's *own* RBAC (the service account and roles it
 uses to manage Kubernetes resources on your behalf), as opposed to the user
 access to custom resources discussed in
-[RBAC on Custom Resources](#rbac-on-custom-resources) above.
+[RBAC on Custom Resources](#rbac-on-custom-resources) and
+[RBAC for Users](rbac.md) above.
 
 The operator interacts with the Kubernetes API server using a dedicated service
 account named `cnpg-manager`. This service account is typically installed in
