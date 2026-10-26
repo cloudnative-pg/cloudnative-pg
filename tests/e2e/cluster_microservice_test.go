@@ -35,6 +35,7 @@ import (
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -248,14 +249,17 @@ func assertTableAndDataOnImportedCluster(
 				tableName,
 				postgres.AppUser,
 			)
-			out, _, err := exec.QueryInInstancePod(
+			out, _, err := exec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
 					Namespace: pod.Namespace,
 					PodName:   pod.Name,
 				},
 				postgres.AppDBName,
-				queryImported)
+				queryImported,
+				environment.RetryTimeout,
+				objects.PollingTime,
+			)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(out, tableName), err).Should(BeTrue())
 		})
