@@ -243,11 +243,8 @@ func (e *SupersededError) Error() string {
 // On any step-down verdict or checker build failure, reason carries the
 // specific cause for the caller to log.
 func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, reason error) {
-	var cfg *apiv1.IsolationCheckConfiguration
-	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
-		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
-	}
-	if cfg == nil || cfg.Enabled == nil || !*cfg.Enabled {
+	cfg := enabledIsolationCheck(cluster)
+	if cfg == nil {
 		return false, nil
 	}
 	if cluster.Spec.Instances == 1 {
@@ -264,4 +261,50 @@ func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, 
 	}
 
 	return false, nil
+}
+
+// CurrentPrimaryStepsDown reports whether the current primary of the cluster
+// stops on its own once the other instances report another target primary,
+// which is what lets a new primary promote as soon as it holds the lease. That
+// takes the isolation check and an instance manager with the step-down: one
+// without it answers /failsafe with a plain "OK", reporting no target primary,
+// and keeps running as primary while it cannot reach the API server. A current
+// primary that cannot be probed counts as stopping, since it cannot be
+// streaming WAL to this instance either.
+func CurrentPrimaryStepsDown(cluster *apiv1.Cluster) bool {
+	cfg := enabledIsolationCheck(cluster)
+	if cfg == nil {
+		return false
+	}
+
+	checker, err := buildInstanceReachabilityChecker(cfg)
+	if err != nil {
+		return false
+	}
+
+	return checker.currentPrimaryStepsDown(cluster)
+}
+
+func (e pinger) currentPrimaryStepsDown(cluster *apiv1.Cluster) bool {
+	name := cluster.Status.CurrentPrimary
+	ip := cluster.Status.InstancesReportedState[apiv1.PodName(name)].IP
+	if ip == "" {
+		return true
+	}
+
+	targetPrimary, err := e.probe(name, ip)
+	return err != nil || targetPrimary != ""
+}
+
+// enabledIsolationCheck returns the isolation check configuration of the
+// cluster, or nil when the check is disabled.
+func enabledIsolationCheck(cluster *apiv1.Cluster) *apiv1.IsolationCheckConfiguration {
+	if cluster.Spec.Probes == nil || cluster.Spec.Probes.Liveness == nil {
+		return nil
+	}
+	cfg := cluster.Spec.Probes.Liveness.IsolationCheck
+	if cfg == nil || cfg.Enabled == nil || !*cfg.Enabled {
+		return nil
+	}
+	return cfg
 }

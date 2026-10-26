@@ -118,6 +118,13 @@ alone responsible for primary safety, and the lease alone cannot
 prevent split-brain when the former primary cannot reach the API
 server but remains otherwise healthy.
 
+For the same reason, the new primary promotes as soon as it holds the lease
+only when the former primary stops on its own, that is when the isolation
+check is enabled and the former primary runs an instance manager that steps
+down. Otherwise, as with the isolation check disabled or during an upgrade
+from an instance manager without the step-down, the new primary also waits
+until it stops receiving WAL from the former primary.
+
 ### Inspecting the primary lease
 
 The lease shares the cluster's name, so you can inspect it directly. For a

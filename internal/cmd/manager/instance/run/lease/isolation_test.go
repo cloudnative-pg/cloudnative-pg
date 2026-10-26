@@ -24,6 +24,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/utils/ptr"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -138,5 +140,49 @@ var _ = Describe("pinger.ensureInstancesAreReachable", func() {
 		}}
 
 		Expect(checker.ensureInstancesAreReachable(fourInstances, ourIdentity)).To(Succeed())
+	})
+})
+
+var _ = Describe("whether the current primary steps down", func() {
+	const oldPrimary = "cluster-example-1"
+
+	cluster := &apiv1.Cluster{Status: apiv1.ClusterStatus{
+		CurrentPrimary: oldPrimary,
+		InstancesReportedState: map[apiv1.PodName]apiv1.InstanceReportedState{
+			oldPrimary:          {IP: "10.0.0.1"},
+			"cluster-example-2": {IP: "10.0.0.2"},
+		},
+	}}
+	answering := func(targetPrimary string, err error) pinger {
+		return pinger{probe: func(host, ip string) (string, error) {
+			Expect(host).To(Equal(oldPrimary))
+			Expect(ip).To(Equal("10.0.0.1"))
+			return targetPrimary, err
+		}}
+	}
+
+	It("does not step down with the isolation check disabled", func() {
+		disabled := cluster.DeepCopy()
+		disabled.Spec.Probes = &apiv1.ProbesConfiguration{Liveness: &apiv1.LivenessProbe{
+			IsolationCheck: &apiv1.IsolationCheckConfiguration{Enabled: ptr.To(false)},
+		}}
+		Expect(CurrentPrimaryStepsDown(disabled)).To(BeFalse())
+		Expect(CurrentPrimaryStepsDown(cluster)).To(BeFalse())
+	})
+
+	It("does not step down when its instance manager reports no target primary", func() {
+		Expect(answering("", nil).currentPrimaryStepsDown(cluster)).To(BeFalse())
+	})
+
+	It("steps down when its instance manager reports the target primary", func() {
+		Expect(answering("cluster-example-2", nil).currentPrimaryStepsDown(cluster)).To(BeTrue())
+	})
+
+	It("counts as stopping when it cannot be reached or has no address", func() {
+		Expect(answering("", errors.New("unreachable")).currentPrimaryStepsDown(cluster)).To(BeTrue())
+
+		noAddress := cluster.DeepCopy()
+		noAddress.Status.InstancesReportedState[oldPrimary] = apiv1.InstanceReportedState{}
+		Expect(pinger{}.currentPrimaryStepsDown(noAddress)).To(BeTrue())
 	})
 })
