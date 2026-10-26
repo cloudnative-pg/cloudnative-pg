@@ -88,7 +88,7 @@ export POSTGRES_IMAGE_NAME
 export PGBOUNCER_IMAGE_NAME
 export OPERATOR_MANIFEST_PATH
 # We don't need `trivialVersions=true` anymore, with `crd` it's ok for multi versions
-CRD_OPTIONS ?= "crd"
+CRD_OPTIONS ?= "crd:omitToolVersion=true"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
