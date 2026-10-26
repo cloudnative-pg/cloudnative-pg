@@ -249,7 +249,7 @@ including:
 - the bootstrap SQL hooks `postInitSQL`, `postInitApplicationSQL`, and
   `postInitTemplateSQL`, executed as the `postgres` superuser at initialization
   (see [Executing Queries After Initialization](bootstrap.md#executing-queries-after-initialization));
-- [inline managed roles](declarative_role_management.md#inline-managed-roles)
+- [managed roles](declarative_role_management.md)
   (`spec.managed.roles`), which may set `superuser: true` or grant membership of
   existing roles, and can use PostgreSQL features such as `COPY ... FROM PROGRAM`
   to run commands inside the operand Pod;
