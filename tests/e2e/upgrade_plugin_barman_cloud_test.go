@@ -419,6 +419,13 @@ var _ = Describe("Upgrade (plugin-barman-cloud)", Label(tests.LabelUpgrade, test
 				env.Ctx, env.Client,
 				objectStoreEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"objectstore.log",
 			)
+			// Dump the events of the namespaces where the plugin is installed
+			for _, ns := range []string{operatorNamespace, "cert-manager"} {
+				namespaces.DumpNamespaceObjects(
+					env.Ctx, env.Client,
+					ns, "out/"+CurrentSpecReport().LeafNodeText+ns+".log",
+				)
+			}
 			// Dump the operator namespace, as operator is changing too
 			operator.Dump(
 				env.Ctx, env.Client,
