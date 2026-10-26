@@ -28,13 +28,19 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
+
+// ErrWalReceiversRunning is raised when a new primary server can't be elected
+// because there is a WAL receiver running in our Pod list
+var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 
 // ErrWaitingOnFailOverDelay is raised when the primary server can't be elected because the .spec.failoverDelay hasn't
 // elapsed yet
@@ -169,7 +175,13 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	}
 
 	// Step 2: before (re-)electing, the old primary must be gone, so that the
-	// status snapshot is final.
+	// status snapshot is final. The lease going away shows that only for an old
+	// primary that stops on its own: any other may still be streaming WAL,
+	// until every WAL receiver is down.
+	if !currentPrimaryStepsDown(cluster, resources.instances.Items) &&
+		!status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
+		return "", ErrWalReceiversRunning
+	}
 	if err := r.checkOldPrimaryLease(ctx, cluster); err != nil {
 		return "", err
 	}
@@ -250,6 +262,28 @@ func (r *ClusterReconciler) markOldPrimaryAsUnhealthy(
 	origPod := oldPrimary.DeepCopy()
 	utils.SetInstanceRole(&oldPrimary.ObjectMeta, specs.ClusterRoleLabelUnhealthy)
 	return r.Patch(ctx, oldPrimary, client.MergeFrom(origPod))
+}
+
+// currentPrimaryStepsDown reports whether the current primary stops on its own
+// once it is replaced, which takes the isolation check and an instance manager
+// with the step-down. Only a Pod started from this operator's image is known to
+// run one: a Pod started from another, as during an upgrade, may not.
+func currentPrimaryStepsDown(cluster *apiv1.Cluster, instances []corev1.Pod) bool {
+	probes := cluster.Spec.Probes
+	if probes == nil || probes.Liveness == nil || probes.Liveness.IsolationCheck == nil ||
+		!ptr.Deref(probes.Liveness.IsolationCheck.Enabled, false) {
+		return false
+	}
+
+	idx := slices.IndexFunc(instances, func(pod corev1.Pod) bool {
+		return pod.Name == cluster.Status.CurrentPrimary
+	})
+	if idx == -1 {
+		return false
+	}
+
+	image, err := specs.GetBootstrapControllerImageName(instances[idx])
+	return err == nil && image == configuration.Current.OperatorImageName
 }
 
 // isNodeUnschedulableOrBeingDrained checks if a node is currently being drained.

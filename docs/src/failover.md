@@ -118,12 +118,16 @@ alone responsible for primary safety, and the lease alone cannot
 prevent split-brain when the former primary cannot reach the API
 server but remains otherwise healthy.
 
-For the same reason, the new primary promotes as soon as it holds the lease
-only when the former primary stops on its own, that is when the isolation
-check is enabled and the former primary runs an instance manager that steps
-down. Otherwise, as with the isolation check disabled or during an upgrade
-from an instance manager without the step-down, the new primary also waits
-until it stops receiving WAL from the former primary.
+For the same reason, the lease alone orders the failover only after a former
+primary that stops on its own, that is when the isolation check is enabled and
+the former primary runs an instance manager that steps down. Otherwise, as with
+the isolation check disabled or during an upgrade from an instance manager
+without the step-down, the operator also waits for every WAL receiver to stop
+before electing the new primary, and the new primary waits until it stops
+receiving WAL from the former primary before promoting. The operator judges the
+former primary from its Pod: it waits for the WAL receivers as long as that Pod
+was created by a previous operator version, even when the instance manager in
+it was upgraded in place.
 
 ### Inspecting the primary lease
 

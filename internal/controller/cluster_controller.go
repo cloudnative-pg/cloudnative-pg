@@ -768,6 +768,10 @@ func (r *ClusterReconciler) handleSwitchover(
 			contextLogger.Info("Waiting for the failover delay to expire")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
+		if errors.Is(err, ErrWalReceiversRunning) {
+			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 		if errors.Is(err, ErrPrimaryLeaseHeld) {
 			contextLogger.Info("Waiting for the primary lease to be released or expire")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil

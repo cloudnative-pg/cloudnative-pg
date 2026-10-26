@@ -1317,6 +1317,56 @@ var _ = Describe("Updating target primary", func() {
 		Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 	})
 
+	DescribeTable("waits for every WAL receiver to stop when the old primary may not step down",
+		func(ctx SpecContext, mayNotStepDown func(*apiv1.Cluster, *managedResources)) {
+			// The old primary is past its lease but still streaming WAL.
+			cluster, _, statusList, managedResources := failoverCase(1, 2)
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+			statusList.Items[1].IsWalReceiverActive = true
+			mayNotStepDown(cluster, managedResources)
+
+			for range 2 {
+				selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+					ctx, cluster, statusList, managedResources)
+				Expect(err).To(MatchError(ErrWalReceiversRunning))
+				Expect(selectedPrimary).To(BeEmpty())
+			}
+
+			statusList.Items[1].IsWalReceiverActive = false
+			_, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources)
+			Expect(err).To(MatchError(ErrPrimaryLeaseHeld))
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, managedResources)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
+		},
+		Entry("with the isolation check disabled", func(cluster *apiv1.Cluster, _ *managedResources) {
+			cluster.Spec.Probes.Liveness.IsolationCheck.Enabled = ptr.To(false)
+		}),
+		Entry("with the old primary started from another operator image",
+			func(_ *apiv1.Cluster, resources *managedResources) {
+				resources.instances.Items[0].Spec.InitContainers[0].Image = "operator:previous"
+			}),
+		Entry("with the old primary Pod gone", func(_ *apiv1.Cluster, resources *managedResources) {
+			resources.instances.Items = resources.instances.Items[1:]
+		}),
+	)
+
+	It("does not wait for the WAL receivers when the old primary steps down", func(ctx SpecContext) {
+		cluster, _, statusList, managedResources := failoverCase(1, 2)
+		cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+		statusList.Items[1].IsWalReceiverActive = true
+
+		_, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+		Expect(err).To(MatchError(ErrPrimaryLeaseHeld))
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
+	})
+
 	It("elects right after the pending marker without waiting the failover delay again", func(ctx SpecContext) {
 		cluster, instances, statusList, managedResources := failoverCase(1, 2)
 		cluster.Spec.FailoverDelay = 1
