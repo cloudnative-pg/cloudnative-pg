@@ -993,6 +993,10 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("updating target primary pods for the cluster", func() {
+			// The first pass finds the old primary gone and leaves the election to the next.
+			_, err := env.clusterReconciler.reconcileTargetPrimaryFromPods(ctx, cluster, statusList, managedResources)
+			Expect(err).To(MatchError(ErrPrimaryLeaseHeld))
+
 			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryFromPods(
 				ctx,
 				cluster,
@@ -1192,6 +1196,11 @@ var _ = Describe("Updating target primary", func() {
 		// sees the list: sort pushes the fenced instance to the tail.
 		sort.Sort(&statusList)
 
+		// The first pass finds the old primary gone and leaves the election to the next.
+		_, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+		Expect(err).To(MatchError(ErrPrimaryLeaseHeld))
+
 		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
 			ctx,
 			cluster,
@@ -1282,23 +1291,33 @@ var _ = Describe("Updating target primary", func() {
 			},
 		})).To(Succeed())
 
+		_, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+		Expect(err).To(MatchError(ErrPrimaryLeaseHeld))
 		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
 			ctx, cluster, statusList, managedResources)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(selectedPrimary).To(Equal(instances[2].Name))
 	})
 
-	It("elects immediately when there is no primary lease", func(ctx SpecContext) {
+	It("elects on the pass after the one that finds the old primary gone", func(ctx SpecContext) {
+		// That pass read the instances status before the lease: the old
+		// primary may still have been streaming WAL when it did.
 		cluster, _, statusList, managedResources := failoverCase(1, 2)
 		cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
 
 		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
 			ctx, cluster, statusList, managedResources)
+		Expect(err).To(MatchError(ErrPrimaryLeaseHeld))
+		Expect(selectedPrimary).To(BeEmpty())
+
+		selectedPrimary, err = env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 	})
 
-	It("elects on the pass after the pending marker without waiting the failover delay again", func(ctx SpecContext) {
+	It("elects right after the pending marker without waiting the failover delay again", func(ctx SpecContext) {
 		cluster, instances, statusList, managedResources := failoverCase(1, 2)
 		cluster.Spec.FailoverDelay = 1
 		cluster.Status.TargetPrimary = instances[0].Name
@@ -1312,7 +1331,13 @@ var _ = Describe("Updating target primary", func() {
 		}).WithTimeout(5 * time.Second).Should(Succeed())
 		Expect(requeued).To(BeTrue())
 
+		// No lease: the first pass finds the old primary gone, the next elects.
 		result, err := env.clusterReconciler.handleSwitchover(ctx, cluster, managedResources, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+		Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
+
+		result, err = env.clusterReconciler.handleSwitchover(ctx, cluster, managedResources, statusList)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).ToNot(BeNil())
 		Expect(cluster.Status.TargetPrimary).To(Equal(statusList.Items[0].Pod.Name))

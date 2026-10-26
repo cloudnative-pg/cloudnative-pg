@@ -107,6 +107,7 @@ type ClusterReconciler struct {
 	rolloutManager    *rolloutManager.Manager
 	leaseMu           sync.Mutex
 	leaseObservations map[client.ObjectKey]leaseObservation
+	oldPrimaryGone    map[client.ObjectKey]struct{}
 	admission         *guard.Admission[*apiv1.Cluster]
 }
 
@@ -132,6 +133,7 @@ func NewClusterReconciler(
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
 		leaseObservations: map[client.ObjectKey]leaseObservation{},
+		oldPrimaryGone:    map[client.ObjectKey]struct{}{},
 		drainTaints:       drainTaints,
 		admission:         admission,
 	}
@@ -185,6 +187,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if cluster == nil || cluster.GetDeletionTimestamp() != nil {
 		r.forgetPrimaryLease(req.NamespacedName)
+		r.forgetOldPrimaryGone(req.NamespacedName)
 		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
 			contextLogger.Error(
 				err,

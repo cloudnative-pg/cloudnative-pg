@@ -149,11 +149,21 @@ func (r *ClusterReconciler) livePrimaryLeaseHolder(ctx context.Context, cluster 
 // still be sending WAL: its lease is held, or cannot be read. A lease held by
 // anyone else is that of a target that was never promoted, and waiting for it
 // would stall the failover for as long as that target keeps renewing.
+//
+// The instances status a pass elects on was read before its lease check, so
+// it may predate the old primary going away: only the next pass, whose status
+// is read after that, elects.
 func (r *ClusterReconciler) checkOldPrimaryLease(ctx context.Context, cluster *apiv1.Cluster) error {
+	key := client.ObjectKeyFromObject(cluster)
 	holder, err := r.livePrimaryLeaseHolder(ctx, cluster)
 	if err != nil || (holder != "" && holder == cluster.Status.CurrentPrimary) {
+		r.forgetOldPrimaryGone(key)
 		log.FromContext(ctx).Info("Primary lease still held by the old primary or unreadable, deferring election",
 			"holder", holder, "err", err)
+		return ErrPrimaryLeaseHeld
+	}
+	if !r.oldPrimaryGoneBefore(key) {
+		log.FromContext(ctx).Info("Old primary gone, deferring election to a status read after it")
 		return ErrPrimaryLeaseHeld
 	}
 	return nil
@@ -164,6 +174,27 @@ func (r *ClusterReconciler) forgetPrimaryLease(key client.ObjectKey) {
 	r.leaseMu.Lock()
 	defer r.leaseMu.Unlock()
 	delete(r.leaseObservations, key)
+}
+
+// oldPrimaryGoneBefore reports whether the previous pass already found the old
+// primary gone, and records that this one did. The pass that gets true elects,
+// so it drops the record, and a later failover starts over.
+func (r *ClusterReconciler) oldPrimaryGoneBefore(key client.ObjectKey) bool {
+	r.leaseMu.Lock()
+	defer r.leaseMu.Unlock()
+	if _, found := r.oldPrimaryGone[key]; found {
+		delete(r.oldPrimaryGone, key)
+		return true
+	}
+	r.oldPrimaryGone[key] = struct{}{}
+	return false
+}
+
+// forgetOldPrimaryGone drops the record that a pass found the old primary gone.
+func (r *ClusterReconciler) forgetOldPrimaryGone(key client.ObjectKey) {
+	r.leaseMu.Lock()
+	defer r.leaseMu.Unlock()
+	delete(r.oldPrimaryGone, key)
 }
 
 // leaseAdoption is the decision made about an existing Lease named after the

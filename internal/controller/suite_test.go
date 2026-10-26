@@ -112,6 +112,7 @@ func buildTestEnvironment() *testingEnvironment {
 		Recorder:          record.NewFakeRecorder(120),
 		DiscoveryClient:   discoveryClient,
 		leaseObservations: map[client.ObjectKey]leaseObservation{},
+		oldPrimaryGone:    map[client.ObjectKey]struct{}{},
 	}
 
 	poolerReconciler := &PoolerReconciler{
