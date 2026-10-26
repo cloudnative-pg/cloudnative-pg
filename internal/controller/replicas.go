@@ -142,34 +142,8 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	// The error makes the caller requeue, as a nil one would read as a
 	// healthy primary and reset the failover delay.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
-		contextLogger.Info("Current primary isn't healthy, initiating a failover")
-		status.LogStatus(ctx)
-		contextLogger.Debug("Cluster status before initiating the failover", "instances", resources.instances)
-		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
-			"Current primary isn't healthy, initiating a failover from %v", cluster.Status.CurrentPrimary)
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-			fmt.Sprintf("Initiating a failover from %v", cluster.Status.CurrentPrimary)); err != nil {
+		if err := r.markFailoverAsPending(ctx, cluster, status, resources); err != nil {
 			return "", err
-		}
-		err := r.setPrimaryInstance(ctx, cluster, apiv1.PendingFailoverMarker)
-		if err != nil {
-			return "", err
-		}
-
-		// Mark the old primary as unhealthy immediately when failover starts,
-		// removing it from both the -rw and -ro services. This prevents replicas
-		// from reconnecting to it (primary_conninfo uses <cluster>-rw) and
-		// satisfying the synchronous replication quorum on a stale primary.
-		// Best-effort: the failover must proceed even if this fails. The
-		// retryable call in the reconcile loop's failover guard will correct
-		// the label on subsequent passes.
-		if err := r.markOldPrimaryAsUnhealthy(
-			ctx,
-			cluster.Status.CurrentPrimary,
-			resources.instances.Items,
-		); err != nil {
-			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
-				"oldPrimary", cluster.Status.CurrentPrimary)
 		}
 		return "", ErrPrimaryLeaseHeld
 	}
@@ -229,6 +203,48 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	// Set the first pod in the sorted list as the new targetPrimary
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
+}
+
+// markFailoverAsPending records that the current primary is unhealthy and the
+// election has to wait for its lease to be gone.
+func (r *ClusterReconciler) markFailoverAsPending(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	status postgres.PostgresqlStatusList,
+	resources *managedResources,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Current primary isn't healthy, initiating a failover")
+	status.LogStatus(ctx)
+	contextLogger.Debug("Cluster status before initiating the failover", "instances", resources.instances)
+	r.Recorder.Eventf(cluster, "Normal", "FailingOver",
+		"Current primary isn't healthy, initiating a failover from %v", cluster.Status.CurrentPrimary)
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
+		fmt.Sprintf("Initiating a failover from %v", cluster.Status.CurrentPrimary)); err != nil {
+		return err
+	}
+	err := r.setPrimaryInstance(ctx, cluster, apiv1.PendingFailoverMarker)
+	if err != nil {
+		return err
+	}
+
+	// Mark the old primary as unhealthy immediately when failover starts,
+	// removing it from both the -rw and -ro services. This prevents replicas
+	// from reconnecting to it (primary_conninfo uses <cluster>-rw) and
+	// satisfying the synchronous replication quorum on a stale primary.
+	// Best-effort: the failover must proceed even if this fails. The
+	// retryable call in the reconcile loop's failover guard will correct
+	// the label on subsequent passes.
+	if err := r.markOldPrimaryAsUnhealthy(
+		ctx,
+		cluster.Status.CurrentPrimary,
+		resources.instances.Items,
+	); err != nil {
+		contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
+			"oldPrimary", cluster.Status.CurrentPrimary)
+	}
+	return nil
 }
 
 // markOldPrimaryAsUnhealthy labels the old primary pod as unhealthy when failover
