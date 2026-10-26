@@ -55,11 +55,11 @@ PGBOUNCER_IMAGE_NAME ?= $(shell grep 'DefaultPgbouncerImage.*=' "pkg/versions/ve
 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize versioning=loose
 KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
-CONTROLLER_TOOLS_VERSION ?= v0.22.0
+CONTROLLER_TOOLS_VERSION ?= v0.23.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
 CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.18.3
+GORELEASER_VERSION ?= v2.19.0
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
 SPELLCHECK_VERSION ?= 0.66.0@sha256:6c852d66bdd4ed63cfcf6888bc84dbf7380a99dbffbbc661200b50c48cf3f4d9
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
@@ -88,7 +88,7 @@ export POSTGRES_IMAGE_NAME
 export PGBOUNCER_IMAGE_NAME
 export OPERATOR_MANIFEST_PATH
 # We don't need `trivialVersions=true` anymore, with `crd` it's ok for multi versions
-CRD_OPTIONS ?= "crd"
+CRD_OPTIONS ?= "crd:omitToolVersion=true"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))

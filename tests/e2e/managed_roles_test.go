@@ -37,6 +37,7 @@ import (
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -181,14 +182,17 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					userWithPerpetualPass)
 
 				for _, q := range []string{query, query2} {
-					stdout, _, err := exec.QueryInInstancePod(
+					stdout, _, err := exec.EventuallyExecQueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 						exec.PodLocator{
 							Namespace: primaryPod.Namespace,
 							PodName:   primaryPod.Name,
 						},
 						postgres.PostgresDBName,
-						q)
+						q,
+						environment.RetryTimeout,
+						objects.PollingTime,
+					)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(stdout).To(Equal("t\n"))
 				}
