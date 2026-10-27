@@ -288,6 +288,29 @@ const (
 	defaultConnectionTimeout = 1000
 )
 
+// GetIsolationCheckConfiguration returns the configuration of the primary
+// isolation check. The check is always active, so the enabled field is not
+// read: only the timeouts are, with their defaults when unset.
+func (r *Cluster) GetIsolationCheckConfiguration() IsolationCheckConfiguration {
+	cfg := IsolationCheckConfiguration{
+		RequestTimeout:    defaultRequestTimeout,
+		ConnectionTimeout: defaultConnectionTimeout,
+	}
+	if r.Spec.Probes == nil || r.Spec.Probes.Liveness == nil || r.Spec.Probes.Liveness.IsolationCheck == nil {
+		return cfg
+	}
+
+	configured := r.Spec.Probes.Liveness.IsolationCheck
+	if configured.RequestTimeout != 0 {
+		cfg.RequestTimeout = configured.RequestTimeout
+	}
+	if configured.ConnectionTimeout != 0 {
+		cfg.ConnectionTimeout = configured.ConnectionTimeout
+	}
+
+	return cfg
+}
+
 func (r *Cluster) setProbes() {
 	if r.Spec.Probes == nil {
 		r.Spec.Probes = &ProbesConfiguration{}

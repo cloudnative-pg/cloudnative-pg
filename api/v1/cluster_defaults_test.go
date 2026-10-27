@@ -575,3 +575,33 @@ var _ = Describe("failover quorum defaults", func() {
 		Expect(cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum).To(BeTrue())
 	})
 })
+
+var _ = Describe("GetIsolationCheckConfiguration", func() {
+	It("returns the default timeouts when nothing is configured", func() {
+		cfg := (&Cluster{}).GetIsolationCheckConfiguration()
+		Expect(cfg.RequestTimeout).To(Equal(1000))
+		Expect(cfg.ConnectionTimeout).To(Equal(1000))
+	})
+
+	It("returns the configured timeouts and ignores the enabled field", func() {
+		cluster := &Cluster{Spec: ClusterSpec{Probes: &ProbesConfiguration{Liveness: &LivenessProbe{
+			IsolationCheck: &IsolationCheckConfiguration{
+				Enabled:           ptr.To(false),
+				RequestTimeout:    300,
+				ConnectionTimeout: 600,
+			},
+		}}}}
+		cfg := cluster.GetIsolationCheckConfiguration()
+		Expect(cfg.RequestTimeout).To(Equal(300))
+		Expect(cfg.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("falls back to the default of a timeout that is not set", func() {
+		cluster := &Cluster{Spec: ClusterSpec{Probes: &ProbesConfiguration{Liveness: &LivenessProbe{
+			IsolationCheck: &IsolationCheckConfiguration{RequestTimeout: 300},
+		}}}}
+		cfg := cluster.GetIsolationCheckConfiguration()
+		Expect(cfg.RequestTimeout).To(Equal(300))
+		Expect(cfg.ConnectionTimeout).To(Equal(1000))
+	})
+})

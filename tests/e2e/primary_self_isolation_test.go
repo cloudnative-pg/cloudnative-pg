@@ -57,38 +57,26 @@ var _ = Describe("Primary self isolation", Serial, Label(tests.LabelDisruptive),
 		}
 	})
 
-	verifyIsolatedPrimary := func(namespace, isolatedPod, isolatedNode string, isolationCheckEnabled bool) {
-		By("verifying the isolatedPod behaviour", func() {
-			defaultCommand := fmt.Sprintf(
+	verifyIsolatedPrimary := func(namespace, isolatedPod, isolatedNode string) {
+		By("verifying the isolatedPod has been terminated", func() {
+			command := fmt.Sprintf(
 				"docker exec %v crictl ps -a -q "+
 					"--label io.kubernetes.pod.namespace=%s,io.kubernetes.pod.name=%s "+
-					"--name postgres", isolatedNode, namespace, isolatedPod)
+					"--name postgres -s Exited", isolatedNode, namespace, isolatedPod)
 
-			if isolationCheckEnabled {
-				Eventually(func(g Gomega) {
-					out, _, err := run.Unchecked(fmt.Sprintf("%s -s Exited", defaultCommand))
-					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(out).ToNot(BeEmpty())
-					if out != "" {
-						GinkgoWriter.Printf("Container %s (%s) has been terminated\n",
-							isolatedPod, strings.TrimSpace(out))
-					}
-				}, 120).Should(Succeed())
-			} else {
-				Consistently(func(g Gomega) {
-					out, _, err := run.Unchecked(fmt.Sprintf("%s -s Running", defaultCommand))
-					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(out).ToNot(BeEmpty())
-					if out != "" {
-						GinkgoWriter.Printf("Container %s (%s) is still running\n",
-							isolatedPod, strings.TrimSpace(out))
-					}
-				}, 20, 5).Should(Succeed())
-			}
+			Eventually(func(g Gomega) {
+				out, _, err := run.Unchecked(command)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(out).ToNot(BeEmpty())
+				if out != "" {
+					GinkgoWriter.Printf("Container %s (%s) has been terminated\n",
+						isolatedPod, strings.TrimSpace(out))
+				}
+			}, 120).Should(Succeed())
 		})
 	}
 
-	assertPrimaryIsolation := func(clusterManifest string, isolationCheckEnabled bool) {
+	assertPrimaryIsolation := func(clusterManifest string) {
 		var namespace, clusterName, isolatedNode string
 		var err error
 		var oldPrimaryPod *corev1.Pod
@@ -139,7 +127,7 @@ var _ = Describe("Primary self isolation", Serial, Label(tests.LabelDisruptive),
 			}, testTimeouts[timeouts.NewPrimaryAfterFailover]).Should(Succeed())
 		})
 
-		verifyIsolatedPrimary(namespace, oldPrimaryPod.Name, isolatedNode, isolationCheckEnabled)
+		verifyIsolatedPrimary(namespace, oldPrimaryPod.Name, isolatedNode)
 
 		By("reconnecting the isolated Node", func() {
 			_, _, err = run.Unchecked(fmt.Sprintf("docker network connect kind %v", isolatedNode))
@@ -166,14 +154,14 @@ var _ = Describe("Primary self isolation", Serial, Label(tests.LabelDisruptive),
 	When("the primary isolation check is enabled", func() {
 		const sampleFile = fixturesDir + "/primary_self_isolation/cluster-primary-isolation-enabled.yaml.template"
 		It("will terminate an isolated primary", func() {
-			assertPrimaryIsolation(sampleFile, true)
+			assertPrimaryIsolation(sampleFile)
 		})
 	})
 
-	When("the primary isolation check is disabled", func() {
+	When("the primary isolation check is set as disabled", func() {
 		const sampleFile = fixturesDir + "/primary_self_isolation/cluster-primary-isolation-disabled.yaml.template"
-		It("will not restart an isolated primary", func() {
-			assertPrimaryIsolation(sampleFile, false)
+		It("will still terminate an isolated primary", func() {
+			assertPrimaryIsolation(sampleFile)
 		})
 	})
 })

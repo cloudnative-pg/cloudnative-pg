@@ -105,17 +105,15 @@ The lease alone does not stop a primary that has lost connectivity to the
 Kubernetes API server but is still running. Stopping it is the job of the
 [primary isolation](instance_manager.md#primary-isolation) check, which watches
 how long the lease has gone without a successful renewal.
-The two mechanisms are complementary and both are enabled by default:
+The two mechanisms are complementary and both are always active:
 
 * The lease prevents *premature* promotion: a replica cannot promote
   while the former primary still holds the lease.
 * The isolation check stops an *isolated* primary from continuing to
   accept writes, by shutting PostgreSQL down immediately.
 
-Keep both enabled. Disabling the isolation check leaves the lease
-alone responsible for primary safety, and the lease alone cannot
-prevent split-brain when the former primary cannot reach the API
-server but remains otherwise healthy.
+The isolation check cannot be disabled: the lease alone does not stop a former
+primary that is cut off but still running.
 
 ### Inspecting the primary lease
 
@@ -288,8 +286,7 @@ mechanism, driven by `tolerationSeconds` on the
 `node.kubernetes.io/unreachable` `NoExecute` taint (`300s` by default). That
 timer does not hold up the operator's failover decision; CloudNativePG
 promotes a new primary as soon as the `Ready` condition flips. By that point
-PostgreSQL on the isolated node has already been stopped locally: with the
-default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
+PostgreSQL on the isolated node has already been stopped locally: the instance
 manager requests an immediate PostgreSQL shutdown once its last successful lease
 renewal is older than the renew deadline and either at least one other instance
 is unreachable or a reachable one names a different target primary, within the

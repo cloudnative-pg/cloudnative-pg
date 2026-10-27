@@ -2809,6 +2809,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 	list = append(list, getSynchronousReplicationWarnings(r)...)
 	list = append(list, getPrimaryIsolationTimingWarnings(r)...)
+	list = append(list, getPrimaryIsolationDisabledWarnings(r)...)
 	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
 
@@ -3325,13 +3326,11 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 // and not an error so that existing clusters with such timings can still be
 // updated.
 func getPrimaryIsolationTimingWarnings(r *apiv1.Cluster) admission.Warnings {
-	var cfg *apiv1.IsolationCheckConfiguration
-	if r.Spec.Probes != nil && r.Spec.Probes.Liveness != nil {
-		cfg = r.Spec.Probes.Liveness.IsolationCheck
-	}
-	if cfg == nil || cfg.Enabled == nil || !*cfg.Enabled {
+	if r.Spec.Instances == 1 {
 		return nil
 	}
+
+	cfg := r.GetIsolationCheckConfiguration()
 
 	stepDownBound := r.GetPrimaryLeaseRenewDeadline() +
 		r.GetPrimaryLeaseRetryPeriod() +
@@ -3347,6 +3346,24 @@ func getPrimaryIsolationTimingWarnings(r *apiv1.Cluster) admission.Warnings {
 			"isolationCheck.requestTimeout) to request its shutdown, which is not less than the %s lease duration. "+
 			"Increase .spec.primaryLease.leaseDurationSeconds or reduce the other timings.",
 			stepDownBound, leaseDuration),
+	}
+}
+
+// getPrimaryIsolationDisabledWarnings warns when the primary isolation check is
+// set as disabled: the check is always active, so the setting has no effect.
+func getPrimaryIsolationDisabledWarnings(r *apiv1.Cluster) admission.Warnings {
+	if r.Spec.Probes == nil || r.Spec.Probes.Liveness == nil || r.Spec.Probes.Liveness.IsolationCheck == nil {
+		return nil
+	}
+
+	enabled := r.Spec.Probes.Liveness.IsolationCheck.Enabled
+	if enabled == nil || *enabled {
+		return nil
+	}
+
+	return admission.Warnings{
+		"The primary isolation check cannot be disabled. The isolationCheck.enabled setting, " +
+			"or the alpha.cnpg.io/livenessPinger annotation, is ignored and should be removed.",
 	}
 }
 

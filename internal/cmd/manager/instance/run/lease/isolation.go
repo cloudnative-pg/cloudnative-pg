@@ -238,23 +238,17 @@ func (e *SupersededError) Error() string {
 // shouldStepDown reports whether this primary should stop believing it is
 // still the legitimate primary: either because it cannot reach some peer
 // instance, or because a reachable peer reports a different target primary
-// (see SupersededError). It returns (false, nil) without checking anything
-// if the isolation check is disabled or the cluster has a single instance.
-// On any step-down verdict or checker build failure, reason carries the
-// specific cause for the caller to log.
+// (see SupersededError). The check is always on, whatever the enabled field of
+// the isolation check says. It returns (false, nil) without checking anything
+// if the cluster has a single instance. On any step-down verdict or checker
+// build failure, reason carries the specific cause for the caller to log.
 func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, reason error) {
-	var cfg *apiv1.IsolationCheckConfiguration
-	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
-		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
-	}
-	if cfg == nil || cfg.Enabled == nil || !*cfg.Enabled {
-		return false, nil
-	}
 	if cluster.Spec.Instances == 1 {
 		return false, nil
 	}
 
-	checker, err := buildInstanceReachabilityChecker(cfg)
+	cfg := cluster.GetIsolationCheckConfiguration()
+	checker, err := buildInstanceReachabilityChecker(&cfg)
 	if err != nil {
 		return false, fmt.Errorf("failed to build instance reachability checker: %w", err)
 	}

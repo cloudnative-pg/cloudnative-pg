@@ -681,7 +681,7 @@ type LivenessProbe struct {
 	// different target primary, so that it stops accepting writes it can no
 	// longer safely serve. Its reaction time is set by the `primaryLease`
 	// timings and by `requestTimeout`, not by the liveness probe settings this
-	// stanza lives under. Enabled by default.
+	// stanza lives under. The check is always active.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
 }
@@ -689,7 +689,7 @@ type LivenessProbe struct {
 // IsolationCheckConfiguration contains the configuration for the primary
 // isolation check
 type IsolationCheckConfiguration struct {
-	// Whether primary isolation checking is enabled
+	// Ignored: the primary isolation check is always active
 	// +optional
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`

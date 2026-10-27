@@ -5080,7 +5080,7 @@ spec:
                           different target primary, so that it stops accepting writes it can no
                           longer safely serve. Its reaction time is set by the `primaryLease`
                           timings and by `requestTimeout`, not by the liveness probe settings this
-                          stanza lives under. Enabled by default.
+                          stanza lives under. The check is always active.
                         properties:
                           connectionTimeout:
                             default: 1000
@@ -5089,7 +5089,8 @@ spec:
                             type: integer
                           enabled:
                             default: true
-                            description: Whether primary isolation checking is enabled
+                            description: 'Ignored: the primary isolation check is
+                              always active'
                             type: boolean
                           requestTimeout:
                             default: 1000
