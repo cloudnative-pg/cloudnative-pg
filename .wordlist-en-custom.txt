@@ -233,6 +233,7 @@ GrantUsageSpecType
 HH
 HPA
 HashiCorp
+Hetzner
 HistoryTags
 Homebrew
 HoniSanders
@@ -915,6 +916,7 @@ ddf
 ddl
 de
 declaratively
+decrypt
 defaultMode
 demotionToken
 dennispidun
@@ -1584,6 +1586,7 @@ sqlrefs
 src
 sre
 ssc
+sse
 ssl
 sslCert
 sslKey
