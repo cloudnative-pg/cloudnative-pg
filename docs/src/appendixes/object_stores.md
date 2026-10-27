@@ -201,6 +201,66 @@ spec:
 ```
 :::
 
+### Server-Side Encryption with customer-provided keys (SSE-C)
+
+Some S3-compatible providers, such as Hetzner Object Storage, do not offer
+bucket-managed server-side encryption (SSE-S3 / SSE-KMS) and only support
+Server-Side Encryption with customer-provided keys (SSE-C). With SSE-C, the
+encryption key is supplied with every request, and the provider uses it to
+encrypt and decrypt objects without storing it.
+
+To enable SSE-C, set the `sseCustomerKey` field in the `s3Credentials` section
+to a reference to a secret holding a base64-encoded 256-bit (32-byte) AES key.
+
+Generate the key and store it in a Kubernetes secret:
+
+```sh
+openssl rand 32 | base64 > encryption.key
+
+kubectl create secret generic aws-sse-c \
+  --from-file=key=encryption.key
+```
+
+:::warning
+    Keep this key safe and backed up **outside** the object store. If you lose
+    it, your backups and WAL files become permanently unrecoverable: the
+    provider cannot decrypt them for you.
+:::
+
+Then reference the secret in the `Cluster` definition:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://BUCKET_NAME/path/to/folder"
+      endpointURL: "https://fsn1.your-objectstorage.com"
+      s3Credentials:
+        accessKeyId:
+          name: aws-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: aws-creds
+          key: ACCESS_SECRET_KEY
+        sseCustomerKey:
+          name: aws-sse-c
+          key: key
+      [...]
+```
+
+The same key is used for every operation: base backups, WAL archiving, WAL
+restore and recovery. It must remain unchanged and available for the whole
+lifetime of the backups it protects. To use a new key, use a new
+`destinationPath` or `serverName`.
+
+`sseCustomerKey` works with any authentication method, including
+`inheritFromIAMRole`. It cannot be combined with the bucket-managed
+`encryption` setting of the `data` and `wal` sections: a `Cluster` that sets
+both is rejected.
+
 ### Using Object Storage with a private CA
 
 Suppose you configure an Object Storage provider which uses a certificate
