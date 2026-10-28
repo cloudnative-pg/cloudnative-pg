@@ -15,3 +15,12 @@ resources:
 - database_editor_role.yaml
 - database_viewer_role.yaml
 - viewer_role.yaml
+- editor_role.yaml
+- cluster_editor_role.yaml
+- backup_editor_role.yaml
+- scheduledbackup_editor_role.yaml
+- imagecatalog_editor_role.yaml
+# High-privilege or cluster-scoped: granted separately, not part of editor-role.
+- pooler_editor_role.yaml
+- databaserole_editor_role.yaml
+- clusterimagecatalog_editor_role.yaml

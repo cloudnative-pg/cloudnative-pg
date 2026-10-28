@@ -1,0 +1,25 @@
+# permissions for end users to edit imagecatalogs.
+# ImageCatalog is namespaced: bind this role with a RoleBinding.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: imagecatalog-editor-role
+rules:
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - imagecatalogs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - imagecatalogs/status
+  verbs:
+  - get

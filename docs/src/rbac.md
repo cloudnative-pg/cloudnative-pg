@@ -15,7 +15,9 @@ scoped, namespaced set of permissions, distinct from both platform
 administrators and the operator's own service account (described in the
 [Security](security.md#role-based-access-control-rbac) page).
 
-This page describes a read-only persona. Granting write access to
+This page describes a read-only persona, and the editor roles for automation
+(CI/CD, GitOps controllers, platform tooling) that needs to write CloudNativePG
+resources in a namespace without `cluster-admin`. Granting write access to
 CloudNativePG resources is a high-privilege decision, covered in
 [RBAC on Custom Resources](security.md#rbac-on-custom-resources).
 
@@ -197,3 +199,50 @@ view role, but also gives everyone bound to `edit` or `admin` write access to
 CloudNativePG resources through the chart's edit role. Do not apply the label to
 `cnpg-dba-viewer`, which would also give every `view` user access to
 `pods/proxy`, leases and VolumeSnapshots.
+
+## Editor roles for automation
+
+The operator manifest also installs editor roles, for automation that needs
+write access to `postgresql.cnpg.io` resources in a namespace. Bind them with a
+`RoleBinding` to limit them to a single namespace.
+
+| Role | Grants | Notes |
+| ---- | ------ | ----- |
+| `cnpg-editor-role` | Write access to `Cluster`, `Backup`, `ScheduledBackup`, `Database`, `Publication`, `Subscription` and `ImageCatalog`, and `patch` on `clusters/status` | The aggregate role, counterpart of `cnpg-viewer-role`. Write access to `Cluster` is itself a high-privilege grant. |
+| `cnpg-cluster-editor-role`, `cnpg-backup-editor-role`, `cnpg-scheduledbackup-editor-role`, `cnpg-database-editor-role`, `cnpg-publication-editor-role`, `cnpg-subscription-editor-role`, `cnpg-imagecatalog-editor-role` | Write access to one resource | Use them to grant less than `cnpg-editor-role`. |
+| `cnpg-databaserole-editor-role` | Write access to `DatabaseRole` | **High privilege**: `superuser: true` and `inRoles` make it equivalent to PostgreSQL superuser access on the namespace. |
+| `cnpg-pooler-editor-role` | Write access to `Pooler` | **High privilege**: `authQuery` runs arbitrary SQL. |
+| `cnpg-clusterimagecatalog-editor-role` | Write access to `ClusterImageCatalog` | `ClusterImageCatalog` is cluster-scoped, so this role needs a `ClusterRoleBinding`, which users who cannot create one cannot use. |
+
+`cnpg-editor-role` does not include the high-privilege resources, so they can be
+granted separately. `FailoverQuorum` has no editor role: it is written by the
+operator and read-only for users, who already see it through the viewer roles.
+
+:::warning
+    Like `cnpg-viewer-role`, these roles come with the operator manifest, not
+    with the Helm chart.
+:::
+
+`kubectl cnpg` commands that change a Cluster work with `cnpg-editor-role`
+combined with the read access of `cnpg-viewer-role` or `cnpg-dba-viewer`:
+`backup` creates a `Backup`, `promote` patches `clusters/status`, and `restart`,
+`fence`, `hibernate` and `maintenance` patch the `Cluster`. Commands that open a
+shell or a tunnel (`psql`, `exec`, `port-forward`) need the Pod permissions of
+the DBA samples instead.
+
+### Aggregating `cnpg-editor-role` into `edit` and `admin`
+
+As an alternative to widening the operator's own `cnpg-manager` role, you can
+aggregate `cnpg-editor-role` into the built-in `edit` and `admin` roles:
+
+```sh
+kubectl label clusterrole cnpg-editor-role \
+  rbac.authorization.k8s.io/aggregate-to-edit=true \
+  rbac.authorization.k8s.io/aggregate-to-admin=true
+```
+
+This is off by default. It gives everyone bound to `edit` or `admin`, in every
+namespace, write access to the resources above, so it must be an explicit
+decision of the platform team. Do not aggregate `cnpg-databaserole-editor-role`
+or `cnpg-pooler-editor-role` unless you accept that every namespace admin can
+obtain superuser access to PostgreSQL.
