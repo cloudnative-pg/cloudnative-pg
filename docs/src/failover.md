@@ -90,8 +90,8 @@ flushed and archived its remaining WAL, so the replica that takes
 over sees the archive at its definitive end. If the previous primary
 cannot release the lease (crash, node failure, or the instance
 manager itself unreachable), the replica can promote once the lease has been
-unchanged for `leaseDurationSeconds` since the operator named it the target
-primary. In that
+unchanged for `leaseDurationSeconds` since the operator marked the failover as
+`pending`. In that
 path the archive may not have caught up, and any writes the previous
 primary did not finish archiving are lost. A target primary that is replaced
 before it promotes stops renewing the lease it may hold, so the new target can
