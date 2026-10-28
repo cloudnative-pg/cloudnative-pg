@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package postgres
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -64,8 +63,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-const maxConnectionsParameter = "max_connections"
-
 var (
 	// ErrInstanceInRecovery is raised while PostgreSQL is still in recovery mode
 	ErrInstanceInRecovery = fmt.Errorf("instance in recovery")
@@ -77,14 +74,6 @@ var (
 		// Steps is declared as an "int", so we are capping
 		// to int32 to support ARM-based 32 bit architectures
 		Steps: math.MaxInt32,
-	}
-
-	pgControldataSettingsToParamsMap = map[string]string{
-		"max_connections setting":      maxConnectionsParameter,
-		"max_wal_senders setting":      "max_wal_senders",
-		"max_worker_processes setting": "max_worker_processes",
-		"max_prepared_xacts setting":   "max_prepared_transactions",
-		"max_locks_per_xact setting":   "max_locks_per_transaction",
 	}
 )
 
@@ -806,102 +795,6 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 		path.Join(info.PgData, "recovery.signal"),
 		[]byte(""),
 		0o600)
-}
-
-// LoadEnforcedParametersFromPgControldata will parse the output of pg_controldata in order to get
-// the values of all the hot standby sensible parameters
-func LoadEnforcedParametersFromPgControldata(pgData string) (map[string]int, error) {
-	var stdoutBuffer bytes.Buffer
-	var stderrBuffer bytes.Buffer
-	pgControlDataCmd := exec.Command(pgControlDataName,
-		"-D",
-		pgData) // #nosec G204
-	pgControlDataCmd.Stdout = &stdoutBuffer
-	pgControlDataCmd.Stderr = &stderrBuffer
-	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "LANG=C", "LC_MESSAGES=C")
-	err := pgControlDataCmd.Run()
-	if err != nil {
-		log.Error(err, "while reading pg_controldata",
-			"stderr", stderrBuffer.String(),
-			"stdout", stdoutBuffer.String())
-		return nil, err
-	}
-
-	log.Debug("pg_controldata stdout", "stdout", stdoutBuffer.String())
-
-	enforcedParams := make(map[string]int)
-	for key, value := range utils.ParsePgControldataOutput(stdoutBuffer.String()) {
-		if param, ok := pgControldataSettingsToParamsMap[key]; ok {
-			intValue, err := strconv.Atoi(value)
-			if err != nil {
-				log.Error(err, "while parsing pg_controldata content",
-					"key", key,
-					"value", value)
-				return nil, err
-			}
-			enforcedParams[param] = intValue
-		}
-	}
-
-	return enforcedParams, nil
-}
-
-// LoadStartupParameterValue asks PostgreSQL which value the given parameter
-// will have at startup with the current configuration files, by running
-// `postgres -C <name>`. It works while the server is not running: when no
-// configuration file sets the parameter, it returns the built-in default.
-func LoadStartupParameterValue(pgData string, name string) (int, error) {
-	var stdoutBuffer bytes.Buffer
-	var stderrBuffer bytes.Buffer
-	postgresCmd := exec.Command(GetPostgresExecutableName(),
-		"-D", pgData,
-		"-C", name) // #nosec G204
-	postgresCmd.Stdout = &stdoutBuffer
-	postgresCmd.Stderr = &stderrBuffer
-	// the postgres executable needs the parent environment (PATH above all)
-	// to locate itself while evaluating the -C flag
-	postgresCmd.Env = append(os.Environ(), "LANG=C", "LC_MESSAGES=C")
-	if err := postgresCmd.Run(); err != nil {
-		log.Error(err, "while reading the startup value of a parameter",
-			"name", name,
-			"stderr", stderrBuffer.String(),
-			"stdout", stdoutBuffer.String())
-		return 0, err
-	}
-
-	value, err := strconv.Atoi(strings.TrimSpace(stdoutBuffer.String()))
-	if err != nil {
-		log.Error(err, "while parsing the startup value of a parameter",
-			"name", name,
-			"value", stdoutBuffer.String())
-		return 0, err
-	}
-
-	return value, nil
-}
-
-// LoadEnforcedParametersFromCluster loads the enforced parameters which defined in cluster spec
-func LoadEnforcedParametersFromCluster(
-	cluster *apiv1.Cluster,
-) (map[string]int, error) {
-	clusterParams := cluster.Spec.PostgresConfiguration.Parameters
-	enforcedParams := map[string]int{}
-	for _, param := range pgControldataSettingsToParamsMap {
-		value, found := clusterParams[param]
-		if !found {
-			continue
-		}
-
-		intValue, err := strconv.Atoi(value)
-		if err != nil {
-			log.Error(err, "while parsing enforced postgres parameter",
-				"param", param,
-				"value", value)
-			return nil, err
-		}
-		enforcedParams[param] = intValue
-	}
-	return enforcedParams, nil
 }
 
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
