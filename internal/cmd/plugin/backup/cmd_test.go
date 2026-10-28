@@ -135,45 +135,36 @@ var _ = Describe("backup command", func() {
 		plugin.Namespace = namespace
 	})
 
-	DescribeTable("keeps the online configuration of the cluster for the options not set",
-		func(ctx SpecContext, option string, expected *apiv1.OnlineConfiguration) {
-			cluster := &apiv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
-				Spec: apiv1.ClusterSpec{
-					Backup: &apiv1.BackupConfiguration{
-						VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
-							OnlineConfiguration: apiv1.OnlineConfiguration{
-								WaitForArchive:  ptr.To(false),
-								SkipWalSnapshot: ptr.To(true),
-							},
+	It("keeps the online configuration of the cluster for the options not set", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
+						OnlineConfiguration: apiv1.OnlineConfiguration{
+							WaitForArchive: ptr.To(false),
 						},
 					},
 				},
-			}
-			plugin.Client = fake.NewClientBuilder().
-				WithScheme(scheme.BuildWithAllKnownScheme()).
-				WithObjects(cluster).
-				Build()
+			},
+		}
+		plugin.Client = fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
 
-			cmd := NewCmd()
-			cmd.SetArgs([]string{clusterName, "--method=volumeSnapshot", option})
-			captureStdout(func() {
-				Expect(cmd.ExecuteContext(ctx)).To(Succeed())
-			})
+		cmd := NewCmd()
+		cmd.SetArgs([]string{clusterName, "--method=volumeSnapshot", "--immediate-checkpoint=true"})
+		captureStdout(func() {
+			Expect(cmd.ExecuteContext(ctx)).To(Succeed())
+		})
 
-			var backups apiv1.BackupList
-			Expect(plugin.Client.List(ctx, &backups)).To(Succeed())
-			Expect(backups.Items).To(HaveLen(1))
-			Expect(backups.Items[0].Spec.OnlineConfiguration).To(Equal(expected))
-		},
-		Entry("when requesting an immediate checkpoint", "--immediate-checkpoint=true", &apiv1.OnlineConfiguration{
+		var backups apiv1.BackupList
+		Expect(plugin.Client.List(ctx, &backups)).To(Succeed())
+		Expect(backups.Items).To(HaveLen(1))
+		Expect(backups.Items[0].Spec.OnlineConfiguration).To(Equal(&apiv1.OnlineConfiguration{
 			WaitForArchive:      ptr.To(false),
 			ImmediateCheckpoint: ptr.To(true),
-			SkipWalSnapshot:     ptr.To(true),
-		}),
-		Entry("when keeping the WAL snapshot", "--skip-wal-snapshot=false", &apiv1.OnlineConfiguration{
-			WaitForArchive:  ptr.To(false),
-			SkipWalSnapshot: ptr.To(false),
-		}),
-	)
+		}))
+	})
 })

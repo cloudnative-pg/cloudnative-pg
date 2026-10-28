@@ -421,7 +421,6 @@ func EnsurePodIsUnfenced(
 func isWalSnapshotSkipped(cluster *apiv1.Cluster, backup *apiv1.Backup) bool {
 	onlineConfiguration := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot).OnlineConfiguration
 	return backup.GetOnlineOrDefault(cluster) &&
-		onlineConfiguration.GetSkipWalSnapshot() &&
 		onlineConfiguration.GetWaitForArchive() &&
 		cluster.GetEnabledWALArchivePluginName() != ""
 }

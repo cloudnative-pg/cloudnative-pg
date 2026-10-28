@@ -337,153 +337,6 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 			var namespace, clusterName string
 			var backupTaken *apiv1.Backup
 
-			BeforeAll(func() {
-				var err error
-				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
-				Expect(err).ToNot(HaveOccurred())
-
-				clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
-				Expect(err).ToNot(HaveOccurred())
-
-				setupPluginObjectStore(namespace, clusterName)
-
-				By("creating the cluster to snapshot, archiving through the plugin", func() {
-					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
-				})
-
-				By("verifying WAL archiving through the plugin is working", func() {
-					// This source cluster is single-instance and idle here: no replica
-					// bootstrap or workload forces a WAL switch, so archive_command would
-					// only fire once archive_timeout (5m) elapses, making a wait on the
-					// ContinuousArchiving condition flaky. Force a switch and verify the
-					// WAL reaches the object store, so we fail fast and deterministically
-					// if the plugin cannot archive before the online backup (which waits
-					// for the WAL archiver) runs.
-					objectstoreasserts.AssertArchiveWalOnObjectStore(
-						env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName)
-				})
-			})
-
-			It("should execute a backup with online set to true", func() {
-				DeferCleanup(func() {
-					config.UnsetTemplateVariable(snapshotDataEnv)
-					config.UnsetTemplateVariable(snapshotWalEnv)
-				})
-
-				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
-					// Create the table with rows 1,2 then add 3,4; the hot backup is
-					// expected to capture them all.
-					insertDataAndArchiveWAL(namespace, clusterName, tableName, true, 3, 4)
-				})
-
-				By("creating a snapshot and waiting until it's completed", func() {
-					backupTaken = takeVolumeSnapshotBackup(namespace, clusterName,
-						fmt.Sprintf("%s-online", clusterName), apiv1.BackupTargetPrimary, false, true, 2)
-				})
-
-				By("fetching the volume snapshots", func() {
-					captureSnapshotNames(backupTaken, clusterName, namespace, snapshotDataEnv, snapshotWalEnv)
-				})
-
-				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreManifest)
-				Expect(err).ToNot(HaveOccurred())
-
-				By("creating the cluster to be restored through snapshot", func() {
-					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, restoreManifest)
-					clusterasserts.AssertClusterIsReady(
-						env, namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
-					)
-				})
-
-				By("verifying the correct data exists in the restored cluster", func() {
-					tableLocator := pgasserts.TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToRestoreName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    tableName,
-					}
-					pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
-				})
-			})
-
-			It("should scale up the cluster with volume snapshot", func() {
-				// insert some data after the snapshot is taken, we want to verify the data exists in
-				// the new pod when cluster scaled up
-				By("inserting more test data and creating WALs on the cluster snapshotted", func() {
-					insertDataAndArchiveWAL(namespace, clusterName, tableName, false, 5, 6)
-				})
-
-				// reuse the snapshot taken from the clusterToSnapshot cluster
-				By("fetching the volume snapshots", func() {
-					captureSnapshotNames(backupTaken, clusterName, namespace, snapshotDataEnv, snapshotWalEnv)
-				})
-
-				By("scale up the cluster", func() {
-					err := clusterutils.ScaleSize(env.Ctx, env.Client, namespace, clusterName, 3)
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				By("checking the cluster is working", func() {
-					// Setting up a cluster with three pods is slow, usually 200-600s
-					clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
-				})
-
-				By("checking the new replicas have been created using the snapshot", func() {
-					pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
-					Expect(err).ToNot(HaveOccurred())
-					matched := 0
-					for _, pvc := range pvcList.Items {
-						if pvc.Labels[utils.ClusterInstanceRoleLabelName] == specs.ClusterRoleLabelReplica &&
-							pvc.Labels[utils.ClusterLabelName] == clusterName {
-							Expect(pvc.Spec.DataSource.Kind).To(Equal(apiv1.VolumeSnapshotKind))
-							Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(apiv1.VolumeSnapshotKind))
-							matched++
-						}
-					}
-					// Each new replica has both a PGDATA and a WAL PVC (this
-					// cluster configures separate walStorage), so 2 replicas
-					// means 4 matching PVCs, not 2.
-					Expect(matched).To(Equal(4), "expected 4 replica PVCs (PGDATA + WAL, x2 replicas) provisioned from the snapshot")
-				})
-
-				// Query each replica pod directly: a cluster-wide service
-				// connection always resolves to the primary, and would not
-				// confirm that a specific replica has caught up.
-				By("verifying the correct data exists in the new pod of the scaled cluster", func() {
-					podList, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(podList.Items).To(HaveLen(2))
-					query := fmt.Sprintf("SELECT count(*) FROM %s", tableName)
-					for _, pod := range podList.Items {
-						Eventually(func() (string, error) {
-							stdOut, _, err := exec.QueryInInstancePod(
-								env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-								exec.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
-								postgres.AppDBName, query)
-							return strings.TrimSpace(stdOut), err
-						}, RetryTimeout).Should(Equal("6"), "replica pod %s did not catch up", pod.Name)
-					}
-				})
-			})
-		})
-
-		Context("online hot volume snapshot without the WAL storage", Ordered, func() {
-			const (
-				namespacePrefix = "plugin-snapshot-skip-wal"
-				filesDir        = fixturesDir + "/volume_snapshot"
-
-				clusterManifest = filesDir + "/cluster-pvc-skip-wal-snapshot-plugin.yaml.template"
-				restoreManifest = filesDir + "/cluster-pvc-skip-wal-restore-plugin.yaml.template"
-
-				snapshotDataEnv = "SNAPSHOT_PLUGIN_SKIP_WAL_PGDATA"
-				snapshotWalEnv  = "SNAPSHOT_PLUGIN_SKIP_WAL_PGWAL"
-
-				tableName = "skip_wal_test"
-			)
-
-			var namespace, clusterName string
-			var backupTaken *apiv1.Backup
-
 			// expectEmptyWalPVCs checks that the WAL PVCs of the given instances
 			// were created empty, while their PGDATA PVCs come from a snapshot
 			expectEmptyWalPVCs := func(clusterName string, role string, expectedInstances int) {
@@ -525,18 +378,27 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 				})
 
 				By("verifying WAL archiving through the plugin is working", func() {
+					// This source cluster is single-instance and idle here: no replica
+					// bootstrap or workload forces a WAL switch, so archive_command would
+					// only fire once archive_timeout (5m) elapses, making a wait on the
+					// ContinuousArchiving condition flaky. Force a switch and verify the
+					// WAL reaches the object store, so we fail fast and deterministically
+					// if the plugin cannot archive before the online backup (which waits
+					// for the WAL archiver) runs.
 					objectstoreasserts.AssertArchiveWalOnObjectStore(
 						env, testTimeouts, objectStoreEnv, namespace, clusterName, clusterName)
 				})
 			})
 
-			It("restores a backup without the WAL storage snapshot", func() {
+			It("should execute a backup with online set to true", func() {
 				DeferCleanup(func() {
 					config.UnsetTemplateVariable(snapshotDataEnv)
 					config.UnsetTemplateVariable(snapshotWalEnv)
 				})
 
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+					// Create the table with rows 1,2 then add 3,4; the hot backup is
+					// expected to capture them all.
 					insertDataAndArchiveWAL(namespace, clusterName, tableName, true, 3, 4)
 				})
 
@@ -582,36 +444,49 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 				})
 			})
 
-			It("scales up the cluster from a backup without the WAL storage snapshot", func() {
+			It("should scale up the cluster with volume snapshot", func() {
+				// insert some data after the snapshot is taken, we want to verify the data exists in
+				// the new pod when cluster scaled up
 				By("inserting more test data and creating WALs on the cluster snapshotted", func() {
 					insertDataAndArchiveWAL(namespace, clusterName, tableName, false, 5, 6)
 				})
 
+				// reuse the snapshot taken from the clusterToSnapshot cluster
+				By("fetching the volume snapshots", func() {
+					captureSnapshotNames(backupTaken, clusterName, namespace, snapshotDataEnv, snapshotWalEnv)
+				})
+
 				By("scale up the cluster", func() {
-					err := clusterutils.ScaleSize(env.Ctx, env.Client, namespace, clusterName, 2)
+					err := clusterutils.ScaleSize(env.Ctx, env.Client, namespace, clusterName, 3)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
 				By("checking the cluster is working", func() {
+					// Setting up a cluster with three pods is slow, usually 200-600s
 					clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 				})
 
-				By("checking the new replica has been created using the snapshot and an empty WAL PVC", func() {
-					expectEmptyWalPVCs(clusterName, specs.ClusterRoleLabelReplica, 1)
+				By("checking the new replicas have been created using the snapshot and an empty WAL PVC", func() {
+					expectEmptyWalPVCs(clusterName, specs.ClusterRoleLabelReplica, 2)
 				})
 
-				By("verifying the correct data exists in the new replica", func() {
+				// Query each replica pod directly: a cluster-wide service
+				// connection always resolves to the primary, and would not
+				// confirm that a specific replica has caught up.
+				By("verifying the correct data exists in the new pod of the scaled cluster", func() {
 					podList, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(podList.Items).To(HaveLen(1))
+					Expect(podList.Items).To(HaveLen(2))
 					query := fmt.Sprintf("SELECT count(*) FROM %s", tableName)
-					Eventually(func() (string, error) {
-						stdOut, _, err := exec.QueryInInstancePod(
-							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-							exec.PodLocator{Namespace: namespace, PodName: podList.Items[0].Name},
-							postgres.AppDBName, query)
-						return strings.TrimSpace(stdOut), err
-					}, RetryTimeout).Should(Equal("6"), "replica pod %s did not catch up", podList.Items[0].Name)
+					for _, pod := range podList.Items {
+						Eventually(func() (string, error) {
+							stdOut, _, err := exec.QueryInInstancePod(
+								env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+								exec.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
+								postgres.AppDBName, query)
+							return strings.TrimSpace(stdOut), err
+						}, RetryTimeout).Should(Equal("6"), "replica pod %s did not catch up", pod.Name)
+					}
 				})
 			})
 
