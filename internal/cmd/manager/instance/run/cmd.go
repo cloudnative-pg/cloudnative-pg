@@ -455,6 +455,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	contextLogger.Info("starting cross-namespace watch scope manager")
 	if err := newWatchScopeReconciler(
 		mgr.GetClient(),
+		kubeClientset,
 		instance,
 		crossNamespaceResources,
 		onlineUpgradeCancelFunc,

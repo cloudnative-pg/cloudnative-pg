@@ -21,8 +21,13 @@ package run
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	authorizationv1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -31,6 +36,20 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 )
+
+// clusterWideAccessRetryDelay is how long to wait before checking again whether
+// the managed resources can be watched in every namespace. The operator grants
+// that access right after the cross-namespace resources support is enabled, so
+// a short delay is enough.
+const clusterWideAccessRetryDelay = 5 * time.Second
+
+// clusterWideResources are the managed resources that the cache of the
+// instance manager watches in every namespace when the cross-namespace
+// resources support is enabled
+var clusterWideResources = []string{"databases", "databaseroles", "publications", "subscriptions"}
+
+// clusterWideVerbs are the verbs the informers of the cache need
+var clusterWideVerbs = []string{"list", "watch"}
 
 // watchScopeReconciler restarts the instance manager when the namespaces
 // the managed resources are watched in no longer match the ones this process
@@ -64,11 +83,55 @@ type watchScopeReconciler struct {
 // the missing permission.
 type clusterWideAccessChecker func(ctx context.Context) (allowed bool, reason string, err error)
 
+// newClusterWideAccessChecker builds a clusterWideAccessChecker asking the
+// API server, through SelfSubjectAccessReviews, whether this instance manager can
+// list and watch the managed resources in every namespace. Creating a
+// SelfSubjectAccessReview needs no specific permission.
+func newClusterWideAccessChecker(kubeClient kubernetes.Interface) clusterWideAccessChecker {
+	return func(ctx context.Context) (bool, string, error) {
+		for _, resource := range clusterWideResources {
+			for _, verb := range clusterWideVerbs {
+				review, err := kubeClient.AuthorizationV1().SelfSubjectAccessReviews().Create(
+					ctx,
+					&authorizationv1.SelfSubjectAccessReview{
+						Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+							ResourceAttributes: &authorizationv1.ResourceAttributes{
+								// An empty namespace means every namespace
+								Namespace: "",
+								Verb:      verb,
+								Group:     apiv1.SchemeGroupVersion.Group,
+								Resource:  resource,
+							},
+						},
+					},
+					metav1.CreateOptions{},
+				)
+				if err != nil {
+					return false, "", fmt.Errorf("while checking the permission to %s %s in every namespace: %w",
+						verb, resource, err)
+				}
+
+				if !review.Status.Allowed {
+					reason := fmt.Sprintf("cannot %s %s.%s in every namespace",
+						verb, resource, apiv1.SchemeGroupVersion.Group)
+					if review.Status.Reason != "" {
+						reason = fmt.Sprintf("%s: %s", reason, review.Status.Reason)
+					}
+					return false, reason, nil
+				}
+			}
+		}
+
+		return true, "", nil
+	}
+}
+
 // newWatchScopeReconciler builds a watchScopeReconciler for the
 // passed instance, whose cache watches Database objects cluster-wide only when
 // crossNamespace is true
 func newWatchScopeReconciler(
 	cli client.Client,
+	kubeClient kubernetes.Interface,
 	instance *postgres.Instance,
 	crossNamespace bool,
 	cancelFunc context.CancelFunc,
@@ -81,6 +144,7 @@ func newWatchScopeReconciler(
 		cancelFunc:      cancelFunc,
 		exitedCondition: exitedCondition,
 		restart:         upgrade.RestartInstanceManager,
+		checkAccess:     newClusterWideAccessChecker(kubeClient),
 	}
 }
 
@@ -99,6 +163,26 @@ func (r *watchScopeReconciler) Reconcile(
 
 	if cluster.Spec.EnableCrossNamespaceResources == r.crossNamespace {
 		return ctrl.Result{}, nil
+	}
+
+	// A new process would start its informers in every namespace right away.
+	// If the operator did not grant that access yet, they would be refused,
+	// the cache would never sync and the probes would stop answering, making
+	// the kubelet restart PostgreSQL. Wait until the access is usable.
+	// Narrowing the scope needs no new permission.
+	if cluster.Spec.EnableCrossNamespaceResources {
+		allowed, reason, err := r.checkAccess(ctx)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !allowed {
+			contextLogger.Info(
+				"Cross-namespace resources support enabled, waiting for the cluster-wide access "+
+					"before restarting the instance manager",
+				"reason", reason,
+				"retryAfter", clusterWideAccessRetryDelay)
+			return ctrl.Result{RequeueAfter: clusterWideAccessRetryDelay}, nil
+		}
 	}
 
 	// Signal to the PostgreSQL lifecycle manager that the coming cancellation of

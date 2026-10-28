@@ -23,8 +23,12 @@ import (
 	"context"
 	"errors"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -261,5 +265,74 @@ var _ = Describe("watchScopeReconciler", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(accessChecks).To(BeZero())
 		Expect(restarts).To(Equal(1))
+	})
+})
+
+var _ = Describe("newClusterWideAccessChecker", func() {
+	var (
+		kubeClient *kubefake.Clientset
+		reviews    []authorizationv1.ResourceAttributes
+		denied     string
+		reviewErr  error
+	)
+
+	BeforeEach(func() {
+		reviews = nil
+		denied = ""
+		reviewErr = nil
+		kubeClient = kubefake.NewClientset()
+		kubeClient.PrependReactor("create", "selfsubjectaccessreviews",
+			func(action k8stesting.Action) (bool, runtime.Object, error) {
+				review := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+				reviews = append(reviews, *review.Spec.ResourceAttributes)
+				if reviewErr != nil {
+					return true, nil, reviewErr
+				}
+				if review.Spec.ResourceAttributes.Resource == denied {
+					review.Status.Reason = "no RBAC policy matched"
+					return true, review, nil
+				}
+				review.Status.Allowed = true
+				return true, review, nil
+			})
+	})
+
+	It("allows the restart when every resource can be listed and watched everywhere", func(ctx SpecContext) {
+		allowed, reason, err := newClusterWideAccessChecker(kubeClient)(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(allowed).To(BeTrue())
+		Expect(reason).To(BeEmpty())
+
+		expected := make([]authorizationv1.ResourceAttributes, 0, 8)
+		for _, resource := range []string{"databases", "databaseroles", "publications", "subscriptions"} {
+			for _, verb := range []string{"list", "watch"} {
+				expected = append(expected, authorizationv1.ResourceAttributes{
+					Namespace: "",
+					Verb:      verb,
+					Group:     "postgresql.cnpg.io",
+					Resource:  resource,
+				})
+			}
+		}
+		Expect(reviews).To(Equal(expected))
+	})
+
+	It("reports the first missing permission", func(ctx SpecContext) {
+		denied = "publications"
+
+		allowed, reason, err := newClusterWideAccessChecker(kubeClient)(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(allowed).To(BeFalse())
+		Expect(reason).To(Equal(
+			"cannot list publications.postgresql.cnpg.io in every namespace: no RBAC policy matched"))
+		Expect(reviews).To(HaveLen(5))
+	})
+
+	It("fails when the review cannot be created", func(ctx SpecContext) {
+		reviewErr = errors.New("connection refused")
+
+		allowed, _, err := newClusterWideAccessChecker(kubeClient)(ctx)
+		Expect(err).To(MatchError(ContainSubstring("connection refused")))
+		Expect(allowed).To(BeFalse())
 	})
 })
