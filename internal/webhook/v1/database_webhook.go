@@ -104,16 +104,13 @@ func (v *DatabaseCustomValidator) ValidateCreate(
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Database .
 func (v *DatabaseCustomValidator) ValidateUpdate(
 	ctx context.Context,
-	oldDatabase *apiv1.Database, database *apiv1.Database,
+	_ *apiv1.Database, database *apiv1.Database,
 ) (admission.Warnings, error) {
 	databaseLog.Info(
 		"Validation for Database upon update",
 		"name", database.GetName(), "namespace", database.GetNamespace())
 
-	allErrs := append(
-		v.validate(database),
-		v.validateDatabaseChanges(database, oldDatabase)...,
-	)
+	allErrs := v.validate(database)
 	allErrs = append(allErrs, v.validateCrossNamespaceCluster(ctx, database)...)
 	allWarnings := v.getAdmissionWarnings(database)
 
@@ -124,22 +121,6 @@ func (v *DatabaseCustomValidator) ValidateUpdate(
 	return allWarnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: "database.cnpg.io", Kind: "Database "},
 		database.Name, allErrs)
-}
-
-func (v *DatabaseCustomValidator) validateDatabaseChanges(newDB, oldDB *apiv1.Database) field.ErrorList {
-	var allErrs field.ErrorList
-
-	// Prevent changing cluster.namespace after creation
-	if oldDB.Spec.ClusterRef.Namespace != "" &&
-		newDB.Spec.ClusterRef.Namespace != oldDB.Spec.ClusterRef.Namespace {
-		allErrs = append(allErrs, field.Invalid(
-			field.NewPath("spec", "cluster", "namespace"),
-			newDB.Spec.ClusterRef.Namespace,
-			"cluster.namespace is immutable once set",
-		))
-	}
-
-	return allErrs
 }
 
 // validateCrossNamespaceCluster validates that if the Database references a Cluster
