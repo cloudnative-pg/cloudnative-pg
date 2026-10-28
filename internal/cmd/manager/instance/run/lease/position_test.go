@@ -27,8 +27,12 @@ import (
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/utils/ptr"
 
@@ -277,5 +281,145 @@ var _ = Describe("The position published when the primary lease is written as th
 		stored, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(stored.Annotations).To(HaveKeyWithValue(utils.LeasePositionAnnotationName, previous))
+	})
+})
+
+var _ = Describe("Reading and consuming the position of the previous primary", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-3"
+		otherPod    = "test-cluster-2"
+		previous    = `{"lsn":"0/8000028","timeline":2,"state":"shut down","pod":"test-cluster-2"}`
+		unrelated   = "example.com/other"
+	)
+
+	var (
+		kubeClient *fake.Clientset
+		r          *Runnable
+	)
+
+	BeforeEach(func() {
+		kubeClient = fake.NewClientset()
+		r = New(kubeClient, postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName))
+	})
+
+	createLease := func(ctx context.Context, holder string, annotations map[string]string) {
+		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Annotations: annotations},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: ptr.To(holder)},
+		}, metav1.CreateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	annotation := func(ctx context.Context) (string, bool) {
+		lease, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		value, ok := lease.Annotations[utils.LeasePositionAnnotationName]
+		return value, ok
+	}
+
+	Describe("Position", func() {
+		It("returns the position of the previous primary", func(ctx context.Context) {
+			createLease(ctx, thisPod, map[string]string{utils.LeasePositionAnnotationName: previous})
+
+			value, err := r.Position(ctx)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(value).To(Equal(previous))
+		})
+
+		It("returns nothing when the lease has no position", func(ctx context.Context) {
+			createLease(ctx, thisPod, nil)
+
+			value, err := r.Position(ctx)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(value).To(BeEmpty())
+		})
+
+		It("fails when another pod holds the lease", func(ctx context.Context) {
+			createLease(ctx, otherPod, map[string]string{utils.LeasePositionAnnotationName: previous})
+
+			_, err := r.Position(ctx)
+			Expect(err).To(MatchError(ContainSubstring(otherPod)))
+		})
+
+		It("fails when there is no lease", func(ctx context.Context) {
+			_, err := r.Position(ctx)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	Describe("MarkPromoting", func() {
+		It("replaces the position of the previous primary with the one of this replica", func(ctx context.Context) {
+			createLease(ctx, thisPod, map[string]string{
+				utils.LeasePositionAnnotationName: previous,
+				unrelated:                         "kept",
+			})
+
+			Expect(r.MarkPromoting(ctx, "0/80000A0", 2)).To(Succeed())
+
+			value, _ := annotation(ctx)
+			position, err := utils.ParseLeasePosition(value)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(position).To(Equal(&utils.LeasePosition{
+				LSN:      "0/80000A0",
+				Timeline: 2,
+				State:    utils.LeasePositionStatePromoting,
+				Pod:      thisPod,
+			}))
+
+			lease, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(lease.Annotations).To(HaveKeyWithValue(unrelated, "kept"))
+			Expect(lease.Spec.HolderIdentity).To(HaveValue(Equal(thisPod)))
+		})
+
+		It("adds the marker to a lease that has no annotations at all", func(ctx context.Context) {
+			createLease(ctx, thisPod, nil)
+
+			Expect(r.MarkPromoting(ctx, "0/80000A0", 2)).To(Succeed())
+			_, found := annotation(ctx)
+			Expect(found).To(BeTrue())
+		})
+
+		It("retries when the lease changed under it, as the elector does on every renewal", func(ctx context.Context) {
+			createLease(ctx, thisPod, map[string]string{utils.LeasePositionAnnotationName: previous})
+
+			conflicts := 0
+			kubeClient.PrependReactor("update", "leases", func(k8stesting.Action) (bool, runtime.Object, error) {
+				if conflicts == 0 {
+					conflicts++
+					return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "leases"}, clusterName, nil)
+				}
+				return false, nil, nil
+			})
+
+			Expect(r.MarkPromoting(ctx, "0/80000A0", 2)).To(Succeed())
+			Expect(conflicts).To(Equal(1))
+			value, _ := annotation(ctx)
+			Expect(value).To(ContainSubstring(string(utils.LeasePositionStatePromoting)))
+		})
+
+		It("does not touch the lease when another pod holds it", func(ctx context.Context) {
+			createLease(ctx, otherPod, map[string]string{utils.LeasePositionAnnotationName: previous})
+
+			Expect(r.MarkPromoting(ctx, "0/80000A0", 2)).To(MatchError(ContainSubstring(otherPod)))
+			value, _ := annotation(ctx)
+			Expect(value).To(Equal(previous))
+		})
+
+		It("fails when the lease cannot be written", func(ctx context.Context) {
+			createLease(ctx, thisPod, map[string]string{utils.LeasePositionAnnotationName: previous})
+			kubeClient.PrependReactor("update", "leases", func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, errors.New("the API server is on fire")
+			})
+
+			Expect(r.MarkPromoting(ctx, "0/80000A0", 2)).To(MatchError(ContainSubstring("on fire")))
+			value, _ := annotation(ctx)
+			Expect(value).To(Equal(previous))
+		})
 	})
 })

@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
-	"time"
-
 	"github.com/cloudnative-pg/machinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -53,10 +51,9 @@ var _ = Describe("decidePromotion", func() {
 
 	decide := func(annotation string, replica replicaPosition) promotionDecision {
 		return decidePromotion(promotionGateInput{
-			Annotation:    annotation,
-			PodName:       thisPod,
-			Replica:       replica,
-			AnnotationAge: 3 * time.Second,
+			Annotation: annotation,
+			PodName:    thisPod,
+			Replica:    replica,
 		})
 	}
 
@@ -94,7 +91,9 @@ var _ = Describe("decidePromotion", func() {
 	It("names the pod that is promoting when it is not this one", func() {
 		decision := decide(position(utils.LeasePositionStatePromoting, "0/70000A0", 2),
 			replica("0/70000A0", 2))
-		Expect(decision.Details).To(ContainElements("writer", "cluster-example-2", "leasePosition", "0/70000A0"))
+		Expect(decision.Details).To(ContainElements("leasePosition", utils.LeasePosition{
+			LSN: "0/70000A0", Timeline: 2, State: utils.LeasePositionStatePromoting, Pod: previousPrimary,
+		}))
 	})
 
 	DescribeTable("after a clean shutdown of the previous primary",
@@ -138,11 +137,12 @@ var _ = Describe("decidePromotion", func() {
 			"0/7000028", 1, "0/70000A0", 0, promotionWait, promotionLogWarning),
 	)
 
-	It("tells how much is missing when the replica is behind", func() {
+	It("tells how much is missing when the replica is behind, and how to go on without it", func() {
 		decision := decide(position(utils.PgDataStateShutDown, "0/7000028", 1),
 			replica("0/7000000", 1))
 		Expect(decision.Verdict).To(Equal(promotionWait))
 		Expect(decision.Details).To(ContainElements("missingBytes", uint64(0x28)))
+		Expect(decision.Message).To(ContainSubstring("kubectl annotate lease <cluster> cnpg.io/position-"))
 	})
 
 	It("tells how to unblock a replica that is blocked", func() {
@@ -160,10 +160,10 @@ var _ = Describe("decidePromotion", func() {
 				Expect(decision.Verdict).To(Equal(promotionProceed))
 				Expect(decision.Level).To(Equal(promotionLogWarning))
 				Expect(decision.Details).To(ContainElements(
-					"writer", "cluster-example-2",
-					"state", state,
+					"leasePosition", utils.LeasePosition{
+						LSN: "0/8000000", Timeline: 2, State: state, Pod: previousPrimary,
+					},
 					"possiblyMissingBytes", uint64(0x100),
-					"age", "3s",
 				))
 			},
 			Entry("in production", utils.PgDataStateInProduction),
@@ -190,15 +190,6 @@ var _ = Describe("decidePromotion", func() {
 				replicaPosition{})
 			Expect(decision.Verdict).To(Equal(promotionProceed))
 			Expect(decision.Details).ToNot(ContainElement("possiblyMissingBytes"))
-		})
-
-		It("leaves the age out when it is not known", func() {
-			decision := decidePromotion(promotionGateInput{
-				Annotation: position(utils.PgDataStateInProduction, "0/8000000", 2),
-				PodName:    thisPod,
-				Replica:    replica("0/7FFFF00", 2),
-			})
-			Expect(decision.Details).ToNot(ContainElement("age"))
 		})
 	})
 })

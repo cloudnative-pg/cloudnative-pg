@@ -21,7 +21,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/types"
 
@@ -75,9 +74,6 @@ type promotionGateInput struct {
 
 	// Replica is the position of the pod that is about to promote
 	Replica replicaPosition
-
-	// AnnotationAge is how long ago the lease was last written, zero if not known
-	AnnotationAge time.Duration
 }
 
 // promotionDecision is the result of the promotion gate, with what to log
@@ -126,7 +122,7 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 			Level:   promotionLogWarning,
 			Message: "The position of the previous primary is not known, " +
 				"proceeding with the promotion without being able to check it",
-			Details: []any{"writer", leasePosition.Pod},
+			Details: []any{"leasePosition", *leasePosition},
 		}
 
 	case utils.LeasePositionStatePromoting:
@@ -135,17 +131,14 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 				Verdict: promotionProceed,
 				Level:   promotionLogInfo,
 				Message: "This pod already passed the promotion gate, proceeding with the promotion",
+				Details: []any{"leasePosition", *leasePosition},
 			}
 		}
 		return promotionDecision{
 			Verdict: promotionProceed,
 			Level:   promotionLogWarning,
 			Message: "Another pod started to promote and did not complete it, proceeding with the promotion",
-			Details: []any{
-				"writer", leasePosition.Pod,
-				"leasePosition", leasePosition.LSN,
-				"leaseTimeline", leasePosition.Timeline,
-			},
+			Details: []any{"leasePosition", *leasePosition},
 		}
 
 	case utils.PgDataStateShutDown:
@@ -159,9 +152,7 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 // primary published a final position
 func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.LeasePosition) promotionDecision {
 	details := []any{
-		"writer", leasePosition.Pod,
-		"leaseLSN", leasePosition.LSN,
-		"leaseTimeline", leasePosition.Timeline,
+		"leasePosition", *leasePosition,
 		"replicaLSN", input.Replica.LSN,
 		"replicaTimeline", input.Replica.Timeline,
 	}
@@ -212,7 +203,7 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 			Verdict: promotionWait,
 			Level:   promotionLogWarning,
 			Message: "This replica does not have all the data of the previous primary, which exists only " +
-				"there, waiting for the missing WAL to be delivered by the archive",
+				"there, waiting for the missing WAL to be delivered by the archive. " + unblockPromotionHint,
 			Details: append(details, "missingBytes", leaseLSN-replicaLSN),
 		}
 	}
@@ -231,15 +222,9 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 // reported.
 func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePosition) promotionDecision {
 	details := []any{
-		"writer", leasePosition.Pod,
-		"state", leasePosition.State,
-		"leaseLSN", leasePosition.LSN,
-		"leaseTimeline", leasePosition.Timeline,
+		"leasePosition", *leasePosition,
 		"replicaLSN", input.Replica.LSN,
 		"replicaTimeline", input.Replica.Timeline,
-	}
-	if input.AnnotationAge > 0 {
-		details = append(details, "age", input.AnnotationAge.Round(time.Millisecond).String())
 	}
 
 	message := "The previous primary did not stop cleanly, proceeding with the promotion"

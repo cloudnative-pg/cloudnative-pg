@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
@@ -105,6 +106,10 @@ type Runnable struct {
 
 	// lock is wrapped by the watchdog: every Get and Update beats it.
 	lock resourcelock.Interface
+
+	// leases reads the lease, and writes the promoting marker. It does not
+	// annotate what it writes: the marker is the annotation.
+	leases coordinationv1client.LeaseInterface
 
 	watchdog *watchdog.LeaseWatchdog
 
@@ -202,6 +207,7 @@ func New(
 		heldCh:        make(chan struct{}),
 		checkStepDown: shouldStepDown,
 	}
+	result.leases = kubeClient.CoordinationV1().Leases(instance.GetNamespaceName())
 	result.readControldata = instance.GetPgControldata
 	result.queryLivePosition = result.queryInstanceLivePosition
 	result.hardStop = result.killPostgresAndExit

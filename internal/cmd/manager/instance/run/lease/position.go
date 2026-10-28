@@ -30,6 +30,9 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -50,6 +53,10 @@ const liveQueryTimeout = 1 * time.Second
 const livePositionQuery = `SELECT pg_catalog.pg_current_wal_flush_lsn()::text,
 	pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_flush_lsn())
  WHERE NOT pg_catalog.pg_is_in_recovery()`
+
+// leaseAPITimeout bounds the calls to the API server that read the position of
+// the previous primary and mark the promotion
+const leaseAPITimeout = 5 * time.Second
 
 // positionSource is what the client of the lock calls before writing the lease
 // to know the position to publish: nil leaves the annotation as it is.
@@ -183,4 +190,83 @@ func (r *Runnable) releasePosition(ctx context.Context) *utils.LeasePosition {
 	}
 
 	return position
+}
+
+// getHeldLease reads the lease, and checks that this pod is the holder: the
+// claim was a conditional write, so nobody but this pod writes the annotation
+// while it holds the lease.
+func (r *Runnable) getHeldLease(ctx context.Context) (*coordinationv1.Lease, error) {
+	lease, err := r.leases.Get(ctx, r.instance.GetClusterName(), metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("while reading the primary lease: %w", err)
+	}
+
+	if holder := lease.Spec.HolderIdentity; holder == nil || *holder != r.lock.Identity() {
+		return nil, fmt.Errorf("the primary lease is not held by this pod, the holder is %q", ptr.Deref(holder, ""))
+	}
+
+	return lease, nil
+}
+
+// Position returns the position that the previous primary published on the
+// primary lease, as the value of the annotation. The value is empty if the
+// lease has none. It fails when this pod does not hold the lease.
+func (r *Runnable) Position(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, leaseAPITimeout)
+	defer cancel()
+
+	lease, err := r.getHeldLease(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return lease.Annotations[utils.LeasePositionAnnotationName], nil
+}
+
+// MarkPromoting replaces the position of the previous primary on the primary
+// lease with the one of this replica, marked as promoting. It is done before
+// the promotion, to consume the position of the previous primary: the position
+// of a primary that is no longer current must not be read again.
+//
+// It fails when this pod does not hold the lease, and it retries on a conflict
+// with the renewals of the elector.
+func (r *Runnable) MarkPromoting(ctx context.Context, lsn string, timeline int) error {
+	contextLogger := log.FromContext(ctx)
+
+	position := utils.LeasePosition{
+		LSN:      lsn,
+		Timeline: timeline,
+		State:    utils.LeasePositionStatePromoting,
+		Pod:      r.instance.GetPodName(),
+	}
+	value, err := position.Marshal()
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, leaseAPITimeout)
+	defer cancel()
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		lease, err := r.getHeldLease(ctx)
+		if err != nil {
+			return err
+		}
+
+		if lease.Annotations == nil {
+			lease.Annotations = make(map[string]string, 1)
+		}
+		lease.Annotations[utils.LeasePositionAnnotationName] = value
+
+		_, err = r.leases.Update(ctx, lease, metav1.UpdateOptions{})
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	// The position is overwritten by the first write of the new primary: this
+	// is the only trace of what this replica published before promoting
+	contextLogger.Info("Marked the promotion on the primary lease", "position", position)
+	return nil
 }

@@ -1362,9 +1362,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			return reconcile.Result{}, err
 		}
 
-		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
-		if err := r.handlePromotion(ctx, cluster); err != nil {
-			return reconcile.Result{}, err
+		if result, err := r.promoteAfterGate(ctx, cluster); err != nil || !result.IsZero() {
+			return result, err
 		}
 	}
 

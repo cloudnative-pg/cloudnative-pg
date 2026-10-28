@@ -51,6 +51,16 @@ type PrimaryLeaseAcquirer interface {
 	// without releasing the lease record, so that a new target primary can take
 	// it over once it goes stale. The next Acquire takes the lease back.
 	Yield(ctx context.Context)
+
+	// Position returns the position that the previous primary published on the
+	// primary lease, as the value of its annotation (empty if there is none).
+	// It fails unless this pod holds the lease.
+	Position(ctx context.Context) (string, error)
+
+	// MarkPromoting replaces the position of the previous primary on the
+	// primary lease with the position of this replica, marked as promoting. It
+	// must succeed before this replica is promoted.
+	MarkPromoting(ctx context.Context, lsn string, timeline int) error
 }
 
 // InstanceReconciler reconciles the status of the Cluster resource with
@@ -86,6 +96,15 @@ type InstanceReconciler struct {
 	// means instance.PromoteAndWait; tests set a stub.
 	promoteInstance func(ctx context.Context) error
 
+	// enforcePromotionGate is whether the promotion gate holds a promotion back,
+	// or only logs what it would have done. See promotionGateEnforced.
+	enforcePromotionGate bool
+
+	// readReplicaPosition is how the promotion gate reads the position of this
+	// replica. Nil means to query PostgreSQL, and is replaced by a stub in the
+	// unit tests.
+	readReplicaPosition func(ctx context.Context) (replicaPosition, error)
+
 	admission *guard.Admission[*apiv1.Cluster]
 }
 
@@ -109,6 +128,7 @@ func NewInstanceReconciler(
 		pluginRepository:      pluginRepository,
 		primaryLeaseAcquirer:  primaryLeaseAcquirer,
 		admission:             admission,
+		enforcePromotionGate:  promotionGateEnforced,
 	}
 }
 
