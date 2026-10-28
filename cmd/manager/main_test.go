@@ -20,10 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
+	"context"
 	stdlog "log"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/klog/v2"
@@ -59,8 +63,13 @@ var _ = Describe("logging options of the manager subcommands", func() {
 	DescribeTable("exports the records via OpenTelemetry only from the main process of a container",
 		func(args []string, exported bool) {
 			restoreGlobalLoggers()
-			// never contacted: the exporter connects only to send records
-			GinkgoT().Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318")
+			var requests atomic.Int32
+			collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				requests.Add(1)
+				w.Header().Set("Content-Type", "application/x-protobuf")
+			}))
+			DeferCleanup(collector.Close)
+			GinkgoT().Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", collector.URL)
 
 			cmd, _, err := newRootCmd().Find(args)
 			Expect(err).ToNot(HaveOccurred())
@@ -68,7 +77,14 @@ var _ = Describe("logging options of the manager subcommands", func() {
 			logFlags := &log.Flags{}
 			logFlags.ConfigureLogging(loggingOptions(cmd)...)
 
-			Expect(log.OpenTelemetryLogger().Enabled()).To(Equal(exported))
+			log.Info("export-marker")
+			Expect(log.ShutdownOpenTelemetry(context.Background())).To(Succeed())
+
+			if exported {
+				Expect(requests.Load()).To(BeNumerically(">", 0))
+			} else {
+				Expect(requests.Load()).To(BeZero())
+			}
 		},
 		Entry("controller", []string{"controller"}, true),
 		Entry("instance run", []string{"instance", "run"}, true),
