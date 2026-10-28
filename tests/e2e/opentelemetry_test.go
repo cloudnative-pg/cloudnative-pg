@@ -40,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/opentelemetry"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -228,13 +229,11 @@ func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, 
 	GinkgoHelper()
 	Eventually(func(g Gomega) {
 		exportedBefore := exportedPodRecords(g, collectorNamespace, pod.Name)
-		var output []byte
+		var output string
 		for _, container := range containers {
-			containerOutput, err := env.Interface.CoreV1().Pods(pod.Namespace).
-				GetLogs(pod.Name, &corev1.PodLogOptions{Container: container}).
-				DoRaw(env.Ctx)
+			containerOutput, err := pods.ContainerLogs(env.Ctx, env.Interface, pod.Namespace, pod.Name, container)
 			g.Expect(err).ToNot(HaveOccurred())
-			output = append(output, containerOutput...)
+			output += containerOutput + "\n"
 		}
 		readTime := time.Now()
 		exportedAfter := exportedPodRecords(g, collectorNamespace, pod.Name)
@@ -242,7 +241,7 @@ func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, 
 		written := make(map[recordKey]int)
 		// The most recent records are left the time to be exported
 		writtenBefore := make(map[recordKey]int)
-		for _, line := range strings.Split(string(output), "\n") {
+		for _, line := range strings.Split(output, "\n") {
 			var entry struct {
 				Message string    `json:"msg"`
 				Time    time.Time `json:"ts"`

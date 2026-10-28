@@ -21,7 +21,6 @@ SPDX-License-Identifier: Apache-2.0
 package pods
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -119,25 +118,31 @@ func Logs(
 	kubeInterface kubernetes.Interface,
 	namespace, podName string,
 ) (string, error) {
-	req := kubeInterface.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
+	return ContainerLogs(ctx, kubeInterface, namespace, podName, "")
+}
+
+// ContainerLogs gathers the logs of a container of a pod, or of its only
+// container when the name is empty
+func ContainerLogs(
+	ctx context.Context,
+	kubeInterface kubernetes.Interface,
+	namespace, podName, containerName string,
+) (string, error) {
+	req := kubeInterface.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{Container: containerName})
 	podLogs, err := req.Stream(ctx)
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		innerErr := podLogs.Close()
-		if err == nil && innerErr != nil {
-			err = innerErr
-		}
-	}()
 
-	// Create a buffer to hold JSON data
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, podLogs)
+	logs, err := io.ReadAll(podLogs)
+	closeErr := podLogs.Close()
 	if err != nil {
 		return "", err
 	}
-	return buf.String(), nil
+	if closeErr != nil {
+		return "", closeErr
+	}
+	return string(logs), nil
 }
 
 // Get gets a pod by namespace and name
