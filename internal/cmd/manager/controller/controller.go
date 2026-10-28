@@ -385,6 +385,17 @@ func setupReconcilers(
 		return err
 	}
 
+	// Removes the cross-namespace RBAC objects of the clusters deleted while
+	// the operator was not running
+	if err := mgr.Add(controller.NewCrossNamespaceRBACSweeper(
+		mgr.GetClient(),
+		mgr.GetAPIReader(),
+		conf.WatchedNamespaces(),
+	)); err != nil {
+		setupLog.Error(err, "unable to add the cross-namespace RBAC sweeper")
+		return err
+	}
+
 	return nil
 }
 
