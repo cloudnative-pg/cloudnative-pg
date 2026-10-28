@@ -52,6 +52,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
@@ -78,12 +79,6 @@ const (
 	poolerClusterKey              = ".spec.cluster.name"
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
-	databaseRoleClusterKey        = ".spec.cluster.name"
-	// databaseClusterKey indexes the Database objects by the namespaced name of
-	// the cluster they refer to. Unlike the other owned resources, a Database
-	// may refer to a cluster living in another namespace, so indexing its name
-	// alone would not identify it.
-	databaseClusterKey = ".spec.cluster.namespacedName"
 	// usedPluginsClusterKey is a synthetic index key, not a real Cluster spec field;
 	// it is populated by getPluginsNeededForReconcile.
 	usedPluginsClusterKey = ".spec.usedPlugins"
@@ -1582,15 +1577,10 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
-	// Create a new indexed field on Databases. This field will be used to easily
-	// find all the Databases pointing to a cluster, including the ones living in
-	// another namespace.
-	if err := mgr.GetFieldIndexer().IndexField(
-		ctx,
-		&apiv1.Database{},
-		databaseClusterKey,
-		indexDatabaseByCluster,
-	); err != nil {
+	// Index the Databases, DatabaseRoles, Publications and Subscriptions by
+	// the namespaced name of their cluster, to find all the resources of a
+	// cluster, including the ones living in another namespace.
+	if err := clusterindex.Register(ctx, mgr.GetFieldIndexer()); err != nil {
 		return err
 	}
 
@@ -1606,24 +1596,6 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 			}
 			return []string{cluster.Spec.ImageCatalogRef.Name}
 		}); err != nil {
-		return err
-	}
-
-	// Create a new indexed field on Roles. This field will be used to easily
-	// find all the Roles pointing to a cluster.
-	if err := mgr.GetFieldIndexer().IndexField(
-		ctx,
-		&apiv1.DatabaseRole{},
-		databaseRoleClusterKey,
-		func(rawObj client.Object) []string {
-			role := rawObj.(*apiv1.DatabaseRole)
-			if role.Spec.ClusterRef.Name == "" {
-				return nil
-			}
-
-			return []string{role.Spec.ClusterRef.Name}
-		},
-	); err != nil {
 		return err
 	}
 

@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -41,12 +42,14 @@ import (
 const testDeletionClusterName = "cluster"
 
 // newOwnedResourcesFakeClientBuilder returns a builder registering the same
-// Database index the manager creates, which notifyDeletionToOwnedResources
-// queries to find the databases of a cluster in any namespace
+// cluster index the manager creates, which notifyDeletionToOwnedResources
+// queries to find the resources of a cluster in any namespace
 func newOwnedResourcesFakeClientBuilder(scheme *runtime.Scheme) *fake.ClientBuilder {
-	return fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithIndex(&apiv1.Database{}, databaseClusterKey, indexDatabaseByCluster)
+	builder := fake.NewClientBuilder().WithScheme(scheme)
+	for _, obj := range clusterindex.IndexedObjects() {
+		builder = builder.WithIndex(obj, clusterindex.Key, clusterindex.IndexByCluster)
+	}
+	return builder
 }
 
 //nolint:dupl

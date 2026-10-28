@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
@@ -301,6 +302,13 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	})
 	if err != nil {
 		contextLogger.Error(err, "unable to set up overall controller manager")
+		return err
+	}
+
+	// Index the resources reconciled by this instance manager by the namespaced
+	// name of their cluster: they may live in any namespace watched by the cache
+	if err := clusterindex.Register(ctx, mgr.GetFieldIndexer()); err != nil {
+		contextLogger.Error(err, "unable to index the resources by cluster")
 		return err
 	}
 
