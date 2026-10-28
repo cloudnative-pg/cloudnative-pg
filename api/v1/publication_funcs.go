@@ -54,16 +54,19 @@ func (pub *Publication) GetStatusApplied() *bool {
 
 // GetClusterRef returns the cluster reference of the publication
 func (pub *Publication) GetClusterRef() ClusterObjectReference {
-	return ClusterObjectReference{
-		Name: pub.Spec.ClusterRef.Name,
-	}
+	return pub.Spec.ClusterRef
 }
 
 // GetClusterNamespace returns the namespace of the referenced cluster.
-// Publications do not support cross-namespace references, so this always
-// returns the Publication's namespace.
+// If not specified, defaults to the Publication's namespace.
 func (pub *Publication) GetClusterNamespace() string {
-	return pub.Namespace
+	return pub.Spec.ClusterRef.namespaceOrDefault(pub.Namespace)
+}
+
+// IsCrossNamespace returns true if the Publication references a Cluster
+// in a different namespace.
+func (pub *Publication) IsCrossNamespace() bool {
+	return pub.Spec.ClusterRef.isCrossNamespace(pub.Namespace)
 }
 
 // GetManagedObjectName returns the name of the managed publication object

@@ -27,7 +27,6 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -90,7 +89,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.SubscriptionSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				ReclaimPolicy:       apiv1.SubscriptionReclaimDelete,
@@ -377,7 +376,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.SubscriptionSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				Name: "sub-one",
@@ -408,7 +407,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.SubscriptionSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				Name:                "sub-one",

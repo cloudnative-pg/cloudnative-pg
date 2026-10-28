@@ -59,16 +59,19 @@ func (roleList *DatabaseRoleList) MustHaveManagedResourceExclusivity(role *Datab
 
 // GetClusterRef returns the cluster reference of the role
 func (r *DatabaseRole) GetClusterRef() ClusterObjectReference {
-	return ClusterObjectReference{
-		Name: r.Spec.ClusterRef.Name,
-	}
+	return r.Spec.ClusterRef
 }
 
 // GetClusterNamespace returns the namespace of the referenced cluster.
-// DatabaseRoles do not support cross-namespace references, so this always
-// returns the DatabaseRole's namespace.
+// If not specified, defaults to the DatabaseRole's namespace.
 func (r *DatabaseRole) GetClusterNamespace() string {
-	return r.Namespace
+	return r.Spec.ClusterRef.namespaceOrDefault(r.Namespace)
+}
+
+// IsCrossNamespace returns true if the DatabaseRole references a Cluster
+// in a different namespace.
+func (r *DatabaseRole) IsCrossNamespace() bool {
+	return r.Spec.ClusterRef.isCrossNamespace(r.Namespace)
 }
 
 // GetManagedObjectName returns the name of the managed role object

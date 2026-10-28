@@ -81,8 +81,10 @@ spec:
                     description: Name of the Cluster.
                     type: string
                   namespace:
-                    description: Namespace of the Cluster. Defaults to the Database's
-                      namespace if empty.
+                    description: |-
+                      Namespace of the Cluster. Defaults to the namespace of the referring
+                      object if empty. A Cluster in another namespace must have
+                      `enableCrossNamespaceResources` set to true.
                     type: string
                 required:
                 - name

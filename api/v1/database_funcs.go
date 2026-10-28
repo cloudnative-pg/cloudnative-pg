@@ -60,17 +60,13 @@ func (db *Database) GetClusterRef() ClusterObjectReference {
 // GetClusterNamespace returns the namespace of the referenced cluster.
 // If not specified, defaults to the Database's namespace.
 func (db *Database) GetClusterNamespace() string {
-	if db.Spec.ClusterRef.Namespace != "" {
-		return db.Spec.ClusterRef.Namespace
-	}
-	return db.Namespace
+	return db.Spec.ClusterRef.namespaceOrDefault(db.Namespace)
 }
 
 // IsCrossNamespace returns true if the Database references a Cluster
 // in a different namespace.
 func (db *Database) IsCrossNamespace() bool {
-	return db.Spec.ClusterRef.Namespace != "" &&
-		db.Spec.ClusterRef.Namespace != db.Namespace
+	return db.Spec.ClusterRef.isCrossNamespace(db.Namespace)
 }
 
 // GetManagedObjectName returns the name of the managed database object

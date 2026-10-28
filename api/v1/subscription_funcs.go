@@ -54,16 +54,19 @@ func (sub *Subscription) GetStatusApplied() *bool {
 
 // GetClusterRef returns the cluster reference of the subscription
 func (sub *Subscription) GetClusterRef() ClusterObjectReference {
-	return ClusterObjectReference{
-		Name: sub.Spec.ClusterRef.Name,
-	}
+	return sub.Spec.ClusterRef
 }
 
 // GetClusterNamespace returns the namespace of the referenced cluster.
-// Subscriptions do not support cross-namespace references, so this always
-// returns the Subscription's namespace.
+// If not specified, defaults to the Subscription's namespace.
 func (sub *Subscription) GetClusterNamespace() string {
-	return sub.Namespace
+	return sub.Spec.ClusterRef.namespaceOrDefault(sub.Namespace)
+}
+
+// IsCrossNamespace returns true if the Subscription references a Cluster
+// in a different namespace.
+func (sub *Subscription) IsCrossNamespace() bool {
+	return sub.Spec.ClusterRef.isCrossNamespace(sub.Namespace)
 }
 
 // GetName returns the subscription object name

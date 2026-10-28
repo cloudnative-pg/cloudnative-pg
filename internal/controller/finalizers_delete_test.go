@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -175,7 +174,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.PublicationSpec{
 						Name: "pub-test",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: testDeletionClusterName,
 						},
 					},
@@ -194,7 +193,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.PublicationSpec{
 						Name: "pub-test-2",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: testDeletionClusterName,
 						},
 					},
@@ -231,7 +230,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.PublicationSpec{
 						Name: "pub-test",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: "another-cluster",
 						},
 					},
@@ -265,7 +264,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.SubscriptionSpec{
 						Name: "sub-test",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: testDeletionClusterName,
 						},
 					},
@@ -284,7 +283,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.SubscriptionSpec{
 						Name: "sub-test-2",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: testDeletionClusterName,
 						},
 					},
@@ -321,7 +320,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.SubscriptionSpec{
 						Name: "sub-test",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: "another-cluster",
 						},
 					},

@@ -48,7 +48,7 @@ func (r *DatabaseRoleReconciler) getReferencedCluster(
 ) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
 	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: role.Namespace,
+		Namespace: role.GetClusterNamespace(),
 		Name:      role.Spec.ClusterRef.Name,
 	}, &cluster); apierrs.IsNotFound(err) {
 		log.FromContext(ctx).Info("cluster not found, will retry when it appears",

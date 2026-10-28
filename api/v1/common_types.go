@@ -28,7 +28,9 @@ type ClusterObjectReference struct {
 	// Name of the Cluster.
 	Name string `json:"name"`
 
-	// Namespace of the Cluster. Defaults to the Database's namespace if empty.
+	// Namespace of the Cluster. Defaults to the namespace of the referring
+	// object if empty. A Cluster in another namespace must have
+	// `enableCrossNamespaceResources` set to true.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
