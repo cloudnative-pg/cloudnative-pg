@@ -420,3 +420,64 @@ var _ = Describe("The mark that a promotion is starting, on the primary lease", 
 		Expect(r.MarkPromoting(ctx)).ToNot(Succeed())
 	})
 })
+
+var _ = Describe("Reading the position of the previous primary from the primary lease", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+		previous    = `{"lsn":"0/7000028","timeline":2,"state":"shut down","pod":"test-cluster-2"}`
+	)
+
+	var (
+		kubeClient *fake.Clientset
+		r          *Runnable
+	)
+
+	BeforeEach(func() {
+		kubeClient = fake.NewClientset()
+		r = New(kubeClient, postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName))
+	})
+
+	createLease := func(ctx context.Context, holder string, annotations map[string]string, renewed *metav1.MicroTime) {
+		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Annotations: annotations},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: ptr.To(holder), RenewTime: renewed},
+		}, metav1.CreateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	It("returns the annotation and how long ago the lease was renewed", func(ctx context.Context) {
+		createLease(ctx, thisPod, map[string]string{utils.LeasePositionAnnotationName: previous},
+			ptr.To(metav1.NewMicroTime(time.Now().Add(-10*time.Second))))
+
+		value, age, err := r.Position(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(value).To(Equal(previous))
+		Expect(age).To(BeNumerically(">=", 10*time.Second))
+	})
+
+	It("returns an empty value when the lease has no position", func(ctx context.Context) {
+		createLease(ctx, thisPod, nil, nil)
+
+		value, age, err := r.Position(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(value).To(BeEmpty())
+		Expect(age).To(BeZero())
+	})
+
+	It("fails when another pod holds the lease", func(ctx context.Context) {
+		createLease(ctx, "test-cluster-2", map[string]string{utils.LeasePositionAnnotationName: previous}, nil)
+
+		_, _, err := r.Position(ctx)
+		Expect(err).To(MatchError(ContainSubstring("not held by " + thisPod)))
+	})
+
+	It("fails when there is no lease", func(ctx context.Context) {
+		_, _, err := r.Position(ctx)
+		Expect(err).To(HaveOccurred())
+	})
+})
