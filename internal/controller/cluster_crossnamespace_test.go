@@ -92,7 +92,7 @@ var _ = Describe("cross-namespace DatabaseRole password Secrets access", func() 
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		fakeClient = newOwnedResourcesFakeClientBuilder(schemeBuilder.BuildWithAllKnownScheme()).Build()
+		fakeClient = newClusterIndexedFakeClientBuilder(schemeBuilder.BuildWithAllKnownScheme()).Build()
 		reconciler = &ClusterReconciler{
 			Client:   fakeClient,
 			Recorder: record.NewFakeRecorder(10000),

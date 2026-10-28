@@ -95,7 +95,7 @@ var _ = Describe("CrossNamespaceRBACSweeper", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		getErr = nil
-		fakeClient = newOwnedResourcesFakeClientBuilder(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient = newClusterIndexedFakeClientBuilder(schemeBuilder.BuildWithAllKnownScheme()).
 			WithInterceptorFuncs(interceptor.Funcs{
 				Get: func(
 					ctx context.Context,
