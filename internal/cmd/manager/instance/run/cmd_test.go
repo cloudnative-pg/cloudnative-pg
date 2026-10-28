@@ -24,15 +24,18 @@ import (
 	"errors"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -104,6 +107,49 @@ var _ = Describe("isCrossNamespaceResourcesEnabled", func() {
 		_, err := isCrossNamespaceResourcesEnabled(
 			ctx, newWatchScopeClient(), watchScopeNamespace, watchScopeClusterName)
 		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("detectCrossNamespaceResources", func() {
+	// noDelay retries without waiting, to keep the tests fast
+	noDelay := wait.Backoff{Steps: 3}
+
+	// failingClient fails the first reads of the cluster, and counts them all
+	failingClient := func(failures int, cluster *apiv1.Cluster) (client.Client, *int) {
+		reads := 0
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(
+					ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object,
+					opts ...client.GetOption,
+				) error {
+					reads++
+					if reads <= failures {
+						return apierrors.NewServiceUnavailable("the API server is unavailable")
+					}
+					return cli.Get(ctx, key, obj, opts...)
+				},
+			}).
+			Build()
+		return cli, &reads
+	}
+
+	It("retries reading the cluster after a transient failure", func(ctx SpecContext) {
+		cli, reads := failingClient(2, newWatchScopeCluster(true))
+
+		Expect(detectCrossNamespaceResources(
+			ctx, cli, watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeTrue())
+		Expect(*reads).To(Equal(3))
+	})
+
+	It("falls back to the namespace of the cluster when it cannot be read", func(ctx SpecContext) {
+		cli, reads := failingClient(10, newWatchScopeCluster(true))
+
+		Expect(detectCrossNamespaceResources(
+			ctx, cli, watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeFalse())
+		Expect(*reads).To(Equal(noDelay.Steps))
 	})
 })
 
