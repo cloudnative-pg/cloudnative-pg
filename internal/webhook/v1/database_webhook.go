@@ -43,7 +43,7 @@ var databaseLog = log.WithName("database-resource").WithValues("version", "v1")
 // SetupDatabaseWebhookWithManager registers the webhook for Database in the manager.
 func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Database{}).
-		WithValidator(newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{client: mgr.GetClient()})).
+		WithValidator(newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{client: mgr.GetAPIReader()})).
 		WithDefaulter(&DatabaseCustomDefaulter{}).
 		Complete()
 }
@@ -77,7 +77,11 @@ func (d *DatabaseCustomDefaulter) Default(_ context.Context, database *apiv1.Dat
 // DatabaseCustomValidator is responsible for validating the Database
 // resource when it is created, updated, or deleted.
 type DatabaseCustomValidator struct {
-	client client.Client
+	// client reads the referenced Cluster. It should not be backed by a
+	// cache: a stale copy would reject a Database right after the Cluster
+	// opted in, and a cache limited to some namespaces cannot read the
+	// Clusters living elsewhere.
+	client client.Reader
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Database .
