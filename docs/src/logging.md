@@ -287,12 +287,14 @@ spec:
 
 Each exported record carries the fields of the corresponding JSON entry:
 
+- `ts` is the timestamp;
 - `msg` is the body;
 - `level` is the severity, with `debug` and `trace` both mapped to `DEBUG`;
 - `logger` is the instrumentation scope, or an attribute when the process
   sets it as a field, as the instance manager does;
 - `error` and `stacktrace` are the `exception.message` and
-  `exception.stacktrace` attributes of the OpenTelemetry semantic conventions;
+  `exception.stacktrace` attributes of the OpenTelemetry semantic conventions,
+  with `stacktrace` becoming `code.stacktrace` in a record without an error;
 - every other field is an attribute that keeps its structure: the `record` of
   a PostgreSQL log entry, for example, is a map with the same keys it has in
   the JSON entry.
