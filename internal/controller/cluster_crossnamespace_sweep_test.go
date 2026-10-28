@@ -124,6 +124,62 @@ var _ = Describe("CrossNamespaceRBACSweeper", func() {
 		expectRBAC(cluster, false)
 	})
 
+	It("removes the password Secrets RBAC of the tenant namespaces", func() {
+		cluster := newCluster("postgres", "gone")
+		Expect(fakeClient.Create(ctx, cluster)).To(Succeed())
+		Expect(fakeClient.Create(ctx, &apiv1.DatabaseRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "alice", Namespace: "tenant"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{
+					Name:           "alice",
+					PasswordSecret: &apiv1.LocalObjectReference{Name: "alice-secret"},
+				},
+				ClusterRef: apiv1.ClusterObjectReference{Name: cluster.Name, Namespace: cluster.Namespace},
+			},
+		})).To(Succeed())
+		reconciler := &ClusterReconciler{
+			Client:   fakeClient,
+			Recorder: record.NewFakeRecorder(100),
+			Scheme:   fakeClient.Scheme(),
+		}
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+		key := client.ObjectKey{Namespace: "tenant", Name: specs.GetCrossNamespaceRoleName(*cluster)}
+		Expect(fakeClient.Get(ctx, key, &rbacv1.Role{})).To(Succeed())
+		Expect(fakeClient.Get(ctx, key, &rbacv1.RoleBinding{})).To(Succeed())
+
+		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
+		Expect(newSweeper().Sweep(ctx)).To(Succeed())
+
+		Expect(apierrs.IsNotFound(fakeClient.Get(ctx, key, &rbacv1.Role{}))).To(BeTrue())
+		Expect(apierrs.IsNotFound(fakeClient.Get(ctx, key, &rbacv1.RoleBinding{}))).To(BeTrue())
+	})
+
+	It("removes the RBAC left for a cluster recreated without the feature", func() {
+		cluster := createWithRBAC("postgres", "recreated")
+		recreated := cluster.DeepCopy()
+		recreated.Spec.EnableCrossNamespaceResources = false
+		Expect(fakeClient.Update(ctx, recreated)).To(Succeed())
+
+		Expect(newSweeper().Sweep(ctx)).To(Succeed())
+		expectRBAC(cluster, false)
+	})
+
+	It("only deletes the objects having the name computed for the cluster", func() {
+		cluster := createWithRBAC("postgres", "gone")
+		other := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{
+			Name:      "another-name",
+			Namespace: "tenant",
+			Labels:    specs.CrossNamespaceRBACLabelsFor(cluster.Namespace, cluster.Name),
+		}}
+		Expect(fakeClient.Create(ctx, other)).To(Succeed())
+		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
+
+		Expect(newSweeper().Sweep(ctx)).To(Succeed())
+
+		expectRBAC(cluster, false)
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(other), &rbacv1.Role{})).To(Succeed())
+	})
+
 	It("keeps the RBAC of an existing cluster", func() {
 		kept := createWithRBAC("postgres", "kept")
 		gone := createWithRBAC("other", "gone")
