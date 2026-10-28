@@ -38,10 +38,9 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	ctx context.Context,
 	namespacedName types.NamespacedName,
 ) error {
-	// Databases are the only owned resources that may refer to a cluster living
-	// in another namespace, so they are looked up in every namespace through the
-	// index of their cluster reference, instead of being listed in the namespace
-	// of the cluster.
+	// The owned resources may refer to a cluster living in another namespace,
+	// so they are looked up in every namespace through the index of their
+	// cluster reference, instead of being listed in the namespace of the cluster.
 	var dbList apiv1.DatabaseList
 	if err := r.List(ctx, &dbList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
@@ -58,7 +57,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	}
 
 	var pbList apiv1.PublicationList
-	if err := r.List(ctx, &pbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+	if err := r.List(ctx, &pbList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
 	}
 
@@ -73,7 +72,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	}
 
 	var sbList apiv1.SubscriptionList
-	if err := r.List(ctx, &sbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+	if err := r.List(ctx, &sbList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
 	}
 
@@ -88,7 +87,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	}
 
 	var roleList apiv1.DatabaseRoleList
-	if err := r.List(ctx, &roleList, client.InNamespace(namespacedName.Namespace)); err != nil {
+	if err := r.List(ctx, &roleList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
 	}
 

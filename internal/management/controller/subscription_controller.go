@@ -75,10 +75,12 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// This is not for me!
-	if subscription.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+	if !isForThisInstance(r.instance, &subscription) {
 		contextLogger.Trace("Subscription is not for this cluster",
 			"cluster", subscription.Spec.ClusterRef.Name,
-			"expected", r.instance.GetClusterName(),
+			"clusterNamespace", subscription.GetClusterNamespace(),
+			"expectedCluster", r.instance.GetClusterName(),
+			"expectedNamespace", r.instance.GetNamespaceName(),
 		)
 		return ctrl.Result{}, nil
 	}

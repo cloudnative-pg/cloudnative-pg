@@ -69,7 +69,7 @@ var _ = Describe("databaserole_pki", func() {
 					Name:  name,
 					Login: true,
 				},
-				ClusterRef: corev1.LocalObjectReference{Name: cluster.Name},
+				ClusterRef: apiv1.ClusterObjectReference{Name: cluster.Name},
 			},
 		}
 		if issueClientCert {

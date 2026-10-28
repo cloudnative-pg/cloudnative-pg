@@ -112,12 +112,10 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// This is not for me!
-	clusterNamespace := database.GetClusterNamespace()
-	if database.Spec.ClusterRef.Name != r.instance.GetClusterName() ||
-		clusterNamespace != r.instance.GetNamespaceName() {
+	if !isForThisInstance(r.instance, &database) {
 		contextLogger.Trace("Database is not for this cluster",
 			"cluster", database.Spec.ClusterRef.Name,
-			"clusterNamespace", clusterNamespace,
+			"clusterNamespace", database.GetClusterNamespace(),
 			"expectedCluster", r.instance.GetClusterName(),
 			"expectedNamespace", r.instance.GetNamespaceName(),
 		)

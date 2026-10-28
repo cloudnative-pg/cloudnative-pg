@@ -68,7 +68,7 @@ func newTestDatabaseRole() *apiv1.DatabaseRole {
 		},
 		Spec: apiv1.DatabaseRoleSpec{
 			RoleConfiguration: apiv1.RoleConfiguration{Name: testRoleName},
-			ClusterRef:        corev1.LocalObjectReference{Name: testClusterName},
+			ClusterRef:        apiv1.ClusterObjectReference{Name: testClusterName},
 			ReclaimPolicy:     apiv1.DatabaseRoleReclaimRetain,
 		},
 	}

@@ -81,10 +81,12 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// This is not for me!
-	if publication.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+	if !isForThisInstance(r.instance, &publication) {
 		contextLogger.Trace("Publication is not for this cluster",
 			"cluster", publication.Spec.ClusterRef.Name,
-			"expected", r.instance.GetClusterName(),
+			"clusterNamespace", publication.GetClusterNamespace(),
+			"expectedCluster", r.instance.GetClusterName(),
+			"expectedNamespace", r.instance.GetNamespaceName(),
 		)
 		return ctrl.Result{}, nil
 	}

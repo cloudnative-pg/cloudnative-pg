@@ -84,7 +84,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "role-dante", Namespace: namespace},
 			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{Name: roleName, Login: true},
-				ClusterRef:        corev1.LocalObjectReference{Name: clusterName},
+				ClusterRef:        apiv1.ClusterObjectReference{Name: clusterName},
 				Password:          config,
 			},
 		}
@@ -630,7 +630,7 @@ var _ = Describe("DatabaseRole password rotation from a lagging cache", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "role-dante", Namespace: "default"},
 			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{Name: "dante", Login: true},
-				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+				ClusterRef:        apiv1.ClusterObjectReference{Name: "cluster-example"},
 				Password: &apiv1.PasswordConfiguration{
 					Mode:        apiv1.PasswordModeGenerate,
 					Duration:    &metav1.Duration{Duration: 5 * time.Minute},

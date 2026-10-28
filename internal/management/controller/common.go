@@ -154,6 +154,21 @@ func markAsReady(
 	return cli.Status().Update(ctx, resource)
 }
 
+// clusterReferrer is a resource referring to a cluster, possibly living in
+// another namespace
+type clusterReferrer interface {
+	GetClusterRef() apiv1.ClusterObjectReference
+	GetClusterNamespace() string
+}
+
+// isForThisInstance tells whether the passed resource refers to the cluster of
+// this instance. The resource may live in another namespace, so the namespace
+// of the referenced cluster is checked together with its name.
+func isForThisInstance(instance instanceInterface, resource clusterReferrer) bool {
+	return resource.GetClusterRef().Name == instance.GetClusterName() &&
+		resource.GetClusterNamespace() == instance.GetNamespaceName()
+}
+
 // mapClusterToManagedResources builds a watch mapper that enqueues every item
 // of the given list type targeting this instance's cluster, in any namespace,
 // to react to cluster spec changes (e.g. a demotion to replica).

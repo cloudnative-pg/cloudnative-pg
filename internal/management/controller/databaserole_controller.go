@@ -86,7 +86,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Roles for other clusters are handled by their own instance managers.
-	if role.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+	if !isForThisInstance(r.instance, &role) {
 		return ctrl.Result{}, nil
 	}
 
@@ -630,7 +630,7 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	}
 
 	passwordVersion, err := dbRole.ApplyPassword(
-		ctx, r.Client, role.GetPasswordSecretName(), passwordSetToNull(role), r.instance.GetNamespaceName(),
+		ctx, r.Client, role.GetPasswordSecretName(), passwordSetToNull(role), role.Namespace,
 	)
 	if err != nil {
 		return "", fmt.Errorf("while getting the role password: %w", err)

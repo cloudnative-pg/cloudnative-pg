@@ -58,7 +58,7 @@ var _ = Describe("DatabaseRole operator-side controller", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
 			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{Name: name},
-				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+				ClusterRef:        apiv1.ClusterObjectReference{Name: "cluster-example"},
 			},
 		}
 		if secretName != "" {
@@ -231,7 +231,7 @@ var _ = Describe("DatabaseRole status patch", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "role-a", Namespace: "default"},
 			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{Name: "role-a"},
-				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+				ClusterRef:        apiv1.ClusterObjectReference{Name: "cluster-example"},
 			},
 			Status: apiv1.DatabaseRoleStatus{
 				Password: &apiv1.GeneratedPasswordState{SecretName: "role-a-password"},
