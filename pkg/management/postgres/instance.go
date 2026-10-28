@@ -928,8 +928,15 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
+	// Each pipe logs its exit when Start returns, which the exited
+	// condition doesn't wait for: waiting for Start too writes that record
+	// before the caller exits and stops the log export
+	var pipes sync.WaitGroup
+	pipes.Add(3)
+
 	csvPipe := logpipe.NewLogPipe()
 	go func() {
+		defer pipes.Done()
 		if err := csvPipe.Start(ctx); err != nil {
 			log.Info("csv log pipe encountered an error", "err", err)
 		}
@@ -940,6 +947,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 		logpipe.LoggingCollectorRecordName,
 	)
 	go func() {
+		defer pipes.Done()
 		if err := rawPipe.Start(ctx); err != nil {
 			log.Info("raw log pipe encountered an error", "err", err)
 		}
@@ -949,6 +957,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 		filepath.Join(postgres.LogPath, postgres.LogFileName+".json"),
 	)
 	go func() {
+		defer pipes.Done()
 		if err := jsonPipe.Start(ctx); err != nil {
 			log.Info("json log pipe encountered an error", "err", err)
 		}
@@ -956,6 +965,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 
 	defer func() {
 		ctxCancel()
+		pipes.Wait()
 		csvPipe.GetExitedCondition().Wait()
 		rawPipe.GetExitedCondition().Wait()
 		jsonPipe.GetExitedCondition().Wait()
