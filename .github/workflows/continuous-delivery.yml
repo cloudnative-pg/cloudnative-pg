@@ -2528,7 +2528,38 @@ jobs:
         name: Destroy OpenShift Cluster ${{ env.K8S_VERSION }}
         if: always()
         run: |
+          # The installer may remove the metadata, keep the infra ID for the next step
+          echo "INFRA_ID=$(jq -r '.infraID // empty' hack/metadata.json 2>/dev/null)" >> "$GITHUB_ENV"
           openshift-install destroy cluster --dir hack/
+      -
+        # The disks of the cluster volumes can outlive the cluster
+        name: Delete leftover disks
+        if: ${{ always() && env.OPENSHIFT_PLATFORM == 'gcp' }}
+        run: |
+          set +e
+          if [ -z "${INFRA_ID:-}" ]; then
+            echo "::notice::No infra ID, skipping the disk cleanup"
+            exit 0
+          fi
+
+          list_disks() {
+            gcloud compute disks list --project "${GCP_PROJECT_ID}" \
+              --filter="labels.kubernetes-io-cluster-${INFRA_ID}=owned AND -users:*" \
+              --format="value(name,zone.basename())"
+          }
+
+          for attempt in 1 2 3; do
+            disks=$(list_disks) || { echo "::warning::Cannot list the disks of ${INFRA_ID}"; exit 0; }
+            [ -n "${disks}" ] || exit 0
+            while read -r name zone; do
+              gcloud compute disks delete "${name}" --project "${GCP_PROJECT_ID}" --zone "${zone}" --quiet < /dev/null
+            done <<< "${disks}"
+            sleep 5
+          done
+
+          disks=$(list_disks) || { echo "::warning::Cannot list the disks of ${INFRA_ID}"; exit 0; }
+          [ -z "${disks}" ] || echo "::warning::Leftover disks of ${INFRA_ID}: ${disks//$'\n'/, }"
+          exit 0
 
   # Summarize E2E test results, display in the GitHub 'summary' view
   summarize-e2e-tests:
