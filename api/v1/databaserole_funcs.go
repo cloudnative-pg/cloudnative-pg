@@ -68,12 +68,6 @@ func (r *DatabaseRole) GetClusterNamespace() string {
 	return r.Spec.ClusterRef.namespaceOrDefault(r.Namespace)
 }
 
-// IsCrossNamespace returns true if the DatabaseRole references a Cluster
-// in a different namespace.
-func (r *DatabaseRole) IsCrossNamespace() bool {
-	return r.Spec.ClusterRef.isCrossNamespace(r.Namespace)
-}
-
 // GetManagedObjectName returns the name of the managed role object
 func (r *DatabaseRole) GetManagedObjectName() string {
 	return r.Spec.Name

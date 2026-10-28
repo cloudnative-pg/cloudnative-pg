@@ -104,8 +104,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 // capabilities
 type clusterOwnedResourceWithStatus interface {
 	client.Object
-	GetClusterRef() apiv1.ClusterObjectReference
-	GetClusterNamespace() string
+	clusterindex.ClusterReferrer
 	GetStatusMessage() string
 	SetAsFailed(err error)
 	SetStatusObservedGeneration(obsGeneration int64)
