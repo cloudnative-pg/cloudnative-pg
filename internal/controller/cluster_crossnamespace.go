@@ -40,6 +40,13 @@ import (
 // name computed for a cluster exists but was not created for it
 var errCrossNamespaceRBACNotOwned = errors.New("exists and is not managed for this cluster")
 
+// crossNamespaceResourcesPurpose and crossNamespaceSecretsPurpose describe,
+// in the logs and the events, what the RBAC objects are created for
+const (
+	crossNamespaceResourcesPurpose = "cross-namespace resources access"
+	crossNamespaceSecretsPurpose   = "cross-namespace role password Secrets"
+)
+
 // reconcileCrossNamespaceRBAC creates and repairs the ClusterRole and the
 // ClusterRoleBinding granting the instance manager access to the resources
 // referring to its cluster from other namespaces.
@@ -52,117 +59,164 @@ func (r *ClusterReconciler) reconcileCrossNamespaceRBAC(ctx context.Context, clu
 		return nil
 	}
 
-	if err := r.reconcileCrossNamespaceClusterRole(ctx, cluster); err != nil {
+	clusterRole := specs.CreateCrossNamespaceRole(*cluster)
+	if err := r.ensureCrossNamespaceRBACObject(
+		ctx, cluster, &clusterRole, &rbacv1.ClusterRole{}, crossNamespaceResourcesPurpose,
+	); err != nil {
 		return err
 	}
 
-	if err := r.reconcileCrossNamespaceClusterRoleBinding(ctx, cluster); err != nil {
+	clusterRoleBinding := specs.CreateCrossNamespaceRoleBinding(*cluster)
+	if err := r.ensureCrossNamespaceRBACObject(
+		ctx, cluster, &clusterRoleBinding, &rbacv1.ClusterRoleBinding{}, crossNamespaceResourcesPurpose,
+	); err != nil {
 		return err
 	}
 
 	return r.reconcileCrossNamespaceSecretsRBAC(ctx, cluster)
 }
 
-// reconcileCrossNamespaceClusterRole creates the cross-namespace ClusterRole
-// of the cluster, or restores its rules
-func (r *ClusterReconciler) reconcileCrossNamespaceClusterRole(ctx context.Context, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx)
-	desired := specs.CreateCrossNamespaceRole(*cluster)
-
-	var existing rbacv1.ClusterRole
-	if err := r.Get(ctx, client.ObjectKey{Name: desired.Name}, &existing); err != nil {
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("while getting ClusterRole: %w", err)
-		}
-
-		contextLogger.Info("Creating ClusterRole for cross-namespace resources access", "name", desired.Name)
-		r.Recorder.Event(cluster, "Normal", "CreatingClusterRole",
-			fmt.Sprintf("Creating ClusterRole %s for cross-namespace resources access", desired.Name))
-		if err := r.Create(ctx, &desired); err != nil {
-			return fmt.Errorf("while creating ClusterRole: %w", err)
-		}
-		return nil
-	}
-
-	if !specs.IsCrossNamespaceRBACOwnedBy(existing.Labels, cluster.Namespace, cluster.Name) {
-		return fmt.Errorf("ClusterRole %s %w", desired.Name, errCrossNamespaceRBACNotOwned)
-	}
-
-	if equality.Semantic.DeepEqual(existing.Rules, desired.Rules) {
-		return nil
-	}
-
-	contextLogger.Info("Updating ClusterRole for cross-namespace resources access", "name", desired.Name)
-	patched := existing.DeepCopy()
-	patched.Rules = desired.Rules
-	if err := r.Patch(ctx, patched, client.MergeFrom(&existing)); err != nil {
-		return fmt.Errorf("while patching ClusterRole: %w", err)
-	}
-	return nil
-}
-
-// reconcileCrossNamespaceClusterRoleBinding creates the cross-namespace
-// ClusterRoleBinding of the cluster, or restores its subjects and role
-func (r *ClusterReconciler) reconcileCrossNamespaceClusterRoleBinding(
+// ensureCrossNamespaceRBACObject creates the desired Role, ClusterRole,
+// RoleBinding or ClusterRoleBinding, or restores the rules of a role and the
+// subjects of a binding. The role of a binding cannot be changed, so a
+// binding referring to another role is replaced.
+//
+// The existing parameter is an empty object of the same kind, used to read
+// the current state. When an object having the desired name exists but was
+// not created for the cluster, errCrossNamespaceRBACNotOwned is returned and
+// the object is left alone.
+func (r *ClusterReconciler) ensureCrossNamespaceRBACObject(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
+	desired client.Object,
+	existing client.Object,
+	purpose string,
 ) error {
-	contextLogger := log.FromContext(ctx)
-	desired := specs.CreateCrossNamespaceRoleBinding(*cluster)
+	kind, name := crossNamespaceRBACKindOf(desired), crossNamespaceRBACDisplayName(desired)
+	contextLogger := log.FromContext(ctx).WithValues("kind", kind, "name", name)
 
-	var existing rbacv1.ClusterRoleBinding
-	err := r.Get(ctx, client.ObjectKey{Name: desired.Name}, &existing)
+	err := r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
 	if err != nil && !apierrs.IsNotFound(err) {
-		return fmt.Errorf("while getting ClusterRoleBinding: %w", err)
+		return fmt.Errorf("while getting %s %s: %w", kind, name, err)
 	}
 
 	if err == nil {
-		if !specs.IsCrossNamespaceRBACOwnedBy(existing.Labels, cluster.Namespace, cluster.Name) {
-			return fmt.Errorf("ClusterRoleBinding %s %w", desired.Name, errCrossNamespaceRBACNotOwned)
+		if !specs.IsCrossNamespaceRBACOwnedBy(existing.GetLabels(), cluster.Namespace, cluster.Name) {
+			return fmt.Errorf("%s %s %w", kind, name, errCrossNamespaceRBACNotOwned)
 		}
 
-		// The role of a binding cannot be changed: a binding pointing to
-		// another role is replaced
-		if existing.RoleRef == desired.RoleRef {
-			return r.patchCrossNamespaceClusterRoleBindingSubjects(ctx, &existing, desired.Subjects)
+		replace, err := r.repairCrossNamespaceRBACObject(ctx, existing, desired, purpose)
+		if err != nil || !replace {
+			return err
 		}
 
-		contextLogger.Info("Replacing ClusterRoleBinding for cross-namespace resources access",
-			"name", desired.Name, "roleRef", existing.RoleRef)
-		if err := r.Delete(ctx, &existing); err != nil && !apierrs.IsNotFound(err) {
-			return fmt.Errorf("while deleting ClusterRoleBinding: %w", err)
+		contextLogger.Info("Replacing a binding referring to another role for " + purpose)
+		if err := r.Delete(ctx, existing); err != nil && !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while deleting %s %s: %w", kind, name, err)
 		}
 	}
 
-	contextLogger.Info("Creating ClusterRoleBinding for cross-namespace resources access", "name", desired.Name)
-	r.Recorder.Event(cluster, "Normal", "CreatingClusterRoleBinding",
-		fmt.Sprintf("Creating ClusterRoleBinding %s for cross-namespace resources access", desired.Name))
-	if err := r.Create(ctx, &desired); err != nil {
-		return fmt.Errorf("while creating ClusterRoleBinding: %w", err)
+	contextLogger.Info("Creating " + kind + " for " + purpose)
+	r.Recorder.Event(cluster, "Normal", "Creating"+kind,
+		fmt.Sprintf("Creating %s %s for %s", kind, name, purpose))
+	if err := r.Create(ctx, desired); err != nil {
+		// Only the cluster-scoped objects created by the operator are cached:
+		// one having the same name but not their labels cannot be read, and
+		// is only detected when creating the desired one
+		if apierrs.IsAlreadyExists(err) {
+			return fmt.Errorf("%s %s %w", kind, name, errCrossNamespaceRBACNotOwned)
+		}
+		return fmt.Errorf("while creating %s %s: %w", kind, name, err)
 	}
 	return nil
 }
 
-// patchCrossNamespaceClusterRoleBindingSubjects restores the subjects of the
-// cross-namespace ClusterRoleBinding of a cluster, which must only grant its
-// role to the ServiceAccount of the cluster
-func (r *ClusterReconciler) patchCrossNamespaceClusterRoleBindingSubjects(
+// repairCrossNamespaceRBACObject restores the rules of an existing role, or
+// the subjects of an existing binding, to the desired ones. It returns true
+// when the existing object is a binding referring to another role, which
+// must be replaced since the role of a binding cannot be changed.
+func (r *ClusterReconciler) repairCrossNamespaceRBACObject(
 	ctx context.Context,
-	existing *rbacv1.ClusterRoleBinding,
-	subjects []rbacv1.Subject,
-) error {
-	if equality.Semantic.DeepEqual(existing.Subjects, subjects) {
-		return nil
+	existing client.Object,
+	desired client.Object,
+	purpose string,
+) (bool, error) {
+	patched, ok := existing.DeepCopyObject().(client.Object)
+	if !ok {
+		return false, fmt.Errorf("unexpected RBAC object %T", existing)
 	}
 
-	log.FromContext(ctx).Info("Updating ClusterRoleBinding for cross-namespace resources access",
-		"name", existing.Name)
-	patched := existing.DeepCopy()
-	patched.Subjects = subjects
-	if err := r.Patch(ctx, patched, client.MergeFrom(existing)); err != nil {
-		return fmt.Errorf("while patching ClusterRoleBinding: %w", err)
+	switch target := patched.(type) {
+	case *rbacv1.ClusterRole:
+		desiredRules := desired.(*rbacv1.ClusterRole).Rules
+		if equality.Semantic.DeepEqual(target.Rules, desiredRules) {
+			return false, nil
+		}
+		target.Rules = desiredRules
+
+	case *rbacv1.Role:
+		desiredRules := desired.(*rbacv1.Role).Rules
+		if equality.Semantic.DeepEqual(target.Rules, desiredRules) {
+			return false, nil
+		}
+		target.Rules = desiredRules
+
+	case *rbacv1.ClusterRoleBinding:
+		desiredBinding := desired.(*rbacv1.ClusterRoleBinding)
+		if target.RoleRef != desiredBinding.RoleRef {
+			return true, nil
+		}
+		if equality.Semantic.DeepEqual(target.Subjects, desiredBinding.Subjects) {
+			return false, nil
+		}
+		target.Subjects = desiredBinding.Subjects
+
+	case *rbacv1.RoleBinding:
+		desiredBinding := desired.(*rbacv1.RoleBinding)
+		if target.RoleRef != desiredBinding.RoleRef {
+			return true, nil
+		}
+		if equality.Semantic.DeepEqual(target.Subjects, desiredBinding.Subjects) {
+			return false, nil
+		}
+		target.Subjects = desiredBinding.Subjects
+
+	default:
+		return false, fmt.Errorf("unexpected RBAC object %T", existing)
 	}
-	return nil
+
+	kind, name := crossNamespaceRBACKindOf(desired), crossNamespaceRBACDisplayName(desired)
+	log.FromContext(ctx).Info("Updating "+kind+" for "+purpose, "kind", kind, "name", name)
+	if err := r.Patch(ctx, patched, client.MergeFrom(existing)); err != nil {
+		return false, fmt.Errorf("while patching %s %s: %w", kind, name, err)
+	}
+	return false, nil
+}
+
+// crossNamespaceRBACKindOf returns the kind of an RBAC object, whose type
+// information is not set on the objects built by the operator
+func crossNamespaceRBACKindOf(obj client.Object) string {
+	switch obj.(type) {
+	case *rbacv1.ClusterRole:
+		return "ClusterRole"
+	case *rbacv1.ClusterRoleBinding:
+		return "ClusterRoleBinding"
+	case *rbacv1.Role:
+		return "Role"
+	case *rbacv1.RoleBinding:
+		return "RoleBinding"
+	default:
+		return fmt.Sprintf("%T", obj)
+	}
+}
+
+// crossNamespaceRBACDisplayName returns the name of an RBAC object as shown
+// in the logs, the errors and the events
+func crossNamespaceRBACDisplayName(obj client.Object) string {
+	if obj.GetNamespace() == "" {
+		return obj.GetName()
+	}
+	return obj.GetNamespace() + "/" + obj.GetName()
 }
 
 // deleteCrossNamespaceRBACByKey deletes the ClusterRole and the
@@ -243,6 +297,9 @@ func (r *ClusterReconciler) deleteOwnedCrossNamespaceRBAC(
 // A Role or a RoleBinding having the computed name but not created for the
 // cluster is left alone and reported, without failing the reconciliation:
 // otherwise a tenant could block the cluster by creating it in its namespace.
+// A failure in one namespace, such as one being terminated, does not prevent
+// the other namespaces from being reconciled: the failures are returned
+// together once every namespace was handled.
 func (r *ClusterReconciler) reconcileCrossNamespaceSecretsRBAC(ctx context.Context, cluster *apiv1.Cluster) error {
 	var roleList apiv1.DatabaseRoleList
 	if err := r.List(
@@ -272,120 +329,48 @@ func (r *ClusterReconciler) reconcileCrossNamespaceSecretsRBAC(ctx context.Conte
 		}
 	}
 
+	var errs []error
 	for namespace, secretNames := range desiredNamespaces {
-		if err := r.reconcileCrossNamespaceSecretsRole(ctx, cluster, namespace, secretNames); err != nil {
-			return err
-		}
-		if err := r.reconcileCrossNamespaceSecretsRoleBinding(ctx, cluster, namespace); err != nil {
-			return err
+		if err := r.reconcileCrossNamespaceSecretsNamespace(ctx, cluster, namespace, secretNames); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	return r.deleteCrossNamespaceSecretsRBAC(ctx, client.ObjectKeyFromObject(cluster), desiredNamespaces)
+	if err := r.deleteCrossNamespaceSecretsRBAC(ctx, client.ObjectKeyFromObject(cluster), desiredNamespaces); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
 }
 
-// reconcileCrossNamespaceSecretsRole creates the Role allowing the instance
-// manager to read the password Secrets in the passed namespace, or restores
-// its rules
-func (r *ClusterReconciler) reconcileCrossNamespaceSecretsRole(
+// reconcileCrossNamespaceSecretsNamespace creates or repairs, in the passed
+// namespace, the Role allowing the instance manager to read the passed
+// password Secrets and the RoleBinding granting it to the ServiceAccount of
+// the cluster. When the Role was not created for the cluster, no binding to
+// it is made: its rules are not under the control of the operator.
+func (r *ClusterReconciler) reconcileCrossNamespaceSecretsNamespace(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	namespace string,
 	secretNames []string,
 ) error {
-	contextLogger := log.FromContext(ctx)
-	desired := specs.CreateCrossNamespaceSecretsRole(*cluster, namespace, secretNames)
-
-	var existing rbacv1.Role
-	if err := r.Get(ctx, client.ObjectKeyFromObject(&desired), &existing); err != nil {
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("while getting Role %s/%s: %w", namespace, desired.Name, err)
-		}
-
-		contextLogger.Info("Creating Role for cross-namespace role password Secrets",
-			"namespace", namespace, "name", desired.Name)
-		r.Recorder.Event(cluster, "Normal", "CreatingRole",
-			fmt.Sprintf("Creating Role %s/%s for cross-namespace role password Secrets", namespace, desired.Name))
-		if err := r.Create(ctx, &desired); err != nil {
-			return fmt.Errorf("while creating Role %s/%s: %w", namespace, desired.Name, err)
-		}
+	role := specs.CreateCrossNamespaceSecretsRole(*cluster, namespace, secretNames)
+	err := r.ensureCrossNamespaceRBACObject(ctx, cluster, &role, &rbacv1.Role{}, crossNamespaceSecretsPurpose)
+	if errors.Is(err, errCrossNamespaceRBACNotOwned) {
+		r.reportNotOwnedCrossNamespaceRBAC(ctx, cluster, err)
 		return nil
 	}
+	if err != nil {
+		return err
+	}
 
-	if !specs.IsCrossNamespaceRBACOwnedBy(existing.Labels, cluster.Namespace, cluster.Name) {
-		r.reportNotOwnedCrossNamespaceRBAC(ctx, cluster, "Role", namespace, desired.Name)
+	binding := specs.CreateCrossNamespaceSecretsRoleBinding(*cluster, namespace)
+	err = r.ensureCrossNamespaceRBACObject(ctx, cluster, &binding, &rbacv1.RoleBinding{}, crossNamespaceSecretsPurpose)
+	if errors.Is(err, errCrossNamespaceRBACNotOwned) {
+		r.reportNotOwnedCrossNamespaceRBAC(ctx, cluster, err)
 		return nil
 	}
-
-	if equality.Semantic.DeepEqual(existing.Rules, desired.Rules) {
-		return nil
-	}
-
-	contextLogger.Info("Updating Role for cross-namespace role password Secrets",
-		"namespace", namespace, "name", desired.Name)
-	patched := existing.DeepCopy()
-	patched.Rules = desired.Rules
-	if err := r.Patch(ctx, patched, client.MergeFrom(&existing)); err != nil {
-		return fmt.Errorf("while patching Role %s/%s: %w", namespace, desired.Name, err)
-	}
-	return nil
-}
-
-// reconcileCrossNamespaceSecretsRoleBinding creates the RoleBinding granting
-// the password Secrets Role of the passed namespace to the ServiceAccount of
-// the cluster, or restores its subjects and role
-func (r *ClusterReconciler) reconcileCrossNamespaceSecretsRoleBinding(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	namespace string,
-) error {
-	contextLogger := log.FromContext(ctx)
-	desired := specs.CreateCrossNamespaceSecretsRoleBinding(*cluster, namespace)
-
-	var existing rbacv1.RoleBinding
-	err := r.Get(ctx, client.ObjectKeyFromObject(&desired), &existing)
-	if err != nil && !apierrs.IsNotFound(err) {
-		return fmt.Errorf("while getting RoleBinding %s/%s: %w", namespace, desired.Name, err)
-	}
-
-	if err == nil {
-		if !specs.IsCrossNamespaceRBACOwnedBy(existing.Labels, cluster.Namespace, cluster.Name) {
-			r.reportNotOwnedCrossNamespaceRBAC(ctx, cluster, "RoleBinding", namespace, desired.Name)
-			return nil
-		}
-
-		// The role of a binding cannot be changed: a binding pointing to
-		// another role is replaced
-		if existing.RoleRef == desired.RoleRef {
-			if equality.Semantic.DeepEqual(existing.Subjects, desired.Subjects) {
-				return nil
-			}
-
-			contextLogger.Info("Updating RoleBinding for cross-namespace role password Secrets",
-				"namespace", namespace, "name", desired.Name)
-			patched := existing.DeepCopy()
-			patched.Subjects = desired.Subjects
-			if err := r.Patch(ctx, patched, client.MergeFrom(&existing)); err != nil {
-				return fmt.Errorf("while patching RoleBinding %s/%s: %w", namespace, desired.Name, err)
-			}
-			return nil
-		}
-
-		contextLogger.Info("Replacing RoleBinding for cross-namespace role password Secrets",
-			"namespace", namespace, "name", desired.Name, "roleRef", existing.RoleRef)
-		if err := r.Delete(ctx, &existing); err != nil && !apierrs.IsNotFound(err) {
-			return fmt.Errorf("while deleting RoleBinding %s/%s: %w", namespace, desired.Name, err)
-		}
-	}
-
-	contextLogger.Info("Creating RoleBinding for cross-namespace role password Secrets",
-		"namespace", namespace, "name", desired.Name)
-	r.Recorder.Event(cluster, "Normal", "CreatingRoleBinding",
-		fmt.Sprintf("Creating RoleBinding %s/%s for cross-namespace role password Secrets", namespace, desired.Name))
-	if err := r.Create(ctx, &desired); err != nil {
-		return fmt.Errorf("while creating RoleBinding %s/%s: %w", namespace, desired.Name, err)
-	}
-	return nil
+	return err
 }
 
 // reportNotOwnedCrossNamespaceRBAC reports a namespaced RBAC object having
@@ -393,13 +378,12 @@ func (r *ClusterReconciler) reconcileCrossNamespaceSecretsRoleBinding(
 func (r *ClusterReconciler) reportNotOwnedCrossNamespaceRBAC(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	kind, namespace, name string,
+	err error,
 ) {
-	log.FromContext(ctx).Info("Leaving alone an RBAC object not managed for this cluster",
-		"kind", kind, "namespace", namespace, "name", name)
+	log.FromContext(ctx).Info("Leaving alone an RBAC object not managed for this cluster", "reason", err.Error())
 	r.Recorder.Event(cluster, "Warning", "CrossNamespaceRBACNotOwned",
-		fmt.Sprintf("%s %s/%s %s: the instance manager cannot read the password Secrets of "+
-			"the DatabaseRoles in that namespace", kind, namespace, name, errCrossNamespaceRBACNotOwned))
+		fmt.Sprintf("%s: the instance manager cannot read the password Secrets of "+
+			"the DatabaseRoles in that namespace", err))
 }
 
 // deleteCrossNamespaceSecretsRBAC deletes the password Secrets Roles and
