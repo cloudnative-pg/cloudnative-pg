@@ -72,6 +72,11 @@ the Pod is not recreated, and no switchover or connection drop is involved.
 Cross-namespace objects created before the restart are reconciled as soon as
 the new instance manager is up.
 
+The same restart happens if an instance manager cannot read its cluster when
+it starts, for example during a brief unavailability of the API server: it
+then watches the namespace of its cluster only, and widens its watch once the
+cluster can be read, instead of failing to start.
+
 ## Referencing a cluster in another namespace
 
 Each of the four resources references its cluster through `spec.cluster`,
@@ -83,6 +88,9 @@ which accepts an optional `namespace` field next to `name`:
   cluster must have `enableCrossNamespaceResources: true`.
 
 Like the rest of `spec.cluster`, the namespace is **immutable** after creation.
+The reference is compared as written: adding `namespace` to an existing object,
+even set to the namespace of the object itself, is rejected as a change. Keep
+writing the reference of an existing object the way it was created.
 
 The examples below create objects in a `team-a` namespace, referencing the
 `shared-pg` cluster in the `databases` namespace.
@@ -113,7 +121,10 @@ spec.cluster.namespace: Forbidden: cluster "shared-pg" does not have enableCross
 The other three kinds have no such webhook check: a `DatabaseRole`,
 `Publication` or `Subscription` referencing a cluster that has not opted in is
 accepted by the API server but never reconciled, because the instance manager
-of that cluster does not watch other namespaces.
+of that cluster does not watch other namespaces. The operator does not
+generate the password of such a `DatabaseRole` nor issue its client
+certificate either, and records why in `status.password.message` and
+`status.clientCertificate.message`.
 
 ### DatabaseRole
 
@@ -229,6 +240,12 @@ The namespace of the managing object is shown when it differs from the one of
 the rejected object. The rejected object is retried periodically, and takes
 over once the managing object is gone.
 
+The operator does not issue a
+[client certificate](declarative_role_management.md#generated-certificate-secret)
+for a rejected `DatabaseRole` either: the certificate would let the namespace
+of the rejected object log in as a role managed by another object. The reason
+is recorded in `status.clientCertificate.message`.
+
 Deleting a rejected object never changes PostgreSQL, **even when its reclaim
 policy is `delete`**: since it never reconciled, it does not own the
 PostgreSQL object, and dropping it would destroy what the managing object
@@ -256,7 +273,8 @@ SHA-256 of `<cluster namespace>/<cluster name>`, so that clusters with the same
 name in different namespaces never collide.
 
 A **`ClusterRole`** and a **`ClusterRoleBinding`**, binding the `ClusterRole`
-to the ServiceAccount of the cluster. The `ClusterRole` grants, in **all
+to the ServiceAccount the instances run with: the one named after the cluster,
+or the one set in `serviceAccountName`. The `ClusterRole` grants, in **all
 namespaces**:
 
 | API group | Resources | Verbs |
@@ -293,17 +311,30 @@ They cannot carry an owner reference to the `Cluster`, which lives in another
 namespace (or, for cluster-scoped objects, in a namespace at all), so the
 operator relies on these labels:
 
+- These objects are reconciled apart from the rest of the cluster, so a
+  failure, for example in a tenant namespace being deleted, never stops the
+  management of the instances nor changes the phase of the cluster. The
+  failure is recorded as a `CrossNamespaceRBACFailed` warning event on the
+  cluster and retried, while the other namespaces are still reconciled.
+  Changes made to these objects by someone else are reverted.
 - An existing object with the expected name but without the matching labels is
   **never modified or deleted**. For the `ClusterRole` and
-  `ClusterRoleBinding`, this is reported as a reconciliation error of the
-  cluster. For a `Role` or `RoleBinding` in a tenant namespace, the operator
+  `ClusterRoleBinding`, this is reported as a `CrossNamespaceRBACFailed`
+  event. For a `Role` or `RoleBinding` in a tenant namespace, the operator
   records a `CrossNamespaceRBACNotOwned` warning event on the cluster and leaves
   it alone, so that a tenant cannot block the cluster by creating it: the
-  password Secrets of that namespace are then not readable by the cluster.
-- When the cluster is deleted, the operator deletes all of them.
+  password Secrets of that namespace are then not readable by the cluster, and
+  no `RoleBinding` to a foreign `Role` is created.
+- When the cluster is deleted, the operator deletes all of them, even when
+  some of the objects depending on the cluster cannot be updated.
 - A sweep, run when the operator starts and then every 15 minutes, deletes the
-  `ClusterRole` and `ClusterRoleBinding` objects left behind by clusters that
-  were deleted while the operator was not running.
+  objects left behind by clusters that were deleted while the operator was not
+  running, including the `Role` and `RoleBinding` objects of the tenant
+  namespaces. It also deletes the ones of a cluster that does not enable the
+  feature, such as a new cluster created with the name of a deleted one, which
+  must not inherit its access.
+- The operator only caches the `ClusterRole` and `ClusterRoleBinding` objects
+  carrying these labels, not every one of the Kubernetes cluster.
 
 ### Additional permissions of the operator
 
@@ -413,7 +444,10 @@ teams described above.
 - Only the `Database` resource is checked by the webhook against the opt-in of
   the cluster. Cross-namespace `DatabaseRole`, `Publication` and
   `Subscription` objects targeting a cluster that has not opted in are accepted
-  and are never reconciled, without a status message.
+  and are never reconciled. Only a `DatabaseRole` gets a status message, about
+  its password and client certificate, which the operator does not generate.
+- `spec.cluster` is compared as written: setting `namespace` on an existing
+  object, even to its own namespace, is rejected.
 - A cross-namespace `Database` can only be created once its cluster exists,
   since the webhook needs to read it.
 - The operator must be able to see the namespaces holding the cross-namespace
