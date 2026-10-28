@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	pgpostgres "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -524,16 +525,13 @@ func (r *DatabaseRoleReconciler) mapClusterToDatabaseRoles(
 	}
 
 	var roles apiv1.DatabaseRoleList
-	if err := r.List(ctx, &roles, client.InNamespace(obj.GetNamespace())); err != nil {
+	if err := r.List(ctx, &roles, clusterindex.MatchingCluster(client.ObjectKeyFromObject(obj))); err != nil {
 		log.FromContext(ctx).Error(err, "while listing DatabaseRoles to react to a cluster change")
 		return nil
 	}
 
 	requests := make([]reconcile.Request, 0, len(roles.Items))
 	for i := range roles.Items {
-		if roles.Items[i].Spec.ClusterRef.Name != obj.GetName() {
-			continue
-		}
 		requests = append(requests, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(&roles.Items[i]),
 		})
