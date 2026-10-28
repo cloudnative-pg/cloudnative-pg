@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -96,8 +95,7 @@ var _ = Describe("CrossNamespaceRBACSweeper", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		getErr = nil
-		fakeClient = fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient = newOwnedResourcesFakeClientBuilder(schemeBuilder.BuildWithAllKnownScheme()).
 			WithInterceptorFuncs(interceptor.Funcs{
 				Get: func(
 					ctx context.Context,
