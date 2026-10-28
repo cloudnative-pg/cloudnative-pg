@@ -66,7 +66,7 @@ func NewJSONLineLogPipe(fileName string) *LineLogPipe {
 		fileName: fileName,
 		handler: func(line []byte) {
 			fmt.Println(string(line))
-			exportJSONRecord(line)
+			log.ForwardToOpenTelemetry(line)
 		},
 		initialized: concurrency.NewExecuted(),
 		exited:      concurrency.NewExecuted(),

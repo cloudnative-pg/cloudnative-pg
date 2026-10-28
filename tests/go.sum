@@ -18,8 +18,8 @@ github.com/cloudnative-pg/barman-cloud v0.7.0 h1:F6U2qNzucaHss4pZbznOZ1ZdVVubRgp
 github.com/cloudnative-pg/barman-cloud v0.7.0/go.mod h1:PVldcjsh/1VCS18Ka7w0dqXEx6tAyXzW+BnuvYLaulY=
 github.com/cloudnative-pg/cnpg-i v0.6.0 h1:LA//DLkFOLIjU0ASOpFkydZhGir9IAIDfgSsTTX9IpU=
 github.com/cloudnative-pg/cnpg-i v0.6.0/go.mod h1:4kcpLAj+feMTnh0TVadXRASdVnEhBytNSm/BvktLgmI=
-github.com/cloudnative-pg/machinery v0.6.2-0.20261028110518-0ebe2461824a h1:JB/tnTkxF90HxDRGrcoqaHMesQ9lH0GF2G/gl8OXAr0=
-github.com/cloudnative-pg/machinery v0.6.2-0.20261028110518-0ebe2461824a/go.mod h1:WjwVsbExPtSV873AE0s88QTZVYLY7bIrUA8xLlcKDzg=
+github.com/cloudnative-pg/machinery v0.6.2-0.20261028124740-32c682fe6c93 h1:cXG1dOV5bZZ4xVTGp3/HCyVM7+IKcqkrpMkRYuyR10M=
+github.com/cloudnative-pg/machinery v0.6.2-0.20261028124740-32c682fe6c93/go.mod h1:RpV61dxuaF+ZoQT1ROdDp+dQ2Z/aHxCHHzFVvFBXwlg=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
