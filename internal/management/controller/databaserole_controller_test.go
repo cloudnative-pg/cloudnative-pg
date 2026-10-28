@@ -33,11 +33,9 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -256,8 +254,7 @@ var _ = Describe("DatabaseRole succeededReconciliation", func() {
 		role := newTestDatabaseRole()
 		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
 		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient := newIndexedFakeClientBuilder().
 			WithObjects(role).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
@@ -278,8 +275,7 @@ var _ = Describe("DatabaseRole succeededReconciliation", func() {
 
 var _ = Describe("DatabaseRole shouldReconcile", func() {
 	reconcilerFor := func(role *apiv1.DatabaseRole) *DatabaseRoleReconciler {
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient := newIndexedFakeClientBuilder().
 			WithObjects(role).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
@@ -484,8 +480,7 @@ var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
 				corev1.BasicAuthPasswordKey: []byte("0mA3nCe0f6THe1dIvIne"),
 			},
 		}
-		cli := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		cli := newIndexedFakeClientBuilder().
 			WithObjects(role, secret).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
@@ -523,8 +518,7 @@ var _ = Describe("DatabaseRole handleDeletion", func() {
 
 	// run persists the (deleting) role, then drives handleDeletion against it.
 	run := func(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) (client.Client, ctrl.Result) {
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient := newIndexedFakeClientBuilder().
 			WithObjects(role).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
@@ -644,8 +638,7 @@ var _ = Describe("DatabaseRole mapClusterToDatabaseRoles", func() {
 		foreign := newTestDatabaseRole()
 		foreign.Name = "role-cr-other-namespace"
 		foreign.Namespace = "another-namespace"
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient := newIndexedFakeClientBuilder().
 			WithObjects(mine, other, foreign).
 			Build()
 		r = &DatabaseRoleReconciler{Client: fakeClient, instance: &fakeRoleInstance{}}

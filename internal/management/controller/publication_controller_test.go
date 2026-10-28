@@ -33,7 +33,6 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -99,7 +98,7 @@ var _ = Describe("Managed publication controller tests", func() {
 			WithPodName("cluster-example-1").
 			WithClusterName("cluster-example")
 
-		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient = newIndexedFakeClientBuilder().
 			WithObjects(cluster, publication).
 			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Publication{}).
 			Build()
