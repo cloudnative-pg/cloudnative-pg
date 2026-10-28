@@ -89,11 +89,11 @@ func newRootCmd() *cobra.Command {
 // manager forwarding the PostgreSQL log, whose records share a single message
 // and would otherwise be collapsed by the sampler under a burst of activity.
 //
-// The controller, instance and pgbouncer subcommands, which run as the main
-// process of the operator, Cluster and Pooler containers, also export their
-// records via OpenTelemetry. wal-archive and wal-restore don't: the instance
-// manager forwards what they write, and exporting from them would add the
-// export to the latency of every WAL file.
+// The controller, instance and pgbouncer subcommands, which run in the
+// operator, Cluster and Pooler pods, also export their records via
+// OpenTelemetry. wal-archive and wal-restore don't: the instance manager
+// forwards what they write, and exporting from them would add the export to
+// the latency of every WAL file.
 func loggingOptions(cmd *cobra.Command) []log.ConfigureOption {
 	switch topLevelCommand(cmd).Name() {
 	case "controller":
