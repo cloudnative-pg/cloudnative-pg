@@ -67,6 +67,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/podselector"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -222,6 +223,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	ctx = cluster.SetInContext(ctx)
+	ctx = status.WithReconciledGeneration(ctx, cluster.Generation)
 
 	// Load the plugins required to bootstrap and reconcile this cluster
 	enabledPluginNames := getPluginsNeededForReconcile(cluster)
