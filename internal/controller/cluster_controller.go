@@ -1370,6 +1370,12 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
+	// The RBAC objects of the cross-namespace resources support are
+	// reconciled apart, so that their failures do not stop this loop
+	if err := r.setupCrossNamespaceRBACController(mgr); err != nil {
+		return err
+	}
+
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
