@@ -27,6 +27,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -405,6 +407,26 @@ func CrossNamespaceRBACLabelsFor(namespace, name string) map[string]string {
 		utils.ClusterNamespaceLabelName:       namespace,
 		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 	}
+}
+
+// CrossNamespaceRBACSelector selects the RBAC objects the operator created
+// for the cross-namespace resources support of any cluster: the ones managed
+// by the operator and carrying the namespace and the name of their cluster
+func CrossNamespaceRBACSelector() (labels.Selector, error) {
+	managedBy, err := labels.NewRequirement(
+		utils.KubernetesAppManagedByLabelName, selection.Equals, []string{utils.ManagerName})
+	if err != nil {
+		return nil, err
+	}
+	clusterName, err := labels.NewRequirement(utils.ClusterLabelName, selection.Exists, nil)
+	if err != nil {
+		return nil, err
+	}
+	clusterNamespace, err := labels.NewRequirement(utils.ClusterNamespaceLabelName, selection.Exists, nil)
+	if err != nil {
+		return nil, err
+	}
+	return labels.NewSelector().Add(*managedBy, *clusterName, *clusterNamespace), nil
 }
 
 // IsCrossNamespaceRBACOwnedBy tells whether the labels of an RBAC object

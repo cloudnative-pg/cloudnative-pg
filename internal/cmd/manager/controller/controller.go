@@ -49,6 +49,7 @@ import (
 	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -173,20 +174,20 @@ func RunController(
 		setupLog.Info("Plugin EndpointSlice watch disabled: OPERATOR_NAMESPACE not set")
 	}
 
-	managerOptions.Cache = cache.Options{ByObject: cacheFilters}
-
-	// The ClusterRoles and ClusterRoleBindings are only read for the clusters
-	// enabling the cross-namespace resources support. Reading them directly
-	// avoids caching every RBAC object of the Kubernetes cluster, which is
-	// what reading them through the cache would do.
-	managerOptions.Client = client.Options{
-		Cache: &client.CacheOptions{
-			DisableFor: []client.Object{
-				&rbacv1.ClusterRole{},
-				&rbacv1.ClusterRoleBinding{},
-			},
-		},
+	// The only ClusterRoles and ClusterRoleBindings the operator reads are the
+	// ones it creates for the clusters enabling the cross-namespace resources
+	// support. Caching only those, through their labels, avoids both caching
+	// every RBAC object of the Kubernetes cluster and reading them from the
+	// API server at every reconciliation of a cluster.
+	crossNamespaceRBACSelector, err := specs.CrossNamespaceRBACSelector()
+	if err != nil {
+		setupLog.Error(err, "unable to build the selector of the cross-namespace RBAC objects")
+		return err
 	}
+	cacheFilters[&rbacv1.ClusterRole{}] = cache.ByObject{Label: crossNamespaceRBACSelector}
+	cacheFilters[&rbacv1.ClusterRoleBinding{}] = cache.ByObject{Label: crossNamespaceRBACSelector}
+
+	managerOptions.Cache = cache.Options{ByObject: cacheFilters}
 
 	if conf.WatchNamespace != "" {
 		namespaces := conf.WatchedNamespaces()
