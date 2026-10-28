@@ -34,6 +34,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
@@ -102,7 +103,13 @@ func FromReader(
 		return fmt.Errorf("while replacing instance manager binary: %w", err)
 	}
 
-	// We are ready to reload the instance manager
+	// We are ready to reload the instance manager.
+	// The queued log records are exported before the log pipes stop, so that
+	// an unreachable collector can only delay the upgrade, never leave the
+	// PostgreSQL log without a reader. The records written from now until the
+	// process is replaced are not exported.
+	management.ShutdownLogExport()
+
 	// First we are going to cancel the context, this will trigger the shutdown of all
 	// the Runnables handled by the manager.
 	// Only the postgres process will not be actually killed, as the postgres lifecycle
