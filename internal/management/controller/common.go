@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 )
 
 // errClusterIsReplica is raised when an object
@@ -153,16 +154,9 @@ func markAsReady(
 	return cli.Status().Update(ctx, resource)
 }
 
-// clusterScopedResource is a resource bound to a Cluster through a local
-// object reference.
-type clusterScopedResource interface {
-	client.Object
-	GetClusterRef() apiv1.ClusterObjectReference
-}
-
 // mapClusterToManagedResources builds a watch mapper that enqueues every item
-// of the given list type targeting this instance's cluster, to react to
-// cluster spec changes (e.g. a demotion to replica).
+// of the given list type targeting this instance's cluster, in any namespace,
+// to react to cluster spec changes (e.g. a demotion to replica).
 func mapClusterToManagedResources(
 	instance instanceInterface,
 	cli client.Client,
@@ -175,7 +169,7 @@ func mapClusterToManagedResources(
 		}
 
 		list := newList()
-		if err := cli.List(ctx, list, client.InNamespace(obj.GetNamespace())); err != nil {
+		if err := cli.List(ctx, list, clusterindex.MatchingCluster(client.ObjectKeyFromObject(obj))); err != nil {
 			log.FromContext(ctx).Error(err, "while listing resources to react to a cluster change",
 				"kind", fmt.Sprintf("%T", list))
 			return nil
@@ -190,15 +184,12 @@ func mapClusterToManagedResources(
 
 		requests := make([]reconcile.Request, 0, len(items))
 		for _, item := range items {
-			resource, ok := item.(clusterScopedResource)
-			if !ok || resource.GetClusterRef().Name != obj.GetName() {
+			resource, ok := item.(client.Object)
+			if !ok {
 				continue
 			}
 			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: resource.GetNamespace(),
-					Name:      resource.GetName(),
-				},
+				NamespacedName: client.ObjectKeyFromObject(resource),
 			})
 		}
 
@@ -236,6 +227,8 @@ func toPostgresParameters(parameters map[string]string) string {
 
 type postgresResourceManager interface {
 	client.Object
+	GetClusterRef() apiv1.ClusterObjectReference
+	GetClusterNamespace() string
 	HasReconciliations() bool
 	markableAsFailed
 }
@@ -256,17 +249,21 @@ func detectConflictingManagers[T postgresResourceManager, TL managedResourceExcl
 	}
 	contextLogger := log.FromContext(ctx)
 
-	if err := cli.List(ctx, list,
-		client.InNamespace(resource.GetNamespace()),
-	); err != nil {
+	// The resources managing the same PostgreSQL object may live in any
+	// namespace, so they are looked up through the index of their cluster
+	clusterKey := types.NamespacedName{
+		Namespace: resource.GetClusterNamespace(),
+		Name:      resource.GetClusterRef().Name,
+	}
+	if err := cli.List(ctx, list, clusterindex.MatchingCluster(clusterKey)); err != nil {
 		kind := list.GetObjectKind().GroupVersionKind().Kind
 
 		contextLogger.Error(err, "while getting list",
 			"kind", kind,
-			"namespace", resource.GetNamespace(),
+			"cluster", clusterKey,
 		)
-		return ctrl.Result{}, fmt.Errorf("impossible to list %s objects in namespace %s: %w",
-			kind, resource.GetNamespace(), err)
+		return ctrl.Result{}, fmt.Errorf("impossible to list %s objects of cluster %s: %w",
+			kind, clusterKey, err)
 	}
 
 	// Make sure the target PG element is not being managed by another kubernetes resource
