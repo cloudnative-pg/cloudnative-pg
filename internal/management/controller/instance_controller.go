@@ -202,16 +202,20 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Reconcile secrets and cryptographic material
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
-	reloadNeeded, err := r.certificateReconciler.RefreshSecrets(ctx, cluster)
+	reloadSecretsNeeded, err := r.certificateReconciler.RefreshSecrets(ctx, cluster)
+	// The reload is kept pending until it is executed: this loop can end
+	// before reaching it, e.g. while PostgreSQL is starting up, and the
+	// next loops will find the files already updated
+	r.pendingReload = r.pendingReload || reloadSecretsNeeded
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("while refreshing secrets: %w", err)
 	}
 
 	reloadConfigNeeded, err := r.refreshConfigurationFiles(ctx, cluster)
+	r.pendingReload = r.pendingReload || reloadConfigNeeded
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	reloadNeeded = reloadNeeded || reloadConfigNeeded
 
 	// here we execute initialization tasks that need to be executed only on the first reconciliation loop.
 	// Notably, if this PGDATA is already a primary, initialize() also acquires the primary lease
@@ -226,10 +230,10 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Reconcile cluster role without DB
 	reloadClusterRoleConfig, err := r.reconcileClusterRoleWithoutDB(ctx, cluster)
+	r.pendingReload = r.pendingReload || reloadClusterRoleConfig
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	reloadNeeded = reloadNeeded || reloadClusterRoleConfig
 
 	r.systemInitialization.Broadcast()
 
@@ -289,7 +293,12 @@ func (r *InstanceReconciler) Reconcile(
 	}
 	restarted = restarted || restartedInplace
 
-	if reloadNeeded && !restarted {
+	// A restart loads the configuration files too
+	if restarted {
+		r.pendingReload = false
+	}
+
+	if r.pendingReload {
 		contextLogger.Info("reloading the instance")
 
 		// IMPORTANT
@@ -306,6 +315,7 @@ func (r *InstanceReconciler) Reconcile(
 		if err = r.instance.Reload(ctx); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
 		}
+		r.pendingReload = false
 		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 		}
@@ -442,7 +452,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 
 	reloadIdent, err := r.instance.RefreshPGIdent(ctx, cluster.Spec.PostgresConfiguration.PgIdent)
 	if err != nil {
-		return false, err
+		return reloadNeeded, err
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
 
@@ -458,16 +468,12 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 		postgresClient.OperationType_TYPE_RECONCILE,
 	)
 	if err != nil {
-		return false, err
+		return reloadNeeded, err
 	}
 	reloadNeeded = reloadNeeded || reloadConfig
 
 	reloadReplicaConfig, err := r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
-	if err != nil {
-		return false, err
-	}
-	reloadNeeded = reloadNeeded || reloadReplicaConfig
-	return reloadNeeded, nil
+	return reloadNeeded || reloadReplicaConfig, err
 }
 
 func (r *InstanceReconciler) requiresImagesRollout(ctx context.Context, cluster *apiv1.Cluster) bool {
@@ -604,7 +610,16 @@ func (r *InstanceReconciler) verifyParametersForFollower(
 	for key, enforcedparam := range controldataParams {
 		clusterparam, found := clusterParams[key]
 		if !found {
-			continue
+			// The parameter is not in the cluster spec, so the instance will
+			// start with the value resolved from the configuration files,
+			// usually the PostgreSQL default (#10395). Enforcing the
+			// pg_controldata value unconditionally instead would make the
+			// configuration permanently diverge from the cluster spec,
+			// causing an endless restart loop.
+			clusterparam, err = postgresManagement.LoadStartupParameterValue(r.instance.PgData, key)
+			if err != nil {
+				return err
+			}
 		}
 		// if the values from `pg_controldata` are higher than the cluster spec,
 		// they are the safer choice, so set them in config

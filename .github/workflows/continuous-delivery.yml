@@ -55,7 +55,7 @@ env:
   # renovate: datasource=github-releases depName=k3d-io/k3d versioning=semver
   K3D_VERSION: "v5.9.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
-  ROOK_VERSION: "v1.21.0"
+  ROOK_VERSION: "v1.21.1"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
   EXTERNAL_SNAPSHOTTER_VERSION: "v8.7.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
@@ -1297,6 +1297,11 @@ jobs:
             kubectl wait --for=condition=Established --timeout=60s \
               $(kubectl get -f /tmp/rook-csi-operator.yaml -o name | grep ^customresourcedefinition)
             curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/operator.yaml | kubectl apply -f -
+            # The AKS cluster has no availability zones, so nodes get the zone
+            # label "0", which AKS does not let us change. Rook 1.21.1+ refuses
+            # purely numeric topology values and creates no OSDs.
+            kubectl set env -n rook-ceph deploy/rook-ceph-operator ROOK_SKIP_OSD_TOPOLOGY_CHECK=true
+            kubectl rollout status -n rook-ceph deploy/rook-ceph-operator --timeout=120s
             # keyType "aes" below is required until every AKS node runs
             # Linux kernel 7.0+: Rook's aes256k CephX key (the CVE-2025-30156
             # fix) can't be loaded by an older kernel's RBD client, so the
@@ -1317,6 +1322,13 @@ jobs:
               fi
               sleep 2
             done
+            if [[ $(wc -w <<< $output) != 3 ]]; then
+              echo "Rook OSDs were not created"
+              kubectl get node -L topology.kubernetes.io/zone
+              kubectl get cephcluster -n rook-ceph -o yaml
+              kubectl logs -n rook-ceph deploy/rook-ceph-operator --tail=200
+              exit 1
+            fi
             echo "Waiting for Rook OSDs to be available"
             kubectl wait deploy -n rook-ceph --for condition=available --timeout 480s -l app=rook-ceph-osd
             curl -H "Authorization: Bearer ${GITHUB_TOKEN}" --retry 5 --retry-delay 2 -fsSL ${ROOK_BASE_URL}/csi/rbd/storageclass.yaml | kubectl apply -f -
@@ -2516,7 +2528,48 @@ jobs:
         name: Destroy OpenShift Cluster ${{ env.K8S_VERSION }}
         if: always()
         run: |
+          # The installer may remove the metadata, keep the infra ID for the next step
+          echo "INFRA_ID=$(jq -r '.infraID // empty' hack/metadata.json 2>/dev/null)" >> "$GITHUB_ENV"
           openshift-install destroy cluster --dir hack/
+      -
+        # The disks of the cluster volumes can outlive the cluster
+        name: Delete leftover disks
+        if: ${{ always() && env.OPENSHIFT_PLATFORM == 'gcp' }}
+        run: |
+          set +e
+          if [ -z "${INFRA_ID:-}" ]; then
+            echo "::notice::No infra ID, skipping the disk cleanup"
+            exit 0
+          fi
+
+          # On failure, print the gcloud error (e.g. missing permissions) and return non-zero
+          list_disks() {
+            local err
+            err=$(mktemp)
+            if ! gcloud compute disks list --project "${GCP_PROJECT_ID}" \
+              --filter="labels.kubernetes-io-cluster-${INFRA_ID}=owned AND NOT users:*" \
+              --format="value(name,zone.basename())" 2> "${err}"; then
+              echo "::warning::Cannot list the disks of ${INFRA_ID}: $(tr '\n' ' ' < "${err}")" >&2
+              rm -f "${err}"
+              return 1
+            fi
+            rm -f "${err}"
+          }
+
+          for attempt in 1 2 3; do
+            disks=$(list_disks) || exit 0
+            [ -n "${disks}" ] || exit 0
+            while read -r name zone; do
+              if ! out=$(gcloud compute disks delete "${name}" --project "${GCP_PROJECT_ID}" --zone "${zone}" --quiet 2>&1 < /dev/null); then
+                echo "::warning::Cannot delete the disk ${name} (zone ${zone}, attempt ${attempt}): ${out//$'\n'/ }"
+              fi
+            done <<< "${disks}"
+            sleep 5
+          done
+
+          disks=$(list_disks) || exit 0
+          [ -z "${disks}" ] || echo "::warning::Leftover disks of ${INFRA_ID}: ${disks//$'\n'/, }"
+          exit 0
 
   # Summarize E2E test results, display in the GitHub 'summary' view
   summarize-e2e-tests:
