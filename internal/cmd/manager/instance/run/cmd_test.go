@@ -60,7 +60,7 @@ func newWatchScopeCluster(crossNamespace bool) *apiv1.Cluster {
 		},
 		Spec: apiv1.ClusterSpec{
 			Instances:                     1,
-			EnableCrossNamespaceDatabases: crossNamespace,
+			EnableCrossNamespaceResources: crossNamespace,
 		},
 	}
 }
@@ -72,24 +72,24 @@ func newWatchScopeClient(objects ...client.Object) client.Client {
 		Build()
 }
 
-var _ = Describe("getDatabaseCacheConfig", func() {
+var _ = Describe("getManagedResourcesCacheConfig", func() {
 	It("restricts the watch to the cluster namespace by default", func() {
-		config := getDatabaseCacheConfig(false, watchScopeNamespace)
+		config := getManagedResourcesCacheConfig(false, watchScopeNamespace)
 		Expect(config.Namespaces).To(HaveKey(watchScopeNamespace))
 		Expect(config.Namespaces).To(HaveLen(1))
 	})
 
 	It("watches every namespace when cross-namespace databases are enabled", func() {
-		Expect(getDatabaseCacheConfig(true, watchScopeNamespace)).To(Equal(cache.ByObject{}))
+		Expect(getManagedResourcesCacheConfig(true, watchScopeNamespace)).To(Equal(cache.ByObject{}))
 	})
 })
 
-var _ = Describe("isCrossNamespaceDatabasesEnabled", func() {
+var _ = Describe("isCrossNamespaceResourcesEnabled", func() {
 	DescribeTable("reports the setting of the cluster",
 		func(ctx SpecContext, enabled bool) {
 			cli := newWatchScopeClient(newWatchScopeCluster(enabled))
 
-			Expect(isCrossNamespaceDatabasesEnabled(
+			Expect(isCrossNamespaceResourcesEnabled(
 				ctx, cli, watchScopeNamespace, watchScopeClusterName)).To(Equal(enabled))
 		},
 		Entry("when disabled", false),
@@ -97,13 +97,13 @@ var _ = Describe("isCrossNamespaceDatabasesEnabled", func() {
 	)
 
 	It("fails when the cluster cannot be read", func(ctx SpecContext) {
-		_, err := isCrossNamespaceDatabasesEnabled(
+		_, err := isCrossNamespaceResourcesEnabled(
 			ctx, newWatchScopeClient(), watchScopeNamespace, watchScopeClusterName)
 		Expect(err).To(HaveOccurred())
 	})
 })
 
-var _ = Describe("databaseWatchScopeReconciler", func() {
+var _ = Describe("watchScopeReconciler", func() {
 	var (
 		instance   *postgres.Instance
 		cancelled  bool
@@ -111,7 +111,7 @@ var _ = Describe("databaseWatchScopeReconciler", func() {
 		restartErr error
 	)
 
-	reconcilerFor := func(cluster *apiv1.Cluster, bootValue bool) *databaseWatchScopeReconciler {
+	reconcilerFor := func(cluster *apiv1.Cluster, bootValue bool) *watchScopeReconciler {
 		instance = postgres.NewInstance().
 			WithNamespace(watchScopeNamespace).
 			WithClusterName(watchScopeClusterName)
@@ -123,7 +123,7 @@ var _ = Describe("databaseWatchScopeReconciler", func() {
 			objects = append(objects, cluster)
 		}
 
-		return &databaseWatchScopeReconciler{
+		return &watchScopeReconciler{
 			client:         newWatchScopeClient(objects...),
 			instance:       instance,
 			crossNamespace: bootValue,

@@ -543,12 +543,16 @@ type ClusterSpec struct {
 	// +optional
 	PrimaryLease *PrimaryLeaseConfiguration `json:"primaryLease,omitempty"`
 
-	// EnableCrossNamespaceDatabases enables this cluster to manage Database
-	// resources from other namespaces. When enabled, a ClusterRole and
-	// ClusterRoleBinding are created to grant cross-namespace access.
+	// EnableCrossNamespaceResources enables this cluster to manage the
+	// Database, DatabaseRole, Publication and Subscription resources of other
+	// namespaces. When enabled, a ClusterRole and a ClusterRoleBinding are
+	// created to grant the cluster access to those resources in every
+	// namespace, and a Role with its RoleBinding is created in each namespace
+	// holding the password Secrets of its DatabaseRoles.
+	// It cannot be disabled once enabled.
 	// +kubebuilder:default:=false
 	// +optional
-	EnableCrossNamespaceDatabases bool `json:"enableCrossNamespaceDatabases,omitempty"`
+	EnableCrossNamespaceResources bool `json:"enableCrossNamespaceResources,omitempty"`
 }
 
 // PrimaryLeaseConfiguration configures the timings of the Kubernetes `Lease`

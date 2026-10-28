@@ -17,7 +17,6 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-
 // Package clusterindex contains the field index that finds the resources
 // referring to a Cluster, such as Database objects, in any namespace.
 //

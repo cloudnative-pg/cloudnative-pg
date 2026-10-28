@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -173,6 +174,19 @@ func RunController(
 	}
 
 	managerOptions.Cache = cache.Options{ByObject: cacheFilters}
+
+	// The ClusterRoles and ClusterRoleBindings are only read for the clusters
+	// enabling the cross-namespace resources support. Reading them directly
+	// avoids caching every RBAC object of the Kubernetes cluster, which is
+	// what reading them through the cache would do.
+	managerOptions.Client = client.Options{
+		Cache: &client.CacheOptions{
+			DisableFor: []client.Object{
+				&rbacv1.ClusterRole{},
+				&rbacv1.ClusterRoleBinding{},
+			},
+		},
+	}
 
 	if conf.WatchNamespace != "" {
 		namespaces := conf.WatchedNamespaces()

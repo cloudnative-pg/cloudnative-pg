@@ -306,7 +306,7 @@ func (r *ClusterReconciler) reconcileDeletedCluster(
 		return ctrl.Result{}, err
 	}
 
-	// The RBAC resources supporting cross-namespace Database objects are
+	// The RBAC resources supporting cross-namespace resources are
 	// cluster-scoped, so they are not garbage collected together with the
 	// Cluster and need to be deleted explicitly. The Cluster may already be
 	// gone at this point, in which case no event can be recorded on it.
@@ -314,10 +314,10 @@ func (r *ClusterReconciler) reconcileDeletedCluster(
 	if cluster != nil {
 		recorderObject = cluster
 	}
-	if err := r.deleteCrossNamespaceDatabaseRBACByKey(ctx, req.NamespacedName, recorderObject); err != nil {
+	if err := r.deleteCrossNamespaceRBACByKey(ctx, req.NamespacedName, recorderObject); err != nil {
 		contextLogger.Error(
 			err,
-			"error while deleting the cross-namespace Database RBAC resources",
+			"error while deleting the cross-namespace RBAC resources",
 			"clusterName", req.Name,
 			"namespace", req.Namespace,
 		)
