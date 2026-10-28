@@ -662,7 +662,7 @@ var _ = Describe("Cross-Namespace Database reconciliation", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				Instances:                     1,
-				EnableCrossNamespaceDatabases: true,
+				EnableCrossNamespaceResources: true,
 			},
 			Status: apiv1.ClusterStatus{
 				CurrentPrimary: "my-cluster-1",

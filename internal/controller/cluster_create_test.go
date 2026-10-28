@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -1582,12 +1584,13 @@ var _ = Describe("generateNodeSerial", func() {
 	})
 })
 
-var _ = Describe("reconcileCrossNamespaceDatabaseRBAC", func() {
+var _ = Describe("reconcileCrossNamespaceRBAC", func() {
 	var (
 		ctx        context.Context
 		fakeClient k8client.Client
 		reconciler *ClusterReconciler
 		cluster    *apiv1.Cluster
+		rbacName   types.NamespacedName
 	)
 
 	BeforeEach(func() {
@@ -1604,137 +1607,129 @@ var _ = Describe("reconcileCrossNamespaceDatabaseRBAC", func() {
 				Namespace: "postgres",
 			},
 			Spec: apiv1.ClusterSpec{
-				Instances: 1,
+				Instances:                     1,
+				EnableCrossNamespaceResources: true,
 			},
 		}
+		rbacName = types.NamespacedName{Name: specs.GetCrossNamespaceRoleName(*cluster)}
 	})
 
-	Context("when EnableCrossNamespaceDatabases is true", func() {
-		BeforeEach(func() {
-			cluster.Spec.EnableCrossNamespaceDatabases = true
-		})
+	It("creates the ClusterRole and ClusterRoleBinding", func() {
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
 
-		It("should create the ClusterRole and ClusterRoleBinding", func() {
-			err := reconciler.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
+		var clusterRole rbacv1.ClusterRole
+		Expect(fakeClient.Get(ctx, rbacName, &clusterRole)).To(Succeed())
+		Expect(clusterRole.Rules).To(Equal(specs.CreateCrossNamespaceRole(*cluster).Rules))
 
-			// Check ClusterRole was created
-			var clusterRole rbacv1.ClusterRole
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster),
-			}, &clusterRole)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(clusterRole.Rules).To(HaveLen(2))
-			Expect(clusterRole.Rules[0].Resources).To(ConsistOf("databases"))
-			Expect(clusterRole.Rules[1].Resources).To(ConsistOf("databases/status"))
-
-			// Check ClusterRoleBinding was created
-			var clusterRoleBinding rbacv1.ClusterRoleBinding
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster),
-			}, &clusterRoleBinding)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(clusterRoleBinding.Subjects).To(HaveLen(1))
-			Expect(clusterRoleBinding.Subjects[0].Kind).To(Equal("ServiceAccount"))
-			Expect(clusterRoleBinding.Subjects[0].Name).To(Equal(cluster.Name))
-			Expect(clusterRoleBinding.Subjects[0].Namespace).To(Equal(cluster.Namespace))
-		})
-
-		It("should not error if the resources already exist", func() {
-			// First call creates the resources
-			err := reconciler.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-
-			// Second call should succeed without error
-			err = reconciler.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-		})
+		var clusterRoleBinding rbacv1.ClusterRoleBinding
+		Expect(fakeClient.Get(ctx, rbacName, &clusterRoleBinding)).To(Succeed())
+		Expect(clusterRoleBinding.Subjects).To(ConsistOf(rbacv1.Subject{
+			Kind:      "ServiceAccount",
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		}))
 	})
 
-	Context("when EnableCrossNamespaceDatabases is false", func() {
-		BeforeEach(func() {
-			cluster.Spec.EnableCrossNamespaceDatabases = false
+	It("is idempotent", func() {
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+	})
+
+	It("does not read any RBAC object when the feature is disabled", func() {
+		reconciler.Client = interceptor.NewClient(fakeClient.(k8client.WithWatch), interceptor.Funcs{
+			Get: func(
+				_ context.Context, _ k8client.WithWatch, _ k8client.ObjectKey, obj k8client.Object, _ ...k8client.GetOption,
+			) error {
+				Fail(fmt.Sprintf("unexpected read of a %T", obj))
+				return nil
+			},
 		})
+		cluster.Spec.EnableCrossNamespaceResources = false
 
-		It("should not create the ClusterRole and ClusterRoleBinding", func() {
-			err := reconciler.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+	})
 
-			// Check ClusterRole was not created
-			var clusterRole rbacv1.ClusterRole
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster),
-			}, &clusterRole)
-			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	It("restores the rules of the ClusterRole", func() {
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+
+		var clusterRole rbacv1.ClusterRole
+		Expect(fakeClient.Get(ctx, rbacName, &clusterRole)).To(Succeed())
+		clusterRole.Rules = clusterRole.Rules[:1]
+		Expect(fakeClient.Update(ctx, &clusterRole)).To(Succeed())
+
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+		Expect(fakeClient.Get(ctx, rbacName, &clusterRole)).To(Succeed())
+		Expect(clusterRole.Rules).To(Equal(specs.CreateCrossNamespaceRole(*cluster).Rules))
+	})
+
+	It("restores the subjects of the ClusterRoleBinding", func() {
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+
+		var binding rbacv1.ClusterRoleBinding
+		Expect(fakeClient.Get(ctx, rbacName, &binding)).To(Succeed())
+		binding.Subjects = append(binding.Subjects, rbacv1.Subject{
+			Kind: "ServiceAccount", Name: "intruder", Namespace: "elsewhere",
 		})
+		Expect(fakeClient.Update(ctx, &binding)).To(Succeed())
 
-		It("should delete existing ClusterRole and ClusterRoleBinding when disabled", func() {
-			// First, enable and create the resources
-			cluster.Spec.EnableCrossNamespaceDatabases = true
-			err := reconciler.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+		Expect(fakeClient.Get(ctx, rbacName, &binding)).To(Succeed())
+		Expect(binding.Subjects).To(Equal(specs.CreateCrossNamespaceRoleBinding(*cluster).Subjects))
+	})
 
-			// Verify resources exist
-			var clusterRole rbacv1.ClusterRole
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster),
-			}, &clusterRole)
-			Expect(err).ToNot(HaveOccurred())
+	It("replaces a ClusterRoleBinding granting another role", func() {
+		binding := specs.CreateCrossNamespaceRoleBinding(*cluster)
+		binding.RoleRef.Name = "cluster-admin"
+		Expect(fakeClient.Create(ctx, &binding)).To(Succeed())
 
-			var clusterRoleBinding rbacv1.ClusterRoleBinding
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster),
-			}, &clusterRoleBinding)
-			Expect(err).ToNot(HaveOccurred())
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
 
-			// Now disable and verify deletion
-			cluster.Spec.EnableCrossNamespaceDatabases = false
-			err = reconciler.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
+		Expect(fakeClient.Get(ctx, rbacName, &binding)).To(Succeed())
+		Expect(binding.RoleRef).To(Equal(specs.CreateCrossNamespaceRoleBinding(*cluster).RoleRef))
+	})
 
-			// Check ClusterRole was deleted
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster),
-			}, &clusterRole)
-			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	It("refuses to adopt RBAC objects not created for the cluster", func() {
+		foreign := rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: rbacName.Name}}
+		Expect(fakeClient.Create(ctx, &foreign)).To(Succeed())
 
-			// Check ClusterRoleBinding was deleted
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster),
-			}, &clusterRoleBinding)
-			Expect(apierrs.IsNotFound(err)).To(BeTrue())
-		})
+		err := reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)
+		Expect(err).To(MatchError(errCrossNamespaceRBACNotOwned))
+
+		var clusterRole rbacv1.ClusterRole
+		Expect(fakeClient.Get(ctx, rbacName, &clusterRole)).To(Succeed())
+		Expect(clusterRole.Rules).To(BeEmpty())
 	})
 
 	Context("when the cluster is being deleted", func() {
-		It("removes the cluster-scoped resources without a recorder object", func() {
-			cluster.Spec.EnableCrossNamespaceDatabases = true
-			Expect(reconciler.reconcileCrossNamespaceDatabaseRBAC(ctx, cluster)).To(Succeed())
+		clusterKey := func() types.NamespacedName {
+			return types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name}
+		}
 
-			roleName := types.NamespacedName{Name: specs.GetCrossNamespaceDatabaseRoleName(*cluster)}
-			var clusterRole rbacv1.ClusterRole
-			Expect(fakeClient.Get(ctx, roleName, &clusterRole)).To(Succeed())
+		It("removes the cluster-scoped resources without a recorder object", func() {
+			Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
 
 			// The Cluster may already be gone, so the cleanup only gets its
 			// namespaced name and cannot record events on it
-			Expect(reconciler.deleteCrossNamespaceDatabaseRBACByKey(
-				ctx,
-				types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name},
-				nil,
-			)).To(Succeed())
+			Expect(reconciler.deleteCrossNamespaceRBACByKey(ctx, clusterKey(), nil)).To(Succeed())
 
-			Expect(apierrs.IsNotFound(fakeClient.Get(ctx, roleName, &clusterRole))).To(BeTrue())
-
+			var clusterRole rbacv1.ClusterRole
+			Expect(apierrs.IsNotFound(fakeClient.Get(ctx, rbacName, &clusterRole))).To(BeTrue())
 			var clusterRoleBinding rbacv1.ClusterRoleBinding
-			Expect(apierrs.IsNotFound(fakeClient.Get(ctx, roleName, &clusterRoleBinding))).To(BeTrue())
+			Expect(apierrs.IsNotFound(fakeClient.Get(ctx, rbacName, &clusterRoleBinding))).To(BeTrue())
 		})
 
 		It("succeeds when the cluster-scoped resources were never created", func() {
-			Expect(reconciler.deleteCrossNamespaceDatabaseRBACByKey(
-				ctx,
-				types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name},
-				nil,
-			)).To(Succeed())
+			Expect(reconciler.deleteCrossNamespaceRBACByKey(ctx, clusterKey(), nil)).To(Succeed())
+		})
+
+		It("leaves alone the RBAC objects not created for the cluster", func() {
+			foreign := rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: rbacName.Name}}
+			Expect(fakeClient.Create(ctx, &foreign)).To(Succeed())
+
+			Expect(reconciler.deleteCrossNamespaceRBACByKey(ctx, clusterKey(), nil)).To(Succeed())
+
+			var clusterRole rbacv1.ClusterRole
+			Expect(fakeClient.Get(ctx, rbacName, &clusterRole)).To(Succeed())
 		})
 	})
 })

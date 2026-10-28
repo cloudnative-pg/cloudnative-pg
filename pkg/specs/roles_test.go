@@ -476,7 +476,7 @@ var _ = Describe("CRD database role secret name", func() {
 	})
 })
 
-var _ = Describe("Cross-Namespace Database RBAC", func() {
+var _ = Describe("Cross-Namespace RBAC", func() {
 	cluster := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-cluster",
@@ -484,70 +484,85 @@ var _ = Describe("Cross-Namespace Database RBAC", func() {
 		},
 		Spec: apiv1.ClusterSpec{
 			Instances:                     1,
-			EnableCrossNamespaceDatabases: true,
+			EnableCrossNamespaceResources: true,
 		},
 	}
+	expectedName := GetCrossNamespaceRoleName(cluster)
 
-	Describe("GetCrossNamespaceDatabaseRoleName", func() {
-		It("returns the correct naming format", func() {
-			name := GetCrossNamespaceDatabaseRoleName(cluster)
-			Expect(name).To(Equal("cnpg-postgres-my-cluster-cross-ns-db"))
+	Describe("GetCrossNamespaceRoleName", func() {
+		It("returns a valid name embedding a hash of the cluster", func() {
+			Expect(expectedName).To(MatchRegexp(`^cnpg-cross-ns-[0-9a-f]{16}$`))
+			Expect(GetCrossNamespaceRoleNameFor("postgres", "my-cluster")).To(Equal(expectedName))
 		})
 
 		It("returns unique names for different clusters", func() {
-			cluster2 := cluster.DeepCopy()
-			cluster2.Name = "other-cluster"
-			cluster2.Namespace = "other-ns"
+			Expect(GetCrossNamespaceRoleNameFor("other-ns", "other-cluster")).NotTo(Equal(expectedName))
+		})
 
-			name1 := GetCrossNamespaceDatabaseRoleName(cluster)
-			name2 := GetCrossNamespaceDatabaseRoleName(*cluster2)
-
-			Expect(name1).NotTo(Equal(name2))
-			Expect(name2).To(Equal("cnpg-other-ns-other-cluster-cross-ns-db"))
+		It("is not ambiguous when the namespace and the name contain dashes", func() {
+			Expect(GetCrossNamespaceRoleNameFor("app-db", "one")).
+				NotTo(Equal(GetCrossNamespaceRoleNameFor("app", "db-one")))
 		})
 	})
 
-	Describe("CreateCrossNamespaceDatabaseRole", func() {
-		It("creates a ClusterRole with correct metadata", func() {
-			role := CreateCrossNamespaceDatabaseRole(cluster)
+	Describe("IsCrossNamespaceRBACOwnedBy", func() {
+		It("recognizes the objects created for the cluster", func() {
+			labels := CreateCrossNamespaceRole(cluster).Labels
+			Expect(IsCrossNamespaceRBACOwnedBy(labels, "postgres", "my-cluster")).To(BeTrue())
+		})
 
-			Expect(role.Name).To(Equal("cnpg-postgres-my-cluster-cross-ns-db"))
+		It("rejects the objects of another cluster or not managed by the operator", func() {
+			labels := CreateCrossNamespaceRole(cluster).Labels
+			Expect(IsCrossNamespaceRBACOwnedBy(labels, "postgres", "other")).To(BeFalse())
+			Expect(IsCrossNamespaceRBACOwnedBy(labels, "other", "my-cluster")).To(BeFalse())
+			Expect(IsCrossNamespaceRBACOwnedBy(map[string]string{
+				"cnpg.io/cluster":          "my-cluster",
+				"cnpg.io/clusterNamespace": "postgres",
+			}, "postgres", "my-cluster")).To(BeFalse())
+		})
+	})
+
+	Describe("CreateCrossNamespaceRole", func() {
+		It("creates a ClusterRole with correct metadata", func() {
+			role := CreateCrossNamespaceRole(cluster)
+
+			Expect(role.Name).To(Equal(expectedName))
 			Expect(role.Labels).To(HaveKeyWithValue("cnpg.io/cluster", "my-cluster"))
 			Expect(role.Labels).To(HaveKeyWithValue("cnpg.io/clusterNamespace", "postgres"))
 			Expect(role.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "cloudnative-pg"))
 		})
 
-		It("creates a ClusterRole with correct rules for databases", func() {
-			role := CreateCrossNamespaceDatabaseRole(cluster)
+		It("grants access to every resource that may refer to the cluster", func() {
+			role := CreateCrossNamespaceRole(cluster)
 
 			Expect(role.Rules).To(HaveLen(2))
 
-			// Check databases rule
-			dbRule := role.Rules[0]
-			Expect(dbRule.APIGroups).To(ConsistOf("postgresql.cnpg.io"))
-			Expect(dbRule.Resources).To(ConsistOf("databases"))
-			Expect(dbRule.Verbs).To(ConsistOf("get", "update", "list", "watch"))
+			resourceRule := role.Rules[0]
+			Expect(resourceRule.APIGroups).To(ConsistOf("postgresql.cnpg.io"))
+			Expect(resourceRule.Resources).To(ConsistOf(
+				"databases", "databaseroles", "publications", "subscriptions"))
+			Expect(resourceRule.Verbs).To(ConsistOf("get", "update", "list", "watch"))
 
-			// Check databases/status rule
 			statusRule := role.Rules[1]
 			Expect(statusRule.APIGroups).To(ConsistOf("postgresql.cnpg.io"))
-			Expect(statusRule.Resources).To(ConsistOf("databases/status"))
+			Expect(statusRule.Resources).To(ConsistOf(
+				"databases/status", "databaseroles/status", "publications/status", "subscriptions/status"))
 			Expect(statusRule.Verbs).To(ConsistOf("get", "patch", "update"))
 		})
 	})
 
-	Describe("CreateCrossNamespaceDatabaseRoleBinding", func() {
+	Describe("CreateCrossNamespaceRoleBinding", func() {
 		It("creates a ClusterRoleBinding with correct metadata", func() {
-			binding := CreateCrossNamespaceDatabaseRoleBinding(cluster)
+			binding := CreateCrossNamespaceRoleBinding(cluster)
 
-			Expect(binding.Name).To(Equal("cnpg-postgres-my-cluster-cross-ns-db"))
+			Expect(binding.Name).To(Equal(expectedName))
 			Expect(binding.Labels).To(HaveKeyWithValue("cnpg.io/cluster", "my-cluster"))
 			Expect(binding.Labels).To(HaveKeyWithValue("cnpg.io/clusterNamespace", "postgres"))
 			Expect(binding.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "cloudnative-pg"))
 		})
 
 		It("binds the ServiceAccount to the ClusterRole", func() {
-			binding := CreateCrossNamespaceDatabaseRoleBinding(cluster)
+			binding := CreateCrossNamespaceRoleBinding(cluster)
 
 			Expect(binding.Subjects).To(HaveLen(1))
 			Expect(binding.Subjects[0].Kind).To(Equal("ServiceAccount"))
@@ -556,7 +571,7 @@ var _ = Describe("Cross-Namespace Database RBAC", func() {
 
 			Expect(binding.RoleRef.APIGroup).To(Equal("rbac.authorization.k8s.io"))
 			Expect(binding.RoleRef.Kind).To(Equal("ClusterRole"))
-			Expect(binding.RoleRef.Name).To(Equal("cnpg-postgres-my-cluster-cross-ns-db"))
+			Expect(binding.RoleRef.Name).To(Equal(expectedName))
 		})
 	})
 })

@@ -176,7 +176,7 @@ EOL
 ESO
 EdwinaZhu
 EmbeddedObjectMetadata
-EnableCrossNamespaceDatabases
+EnableCrossNamespaceResources
 EnablePDB
 Endevir
 EndpointCA

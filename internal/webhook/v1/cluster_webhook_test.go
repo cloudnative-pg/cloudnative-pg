@@ -3099,60 +3099,60 @@ var _ = Describe("cross-namespace databases change validation", func() {
 	It("rejects disabling cross-namespace databases once enabled", func() {
 		oldCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				EnableCrossNamespaceDatabases: true,
+				EnableCrossNamespaceResources: true,
 			},
 		}
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				EnableCrossNamespaceDatabases: false,
+				EnableCrossNamespaceResources: false,
 			},
 		}
-		result := v.validateCrossNamespaceDatabasesChange(cluster, oldCluster)
+		result := v.validateCrossNamespaceResourcesChange(cluster, oldCluster)
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
-		Expect(result[0].Field).To(Equal("spec.enableCrossNamespaceDatabases"))
+		Expect(result[0].Field).To(Equal("spec.enableCrossNamespaceResources"))
 	})
 
 	It("allows enabling cross-namespace databases", func() {
 		oldCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				EnableCrossNamespaceDatabases: false,
+				EnableCrossNamespaceResources: false,
 			},
 		}
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				EnableCrossNamespaceDatabases: true,
+				EnableCrossNamespaceResources: true,
 			},
 		}
-		Expect(v.validateCrossNamespaceDatabasesChange(cluster, oldCluster)).To(BeEmpty())
+		Expect(v.validateCrossNamespaceResourcesChange(cluster, oldCluster)).To(BeEmpty())
 	})
 
 	It("allows keeping cross-namespace databases enabled", func() {
 		oldCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				EnableCrossNamespaceDatabases: true,
+				EnableCrossNamespaceResources: true,
 			},
 		}
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				EnableCrossNamespaceDatabases: true,
+				EnableCrossNamespaceResources: true,
 			},
 		}
-		Expect(v.validateCrossNamespaceDatabasesChange(cluster, oldCluster)).To(BeEmpty())
+		Expect(v.validateCrossNamespaceResourcesChange(cluster, oldCluster)).To(BeEmpty())
 	})
 
 	It("allows keeping cross-namespace databases disabled", func() {
 		oldCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				EnableCrossNamespaceDatabases: false,
+				EnableCrossNamespaceResources: false,
 			},
 		}
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				EnableCrossNamespaceDatabases: false,
+				EnableCrossNamespaceResources: false,
 			},
 		}
-		Expect(v.validateCrossNamespaceDatabasesChange(cluster, oldCluster)).To(BeEmpty())
+		Expect(v.validateCrossNamespaceResourcesChange(cluster, oldCluster)).To(BeEmpty())
 	})
 })
 

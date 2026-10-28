@@ -481,7 +481,7 @@ var _ = Describe("Database cross-namespace validation", func() {
 		Expect(errs).To(BeEmpty())
 	})
 
-	It("allows cross-namespace Database when cluster has EnableCrossNamespaceDatabases=true", func() {
+	It("allows cross-namespace Database when cluster has EnableCrossNamespaceResources=true", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "my-cluster",
@@ -489,7 +489,7 @@ var _ = Describe("Database cross-namespace validation", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				Instances:                     1,
-				EnableCrossNamespaceDatabases: true,
+				EnableCrossNamespaceResources: true,
 			},
 		}
 
@@ -517,7 +517,7 @@ var _ = Describe("Database cross-namespace validation", func() {
 		Expect(errs).To(BeEmpty())
 	})
 
-	It("rejects cross-namespace Database when cluster has EnableCrossNamespaceDatabases=false", func() {
+	It("rejects cross-namespace Database when cluster has EnableCrossNamespaceResources=false", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "my-cluster",
@@ -525,7 +525,7 @@ var _ = Describe("Database cross-namespace validation", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				Instances:                     1,
-				EnableCrossNamespaceDatabases: false,
+				EnableCrossNamespaceResources: false,
 			},
 		}
 
@@ -553,7 +553,7 @@ var _ = Describe("Database cross-namespace validation", func() {
 		Expect(errs).To(HaveLen(1))
 		Expect(errs[0].Field).To(Equal("spec.cluster.namespace"))
 		Expect(errs[0].Type).To(Equal(field.ErrorTypeForbidden))
-		Expect(errs[0].Detail).To(ContainSubstring("enableCrossNamespaceDatabases"))
+		Expect(errs[0].Detail).To(ContainSubstring("enableCrossNamespaceResources"))
 	})
 
 	It("rejects cross-namespace Database when cluster does not exist", func() {

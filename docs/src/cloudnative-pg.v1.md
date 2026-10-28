@@ -700,7 +700,7 @@ _Appears in:_
 | `plugins` _[PluginConfiguration](#pluginconfiguration) array_ | The plugins configuration, containing<br />any plugin to be loaded with the corresponding configuration |  |  |  |
 | `probes` _[ProbesConfiguration](#probesconfiguration)_ | The configuration of the probes to be injected<br />in the PostgreSQL Pods. |  |  |  |
 | `primaryLease` _[PrimaryLeaseConfiguration](#primaryleaseconfiguration)_ | Configuration of the Kubernetes `Lease` used to coordinate safe primary<br />election within the cluster. When omitted, the operator applies built-in<br />defaults; tune these values only if you understand the consequences for<br />failover timing. |  |  |  |
-| `enableCrossNamespaceDatabases` _boolean_ | EnableCrossNamespaceDatabases enables this cluster to manage Database<br />resources from other namespaces. When enabled, a ClusterRole and<br />ClusterRoleBinding are created to grant cross-namespace access. |  | false |  |
+| `enableCrossNamespaceResources` _boolean_ | EnableCrossNamespaceResources enables this cluster to manage the<br />Database, DatabaseRole, Publication and Subscription resources of other<br />namespaces. When enabled, a ClusterRole and a ClusterRoleBinding are<br />created to grant the cluster access to those resources in every<br />namespace, and a Role with its RoleBinding is created in each namespace<br />holding the password Secrets of its DatabaseRoles.<br />It cannot be disabled once enabled. |  | false |  |
 
 
 #### ClusterStatus

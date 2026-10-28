@@ -32,18 +32,18 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 )
 
-// databaseWatchScopeReconciler restarts the instance manager when the namespaces
-// the Database objects are watched in no longer match the ones this process
+// watchScopeReconciler restarts the instance manager when the namespaces
+// the managed resources are watched in no longer match the ones this process
 // started with.
 //
 // The scope of the cache of a controller-runtime manager is fixed when the
-// manager is built, so enabling the cross-namespace Database support on a
+// manager is built, so enabling the cross-namespace resources support on a
 // running cluster cannot widen the watch of an already started instance manager.
-// Instead of leaving the cross-namespace Database objects unreconciled until the
+// Instead of leaving the cross-namespace resources unreconciled until the
 // pod is recreated, this reconciler replaces the instance manager process with a
 // new one, which reads the current definition of the cluster while starting.
 // PostgreSQL keeps running across the restart.
-type databaseWatchScopeReconciler struct {
+type watchScopeReconciler struct {
 	client          client.Client
 	instance        *postgres.Instance
 	crossNamespace  bool
@@ -55,17 +55,17 @@ type databaseWatchScopeReconciler struct {
 	restart func(context.CancelFunc, concurrency.MultipleExecuted) error
 }
 
-// newDatabaseWatchScopeReconciler builds a databaseWatchScopeReconciler for the
+// newWatchScopeReconciler builds a watchScopeReconciler for the
 // passed instance, whose cache watches Database objects cluster-wide only when
 // crossNamespace is true
-func newDatabaseWatchScopeReconciler(
+func newWatchScopeReconciler(
 	cli client.Client,
 	instance *postgres.Instance,
 	crossNamespace bool,
 	cancelFunc context.CancelFunc,
 	exitedCondition concurrency.MultipleExecuted,
-) *databaseWatchScopeReconciler {
-	return &databaseWatchScopeReconciler{
+) *watchScopeReconciler {
+	return &watchScopeReconciler{
 		client:          cli,
 		instance:        instance,
 		crossNamespace:  crossNamespace,
@@ -75,9 +75,9 @@ func newDatabaseWatchScopeReconciler(
 	}
 }
 
-// Reconcile restarts the instance manager when the cross-namespace Database
+// Reconcile restarts the instance manager when the cross-namespace resources
 // support of the cluster does not match the one of this process
-func (r *databaseWatchScopeReconciler) Reconcile(
+func (r *watchScopeReconciler) Reconcile(
 	ctx context.Context,
 	req ctrl.Request,
 ) (ctrl.Result, error) {
@@ -88,7 +88,7 @@ func (r *databaseWatchScopeReconciler) Reconcile(
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if cluster.Spec.EnableCrossNamespaceDatabases == r.crossNamespace {
+	if cluster.Spec.EnableCrossNamespaceResources == r.crossNamespace {
 		return ctrl.Result{}, nil
 	}
 
@@ -98,14 +98,14 @@ func (r *databaseWatchScopeReconciler) Reconcile(
 	// anyway, so there is nothing left to do here.
 	if !r.instance.InstanceManagerIsUpgrading.CompareAndSwap(false, true) {
 		contextLogger.Info(
-			"Cross-namespace databases support changed while the instance manager is upgrading, " +
+			"Cross-namespace resources support changed while the instance manager is upgrading, " +
 				"the upgrade will apply the new configuration")
 		return ctrl.Result{}, nil
 	}
 
 	contextLogger.Info(
-		"Cross-namespace databases support changed, restarting the instance manager to apply it",
-		"enableCrossNamespaceDatabases", cluster.Spec.EnableCrossNamespaceDatabases)
+		"Cross-namespace resources support changed, restarting the instance manager to apply it",
+		"enableCrossNamespaceResources", cluster.Spec.EnableCrossNamespaceResources)
 
 	// This does not return when it succeeds, as the process is replaced
 	if err := r.restart(r.cancelFunc, r.exitedCondition); err != nil {
@@ -117,9 +117,9 @@ func (r *databaseWatchScopeReconciler) Reconcile(
 }
 
 // SetupWithManager registers the reconciler inside the controller manager
-func (r *databaseWatchScopeReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *watchScopeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
-		Named("database-watch-scope").
+		Named("cross-namespace-watch-scope").
 		Complete(r)
 }

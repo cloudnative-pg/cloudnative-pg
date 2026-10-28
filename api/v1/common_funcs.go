@@ -17,7 +17,6 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-
 package v1
 
 // namespaceOrDefault returns the namespace of the referenced Cluster, which

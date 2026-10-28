@@ -143,7 +143,7 @@ func (v *DatabaseCustomValidator) validateDatabaseChanges(newDB, oldDB *apiv1.Da
 }
 
 // validateCrossNamespaceCluster validates that if the Database references a Cluster
-// in a different namespace, the Cluster must have EnableCrossNamespaceDatabases set to true.
+// in a different namespace, the Cluster must have EnableCrossNamespaceResources set to true.
 func (v *DatabaseCustomValidator) validateCrossNamespaceCluster(
 	ctx context.Context,
 	db *apiv1.Database,
@@ -185,13 +185,13 @@ func (v *DatabaseCustomValidator) validateCrossNamespaceCluster(
 		}
 	}
 
-	// Check if the cluster has EnableCrossNamespaceDatabases set to true
-	if !cluster.Spec.EnableCrossNamespaceDatabases {
+	// Check if the cluster has EnableCrossNamespaceResources set to true
+	if !cluster.Spec.EnableCrossNamespaceResources {
 		return field.ErrorList{
 			field.Forbidden(
 				field.NewPath("spec", "cluster", "namespace"),
 				fmt.Sprintf(
-					"cluster %q does not have enableCrossNamespaceDatabases set to true",
+					"cluster %q does not have enableCrossNamespaceResources set to true",
 					db.Spec.ClusterRef.Name,
 				),
 			),
