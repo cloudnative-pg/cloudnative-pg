@@ -90,11 +90,6 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	err = r.reconcileCrossNamespaceRBAC(ctx, cluster)
-	if err != nil {
-		return err
-	}
-
 	if !cluster.Spec.Monitoring.AreDefaultQueriesDisabled() {
 		err = r.createOrPatchDefaultMetrics(ctx, cluster)
 		if err != nil {
