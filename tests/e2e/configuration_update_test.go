@@ -36,7 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
@@ -44,6 +46,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -615,6 +618,86 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		It("3. performing a rolling update when changing imageName and extension GUC at the same time", func() {
 			oldPrimary := gatherCurrentPrimary(namespace)
 			assertChangeImageAndGucs(namespace, apiv1.PrimaryUpdateMethodRestart)
+			checkSwitchoverHaveNotOccurred(namespace, oldPrimary)
+		})
+	})
+
+	Context("PrimaryUpdateStrategy: supervised", Ordered, func() {
+		BeforeAll(func() {
+			namespacePrefix := "cluster-update-config-supervised"
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			cluster := generateBaseCluster(namespace)
+			cluster.Spec.Instances = 2
+			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
+			cluster.Spec.PrimaryUpdateStrategy = apiv1.PrimaryUpdateStrategySupervised
+			clusterutils.AddTopologySpreadConstraint(cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
+		})
+
+		It("1. restarting a replica while the removal of a hot-standby sensible GUC waits for the user", func() {
+			oldPrimary := gatherCurrentPrimary(namespace)
+
+			By("removing max_connections from the cluster spec", func() {
+				params := generateBaseCluster(namespace).Spec.PostgresConfiguration.Parameters
+				delete(params, "max_connections")
+				updateClusterPostgresParams(params, namespace)
+			})
+
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
+				[]string{apiv1.PhaseWaitingForUser}, 60)
+
+			// The primary is still running with max_connections = 110, so the
+			// replica must keep that value from pg_controldata instead of
+			// starting with the PostgreSQL default and aborting recovery
+			By("restarting the replica", func() {
+				replica, err := clusterutils.GetFirstReplica(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				oldUID := replica.UID
+				Expect(pods.Delete(env.Ctx, env.Client, namespace, replica.Name)).To(Succeed())
+
+				Eventually(func(g Gomega) {
+					pod, err := pods.Get(env.Ctx, env.Client, namespace, replica.Name)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(pod.UID).ToNot(Equal(oldUID))
+					g.Expect(utils.IsPodReady(*pod)).To(BeTrue())
+				}, 180).Should(Succeed())
+
+				pod, err := pods.Get(env.Ctx, env.Client, namespace, replica.Name)
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, pod, postgres.PostgresDBName,
+					"SHOW max_connections", "110"),
+					RetryTimeout).Should(Succeed())
+			})
+
+			By("restarting the primary in place", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(clusterstatus.PatchWithOptimisticLock(
+					env.Ctx,
+					env.Client,
+					cluster,
+					clusterstatus.SetPhase(apiv1.PhaseInplacePrimaryRestart, "Requested by the user"),
+					clusterstatus.SetClusterReadyCondition,
+				)).To(Succeed())
+			})
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
+
+			By("verify that the max_connections has been set to default in every pod", func() {
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				for _, pod := range podList.Items {
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_connections", "100"),
+						RetryTimeout).Should(Succeed())
+				}
+			})
+
 			checkSwitchoverHaveNotOccurred(namespace, oldPrimary)
 		})
 	})
