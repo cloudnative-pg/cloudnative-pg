@@ -33,6 +33,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -496,6 +497,89 @@ var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
 		Expect(statements).To(ContainElement(SatisfyAll(
 			HavePrefix("CREATE ROLE"),
 			ContainSubstring("VALID UNTIL '"+expiration.Format("2006-01-02 15:04:05")),
+		)))
+	})
+})
+
+var _ = Describe("DatabaseRole reconcileRole across namespaces", func() {
+	It("reads the password from the Secret in the namespace of the role", func() {
+		const tenantNamespace = "tenant"
+
+		var (
+			statements  []string
+			readSecrets []client.ObjectKey
+		)
+		recorder := sqlmock.QueryMatcherFunc(func(_, actualSQL string) error {
+			statements = append(statements, actualSQL)
+			return nil
+		})
+		db, dbMock, err := sqlmock.New(sqlmock.QueryMatcherOption(recorder))
+		Expect(err).NotTo(HaveOccurred())
+		// No rows from pg_authid, so reconcileRole takes the create path.
+		dbMock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{
+			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword",
+			"rolvaliduntil", "rolbypassrls", "comment", "xmin", "inroles",
+		}))
+		dbMock.ExpectBegin()
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+		dbMock.ExpectCommit()
+
+		role := newTestDatabaseRole()
+		role.Namespace = tenantNamespace
+		role.Spec.ClusterRef.Namespace = testNamespace
+		role.Spec.PasswordSecret = &apiv1.LocalObjectReference{Name: "app-role-password"}
+
+		newSecret := func(namespace, password string) *corev1.Secret {
+			return &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "app-role-password", Namespace: namespace},
+				Type:       corev1.SecretTypeBasicAuth,
+				Data: map[string][]byte{
+					corev1.BasicAuthUsernameKey: []byte(testRoleName),
+					corev1.BasicAuthPasswordKey: []byte(password),
+				},
+			}
+		}
+		// A Secret with the same name in the namespace of the cluster must
+		// not be used in place of the one next to the role
+		cli := newIndexedFakeClientBuilder().
+			WithObjects(
+				role,
+				newSecret(tenantNamespace, "tenant-password"),
+				newSecret(testNamespace, "cluster-namespace-password"),
+			).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(
+					ctx context.Context,
+					c client.WithWatch,
+					key client.ObjectKey,
+					obj client.Object,
+					opts ...client.GetOption,
+				) error {
+					if _, ok := obj.(*corev1.Secret); ok {
+						readSecrets = append(readSecrets, key)
+					}
+					return c.Get(ctx, key, obj, opts...)
+				},
+			}).
+			Build()
+		r := &DatabaseRoleReconciler{Client: cli, instance: &fakeRoleInstance{db: db}}
+
+		_, err = r.reconcileRole(context.Background(), role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+
+		// The password is hashed before reaching PostgreSQL, so check which
+		// Secret it came from
+		Expect(readSecrets).To(ConsistOf(
+			client.ObjectKey{Namespace: tenantNamespace, Name: "app-role-password"},
+		))
+		Expect(statements).To(ContainElement(SatisfyAll(
+			HavePrefix("CREATE ROLE"),
+			ContainSubstring("PASSWORD 'SCRAM-SHA-256$"),
 		)))
 	})
 })
