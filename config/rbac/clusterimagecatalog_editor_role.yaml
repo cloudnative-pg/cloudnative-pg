@@ -1,0 +1,26 @@
+# permissions for end users to edit clusterimagecatalogs.
+# ClusterImageCatalog is cluster-scoped: it can only be granted with a
+# ClusterRoleBinding, which cannot be limited to a single namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterimagecatalog-editor-role
+rules:
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusterimagecatalogs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusterimagecatalogs/status
+  verbs:
+  - get
