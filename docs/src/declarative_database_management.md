@@ -71,6 +71,12 @@ The `Database` object must reference a specific `Cluster`, determining where
 the database will be created. It is managed by the cluster's primary instance,
 ensuring the database is created or updated as needed.
 
+The `Cluster` is looked up in the namespace of the `Database`, unless
+`spec.cluster.namespace` names another one. A `Database` can reference a
+`Cluster` in another namespace only when that cluster sets
+`enableCrossNamespaceResources: true`: see
+["Cross-namespace resources"](cross_namespace_resources.md).
+
 :::warning
     The `spec.cluster` field is immutable after creation. To target a
     different `Cluster`, create a new `Database` resource instead of updating
@@ -461,9 +467,12 @@ replica is promoted.
 
 ### Conflict Resolution
 
-If two `Database` objects in the same namespace manage the same PostgreSQL
-database (i.e., identical `spec.name` and `spec.cluster.name`), the second
-object will be rejected.
+If two `Database` objects manage the same PostgreSQL database (i.e.,
+identical `spec.name` and the same referenced cluster), the second object will
+be rejected. This applies across namespaces too, when the cluster accepts
+[cross-namespace resources](cross_namespace_resources.md#exclusivity-and-conflicts).
+Deleting a rejected object never drops the database, even with
+`databaseReclaimPolicy: delete`.
 
 Example status message:
 

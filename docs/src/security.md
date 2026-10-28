@@ -299,6 +299,19 @@ other relationship. Because Kubernetes owner references are confined to a
 single namespace, the operator also cannot establish ownership of resources in
 any other namespace.
 
+A Cluster can opt out of part of this isolation by setting
+`enableCrossNamespaceResources: true`, which lets `Database`, `DatabaseRole`,
+`Publication` and `Subscription` objects in **any** namespace target it. The
+operator then grants the Cluster's ServiceAccount access to those objects in
+all namespaces through a `ClusterRole`, and read access to the password Secrets
+of its `DatabaseRole` objects through a `Role` in each namespace holding them.
+Since write access to `DatabaseRole` is equivalent to superuser access, this
+extends that access to whoever can create a `DatabaseRole` anywhere in the
+Kubernetes cluster. The setting cannot be disabled once enabled. See
+["Cross-namespace resources"](cross_namespace_resources.md#security-model)
+for the exact permissions and how to restrict which namespaces can target a
+Cluster.
+
 #### RBAC on Custom Resources
 
 Access to CloudNativePG custom resources is governed by standard Kubernetes
@@ -434,6 +447,14 @@ namespaced or non-namespaced resources.
   backups of a PostgreSQL server. VolumeSnapshots are read too in order to
   validate them before starting the restore process.
 
+`roles`, `rolebindings`, `clusterroles` and `clusterrolebindings`
+: The operator creates a `Role` and a `RoleBinding` for the ServiceAccount of
+  each Cluster. For Clusters that enable
+  [cross-namespace resources](cross_namespace_resources.md#security-model), it
+  also creates and deletes a `ClusterRole` and a `ClusterRoleBinding`, and a
+  `Role` and a `RoleBinding` in each namespace holding `DatabaseRole` objects
+  that reference the Cluster.
+
 `nodes`
 : The operator needs to get the labels for Affinity and AntiAffinity so it can
   decide in which nodes a pod can be scheduled. This is useful, for example, to
@@ -478,6 +499,11 @@ permission management.
 The operator currently requires `ClusterRole` permissions to read `nodes` and
 `ClusterImageCatalog` objects. All other permissions can be namespace-scoped (i.e., `Role`) or
 cluster-wide (i.e., `ClusterRole`).
+
+[Cross-namespace resources](cross_namespace_resources.md) additionally need
+cluster-wide permissions to manage `ClusterRole` and `ClusterRoleBinding`
+objects, which are cluster-scoped: the operator can only grant a Cluster access
+to other namespaces through permissions it holds itself.
 
 Even with these permissions, if someone gains access to the `ServiceAccount`,
 they will only have `get`, `list`, and `watch` permissions, which are limited
