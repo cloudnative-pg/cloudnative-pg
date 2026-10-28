@@ -25,12 +25,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
@@ -209,6 +211,57 @@ func isCrossNamespaceResourcesEnabled(
 	return cluster.Spec.EnableCrossNamespaceResources, nil
 }
 
+// crossNamespaceDetectionBackoff is how long detectCrossNamespaceResources
+// keeps trying to read the cluster: a few seconds, so that a brief failure of
+// the API server does not cost an extra restart, while not keeping the probes
+// of an already running PostgreSQL unanswered for long
+var crossNamespaceDetectionBackoff = wait.Backoff{
+	Duration: 500 * time.Millisecond,
+	Factor:   2,
+	Jitter:   0.1,
+	Steps:    5,
+}
+
+// detectCrossNamespaceResources tells whether the managed resources must be
+// watched in every namespace, retrying for a short while when the cluster
+// cannot be read.
+//
+// When the cluster still cannot be read, the managed resources are only
+// watched in the namespace of the cluster, as they were before the
+// cross-namespace resources support existed: the watchScopeReconciler
+// restarts the instance manager once the cluster can be read and turns out
+// to enable the feature. Failing here instead would end this process, and
+// with it a PostgreSQL left running by an online upgrade.
+func detectCrossNamespaceResources(
+	ctx context.Context,
+	cli client.Reader,
+	namespace string,
+	clusterName string,
+	backoff wait.Backoff,
+) bool {
+	contextLogger := log.FromContext(ctx)
+
+	var enabled bool
+	err := retry.OnError(backoff, func(error) bool { return ctx.Err() == nil }, func() error {
+		var err error
+		enabled, err = isCrossNamespaceResourcesEnabled(ctx, cli, namespace, clusterName)
+		if err != nil {
+			contextLogger.Info("Cannot read the cluster to detect the cross-namespace resources support, retrying",
+				"err", err.Error())
+		}
+		return err
+	})
+	if err != nil {
+		contextLogger.Warning(
+			"Cannot detect the cross-namespace resources support, watching the resources of the "+
+				"cluster namespace only until the cluster can be read",
+			"err", err.Error())
+		return false
+	}
+
+	return enabled
+}
+
 func runSubCommand( //nolint: gocyclo,gocognit
 	ctx context.Context,
 	instance *postgres.Instance,
@@ -237,12 +290,9 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		return err
 	}
 
-	crossNamespaceResources, err := isCrossNamespaceResourcesEnabled(
-		ctx, preflightClient, instance.GetNamespaceName(), instance.GetClusterName())
-	if err != nil {
-		contextLogger.Error(err, "unable to detect the cross-namespace resources support")
-		return err
-	}
+	crossNamespaceResources := detectCrossNamespaceResources(
+		ctx, preflightClient, instance.GetNamespaceName(), instance.GetClusterName(),
+		crossNamespaceDetectionBackoff)
 
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
