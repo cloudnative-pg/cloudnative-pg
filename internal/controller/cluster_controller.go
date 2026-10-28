@@ -1714,10 +1714,7 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 // Cluster through the `cluster` field to a reconcile request for that Cluster.
 // It resolves the cluster reference by name instead of through an owner reference.
 func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []reconcile.Request {
-	owned, ok := obj.(interface {
-		GetClusterRef() apiv1.ClusterObjectReference
-		GetClusterNamespace() string
-	})
+	owned, ok := obj.(clusterindex.ClusterReferrer)
 	if !ok {
 		return nil
 	}

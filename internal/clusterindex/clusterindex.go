@@ -38,9 +38,10 @@ import (
 // another namespace, so the name of the cluster alone would not identify it.
 const Key = ".spec.cluster.namespacedName"
 
-// clusterReferrer is a resource referring to a cluster, possibly living in
-// another namespace
-type clusterReferrer interface {
+// ClusterReferrer is a resource referring to a cluster, possibly living in
+// another namespace: a Database, a DatabaseRole, a Publication or a
+// Subscription
+type ClusterReferrer interface {
 	GetClusterRef() apiv1.ClusterObjectReference
 	GetClusterNamespace() string
 }
@@ -48,7 +49,7 @@ type clusterReferrer interface {
 // IndexByCluster extracts the value of the Key index from a resource, that is
 // the namespaced name of the cluster it refers to
 func IndexByCluster(rawObj client.Object) []string {
-	referrer, ok := rawObj.(clusterReferrer)
+	referrer, ok := rawObj.(ClusterReferrer)
 	if !ok || referrer.GetClusterRef().Name == "" {
 		return nil
 	}

@@ -63,12 +63,6 @@ func (sub *Subscription) GetClusterNamespace() string {
 	return sub.Spec.ClusterRef.namespaceOrDefault(sub.Namespace)
 }
 
-// IsCrossNamespace returns true if the Subscription references a Cluster
-// in a different namespace.
-func (sub *Subscription) IsCrossNamespace() bool {
-	return sub.Spec.ClusterRef.isCrossNamespace(sub.Namespace)
-}
-
 // GetName returns the subscription object name
 func (sub *Subscription) GetName() string {
 	return sub.Name

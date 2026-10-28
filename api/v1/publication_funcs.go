@@ -63,12 +63,6 @@ func (pub *Publication) GetClusterNamespace() string {
 	return pub.Spec.ClusterRef.namespaceOrDefault(pub.Namespace)
 }
 
-// IsCrossNamespace returns true if the Publication references a Cluster
-// in a different namespace.
-func (pub *Publication) IsCrossNamespace() bool {
-	return pub.Spec.ClusterRef.isCrossNamespace(pub.Namespace)
-}
-
 // GetManagedObjectName returns the name of the managed publication object
 func (pub *Publication) GetManagedObjectName() string {
 	return pub.Spec.Name

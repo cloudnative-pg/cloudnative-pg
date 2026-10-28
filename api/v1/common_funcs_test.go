@@ -31,7 +31,6 @@ import (
 type crossNamespaceReferrer interface {
 	GetClusterRef() ClusterObjectReference
 	GetClusterNamespace() string
-	IsCrossNamespace() bool
 }
 
 var _ = Describe("Cross-namespace cluster references", func() {
@@ -50,18 +49,17 @@ var _ = Describe("Cross-namespace cluster references", func() {
 	}
 
 	DescribeTable("resolve the namespace of the cluster",
-		func(ref ClusterObjectReference, expectedNamespace string, expectedCrossNamespace bool) {
+		func(ref ClusterObjectReference, expectedNamespace string) {
 			for kind, referrer := range newReferrers(ref) {
 				Expect(referrer.GetClusterRef()).To(Equal(ref), kind)
 				Expect(referrer.GetClusterNamespace()).To(Equal(expectedNamespace), kind)
-				Expect(referrer.IsCrossNamespace()).To(Equal(expectedCrossNamespace), kind)
 			}
 		},
 		Entry("without a namespace",
-			ClusterObjectReference{Name: "pg"}, "app", false),
+			ClusterObjectReference{Name: "pg"}, "app"),
 		Entry("with the namespace of the resource",
-			ClusterObjectReference{Name: "pg", Namespace: "app"}, "app", false),
+			ClusterObjectReference{Name: "pg", Namespace: "app"}, "app"),
 		Entry("with another namespace",
-			ClusterObjectReference{Name: "pg", Namespace: "postgres"}, "postgres", true),
+			ClusterObjectReference{Name: "pg", Namespace: "postgres"}, "postgres"),
 	)
 })
