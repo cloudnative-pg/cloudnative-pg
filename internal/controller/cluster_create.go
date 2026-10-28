@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -770,9 +771,7 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		ctx,
 		&roleList,
 		client.InNamespace(cluster.Namespace),
-		client.MatchingFields{
-			databaseRoleClusterKey: cluster.Name,
-		},
+		clusterindex.MatchingCluster(client.ObjectKeyFromObject(cluster)),
 	); err != nil {
 		return fmt.Errorf("while listing database roles: %w", err)
 	}

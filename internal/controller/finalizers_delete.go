@@ -29,28 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
-
-// indexDatabaseByCluster extracts the value of the databaseClusterKey index
-// from a Database, that is the namespaced name of the cluster it refers to
-func indexDatabaseByCluster(rawObj client.Object) []string {
-	database, ok := rawObj.(*apiv1.Database)
-	if !ok || database.Spec.ClusterRef.Name == "" {
-		return nil
-	}
-
-	return []string{databaseClusterIndexValue(types.NamespacedName{
-		Namespace: database.GetClusterNamespace(),
-		Name:      database.Spec.ClusterRef.Name,
-	})}
-}
-
-// databaseClusterIndexValue returns the value to look up in the
-// databaseClusterKey index to get the Database objects of a cluster
-func databaseClusterIndexValue(namespacedName types.NamespacedName) string {
-	return namespacedName.String()
-}
 
 // notifyDeletionToOwnedResources notifies the cluster deletion to the managed owned resources
 func (r *ClusterReconciler) notifyDeletionToOwnedResources(
@@ -62,9 +43,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	// index of their cluster reference, instead of being listed in the namespace
 	// of the cluster.
 	var dbList apiv1.DatabaseList
-	if err := r.List(ctx, &dbList, client.MatchingFields{
-		databaseClusterKey: databaseClusterIndexValue(namespacedName),
-	}); err != nil {
+	if err := r.List(ctx, &dbList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
 	}
 
