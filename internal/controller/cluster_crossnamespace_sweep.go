@@ -51,10 +51,14 @@ type crossNamespaceRBACKind struct {
 }
 
 // crossNamespaceRBACKinds are the kinds of RBAC objects swept, in deletion
-// order: the bindings go before the roles they refer to
+// order: the bindings go before the roles they refer to. The Roles and the
+// RoleBindings are the ones granting access to the password Secrets of the
+// tenant namespaces.
 var crossNamespaceRBACKinds = []crossNamespaceRBACKind{
 	{name: "ClusterRoleBinding", newList: func() client.ObjectList { return &rbacv1.ClusterRoleBindingList{} }},
+	{name: "RoleBinding", newList: func() client.ObjectList { return &rbacv1.RoleBindingList{} }},
 	{name: "ClusterRole", newList: func() client.ObjectList { return &rbacv1.ClusterRoleList{} }},
+	{name: "Role", newList: func() client.ObjectList { return &rbacv1.RoleList{} }},
 }
 
 // crossNamespaceRBACObject is an RBAC object found by the sweep
@@ -64,12 +68,15 @@ type crossNamespaceRBACObject struct {
 }
 
 // CrossNamespaceRBACSweeper deletes the RBAC objects created for the
-// cross-namespace resources support of clusters that no longer exist.
+// cross-namespace resources support of clusters that no longer exist, or
+// that do not enable the feature.
 //
-// Those objects are cluster-scoped and cannot be garbage collected through an
-// owner reference to the Cluster. They are deleted when the deletion of the
-// Cluster is reconciled, but a Cluster deleted while the operator is down,
-// with no dependent left to enqueue it, is never reconciled again: the sweep,
+// Those objects are cluster-scoped, or live in the namespaces of the tenants,
+// and cannot be garbage collected through an owner reference to the Cluster.
+// They are deleted when the deletion of the Cluster is reconciled, but a
+// Cluster deleted while the operator is down, with no dependent left to
+// enqueue it, is never reconciled again, and a new Cluster having the same
+// name must not inherit the access granted to the previous one: the sweep,
 // run at startup and periodically, removes what is left.
 type CrossNamespaceRBACSweeper struct {
 	// client lists and deletes the RBAC objects
@@ -132,8 +139,8 @@ func (s *CrossNamespaceRBACSweeper) Start(ctx context.Context) error {
 }
 
 // Sweep deletes the cross-namespace RBAC objects of the clusters that no
-// longer exist. A cluster whose existence cannot be confirmed, for an error
-// other than NotFound, is left alone.
+// longer exist or do not enable the feature. A cluster that cannot be read,
+// for an error other than NotFound, is left alone.
 func (s *CrossNamespaceRBACSweeper) Sweep(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -175,12 +182,12 @@ func (s *CrossNamespaceRBACSweeper) Sweep(ctx context.Context) error {
 
 	var errs []error
 	for _, key := range clusterKeys {
-		err := s.reader.Get(ctx, key, &apiv1.Cluster{})
-		if err == nil {
+		orphaned, err := s.isOrphaned(ctx, key)
+		if err != nil {
+			errs = append(errs, err)
 			continue
 		}
-		if !apierrs.IsNotFound(err) {
-			errs = append(errs, fmt.Errorf("while checking whether cluster %s exists: %w", key, err))
+		if !orphaned {
 			continue
 		}
 
@@ -197,15 +204,34 @@ func (s *CrossNamespaceRBACSweeper) Sweep(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// isOrphaned tells whether the cluster having the passed key no longer needs
+// its cross-namespace RBAC objects: it does not exist, or it does not enable
+// the feature. A cluster that cannot be read is reported as an error.
+func (s *CrossNamespaceRBACSweeper) isOrphaned(ctx context.Context, key types.NamespacedName) (bool, error) {
+	var cluster apiv1.Cluster
+	err := s.reader.Get(ctx, key, &cluster)
+	switch {
+	case apierrs.IsNotFound(err):
+		return true, nil
+	case err != nil:
+		return false, fmt.Errorf("while checking whether cluster %s exists: %w", key, err)
+	default:
+		return !cluster.Spec.EnableCrossNamespaceResources, nil
+	}
+}
+
 // deleteOrphaned deletes an RBAC object created for the passed cluster,
-// which no longer exists
+// which no longer exists or does not enable the feature. Only the objects
+// having the name computed for the cluster are deleted: the labels alone
+// could also match other objects of the operator.
 func (s *CrossNamespaceRBACSweeper) deleteOrphaned(
 	ctx context.Context,
 	key types.NamespacedName,
 	object crossNamespaceRBACObject,
 ) error {
 	obj, kind := object.obj, object.kind
-	if !specs.IsCrossNamespaceRBACOwnedBy(obj.GetLabels(), key.Namespace, key.Name) {
+	if obj.GetName() != specs.GetCrossNamespaceRoleNameFor(key.Namespace, key.Name) ||
+		!specs.IsCrossNamespaceRBACOwnedBy(obj.GetLabels(), key.Namespace, key.Name) {
 		return nil
 	}
 
