@@ -1615,7 +1615,7 @@ var _ = Describe("reconcileCrossNamespaceRBAC", func() {
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
+		fakeClient = newOwnedResourcesFakeClientBuilder(schemeBuilder.BuildWithAllKnownScheme()).Build()
 		reconciler = &ClusterReconciler{
 			Client:   fakeClient,
 			Recorder: record.NewFakeRecorder(10000),

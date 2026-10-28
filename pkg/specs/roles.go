@@ -392,9 +392,17 @@ func CreateCrossNamespaceRole(cluster apiv1.Cluster) rbacv1.ClusterRole {
 // one of the RBAC objects granting access to other namespaces: those objects
 // cannot have an owner reference to the cluster, which lives in a namespace
 func crossNamespaceRBACLabels(cluster apiv1.Cluster) map[string]string {
+	return CrossNamespaceRBACLabelsFor(cluster.Namespace, cluster.Name)
+}
+
+// CrossNamespaceRBACLabelsFor returns the labels identifying the RBAC objects
+// granting access to other namespaces to the cluster having the passed
+// namespace and name. It allows finding them when the Cluster object is no
+// longer available.
+func CrossNamespaceRBACLabelsFor(namespace, name string) map[string]string {
 	return map[string]string{
-		utils.ClusterLabelName:                cluster.Name,
-		utils.ClusterNamespaceLabelName:       cluster.Namespace,
+		utils.ClusterLabelName:                name,
+		utils.ClusterNamespaceLabelName:       namespace,
 		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 	}
 }
@@ -426,6 +434,68 @@ func CreateCrossNamespaceRoleBinding(cluster apiv1.Cluster) rbacv1.ClusterRoleBi
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
+			Name:     GetCrossNamespaceRoleName(cluster),
+		},
+	}
+}
+
+// GetCrossNamespaceSecretNames returns the names of the password Secrets the
+// instance manager must read to apply the passwords of the passed
+// DatabaseRoles, sorted and without duplicates
+func GetCrossNamespaceSecretNames(roles []apiv1.DatabaseRole) []string {
+	return cleanupResourceList(customResourceRolesSecrets(roles))
+}
+
+// CreateCrossNamespaceSecretsRole creates the Role allowing the instance
+// manager to read, in the passed namespace, the password Secrets of the
+// DatabaseRoles of the cluster living there.
+//
+// A ClusterRole cannot be used here, as its resource names would match the
+// Secrets of every namespace. The caller must not create the Role when
+// there is no Secret to read: a rule without resource names would grant
+// access to every Secret of the namespace.
+func CreateCrossNamespaceSecretsRole(
+	cluster apiv1.Cluster,
+	namespace string,
+	secretNames []string,
+) rbacv1.Role {
+	return rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GetCrossNamespaceRoleName(cluster),
+			Namespace: namespace,
+			Labels:    crossNamespaceRBACLabels(cluster),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				Verbs:         []string{"get", "watch"},
+				ResourceNames: slices.Clone(secretNames),
+			},
+		},
+	}
+}
+
+// CreateCrossNamespaceSecretsRoleBinding creates the RoleBinding granting,
+// in the passed namespace, the Role created by CreateCrossNamespaceSecretsRole
+// to the ServiceAccount of the cluster
+func CreateCrossNamespaceSecretsRoleBinding(cluster apiv1.Cluster, namespace string) rbacv1.RoleBinding {
+	return rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GetCrossNamespaceRoleName(cluster),
+			Namespace: namespace,
+			Labels:    crossNamespaceRBACLabels(cluster),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      cluster.Name,
+				Namespace: cluster.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
 			Name:     GetCrossNamespaceRoleName(cluster),
 		},
 	}
