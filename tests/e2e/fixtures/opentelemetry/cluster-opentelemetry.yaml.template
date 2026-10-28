@@ -5,8 +5,9 @@ metadata:
 spec:
   instances: 2
 
-  # The instances, and the initdb and join jobs, export their logs via gRPC
-  # to the collector in the same namespace, identified by the pod name
+  # The instances, including the init container that bootstraps them, export
+  # their logs via gRPC to the collector in the same namespace, identified by
+  # the pod name
   env:
   - name: K8S_POD_NAME
     valueFrom:
