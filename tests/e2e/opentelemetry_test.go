@@ -36,8 +36,11 @@ import (
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/opentelemetry"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -69,12 +72,12 @@ var _ = Describe("OpenTelemetry log export", Label(tests.LabelObservability), fu
 
 		primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		commandTimeout := time.Second * 10
+		primaryLocator := exec.PodLocator{Namespace: namespace, PodName: primary.Name}
 
 		By("exporting the PostgreSQL records as structured attributes", func() {
 			const errorTestQuery = "selecct 1"
-			_, _, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, *primary,
-				specs.PostgresContainerName, &commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
+			_, _, err := exec.QueryInInstancePod(env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				primaryLocator, postgres.AppDBName, errorTestQuery)
 			Expect(err).To(HaveOccurred())
 
 			Eventually(func(g Gomega) {
@@ -92,15 +95,14 @@ var _ = Describe("OpenTelemetry log export", Label(tests.LabelObservability), fu
 			// An unreachable object store makes wal-archive log an error
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(env.Client.Patch(env.Ctx, cluster, client.RawPatch(types.MergePatchType, []byte(
+			Expect(objects.Patch(env.Ctx, env.Client, cluster, client.RawPatch(types.MergePatchType, []byte(
 				`{"spec":{"backup":{"barmanObjectStore":{"destinationPath":"s3://unreachable/",`+
 					`"endpointURL":"http://127.0.0.1:1","s3Credentials":{"inheritFromIAMRole":true}}}}}`,
 			)))).To(Succeed())
 
 			Eventually(func(g Gomega) {
-				_, _, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, *primary,
-					specs.PostgresContainerName, &commandTimeout, "psql", "-U", "postgres", "-tAc",
-					"CHECKPOINT; SELECT pg_catalog.pg_switch_wal()")
+				_, _, err := exec.QueryInInstancePod(env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					primaryLocator, postgres.PostgresDBName, "CHECKPOINT; SELECT pg_catalog.pg_switch_wal()")
 				g.Expect(err).ToNot(HaveOccurred())
 
 				g.Expect(exportedPodRecords(g, namespace, primary.Name)).To(ContainElement(SatisfyAll(
@@ -109,13 +111,13 @@ var _ = Describe("OpenTelemetry log export", Label(tests.LabelObservability), fu
 				)))
 			}, 120, 10).Should(Succeed())
 
-			Expect(env.Client.Patch(env.Ctx, cluster, client.RawPatch(types.MergePatchType,
+			Expect(objects.Patch(env.Ctx, env.Client, cluster, client.RawPatch(types.MergePatchType,
 				[]byte(`{"spec":{"backup":null}}`)))).To(Succeed())
 		})
 
 		By("exporting the PgBouncer records as structured attributes", func() {
 			poolerPods := &corev1.PodList{}
-			Expect(env.Client.List(env.Ctx, poolerPods, client.InNamespace(namespace),
+			Expect(objects.List(env.Ctx, env.Client, poolerPods, client.InNamespace(namespace),
 				client.MatchingLabels{utils.PgbouncerNameLabel: poolerName})).To(Succeed())
 			Expect(poolerPods.Items).To(HaveLen(1))
 
@@ -199,7 +201,7 @@ func setOperatorEnv(envVars []corev1.EnvVar) {
 	Expect(err).ToNot(HaveOccurred())
 	updated := deployment.DeepCopy()
 	updated.Spec.Template.Spec.Containers[0].Env = envVars
-	Expect(env.Client.Patch(env.Ctx, updated, client.MergeFrom(&deployment))).To(Succeed())
+	Expect(objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(&deployment))).To(Succeed())
 	Expect(operator.WaitForReady(env.Ctx, env.Client, 120, true)).To(Succeed())
 }
 
