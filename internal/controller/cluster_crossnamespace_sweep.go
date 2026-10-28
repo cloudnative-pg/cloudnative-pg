@@ -30,8 +30,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -139,7 +137,7 @@ func (s *CrossNamespaceRBACSweeper) Start(ctx context.Context) error {
 func (s *CrossNamespaceRBACSweeper) Sweep(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
-	selector, err := crossNamespaceRBACSelector()
+	selector, err := specs.CrossNamespaceRBACSelector()
 	if err != nil {
 		return err
 	}
@@ -223,23 +221,4 @@ func (s *CrossNamespaceRBACSweeper) deleteOrphaned(
 // by this operator
 func (s *CrossNamespaceRBACSweeper) isWatched(namespace string) bool {
 	return len(s.watchedNamespaces) == 0 || slices.Contains(s.watchedNamespaces, namespace)
-}
-
-// crossNamespaceRBACSelector selects the RBAC objects managed by the operator
-// carrying the namespace and the name of the cluster they were created for
-func crossNamespaceRBACSelector() (labels.Selector, error) {
-	managedBy, err := labels.NewRequirement(
-		utils.KubernetesAppManagedByLabelName, selection.Equals, []string{utils.ManagerName})
-	if err != nil {
-		return nil, err
-	}
-	clusterName, err := labels.NewRequirement(utils.ClusterLabelName, selection.Exists, nil)
-	if err != nil {
-		return nil, err
-	}
-	clusterNamespace, err := labels.NewRequirement(utils.ClusterNamespaceLabelName, selection.Exists, nil)
-	if err != nil {
-		return nil, err
-	}
-	return labels.NewSelector().Add(*managedBy, *clusterName, *clusterNamespace), nil
 }
