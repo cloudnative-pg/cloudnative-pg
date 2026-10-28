@@ -166,8 +166,7 @@ func (v *DatabaseCustomValidator) validateCrossNamespaceCluster(
 		}
 	}
 
-	// Check if the cluster has EnableCrossNamespaceResources set to true
-	if !cluster.Spec.EnableCrossNamespaceResources {
+	if !cluster.AcceptsReferencesFrom(db.Namespace) {
 		return field.ErrorList{
 			field.Forbidden(
 				field.NewPath("spec", "cluster", "namespace"),

@@ -40,10 +40,10 @@ import (
 // to the owned resources of these tests
 const testDeletionClusterName = "cluster"
 
-// newOwnedResourcesFakeClientBuilder returns a builder registering the same
-// cluster index the manager creates, which notifyDeletionToOwnedResources
-// queries to find the resources of a cluster in any namespace
-func newOwnedResourcesFakeClientBuilder(scheme *runtime.Scheme) *fake.ClientBuilder {
+// newClusterIndexedFakeClientBuilder returns a builder registering the same
+// cluster index the manager creates, which the reconcilers query to find the
+// resources of a cluster in any namespace
+func newClusterIndexedFakeClientBuilder(scheme *runtime.Scheme) *fake.ClientBuilder {
 	builder := fake.NewClientBuilder().WithScheme(scheme)
 	for _, obj := range clusterindex.IndexedObjects() {
 		builder = builder.WithIndex(obj, clusterindex.Key, clusterindex.IndexByCluster)
@@ -110,7 +110,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 			},
 		}
 
-		cli := newOwnedResourcesFakeClientBuilder(scheme).WithLists(databaseList).
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(databaseList).
 			WithStatusSubresource(&databaseList.Items[0], &databaseList.Items[1]).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
@@ -148,7 +148,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 				},
 			}
 
-			cli := newOwnedResourcesFakeClientBuilder(scheme).WithLists(databaseList).Build()
+			cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(databaseList).Build()
 			r.Client = cli
 			err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 			Expect(err).ToNot(HaveOccurred())
@@ -201,7 +201,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 			},
 		}
 
-		cli := newOwnedResourcesFakeClientBuilder(scheme).WithLists(publicationList).
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(publicationList).
 			WithStatusSubresource(&publicationList.Items[0], &publicationList.Items[1]).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
@@ -238,7 +238,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 			},
 		}
 
-		cli := newOwnedResourcesFakeClientBuilder(scheme).WithLists(publicationList).Build()
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(publicationList).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
@@ -291,7 +291,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 			},
 		}
 
-		cli := newOwnedResourcesFakeClientBuilder(scheme).WithLists(subscriptionList).
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(subscriptionList).
 			WithStatusSubresource(&subscriptionList.Items[0], &subscriptionList.Items[1]).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
@@ -328,7 +328,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 			},
 		}
 
-		cli := newOwnedResourcesFakeClientBuilder(scheme).WithLists(subscriptionList).Build()
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(subscriptionList).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
@@ -369,7 +369,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 				},
 			}
 
-			cli := newOwnedResourcesFakeClientBuilder(scheme).WithLists(databaseList).
+			cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(databaseList).
 				WithStatusSubresource(&databaseList.Items[0]).Build()
 			r.Client = cli
 			Expect(r.notifyDeletionToOwnedResources(ctx, namespacedName)).To(Succeed())
@@ -391,7 +391,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 				}
 
-				cli := newOwnedResourcesFakeClientBuilder(scheme).WithLists(databaseList).
+				cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(databaseList).
 					WithStatusSubresource(&databaseList.Items[0]).Build()
 				r.Client = cli
 				Expect(r.notifyDeletionToOwnedResources(ctx, namespacedName)).To(Succeed())

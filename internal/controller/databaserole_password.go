@@ -155,6 +155,10 @@ func passwordGenerationBlocked(role *apiv1.DatabaseRole, cluster *apiv1.Cluster)
 			role.Spec.ClusterRef.Name)
 	}
 
+	if reason := crossNamespaceRefusal(role, cluster); reason != "" {
+		return true, reason + ": no password is generated for a role in another namespace"
+	}
+
 	// On a replica cluster the role's password is owned by the primary and
 	// replicated from it, so one generated here would never be applied. Leave
 	// an already-generated Secret in place.

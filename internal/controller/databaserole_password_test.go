@@ -34,7 +34,6 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -92,8 +91,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 
 	buildReconciler := func(objs ...client.Object) (*DatabaseRoleReconciler, client.Client) {
 		scheme := schemeBuilder.BuildWithAllKnownScheme()
-		cli := fake.NewClientBuilder().
-			WithScheme(scheme).
+		cli := newClusterIndexedFakeClientBuilder(scheme).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			WithObjects(objs...).
 			Build()
@@ -352,6 +350,21 @@ var _ = Describe("DatabaseRole password generation", func() {
 		Expect(getRole(cli, role).Status.Password.Message).To(ContainSubstring("client certificate"))
 	})
 
+	It("generates no password for another namespace when the cluster did not opt in", func() {
+		role := newRoleWithPassword(&apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate})
+		role.Namespace = "tenant"
+		role.Spec.ClusterRef.Namespace = namespace
+		r, cli := buildReconciler(role, newCluster())
+
+		_, err := r.Reconcile(ctx, requestFor(role))
+		Expect(err).NotTo(HaveOccurred())
+
+		err = cli.Get(ctx, client.ObjectKey{Namespace: "tenant", Name: role.GetGeneratedPasswordSecretName()},
+			&corev1.Secret{})
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		Expect(getRole(cli, role).Status.Password.Message).To(ContainSubstring("enableCrossNamespaceResources"))
+	})
+
 	It("keeps the applied expiration while it explains why generation is blocked", func() {
 		// SetPasswordMessage rebuilds the password state to add its message,
 		// and runs on every loop for as long as the cause lasts.
@@ -398,8 +411,7 @@ var _ = Describe("DatabaseRole password generation", func() {
 		cluster := newCluster()
 
 		scheme := schemeBuilder.BuildWithAllKnownScheme()
-		cli := fake.NewClientBuilder().
-			WithScheme(scheme).
+		cli := newClusterIndexedFakeClientBuilder(scheme).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			WithObjects(role, cluster).
 			WithInterceptorFuncs(interceptor.Funcs{
@@ -643,8 +655,7 @@ var _ = Describe("DatabaseRole password rotation from a lagging cache", func() {
 
 		cache = &cachedView{}
 		scheme := schemeBuilder.BuildWithAllKnownScheme()
-		cli = fake.NewClientBuilder().
-			WithScheme(scheme).
+		cli = newClusterIndexedFakeClientBuilder(scheme).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			WithObjects(role, cluster).
 			WithInterceptorFuncs(interceptor.Funcs{

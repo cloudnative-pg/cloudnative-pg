@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
 
@@ -59,7 +60,45 @@ func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 		return nil
 	}
 
+	reason, err := r.clientCertificateRefusal(ctx, role, cluster)
+	if err != nil {
+		return err
+	}
+	if reason != "" {
+		role.Status.ClientCertificate = &apiv1.ClientCertificateState{Message: reason}
+		return nil
+	}
+
 	return r.issueClientCertificate(ctx, role, cluster, secretKey)
+}
+
+// clientCertificateRefusal returns why no client certificate may be issued
+// for the role, or an empty string when it may.
+//
+// The certificate authenticates as the PostgreSQL role, so it is only issued
+// to the object entitled to manage that role: never for a cluster that does
+// not accept the roles of the namespace, and never for a duplicate claiming a
+// role already managed by another object, possibly from another namespace.
+// The instance manager refuses to apply such a duplicate, but a certificate
+// issued for it would still let its namespace log in as the role.
+func (r *DatabaseRoleReconciler) clientCertificateRefusal(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+	cluster *apiv1.Cluster,
+) (string, error) {
+	if reason := crossNamespaceRefusal(role, cluster); reason != "" {
+		return reason + ": no client certificate is issued for a role in another namespace", nil
+	}
+
+	var roles apiv1.DatabaseRoleList
+	if err := r.List(ctx, &roles, clusterindex.MatchingCluster(client.ObjectKeyFromObject(cluster))); err != nil {
+		return "", fmt.Errorf("while listing the roles of cluster %q: %w", cluster.Name, err)
+	}
+	if err := roles.MustHaveManagedResourceExclusivity(role); err != nil {
+		return fmt.Sprintf("no client certificate is issued: %s", err), nil
+	}
+
+	return "", nil
 }
 
 // issueClientCertificate ensures the TLS client certificate Secret for the
