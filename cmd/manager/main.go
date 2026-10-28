@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -45,7 +46,9 @@ import (
 func main() {
 	cobra.EnableTraverseRunHooks = true
 
-	if err := newRootCmd().Execute(); err != nil {
+	err := newRootCmd().Execute()
+	management.ShutdownLogExport()
+	if err != nil {
 		os.Exit(1)
 	}
 }
@@ -85,12 +88,21 @@ func newRootCmd() *cobra.Command {
 // dropping records is never acceptable, most importantly for the instance
 // manager forwarding the PostgreSQL log, whose records share a single message
 // and would otherwise be collapsed by the sampler under a burst of activity.
+//
+// The controller, instance and pgbouncer subcommands, which run as the main
+// process of the operator, Cluster and Pooler containers, also export their
+// records via OpenTelemetry. wal-archive and wal-restore don't: the instance
+// manager forwards what they write, and exporting from them would add the
+// export to the latency of every WAL file.
 func loggingOptions(cmd *cobra.Command) []log.ConfigureOption {
-	if topLevelCommand(cmd).Name() == "controller" {
-		return nil
+	switch topLevelCommand(cmd).Name() {
+	case "controller":
+		return []log.ConfigureOption{log.WithOpenTelemetry()}
+	case "instance", "pgbouncer":
+		return []log.ConfigureOption{log.WithDisabledSampling(), log.WithOpenTelemetry()}
+	default:
+		return []log.ConfigureOption{log.WithDisabledSampling()}
 	}
-
-	return []log.ConfigureOption{log.WithDisabledSampling()}
 }
 
 // topLevelCommand walks up the command tree until it finds the direct child

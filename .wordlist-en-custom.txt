@@ -343,6 +343,7 @@ OLAP
 OLTP
 OOM
 OSPS
+OTLP
 OU
 ObjectMeta
 OnlineConfiguration
@@ -353,6 +354,7 @@ OpenID
 OpenSSF
 OpenSSL
 OpenShift
+OpenTelemetry
 Openshift
 OperatorCapabilities
 OperatorCertificateFingerprint
@@ -1271,6 +1273,7 @@ onlineUpdateEnabled
 onlineconfiguration
 openldap
 openshift
+opentelemetry
 operability
 operativity
 operatorCapabilities
