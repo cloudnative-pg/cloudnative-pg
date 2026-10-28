@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-cross-namespace-databases
+spec:
+  instances: 2
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
