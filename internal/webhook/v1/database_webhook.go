@@ -109,14 +109,21 @@ func (v *DatabaseCustomValidator) ValidateCreate(
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Database .
 func (v *DatabaseCustomValidator) ValidateUpdate(
 	ctx context.Context,
-	_ *apiv1.Database, database *apiv1.Database,
+	oldDatabase *apiv1.Database, database *apiv1.Database,
 ) (admission.Warnings, error) {
 	databaseLog.Info(
 		"Validation for Database upon update",
 		"name", database.GetName(), "namespace", database.GetNamespace())
 
 	allErrs := v.validate(database)
-	allErrs = append(allErrs, v.validateCrossNamespaceCluster(ctx, database)...)
+	// The reference was checked when the Database was created, and the opt-in
+	// of the cluster cannot be withdrawn. Checking it again on every update
+	// would reject the patch removing the finalizer of a Database whose
+	// cluster was deleted, leaving it stuck, so the cluster is only read
+	// again when the reference changes, which the CRD itself forbids.
+	if oldDatabase.Spec.ClusterRef != database.Spec.ClusterRef {
+		allErrs = append(allErrs, v.validateCrossNamespaceCluster(ctx, database)...)
+	}
 	allWarnings := v.getAdmissionWarnings(database)
 
 	if len(allErrs) == 0 {

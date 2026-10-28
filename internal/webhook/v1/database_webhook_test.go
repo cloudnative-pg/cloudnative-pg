@@ -519,6 +519,58 @@ var _ = Describe("Database cross-namespace validation", func() {
 		errs := v.validateCrossNamespaceCluster(ctx, db)
 		Expect(errs).To(BeEmpty())
 	})
+
+	It("admits the removal of the finalizer of a Database whose cluster was deleted", func() {
+		// The cluster is gone: the operator removes the finalizer of the
+		// cross-namespace Databases that referred to it
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "mydb",
+				Namespace:  "app-namespace",
+				Finalizers: []string{"cnpg.io/deleteDatabase"},
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+		newDB := oldDB.DeepCopy()
+		newDB.Finalizers = nil
+
+		_, err := v.ValidateUpdate(ctx, oldDB, newDB)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("checks the cluster again when the reference changes", func() {
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{Name: "mydb", Namespace: "app-namespace"},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{Name: "my-cluster"},
+				Name:       "mydb",
+				Owner:      "app",
+			},
+		}
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.ClusterRef.Namespace = "cluster-namespace"
+
+		_, err := v.ValidateUpdate(ctx, oldDB, newDB)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("spec.cluster"))
+	})
 })
 
 var _ = Describe("Database admission guard", func() {
