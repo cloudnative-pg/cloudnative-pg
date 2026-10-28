@@ -336,7 +336,9 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	dbReconciler := controller.NewDatabaseReconciler(
 		mgr,
 		instance,
-		webhookv1.NewDatabaseAdmissionGuard(),
+		// The guard only validates the databases of this cluster, whose
+		// Cluster is readable even from another namespace's object
+		webhookv1.NewDatabaseAdmissionGuard(mgr.GetAPIReader()),
 	)
 	if err := dbReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create database controller")

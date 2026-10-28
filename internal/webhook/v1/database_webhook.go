@@ -49,10 +49,11 @@ func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
 }
 
 // NewDatabaseAdmissionGuard creates a guard to protect a reconciliation loop.
-func NewDatabaseAdmissionGuard() *guard.Admission[*apiv1.Database] {
+// The reader is used to check the Cluster referenced from another namespace.
+func NewDatabaseAdmissionGuard(reader client.Reader) *guard.Admission[*apiv1.Database] {
 	return &guard.Admission[*apiv1.Database]{
 		Defaulter: &DatabaseCustomDefaulter{},
-		Validator: newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{}),
+		Validator: newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{client: reader}),
 	}
 }
 
@@ -135,11 +136,6 @@ func (v *DatabaseCustomValidator) validateCrossNamespaceCluster(
 ) field.ErrorList {
 	// If not cross-namespace, no validation needed
 	if !db.IsCrossNamespace() {
-		return nil
-	}
-
-	// If no client is available (e.g., in unit tests), skip this validation
-	if v.client == nil {
 		return nil
 	}
 

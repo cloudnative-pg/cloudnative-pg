@@ -457,26 +457,6 @@ var _ = Describe("Database cross-namespace validation", func() {
 		Expect(errs[0].Type).To(Equal(field.ErrorTypeNotFound))
 	})
 
-	It("skips validation when client is nil (unit test mode)", func() {
-		v := &DatabaseCustomValidator{client: nil}
-		db := &apiv1.Database{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mydb",
-				Namespace: "app-namespace",
-			},
-			Spec: apiv1.DatabaseSpec{
-				ClusterRef: apiv1.ClusterObjectReference{
-					Name:      "my-cluster",
-					Namespace: "cluster-namespace",
-				},
-				Name: "mydb",
-			},
-		}
-
-		errs := v.validateCrossNamespaceCluster(ctx, db)
-		Expect(errs).To(BeEmpty())
-	})
-
 	It("rejects cross-namespace Database when the cluster cannot be fetched", func() {
 		getErr := apierrors.NewServiceUnavailable("the server is currently unable to handle the request")
 		fakeClient := fake.NewClientBuilder().
@@ -538,5 +518,38 @@ var _ = Describe("Database cross-namespace validation", func() {
 
 		errs := v.validateCrossNamespaceCluster(ctx, db)
 		Expect(errs).To(BeEmpty())
+	})
+})
+
+var _ = Describe("Database admission guard", func() {
+	It("rejects a cross-namespace Database whose cluster does not opt in", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-cluster",
+				Namespace: "cluster-namespace",
+			},
+			Spec: apiv1.ClusterSpec{Instances: 1},
+		}
+		reader := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		_, err := NewDatabaseAdmissionGuard(reader).Validator.ValidateCreate(ctx, db)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("enableCrossNamespaceResources"))
 	})
 })
