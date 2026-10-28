@@ -222,9 +222,8 @@ func exportedPodRecords(g Gomega, collectorNamespace, podName string) []opentele
 
 // assertContainerLogsAreExported verifies that the collector in the given
 // namespace receives every record that the containers of a pod write on
-// their standard output, and no other one. The records are matched by
-// message, as the forwarded ones, such as those of wal-archive, are exported
-// with the time they were forwarded at.
+// their standard output, and no other one, matching them by message and
+// time.
 func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, containers ...string) {
 	GinkgoHelper()
 	Eventually(func(g Gomega) {
@@ -240,9 +239,9 @@ func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, 
 		readTime := time.Now()
 		exportedAfter := exportedPodRecords(g, collectorNamespace, pod.Name)
 
-		written := make(map[string]int)
+		written := make(map[recordKey]int)
 		// The most recent records are left the time to be exported
-		writtenBefore := make(map[string]int)
+		writtenBefore := make(map[recordKey]int)
 		for _, line := range strings.Split(string(output), "\n") {
 			var entry struct {
 				Message string    `json:"msg"`
@@ -252,30 +251,37 @@ func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, 
 			if json.Unmarshal([]byte(line), &entry) != nil {
 				continue
 			}
-			written[entry.Message]++
+			key := recordKey{message: entry.Message, unixNano: entry.Time.UnixNano()}
+			written[key]++
 			if entry.Time.Before(readTime.Add(-10 * time.Second)) {
-				writtenBefore[entry.Message]++
+				writtenBefore[key]++
 			}
 		}
 		g.Expect(writtenBefore).ToNot(BeEmpty())
 
-		for message, count := range countByMessage(exportedBefore) {
-			g.Expect(written[message]).To(BeNumerically(">=", count),
-				"exported record not written on the standard output: %q", message)
+		for key, count := range countByKey(exportedBefore) {
+			g.Expect(written[key]).To(BeNumerically(">=", count),
+				"exported record not written on the standard output: %+v", key)
 		}
-		exported := countByMessage(exportedAfter)
-		for message, count := range writtenBefore {
-			g.Expect(exported[message]).To(BeNumerically(">=", count),
-				"record written on the standard output and not exported: %q", message)
+		exported := countByKey(exportedAfter)
+		for key, count := range writtenBefore {
+			g.Expect(exported[key]).To(BeNumerically(">=", count),
+				"record written on the standard output and not exported: %+v", key)
 		}
 	}, 120, 10).Should(Succeed())
 }
 
-func countByMessage(records []opentelemetry.Record) map[string]int {
-	result := make(map[string]int)
+// recordKey identifies a record on the standard output and in the collector
+type recordKey struct {
+	message  string
+	unixNano int64
+}
+
+func countByKey(records []opentelemetry.Record) map[recordKey]int {
+	result := make(map[recordKey]int)
 	for _, record := range records {
 		message, _ := record.Body.(string)
-		result[message]++
+		result[recordKey{message: message, unixNano: record.Time.UnixNano()}]++
 	}
 	return result
 }
