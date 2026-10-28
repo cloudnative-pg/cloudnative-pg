@@ -53,7 +53,16 @@ type watchScopeReconciler struct {
 	// restart replaces this process, and never returns when it succeeds. It is
 	// a field to keep the reconciler testable.
 	restart func(context.CancelFunc, concurrency.MultipleExecuted) error
+
+	// checkAccess tells whether this instance manager can already list and watch
+	// the managed resources in every namespace
+	checkAccess clusterWideAccessChecker
 }
+
+// clusterWideAccessChecker reports whether the managed resources can be listed
+// and watched in every namespace. When they cannot, it returns a description of
+// the missing permission.
+type clusterWideAccessChecker func(ctx context.Context) (allowed bool, reason string, err error)
 
 // newWatchScopeReconciler builds a watchScopeReconciler for the
 // passed instance, whose cache watches Database objects cluster-wide only when

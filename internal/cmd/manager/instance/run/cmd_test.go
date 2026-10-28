@@ -109,6 +109,10 @@ var _ = Describe("watchScopeReconciler", func() {
 		cancelled  bool
 		restarts   int
 		restartErr error
+
+		accessChecks  int
+		accessAllowed bool
+		accessErr     error
 	)
 
 	reconcilerFor := func(cluster *apiv1.Cluster, bootValue bool) *watchScopeReconciler {
@@ -133,6 +137,13 @@ var _ = Describe("watchScopeReconciler", func() {
 				cancelFunc()
 				return restartErr
 			},
+			checkAccess: func(context.Context) (bool, string, error) {
+				accessChecks++
+				if accessAllowed {
+					return true, "", accessErr
+				}
+				return false, "list databases.postgresql.cnpg.io in every namespace is forbidden", accessErr
+			},
 		}
 	}
 
@@ -142,6 +153,9 @@ var _ = Describe("watchScopeReconciler", func() {
 
 	BeforeEach(func() {
 		restartErr = nil
+		accessChecks = 0
+		accessAllowed = true
+		accessErr = nil
 	})
 
 	DescribeTable("keeps the instance manager running when the setting did not change",
@@ -202,5 +216,50 @@ var _ = Describe("watchScopeReconciler", func() {
 		_, err := reconciler.Reconcile(ctx, request)
 		Expect(err).To(MatchError(restartErr))
 		Expect(instance.InstanceManagerIsUpgrading.Load()).To(BeFalse())
+	})
+
+	Context("when the cross-namespace resources support got enabled", func() {
+		It("waits for the cluster-wide access before restarting", func(ctx SpecContext) {
+			accessAllowed = false
+			reconciler := reconcilerFor(newWatchScopeCluster(true), false)
+
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+			Expect(accessChecks).To(Equal(1))
+			Expect(restarts).To(BeZero())
+			Expect(cancelled).To(BeFalse())
+			Expect(instance.InstanceManagerIsUpgrading.Load()).To(BeFalse())
+		})
+
+		It("restarts once the cluster-wide access is granted", func(ctx SpecContext) {
+			reconciler := reconcilerFor(newWatchScopeCluster(true), false)
+
+			_, err := reconciler.Reconcile(ctx, request)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(accessChecks).To(Equal(1))
+			Expect(restarts).To(Equal(1))
+		})
+
+		It("retries without restarting when the access cannot be checked", func(ctx SpecContext) {
+			accessErr = errors.New("connection refused")
+			reconciler := reconcilerFor(newWatchScopeCluster(true), false)
+
+			_, err := reconciler.Reconcile(ctx, request)
+			Expect(err).To(MatchError(accessErr))
+			Expect(restarts).To(BeZero())
+			Expect(cancelled).To(BeFalse())
+			Expect(instance.InstanceManagerIsUpgrading.Load()).To(BeFalse())
+		})
+	})
+
+	It("does not check the cluster-wide access when the support got disabled", func(ctx SpecContext) {
+		accessAllowed = false
+		reconciler := reconcilerFor(newWatchScopeCluster(false), true)
+
+		_, err := reconciler.Reconcile(ctx, request)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(accessChecks).To(BeZero())
+		Expect(restarts).To(Equal(1))
 	})
 })
