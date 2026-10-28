@@ -77,9 +77,6 @@ var _ = Describe("WAL snapshot skipping", func() {
 					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
 						ClassName: "csi-hostpath-snapclass",
 						Online:    ptr.To(true),
-						OnlineConfiguration: apiv1.OnlineConfiguration{
-							SkipWalSnapshot: ptr.To(true),
-						},
 					},
 				},
 				Plugins: []apiv1.PluginConfiguration{
@@ -122,9 +119,6 @@ var _ = Describe("WAL snapshot skipping", func() {
 			mutate(cluster, backup)
 			Expect(isWalSnapshotSkipped(cluster, backup)).To(BeFalse())
 		},
-		Entry("when the setting is not enabled", func(c *apiv1.Cluster, _ *apiv1.Backup) {
-			c.Spec.Backup.VolumeSnapshot.OnlineConfiguration.SkipWalSnapshot = nil
-		}),
 		Entry("for a cold backup", func(_ *apiv1.Cluster, b *apiv1.Backup) {
 			b.Spec.Online = ptr.To(false)
 		}),
@@ -137,16 +131,10 @@ var _ = Describe("WAL snapshot skipping", func() {
 		Entry("when the WAL archiver plugin is disabled", func(c *apiv1.Cluster, _ *apiv1.Backup) {
 			c.Spec.Plugins[0].Enabled = ptr.To(false)
 		}),
-		Entry("when the Backup overrides the online configuration", func(_ *apiv1.Cluster, b *apiv1.Backup) {
-			b.Spec.OnlineConfiguration = &apiv1.OnlineConfiguration{ImmediateCheckpoint: ptr.To(true)}
+		Entry("when the Backup doesn't wait for the archive", func(_ *apiv1.Cluster, b *apiv1.Backup) {
+			b.Spec.OnlineConfiguration = &apiv1.OnlineConfiguration{WaitForArchive: ptr.To(false)}
 		}),
 	)
-
-	It("honors a Backup enabling the setting over the cluster", func() {
-		cluster.Spec.Backup.VolumeSnapshot.OnlineConfiguration.SkipWalSnapshot = nil
-		backup.Spec.OnlineConfiguration = &apiv1.OnlineConfiguration{SkipWalSnapshot: ptr.To(true)}
-		Expect(isWalSnapshotSkipped(cluster, backup)).To(BeTrue())
-	})
 
 	newExecutor := func(stopWaitsForArchive bool) *Reconciler {
 		mockClient := fake.NewClientBuilder().

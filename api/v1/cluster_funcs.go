@@ -78,15 +78,6 @@ func (o OnlineConfiguration) GetImmediateCheckpoint() bool {
 	return *o.ImmediateCheckpoint
 }
 
-// GetSkipWalSnapshot tells whether to skip the snapshot of the WAL storage
-func (o OnlineConfiguration) GetSkipWalSnapshot() bool {
-	if o.SkipWalSnapshot == nil {
-		return false
-	}
-
-	return *o.SkipWalSnapshot
-}
-
 // GetPluginConfigurationEnabledPluginNames gets the name of the plugins that are involved
 // in the reconciliation of this cluster
 func GetPluginConfigurationEnabledPluginNames(pluginList []PluginConfiguration) (result []string) {

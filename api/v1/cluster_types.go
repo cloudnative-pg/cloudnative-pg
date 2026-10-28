@@ -194,16 +194,6 @@ type OnlineConfiguration struct {
 	// possible. `false` by default.
 	// +optional
 	ImmediateCheckpoint *bool `json:"immediateCheckpoint,omitempty"`
-
-	// Control whether the volume snapshot of the WAL storage is skipped.
-	// If set to true, an online backup taken on the primary of a cluster with
-	// a separate WAL storage and a WAL archiver plugin does not snapshot the
-	// WAL volume: the WAL files needed to recover the backup are fetched from
-	// the WAL archive, as `waitForArchive` has to be true for this setting to
-	// take effect. In any other case the WAL volume is snapshotted.
-	// `false` by default.
-	// +optional
-	SkipWalSnapshot *bool `json:"skipWalSnapshot,omitempty"`
 }
 
 // ImageCatalogRef defines the reference to a major version in an ImageCatalog

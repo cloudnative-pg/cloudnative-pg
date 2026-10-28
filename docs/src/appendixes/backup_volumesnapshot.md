@@ -195,22 +195,9 @@ you can add this section:
 When a cluster has a separate volume for WAL files (`.spec.walStorage`), a
 volume snapshot backup includes a snapshot of that volume too. For online
 backups the WAL files required to recover the backup are also archived, and
-you can avoid paying for the duplicated storage by setting
-`onlineConfiguration.skipWalSnapshot` to `true`:
-
-```yaml
-  # ...
-  backup:
-    volumeSnapshot:
-       online: true
-       onlineConfiguration:
-         waitForArchive: true
-         skipWalSnapshot: true
-       # ...
-```
-
-CloudNativePG leaves the WAL volume out of the backup only when all these
-conditions are met, and otherwise snapshots it as usual:
+CloudNativePG avoids paying for the duplicated storage by leaving the WAL
+volume out of the backup when all these conditions are met, and otherwise
+snapshots it as usual:
 
 - the backup is online
 - `onlineConfiguration.waitForArchive` is `true`, so that the backup
@@ -221,16 +208,14 @@ conditions are met, and otherwise snapshots it as usual:
 - the backup is taken on the primary while PostgreSQL archives WAL files, as
   `pg_backup_stop` doesn't wait for the archiver on a standby, nor while
   `archive_mode` is `off`. As the default backup `target` is
-  `prefer-standby`, set it to `primary`. The instances of a
+  `prefer-standby`, this requires the `primary` target on a cluster with
+  replicas. The instances of a
   [replica cluster](../replica_cluster.md) are all standbys, and
   `archive_mode` stays `off` after the removal of the
   `cnpg.io/skipWalArchiving` annotation until the primary is restarted
 
 If the WAL archiver plugin is removed while such a backup is running, the
 backup fails, as the WAL files might not have been archived.
-
-A `Backup` or `ScheduledBackup` that defines its own `onlineConfiguration`
-replaces the one of the cluster, `skipWalSnapshot` included.
 
 Such a `Backup` reports `.status.snapshotBackupStatus.walSnapshotSkipped: true`,
 and its volume snapshots carry the `cnpg.io/walSnapshotSkipped: "true"`
@@ -247,7 +232,7 @@ the cluster.
     can only be recovered as long as the WAL archive holds the WAL files
     written while it was running. Keep this in mind when you copy the volume
     snapshots to another region or account, and when you define the retention
-    policy of the WAL archive.
+    policy of the WAL archive. A cold backup always includes the WAL volume.
 :::
 
 ### Overriding the default behavior
