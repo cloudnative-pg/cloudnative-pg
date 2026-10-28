@@ -1,0 +1,24 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-opentelemetry
+spec:
+  instances: 2
+
+  # The instances, and the initdb and join jobs, export their logs via gRPC
+  # to the collector in the same namespace, identified by the pod name
+  env:
+  - name: K8S_POD_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: http://otel-collector:4317
+  - name: OTEL_EXPORTER_OTLP_PROTOCOL
+    value: grpc
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: k8s.pod.name=$(K8S_POD_NAME)
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
