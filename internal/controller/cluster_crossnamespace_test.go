@@ -21,17 +21,23 @@ package controller
 
 import (
 	"context"
+	"errors"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -296,5 +302,60 @@ var _ = Describe("cross-namespace DatabaseRole password Secrets access", func() 
 			_, err = getRoleBinding(namespace)
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		}
+	})
+
+	It("removes the RBAC of a deleted cluster even when a dependent cannot be notified", func() {
+		// The deletion also cleans up the monitoring queries, depending on the
+		// operator configuration other tests change
+		previousConfiguration := configuration.Current
+		configuration.Current = configuration.NewConfiguration()
+		DeferCleanup(func() { configuration.Current = previousConfiguration })
+
+		patchErr := apierrs.NewForbidden(
+			schema.GroupResource{Group: apiv1.SchemeGroupVersion.Group, Resource: "databases"},
+			"stuck", errors.New("denied by an admission webhook"))
+		fakeClient = newClusterIndexedFakeClientBuilder(schemeBuilder.BuildWithAllKnownScheme()).
+			WithStatusSubresource(&apiv1.Database{}).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(
+					ctx context.Context, cli k8client.WithWatch, obj k8client.Object,
+					patch k8client.Patch, opts ...k8client.PatchOption,
+				) error {
+					if _, ok := obj.(*apiv1.Database); ok {
+						return patchErr
+					}
+					return cli.Patch(ctx, obj, patch, opts...)
+				},
+			}).
+			Build()
+		reconciler.Client = fakeClient
+
+		Expect(fakeClient.Create(ctx, newRole(tenantNamespace, "alice", "alice-secret"))).To(Succeed())
+		Expect(fakeClient.Create(ctx, &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "stuck",
+				Namespace:  tenantNamespace,
+				Finalizers: []string{utils.DatabaseFinalizerName},
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{Name: cluster.Name, Namespace: cluster.Namespace},
+				Name:       "stuck",
+				Owner:      "app",
+			},
+		})).To(Succeed())
+		Expect(reconciler.reconcileCrossNamespaceRBAC(ctx, cluster)).To(Succeed())
+
+		_, err := reconciler.reconcileDeletedCluster(
+			ctx, ctrl.Request{NamespacedName: k8client.ObjectKeyFromObject(cluster)}, nil)
+		Expect(err).To(MatchError(patchErr))
+
+		_, err = getRole(tenantNamespace)
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		_, err = getRoleBinding(tenantNamespace)
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		err = fakeClient.Get(ctx, types.NamespacedName{Name: rbacName}, &rbacv1.ClusterRoleBinding{})
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		err = fakeClient.Get(ctx, types.NamespacedName{Name: rbacName}, &rbacv1.ClusterRole{})
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 	})
 })

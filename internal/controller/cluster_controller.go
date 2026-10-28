@@ -287,29 +287,15 @@ func (r *ClusterReconciler) reconcileDeletedCluster(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName); err != nil {
-		// Optimistic locking conflict is transient - requeue to retry
-		if apierrs.IsConflict(err) {
-			contextLogger.Info(
-				"Optimistic locking conflict while removing finalizers, requeueing",
-				"clusterName", req.Name,
-				"namespace", req.Namespace,
-			)
-			return ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-		contextLogger.Error(
-			err,
-			"error while deleting finalizers of objects on the cluster",
-			"clusterName", req.Name,
-			"namespace", req.Namespace,
-		)
-		return ctrl.Result{}, err
-	}
+	notifyErr := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName)
 
 	// The RBAC resources supporting cross-namespace resources are
 	// cluster-scoped, so they are not garbage collected together with the
-	// Cluster and need to be deleted explicitly. The Cluster may already be
-	// gone at this point, in which case no event can be recorded on it.
+	// Cluster and need to be deleted explicitly. They are deleted even when a
+	// dependent resource could not be notified: an object that cannot be
+	// updated must not keep the permissions of a deleted cluster in place.
+	// The Cluster may already be gone at this point, in which case no event
+	// can be recorded on it.
 	var recorderObject client.Object
 	if cluster != nil {
 		recorderObject = cluster
@@ -321,7 +307,26 @@ func (r *ClusterReconciler) reconcileDeletedCluster(
 			"clusterName", req.Name,
 			"namespace", req.Namespace,
 		)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errors.Join(err, notifyErr)
+	}
+
+	if notifyErr != nil {
+		// Optimistic locking conflict is transient - requeue to retry
+		if apierrs.IsConflict(notifyErr) {
+			contextLogger.Info(
+				"Optimistic locking conflict while removing finalizers, requeueing",
+				"clusterName", req.Name,
+				"namespace", req.Namespace,
+			)
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		contextLogger.Error(
+			notifyErr,
+			"error while deleting finalizers of objects on the cluster",
+			"clusterName", req.Name,
+			"namespace", req.Namespace,
+		)
+		return ctrl.Result{}, notifyErr
 	}
 
 	return ctrl.Result{}, nil
