@@ -424,17 +424,24 @@ func CreateCrossNamespaceRoleBinding(cluster apiv1.Cluster) rbacv1.ClusterRoleBi
 			Name:   GetCrossNamespaceRoleName(cluster),
 			Labels: crossNamespaceRBACLabels(cluster),
 		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      cluster.Name,
-				Namespace: cluster.Namespace,
-			},
-		},
+		Subjects: crossNamespaceRBACSubjects(cluster),
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     GetCrossNamespaceRoleName(cluster),
+		},
+	}
+}
+
+// crossNamespaceRBACSubjects returns the subjects of the bindings granting
+// access to other namespaces: the ServiceAccount the instances run with, which
+// is not named after the cluster when `serviceAccountName` is set
+func crossNamespaceRBACSubjects(cluster apiv1.Cluster) []rbacv1.Subject {
+	return []rbacv1.Subject{
+		{
+			Kind:      "ServiceAccount",
+			Name:      cluster.GetServiceAccountName(),
+			Namespace: cluster.Namespace,
 		},
 	}
 }
@@ -486,13 +493,7 @@ func CreateCrossNamespaceSecretsRoleBinding(cluster apiv1.Cluster, namespace str
 			Namespace: namespace,
 			Labels:    crossNamespaceRBACLabels(cluster),
 		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      cluster.Name,
-				Namespace: cluster.Namespace,
-			},
-		},
+		Subjects: crossNamespaceRBACSubjects(cluster),
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",

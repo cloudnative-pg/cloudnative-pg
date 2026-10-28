@@ -573,6 +573,17 @@ var _ = Describe("Cross-Namespace RBAC", func() {
 			Expect(binding.RoleRef.Kind).To(Equal("ClusterRole"))
 			Expect(binding.RoleRef.Name).To(Equal(expectedName))
 		})
+
+		It("binds the ServiceAccount set in serviceAccountName", func() {
+			sharedAccountCluster := cluster.DeepCopy()
+			sharedAccountCluster.Spec.ServiceAccountName = "shared-sa"
+
+			binding := CreateCrossNamespaceRoleBinding(*sharedAccountCluster)
+
+			Expect(binding.Subjects).To(Equal([]rbacv1.Subject{{
+				Kind: "ServiceAccount", Name: "shared-sa", Namespace: "postgres",
+			}}))
+		})
 	})
 
 	Describe("cross-namespace role password Secrets", func() {
@@ -624,6 +635,17 @@ var _ = Describe("Cross-Namespace RBAC", func() {
 			Expect(binding.RoleRef).To(Equal(rbacv1.RoleRef{
 				APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: expectedName,
 			}))
+		})
+
+		It("binds the Role of the tenant namespace to the ServiceAccount set in serviceAccountName", func() {
+			sharedAccountCluster := cluster.DeepCopy()
+			sharedAccountCluster.Spec.ServiceAccountName = "shared-sa"
+
+			binding := CreateCrossNamespaceSecretsRoleBinding(*sharedAccountCluster, "tenant")
+
+			Expect(binding.Subjects).To(Equal([]rbacv1.Subject{{
+				Kind: "ServiceAccount", Name: "shared-sa", Namespace: "postgres",
+			}}))
 		})
 	})
 })
