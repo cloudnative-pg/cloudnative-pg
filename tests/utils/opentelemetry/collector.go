@@ -23,7 +23,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -79,6 +81,7 @@ service:
 type Record struct {
 	Resource   map[string]any
 	Scope      string
+	Time       time.Time
 	Body       any
 	Attributes map[string]any
 }
@@ -95,8 +98,9 @@ type exportRequest struct {
 				Name string `json:"name"`
 			} `json:"scope"`
 			LogRecords []struct {
-				Body       anyValue   `json:"body"`
-				Attributes []keyValue `json:"attributes"`
+				TimeUnixNano string     `json:"timeUnixNano"`
+				Body         anyValue   `json:"body"`
+				Attributes   []keyValue `json:"attributes"`
 			} `json:"logRecords"`
 		} `json:"scopeLogs"`
 	} `json:"resourceLogs"`
@@ -245,9 +249,14 @@ func Records(namespace string) ([]Record, error) {
 			resource := toMap(resourceLogs.Resource.Attributes)
 			for _, scopeLogs := range resourceLogs.ScopeLogs {
 				for _, logRecord := range scopeLogs.LogRecords {
+					unixNano, err := strconv.ParseInt(logRecord.TimeUnixNano, 10, 64)
+					if err != nil {
+						return nil, err
+					}
 					records = append(records, Record{
 						Resource:   resource,
 						Scope:      scopeLogs.Scope.Name,
+						Time:       time.Unix(0, unixNano),
 						Body:       logRecord.Body.value(),
 						Attributes: toMap(logRecord.Attributes),
 					})
