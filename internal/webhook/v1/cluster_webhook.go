@@ -3351,6 +3351,9 @@ func getPrimaryIsolationTimingWarnings(r *apiv1.Cluster) admission.Warnings {
 
 // getPrimaryIsolationDisabledWarnings warns when the primary isolation check is
 // set as disabled: the check is always active, so the setting has no effect.
+// The alpha.cnpg.io/livenessPinger annotation is copied into the spec only
+// while the isolation check stanza is missing, so removing the annotation does
+// not clear a false it has already set.
 func getPrimaryIsolationDisabledWarnings(r *apiv1.Cluster) admission.Warnings {
 	if r.Spec.Probes == nil || r.Spec.Probes.Liveness == nil || r.Spec.Probes.Liveness.IsolationCheck == nil {
 		return nil
@@ -3362,8 +3365,10 @@ func getPrimaryIsolationDisabledWarnings(r *apiv1.Cluster) admission.Warnings {
 	}
 
 	return admission.Warnings{
-		"The primary isolation check cannot be disabled. The isolationCheck.enabled setting, " +
-			"or the alpha.cnpg.io/livenessPinger annotation, is ignored and should be removed.",
+		"spec.probes.liveness.isolationCheck.enabled is false, which has no effect: " +
+			"the primary isolation check cannot be disabled. Set the field to true or remove it. " +
+			"Removing the alpha.cnpg.io/livenessPinger annotation alone does not change the field, " +
+			"even if the annotation set it.",
 	}
 }
 
