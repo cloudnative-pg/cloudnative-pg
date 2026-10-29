@@ -30,7 +30,26 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
+// minimumPostgresMajorVersionForPublicationExcept is the first PostgreSQL
+// major version supporting the `EXCEPT` clause of `FOR ALL TABLES` in
+// publications.
+const minimumPostgresMajorVersionForPublicationExcept = 19
+
 func (r *PublicationReconciler) alignPublication(ctx context.Context, obj *apiv1.Publication) error {
+	if len(obj.Spec.Target.Except) > 0 {
+		version, err := r.getPostgresMajorVersion()
+		if err != nil {
+			return fmt.Errorf("while getting the PostgreSQL major version: %w", err)
+		}
+		if version < minimumPostgresMajorVersionForPublicationExcept {
+			return fmt.Errorf(
+				"target.except requires PostgreSQL %d or higher, but the server is running version %d",
+				minimumPostgresMajorVersionForPublicationExcept,
+				version,
+			)
+		}
+	}
+
 	db, err := r.getDB(obj.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
@@ -102,9 +121,19 @@ func toPublicationCreateSQL(obj *apiv1.Publication) string {
 }
 
 func toPublicationAlterSQL(obj *apiv1.Publication) []string {
-	result := make([]string, 0, 2)
+	result := make([]string, 0, 3)
 
-	if len(obj.Spec.Target.Objects) > 0 {
+	switch {
+	case obj.Spec.Target.AllTables:
+		result = append(result,
+			fmt.Sprintf(
+				"ALTER PUBLICATION %s SET %s",
+				pgx.Identifier{obj.Spec.Name}.Sanitize(),
+				toPublicationAllTablesSQL(&obj.Spec.Target),
+			),
+		)
+
+	case len(obj.Spec.Target.Objects) > 0:
 		result = append(result,
 			fmt.Sprintf(
 				"ALTER PUBLICATION %s SET %s",
@@ -140,7 +169,7 @@ func executeDropPublication(ctx context.Context, db *sql.DB, name string) error 
 
 func toPublicationTargetSQL(obj *apiv1.PublicationTarget) string {
 	if obj.AllTables {
-		return "FOR ALL TABLES"
+		return fmt.Sprintf("FOR %s", toPublicationAllTablesSQL(obj))
 	}
 
 	result := toPublicationTargetObjectsSQL(obj)
@@ -148,6 +177,22 @@ func toPublicationTargetSQL(obj *apiv1.PublicationTarget) string {
 		result = fmt.Sprintf("FOR %s", result)
 	}
 	return result
+}
+
+// toPublicationAllTablesSQL renders the `ALL TABLES [EXCEPT (TABLE ...)]`
+// clause used by both `CREATE PUBLICATION ... FOR ALL TABLES ...` and
+// `ALTER PUBLICATION ... SET ALL TABLES ...` (PostgreSQL 19+).
+func toPublicationAllTablesSQL(obj *apiv1.PublicationTarget) string {
+	if len(obj.Except) == 0 {
+		return "ALL TABLES"
+	}
+
+	exceptTables := make([]string, 0, len(obj.Except))
+	for _, table := range obj.Except {
+		exceptTables = append(exceptTables, toExceptTableDefinitionSQL(&table))
+	}
+
+	return fmt.Sprintf("ALL TABLES EXCEPT (TABLE %s)", strings.Join(exceptTables, ", "))
 }
 
 func toPublicationTargetObjectsSQL(obj *apiv1.PublicationTarget) string {
@@ -201,6 +246,22 @@ func toTableDefinitionSQL(table *apiv1.PublicationTargetTable) string {
 		}
 		fmt.Fprintf(&result, " (%s)", strings.Join(sanitizedColumns, ", "))
 	}
+
+	return result.String()
+}
+
+func toExceptTableDefinitionSQL(table *apiv1.PublicationTargetExceptTable) string {
+	result := strings.Builder{}
+
+	if table.Only {
+		result.WriteString("ONLY ")
+	}
+
+	if len(table.Schema) > 0 {
+		fmt.Fprintf(&result, "%s.", pgx.Identifier{table.Schema}.Sanitize())
+	}
+
+	result.WriteString(pgx.Identifier{table.Name}.Sanitize())
 
 	return result.String()
 }
