@@ -73,9 +73,10 @@ Cross-namespace objects created before the restart are reconciled as soon as
 the new instance manager is up.
 
 The same restart happens if an instance manager cannot read its cluster when
-it starts, for example during a brief unavailability of the API server: it
-then watches the namespace of its cluster only, and widens its watch once the
-cluster can be read, instead of failing to start.
+it starts, for example during a brief unavailability of the API server, or if
+it starts before the operator granted it access to every namespace: it then
+watches the namespace of its cluster only, and widens its watch once the
+cluster can be read and the access is granted, instead of failing to start.
 
 ## Referencing a cluster in another namespace
 

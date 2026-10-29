@@ -232,9 +232,16 @@ var crossNamespaceDetectionBackoff = wait.Backoff{
 // restarts the instance manager once the cluster can be read and turns out
 // to enable the feature. Failing here instead would end this process, and
 // with it a PostgreSQL left running by an online upgrade.
+//
+// The same happens when the cluster enables the feature but this instance
+// manager cannot yet list and watch the managed resources in every namespace,
+// for example because the operator did not create its ClusterRoleBinding
+// yet: the informers would be refused, the cache would never sync and the
+// instance manager would fail to start, again and again.
 func detectCrossNamespaceResources(
 	ctx context.Context,
 	cli client.Reader,
+	checkAccess clusterWideAccessChecker,
 	namespace string,
 	clusterName string,
 	backoff wait.Backoff,
@@ -258,8 +265,27 @@ func detectCrossNamespaceResources(
 			"err", err.Error())
 		return false
 	}
+	if !enabled {
+		return false
+	}
 
-	return enabled
+	allowed, reason, err := checkAccess(ctx)
+	if err != nil {
+		contextLogger.Warning(
+			"Cannot check the cluster-wide access the cross-namespace resources support needs, watching "+
+				"the resources of the cluster namespace only until it is granted",
+			"err", err.Error())
+		return false
+	}
+	if !allowed {
+		contextLogger.Info(
+			"Cross-namespace resources support enabled, but not granted yet: watching the resources of "+
+				"the cluster namespace only until it is",
+			"reason", reason)
+		return false
+	}
+
+	return true
 }
 
 func runSubCommand( //nolint: gocyclo,gocognit
@@ -291,7 +317,8 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	}
 
 	crossNamespaceResources := detectCrossNamespaceResources(
-		ctx, preflightClient, instance.GetNamespaceName(), instance.GetClusterName(),
+		ctx, preflightClient, newClusterWideAccessChecker(kubeClientset),
+		instance.GetNamespaceName(), instance.GetClusterName(),
 		crossNamespaceDetectionBackoff)
 
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
