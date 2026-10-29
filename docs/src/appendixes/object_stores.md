@@ -211,6 +211,9 @@ encrypt and decrypt objects without storing it.
 
 To enable SSE-C, set the `sseCustomerKey` field in the `s3Credentials` section
 to a reference to a secret holding a base64-encoded 256-bit (32-byte) AES key.
+SSE-C requires Barman Cloud 3.20 or later in the operand image: with an older
+version, WAL archiving and backups fail with
+`unrecognized arguments: --sse-customer-key`.
 
 Generate the key and store it in a Kubernetes secret:
 
