@@ -906,3 +906,32 @@ You can work around this issue by setting `STANDBY_TCP_USER_TIMEOUT` in the
 the standby instances to close the TCP connection if the initial `SYN` packet
 is not acknowledged within the specified timeout, allowing them to retry the
 connection more quickly.
+
+### Enabling io_uring causes the cluster to CrashLoopBackOff
+
+If you enable `io_uring` in your Cluster by setting the [io_method](https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-IO-METHOD) parameter
+
+``` yaml
+  postgresql:
+    parameters:
+      io_method: "io_uring"
+```
+
+and afterwards the Pods are `CrashLooping` with this error
+
+```
+[]FATAL:  could not setup io_uring queue: Operation not permitted","pipe":"stderr","logging_pod":"iouring-1"}
+[]HINT:  Check if io_uring is disabled via /proc/sys/kernel/io_uring_disabled.","pipe":"stderr","logging_pod":"iouring-1"}
+```
+
+your `secCompProfile` does not allow the syscall's needed by `io_uring`.
+To fix this problem you have to create a new `secCompProfile` on your worker nodes and refer to it
+in the `securityContext`.
+
+``` yaml
+    seccompProfile:
+      type: Localhost
+      localhostProfile: profiles/postgres.json      
+```
+
+Find the used `secCompProfile` [here](./samples/io_uring-seccompprofile.json).
