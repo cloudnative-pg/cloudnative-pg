@@ -36,6 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -272,6 +274,12 @@ func RunController(
 		"availableArchitectures", utils.GetAvailableArchitectures(),
 	)
 
+	canManageClusterRBAC, err := canManageCrossNamespaceRBAC(ctx, mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to check the access to ClusterRoles and ClusterRoleBindings")
+		return err
+	}
+
 	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir, conf); err != nil {
 		return err
 	}
@@ -298,6 +306,7 @@ func RunController(
 		operatorClientCert,
 		conf,
 		maxConcurrentReconciles,
+		canManageClusterRBAC,
 	); err != nil {
 		return err
 	}
@@ -317,6 +326,43 @@ func RunController(
 	return nil
 }
 
+// canManageCrossNamespaceRBAC tells whether the operator can list and watch
+// the ClusterRoles and ClusterRoleBindings it creates for the clusters
+// enabling the cross-namespace resources support.
+//
+// The RBAC of an operator installed before that support existed, as by an
+// older Helm chart, does not allow it. Watching those objects anyway would
+// stop the operator from starting, as their informers would never sync: the
+// support is unavailable instead, until the operator is granted the access
+// and restarted.
+func canManageCrossNamespaceRBAC(ctx context.Context, restConfig *rest.Config) (bool, error) {
+	kubeClient, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return false, err
+	}
+
+	allowed, reason, err := utils.CheckClusterWideAccess(
+		ctx,
+		kubeClient,
+		rbacv1.GroupName,
+		[]string{"clusterroles", "clusterrolebindings"},
+		[]string{"list", "watch"},
+	)
+	if err != nil {
+		return false, err
+	}
+
+	if !allowed {
+		setupLog.Warning(
+			"The operator cannot manage ClusterRoles and ClusterRoleBindings: the clusters enabling "+
+				"the cross-namespace resources support will not be granted access to other namespaces "+
+				"until the operator is granted it and restarted",
+			"reason", reason)
+	}
+
+	return allowed, nil
+}
+
 // setupReconcilers registers every operator reconciler with the manager.
 func setupReconcilers(
 	ctx context.Context,
@@ -326,6 +372,7 @@ func setupReconcilers(
 	operatorClientCert *tls.Certificate,
 	conf *configuration.Data,
 	maxConcurrentReconciles int,
+	canManageClusterRBAC bool,
 ) error {
 	if err := controller.NewClusterReconciler(
 		mgr,
@@ -334,6 +381,7 @@ func setupReconcilers(
 		conf.DrainTaints,
 		operatorClientCert,
 		webhookv1.NewClusterAdmissionGuard(),
+		canManageClusterRBAC,
 	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
@@ -392,6 +440,7 @@ func setupReconcilers(
 		mgr.GetClient(),
 		mgr.GetAPIReader(),
 		conf.WatchedNamespaces(),
+		canManageClusterRBAC,
 	)); err != nil {
 		setupLog.Error(err, "unable to add the cross-namespace RBAC sweeper")
 		return err

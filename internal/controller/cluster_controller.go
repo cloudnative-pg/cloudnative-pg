@@ -105,9 +105,19 @@ type ClusterReconciler struct {
 	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
 	admission      *guard.Admission[*apiv1.Cluster]
+
+	// clusterRBACForbidden is true when the operator cannot list and watch
+	// ClusterRoles and ClusterRoleBindings, as when its own RBAC predates the
+	// cross-namespace resources support. The cluster-scoped RBAC objects of
+	// that support are then neither watched nor read: an informer refused by
+	// the API server never syncs, which would stop the operator from starting
+	// and hang every reconciliation reading those objects.
+	clusterRBACForbidden bool
 }
 
-// NewClusterReconciler creates a new ClusterReconciler initializing it
+// NewClusterReconciler creates a new ClusterReconciler initializing it.
+// canManageClusterRBAC tells whether the operator can list and watch
+// ClusterRoles and ClusterRoleBindings.
 func NewClusterReconciler(
 	mgr manager.Manager,
 	discoveryClient discovery.DiscoveryInterface,
@@ -115,6 +125,7 @@ func NewClusterReconciler(
 	drainTaints []string,
 	operatorClientCert *tls.Certificate,
 	admission *guard.Admission[*apiv1.Cluster],
+	canManageClusterRBAC bool,
 ) *ClusterReconciler {
 	return &ClusterReconciler{
 		InstanceClient:     remote.NewClient().Instance(),
@@ -128,8 +139,9 @@ func NewClusterReconciler(
 			configuration.Current.GetClustersRolloutDelay(),
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
-		drainTaints: drainTaints,
-		admission:   admission,
+		drainTaints:          drainTaints,
+		admission:            admission,
+		clusterRBACForbidden: !canManageClusterRBAC,
 	}
 }
 

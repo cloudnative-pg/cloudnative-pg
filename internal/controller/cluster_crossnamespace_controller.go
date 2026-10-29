@@ -69,6 +69,16 @@ func (r crossNamespaceRBACReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, r.deleteCrossNamespaceRBACByKey(ctx, req.NamespacedName, &cluster)
 	}
 
+	// Nothing changes until the operator is granted the access and restarted,
+	// so this is reported without retrying
+	if r.clusterRBACForbidden {
+		r.Recorder.Event(&cluster, "Warning", "CrossNamespaceRBACForbidden",
+			"Cannot grant the instances access to the resources of other namespaces: the operator "+
+				"is not allowed to list and watch ClusterRoles and ClusterRoleBindings. "+
+				"Update the RBAC of the operator and restart it")
+		return ctrl.Result{}, nil
+	}
+
 	if err := r.reconcileCrossNamespaceRBAC(ctx, &cluster); err != nil {
 		r.Recorder.Event(&cluster, "Warning", "CrossNamespaceRBACFailed",
 			fmt.Sprintf("Cannot reconcile the RBAC objects for cross-namespace resources: %s", err))
@@ -85,7 +95,7 @@ func (r *ClusterReconciler) setupCrossNamespaceRBACController(mgr ctrl.Manager) 
 		return ok && cluster.Spec.EnableCrossNamespaceResources
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
+	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("cluster-cross-namespace-rbac").
 		For(&apiv1.Cluster{}, builder.WithPredicates(
 			enabledPredicate,
@@ -103,22 +113,27 @@ func (r *ClusterReconciler) setupCrossNamespaceRBACController(mgr ctrl.Manager) 
 		).
 		// A change made to the RBAC objects by someone else is reverted
 		Watches(
-			&rbacv1.ClusterRole{},
-			handler.EnqueueRequestsFromMapFunc(mapCrossNamespaceRBACToCluster),
-		).
-		Watches(
-			&rbacv1.ClusterRoleBinding{},
-			handler.EnqueueRequestsFromMapFunc(mapCrossNamespaceRBACToCluster),
-		).
-		Watches(
 			&rbacv1.Role{},
 			handler.EnqueueRequestsFromMapFunc(mapCrossNamespaceRBACToCluster),
 		).
 		Watches(
 			&rbacv1.RoleBinding{},
 			handler.EnqueueRequestsFromMapFunc(mapCrossNamespaceRBACToCluster),
-		).
-		Complete(crossNamespaceRBACReconciler{ClusterReconciler: r})
+		)
+
+	if !r.clusterRBACForbidden {
+		ctrlBuilder = ctrlBuilder.
+			Watches(
+				&rbacv1.ClusterRole{},
+				handler.EnqueueRequestsFromMapFunc(mapCrossNamespaceRBACToCluster),
+			).
+			Watches(
+				&rbacv1.ClusterRoleBinding{},
+				handler.EnqueueRequestsFromMapFunc(mapCrossNamespaceRBACToCluster),
+			)
+	}
+
+	return ctrlBuilder.Complete(crossNamespaceRBACReconciler{ClusterReconciler: r})
 }
 
 // mapCrossNamespaceRBACToCluster enqueues the cluster an RBAC object was

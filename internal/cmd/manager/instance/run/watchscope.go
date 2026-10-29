@@ -21,12 +21,9 @@ package run
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	authorizationv1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,6 +32,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // clusterWideAccessRetryDelay is how long to wait before checking again whether
@@ -85,44 +83,11 @@ type clusterWideAccessChecker func(ctx context.Context) (allowed bool, reason st
 
 // newClusterWideAccessChecker builds a clusterWideAccessChecker asking the
 // API server, through SelfSubjectAccessReviews, whether this instance manager can
-// list and watch the managed resources in every namespace. Creating a
-// SelfSubjectAccessReview needs no specific permission.
+// list and watch the managed resources in every namespace.
 func newClusterWideAccessChecker(kubeClient kubernetes.Interface) clusterWideAccessChecker {
 	return func(ctx context.Context) (bool, string, error) {
-		for _, resource := range clusterWideResources {
-			for _, verb := range clusterWideVerbs {
-				review, err := kubeClient.AuthorizationV1().SelfSubjectAccessReviews().Create(
-					ctx,
-					&authorizationv1.SelfSubjectAccessReview{
-						Spec: authorizationv1.SelfSubjectAccessReviewSpec{
-							ResourceAttributes: &authorizationv1.ResourceAttributes{
-								// An empty namespace means every namespace
-								Namespace: "",
-								Verb:      verb,
-								Group:     apiv1.SchemeGroupVersion.Group,
-								Resource:  resource,
-							},
-						},
-					},
-					metav1.CreateOptions{},
-				)
-				if err != nil {
-					return false, "", fmt.Errorf("while checking the permission to %s %s in every namespace: %w",
-						verb, resource, err)
-				}
-
-				if !review.Status.Allowed {
-					reason := fmt.Sprintf("cannot %s %s.%s in every namespace",
-						verb, resource, apiv1.SchemeGroupVersion.Group)
-					if review.Status.Reason != "" {
-						reason = fmt.Sprintf("%s: %s", reason, review.Status.Reason)
-					}
-					return false, reason, nil
-				}
-			}
-		}
-
-		return true, "", nil
+		return utils.CheckClusterWideAccess(
+			ctx, kubeClient, apiv1.SchemeGroupVersion.Group, clusterWideResources, clusterWideVerbs)
 	}
 }
 
