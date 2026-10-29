@@ -49,8 +49,10 @@ func NewCmd() *cobra.Command {
 			verbose, _ := cmd.Flags().GetCount("verbose")
 			output, _ := cmd.Flags().GetString("output")
 			timeout, _ := cmd.Flags().GetDuration("timeout")
+			watch, _ := cmd.Flags().GetBool("watch")
+			watchInterval, _ := cmd.Flags().GetDuration("watch-interval")
 
-			return Status(ctx, clusterName, verbose, plugin.OutputFormat(output), timeout)
+			return Status(ctx, clusterName, verbose, plugin.OutputFormat(output), timeout, watch, watchInterval)
 		},
 	}
 
@@ -60,6 +62,10 @@ func NewCmd() *cobra.Command {
 		"output", "o", "text", "Output format. One of text|json")
 	statusCmd.Flags().DurationP(
 		"timeout", "t", 10*time.Second, "Timeout for operations that access pod filesystems (e.g., du, cat)")
+	statusCmd.Flags().BoolP(
+		"watch", "w", false, "Watch cluster status, refreshing every --watch-interval")
+	statusCmd.Flags().Duration(
+		"watch-interval", 5*time.Second, "Interval between status refreshes when --watch is enabled")
 
 	return statusCmd
 }
