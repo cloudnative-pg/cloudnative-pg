@@ -65,11 +65,34 @@ func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 		return err
 	}
 	if reason != "" {
-		role.Status.ClientCertificate = &apiv1.ClientCertificateState{Message: reason}
-		return nil
+		return r.withdrawClientCertificate(ctx, role, secretKey, reason)
 	}
 
 	return r.issueClientCertificate(ctx, role, cluster, secretKey)
+}
+
+// withdrawClientCertificate deletes the certificate a role is no longer
+// entitled to and records why. The role may have been issued one before being
+// refused: two objects claiming the same PostgreSQL role may both be issued a
+// certificate before either is reconciled by the instance manager, and a
+// cluster may stop accepting the roles of a namespace. Keeping it would let
+// the namespace of the role keep logging in as the PostgreSQL role.
+func (r *DatabaseRoleReconciler) withdrawClientCertificate(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+	secretKey client.ObjectKey,
+	reason string,
+) error {
+	deleted, err := r.deleteOwnedSecret(ctx, role, secretKey)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		reason = fmt.Sprintf("%s; %s", reason, fmt.Sprintf(secretNotDeletableMessage, secretKey.Name))
+	}
+
+	role.Status.ClientCertificate = &apiv1.ClientCertificateState{Message: reason}
+	return nil
 }
 
 // clientCertificateRefusal returns why no client certificate may be issued

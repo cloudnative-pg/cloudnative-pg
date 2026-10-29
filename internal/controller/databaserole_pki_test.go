@@ -475,5 +475,61 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(r.reconcileClientCertificate(ctx, owner, cluster)).To(Succeed())
 			Expect(r.Get(ctx, certSecretKey(owner), &corev1.Secret{})).To(Succeed())
 		})
+
+		It("withdraws the certificate issued to a role before it was refused", func(ctx SpecContext) {
+			cluster.Spec.EnableCrossNamespaceResources = true
+
+			// Both objects claim the role before either is reconciled, so both
+			// are issued a certificate
+			owner := newRole("owner", true)
+			duplicate := newTenantRole("duplicate", owner.Spec.Name)
+			Expect(r.reconcileClientCertificate(ctx, duplicate, cluster)).To(Succeed())
+			Expect(r.Get(ctx, tenantCertSecretKey(duplicate), &corev1.Secret{})).To(Succeed())
+
+			// The instance manager then reconciles the owner
+			owner.Status.ObservedGeneration = 1
+			Expect(r.Status().Update(ctx, owner)).To(Succeed())
+
+			Expect(r.reconcileClientCertificate(ctx, duplicate, cluster)).To(Succeed())
+
+			err := r.Get(ctx, tenantCertSecretKey(duplicate), &corev1.Secret{})
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			Expect(duplicate.Status.ClientCertificate.Expiration).To(BeEmpty())
+			Expect(duplicate.Status.ClientCertificate.Message).To(ContainSubstring("already managed"))
+		})
+
+		It("withdraws the certificate of another namespace when the cluster stops accepting it",
+			func(ctx SpecContext) {
+				cluster.Spec.EnableCrossNamespaceResources = true
+				role := newTenantRole("tenant-app", "tenant_app")
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+				Expect(r.Get(ctx, tenantCertSecretKey(role), &corev1.Secret{})).To(Succeed())
+
+				cluster.Spec.EnableCrossNamespaceResources = false
+
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+				err := r.Get(ctx, tenantCertSecretKey(role), &corev1.Secret{})
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
+				Expect(role.Status.ClientCertificate.Message).To(ContainSubstring("enableCrossNamespaceResources"))
+			})
+
+		It("leaves a same-named Secret it does not own when refusing a role", func(ctx SpecContext) {
+			role := newTenantRole("intruder", "app")
+			Expect(r.Create(ctx, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      role.GetClientCertSecretName(),
+					Namespace: tenantNamespace,
+				},
+			})).To(Succeed())
+
+			Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+			Expect(r.Get(ctx, tenantCertSecretKey(role), &corev1.Secret{})).To(Succeed())
+			Expect(role.Status.ClientCertificate.Message).To(SatisfyAll(
+				ContainSubstring("enableCrossNamespaceResources"),
+				ContainSubstring("will not be deleted automatically"),
+			))
+		})
 	})
 })
