@@ -67,6 +67,8 @@ type InstanceReconciler struct {
 	systemInitialization  *concurrency.Executed
 	firstReconcileDone    atomic.Bool
 	metricsServerExporter *metricserver.Exporter
+	// monitoringQueriesInputs is what the current queries collector was built from
+	monitoringQueriesInputs *monitoringQueriesInputs
 
 	// pendingReload is set when the configuration files have been changed
 	// and PostgreSQL has not been reloaded yet
