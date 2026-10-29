@@ -182,6 +182,23 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		}
 	})
 
+	It("should fail when there is no PVC to snapshot", func(ctx SpecContext) {
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod).
+			Build()
+
+		fakeRecorder := record.NewFakeRecorder(3)
+
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+			Build()
+
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, nil)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("without any PVC to snapshot"))
+		Expect(result).To(BeNil())
+	})
+
 	It("should fence the target pod when there are no volumesnapshots", func(ctx SpecContext) {
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
