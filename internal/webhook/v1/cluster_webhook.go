@@ -454,6 +454,16 @@ func (v *ClusterCustomValidator) validateMonolith(s *apiv1.Import) field.ErrorLi
 		)
 	}
 
+	if len(s.PreImportApplicationSQL) > 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "preImportApplicationSQL"),
+				s.PreImportApplicationSQL,
+				"preImportApplicationSQL is not allowed for the `monolith` import type"),
+		)
+	}
+
 	if len(s.PostImportApplicationSQL) > 0 {
 		result = append(
 			result,

@@ -97,27 +97,41 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 		})
 	})
 
-	Context("executePostImportQueries testing", func() {
-		const createQuery = "CREATE TABLE test (id int)"
+	Context("executeImportQueries testing", func() {
+		const preImportQuery = "CREATE TABLE pre (id INT)"
+		const postImportQuery = "CREATE TABLE test (id int)"
 		BeforeEach(func() {
 			ds.cluster.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
 				InitDB: &apiv1.BootstrapInitDB{
 					Import: &apiv1.Import{
-						PostImportApplicationSQL: []string{createQuery},
+						PreImportApplicationSQL:  []string{preImportQuery},
+						PostImportApplicationSQL: []string{postImportQuery},
 					},
 				},
 			}
 		})
 
-		It("should execute the query properly", func(ctx SpecContext) {
+		It("should execute the pre-import query properly", func(ctx SpecContext) {
 			// Each user query is bracketed with SET / RESET search_path
 			// so user-authored DDL still resolves into "$user", public.
 			mock.ExpectExec(`SET search_path TO "$user", public`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			mock.ExpectExec(createQuery).WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(preImportQuery).WillReturnResult(sqlmock.NewResult(0, 0))
 			mock.ExpectExec(`RESET search_path`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			err := ds.executePostImportQueries(ctx, fp, "test")
+			err := ds.executeImportQueries(ctx, fp, "test", ds.cluster.Spec.Bootstrap.InitDB.Import.PreImportApplicationSQL)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should execute the post-import query properly", func(ctx SpecContext) {
+			// Each user query is bracketed with SET / RESET search_path
+			// so user-authored DDL still resolves into "$user", public.
+			mock.ExpectExec(`SET search_path TO "$user", public`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(postImportQuery).WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(`RESET search_path`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			err := ds.executeImportQueries(ctx, fp, "test", ds.cluster.Spec.Bootstrap.InitDB.Import.PostImportApplicationSQL)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -125,11 +139,11 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			expectedErr := fmt.Errorf("will fail")
 			mock.ExpectExec(`SET search_path TO "$user", public`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			mock.ExpectExec(createQuery).WillReturnError(expectedErr)
+			mock.ExpectExec(postImportQuery).WillReturnError(expectedErr)
 			// RESET runs even when the query fails
 			mock.ExpectExec(`RESET search_path`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
-			err := ds.executePostImportQueries(ctx, fp, "test")
+			err := ds.executeImportQueries(ctx, fp, "test", ds.cluster.Spec.Bootstrap.InitDB.Import.PostImportApplicationSQL)
 			Expect(err).To(Equal(expectedErr))
 			Expect(mock.ExpectationsWereMet()).To(Succeed())
 		})
