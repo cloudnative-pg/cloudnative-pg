@@ -298,8 +298,8 @@ spec:
   probes:
     liveness:
       isolationCheck:
-        requestTimeout: "2000"
-        connectionTimeout: "2000"
+        requestTimeout: 2000
+        connectionTimeout: 2000
 ```
 
 :::info
