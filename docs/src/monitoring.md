@@ -106,7 +106,7 @@ find `PodMonitor` resources.
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: cluster-example
+  name: cluster-example-podmonitor
 spec:
   selector:
     matchLabels:
@@ -116,7 +116,9 @@ spec:
 ```
 
 :::info[Important Configuration Details]
-    - `metadata.name`: Give your `PodMonitor` a unique name.
+    - `metadata.name`: Give your `PodMonitor` a unique name that differs from your
+      cluster name to avoid conflicts with the operator. For example, if your cluster
+      is named `cluster-example`, you might name the PodMonitor `cluster-example-podmonitor`.
     - `spec.namespaceSelector`: Use this to specify the namespace where
       your PostgreSQL cluster is running.
     - `spec.selector.matchLabels`: You must use the `cnpg.io/cluster: <cluster-name>`
@@ -128,6 +130,8 @@ spec:
 :::warning[Feature Deprecation Notice]
     The `.spec.monitoring.enablePodMonitor` field in the `Cluster` resource is
     now deprecated and will be removed in a future version of the operator.
+    See [issue #8075](https://github.com/cloudnative-pg/cloudnative-pg/issues/8075)
+    for more details.
 :::
 
 If you are currently using this feature, we strongly recommend you either
@@ -135,6 +139,15 @@ remove or set `.spec.monitoring.enablePodMonitor` to `false` and manually
 create a `PodMonitor` resource for your cluster as described above.
 This change ensures that you have complete ownership of your monitoring
 configuration, preventing it from being managed or overwritten by the operator.
+
+:::warning[Naming Conflict]
+    When manually creating a `PodMonitor`, ensure its `metadata.name` differs from
+    your cluster's name. If you disable `.spec.monitoring.enablePodMonitor` and create
+    a manual `PodMonitor` with the same name as your cluster, the operator will delete it
+    during reconciliation. See [issue #6109](https://github.com/cloudnative-pg/cloudnative-pg/issues/6109)
+    for details. For example, a suffix like `-podmonitor` (e.g., `cluster-example-podmonitor`)
+    can avoid this conflict.
+:::
 
 ### Enabling TLS on the Metrics Port
 
@@ -156,7 +169,7 @@ adjust as needed:
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: cluster-example
+  name: cluster-example-podmonitor
 spec:
   selector:
     matchLabels:
@@ -173,8 +186,8 @@ spec:
 ```
 
 :::info[Important]
-    Ensure you modify the example above with a unique name, as well as the
-    correct Cluster's namespace and labels (e.g., `cluster-example`).
+    Ensure you modify the example above with a unique name that differs from your
+    cluster name, as well as the correct Cluster's namespace and labels (e.g., `cluster-example`).
 :::
 
 :::info[Important]
