@@ -113,3 +113,22 @@ var _ = Describe("instance reconciler health probe certificate", func() {
 			Expect(pgInstance.GetServerCertificate()).ToNot(BeNil())
 		})
 })
+
+var _ = Describe("refreshConfigurationFiles", func() {
+	It("reports the files it changed before failing", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-example"},
+		}
+
+		// Without PG_VERSION the PostgreSQL configuration cannot be generated,
+		// and that happens after pg_hba.conf and pg_ident.conf are written
+		pgInstance := postgres.NewInstance()
+		pgInstance.PgData = GinkgoT().TempDir()
+		reconciler := &InstanceReconciler{instance: pgInstance}
+
+		reloadNeeded, err := reconciler.refreshConfigurationFiles(ctx, cluster)
+
+		Expect(err).To(HaveOccurred())
+		Expect(reloadNeeded).To(BeTrue())
+	})
+})

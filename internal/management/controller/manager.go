@@ -68,6 +68,10 @@ type InstanceReconciler struct {
 	firstReconcileDone    atomic.Bool
 	metricsServerExporter *metricserver.Exporter
 
+	// pendingReload is set when the configuration files have been changed
+	// and PostgreSQL has not been reloaded yet
+	pendingReload bool
+
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
 	primaryLeaseAcquirer  PrimaryLeaseAcquirer
