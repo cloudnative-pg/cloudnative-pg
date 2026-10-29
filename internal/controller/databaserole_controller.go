@@ -244,15 +244,15 @@ func setIfChanged[T comparable](field *T, before, next T) {
 
 // nextRoleSecretReconcile returns how long from now the role's client
 // certificate or password should next be checked for renewal, or zero when
-// neither is enabled. The certificate falls back to the fixed
-// roleSecretReconcileInterval; the password instead requeues right at its
-// renewal deadline, which duration and renewBefore can put far sooner than
-// that interval.
+// neither is enabled. The certificate requeues at a fraction of its renewal
+// window, capped at roleSecretReconcileInterval; the password instead requeues
+// right at its renewal deadline, which duration and renewBefore can put far
+// sooner than that interval.
 func nextRoleSecretReconcile(role *apiv1.DatabaseRole) time.Duration {
 	var next time.Duration
 	certEnabled := role.IsClientCertificateEnabled()
 	if certEnabled {
-		next = roleSecretReconcileInterval
+		next = clientCertRequeueAfter(role)
 	}
 
 	if role.IsPasswordRotationEnabled() {
