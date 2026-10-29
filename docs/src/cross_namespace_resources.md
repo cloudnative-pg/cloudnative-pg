@@ -350,6 +350,14 @@ broader than its own permissions on CloudNativePG resources. These permissions
 are part of the operator installation, whether or not any cluster enables
 cross-namespace resources.
 
+An operator whose RBAC lacks the `list` and `watch` permissions on
+`clusterroles` and `clusterrolebindings`, as one installed from manifests or a
+Helm chart predating cross-namespace resources, still starts, and logs a
+warning. The clusters enabling cross-namespace resources then get a
+`CrossNamespaceRBACForbidden` warning event, and their instances keep watching
+the namespace of their cluster only. Restart the operator once its RBAC is
+updated.
+
 See [Role Based Access Control (RBAC)](security.md#role-based-access-control-rbac)
 for the other permissions of the operator.
 

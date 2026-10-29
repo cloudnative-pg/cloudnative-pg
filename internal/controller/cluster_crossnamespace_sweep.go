@@ -46,8 +46,9 @@ const crossNamespaceRBACSweepInterval = 15 * time.Minute
 // crossNamespaceRBACKind describes a kind of RBAC object created for the
 // cross-namespace resources support and labelled with the owning cluster
 type crossNamespaceRBACKind struct {
-	name    string
-	newList func() client.ObjectList
+	name          string
+	clusterScoped bool
+	newList       func() client.ObjectList
 }
 
 // crossNamespaceRBACKinds are the kinds of RBAC objects swept, in deletion
@@ -55,9 +56,17 @@ type crossNamespaceRBACKind struct {
 // RoleBindings are the ones granting access to the password Secrets of the
 // tenant namespaces.
 var crossNamespaceRBACKinds = []crossNamespaceRBACKind{
-	{name: "ClusterRoleBinding", newList: func() client.ObjectList { return &rbacv1.ClusterRoleBindingList{} }},
+	{
+		name:          "ClusterRoleBinding",
+		clusterScoped: true,
+		newList:       func() client.ObjectList { return &rbacv1.ClusterRoleBindingList{} },
+	},
 	{name: "RoleBinding", newList: func() client.ObjectList { return &rbacv1.RoleBindingList{} }},
-	{name: "ClusterRole", newList: func() client.ObjectList { return &rbacv1.ClusterRoleList{} }},
+	{
+		name:          "ClusterRole",
+		clusterScoped: true,
+		newList:       func() client.ObjectList { return &rbacv1.ClusterRoleList{} },
+	},
 	{name: "Role", newList: func() client.ObjectList { return &rbacv1.RoleList{} }},
 }
 
@@ -90,22 +99,31 @@ type CrossNamespaceRBACSweeper struct {
 	// namespaces. Empty means every namespace.
 	watchedNamespaces []string
 
+	// clusterRBACForbidden skips the ClusterRoles and the ClusterRoleBindings,
+	// which the operator cannot list
+	clusterRBACForbidden bool
+
 	interval time.Duration
 }
 
 var _ manager.LeaderElectionRunnable = &CrossNamespaceRBACSweeper{}
 
-// NewCrossNamespaceRBACSweeper creates a new sweeper
+// NewCrossNamespaceRBACSweeper creates a new sweeper. canManageClusterRBAC
+// tells whether the operator can list and watch ClusterRoles and
+// ClusterRoleBindings: when it cannot, only the Roles and the RoleBindings of
+// the tenant namespaces are swept.
 func NewCrossNamespaceRBACSweeper(
 	cli client.Client,
 	reader client.Reader,
 	watchedNamespaces []string,
+	canManageClusterRBAC bool,
 ) *CrossNamespaceRBACSweeper {
 	return &CrossNamespaceRBACSweeper{
-		client:            cli,
-		reader:            reader,
-		watchedNamespaces: watchedNamespaces,
-		interval:          crossNamespaceRBACSweepInterval,
+		client:               cli,
+		reader:               reader,
+		watchedNamespaces:    watchedNamespaces,
+		clusterRBACForbidden: !canManageClusterRBAC,
+		interval:             crossNamespaceRBACSweepInterval,
 	}
 }
 
@@ -144,40 +162,9 @@ func (s *CrossNamespaceRBACSweeper) Start(ctx context.Context) error {
 func (s *CrossNamespaceRBACSweeper) Sweep(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
-	selector, err := specs.CrossNamespaceRBACSelector()
+	objectsByCluster, clusterKeys, err := s.listByCluster(ctx)
 	if err != nil {
 		return err
-	}
-
-	// The objects of every kind, grouped by the cluster they were created for
-	objectsByCluster := make(map[types.NamespacedName][]crossNamespaceRBACObject)
-	var clusterKeys []types.NamespacedName
-	for _, kind := range crossNamespaceRBACKinds {
-		list := kind.newList()
-		if err := s.client.List(ctx, list, client.MatchingLabelsSelector{Selector: selector}); err != nil {
-			return fmt.Errorf("while listing %s objects: %w", kind.name, err)
-		}
-		items, err := meta.ExtractList(list)
-		if err != nil {
-			return fmt.Errorf("while reading %s objects: %w", kind.name, err)
-		}
-		for _, item := range items {
-			obj, ok := item.(client.Object)
-			if !ok {
-				continue
-			}
-			key := types.NamespacedName{
-				Namespace: obj.GetLabels()[utils.ClusterNamespaceLabelName],
-				Name:      obj.GetLabels()[utils.ClusterLabelName],
-			}
-			if !s.isWatched(key.Namespace) {
-				continue
-			}
-			if _, found := objectsByCluster[key]; !found {
-				clusterKeys = append(clusterKeys, key)
-			}
-			objectsByCluster[key] = append(objectsByCluster[key], crossNamespaceRBACObject{kind: kind.name, obj: obj})
-		}
 	}
 
 	var errs []error
@@ -202,6 +189,54 @@ func (s *CrossNamespaceRBACSweeper) Sweep(ctx context.Context) error {
 		contextLogger.Debug("Swept cross-namespace RBAC objects", "clusters", len(clusterKeys))
 	}
 	return errors.Join(errs...)
+}
+
+// listByCluster lists the cross-namespace RBAC objects of every kind swept,
+// grouped by the cluster of the watched namespaces they were created for.
+// The keys of the clusters are returned in the order they were found.
+func (s *CrossNamespaceRBACSweeper) listByCluster(
+	ctx context.Context,
+) (map[types.NamespacedName][]crossNamespaceRBACObject, []types.NamespacedName, error) {
+	selector, err := specs.CrossNamespaceRBACSelector()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	objectsByCluster := make(map[types.NamespacedName][]crossNamespaceRBACObject)
+	var clusterKeys []types.NamespacedName
+	for _, kind := range crossNamespaceRBACKinds {
+		if kind.clusterScoped && s.clusterRBACForbidden {
+			continue
+		}
+
+		list := kind.newList()
+		if err := s.client.List(ctx, list, client.MatchingLabelsSelector{Selector: selector}); err != nil {
+			return nil, nil, fmt.Errorf("while listing %s objects: %w", kind.name, err)
+		}
+		items, err := meta.ExtractList(list)
+		if err != nil {
+			return nil, nil, fmt.Errorf("while reading %s objects: %w", kind.name, err)
+		}
+		for _, item := range items {
+			obj, ok := item.(client.Object)
+			if !ok {
+				continue
+			}
+			key := types.NamespacedName{
+				Namespace: obj.GetLabels()[utils.ClusterNamespaceLabelName],
+				Name:      obj.GetLabels()[utils.ClusterLabelName],
+			}
+			if !s.isWatched(key.Namespace) {
+				continue
+			}
+			if _, found := objectsByCluster[key]; !found {
+				clusterKeys = append(clusterKeys, key)
+			}
+			objectsByCluster[key] = append(objectsByCluster[key], crossNamespaceRBACObject{kind: kind.name, obj: obj})
+		}
+	}
+
+	return objectsByCluster, clusterKeys, nil
 }
 
 // isOrphaned tells whether the cluster having the passed key no longer needs

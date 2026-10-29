@@ -242,6 +242,12 @@ func (r *ClusterReconciler) deleteCrossNamespaceRBACByKey(
 		return err
 	}
 
+	// Reading them would hang on an informer the API server refuses. An
+	// operator lacking that access cannot have created them either.
+	if r.clusterRBACForbidden {
+		return nil
+	}
+
 	if err := r.deleteOwnedCrossNamespaceRBAC(
 		ctx, key, recorderObject, &rbacv1.ClusterRoleBinding{}, name, "ClusterRoleBinding",
 	); err != nil {

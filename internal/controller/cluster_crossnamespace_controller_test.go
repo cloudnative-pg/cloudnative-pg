@@ -196,6 +196,50 @@ var _ = Describe("cross-namespace RBAC controller", func() {
 		Expect(events()).To(ContainElement(ContainSubstring("CrossNamespaceRBACNotOwned")))
 	})
 
+	Describe("when the operator cannot list and watch ClusterRoles", func() {
+		// noClusterRBACReads fails the reads of the cluster-scoped RBAC
+		// objects: through the cache, they would hang on an informer the
+		// API server refuses
+		noClusterRBACReads := interceptor.Funcs{
+			Get: func(
+				ctx context.Context, cli k8client.WithWatch, key k8client.ObjectKey, obj k8client.Object,
+				opts ...k8client.GetOption,
+			) error {
+				switch obj.(type) {
+				case *rbacv1.ClusterRole, *rbacv1.ClusterRoleBinding:
+					Fail("the cluster-scoped RBAC objects must not be read")
+				}
+				return cli.Get(ctx, key, obj, opts...)
+			},
+		}
+
+		It("reports the cluster enabling the feature without retrying", func() {
+			build(noClusterRBACReads, cluster, newRole(healthyTenant, "bob"))
+			reconciler.clusterRBACForbidden = true
+
+			result, err := reconciler.Reconcile(ctx, request())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+			Expect(events()).To(ConsistOf(ContainSubstring("CrossNamespaceRBACForbidden")))
+
+			Expect(exists(&rbacv1.Role{}, healthyTenant)).To(BeFalse())
+		})
+
+		It("removes the tenant RBAC left for a cluster not enabling the feature", func() {
+			cluster.Spec.EnableCrossNamespaceResources = false
+			leftoverRole := specs.CreateCrossNamespaceSecretsRole(*cluster, healthyTenant, []string{"bob-secret"})
+			leftoverBinding := specs.CreateCrossNamespaceSecretsRoleBinding(*cluster, healthyTenant)
+			build(noClusterRBACReads, cluster, &leftoverRole, &leftoverBinding)
+			reconciler.clusterRBACForbidden = true
+
+			_, err := reconciler.Reconcile(ctx, request())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(exists(&rbacv1.Role{}, healthyTenant)).To(BeFalse())
+			Expect(exists(&rbacv1.RoleBinding{}, healthyTenant)).To(BeFalse())
+		})
+	})
+
 	Describe("mapCrossNamespaceRBACToCluster", func() {
 		It("enqueues the cluster recorded in the labels", func() {
 			role := specs.CreateCrossNamespaceRole(*cluster)

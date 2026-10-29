@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -89,7 +90,7 @@ var _ = Describe("CrossNamespaceRBACSweeper", func() {
 	}
 
 	newSweeper := func(watchedNamespaces ...string) *CrossNamespaceRBACSweeper {
-		return NewCrossNamespaceRBACSweeper(fakeClient, fakeClient, watchedNamespaces)
+		return NewCrossNamespaceRBACSweeper(fakeClient, fakeClient, watchedNamespaces, true)
 	}
 
 	BeforeEach(func() {
@@ -150,6 +151,33 @@ var _ = Describe("CrossNamespaceRBACSweeper", func() {
 		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
 		Expect(newSweeper().Sweep(ctx)).To(Succeed())
 
+		Expect(apierrs.IsNotFound(fakeClient.Get(ctx, key, &rbacv1.Role{}))).To(BeTrue())
+		Expect(apierrs.IsNotFound(fakeClient.Get(ctx, key, &rbacv1.RoleBinding{}))).To(BeTrue())
+	})
+
+	It("sweeps only the tenant RBAC when the operator cannot list ClusterRoles", func() {
+		cluster := newCluster("postgres", "gone")
+		tenantRole := specs.CreateCrossNamespaceSecretsRole(*cluster, "tenant", []string{"alice-secret"})
+		tenantBinding := specs.CreateCrossNamespaceSecretsRoleBinding(*cluster, "tenant")
+		Expect(fakeClient.Create(ctx, &tenantRole)).To(Succeed())
+		Expect(fakeClient.Create(ctx, &tenantBinding)).To(Succeed())
+
+		listed := make(map[string]bool)
+		listingClient := interceptor.NewClient(fakeClient.(client.WithWatch), interceptor.Funcs{
+			List: func(ctx context.Context, cli client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				listed[fmt.Sprintf("%T", list)] = true
+				return cli.List(ctx, list, opts...)
+			},
+		})
+
+		Expect(NewCrossNamespaceRBACSweeper(listingClient, fakeClient, nil, false).Sweep(ctx)).To(Succeed())
+
+		Expect(listed).To(HaveKey("*v1.RoleList"))
+		Expect(listed).To(HaveKey("*v1.RoleBindingList"))
+		Expect(listed).NotTo(HaveKey("*v1.ClusterRoleList"))
+		Expect(listed).NotTo(HaveKey("*v1.ClusterRoleBindingList"))
+
+		key := client.ObjectKeyFromObject(&tenantRole)
 		Expect(apierrs.IsNotFound(fakeClient.Get(ctx, key, &rbacv1.Role{}))).To(BeTrue())
 		Expect(apierrs.IsNotFound(fakeClient.Get(ctx, key, &rbacv1.RoleBinding{}))).To(BeTrue())
 	})

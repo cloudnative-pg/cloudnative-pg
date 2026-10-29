@@ -407,7 +407,7 @@ var _ = Describe("newClusterWideAccessChecker", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(allowed).To(BeFalse())
 		Expect(reason).To(Equal(
-			"cannot list publications.postgresql.cnpg.io in every namespace: no RBAC policy matched"))
+			"cannot list publications.postgresql.cnpg.io cluster-wide: no RBAC policy matched"))
 		Expect(reviews).To(HaveLen(5))
 	})
 
