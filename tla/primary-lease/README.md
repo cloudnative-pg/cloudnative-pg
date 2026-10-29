@@ -256,10 +256,10 @@ within `StepDownDelay` ticks of tripping (and of its previous check),
 check, that the code keeps those two bounds; the second rests on the
 process exiting on `os.Exit` and the kernel killing the rest of the PID
 namespace. It also assumes the peer check reaches a verdict:
-`shouldStepDown` returns "keep leading" without probing when the
-isolation check is disabled or the cluster has one instance, and retries
-without a verdict when it cannot build the probe (unreadable CA); neither
-case is modeled.
+`shouldStepDown` returns "keep leading" without probing when the cluster
+has one instance, returns it despite unreachable peers when the isolation
+check is disabled, and retries without a verdict when it cannot build the
+probe (unreadable CA); none of these cases is modeled.
 
 ## Assumptions and limits
 

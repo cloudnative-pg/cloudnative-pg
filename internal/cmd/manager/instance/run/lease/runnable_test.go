@@ -802,20 +802,86 @@ var _ = Describe("shouldStepDown", func() {
 					},
 				},
 			},
+			Status: apiv1.ClusterStatus{
+				InstancesReportedState: map[apiv1.PodName]apiv1.InstanceReportedState{
+					"test-cluster-1": {IP: "10.0.0.1"},
+					"test-cluster-2": {IP: "10.0.0.2"},
+					"test-cluster-3": {IP: "10.0.0.3"},
+				},
+			},
 		}
 	}
 
-	It("skips the check when isolation checking is disabled", func() {
+	// probing replaces the checker, which needs the server CA on disk, with
+	// one whose probe answers per host and counts the calls.
+	var probed atomic.Int32
+	probing := func(probe func(host string) (string, error)) {
+		probed.Store(0)
+		newReachabilityChecker = func(*apiv1.IsolationCheckConfiguration) (*pinger, error) {
+			return &pinger{probe: func(host, _ string) (string, error) {
+				probed.Add(1)
+				return probe(host)
+			}}, nil
+		}
+		DeferCleanup(func() { newReachabilityChecker = buildInstanceReachabilityChecker })
+	}
+	unreachable := errors.New("unreachable")
+	allUnreachable := func(string) (string, error) { return "", unreachable }
+	allAgree := func(string) (string, error) { return ourIdentity, nil }
+	// test-cluster-2 is unreachable, test-cluster-3 names itself as primary.
+	oneSuperseded := func(host string) (string, error) {
+		if host == "test-cluster-2" {
+			return "", unreachable
+		}
+		return "test-cluster-3", nil
+	}
+
+	It("does not step down when disabled and the peers are only unreachable", func() {
+		probing(allUnreachable)
+		stepDown, err := shouldStepDown(newCluster(false, 3), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+		Expect(probed.Load()).To(BeEquivalentTo(2))
+	})
+
+	It("does not step down when disabled and the peers agree", func() {
+		probing(allAgree)
 		stepDown, err := shouldStepDown(newCluster(false, 3), ourIdentity)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stepDown).To(BeFalse())
 	})
 
-	It("skips the check when the cluster has a single instance", func() {
-		stepDown, err := shouldStepDown(newCluster(true, 1), ourIdentity)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stepDown).To(BeFalse())
+	It("steps down when enabled and a peer is unreachable", func() {
+		probing(allUnreachable)
+		stepDown, err := shouldStepDown(newCluster(true, 3), ourIdentity)
+		Expect(err).To(MatchError(unreachable))
+		Expect(stepDown).To(BeTrue())
 	})
+
+	DescribeTable("steps down when a peer names another target primary",
+		func(enabled bool) {
+			probing(oneSuperseded)
+			stepDown, err := shouldStepDown(newCluster(enabled, 3), ourIdentity)
+			var reason *SupersededError
+			Expect(errors.As(err, &reason)).To(BeTrue())
+			Expect(reason.TargetPrimary).To(Equal("test-cluster-3"))
+			Expect(stepDown).To(BeTrue())
+		},
+		Entry("enabled", true),
+		Entry("disabled", false),
+	)
+
+	DescribeTable("skips the check when the cluster has a single instance",
+		func(enabled bool) {
+			probing(allUnreachable)
+			stepDown, err := shouldStepDown(newCluster(enabled, 1), ourIdentity)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(stepDown).To(BeFalse())
+			Expect(probed.Load()).To(BeZero())
+		},
+		Entry("enabled", true),
+		Entry("disabled", false),
+	)
 
 	It("skips the check when no probes configuration is set", func() {
 		stepDown, err := shouldStepDown(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}, ourIdentity)

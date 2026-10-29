@@ -1529,7 +1529,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `enabled` _boolean_ | Whether primary isolation checking is enabled |  | true |  |
+| `enabled` _boolean_ | Whether primary isolation checking is enabled. When disabled, an<br />isolated primary is not stopped, but a primary that reaches a peer<br />reporting a different target primary still is. |  | true |  |
 | `requestTimeout` _integer_ | Timeout in milliseconds for requests during the primary isolation check |  | 1000 |  |
 | `connectionTimeout` _integer_ | Timeout in milliseconds for connections during the primary isolation check |  | 1000 |  |
 

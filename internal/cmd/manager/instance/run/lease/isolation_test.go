@@ -132,6 +132,23 @@ var _ = Describe("pinger.ensureInstancesAreReachable", func() {
 		Expect(superseded.TargetPrimary).To(Equal("cluster-example-9"))
 	})
 
+	It("prefers a superseded answer over unreachable peers", func() {
+		// The peer order is random: repeat so that the superseded one is also
+		// probed after an unreachable one.
+		checker := pinger{probe: func(host, _ string) (string, error) {
+			if host == "cluster-example-4" {
+				return "cluster-example-9", nil
+			}
+			return "", errors.New("unreachable")
+		}}
+
+		for range 20 {
+			err := checker.ensureInstancesAreReachable(fourInstances, ourIdentity)
+			var superseded *SupersededError
+			Expect(errors.As(err, &superseded)).To(BeTrue())
+		}
+	})
+
 	It("accepts a peer that reports no target primary at all", func() {
 		checker := pinger{probe: func(_, _ string) (string, error) {
 			return "", nil
