@@ -80,10 +80,20 @@ func IsLabelSubset(
 	mapToEvaluate := map[string]string{}
 
 	for key, value := range fixedInheritedLabels {
+		// The managed-by label is owned by the operator and is never inherited
+		// from the Cluster (see InheritLabels), so it must not be part of the
+		// subset check, otherwise resources would be perpetually flagged as
+		// out-of-date.
+		if key == KubernetesAppManagedByLabelName {
+			continue
+		}
 		mapToEvaluate[key] = value
 	}
 
 	for key, value := range clusterLabels {
+		if key == KubernetesAppManagedByLabelName {
+			continue
+		}
 		if controller.IsLabelInherited(key) {
 			mapToEvaluate[key] = value
 		}
