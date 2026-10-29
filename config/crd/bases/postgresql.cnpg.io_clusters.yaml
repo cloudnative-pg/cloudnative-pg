@@ -3426,6 +3426,7 @@ spec:
                         Reference: https://www.postgresql.org/docs/current/sql-createrole.html
                       properties:
                         bypassrls:
+                          default: false
                           description: |-
                             Whether a role bypasses every row-level security (RLS) policy.
                             Default is `false`.
@@ -3441,12 +3442,14 @@ spec:
                           format: int64
                           type: integer
                         createdb:
+                          default: false
                           description: |-
                             When set to `true`, the role being defined will be allowed to create
                             new databases. Specifying `false` (default) will deny a role the
                             ability to create databases.
                           type: boolean
                         createrole:
+                          default: false
                           description: |-
                             Whether the role will be permitted to create, alter, drop, comment
                             on, change the security label for, and grant or revoke membership in
@@ -3480,6 +3483,7 @@ spec:
                             Default is `true`.
                           type: boolean
                         login:
+                          default: false
                           description: |-
                             Whether the role is allowed to log in. A role having the `login`
                             attribute can be thought of as a user. Roles without this attribute
@@ -3503,6 +3507,7 @@ spec:
                           - name
                           type: object
                         replication:
+                          default: false
                           description: |-
                             Whether a role is a replication role. A role must have this
                             attribute (or be a superuser) in order to be able to connect to the
@@ -3513,6 +3518,7 @@ spec:
                             is `false`.
                           type: boolean
                         superuser:
+                          default: false
                           description: |-
                             Whether the role is a `superuser` who can override all access
                             restrictions within the database - superuser status is dangerous and
