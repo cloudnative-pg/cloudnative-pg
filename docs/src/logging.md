@@ -256,14 +256,35 @@ Each component reads these variables from its own environment:
   specification, as described in
   ["Environment variables"](cluster_conf.md#environment-variables), so that
   each `Cluster` can send its logs to its own collector; a change to these
-  stanzas triggers a rolling update of the instances;
+  stanzas triggers a rolling update of the instances, while a change to the
+  content of a ConfigMap or Secret they refer to takes effect only after a
+  manual rollout, for example with
+  [`kubectl cnpg restart`](kubectl-plugin.md#restart);
 - the PgBouncer instances of a `Pooler`, from the environment of the
   `pgbouncer` container in its [pod template](connection_pooling.md#pod-templates).
 
-For example, the following `Cluster` exports its logs via gRPC, identifying
-them with the name of the cluster and of the pod:
+For example, the following `Cluster` exports its logs via gRPC to a collector
+that uses TLS and requires a bearer token. The settings are in a ConfigMap,
+the token in a Secret, and the CA certificate of the collector is mounted
+through the [projected volume](cluster_conf.md#projected-volumes):
 
 ```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-exporter
+data:
+  OTEL_EXPORTER_OTLP_ENDPOINT: https://otel-collector.observability.svc:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_EXPORTER_OTLP_CERTIFICATE: /projected/otel/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: otel-exporter-auth
+stringData:
+  OTEL_EXPORTER_OTLP_HEADERS: Authorization=Bearer%20<token>
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -271,19 +292,38 @@ metadata:
 spec:
   instances: 3
 
+  envFrom:
+  - configMapRef:
+      name: otel-exporter
+  - secretRef:
+      name: otel-exporter-auth
+
   env:
-  - name: OTEL_EXPORTER_OTLP_ENDPOINT
-    value: http://otel-collector.observability.svc:4317
-  - name: OTEL_EXPORTER_OTLP_PROTOCOL
-    value: grpc
   - name: OTEL_SERVICE_NAME
     value: $(CLUSTER_NAME)
   - name: OTEL_RESOURCE_ATTRIBUTES
     value: k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(NAMESPACE)
 
+  projectedVolumeTemplate:
+    sources:
+    - secret:
+        name: otel-collector-ca
+        items:
+        - key: ca.crt
+          path: otel/ca.crt
+
   storage:
     size: 1Gi
 ```
+
+`OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` identify the records with
+the name of the cluster and of the pod, and are set in `env` because
+Kubernetes expands the `$(VAR_NAME)` references only there: a value read
+through `envFrom` is used as it is. The values of `OTEL_EXPORTER_OTLP_HEADERS`
+are percent-decoded, hence the `%20` in place of the space. A `Pooler` can
+refer to the same ConfigMap and Secret through the `envFrom` of the
+`pgbouncer` container, mounting the CA certificate at the same path with a
+volume of its pod template.
 
 Each exported record carries the fields of the corresponding JSON entry:
 
