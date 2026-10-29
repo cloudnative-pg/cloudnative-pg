@@ -119,7 +119,7 @@ var _ = Describe("reconcilePods instance recreation while a PVC is terminating (
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              specs.GetInstanceName(cluster.Name, 1) + apiv1.WalArchiveVolumeSuffix,
 					Namespace:         namespace,
-					DeletionTimestamp: ptr.To(metav1.Now()),
+					DeletionTimestamp: new(metav1.Now()),
 				},
 			},
 		}}
@@ -170,7 +170,7 @@ var _ = Describe("ensureInstancesAreCreated reattachment while a PVC is terminat
 		walName := specs.GetInstanceName(cluster.Name, 3) + apiv1.WalArchiveVolumeSuffix
 		for i := range thirdGroup {
 			if thirdGroup[i].Name == walName {
-				thirdGroup[i].DeletionTimestamp = ptr.To(metav1.Now())
+				thirdGroup[i].DeletionTimestamp = new(metav1.Now())
 			}
 		}
 		cluster.Status.UnusablePVC = []string{specs.GetInstanceName(cluster.Name, 3)}
@@ -765,8 +765,8 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 			// storage source would pick the snapshot-restore path.
 			c.Spec.Plugins = []apiv1.PluginConfiguration{{
 				Name:          "wal-archiver.example.com",
-				Enabled:       ptr.To(true),
-				IsWALArchiver: ptr.To(true),
+				Enabled:       new(true),
+				IsWALArchiver: new(true),
 			}}
 			c.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
 				Recovery: &apiv1.BootstrapRecovery{
@@ -1328,7 +1328,7 @@ var _ = Describe("Updating the designated primary of a replica cluster", func() 
 		return newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
 				Source:  "source-cluster",
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 			}
 		})
 	}

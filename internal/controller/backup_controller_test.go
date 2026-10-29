@@ -27,7 +27,6 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -583,7 +582,7 @@ var _ = Describe("checkPrerequisites for plugin backups", func() {
 			c.Spec.Backup = nil
 			c.Spec.Plugins = []apiv1.PluginConfiguration{{
 				Name:       "test",
-				Enabled:    ptr.To(true),
+				Enabled:    new(true),
 				Parameters: map[string]string{"key": "value"},
 			}}
 		})

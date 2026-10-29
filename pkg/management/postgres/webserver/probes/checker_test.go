@@ -21,7 +21,6 @@ package probes
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -81,13 +80,13 @@ var _ = Describe("getProbeRunnerFromCluster", func() {
 				Probes: &apiv1.ProbesConfiguration{
 					Startup: &apiv1.ProbeWithStrategy{
 						Type:       apiv1.ProbeStrategyStreaming,
-						MaximumLag: ptr.To(resource.MustParse("100")),
+						MaximumLag: new(resource.MustParse("100")),
 					},
 				},
 			},
 		}
 		Expect(getProbeRunnerFromCluster(probeTypeStartup, cluster)).To(Equal(
-			pgStreamingChecker{maximumLag: ptr.To(uint64(100))}))
+			pgStreamingChecker{maximumLag: new(uint64(100))}))
 	})
 
 	It("uses the streaming strategy without a lag limit when none is configured", func() {

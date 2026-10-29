@@ -102,8 +102,7 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// In this case we want to terminate the instance manager and let the Kubelet
 				// restart the Pod.
 				if pgExitStatus != nil {
-					var exitError *exec.ExitError
-					if !errors.As(pgExitStatus, &exitError) {
+					if exitError, ok := errors.AsType[*exec.ExitError](pgExitStatus); !ok {
 						contextLogger.Error(pgExitStatus, "Error waiting on the PostgreSQL process")
 					} else {
 						contextLogger.Error(exitError, "PostgreSQL process exited with errors")

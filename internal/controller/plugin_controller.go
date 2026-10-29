@@ -287,8 +287,7 @@ func (r *PluginReconciler) reconcile(
 		},
 	)
 	if err != nil {
-		var errAlreadyAvailable *repository.ErrPluginAlreadyRegistered
-		if errors.As(err, &errAlreadyAvailable) {
+		if _, ok := errors.AsType[*repository.ErrPluginAlreadyRegistered](err); ok {
 			// TODO(leonardoce): refresh plugin configuration
 			contextLogger.Info("Plugin already registered")
 			return ctrl.Result{}, nil

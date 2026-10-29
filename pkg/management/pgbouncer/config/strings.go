@@ -21,6 +21,7 @@ package config
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"sort"
 	"strings"
@@ -62,9 +63,7 @@ func buildPgBouncerParameters(userParameters map[string]string) map[string]strin
 		params[k] = defaultValue
 	}
 
-	for k, v := range forcedPgBouncerParameters {
-		params[k] = v
-	}
+	maps.Copy(params, forcedPgBouncerParameters)
 
 	return params
 }

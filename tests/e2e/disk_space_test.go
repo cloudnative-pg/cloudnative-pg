@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -174,7 +173,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 					types.NamespacedName{Namespace: primaryPod.Namespace, Name: primaryWALPVC.Name},
 					primaryWALPVC)
 				g.Expect(err).ToNot(HaveOccurred())
-				size := ptr.To(primaryWALPVC.Status.Capacity[corev1.ResourceStorage]).Value()
+				size := new(primaryWALPVC.Status.Capacity[corev1.ResourceStorage]).Value()
 				return size
 			}).WithTimeout(time.Minute * 5).Should(BeNumerically(">=",
 				newSize.Value()))

@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -207,9 +208,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 
 	// Merge the status from database into spec. We should keep all the status
 	// otherwise in the next loop the user without status will be marked as need update
-	for role, stateInDatabase := range passwordStates {
-		storedPasswordState[role] = stateInDatabase
-	}
+	maps.Copy(storedPasswordState, passwordStates)
 	return storedPasswordState, unreconciledRoles, nil
 }
 

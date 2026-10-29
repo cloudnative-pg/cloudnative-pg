@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -872,8 +873,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	//
 	// In both ways, we are skipping this automatic update and relying
 	// on the rollout strategy
-	for i := len(podList.Items) - 1; i >= 0; i-- {
-		postgresqlStatus := podList.Items[i]
+	for _, postgresqlStatus := range slices.Backward(podList.Items) {
 		instanceManagerHash := postgresqlStatus.ExecutableHash
 
 		if instanceManagerHash == "" {
@@ -886,8 +886,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	}
 
 	// We start upgrading the instance managers we have
-	for i := len(podList.Items) - 1; i >= 0; i-- {
-		postgresqlStatus := podList.Items[i]
+	for _, postgresqlStatus := range slices.Backward(podList.Items) {
 		instanceManagerHash := postgresqlStatus.ExecutableHash
 		instanceManagerIsUpgrading := postgresqlStatus.IsInstanceManagerUpgrading
 

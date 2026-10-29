@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -106,7 +105,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).NotTo(HaveOccurred())
-				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
+				cluster.Spec.EnableSuperuserAccess = new(true)
 				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 			}, 60, 5).Should(Succeed())
 
@@ -193,7 +192,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).NotTo(HaveOccurred())
-				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
+				cluster.Spec.EnableSuperuserAccess = new(true)
 				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 			}, 60, 5).Should(Succeed())
 
@@ -216,7 +215,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).NotTo(HaveOccurred())
-				cluster.Spec.EnableSuperuserAccess = ptr.To(false)
+				cluster.Spec.EnableSuperuserAccess = new(false)
 				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 			}, 60, 5).Should(Succeed())
 
@@ -257,7 +256,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, cycleClusterName)
 				g.Expect(err).NotTo(HaveOccurred())
-				cluster.Spec.EnableSuperuserAccess = ptr.To(false)
+				cluster.Spec.EnableSuperuserAccess = new(false)
 				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 			}, 60, 5).Should(Succeed())
 
@@ -292,7 +291,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, cycleClusterName)
 				g.Expect(err).NotTo(HaveOccurred())
-				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
+				cluster.Spec.EnableSuperuserAccess = new(true)
 				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 			}, 60, 5).Should(Succeed())
 

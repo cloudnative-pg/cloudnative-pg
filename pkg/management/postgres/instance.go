@@ -727,8 +727,7 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 			Timeout: &maxSwitchoverDelay,
 		},
 	)
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
+	if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
 		immediateShutdownTimeout := instance.GetClusterOrDefault().GetImmediateShutdownTimeout()

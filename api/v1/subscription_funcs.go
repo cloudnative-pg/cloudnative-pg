@@ -21,12 +21,11 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 )
 
 // SetAsFailed sets the subscription as failed with the given error
 func (sub *Subscription) SetAsFailed(err error) {
-	sub.Status.Applied = ptr.To(false)
+	sub.Status.Applied = new(false)
 	sub.Status.Message = err.Error()
 }
 
@@ -38,7 +37,7 @@ func (sub *Subscription) SetAsUnknown(err error) {
 
 // SetAsReady sets the subscription as working correctly
 func (sub *Subscription) SetAsReady() {
-	sub.Status.Applied = ptr.To(true)
+	sub.Status.Applied = new(true)
 	sub.Status.Message = ""
 	sub.Status.ObservedGeneration = sub.Generation
 }

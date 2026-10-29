@@ -113,6 +113,10 @@ linters:
           alias: metav1
         - pkg: k8s.io/client-go/kubernetes/typed/core/v1
           alias: corev1client
+    modernize:
+      disable:
+        # to avoid conflict with `--fix`
+        - omitzero
     nolintlint:
       # We are temporarily allowing unused nolints due to apparently
       # false failures in CI. See

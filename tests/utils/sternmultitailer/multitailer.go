@@ -61,7 +61,7 @@ func StreamLogs(
 		"\"containerName\": \"{{.ContainerName}}\" }\n"
 
 	funs := template.FuncMap{
-		"json": func(v interface{}) (string, error) {
+		"json": func(v any) (string, error) {
 			b, err := json.Marshal(v)
 			if err != nil {
 				return "", err

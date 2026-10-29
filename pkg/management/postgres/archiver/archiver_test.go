@@ -24,8 +24,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/utils/ptr"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 
@@ -64,11 +62,11 @@ var _ = Describe("shouldCheckEmptyWalArchive", func() {
 		},
 		Entry("no annotation and marker present: check runs", nil, true, true),
 		Entry("no annotation and marker absent: check skipped", nil, false, false),
-		Entry("opt-out annotation and marker present: check skipped", ptr.To("enabled"), true, false),
-		Entry("opt-out annotation and marker absent: check skipped", ptr.To("enabled"), false, false),
-		Entry("unrelated annotation value and marker present: check runs", ptr.To("something-else"), true, true),
-		Entry("unrelated annotation value and marker absent: check skipped", ptr.To("something-else"), false, false),
-		Entry("empty annotation value and marker present: check runs", ptr.To(""), true, true),
+		Entry("opt-out annotation and marker present: check skipped", new("enabled"), true, false),
+		Entry("opt-out annotation and marker absent: check skipped", new("enabled"), false, false),
+		Entry("unrelated annotation value and marker present: check runs", new("something-else"), true, true),
+		Entry("unrelated annotation value and marker absent: check skipped", new("something-else"), false, false),
+		Entry("empty annotation value and marker present: check runs", new(""), true, true),
 	)
 })
 

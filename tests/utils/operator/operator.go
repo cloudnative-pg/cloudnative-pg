@@ -35,7 +35,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
@@ -59,7 +58,7 @@ func ReloadDeployment(
 	}
 
 	err = crudClient.Delete(ctx, &operatorPod,
-		&client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(1))},
+		&client.DeleteOptions{GracePeriodSeconds: new(int64(1))},
 	)
 	if err != nil {
 		return err
@@ -248,7 +247,7 @@ func ScaleOperatorDeployment(
 	}
 
 	updatedOperatorDeployment := *operatorDeployment.DeepCopy()
-	updatedOperatorDeployment.Spec.Replicas = ptr.To(replicas)
+	updatedOperatorDeployment.Spec.Replicas = new(replicas)
 
 	err = objects.Patch(ctx, crudClient, &updatedOperatorDeployment, client.MergeFrom(&operatorDeployment))
 	if err != nil {

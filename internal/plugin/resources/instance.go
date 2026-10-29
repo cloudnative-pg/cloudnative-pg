@@ -153,8 +153,7 @@ func IsInstanceRunning(
 		return true, nil
 	}
 
-	var codeExitError exec.CodeExitError
-	if errors.As(err, &codeExitError) {
+	if codeExitError, ok := errors.AsType[exec.CodeExitError](err); ok {
 		switch pgCtlStatusExitCode(codeExitError.Code) {
 		case pgCtlStatusStopped:
 			return false, nil

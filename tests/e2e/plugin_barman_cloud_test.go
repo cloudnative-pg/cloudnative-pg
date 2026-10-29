@@ -163,25 +163,25 @@ func newObjectStore(namespace, name string, mutators ...func(*unstructured.Unstr
 	})
 	objectStore.SetName(name)
 	objectStore.SetNamespace(namespace)
-	objectStore.Object["spec"] = map[string]interface{}{
-		"configuration": map[string]interface{}{
+	objectStore.Object["spec"] = map[string]any{
+		"configuration": map[string]any{
 			"destinationPath": "s3://" + name + "/",
 			"endpointURL":     "https://" + objectStoreEnv.ServiceName + ":9000",
-			"endpointCA": map[string]interface{}{
+			"endpointCA": map[string]any{
 				"name": objectStoreEnv.CaSecretName,
 				"key":  "ca.crt",
 			},
-			"s3Credentials": map[string]interface{}{
-				"accessKeyId": map[string]interface{}{
+			"s3Credentials": map[string]any{
+				"accessKeyId": map[string]any{
 					"name": barmanCloudCredentialSecret,
 					"key":  "ID",
 				},
-				"secretAccessKey": map[string]interface{}{
+				"secretAccessKey": map[string]any{
 					"name": barmanCloudCredentialSecret,
 					"key":  "KEY",
 				},
 			},
-			"wal": map[string]interface{}{
+			"wal": map[string]any{
 				"compression": "gzip",
 			},
 		},

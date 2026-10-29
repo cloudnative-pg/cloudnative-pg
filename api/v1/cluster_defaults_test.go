@@ -21,7 +21,6 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -267,7 +266,7 @@ var _ = Describe("setDefaultPlugins", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Plugins: []PluginConfiguration{
-					{Name: "existing-plugin", Enabled: ptr.To(true)},
+					{Name: "existing-plugin", Enabled: new(true)},
 				},
 			},
 		}
@@ -278,18 +277,18 @@ var _ = Describe("setDefaultPlugins", func() {
 		cluster.setDefaultPlugins(config)
 
 		Expect(cluster.Spec.Plugins).To(
-			ContainElement(PluginConfiguration{Name: "existing-plugin", Enabled: ptr.To(true)}))
+			ContainElement(PluginConfiguration{Name: "existing-plugin", Enabled: new(true)}))
 		Expect(cluster.Spec.Plugins).To(
-			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: new(true)}))
 		Expect(cluster.Spec.Plugins).To(
-			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: ptr.To(true)}))
+			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: new(true)}))
 	})
 
 	It("does not add pre-defined plugins if already present", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Plugins: []PluginConfiguration{
-					{Name: "predefined-plugin1", Enabled: ptr.To(false)},
+					{Name: "predefined-plugin1", Enabled: new(false)},
 				},
 			},
 		}
@@ -301,9 +300,9 @@ var _ = Describe("setDefaultPlugins", func() {
 
 		Expect(cluster.Spec.Plugins).To(HaveLen(2))
 		Expect(cluster.Spec.Plugins).To(
-			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(false)}))
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: new(false)}))
 		Expect(cluster.Spec.Plugins).To(
-			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: ptr.To(true)}))
+			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: new(true)}))
 	})
 
 	It("handles empty plugin list gracefully", func() {
@@ -316,7 +315,7 @@ var _ = Describe("setDefaultPlugins", func() {
 
 		Expect(cluster.Spec.Plugins).To(HaveLen(1))
 		Expect(cluster.Spec.Plugins).To(
-			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: new(true)}))
 	})
 })
 
@@ -455,7 +454,7 @@ var _ = Describe("probe defaults", func() {
 				Probes: &ProbesConfiguration{
 					Liveness: &LivenessProbe{
 						IsolationCheck: &IsolationCheckConfiguration{
-							Enabled:           ptr.To(false),
+							Enabled:           new(false),
 							RequestTimeout:    300,
 							ConnectionTimeout: 600,
 						},

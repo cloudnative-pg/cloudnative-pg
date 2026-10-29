@@ -117,7 +117,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 			brokenPooler := pooler.DeepCopy()
 			brokenPooler.Status.Image = ""
-			brokenPooler.Spec.Instances = ptr.To(int32(7))
+			brokenPooler.Spec.Instances = new(int32(7))
 
 			err := env.poolerReconciler.updateDeployment(ctx, brokenPooler, res)
 			Expect(err).ToNot(HaveOccurred())
@@ -278,7 +278,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 					Name: cluster.Name,
 				},
 				Type:               "rw",
-				Instances:          ptr.To(int32(1)),
+				Instances:          new(int32(1)),
 				ServiceAccountName: "shared-sa",
 				PgBouncer: &apiv1.PgBouncerSpec{
 					PoolMode: apiv1.PgBouncerPoolModeSession,
@@ -412,7 +412,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			pooler.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
 			pooler.Spec.Template = &apiv1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					TerminationGracePeriodSeconds: ptr.To(int64(100)),
+					TerminationGracePeriodSeconds: new(int64(100)),
 				},
 			}
 		})
@@ -428,7 +428,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure pooler change does not update the deployment", func() {
 			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
-			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(200))
+			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = new(int64(200))
 			err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -458,14 +458,14 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		By("enable again, making sure pooler change updates the deployment", func() {
 			delete(pooler.Annotations, utils.ReconcilePodSpecAnnotationName)
 			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
-			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(300))
+			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = new(int64(300))
 			err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
 			afterDep := getPoolerDeployment(ctx, env.client, pooler)
 			Expect(afterDep.Spec.Template.Spec.TerminationGracePeriodSeconds).NotTo(
 				Equal(beforeDep.Spec.Template.Spec.TerminationGracePeriodSeconds))
-			Expect(afterDep.Spec.Template.Spec.TerminationGracePeriodSeconds).To(Equal(ptr.To(int64(300))))
+			Expect(afterDep.Spec.Template.Spec.TerminationGracePeriodSeconds).To(Equal(new(int64(300))))
 			Expect(beforeDep.Annotations[utils.PoolerSpecHashAnnotationName]).
 				NotTo(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
 		})

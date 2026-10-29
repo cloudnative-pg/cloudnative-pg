@@ -27,7 +27,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -119,7 +118,7 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 									"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
 									"CREATE EXTENSION IF NOT EXISTS pg_trgm;",
 								},
-								DataChecksums:  ptr.To(true),
+								DataChecksums:  new(true),
 								WalSegmentSize: 32,
 							},
 						},
@@ -146,7 +145,7 @@ var _ = Describe("plugin-barman-cloud across a Postgres major upgrade",
 						Plugins: []apiv1.PluginConfiguration{
 							{
 								Name:          pluginName,
-								IsWALArchiver: ptr.To(true),
+								IsWALArchiver: new(true),
 								Parameters:    map[string]string{"barmanObjectName": clusterName},
 							},
 						},

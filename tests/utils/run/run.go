@@ -87,8 +87,7 @@ func UncheckedRetry(command string) (stdout string, stderr string, err error) {
 func Run(command string) (stdout string, stderr string, err error) {
 	stdout, stderr, err = Unchecked(command)
 
-	var exerr *exec.ExitError
-	if errors.As(err, &exerr) {
+	if exerr, ok := errors.AsType[*exec.ExitError](err); ok {
 		ginkgo.GinkgoWriter.Printf("RunCheck: %v\nExitCode: %v\n Out:\n%v\nErr:\n%v\n",
 			command, exerr.ExitCode(), stdout, stderr)
 	}
