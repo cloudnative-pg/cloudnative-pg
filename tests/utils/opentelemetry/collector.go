@@ -51,24 +51,35 @@ const (
 	// port 4318
 	CollectorName = "otel-collector"
 
+	// Headers is the value of OTEL_EXPORTER_OTLP_HEADERS carrying the bearer
+	// token that the collector requires, which the OpenTelemetry fixtures
+	// also set in their Secret
+	Headers = "Authorization=Bearer%20cnpg-e2e"
+
 	// recordsPath is the file where the collector writes the records
 	recordsPath = "/data/logs.jsonl"
 
 	collectorConfig = `extensions:
   health_check:
     endpoint: 0.0.0.0:13133
+  bearertokenauth:
+    token: cnpg-e2e
 receivers:
   otlp:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: bearertokenauth
       http:
         endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth
 exporters:
   file:
     path: ` + recordsPath + `
 service:
-  extensions: [health_check]
+  extensions: [health_check, bearertokenauth]
   pipelines:
     logs:
       receivers: [otlp]

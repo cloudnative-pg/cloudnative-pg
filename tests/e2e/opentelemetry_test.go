@@ -179,6 +179,10 @@ var _ = Describe("OpenTelemetry log export of the operator", Serial,
 						Value: fmt.Sprintf("http://%s.%s.svc:4318", opentelemetry.CollectorName, namespace),
 					},
 					corev1.EnvVar{
+						Name:  "OTEL_EXPORTER_OTLP_HEADERS",
+						Value: opentelemetry.Headers,
+					},
+					corev1.EnvVar{
 						Name:  "OTEL_RESOURCE_ATTRIBUTES",
 						Value: "k8s.pod.name=$(K8S_POD_NAME)",
 					},

@@ -12,11 +12,15 @@ spec:
     poolMode: session
 
   # PgBouncer exports its logs via HTTP, the default protocol, to the
-  # collector in the same namespace, identified by the pod name
+  # collector in the same namespace, identified by the pod name, with the
+  # bearer token of the Secret of the Cluster
   template:
     spec:
       containers:
       - name: pgbouncer
+        envFrom:
+        - secretRef:
+            name: otel-exporter-auth
         env:
         - name: K8S_POD_NAME
           valueFrom:
