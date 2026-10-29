@@ -221,17 +221,34 @@ var _ = Describe("AvailableArchitecture", func() {
 			availableArchitectures = nil
 		})
 
-		It("shouldn't find available architectures", func() {
+		It("should fail when no architecture is found", func() {
 			// Create some sample files
 			Expect(os.WriteFile(filepath.Join(tempDir, "test1"), []byte("amd64"), 0o600)).To(Succeed())
 			Expect(os.WriteFile(filepath.Join(tempDir, "test2"), []byte("arm64"), 0o600)).To(Succeed())
 
 			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 			Expect(availableArchitectures).To(BeNil())
 
 			architectures := GetAvailableArchitectures()
 			Expect(architectures).To(BeEmpty())
+		})
+
+		It("should fail when the directory cannot be read", func() {
+			if os.Getuid() == 0 {
+				Skip("running as root, directory permissions do not apply")
+			}
+
+			Expect(os.WriteFile(filepath.Join(tempDir, "manager_amd64"), []byte("amd64"), 0o600)).To(Succeed())
+			Expect(os.Chmod(tempDir, 0o000)).To(Succeed())
+			DeferCleanup(func() {
+				Expect(os.Chmod(tempDir, 0o700)).To(Succeed())
+			})
+
+			// The binary is there, but Glob cannot list the directory
+			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
+			Expect(err).To(HaveOccurred())
+			Expect(availableArchitectures).To(BeNil())
 		})
 
 		It("should find available architectures", func() {
