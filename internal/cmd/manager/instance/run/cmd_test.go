@@ -114,6 +114,16 @@ var _ = Describe("detectCrossNamespaceResources", func() {
 	// noDelay retries without waiting, to keep the tests fast
 	noDelay := wait.Backoff{Steps: 3}
 
+	// accessChecker answers the access checks as passed, and counts them
+	accessChecker := func(allowed bool, err error) (clusterWideAccessChecker, *int) {
+		checks := 0
+		return func(context.Context) (bool, string, error) {
+			checks++
+			return allowed, "cannot list databases in every namespace", err
+		}, &checks
+	}
+	granted, _ := accessChecker(true, nil)
+
 	// failingClient fails the first reads of the cluster, and counts them all
 	failingClient := func(failures int, cluster *apiv1.Cluster) (client.Client, *int) {
 		reads := 0
@@ -140,7 +150,7 @@ var _ = Describe("detectCrossNamespaceResources", func() {
 		cli, reads := failingClient(2, newWatchScopeCluster(true))
 
 		Expect(detectCrossNamespaceResources(
-			ctx, cli, watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeTrue())
+			ctx, cli, granted, watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeTrue())
 		Expect(*reads).To(Equal(3))
 	})
 
@@ -148,8 +158,35 @@ var _ = Describe("detectCrossNamespaceResources", func() {
 		cli, reads := failingClient(10, newWatchScopeCluster(true))
 
 		Expect(detectCrossNamespaceResources(
-			ctx, cli, watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeFalse())
+			ctx, cli, granted, watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeFalse())
 		Expect(*reads).To(Equal(noDelay.Steps))
+	})
+
+	It("does not check the cluster-wide access when the cluster did not opt in", func(ctx SpecContext) {
+		checkAccess, checks := accessChecker(true, nil)
+
+		Expect(detectCrossNamespaceResources(
+			ctx, newWatchScopeClient(newWatchScopeCluster(false)), checkAccess,
+			watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeFalse())
+		Expect(*checks).To(BeZero())
+	})
+
+	It("falls back to the namespace of the cluster until the cluster-wide access is granted",
+		func(ctx SpecContext) {
+			checkAccess, checks := accessChecker(false, nil)
+
+			Expect(detectCrossNamespaceResources(
+				ctx, newWatchScopeClient(newWatchScopeCluster(true)), checkAccess,
+				watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeFalse())
+			Expect(*checks).To(Equal(1))
+		})
+
+	It("falls back to the namespace of the cluster when the access cannot be checked", func(ctx SpecContext) {
+		checkAccess, _ := accessChecker(true, errors.New("the API server is unavailable"))
+
+		Expect(detectCrossNamespaceResources(
+			ctx, newWatchScopeClient(newWatchScopeCluster(true)), checkAccess,
+			watchScopeNamespace, watchScopeClusterName, noDelay)).To(BeFalse())
 	})
 })
 
