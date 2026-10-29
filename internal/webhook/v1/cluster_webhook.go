@@ -188,6 +188,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateTablespaceNames,
 		v.validateBootstrapPgBaseBackupSource,
 		v.validateBootstrapPgBaseBackupAdditionalArgs,
+		v.validateBootstrapPgCreateSubscriber,
 		v.validateTablespaceBackupSnapshot,
 		v.validateBootstrapRecoverySource,
 		v.validateBootstrapRecoveryDataSource,
@@ -618,6 +619,9 @@ func (v *ClusterCustomValidator) validateBootstrapMethod(r *apiv1.Cluster) field
 	if r.Spec.Bootstrap.PgBaseBackup != nil {
 		bootstrapMethods++
 	}
+	if r.Spec.Bootstrap.PgCreateSubscriber != nil {
+		bootstrapMethods++
+	}
 
 	if bootstrapMethods > 1 {
 		result = append(
@@ -787,6 +791,138 @@ func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupAdditionalArgs(r *
 	for idx, arg := range r.Spec.Bootstrap.PgBaseBackup.AdditionalArgs {
 		if detail := forbiddenPgBaseBackupOption(arg); detail != "" {
 			result = append(result, field.Forbidden(argsPath.Index(idx), detail))
+		}
+	}
+
+	return result
+}
+
+// validateBootstrapPgCreateSubscriber validates the pg_createsubscriber bootstrap configuration
+func (v *ClusterCustomValidator) validateBootstrapPgCreateSubscriber(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.PgCreateSubscriber == nil {
+		return result
+	}
+
+	cs := r.Spec.Bootstrap.PgCreateSubscriber
+	basePath := field.NewPath("spec", "bootstrap", "pg_createsubscriber")
+
+	// 1. Incompatible with replica mode (spec.replica.enabled must NOT be true)
+	if r.IsReplica() {
+		result = append(result, field.Forbidden(
+			field.NewPath("spec", "replicaCluster"),
+			"pg_createsubscriber bootstrap cannot be used with replica cluster mode",
+		))
+	}
+
+	// 2. Validate external cluster source
+	ext, found := r.ExternalCluster(cs.Source)
+	if !found {
+		result = append(
+			result,
+			field.Invalid(
+				basePath.Child("source"),
+				cs.Source,
+				fmt.Sprintf("External cluster %q not found", cs.Source),
+			),
+		)
+	} else {
+		if ext.ConnectionParameters == nil || ext.ConnectionParameters["host"] == "" {
+			result = append(
+				result,
+				field.Required(
+					basePath.Child("source"),
+					fmt.Sprintf("External cluster %q must have 'host' in connectionParameters", cs.Source),
+				),
+			)
+		}
+		if ext.ConnectionParameters == nil || ext.ConnectionParameters["user"] == "" {
+			result = append(
+				result,
+				field.Required(
+					basePath.Child("source"),
+					fmt.Sprintf("External cluster %q must have 'user' in connectionParameters", cs.Source),
+				),
+			)
+		}
+	}
+
+	// 3. PostgreSQL version constraints: only PG 14 and PG 17+ are supported
+	major, err := r.GetPostgresqlMajorVersion()
+	if err == nil {
+		if major != 14 && major < 17 {
+			result = append(
+				result,
+				field.Invalid(
+					basePath,
+					major,
+					fmt.Sprintf("PostgreSQL version %d is not supported by pg_createsubscriber (only PG 14 and PG 17+ are supported)", major),
+				),
+			)
+		}
+	}
+
+	// 4. Validate parameters if provided
+	if cs.Parameters != nil {
+		if cs.Parameters.RecoveryTimeout != nil && *cs.Parameters.RecoveryTimeout < 0 {
+			result = append(
+				result,
+				field.Invalid(
+					basePath.Child("parameters", "recoveryTimeout"),
+					*cs.Parameters.RecoveryTimeout,
+					"recoveryTimeout must be greater than or equal to 0",
+				),
+			)
+		}
+
+		dbSet := make(map[string]bool)
+		for i, db := range cs.Parameters.Databases {
+			dbPath := basePath.Child("parameters", "databases").Index(i)
+			if db == "" {
+				result = append(
+					result,
+					field.Invalid(
+						dbPath,
+						db,
+						"database name cannot be empty",
+					),
+				)
+				continue
+			}
+			if db == "template0" || db == "template1" {
+				result = append(
+					result,
+					field.Forbidden(
+						dbPath,
+						fmt.Sprintf("cannot replicate template database %q", db),
+					),
+				)
+			}
+			if dbSet[db] {
+				result = append(
+					result,
+					field.Duplicate(
+						dbPath,
+						db,
+					),
+				)
+			}
+			dbSet[db] = true
+		}
+	}
+
+	// 5. For PG14 and PG17, if databases list is empty, external cluster must specify dbname
+	hasDatabases := cs.Parameters != nil && len(cs.Parameters.Databases) > 0
+	if !hasDatabases && found && (major == 14 || major == 17) {
+		if ext.ConnectionParameters == nil || ext.ConnectionParameters["dbname"] == "" {
+			result = append(
+				result,
+				field.Required(
+					basePath.Child("parameters", "databases"),
+					fmt.Sprintf("databases list is empty and source externalCluster %q does not specify 'dbname' in connectionParameters for PG%d", cs.Source, major),
+				),
+			)
 		}
 	}
 

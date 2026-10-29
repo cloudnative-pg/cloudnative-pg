@@ -1795,6 +1795,10 @@ type BootstrapConfiguration struct {
 	// PostgreSQL instance
 	// +optional
 	PgBaseBackup *BootstrapPgBaseBackup `json:"pg_basebackup,omitempty"`
+
+	// Bootstrap the cluster using pg_createsubscriber
+	// +optional
+	PgCreateSubscriber *BootstrapPgCreateSubscriber `json:"pg_createsubscriber,omitempty"`
 }
 
 // LDAPScheme defines the possible schemes for LDAP
@@ -2309,6 +2313,30 @@ type TablespaceMappingEntry struct {
 	// contain the `=` or `\` characters and must be unique among the entries.
 	// +kubebuilder:validation:MinLength=1
 	SourceLocation string `json:"sourceLocation"`
+}
+
+// BootstrapPgCreateSubscriber contains the configuration required to bootstrap
+// a cluster using pg_createsubscriber (or an emulated engine for PG14)
+type BootstrapPgCreateSubscriber struct {
+	// The name of the external cluster to use as source
+	// +kubebuilder:validation:MinLength=1
+	Source string `json:"source"`
+
+	// Optional parameters for pg_createsubscriber
+	// +optional
+	Parameters *PgCreateSubscriberParameters `json:"parameters,omitempty"`
+}
+
+// PgCreateSubscriberParameters contains optional parameters for pg_createsubscriber
+type PgCreateSubscriberParameters struct {
+	// List of databases to replicate
+	// +optional
+	Databases []string `json:"databases,omitempty"`
+
+	// Timeout in seconds for recovery to finish
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	RecoveryTimeout *int `json:"recoveryTimeout,omitempty"`
 }
 
 // RecoveryTarget allows to configure the moment where the recovery process
