@@ -183,13 +183,19 @@ func (e pinger) ensureInstancesAreReachable(cluster *apiv1.Cluster, ourIdentity 
 	}
 	wg.Wait()
 
+	// A superseded answer wins over an unreachable peer: with the isolation
+	// check disabled it is the only failure that counts.
+	var first error
 	for _, err := range failures {
-		if err != nil {
+		if errors.As(err, new(*SupersededError)) {
 			return err
+		}
+		if first == nil {
+			first = err
 		}
 	}
 
-	return nil
+	return first
 }
 
 // PingError is raised when the instance connectivity test failed. It is
@@ -235,33 +241,45 @@ func (e *SupersededError) Error() string {
 		e.Host, e.TargetPrimary, e.OurIdentity)
 }
 
+// newReachabilityChecker is a variable so shouldStepDown can be unit-tested
+// without the server CA on disk.
+var newReachabilityChecker = buildInstanceReachabilityChecker
+
 // shouldStepDown reports whether this primary should stop believing it is
 // still the legitimate primary: either because it cannot reach some peer
 // instance, or because a reachable peer reports a different target primary
-// (see SupersededError). It returns (false, nil) without checking anything
-// if the isolation check is disabled or the cluster has a single instance.
-// On any step-down verdict or checker build failure, reason carries the
-// specific cause for the caller to log.
+// (see SupersededError). With the isolation check disabled only the second
+// cause counts: an unreachable peer is not proof of having been replaced, a
+// peer naming another primary is. It returns (false, nil) without checking
+// anything if the check has no configuration or the cluster has a single
+// instance. On any step-down verdict or checker build failure, reason carries
+// the specific cause for the caller to log.
 func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, reason error) {
 	var cfg *apiv1.IsolationCheckConfiguration
 	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
 		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
 	}
-	if cfg == nil || cfg.Enabled == nil || !*cfg.Enabled {
+	if cfg == nil {
 		return false, nil
 	}
 	if cluster.Spec.Instances == 1 {
 		return false, nil
 	}
 
-	checker, err := buildInstanceReachabilityChecker(cfg)
+	checker, err := newReachabilityChecker(cfg)
 	if err != nil {
 		return false, fmt.Errorf("failed to build instance reachability checker: %w", err)
 	}
 
-	if err := checker.ensureInstancesAreReachable(cluster, ourIdentity); err != nil {
+	err = checker.ensureInstancesAreReachable(cluster, ourIdentity)
+	switch {
+	case err == nil:
+		return false, nil
+	case cfg.Enabled != nil && *cfg.Enabled:
 		return true, err
+	case errors.As(err, new(*SupersededError)):
+		return true, err
+	default:
+		return false, nil
 	}
-
-	return false, nil
 }
