@@ -1,3 +1,20 @@
+# The settings of the export are in a ConfigMap, and the bearer token that the
+# collector in the same namespace requires is in a Secret
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-exporter
+data:
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: otel-exporter-auth
+stringData:
+  OTEL_EXPORTER_OTLP_HEADERS: Authorization=Bearer%20cnpg-e2e
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -6,19 +23,16 @@ spec:
   instances: 2
 
   # The instances, including the init container that bootstraps them, export
-  # their logs via gRPC to the collector in the same namespace, identified by
-  # the pod name
+  # their logs via gRPC, identified by the pod name, which stays in env since
+  # Kubernetes expands the references only there
+  envFrom:
+  - configMapRef:
+      name: otel-exporter
+  - secretRef:
+      name: otel-exporter-auth
   env:
-  - name: K8S_POD_NAME
-    valueFrom:
-      fieldRef:
-        fieldPath: metadata.name
-  - name: OTEL_EXPORTER_OTLP_ENDPOINT
-    value: http://otel-collector:4317
-  - name: OTEL_EXPORTER_OTLP_PROTOCOL
-    value: grpc
   - name: OTEL_RESOURCE_ATTRIBUTES
-    value: k8s.pod.name=$(K8S_POD_NAME)
+    value: k8s.pod.name=$(POD_NAME)
 
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
