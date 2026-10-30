@@ -119,6 +119,9 @@ type shutdownOptions struct {
 	// Timeout is the maximum number of seconds to wait for the shutdown to complete
 	// Used only if Wait is true. Defaulted by PostgreSQL to 60 seconds.
 	Timeout *int32
+
+	// SkipCheckpoint skips the CHECKPOINT that precedes a non-immediate shutdown
+	SkipCheckpoint bool
 }
 
 // defaultShutdownOptions are the default shutdown options. That is:
@@ -482,6 +485,10 @@ const (
 	// skipping straight to an immediate shutdown, with no checkpoint
 	// and no fast-shutdown attempt beforehand
 	shutDownImmediate InstanceCommand = "ShutDownImmediate"
+
+	// shutDownStepDown means the instance has to be shut down as in
+	// TryShuttingDownStepDown
+	shutDownStepDown InstanceCommand = "ShutDownStepDown"
 )
 
 // NewInstance creates a new Instance object setting the defaults
@@ -616,7 +623,9 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 		return fmt.Errorf("instance is not running")
 	}
 
-	instance.tryCheckpointBeforeShutdown(ctx, options.Mode)
+	if !options.SkipCheckpoint {
+		instance.tryCheckpointBeforeShutdown(ctx, options.Mode)
+	}
 	instance.ShutdownConnections()
 
 	pgCtlOptions := []string{
@@ -715,16 +724,38 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 // it issues an "immediate" shutdown request and waits for completion.
 // Note: an immediate shutdown may lead to data loss.
 func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) error {
+	return instance.tryShuttingDownFastImmediate(ctx, instance.GetClusterOrDefault().GetMaxSwitchoverDelay(), false)
+}
+
+// TryShuttingDownStepDown is TryShuttingDownFastImmediate for a primary that
+// has to stop before a replica can take over its primary lease: the fast
+// attempt gets one lease retry period, which is the room left before the lease
+// monitor forces the stop, and no CHECKPOINT runs first, so that the primary
+// stops accepting writes at once.
+func (instance *Instance) TryShuttingDownStepDown(ctx context.Context) error {
+	if instance.IsImmediateShutdownUnresponsive() {
+		return errors.New("PostgreSQL was already found unresponsive to an immediate shutdown, not retrying")
+	}
+
+	retryPeriod := instance.GetClusterOrDefault().GetPrimaryLeaseRetryPeriod()
+	return instance.tryShuttingDownFastImmediate(ctx, int32(retryPeriod.Seconds()), true)
+}
+
+func (instance *Instance) tryShuttingDownFastImmediate(
+	ctx context.Context,
+	fastTimeout int32,
+	skipCheckpoint bool,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-	maxSwitchoverDelay := instance.GetClusterOrDefault().GetMaxSwitchoverDelay()
 	err := instance.Shutdown(
 		ctx,
 		shutdownOptions{
-			Mode:    shutdownModeFast,
-			Wait:    true,
-			Timeout: &maxSwitchoverDelay,
+			Mode:           shutdownModeFast,
+			Wait:           true,
+			Timeout:        &fastTimeout,
+			SkipCheckpoint: skipCheckpoint,
 		},
 	)
 	var exitError *exec.ExitError
@@ -1583,6 +1614,18 @@ func (instance *Instance) TryRequestImmediateShutdown() bool {
 	}
 }
 
+// TryRequestStepDownShutdown asks the lifecycle manager to run
+// TryShuttingDownStepDown, without blocking, with the same drop-on-busy
+// semantics as TryRequestImmediateShutdown.
+func (instance *Instance) TryRequestStepDownShutdown() bool {
+	select {
+	case instance.instanceCommandChan <- shutDownStepDown:
+		return true
+	default:
+		return false
+	}
+}
+
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
 // restart the postmaster, and wait for the postmaster to be restarted
 func (instance *Instance) RequestAndWaitRestartSmartFast(ctx context.Context, timeout time.Duration) error {
@@ -1749,6 +1792,11 @@ func (instance *Instance) HandleInstanceCommandRequests(
 		return false, nil
 	case shutDownImmediate:
 		if err := instance.TryShuttingDownImmediate(ctx); err != nil {
+			contextLogger.Error(err, "error shutting down instance, proceeding")
+		}
+		return false, nil
+	case shutDownStepDown:
+		if err := instance.TryShuttingDownStepDown(ctx); err != nil {
 			contextLogger.Error(err, "error shutting down instance, proceeding")
 		}
 		return false, nil
