@@ -23,12 +23,13 @@ package resources
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/envsubst"
@@ -97,8 +98,8 @@ func DeleteResourcesFromFile(env *environment.TestingEnvironment, namespace, sam
 // GetYAMLContent reads a .yaml or .template file and returns its content.
 //
 // .template files are run through envsubst so SHELL-FORMAT variables are
-// substituted using both the process environment and a small set of e2e
-// defaults derived from env.
+// substituted using the values of the e2e configuration and the template
+// variables registered while the tests run.
 func GetYAMLContent(env *environment.TestingEnvironment, sampleFilePath string) ([]byte, error) {
 	wrapErr := func(err error) error { return fmt.Errorf("in GetYAMLContent: %w", err) }
 	cleanPath := filepath.Clean(sampleFilePath)
@@ -109,25 +110,7 @@ func GetYAMLContent(env *environment.TestingEnvironment, sampleFilePath string) 
 	yamlContent := data
 
 	if filepath.Ext(cleanPath) == ".template" {
-		preRollingUpdateImg := os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
-		if preRollingUpdateImg == "" {
-			preRollingUpdateImg = os.Getenv("POSTGRES_IMG")
-		}
-		csiStorageClass := os.Getenv("E2E_CSI_STORAGE_CLASS")
-		if csiStorageClass == "" {
-			csiStorageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-		}
-		envVars := buildTemplateEnvs(map[string]string{
-			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
-			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
-			"PG_MAJOR":                   strconv.FormatUint(env.PostgresVersion, 10),
-		})
-
-		if serverName := os.Getenv("SERVER_NAME"); serverName != "" {
-			envVars["SERVER_NAME"] = serverName
-		}
-
-		yamlContent, err = envsubst.Envsubst(envVars, data)
+		yamlContent, err = envsubst.Envsubst(buildTemplateVariables(env), data)
 		if err != nil {
 			return nil, wrapErr(err)
 		}
@@ -135,19 +118,31 @@ func GetYAMLContent(env *environment.TestingEnvironment, sampleFilePath string) 
 	return yamlContent, nil
 }
 
-func buildTemplateEnvs(additionalEnvs map[string]string) map[string]string {
-	envs := make(map[string]string)
-	for _, s := range os.Environ() {
-		keyValue := strings.SplitN(s, "=", 2)
-		if len(keyValue) < 2 {
-			continue
-		}
-		envs[keyValue[0]] = keyValue[1]
+func buildTemplateVariables(env *environment.TestingEnvironment) map[string]string {
+	cfg := config.Current()
+
+	preRollingUpdateImg := cfg.Postgres.PreRollingUpdateImage
+	if preRollingUpdateImg == "" {
+		preRollingUpdateImg = cfg.Postgres.Image
+	}
+	csiStorageClass := cfg.Storage.CSIStorageClass
+	if csiStorageClass == "" {
+		csiStorageClass = cfg.Storage.StorageClass
 	}
 
-	for key, value := range additionalEnvs {
-		envs[key] = value
+	vars := map[string]string{
+		"POSTGRES_IMG":                     cfg.Postgres.Image,
+		"E2E_PRE_ROLLING_UPDATE_IMG":       preRollingUpdateImg,
+		"E2E_DEFAULT_STORAGE_CLASS":        cfg.Storage.StorageClass,
+		"E2E_CSI_STORAGE_CLASS":            csiStorageClass,
+		"E2E_DEFAULT_VOLUMESNAPSHOT_CLASS": cfg.Storage.VolumeSnapshotClass,
+		"AZURE_STORAGE_ACCOUNT":            cfg.Azure.StorageAccount,
+		"AZURE_BLOB_CONTAINER":             cfg.Azure.BlobContainer,
+		"PG_MAJOR":                         strconv.FormatUint(env.PostgresVersion, 10),
 	}
 
-	return envs
+	// Values computed while the tests run (snapshot names, backup names, ...)
+	maps.Copy(vars, config.TemplateVariables())
+
+	return vars
 }

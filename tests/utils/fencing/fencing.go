@@ -23,12 +23,16 @@ package fencing
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 )
 
@@ -41,6 +45,17 @@ const (
 	// UsingPlugin it is a keyword to use while fencing on/off the instances using plugin method
 	UsingPlugin Method = "plugin"
 )
+
+// retryBackoff matches the fixed delay/attempt count tests/utils/objects
+// already uses for retrying transient write failures (e.g. AKS Konnectivity
+// proxy 500s reaching the admission webhook). client-go's own
+// retry.DefaultBackoff is tuned for a near-instantaneous conflict race
+// (~1.5s total), too short to survive a several-second proxy blip.
+var retryBackoff = wait.Backoff{
+	Steps:    objects.RetryAttempts,
+	Duration: objects.PollingTime * time.Second,
+	Factor:   1.0,
+}
 
 // On marks an instance in a cluster as fenced
 func On(
@@ -59,10 +74,18 @@ func On(
 			return err
 		}
 	case UsingAnnotation:
-		err := utils.NewFencingMetadataExecutor(crudClient).
-			AddFencing().
-			ForInstance(serverName).
-			Execute(ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &apiv1.Cluster{})
+		// Execute is a self-contained get-mutate-patch: retrying the whole
+		// call is safe (AddFencedInstance is a no-op if already applied) and
+		// covers both a concurrent-modification Conflict and a transient
+		// proxy-hop failure (e.g. AKS Konnectivity 500s reaching the
+		// admission webhook), neither of which a bare single attempt would
+		// survive.
+		err := retry.OnError(retryBackoff, objects.IsRetryableConflictOrTransientError, func() error {
+			return utils.NewFencingMetadataExecutor(crudClient).
+				AddFencing().
+				ForInstance(serverName).
+				Execute(ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &apiv1.Cluster{})
+		})
 		if err != nil {
 			return err
 		}
@@ -89,10 +112,12 @@ func Off(
 			return err
 		}
 	case UsingAnnotation:
-		err := utils.NewFencingMetadataExecutor(crudClient).
-			RemoveFencing().
-			ForInstance(serverName).
-			Execute(ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &apiv1.Cluster{})
+		err := retry.OnError(retryBackoff, objects.IsRetryableConflictOrTransientError, func() error {
+			return utils.NewFencingMetadataExecutor(crudClient).
+				RemoveFencing().
+				ForInstance(serverName).
+				Execute(ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &apiv1.Cluster{})
+		})
 		if err != nil {
 			return err
 		}

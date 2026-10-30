@@ -152,10 +152,90 @@ func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir s
 
 	for _, extension := range extensionList {
 		for _, libraryPath := range extension.LdLibraryPath {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", libraryPath)) {
+				log.Warning("Skipping extension LdLibraryPath entry that escapes the extension directory",
+					"extension", extension.Name, "path", libraryPath)
+				continue
+			}
+
 			result = append(
 				result,
 				filepath.Join(baseDir, extension.Name, libraryPath),
 			)
+		}
+	}
+
+	return result
+}
+
+// CollectExtensionControlPaths returns a list of paths which should be added
+// to extension_control_path given a list of extensions mounted under baseDir.
+// Extensions not declaring any path contribute their `share` directory.
+func CollectExtensionControlPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
+	return collectPaths(
+		extensionList,
+		baseDir,
+		"ExtensionControlPath",
+		"share",
+		func(ext apiv1.ExtensionConfiguration) []string {
+			return ext.ExtensionControlPath
+		},
+	)
+}
+
+// CollectDynamicLibraryPaths returns a list of paths which should be added
+// to dynamic_library_path given a list of extensions mounted under baseDir.
+// Extensions not declaring any path contribute their `lib` directory.
+func CollectDynamicLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
+	return collectPaths(
+		extensionList,
+		baseDir,
+		"DynamicLibraryPath",
+		"lib",
+		func(ext apiv1.ExtensionConfiguration) []string {
+			return ext.DynamicLibraryPath
+		},
+	)
+}
+
+// collectPaths joins under baseDir the paths selected by `field` for each
+// extension, falling back to defaultPath when an extension declares none.
+// fieldName is only used to report skipped entries.
+func collectPaths(
+	extensionList []apiv1.ExtensionConfiguration,
+	baseDir string,
+	fieldName string,
+	defaultPath string,
+	field func(apiv1.ExtensionConfiguration) []string,
+) []string {
+	result := make([]string, 0, len(extensionList))
+
+	for _, extension := range extensionList {
+		paths := field(extension)
+		if len(paths) == 0 {
+			paths = []string{defaultPath}
+		}
+
+		for _, entry := range paths {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			//
+			// The check is purely lexical: it does not resolve symbolic links
+			// that may exist inside the extension image. This is acceptable
+			// because the image is already trusted (it provides the libraries
+			// Postgres loads) and the result is only a path handed to Postgres,
+			// never one the operator reads or writes through.
+			if !filepath.IsLocal(filepath.Join(".", entry)) {
+				log.Warning("Skipping extension path that escapes the extension directory",
+					"extension", extension.Name, "field", fieldName, "path", entry)
+				continue
+			}
+
+			result = append(result, filepath.Join(baseDir, extension.Name, entry))
 		}
 	}
 
@@ -229,6 +309,15 @@ func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration, baseDir strin
 
 	for _, extension := range extensionList {
 		for _, binPath := range extension.BinPath {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", binPath)) {
+				log.Warning("Skipping extension BinPath entry that escapes the extension directory",
+					"extension", extension.Name, "path", binPath)
+				continue
+			}
+
 			result = append(
 				result,
 				filepath.Join(baseDir, extension.Name, binPath),

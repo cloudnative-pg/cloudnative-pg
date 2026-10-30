@@ -71,7 +71,7 @@ CloudNativePG manages the following predefined labels:
   deprecated `postgresql` label).
 
 `cnpg.io/jobRole`
-: Role of the job (that is, `import`, `initdb`, `join`, ...)
+: Role of the job (that is, `major-upgrade`)
 
 `cnpg.io/majorVersion`
 : Integer PostgreSQL major version of the backup's data directory (for example, `17`).
@@ -268,6 +268,13 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/reloadedAt`
 :   Contains the latest cluster `reload` time. `reload` is triggered by the user through a plugin.
 
+`cnpg.io/rotatePassword`
+:   When set to any value on a `DatabaseRole` whose password the operator
+    generates, it asks for that password to be rotated immediately, regardless
+    of its renewal deadline. The operator removes the annotation once the
+    rotation has happened, so it is a one-shot request. See
+    [Manual rotation](declarative_role_management.md#manual-rotation).
+
 `cnpg.io/skipEmptyWalArchiveCheck`
 :   When set to `enabled` on a `Cluster` resource, the operator disables the check
     that ensures that the WAL archive is empty before writing data. Use at your own
@@ -303,8 +310,19 @@ CloudNativePG manages the following predefined annotations:
 :   Experimental annotation applied to a `Pod` running a PostgreSQL instance.
     It instructs the operator to delete the `Pod` and all its associated PVCs.
     The instance will then be recreated according to the configured join
-    strategy. This annotation can only be used on instances that are neither the
-    current primary nor the designated target primary.
+    strategy. The annotation is honored regardless of the instance's state, so
+    it also takes effect on a `Pod` that is Pending, Running but not ready, or
+    Terminating. When a Terminating `Pod` has passed its deletion deadline (the
+    deletion request time plus its termination grace period), the operator force
+    removes it so that its PVCs can be deleted and the instance recreated. This
+    annotation can only be used on instances that are neither the current primary
+    nor the designated target primary, which stay excluded even when marked
+    unrecoverable.
+
+    **⚠️ WARNING:** Force removing a `Pod` on an unreachable node does not stop
+    any process that might still be running there, and whether the underlying
+    volumes are detached depends on the storage driver. This is acceptable for
+    this annotation, whose contract already forfeits the instance's data.
 
 ## Prerequisites
 

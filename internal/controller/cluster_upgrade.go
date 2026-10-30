@@ -672,8 +672,8 @@ func checkPodEnvironmentIsOutdated(_ context.Context, pod *corev1.Pod, cluster *
 }
 
 // newInstanceForRunningPod evaluates the instance specification that the given
-// running Pod should currently match. It derives the node serial and status
-// scheme from the Pod, then calls specs.NewInstance, which runs the plugins'
+// running Pod should currently match. It derives the node serial from the Pod,
+// then calls specs.NewInstance, which runs the plugins'
 // OperationVerbEvaluate lifecycle hook so the returned spec already includes any
 // sidecars they inject.
 func newInstanceForRunningPod(
@@ -686,8 +686,7 @@ func newInstanceForRunningPod(
 		return nil, fmt.Errorf("while getting the pod serial value: %w", err)
 	}
 
-	tlsEnabled := remote.GetStatusSchemeFromPod(pod).IsHTTPS()
-	targetPod, err := specs.NewInstance(ctx, *cluster, serial, tlsEnabled)
+	targetPod, err := specs.NewInstance(ctx, *cluster, serial)
 	if err != nil {
 		return nil, fmt.Errorf("while creating a new instance pod: %w", err)
 	}
@@ -770,9 +769,10 @@ func (r *ClusterReconciler) recreatePrimaryInPlace(
 // so it must be recreated to gain the sidecar rather than demoted via a
 // switchover, which would dead-lock on archiving (see issue #10981).
 //
-// Detection diffs the Pod's containers against a freshly evaluated instance
-// spec: NewInstance runs the plugins' OperationVerbEvaluate lifecycle hook, so
-// its containers already include any injected sidecars. The check is a
+// Detection diffs the Pod's containers (regular and native-sidecar init
+// containers) against a freshly evaluated instance spec: NewInstance runs the
+// plugins' OperationVerbEvaluate lifecycle hook, so its containers already
+// include any injected sidecars. The check is a
 // deliberate over-approximation. We cannot map a sidecar back to the specific
 // plugin that injected it, so when several sidecar-injecting plugins are enabled
 // this may recreate the primary even if only a non-archiver sidecar is missing.
@@ -798,12 +798,29 @@ func archiverSidecarMissingOnPrimary(
 		return false, err
 	}
 
-	current := make(map[string]struct{}, len(pod.Spec.Containers))
-	for _, container := range pod.Spec.Containers {
-		current[container.Name] = struct{}{}
+	// Plugins inject their sidecars either as regular containers or, for native
+	// sidecars, as init containers with RestartPolicy=Always. Compare both, so a
+	// missing native sidecar is detected too. Run-once init containers (including
+	// the bootstrap controller) are skipped: they are not long-running, so they
+	// are never the archiver sidecar.
+	collectContainerNames := func(target *corev1.Pod) map[string]struct{} {
+		names := make(map[string]struct{}, len(target.Spec.Containers))
+		for _, container := range target.Spec.Containers {
+			names[container.Name] = struct{}{}
+		}
+		for _, container := range target.Spec.InitContainers {
+			if container.RestartPolicy == nil ||
+				*container.RestartPolicy != corev1.ContainerRestartPolicyAlways {
+				continue
+			}
+			names[container.Name] = struct{}{}
+		}
+		return names
 	}
-	for _, container := range targetPod.Spec.Containers {
-		if _, found := current[container.Name]; !found {
+
+	current := collectContainerNames(pod)
+	for name := range collectContainerNames(targetPod) {
+		if _, found := current[name]; !found {
 			return true, nil
 		}
 	}

@@ -597,4 +597,57 @@ var _ = Describe("CollectLibraryPaths and CollectBinPaths", func() {
 		Expect(CollectBinPaths(exts, postgres.UpgradeTargetExtensionsBaseDirectory)).
 			To(ConsistOf("/new-extensions/ext1/bin"))
 	})
+
+	It("skips entries that escape the extension directory instead of returning them", func() {
+		// The webhook already rejects these at admission time; this guards
+		// callers (e.g. the major-upgrade Job) that read the Cluster spec
+		// directly, without going through admission.
+		exts := []apiv1.ExtensionConfiguration{{
+			Name:          "ext1",
+			LdLibraryPath: []string{"lib", "../../etc"},
+			BinPath:       []string{"bin", "../mount/lib"},
+		}}
+
+		Expect(CollectLibraryPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(ConsistOf("/extensions/ext1/lib"))
+		Expect(CollectBinPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(ConsistOf("/extensions/ext1/bin"))
+	})
+})
+
+var _ = Describe("CollectExtensionControlPaths and CollectDynamicLibraryPaths", func() {
+	It("defaults to the share and lib directories", func() {
+		exts := []apiv1.ExtensionConfiguration{{Name: "postgis"}, {Name: "pgvector"}}
+
+		Expect(CollectExtensionControlPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(Equal([]string{"/extensions/postgis/share", "/extensions/pgvector/share"}))
+		Expect(CollectDynamicLibraryPaths(exts, postgres.UpgradeTargetExtensionsBaseDirectory)).
+			To(Equal([]string{"/new-extensions/postgis/lib", "/new-extensions/pgvector/lib"}))
+	})
+
+	It("uses the custom paths instead of the defaults, normalized under baseDir", func() {
+		exts := []apiv1.ExtensionConfiguration{{
+			Name:                 "geo",
+			ExtensionControlPath: []string{"postgis/share", "./pgrouting/share"},
+			DynamicLibraryPath:   []string{"postgis/lib/", "/pgrouting/lib/"},
+		}}
+
+		Expect(CollectExtensionControlPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(Equal([]string{"/extensions/geo/postgis/share", "/extensions/geo/pgrouting/share"}))
+		Expect(CollectDynamicLibraryPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(Equal([]string{"/extensions/geo/postgis/lib", "/extensions/geo/pgrouting/lib"}))
+	})
+
+	It("skips entries that escape the extension directory instead of returning them", func() {
+		exts := []apiv1.ExtensionConfiguration{{
+			Name:                 "ext1",
+			ExtensionControlPath: []string{"share", "../../etc"},
+			DynamicLibraryPath:   []string{"lib", "../mount/lib"},
+		}}
+
+		Expect(CollectExtensionControlPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(ConsistOf("/extensions/ext1/share"))
+		Expect(CollectDynamicLibraryPaths(exts, postgres.ExtensionsBaseDirectory)).
+			To(ConsistOf("/extensions/ext1/lib"))
+	})
 })

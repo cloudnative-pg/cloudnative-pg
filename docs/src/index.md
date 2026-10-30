@@ -66,7 +66,7 @@ The CloudNativePG operator container images are available on the
 [`cloudnative-pg` project's GitHub Container Registry](https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg)
 in two different flavors:
 
-- Debian 12 distroless
+- Debian 13 distroless
 - Red Hat UBI 9 micro (suffix `-ubi9`)
 
 Red Hat UBI images are primarily intended for OLM consumption.
@@ -99,7 +99,7 @@ Three image flavors are available, each extending the previous one:
     Barman Cloud plugin, or another supported backup solution.
 :::
 
-By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie`.
+By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie`.
 
 All images are signed and shipped with SBOM and provenance attestations.
 Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.
@@ -155,7 +155,10 @@ For details and support, see the [`postgres-containers` project](https://github.
     - Continuous backup and full/PITR recovery via volume snapshots (if
       supported by the storage class).
     - Native integration with Barman Cloud for object store backups via
-      `.spec.backup.barmanObjectStore` (*deprecated since v1.26*).
+      `.spec.backup.barmanObjectStore` (*deprecated since v1.26; 1.31 is the
+      last minor release with native support, which is removed starting from
+      1.32.0; see
+      [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/)*).
 - Offline in-place major upgrades of PostgreSQL
 - Offline and online import of PostgreSQL databases, including major upgrades:
     - *Offline Import*: Direct restore from existing databases.

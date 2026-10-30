@@ -21,12 +21,15 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"syscall"
 
 	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -40,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 // InstallPgDataFileContent installs a file in PgData, returning true/false if
@@ -270,11 +274,36 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 // empty.
 // Returns a boolean indicating if any changes were done and any errors encountered
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+	restoreCommand := fmt.Sprintf(
+		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+		postgres.LogPath, postgres.LogFileName)
+
+	return writePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, restoreCommand)
+}
+
+// configurePostgresOverrideConfFileForRewind writes the content of override.conf file
+// to be used while running `pg_rewind --restore-target-wal`. The restore_command invokes
+// wal-restore in rewind mode, disabling WAL prefetching and the end-of-wal-stream flag
+// machinery: pg_rewind requests the segments it needs walking the WAL backward, and
+// aborts on the first failed restore instead of falling back to streaming replication.
+// This file is replaced with the standard replica configuration when the instance
+// is demoted, right after a successful rewind.
+// Returns a boolean indicating if any changes were done and any errors encountered
+func configurePostgresOverrideConfFileForRewind(pgData, primaryConnInfo string) (changed bool, err error) {
+	restoreCommand := fmt.Sprintf(
+		"/controller/manager wal-restore --log-destination %s/%s.json --rewind %%f %%p",
+		postgres.LogPath, postgres.LogFileName)
+
+	return writePostgresOverrideConfFile(pgData, primaryConnInfo, "", restoreCommand)
+}
+
+// writePostgresOverrideConfFile writes the content of override.conf file, using the
+// given restore_command and replication information.
+// Returns a boolean indicating if any changes were done and any errors encountered
+func writePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, restoreCommand string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 	options := map[string]string{
-		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
+		"restore_command":          restoreCommand,
 		"recovery_target_timeline": "latest",
 		"primary_conninfo":         primaryConnInfo,
 	}
@@ -352,15 +381,11 @@ func createPostgresqlConfiguration(
 	if err != nil {
 		return "", "", err
 	}
-	for _, extension := range exts {
-		info.AdditionalExtensions = append(
-			info.AdditionalExtensions,
-			postgres.AdditionalExtensionConfiguration{
-				MountPath:            filepath.Join(baseDir, extension.Name),
-				ExtensionControlPath: extension.ExtensionControlPath,
-				DynamicLibraryPath:   extension.DynamicLibraryPath,
-			},
-		)
+	if len(exts) > 0 {
+		info.AdditionalExtensions = &postgres.AdditionalExtensionConfiguration{
+			ExtensionControlPath: extensions.CollectExtensionControlPaths(exts, baseDir),
+			DynamicLibraryPath:   extensions.CollectDynamicLibraryPaths(exts, baseDir),
+		}
 	}
 
 	// Setup minimum replay delay if we're on a replica cluster
@@ -384,8 +409,23 @@ func createPostgresqlConfiguration(
 		return "", "", err
 	}
 
-	file, sha := postgres.CreatePostgresqlConfFile(config)
-	return file, sha, nil
+	// The hash identifies the configuration requested by the Cluster: every
+	// Pod must report the same one for a rollout to proceed, including the
+	// Pods that don't mount the extension images yet. The directories missing
+	// from the images mounted in this Pod are only removed from the file.
+	_, sha := postgres.CreatePostgresqlConfFile(config)
+	if info.AdditionalExtensions != nil {
+		if err := removeMissingDirectories(
+			config, postgres.ExtensionControlPath, info.AdditionalExtensions.ExtensionControlPath); err != nil {
+			return "", "", err
+		}
+		if err := removeMissingDirectories(
+			config, postgres.DynamicLibraryPath, info.AdditionalExtensions.DynamicLibraryPath); err != nil {
+			return "", "", err
+		}
+	}
+
+	return postgres.CreatePostgresqlConfFileWithHash(config, sha), sha, nil
 }
 
 func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
@@ -393,6 +433,58 @@ func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
 		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
 		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
 		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
+}
+
+// removeMissingDirectories removes from the path-like parameter named key
+// the candidate directories that are not existing directories
+func removeMissingDirectories(config *postgres.PgConfiguration, key string, candidates []string) error {
+	value, ok := config.GetConfigurationParameters()[key]
+	if !ok {
+		return nil
+	}
+
+	existing, err := filterExistingDirectories(candidates)
+	if err != nil {
+		return err
+	}
+
+	paths := slices.DeleteFunc(strings.Split(value, ":"), func(path string) bool {
+		return slices.Contains(candidates, path) && !slices.Contains(existing, path)
+	})
+	config.OverwriteConfig(key, strings.Join(paths, ":"))
+
+	return nil
+}
+
+// filterExistingDirectories returns the paths that are existing directories,
+// since extension images don't always ship every directory (e.g. a module
+// with only `lib`)
+func filterExistingDirectories(paths []string) ([]string, error) {
+	result := make([]string, 0, len(paths))
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			log.Debug("Skipping extension directory missing from the image", "path", path)
+			continue
+		}
+		// ENOTDIR means a parent of the path is a file, which points to a
+		// malformed extension image rather than an optional missing directory
+		if errors.Is(err, syscall.ENOTDIR) {
+			log.Warning("Skipping extension directory since a parent path is not a directory, "+
+				"the extension image may be malformed", "path", path)
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("while checking extension directory %q: %w", path, err)
+		}
+		if !info.IsDir() {
+			log.Warning("Skipping extension path that is not a directory, "+
+				"the extension image may be malformed", "path", path)
+			continue
+		}
+		result = append(result, path)
+	}
+	return result, nil
 }
 
 // selectAdditionalExtensions returns the extension list and mount base

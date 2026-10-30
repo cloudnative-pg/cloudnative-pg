@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/jackc/pgx/v5/pgtype"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -197,18 +198,71 @@ func shouldDropRole(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) bool {
 		!isClusterManagingRole(cluster, role.Spec.Name) && !cluster.IsReplica()
 }
 
+// passwordSetToNull reports whether the password of the role must be set to
+// NULL in PostgreSQL. `password.mode: setNull` asks for it, and so does a role
+// whose generated password the operator has just revoked, on top of the
+// `disablePassword` the inline managed roles use.
+func passwordSetToNull(role *apiv1.DatabaseRole) bool {
+	return role.Spec.DisablePassword ||
+		role.IsPasswordSetToNull() ||
+		role.IsPasswordRevocationPending()
+}
+
+// desiredPasswordExpiration returns the expiration the role's VALID UNTIL has
+// to follow, and the empty string when the role has none to follow: it does
+// not generate its password, or generates one with no lifetime, or the
+// operator has not recorded an expiration for it yet.
+func desiredPasswordExpiration(role *apiv1.DatabaseRole) string {
+	if !role.IsPasswordRotationEnabled() || role.Status.Password == nil {
+		return ""
+	}
+	return role.Status.Password.Expiration
+}
+
+// appliedPasswordExpiration returns the expiration the instance manager last
+// applied to the role as its VALID UNTIL, and the empty string when it has
+// applied none: a role with no generated password state has nothing recorded.
+func appliedPasswordExpiration(role *apiv1.DatabaseRole) string {
+	if role.Status.Password == nil {
+		return ""
+	}
+	return role.Status.Password.AppliedExpiration
+}
+
+// generatedPasswordValidUntil returns the VALID UNTIL a role whose password the
+// operator generates with a lifetime must carry: the expiration of that
+// password, so a rotation that never happens costs the role its access rather
+// than leaving a valid-forever credential. `validUntil` cannot be set on such
+// a role, so nothing of the user's is overwritten here. The timestamp is
+// invalid when there's no such password, or no expiration recorded yet.
+func generatedPasswordValidUntil(role *apiv1.DatabaseRole) (pgtype.Timestamp, error) {
+	recorded := desiredPasswordExpiration(role)
+	if recorded == "" {
+		return pgtype.Timestamp{}, nil
+	}
+
+	expiration, err := time.Parse(time.RFC3339, recorded)
+	if err != nil {
+		return pgtype.Timestamp{}, fmt.Errorf(
+			"while reading the expiration of the generated password of role %q: %w", role.Spec.Name, err)
+	}
+
+	return pgtype.Timestamp{Valid: true, Time: expiration}, nil
+}
+
 func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 ) (ctrl.Result, error) {
 	// No password secret is configured, we can continue the reconciliation loop
-	if role.Spec.GetRoleSecretName() == "" {
+	secretName := role.GetPasswordSecretName()
+	if secretName == "" {
 		return ctrl.Result{}, nil
 	}
 
 	secretObjectKey := types.NamespacedName{
 		Namespace: role.Namespace,
-		Name:      role.Spec.GetRoleSecretName(),
+		Name:      secretName,
 	}
 	var secret corev1.Secret
 	if err := r.Get(ctx, secretObjectKey, &secret); err != nil {
@@ -269,10 +323,18 @@ func (r *DatabaseRoleReconciler) shouldReconcile(
 // isAlreadyReconciled checks if the role has already been reconciled
 // and the password secret has not changed
 func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) bool {
+	// A password left to revoke asks for the role to be applied again whatever
+	// the generation says: the operator records the revocation after the role
+	// stopped generating a password, which can be after that same generation
+	// was already applied.
+	if role.IsPasswordRevocationPending() {
+		return false
+	}
+
 	// If no password secret is configured, the condition comparison is
 	// irrelevant — a stale condition from a previously-configured secret
 	// must not cause a perpetual reconciliation loop.
-	if role.Spec.GetRoleSecretName() == "" {
+	if role.GetPasswordSecretName() == "" {
 		return role.Generation == role.Status.ObservedGeneration
 	}
 
@@ -285,7 +347,8 @@ func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) b
 	}
 
 	return role.Generation == role.Status.ObservedGeneration &&
-		role.Status.SecretResourceVersion == latestObservedSecretPasswordResourceVersion
+		role.Status.SecretResourceVersion == latestObservedSecretPasswordResourceVersion &&
+		appliedPasswordExpiration(role) == desiredPasswordExpiration(role)
 }
 
 // The status helpers below intentionally bypass the shared markAsReady /
@@ -402,6 +465,18 @@ func (r *DatabaseRoleReconciler) succeededReconciliation(
 	oldRole := role.DeepCopy()
 	role.SetAsReady()
 	role.Status.SecretResourceVersion = passVersion
+	// Recorded next to the rest of the password state, and only when there is
+	// state to record it in: a role that generates no password has no
+	// expiration to apply either.
+	if role.Status.Password != nil {
+		role.Status.Password.AppliedExpiration = desiredPasswordExpiration(role)
+	}
+
+	// Acknowledge a revocation that was part of this successful apply, or it
+	// would keep setting the password to NULL on every following loop.
+	if role.IsPasswordRevocationPending() {
+		role.Status.Password.PendingRevocation = false
+	}
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
 		return ctrl.Result{}, err
@@ -546,8 +621,18 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	validUntilNullIsInfinity := existingDBRole != nil && existingDBRole.ValidUntil.Valid
 	dbRole := roles.DatabaseRoleFromConfiguration(role.Spec.RoleConfiguration, validUntilNullIsInfinity)
 
+	// A generated password with a lifetime owns the expiry of the role: PostgreSQL
+	// must stop accepting it when the operator considers it expired.
+	validUntil, err := generatedPasswordValidUntil(role)
+	if err != nil {
+		return "", err
+	}
+	if validUntil.Valid {
+		dbRole.ValidUntil = validUntil
+	}
+
 	passwordVersion, err := dbRole.ApplyPassword(
-		ctx, r.Client, &role.Spec.RoleConfiguration, r.instance.GetNamespaceName(),
+		ctx, r.Client, role.GetPasswordSecretName(), passwordSetToNull(role), r.instance.GetNamespaceName(),
 	)
 	if err != nil {
 		return "", fmt.Errorf("while getting the role password: %w", err)

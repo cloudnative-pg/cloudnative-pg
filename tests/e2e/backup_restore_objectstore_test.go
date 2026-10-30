@@ -666,6 +666,7 @@ var _ = Describe("Object storage - Backup and restore", Label(tests.LabelBackupR
 
 	Context("timeline divergence protection", Ordered, func() {
 		var namespace string
+		const sharedArchiveName = "shared-timeline-test"
 
 		BeforeAll(func() {
 			if !(IsKind() || IsK3D()) {
@@ -721,21 +722,24 @@ var _ = Describe("Object storage - Backup and restore", Label(tests.LabelBackupR
 			By("verifying second cluster is on timeline 2", func() {
 				Eventually(func() (int, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, secondClusterName)
-					return cluster.Status.TimelineID, err
+					if err != nil {
+						return 0, err
+					}
+					return cluster.Status.TimelineID, nil
 				}, 60).Should(BeEquivalentTo(2))
 			})
 
 			By("verifying timeline 2 history file is archived", func() {
 				objectstoreasserts.AssertArchiveWalOnObjectStore(
-					env, testTimeouts, objectStoreEnv, namespace, secondClusterName, "shared-timeline-test",
+					env, testTimeouts, objectStoreEnv, namespace, secondClusterName, sharedArchiveName,
 				)
 				Eventually(func() (int, error) {
-					return objectstore.CountFiles(objectStoreEnv, objectstore.GetFilePath("shared-timeline-test", "00000002.history*"))
+					return objectstore.CountFiles(objectStoreEnv, objectstore.GetFilePath(sharedArchiveName, "00000002.history*"))
 				}, 60).Should(BeNumerically(">", 0))
 			})
 
 			By("scaling first cluster to 2 instances", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, firstClusterName)
 					if err != nil {
 						return err
@@ -759,6 +763,12 @@ var _ = Describe("Object storage - Backup and restore", Label(tests.LabelBackupR
 					firstClusterName,
 					testTimeouts[timeouts.ClusterIsReadyQuick],
 				)
+			})
+
+			By("verifying first cluster stayed on timeline 1", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, firstClusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.Status.TimelineID).To(BeEquivalentTo(1))
 			})
 
 			By("deleting the first cluster", func() {

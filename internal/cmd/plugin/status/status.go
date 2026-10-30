@@ -22,6 +22,7 @@ package status
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -35,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/logrusorgru/aurora/v4"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -154,6 +156,7 @@ func Status(
 			status.printPodDisruptionBudgetStatus()
 		}
 		status.printInstancesStatus()
+		status.printFailureDomainStatus()
 	}
 	status.printPluginStatus(verbosity)
 
@@ -217,11 +220,52 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 	return strings.Join(fencedInstances.ToList(), ", ")
 }
 
+// errExecNotPermitted is returned when the user lacks `pods/exec`
+var errExecNotPermitted = errors.New("not permitted: requires the pods/exec permission")
+
+// checkExecPermission returns errExecNotPermitted when the user cannot exec
+// into the primary Pod. If the check itself fails, it returns nil so the
+// command runs and reports the actual error. Without a primary Pod the review
+// would have no namespace and run at cluster scope, so it is skipped.
+func (fullStatus *PostgresqlStatus) checkExecPermission(
+	ctx context.Context,
+	client kubernetes.Interface,
+) error {
+	if fullStatus.PrimaryPod.Name == "" {
+		return nil
+	}
+
+	pod := &fullStatus.PrimaryPod
+	review, err := client.AuthorizationV1().SelfSubjectAccessReviews().Create(
+		ctx,
+		&authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Namespace:   pod.Namespace,
+					Verb:        "create",
+					Resource:    "pods",
+					Subresource: "exec",
+					Name:        pod.Name,
+				},
+			},
+		},
+		metav1.CreateOptions{},
+	)
+	if err == nil && !review.Status.Allowed {
+		return errExecNotPermitted
+	}
+	return nil
+}
+
 func (fullStatus *PostgresqlStatus) getClusterSize(
 	ctx context.Context,
 	client kubernetes.Interface,
 	timeout time.Duration,
 ) (string, error) {
+	if err := fullStatus.checkExecPermission(ctx, client); err != nil {
+		return "", err
+	}
+
 	// Compute the disk space through `du`
 	output, _, err := utils.ExecCommand(
 		ctx,
@@ -321,6 +365,8 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(
 			summary.AddLine("Size:", "- (hibernated)")
 		case isPrimaryFenced:
 			summary.AddLine("Size:", "- (fenced)")
+		case errors.Is(clusterSizeErr, errExecNotPermitted):
+			summary.AddLine("Size:", "- ("+clusterSizeErr.Error()+")")
 		default:
 			summary.AddLine("Size:", aurora.Red(clusterSizeErr.Error()))
 		}
@@ -490,6 +536,17 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 	client kubernetes.Interface,
 	timeout time.Duration,
 ) []error {
+	if err := fullStatus.checkExecPermission(ctx, client); err != nil {
+		notPermitted := "- (" + err.Error() + ")"
+		fmt.Println(aurora.Green("PostgreSQL Configuration"))
+		fmt.Println(notPermitted)
+		fmt.Println()
+		fmt.Println(aurora.Green("PostgreSQL HBA Rules"))
+		fmt.Println(notPermitted)
+		fmt.Println()
+		return nil
+	}
+
 	var errs []error
 
 	// Read PostgreSQL configuration from custom.conf
@@ -1415,4 +1472,163 @@ func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(
 	} else {
 		status.AddLine("Last Failed Backup:", "-")
 	}
+}
+
+// failureDomainGroup holds the instances sharing a single failure domain.
+type failureDomainGroup struct {
+	// display is the human-readable label value(s) for this domain
+	display string
+	// instances is the sorted list of pod names in this domain
+	instances []string
+	// hasPrimary is true when the current primary is in this domain
+	hasPrimary bool
+}
+
+// displayFailureDomainValue renders a failure domain label value, making an
+// empty value visible in the status output.
+func displayFailureDomainValue(value string) string {
+	if value == "" {
+		return "<empty>"
+	}
+	return value
+}
+
+// groupInstancesByFailureDomain groups topology instances into failure domain
+// entries ordered by the rendered domain value (sorted instance names within
+// each group). Returns nil when no failure domain keys are configured or
+// topology extraction failed.
+func groupInstancesByFailureDomain(cluster *apiv1.Cluster) []failureDomainGroup {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
+		return nil
+	}
+
+	topology := cluster.Status.Topology
+	if !topology.SuccessfullyExtracted || len(topology.Instances) == 0 {
+		return nil
+	}
+
+	keys := sync.FailureDomainKeys()
+
+	instanceNames := make([]string, 0, len(topology.Instances))
+	for podName := range topology.Instances {
+		instanceNames = append(instanceNames, string(podName))
+	}
+	sort.Strings(instanceNames)
+
+	healthyInstances := make(map[string]bool, len(instanceNames))
+	for _, name := range cluster.Status.InstancesStatus[apiv1.PodHealthy] {
+		healthyInstances[name] = true
+	}
+
+	groupMap := make(map[string]*failureDomainGroup)
+	groupOrder := make([]string, 0)
+
+	for _, name := range instanceNames {
+		labels := topology.Instances[apiv1.PodName(name)]
+
+		vals := make([]string, len(keys))
+		for i, k := range keys {
+			vals[i] = labels[k]
+		}
+		sig := strings.Join(vals, "\x00")
+
+		var display string
+		if len(keys) == 1 {
+			display = displayFailureDomainValue(vals[0])
+		} else {
+			parts := make([]string, len(keys))
+			for i, k := range keys {
+				parts[i] = k + "=" + displayFailureDomainValue(vals[i])
+			}
+			display = strings.Join(parts, ", ")
+		}
+
+		if _, exists := groupMap[sig]; !exists {
+			groupMap[sig] = &failureDomainGroup{display: display}
+			groupOrder = append(groupOrder, sig)
+		}
+		g := groupMap[sig]
+		if name == cluster.Status.CurrentPrimary {
+			g.hasPrimary = true
+		}
+		// mark instances that cannot be elected as synchronous standbys, so
+		// the table cannot be read as contradicting the topology condition
+		if !healthyInstances[name] {
+			name += " (not ready)"
+		}
+		g.instances = append(g.instances, name)
+	}
+
+	result := make([]failureDomainGroup, len(groupOrder))
+	for i, sig := range groupOrder {
+		result[i] = *groupMap[sig]
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].display < result[j].display
+	})
+	return result
+}
+
+func (fullStatus *PostgresqlStatus) printFailureDomainStatus() {
+	cluster := fullStatus.Cluster
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	if sync == nil || len(sync.FailureDomainKeys()) == 0 {
+		return
+	}
+
+	condition := meta.FindStatusCondition(
+		cluster.Status.Conditions,
+		string(apiv1.ConditionSyncReplicationTopologySatisfied),
+	)
+
+	// a missing condition means the topology has not been evaluated yet, so
+	// green is reserved for an explicitly satisfied constraint
+	headerColor := aurora.Yellow
+	if condition != nil && condition.Status == metav1.ConditionTrue {
+		headerColor = aurora.Green
+	}
+	fmt.Println(headerColor("Failure Domain Topology"))
+
+	topology := cluster.Status.Topology
+	if !topology.SuccessfullyExtracted {
+		fmt.Println(aurora.Yellow("Topology labels could not be extracted from pods or nodes"))
+		fmt.Println()
+		return
+	}
+
+	groups := groupInstancesByFailureDomain(cluster)
+	if len(groups) == 0 {
+		fmt.Println(aurora.Yellow("No topology information available yet"))
+		fmt.Println()
+		return
+	}
+
+	domainHeader := "Domain"
+	if keys := sync.FailureDomainKeys(); len(keys) == 1 {
+		domainHeader = keys[0]
+	}
+
+	table := tabby.New()
+	table.AddHeader(domainHeader, "Instances", "Primary Domain")
+	for _, g := range groups {
+		primaryMark := "No"
+		if g.hasPrimary {
+			primaryMark = "Yes"
+		}
+		table.AddLine(g.display, strings.Join(g.instances, ", "), primaryMark)
+	}
+	table.Print()
+
+	if condition != nil {
+		switch condition.Status {
+		case metav1.ConditionTrue:
+			fmt.Println(aurora.Green(fmt.Sprintf("Constraint: %s (%s)", condition.Status, condition.Reason)))
+		case metav1.ConditionFalse:
+			fmt.Println(aurora.Yellow(
+				fmt.Sprintf("Constraint: %s (%s) - %s", condition.Status, condition.Reason, condition.Message),
+			))
+		}
+	}
+	fmt.Println()
 }

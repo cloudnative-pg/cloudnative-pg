@@ -22,7 +22,6 @@ package e2e
 import (
 	"fmt"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -68,6 +68,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		sampleFile string,
 	) {
 		var oldPrimaryPodName, oldPrimaryPVCName string
+		var oldPrimaryPodUID types.UID
 		var err error
 		tableName := "test_pg_data_corruption"
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
@@ -85,6 +86,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			oldPrimaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimaryPodName = oldPrimaryPod.GetName()
+			oldPrimaryPodUID = oldPrimaryPod.GetUID()
 			// Get the PVC related to the pod
 			pvcName := oldPrimaryPod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
 			pvc := &corev1.PersistentVolumeClaim{}
@@ -190,14 +192,25 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			err = podutils.Delete(env.Ctx, env.Client, namespace, oldPrimaryPodName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
-			// checking that the old primary pod is eventually gone
+			// Checking that the old primary pod gets replaced. With in-process
+			// bootstrap the operator reuses the freed serial and recreates a pod
+			// with the same name within seconds, so the name may never be observed
+			// absent: assert the pod is either gone or has been replaced by a new
+			// one carrying a different UID.
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      oldPrimaryPodName,
 			}
-			Eventually(func() bool {
-				err := env.Client.Get(env.Ctx, namespacedName, &corev1.Pod{})
-				return apierrs.IsNotFound(err)
+			Eventually(func() (bool, error) {
+				pod := &corev1.Pod{}
+				err := env.Client.Get(env.Ctx, namespacedName, pod)
+				if apierrs.IsNotFound(err) {
+					return true, nil
+				}
+				if err != nil {
+					return false, err
+				}
+				return pod.GetUID() != oldPrimaryPodUID, nil
 			}, 300).Should(BeTrue())
 
 			By("verifying new pod should join as standby", func() {
@@ -254,7 +267,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 
 	// This deterministically reproduces #10985: when an instance's data PVC has
 	// been removed but its WAL PVC is still terminating, the instance must not be
-	// recreated yet (a Job bound to the vanishing WAL PVC would wedge the Pod and
+	// recreated yet (a Pod bound to the vanishing WAL PVC would wedge Pending and
 	// block reconciliation). We force the race by pinning the WAL PVC with a
 	// finalizer so it lingers Terminating, and assert no recreation happens until
 	// it is released, after which the instance rejoins.
@@ -303,14 +316,14 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				walPVC := &corev1.PersistentVolumeClaim{}
 				Expect(env.Client.Get(env.Ctx, walPVCKey, walPVC)).To(Succeed())
 				controllerutil.AddFinalizer(walPVC, holdFinalizer)
-				Expect(env.Client.Update(env.Ctx, walPVC)).To(Succeed())
+				Expect(objects.Update(env.Ctx, env.Client, walPVC)).To(Succeed())
 			})
 			// Always release the WAL PVC, otherwise namespace teardown would hang.
 			DeferCleanup(func() {
 				walPVC := &corev1.PersistentVolumeClaim{}
 				if err := env.Client.Get(env.Ctx, walPVCKey, walPVC); err == nil {
 					if controllerutil.RemoveFinalizer(walPVC, holdFinalizer) {
-						_ = env.Client.Update(env.Ctx, walPVC)
+						_ = objects.Update(env.Ctx, env.Client, walPVC)
 					}
 				}
 			})
@@ -342,22 +355,22 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				Expect(walPVC.DeletionTimestamp).ToNot(BeNil(), "the WAL PVC should be terminating")
 			})
 
-			joinJobKey := types.NamespacedName{Namespace: namespace, Name: victimName + "-join"}
 			By("verifying the instance is NOT recreated while the WAL PVC is terminating", func() {
-				// Without the fix the operator creates the join Job immediately and
-				// its Pod stays Pending; with the fix no Job is created until the
-				// previous WAL PVC is gone.
+				// Without the fix the operator creates the replacement Pod (with its
+				// join bootstrap init container) immediately and it stays Pending;
+				// with the fix no Pod is created until the previous WAL PVC is gone.
 				Consistently(func() bool {
-					err := env.Client.Get(env.Ctx, joinJobKey, &batchv1.Job{})
+					err := env.Client.Get(env.Ctx,
+						types.NamespacedName{Namespace: namespace, Name: victimName}, &corev1.Pod{})
 					return apierrs.IsNotFound(err)
-				}, 30, 3).Should(BeTrue(), "a join Job must not be created while the previous WAL PVC is terminating")
+				}, 30, 3).Should(BeTrue(), "the instance Pod must not be recreated while the previous WAL PVC is terminating")
 			})
 
 			By("releasing the WAL PVC", func() {
 				walPVC := &corev1.PersistentVolumeClaim{}
 				Expect(env.Client.Get(env.Ctx, walPVCKey, walPVC)).To(Succeed())
 				controllerutil.RemoveFinalizer(walPVC, holdFinalizer)
-				Expect(env.Client.Update(env.Ctx, walPVC)).To(Succeed())
+				Expect(objects.Update(env.Ctx, env.Client, walPVC)).To(Succeed())
 			})
 
 			By("verifying the instance is recreated and rejoins as a ready standby", func() {

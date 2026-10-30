@@ -81,7 +81,6 @@ func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
 	var pprofHTTPServer bool
-	var statusPortTLS bool
 	var metricsPortTLS bool
 
 	cmd := &cobra.Command{
@@ -106,7 +105,6 @@ func NewCmd() *cobra.Command {
 				WithNamespace(namespace)
 
 			instance.PgData = pgData
-			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
 
 			// Since version 0.19.0 of controller-runtime, it is not allowed to create multiple controllers with the
@@ -147,10 +145,18 @@ func NewCmd() *cobra.Command {
 		false,
 		"If true it will start a pprof debug http server on localhost:6060. Defaults to false.",
 	)
-	cmd.Flags().BoolVar(&statusPortTLS, "status-port-tls", false,
-		"Enable TLS for communicating with the operator")
 	cmd.Flags().BoolVar(&metricsPortTLS, "metrics-port-tls", false,
 		"Enable TLS for metrics scraping")
+
+	// An in-place instance manager upgrade re-execs this binary with the argv of
+	// the Pod, which was chosen by the operator that created it. Pods created
+	// before 1.31 pass --status-port-tls, and rejecting it would crash-loop the
+	// instance manager.
+	//
+	// TODO: delete after minor version 1.30 is discontinued
+	cmd.Flags().Bool("status-port-tls", false, "Deprecated: the status port always uses TLS")
+	_ = cmd.Flags().MarkDeprecated("status-port-tls", "the status port always uses TLS")
+
 	return cmd
 }
 
@@ -271,7 +277,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		contextLogger.Error(err, "unable to create instance controller")
 		return err
 	}
-	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
+	postgresStartConditions = append(postgresStartConditions, reconciler.GetInitializedCondition())
 
 	// database reconciler
 	dbReconciler := controller.NewDatabaseReconciler(
@@ -321,7 +327,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		contextLogger.Error(err, "unable to add raw logs handler")
 		return err
 	}
-	postgresStartConditions = append(postgresStartConditions, rawPipe.GetExecutedCondition())
+	postgresStartConditions = append(postgresStartConditions, rawPipe.GetInitializedCondition())
 	exitedConditions = append(exitedConditions, rawPipe.GetExitedCondition())
 
 	// json logs handler
@@ -330,8 +336,17 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		contextLogger.Error(err, "unable to add JSON logs handler")
 		return err
 	}
-	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
+	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetInitializedCondition())
 	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
+
+	// Record these readiness conditions on the instance, so the reconciler can
+	// wait on them before pg_rewind's restore_command or a WAL-archive plugin
+	// invocation could race these readers for the log-destination FIFOs.
+	instance.SetLogPipesReadyCondition(concurrency.MultipleExecuted{
+		postgresLogPipe.GetInitializedCondition(),
+		rawPipe.GetInitializedCondition(),
+		jsonPipe.GetInitializedCondition(),
+	})
 
 	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
 		contextLogger.Error(err, "unable to move `pg_wal` directory to the attached volume")
@@ -339,6 +354,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	}
 
 	postgresLifecycleManager := lifecycle.NewPostgres(ctx, instance, postgresStartConditions)
+	leaseRunnable.SetMonitorContext(postgresLifecycleManager.GetGlobalContext())
 	if err = mgr.Add(postgresLifecycleManager); err != nil {
 		contextLogger.Error(err, "unable to create instance runnable")
 		return err
@@ -383,7 +399,8 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		}
 	}()
 
-	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
+	remoteSrv, err := webserver.NewRemoteWebServer(
+		instance, onlineUpgradeCancelFunc, exitedConditions, leaseRunnable.Watchdog())
 	if err != nil {
 		contextLogger.Error(err, "unable to create remote webserver runnable")
 		return err

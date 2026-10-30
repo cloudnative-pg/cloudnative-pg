@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -33,44 +34,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-var _ = Describe("Retriable error messages", func() {
-	DescribeTable(
-		"Retriable error messages",
-		func(msg string, isRetriable bool) {
-			Expect(isCSIErrorMessageRetriable(msg)).To(Equal(isRetriable))
-		},
-		Entry("conflict", "Hey, the object has been modified!", true),
-		Entry("non-retriable error", "VolumeSnapshotClass not found", false),
-		Entry("explicitly retriable error", "Retriable: true, the storage is gone away forever", true),
-		Entry("explicitly non-retriable error", "Retriable: false because my pod is working", false),
-		Entry("error code 502 - retriable", "RetryAfter: 0s, HTTPStatusCode: 502, RawError: Internal Server Error", true),
-		Entry("error code 404 - non retriable", "RetryAfter: 0s, HTTPStatusCode: 404, RawError: Not found", false),
-		Entry("context deadline exceeded - retriable", "context deadline exceeded waiting for snapshot creation", true),
-		Entry("deadline exceeded - retriable", "deadline exceeded during Azure snapshot creation", true),
-		Entry("timed out - retriable", "operation timed out for csi-disk-handler", true),
-	)
-
-	Describe("isContextDeadlineExceededError", func() {
-		It("detects 'context deadline exceeded' error messages", func() {
-			Expect(isContextDeadlineExceededError("context deadline exceeded")).To(BeTrue())
-		})
-
-		It("detects 'deadline exceeded' error messages", func() {
-			Expect(isContextDeadlineExceededError("deadline exceeded")).To(BeTrue())
-		})
-
-		It("detects 'timed out' error messages", func() {
-			Expect(isContextDeadlineExceededError("operation timed out")).To(BeTrue())
-		})
-
-		It("rejects non-timeout error messages", func() {
-			Expect(isContextDeadlineExceededError("not found")).To(BeFalse())
-			Expect(isContextDeadlineExceededError("permission denied")).To(BeFalse())
-			Expect(isContextDeadlineExceededError("invalid input")).To(BeFalse())
-		})
-	})
-})
 
 var _ = Describe("isNetworkErrorRetryable", func() {
 	It("recognizes server timeout errors", func() {
@@ -101,6 +64,24 @@ var _ = Describe("isNetworkErrorRetryable", func() {
 	It("retries a wrapped transient instance manager rejection (production path)", func() {
 		err := fmt.Errorf("while trying to start the backup: %w",
 			&remote.StatusError{StatusCode: http.StatusServiceUnavailable, Body: "operator certificate not recognized"})
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("retries a transport-level dial timeout to the instance manager (production path)", func() {
+		// Mirrors the error chain produced when the finalize status read cannot reach
+		// the instance manager: a *net.OpError wrapped by the HTTP client and the
+		// reconciler.
+		err := fmt.Errorf("while getting status while finalizing: %w",
+			fmt.Errorf("while executing http request: %w",
+				&net.OpError{Op: "dial", Net: "tcp", Err: errors.New("i/o timeout")}))
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("retries a transport-level connection error", func() {
+		// The bare, unwrapped net.OpError, and a connection refused rather than a
+		// timeout: errors.As must match the type directly, without relying on a
+		// Timeout()/Temporary() check.
+		err := &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}
 		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
 	})
 

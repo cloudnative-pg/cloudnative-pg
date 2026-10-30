@@ -103,6 +103,12 @@ type PostgresqlStatus struct {
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
+
+	// IsFenced is true when the cluster has fenced this instance. A fenced
+	// instance has PostgreSQL shut down and cannot become primary.
+	//
+	// This field is never populated in the instance manager.
+	IsFenced bool `json:"isFenced,omitempty"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
@@ -255,6 +261,7 @@ func (list *PostgresqlStatusList) LogStatus(ctx context.Context) {
 			"replayLsn", item.ReplayLsn,
 			"isPrimary", item.IsPrimary,
 			"isPodReady", item.IsPodReady,
+			"isFenced", item.IsFenced,
 			"pendingRestart", item.PendingRestart,
 			"pendingRestartForDecrease", item.PendingRestartForDecrease,
 			"statusCollectionError", item.Error)
@@ -290,6 +297,16 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 		return true
 	}
 
+	// A fenced instance has PostgreSQL shut down and cannot become primary,
+	// so it always sorts after a non-fenced one, regardless of how caught-up
+	// its replayed LSN was when it got fenced.
+	switch {
+	case list.Items[i].IsFenced && !list.Items[j].IsFenced:
+		return false
+	case !list.Items[i].IsFenced && list.Items[j].IsFenced:
+		return true
+	}
+
 	// Manage primary servers
 	switch {
 	case list.Items[i].IsPrimary && list.Items[j].IsPrimary:
@@ -317,9 +334,13 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	// We rely on the `CurrentPrimary` field to identify the designated primary
 	// instance that is replicating from the external cluster, ensuring it is
 	// sorted first among the standbys.
-	if list.IsReplicaCluster &&
-		(list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary) {
-		return true
+	if list.IsReplicaCluster {
+		switch {
+		case list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary:
+			return true
+		case list.Items[j].Pod.Name == list.CurrentPrimary && list.Items[i].Pod.Name != list.CurrentPrimary:
+			return false
+		}
 	}
 
 	return list.Items[i].Pod.Name < list.Items[j].Pod.Name
@@ -451,6 +472,22 @@ func (list PostgresqlStatusList) InstancesReportingStatus() int {
 	}
 
 	return n
+}
+
+// InstancesReportingStatusIgnoringFenced is like InstancesReportingStatus, but does
+// not count a fenced instance. A fenced instance's MightBeUnavailable flag would
+// otherwise count it as reporting even though its Pod can never become
+// kubelet-Ready while fenced, which would stop the two counts from ever
+// converging.
+func (list PostgresqlStatusList) InstancesReportingStatusIgnoringFenced() int {
+	nonFenced := PostgresqlStatusList{}
+	for _, item := range list.Items {
+		if !item.IsFenced {
+			nonFenced.Items = append(nonFenced.Items, item)
+		}
+	}
+
+	return nonFenced.InstancesReportingStatus()
 }
 
 // PrimaryNames get the names of each primary instance of this Cluster. Under

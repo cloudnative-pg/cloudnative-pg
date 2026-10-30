@@ -34,6 +34,7 @@ import (
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -52,7 +53,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 	var namespace string
 
 	diskSpaceDetectionTest := func(namespace, clusterName string) {
-		const walDir = "/var/lib/postgresql/data/pgdata/pg_wal"
+		const pgDataDir = "/var/lib/postgresql/data/pgdata"
+		const walDir = pgDataDir + "/pg_wal"
 		var cluster *apiv1.Cluster
 		var primaryPod *corev1.Pod
 		By("finding cluster resources", func() {
@@ -68,7 +70,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		By("filling the WAL volume", func() {
 			timeout := time.Minute * 5
 
-			_, _, err := exec.CommandInInstancePod(
+			_, stderr, err := exec.CommandInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
 					Namespace: namespace,
@@ -78,7 +80,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 				"dd", "if=/dev/zero", "of="+walDir+"/fill", "bs=1M",
 			)
 			Expect(err).To(HaveOccurred())
-			// FIXME: check if the error is due to the disk being full
+			Expect(stderr).To(ContainSubstring("No space left on device"))
 		})
 		By("writing something when no space is available", func() {
 			// Create the table used by the scenario
@@ -103,6 +105,26 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 				postgres.PostgresDBName,
 				query)
 			Expect(err).To(HaveOccurred())
+		})
+		By("stopping the postmaster to force a deterministic disk-space check", func() {
+			// Whichever write above hits ENOSPC first decides if
+			// PostgreSQL already crashed, pure chance. Stop it
+			// ourselves with -m immediate: fast/smart shutdown would
+			// need free disk space for the checkpoint.
+			timeout := time.Minute
+			_, stderr, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   primaryPod.Name,
+				},
+				&timeout,
+				"pg_ctl", "stop", "-D", pgDataDir, "-m", "immediate",
+			)
+			// err doesn't mean failure here: pg_ctl also errors if
+			// PostgreSQL already crashed on its own. Log every time to
+			// tell which case hit.
+			GinkgoWriter.Printf("pg_ctl stop: stderr=%q err=%v\n", stderr, err)
 		})
 		By("waiting for the primary to become not ready", func() {
 			Eventually(func(g Gomega) bool {
@@ -146,7 +168,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			originPVC := primaryWALPVC.DeepCopy()
 			newSize := *resource.NewScaledQuantity(2, resource.Giga)
 			primaryWALPVC.Spec.Resources.Requests[corev1.ResourceStorage] = newSize
-			Expect(env.Client.Patch(env.Ctx, primaryWALPVC, ctrlclient.MergeFrom(originPVC))).To(Succeed())
+			Expect(objects.Patch(env.Ctx, env.Client, primaryWALPVC, ctrlclient.MergeFrom(originPVC))).To(Succeed())
 			Eventually(func(g Gomega) int64 {
 				err := env.Client.Get(env.Ctx,
 					types.NamespacedName{Namespace: primaryPod.Namespace, Name: primaryWALPVC.Name},

@@ -103,6 +103,7 @@ Commands:
     generate-manifest     Generate the operator manifest from the local worktree
     deploy                Generate the manifest (if OPERATOR=local) and deploy the operator
     load-helper-images    Load the catalog of helper images in the local registry
+    plugin-barman-cloud   Install the plugin-barman-cloud operator and cert-manager
     print-image           Print the CONTROLLER_IMG name to be used inside the cluster
     export-logs           Export the logs from the cluster
     teardown              Tear down the cluster
@@ -255,7 +256,7 @@ main() {
       fi
       "${CLUSTER_MGR_SCRIPT}" "${command}"
       ;;
-    create | load-helper-images | print-image | export-logs | teardown | pyroscope)
+    create | load-helper-images | plugin-barman-cloud | print-image | export-logs | teardown | pyroscope)
       "${CLUSTER_MGR_SCRIPT}" "${command}"
       ;;
     *)

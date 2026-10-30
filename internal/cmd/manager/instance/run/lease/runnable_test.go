@@ -22,6 +22,7 @@ package lease
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -107,7 +109,7 @@ var _ = Describe("Runnable.Release", func() {
 		r := newRunnable(kubeClient)
 		createLease(ctx, kubeClient, thisPod)
 		// Simulate the lease having been acquired by this run.
-		r.heldOnce.Do(func() { close(r.heldCh) })
+		close(r.heldCh)
 
 		Expect(r.Release(ctx)).To(Succeed())
 		Expect(getHolder(ctx, kubeClient)).To(BeEmpty())
@@ -208,7 +210,7 @@ var _ = Describe("Runnable.Acquire", func() {
 	// markHeld simulates the lease having been acquired so Acquire can return
 	// without a running leader-election loop behind it.
 	markHeld := func(r *Runnable) {
-		r.heldOnce.Do(func() { close(r.heldCh) })
+		close(r.heldCh)
 	}
 
 	BeforeEach(func() {
@@ -265,6 +267,99 @@ var _ = Describe("Runnable.Acquire", func() {
 		})
 })
 
+var _ = Describe("Runnable watchdog", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+	)
+
+	// Short timings give the specs many lock calls, under a silence limit of
+	// 140ms that a busy test host does not stall the loop past.
+	config := Config{
+		LeaseDuration:         time.Hour,
+		RenewDeadline:         100 * time.Millisecond,
+		RetryPeriod:           20 * time.Millisecond,
+		ReleasedLeaseDuration: time.Second,
+	}
+
+	// outage, when not zero, makes every lease call fail after that long, as
+	// an API server that is down or does not answer would.
+	var outage atomic.Int64
+
+	// start runs the lease loop the way the instance manager does, through
+	// Start and Acquire, and returns the function that stops it.
+	start := func(ctx context.Context) (*Runnable, func()) {
+		kubeClient := fake.NewClientset(&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: ptr.To(thisPod)},
+		})
+		kubeClient.PrependReactor("*", "leases", func(k8stesting.Action) (bool, runtime.Object, error) {
+			delay := time.Duration(outage.Load())
+			if delay == 0 {
+				return false, nil, nil
+			}
+			time.Sleep(delay)
+			return true, nil, errors.New("API server unavailable")
+		})
+		r := New(kubeClient, postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName))
+		r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) { return false, nil }
+
+		runCtx, cancelRun := context.WithCancel(ctx)
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			_ = r.Start(runCtx)
+		}()
+		Expect(r.Acquire(ctx, config)).To(Succeed())
+
+		return r, func() {
+			cancelRun()
+			Eventually(returned).Should(BeClosed())
+		}
+	}
+
+	BeforeEach(func() {
+		outage.Store(0)
+	})
+
+	It("stays healthy while the loop renews the lease, and reports it stuck once the loop stops",
+		func(ctx context.Context) {
+			r, stop := start(ctx)
+			Consistently(r.Watchdog().IsHealthy, 500*time.Millisecond).Should(Succeed())
+
+			stop()
+			Eventually(r.Watchdog().IsHealthy).Should(MatchError(ContainSubstring("primary lease loop")))
+		})
+
+	It("stays healthy while every lease call fails", func(ctx context.Context) {
+		r, stop := start(ctx)
+		defer stop()
+
+		outage.Store(int64(time.Millisecond))
+		Consistently(r.Watchdog().IsHealthy, 500*time.Millisecond).Should(Succeed())
+	})
+
+	It("stays healthy while lease calls take longer than the silence limit to fail", func(ctx context.Context) {
+		r, stop := start(ctx)
+		defer stop()
+
+		outage.Store(int64(400 * time.Millisecond))
+		Consistently(r.Watchdog().IsHealthy, time.Second).Should(Succeed())
+	})
+
+	It("stays healthy after a yield, so the liveness probe never restarts the replica", func(ctx context.Context) {
+		r, stop := start(ctx)
+		defer stop()
+
+		r.Yield(ctx)
+		Consistently(r.Watchdog().IsHealthy, 500*time.Millisecond).Should(Succeed())
+	})
+})
+
 var _ = Describe("Runnable.tryTakeOver", func() {
 	const (
 		namespace   = "test-ns"
@@ -278,10 +373,18 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			WithNamespace(namespace).
 			WithPodName(thisPod).
 			WithClusterName(clusterName)
+		// This pod is the target primary unless a spec says otherwise: only the
+		// target may take a lease over.
+		instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: thisPod}})
 		r := New(kubeClient, instance)
 		// Set a realistic lease duration so the expiry math is exercised.
 		r.config.LeaseDuration = 15 * time.Second
 		return r
+	}
+
+	// setTarget changes the target primary the instance manager has reconciled.
+	setTarget := func(r *Runnable, target string) {
+		r.instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: target}})
 	}
 
 	// putLease writes a lease object with the given holder, renew time and TTL.
@@ -347,17 +450,43 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(r.observedRecord).To(BeNil())
 		})
 
-	It("returns true and does not write when this pod is already the holder", func(ctx context.Context) {
+	It("refreshes the record with a write when this pod is already the holder", func(ctx context.Context) {
 		kubeClient := fake.NewClientset()
 		r := newRunnable(kubeClient)
-		putLease(ctx, kubeClient, thisPod, time.Now(), 15)
-		before := getLease(ctx, kubeClient).ResourceVersion
+		putLease(ctx, kubeClient, thisPod, time.Now().Add(-10*time.Second), 15)
+		before := getLease(ctx, kubeClient)
 
 		acquired, err := r.tryTakeOver(ctx)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(acquired).To(BeTrue())
-		// No write happened: ResourceVersion is unchanged.
-		Expect(getLease(ctx, kubeClient).ResourceVersion).To(Equal(before))
+
+		after := getLease(ctx, kubeClient)
+		Expect(after.Spec.RenewTime.After(before.Spec.RenewTime.Time)).To(BeTrue())
+		// Re-adopting our own record is not a transition.
+		Expect(ptr.Deref(after.Spec.HolderIdentity, "")).To(Equal(thisPod))
+		Expect(ptr.Deref(after.Spec.LeaseTransitions, 0)).To(BeEquivalentTo(3))
+		// The write is what the monitor ages the lease from.
+		Expect(r.lastConfirmed.Load()).NotTo(BeNil())
+	})
+
+	It("does not report the lease as held when a challenger claims it first", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		putLease(ctx, kubeClient, thisPod, time.Now().Add(-10*time.Second), 15)
+
+		// The challenger's claim lands between our read and our write, so our
+		// conditional write fails with a conflict.
+		kubeClient.PrependReactor("update", "leases",
+			func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewConflict(
+					schema.GroupResource{Resource: "leases"}, clusterName,
+					errors.New("the object has been modified"))
+			})
+
+		acquired, err := r.tryTakeOver(ctx)
+		Expect(apierrors.IsConflict(err)).To(BeTrue())
+		Expect(acquired).To(BeFalse())
+		Expect(r.lastConfirmed.Load()).To(BeNil())
 	})
 
 	It("refuses on the first sighting of another holder and records the observation",
@@ -428,6 +557,92 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(*lease.Spec.LeaseTransitions).To(Equal(int32(4)))
 		})
 
+	It("does not take over a released lease while another pod is the target primary", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		setTarget(r, otherPod)
+		putLease(ctx, kubeClient, "", time.Now(), 15)
+
+		acquired, err := r.tryTakeOver(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquired).To(BeFalse())
+		Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(BeEmpty())
+	})
+
+	It("does not start the observation window while another pod is the target primary",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+			setTarget(r, otherPod)
+
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(r.observedRecord).To(BeNil())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
+		})
+
+	It("waits a full window after becoming the target before it takes over a stale holder",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+			setTarget(r, otherPod)
+			for range 3 {
+				_, err := r.tryTakeOver(ctx)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			// Whatever the polls recorded is older than the window by now.
+			r.observedTime = time.Now().Add(-r.config.LeaseDuration - time.Second)
+
+			// A reconcile stores this pod as the target: the holder was stale long
+			// before, but the old primary may only now learn that it was replaced.
+			setTarget(r, thisPod)
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
+
+			r.observedTime = time.Now().Add(-r.config.LeaseDuration - time.Second)
+			acquired, err = r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeTrue())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(thisPod))
+		})
+
+	It("converges through the polling loop once a reconcile makes this pod the target", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		r.config.LeaseDuration = 50 * time.Millisecond
+		r.config.RenewDeadline = 40 * time.Millisecond
+		r.config.RetryPeriod = 5 * time.Millisecond
+		setTarget(r, otherPod)
+		putLease(ctx, kubeClient, otherPod, time.Now(), 15)
+
+		acquired := make(chan error, 1)
+		go func() { acquired <- r.preAcquire(ctx) }()
+
+		// Well past the window, and still no claim.
+		Consistently(acquired, 200*time.Millisecond).ShouldNot(Receive())
+
+		setTarget(r, thisPod)
+
+		Eventually(acquired).Should(Receive(BeNil()))
+		Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(thisPod))
+	})
+
+	It("keeps renewing its own lease after another pod became the target primary", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		setTarget(r, otherPod)
+		putLease(ctx, kubeClient, thisPod, time.Now().Add(-10*time.Second), 15)
+
+		acquired, err := r.tryTakeOver(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquired).To(BeTrue())
+	})
+
 	It("reports not-acquired when a competing candidate wins the take-over race",
 		func(ctx context.Context) {
 			kubeClient := fake.NewClientset()
@@ -449,7 +664,92 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(apierrors.IsConflict(err)).To(BeTrue())
 			Expect(acquired).To(BeFalse())
 		})
+
+	It("bounds the Get call so it cannot block past RenewDeadline when the API server is unreachable",
+		func(ctx context.Context) {
+			r := newRunnable(fake.NewClientset())
+			r.config.RenewDeadline = 50 * time.Millisecond
+			r.lock = &blockingLock{}
+
+			start := time.Now()
+			acquired, err := r.tryTakeOver(ctx)
+
+			// The lock never actually replies: the only way this call returns
+			// is the per-call timeout added around it, well before
+			// blockingLock's own 2s safety net would fire.
+			Expect(time.Since(start)).To(BeNumerically("<", time.Second))
+			Expect(acquired).To(BeFalse())
+			Expect(err).To(MatchError(context.DeadlineExceeded))
+		})
+
+	It("takes the lease over when the API server answers well within RenewDeadline",
+		func(ctx context.Context) {
+			r := newRunnable(fake.NewClientset())
+			// tryTakeOver ignores RetryPeriod. We set it small anyway, so
+			// this test still works if the default value changes later.
+			r.config.RetryPeriod = 20 * time.Millisecond
+			r.config.RenewDeadline = 600 * time.Millisecond
+			r.lock = &slowLock{getDelay: 400 * time.Millisecond}
+
+			acquired, err := r.tryTakeOver(ctx)
+
+			// getDelay is bigger than RetryPeriod, smaller than
+			// RenewDeadline. So this test only passes if the code waits
+			// for RenewDeadline, not the shorter, wrong bound from an
+			// earlier version of this fix.
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeTrue())
+		})
 })
+
+// slowLock is a resourcelock.Interface that answers, but only after getDelay,
+// simulating an API server under load rather than an unreachable one. The
+// record it returns has an empty holder, the cleanly-released state that
+// tryTakeOver claims straight away.
+type slowLock struct {
+	getDelay time.Duration
+}
+
+func (l *slowLock) Get(ctx context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case <-time.After(l.getDelay):
+		return &resourcelock.LeaderElectionRecord{HolderIdentity: ""}, nil, nil
+	}
+}
+
+func (*slowLock) Create(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*slowLock) Update(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*slowLock) RecordEvent(string)                                              {}
+
+// Identity is never empty: an empty identity would make the record read above
+// look like one we already hold, short-circuiting the claim under test.
+func (*slowLock) Identity() string { return "slow-lock" }
+func (*slowLock) Describe() string { return "slowLock" }
+
+// blockingLock is a resourcelock.Interface whose Get never replies on its
+// own, simulating an API server that accepts the connection but never
+// answers. It exists to prove tryTakeOver bounds the call itself rather
+// than depending on the caller's context already having a deadline.
+type blockingLock struct{}
+
+func (*blockingLock) Get(ctx context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case <-time.After(2 * time.Second):
+		// Safety net: fails the test with a clear message instead of
+		// hanging forever if the per-call bound regresses.
+		return nil, nil, errors.New("blockingLock.Get: not bounded by a per-call timeout")
+	}
+}
+
+func (*blockingLock) Create(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*blockingLock) Update(context.Context, resourcelock.LeaderElectionRecord) error { return nil }
+func (*blockingLock) RecordEvent(string)                                              {}
+func (*blockingLock) Identity() string                                                { return "" }
+func (*blockingLock) Describe() string                                                { return "blockingLock" }
 
 var _ = Describe("classifyLeaseAfterRun", func() {
 	const ourIdentity = "test-cluster-1"
@@ -482,5 +782,282 @@ var _ = Describe("classifyLeaseAfterRun", func() {
 	It("treats our own identity as still held (transient blip, retry)", func() {
 		Expect(classifyLeaseAfterRun(nil, record(ourIdentity), ourIdentity)).
 			To(Equal(leaseStillHeld))
+	})
+})
+
+var _ = Describe("shouldStepDown", func() {
+	const ourIdentity = "test-cluster-1"
+
+	newCluster := func(enabled bool, instances int) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: instances,
+				Probes: &apiv1.ProbesConfiguration{
+					Liveness: &apiv1.LivenessProbe{
+						IsolationCheck: &apiv1.IsolationCheckConfiguration{
+							Enabled:           ptr.To(enabled),
+							RequestTimeout:    1000,
+							ConnectionTimeout: 1000,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("skips the check when isolation checking is disabled", func() {
+		stepDown, err := shouldStepDown(newCluster(false, 3), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("skips the check when the cluster has a single instance", func() {
+		stepDown, err := shouldStepDown(newCluster(true, 1), ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("skips the check when no probes configuration is set", func() {
+		stepDown, err := shouldStepDown(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}, ourIdentity)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+
+	It("fails open when the reachability checker cannot be built", func() {
+		// In the test environment there is no server CA certificate on disk,
+		// so building the checker fails; this must not be reported as a step-down.
+		stepDown, err := shouldStepDown(newCluster(true, 3), ourIdentity)
+		Expect(err).To(HaveOccurred())
+		Expect(stepDown).To(BeFalse())
+	})
+})
+
+// held reports whether the lease is held: taken by the run loop and not yielded
+// since.
+func (r *Runnable) held() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	select {
+	case <-r.heldCh:
+		return true
+	default:
+		return false
+	}
+}
+
+var _ = Describe("Runnable.Yield", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+	)
+
+	var (
+		kubeClient *fake.Clientset
+		r          *Runnable
+		hardStops  atomic.Int32
+		stopRun    func()
+	)
+
+	getLease := func(ctx context.Context) *coordinationv1.Lease {
+		lease, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		return lease
+	}
+
+	// A released lease, with this pod as the target: the run loop claims it on
+	// its first poll.
+	BeforeEach(func() {
+		kubeClient = fake.NewClientset(&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: ptr.To("")},
+		})
+		instance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName)
+		instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: thisPod}})
+		r = New(kubeClient, instance)
+		r.config.RetryPeriod = 10 * time.Millisecond
+		r.config.RenewDeadline = 50 * time.Millisecond
+		r.config.LeaseDuration = 200 * time.Millisecond
+		// Any stale lease is a step-down; only a running monitor can get here.
+		r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) { return true, nil }
+		hardStops.Store(0)
+		r.hardStop = func() { hardStops.Add(1) }
+
+		// Not the node's ctx: Ginkgo cancels that one when BeforeEach returns,
+		// and the loop has to outlive it.
+		runCtx, cancelRun := context.WithCancel(context.Background())
+		returned := make(chan struct{})
+		go func(r *Runnable) {
+			defer GinkgoRecover()
+			defer close(returned)
+			Expect(r.Start(runCtx)).To(Succeed())
+		}(r)
+		stopRun = func() {
+			cancelRun()
+			Eventually(returned).Should(BeClosed())
+		}
+		DeferCleanup(func() { stopRun() })
+	})
+
+	It("stops renewing without writing, and renews again only after the next Acquire", func(ctx context.Context) {
+		Expect(r.Acquire(ctx, r.config)).To(Succeed())
+		r.Yield(ctx)
+		Expect(r.held()).To(BeFalse())
+
+		// At most the write in flight at the Yield still lands: over the
+		// window the RenewTime changes once at most, then the record keeps
+		// naming this pod unchanged, so the new target sees it go stale.
+		seen := map[time.Time]struct{}{}
+		Consistently(func() int {
+			seen[getLease(ctx).Spec.RenewTime.Time] = struct{}{}
+			return len(seen)
+		}, r.config.LeaseDuration+r.config.RenewDeadline).Should(BeNumerically("<=", 2))
+		Expect(ptr.Deref(getLease(ctx).Spec.HolderIdentity, "")).To(Equal(thisPod))
+		Expect(r.held()).To(BeFalse())
+
+		renewedAt := getLease(ctx).Spec.RenewTime
+		acquireCtx, cancel := context.WithTimeout(ctx, 3*r.config.LeaseDuration)
+		defer cancel()
+		Expect(r.Acquire(acquireCtx, r.config)).To(Succeed())
+		Expect(ptr.Deref(getLease(ctx).Spec.HolderIdentity, "")).To(Equal(thisPod))
+		Expect(getLease(ctx).Spec.RenewTime.After(renewedAt.Time)).To(BeTrue())
+	})
+
+	It("leaves a hold that is being taken unpublished when the yield comes in during the write",
+		func(ctx context.Context) {
+			kubeClient.PrependReactor("update", "leases",
+				func(k8stesting.Action) (bool, runtime.Object, error) {
+					r.Yield(ctx)
+					return false, nil, nil
+				})
+			acquireCtx, cancel := context.WithTimeout(ctx, 3*r.config.LeaseDuration)
+			defer cancel()
+			Expect(r.Acquire(acquireCtx, r.config)).To(MatchError(context.DeadlineExceeded))
+			Expect(ptr.Deref(getLease(ctx).Spec.HolderIdentity, "")).To(Equal(thisPod))
+			Consistently(hardStops.Load, r.config.LeaseDuration).Should(BeZero())
+		})
+
+	It("does not blank the record at process exit, so the new target waits the full window",
+		func(ctx context.Context) {
+			Expect(r.Acquire(ctx, r.config)).To(Succeed())
+			r.Yield(ctx)
+			// As in cmd.go, Release runs once the runnables have stopped.
+			stopRun()
+			Expect(r.Release(ctx)).To(Succeed())
+			Expect(ptr.Deref(getLease(ctx).Spec.HolderIdentity, "")).To(Equal(thisPod))
+		})
+
+	It("lets the new target take the lease over, and never writes it again", func(ctx context.Context) {
+		const newTarget = "test-cluster-3"
+		Expect(r.Acquire(ctx, r.config)).To(Succeed())
+
+		// A second instance manager, on the same lease.
+		other := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(newTarget).
+			WithClusterName(clusterName)
+		r3 := New(kubeClient, other)
+		r3.config = r.config
+		r3.checkStepDown = r.checkStepDown
+		r3.hardStop = r.hardStop
+		runCtx, cancelRun := context.WithCancel(context.Background())
+		returned := make(chan struct{})
+		go func() {
+			defer GinkgoRecover()
+			defer close(returned)
+			Expect(r3.Start(runCtx)).To(Succeed())
+		}()
+		DeferCleanup(func() {
+			cancelRun()
+			Eventually(returned).Should(BeClosed())
+		})
+
+		// The operator names the other pod as target; both reconcilers see it.
+		target := &apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: newTarget}}
+		r.instance.SetCluster(target)
+		other.SetCluster(target)
+		r.Yield(ctx)
+
+		acquireCtx, cancel := context.WithTimeout(ctx, 3*r.config.LeaseDuration)
+		defer cancel()
+		Expect(r3.Acquire(acquireCtx, r3.config)).To(Succeed())
+		Expect(ptr.Deref(getLease(ctx).Spec.HolderIdentity, "")).To(Equal(newTarget))
+
+		// The yielded pod polls on but never writes: the holder stays the
+		// new target, which renews it.
+		Consistently(func() string {
+			return ptr.Deref(getLease(ctx).Spec.HolderIdentity, "")
+		}, 2*r.config.LeaseDuration).Should(Equal(newTarget))
+		Expect(r.held()).To(BeFalse())
+		Expect(hardStops.Load()).To(BeZero())
+	})
+
+	It("does not claim the lease when the Yield comes during the take-over read", func(ctx context.Context) {
+		// The read can take up to RenewDeadline; the write that follows it
+		// must still honour a Yield that came meanwhile.
+		reading := make(chan struct{})
+		release := make(chan struct{})
+		var blocked atomic.Bool
+		kubeClient.PrependReactor("get", "leases",
+			func(k8stesting.Action) (bool, runtime.Object, error) {
+				if blocked.CompareAndSwap(false, true) {
+					close(reading)
+					<-release
+				}
+				return false, nil, nil
+			})
+		acquireCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		go func() {
+			defer GinkgoRecover()
+			_ = r.Acquire(acquireCtx, r.config)
+		}()
+
+		Eventually(reading).Should(BeClosed())
+		r.Yield(ctx)
+		close(release)
+
+		Consistently(func() string {
+			return ptr.Deref(getLease(ctx).Spec.HolderIdentity, "")
+		}, r.config.LeaseDuration).Should(BeEmpty())
+	})
+
+	It("stops the monitor of a hold that survived a transient renewal failure", func(ctx context.Context) {
+		// A renewal loop that gives up and is re-entered is the same hold, so
+		// the monitor Yield stops must still be the one watching it.
+		r.config.RenewDeadline = 300 * time.Millisecond
+		r.config.LeaseDuration = 2 * time.Second
+		var rejectWrites atomic.Bool
+		kubeClient.PrependReactor("update", "leases",
+			func(k8stesting.Action) (bool, runtime.Object, error) {
+				if rejectWrites.Load() {
+					return true, nil, apierrors.NewInternalError(errors.New("api server down"))
+				}
+				return false, nil, nil
+			})
+		Expect(r.Acquire(ctx, r.config)).To(Succeed())
+		// The renewal loop only gives up once it is renewing: its first write
+		// is an acquire, which it retries for as long as it takes.
+		renewedAt := getLease(ctx).Spec.RenewTime
+		Eventually(func() bool {
+			return getLease(ctx).Spec.RenewTime.After(renewedAt.Time)
+		}).Should(BeTrue())
+
+		// Long enough for the renewal loop to give up, then let it renew again:
+		// once from the take-over poll, then from the re-entered renewal loop.
+		rejectWrites.Store(true)
+		time.Sleep(2 * r.config.RenewDeadline)
+		rejectWrites.Store(false)
+		seen := map[time.Time]struct{}{}
+		Eventually(func() int {
+			seen[getLease(ctx).Spec.RenewTime.Time] = struct{}{}
+			return len(seen)
+		}).Should(BeNumerically(">=", 3))
+
+		r.Yield(ctx)
+		Consistently(hardStops.Load, r.config.LeaseDuration+r.config.RenewDeadline).Should(BeZero())
 	})
 })

@@ -28,7 +28,9 @@ import (
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -65,13 +67,16 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			"querying the %s table in the %s database defined by postInit SQL",
 			tableName, dbName,
 		), func() {
-			stdout, _, err := exec.QueryInInstancePod(
+			stdout, _, err := exec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   primary.Name,
 				}, dbName,
-				query)
+				query,
+				environment.RetryTimeout,
+				objects.PollingTime,
+			)
 			Expect(err).ToNot(HaveOccurred())
 			nRows, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
 			Expect(nRows, atoiErr).To(BeEquivalentTo(expectedCount))
@@ -138,13 +143,16 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := exec.EventuallyExecQueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "postgres",
-					"select datcollate from pg_catalog.pg_database where datname='template0'")
+					"select datcollate from pg_catalog.pg_database where datname='template0'",
+					environment.RetryTimeout,
+					objects.PollingTime,
+				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("C\n"))
 			})
@@ -180,13 +188,14 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			// function has been invoked in the application database. The query
 			// is fully schema-qualified so it cannot itself trigger the shadow.
 			shadowCalls := func() string {
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := exec.EventuallyExecQueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "app",
-					"SELECT pg_catalog.count(*)::text FROM public.shadow_calls")
+					"SELECT pg_catalog.count(*)::text FROM public.shadow_calls",
+					RetryTimeout, PollingTime)
 				Expect(err).ToNot(HaveOccurred())
 				return strings.TrimSpace(stdout)
 			}
@@ -246,13 +255,16 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := exec.EventuallyExecQueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "postgres",
-					"select datcollate from pg_catalog.pg_database where datname='template0'")
+					"select datcollate from pg_catalog.pg_database where datname='template0'",
+					environment.RetryTimeout,
+					objects.PollingTime,
+				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(strings.TrimSpace(stdout), err).To(Equal("C"))
 			})

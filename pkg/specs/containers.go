@@ -41,7 +41,10 @@ func createBootstrapContainer(cluster apiv1.Cluster, extensions []apiv1.Extensio
 			"bootstrap",
 			"/controller/manager",
 		},
-		VolumeMounts:    CreatePostgresVolumeMounts(cluster, extensions),
+		VolumeMounts: CreatePostgresVolumeMounts(VolumeMountsConfig{
+			Cluster:    cluster,
+			Extensions: extensions,
+		}),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: GetSecurityContext(&cluster),
 	}

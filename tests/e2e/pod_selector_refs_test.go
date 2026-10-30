@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +31,7 @@ import (
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -61,7 +61,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "pod-selector-refs-e2e")
 			Expect(err).ToNot(HaveOccurred())
 
-			storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+			storageClass := env.DefaultStorageClass
 			Expect(storageClass).ToNot(BeEmpty())
 
 			cluster := &apiv1.Cluster{
@@ -96,7 +96,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 					},
 				},
 			}
-			err = env.Client.Create(env.Ctx, cluster)
+			_, err = objects.Create(env.Ctx, env.Client, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
@@ -224,7 +224,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 
 		It("updates pg_hba when podSelectorRefs are added to an existing cluster", func() {
 			By("removing existing podSelectorRefs and pg_hba rules", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return err
@@ -245,7 +245,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 			})
 
 			By("re-adding podSelectorRefs with a new pg_hba rule", func() {
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return err

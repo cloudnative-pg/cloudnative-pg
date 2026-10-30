@@ -46,7 +46,7 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 			},
 			Spec: apiv1.PoolerSpec{
 				Monitoring: &apiv1.PoolerMonitoringConfiguration{
-					EnablePodMonitor: false,
+					EnablePodMonitor: false, //nolint:staticcheck
 				},
 			},
 		}

@@ -360,7 +360,7 @@ _Appears in:_
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 | `options` _string array_ | The list of options that must be passed to initdb when creating the cluster.<br />Deprecated: This could lead to inconsistent configurations,<br />please use the explicit provided parameters instead.<br />If defined, explicit values will be ignored. |  |  |  |
-| `dataChecksums` _boolean_ | Whether the `-k` option should be passed to initdb,<br />enabling checksums on data pages (default: `false`) |  |  |  |
+| `dataChecksums` _boolean_ | Whether data checksums are enabled on data pages, to help detect<br />corruption by the I/O system that would otherwise be silent<br />(default: `false` before PostgreSQL 18, `true` from PostgreSQL 18 on,<br />matching the initdb default in each case). |  |  |  |
 | `encoding` _string_ | The value to be passed as option `--encoding` for initdb (default:`UTF8`) |  |  |  |
 | `localeCollate` _string_ | The value to be passed as option `--lc-collate` for initdb (default:`C`) |  |  |  |
 | `localeCType` _string_ | The value to be passed as option `--lc-ctype` for initdb (default:`C`) |  |  |  |
@@ -398,6 +398,8 @@ _Appears in:_
 | `database` _string_ | Name of the database used by the application. Default: `app`. |  |  |  |
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
+| `additionalArgs` _string array_ | List of custom options to pass to the `pg_basebackup` command.<br />IMPORTANT: Use with caution. The operator rejects the options it relies on,<br />as listed in the bootstrap documentation, but it does not validate the<br />others, and some of them may still interfere with its intended<br />functionality or design.<br />You are responsible for ensuring that the provided options are compatible<br />with your environment and PostgreSQL version. |  |  |  |
+| `tablespaceMapping` _[TablespaceMappingEntry](#tablespacemappingentry) array_ | Maps each tablespace declared in `spec.tablespaces` to its location<br />in the source instance. |  |  |  |
 
 
 #### BootstrapRecovery
@@ -650,6 +652,7 @@ _Appears in:_
 | `stopDelay` _integer_ | The time in seconds that is allowed for a PostgreSQL instance to<br />gracefully shutdown (default 1800) |  | 1800 |  |
 | `smartShutdownTimeout` _integer_ | The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.<br />Make sure you reserve enough time for the operator to request a fast shutdown of Postgres<br />(that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds. |  | 180 |  |
 | `switchoverDelay` _integer_ | The time in seconds that is allowed for a primary PostgreSQL instance<br />to gracefully shutdown during a switchover.<br />Default value is 3600 seconds (1 hour). |  | 3600 |  |
+| `immediateShutdownTimeout` _integer_ | The time in seconds that is allowed for a PostgreSQL instance to stop<br />after an immediate shutdown request (used, for example, when a primary<br />must step down and cannot wait for a graceful shutdown). Once this time<br />has passed with PostgreSQL still running, the instance is considered<br />unresponsive. Default value is 30 seconds. |  | 30 |  |
 | `failoverDelay` _integer_ | The amount of time (in seconds) to wait before triggering a failover<br />after the primary PostgreSQL instance in the cluster was detected<br />to be unhealthy |  | 0 |  |
 | `livenessProbeTimeout` _integer_ | LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance<br />to successfully respond to the liveness probe (default 30).<br />The Liveness probe failure threshold is derived from this value using the formula:<br />ceiling(livenessProbe / 10). |  |  |  |
 | `affinity` _[AffinityConfiguration](#affinityconfiguration)_ | Affinity/Anti-affinity rules for Pods |  |  |  |
@@ -984,7 +987,7 @@ _Appears in:_
 | `ensure` _[EnsureOption](#ensureoption)_ | Ensure the role is `present` or `absent` - defaults to "present" |  | present | Enum: [present absent] <br /> |
 | `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present).<br />If null, the password will be ignored unless DisablePassword is set.<br />When set, the secret must follow the `kubernetes.io/basic-auth` format<br />and contain both a `username` and a `password` field. |  |  |  |
 | `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
-| `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
+| `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default).<br />On a `DatabaseRole` whose password the operator generates with a<br />`password.duration`, this is controlled by the operator instead: the role<br />is valid until the generated password expires, and setting `validUntil`<br />explicitly is rejected. |  |  |  |
 | `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty.<br />Changes to the list are applied to an existing role through<br />`GRANT` and `REVOKE` statements, not only at role creation. |  |  |  |
 | `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Default is `true`. |  | true |  |
 | `disablePassword` _boolean_ | DisablePassword indicates that a role's password should be set to NULL in Postgres |  |  |  |
@@ -997,6 +1000,7 @@ _Appears in:_
 | `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
 | `databaseRoleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
 | `clientCertificate` _[ClientCertificateConfiguration](#clientcertificateconfiguration)_ | ClientCertificate configures the operator to generate and renew a TLS client<br />certificate for this role, signed by the cluster's client CA. The certificate<br />is stored in a Secret named `<databaserole-name>-client-cert`.<br />Requires login to be true. |  |  |  |
+| `password` _[PasswordConfiguration](#passwordconfiguration)_ | Password configures how the operator manages the password of this role,<br />instead of requiring a pre-existing Secret through `passwordSecret` or<br />disabling it through `disablePassword`. Mutually exclusive with both. |  |  |  |
 
 
 #### DatabaseRoleStatus
@@ -1018,6 +1022,7 @@ _Appears in:_
 | `message` _string_ | Message is the reconciliation error message |  |  |  |
 | `secretResourceVersion` _string_ | SecretResourceVersion is the resource version of the password secret<br />last applied to the role; a change to it triggers reconciliation. |  |  |  |
 | `clientCertificate` _[ClientCertificateState](#clientcertificatestate)_ | ClientCertificate holds the observed state of the generated TLS client<br />certificate, when client certificate issuance is enabled. |  |  |  |
+| `password` _[GeneratedPasswordState](#generatedpasswordstate)_ | Password holds the observed state of the generated password, when password<br />generation is enabled. |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for the DatabaseRole object |  |  |  |
 
 
@@ -1304,6 +1309,28 @@ _Appears in:_
 | `primary` _string_ | Primary is the name of the primary instance that updated<br />this object the latest time. |  |  |  |
 
 
+#### GeneratedPasswordState
+
+
+
+GeneratedPasswordState holds the observed state of the generated password.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleStatus](#databaserolestatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `secretName` _string_ | SecretName is the name of the Secret the password was generated into. The<br />operator records it to recognize the Secret as its own once the role stops<br />generating a password, or starts generating it somewhere else, and delete<br />what it left behind. |  |  |  |
+| `issuedAt` _string_ | IssuedAt is the time the current generated password was issued, in RFC3339<br />format. The expiration and rotation deadline are derived from it and the<br />role's current duration/renewBefore, recomputed on every reconciliation. |  |  |  |
+| `expiration` _string_ | Expiration is the time at which the generated password is considered<br />expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of<br />that. It is empty when rotation is not enabled. |  |  |  |
+| `pendingRevocation` _boolean_ | PendingRevocation is set by the operator when it deleted the Secret<br />holding a password it had generated, and the role stopped managing the<br />password instead of replacing it: the password is still set on the role<br />in PostgreSQL and nothing can read it any more, so it has to be set to<br />NULL. The instance manager clears it once it has done so. |  |  |  |
+| `appliedExpiration` _string_ | AppliedExpiration is the expiration last applied to the role as its<br />VALID UNTIL, in RFC3339 format. Written by the instance manager, not the<br />operator, and used to tell whether the role still needs to be applied<br />after `expiration` moved without the password Secret changing. |  |  |  |
+| `message` _string_ | Message contains a human-readable explanation of the current password<br />status, such as why generation was skipped or why an existing Secret was<br />left untouched. |  |  |  |
+
+
 
 
 
@@ -1491,8 +1518,8 @@ _Appears in:_
 
 
 
-IsolationCheckConfiguration contains the configuration for the isolation check
-functionality in the liveness probe
+IsolationCheckConfiguration contains the configuration for the primary
+isolation check
 
 
 
@@ -1502,7 +1529,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `enabled` _boolean_ | Whether primary isolation checking is enabled for the liveness probe |  | true |  |
+| `enabled` _boolean_ | Whether primary isolation checking is enabled |  | true |  |
 | `requestTimeout` _integer_ | Timeout in milliseconds for requests during the primary isolation check |  | 1000 |  |
 | `connectionTimeout` _integer_ | Timeout in milliseconds for connections during the primary isolation check |  | 1000 |  |
 
@@ -1610,7 +1637,7 @@ _Appears in:_
 | `successThreshold` _integer_ | Minimum consecutive successes for the probe to be considered successful after having failed.<br />Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1. |  |  |  |
 | `failureThreshold` _integer_ | Minimum consecutive failures for the probe to be considered failed after having succeeded.<br />Defaults to 3. Minimum value is 1. |  |  |  |
 | `terminationGracePeriodSeconds` _integer_ | Optional duration in seconds the pod needs to terminate gracefully upon probe failure.<br />The grace period is the duration in seconds after the processes running in the pod are sent<br />a termination signal and the time when the processes are forcibly halted with a kill signal.<br />Set this value longer than the expected cleanup time for your process.<br />If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this<br />value overrides the value provided by the pod spec.<br />Value must be non-negative integer. The value zero indicates stop immediately via<br />the kill signal (no opportunity to shut down).<br />This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.<br />Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset. |  |  |  |
-| `isolationCheck` _[IsolationCheckConfiguration](#isolationcheckconfiguration)_ | Configure the feature that extends the liveness probe for a primary<br />instance. In addition to the basic checks, this verifies whether the<br />primary is isolated from the Kubernetes API server and from its<br />replicas, ensuring that it can be safely shut down if network<br />partition or API unavailability is detected. Enabled by default. |  |  |  |
+| `isolationCheck` _[IsolationCheckConfiguration](#isolationcheckconfiguration)_ | Configure the primary isolation check, which stops a primary whose<br />primary lease has gone past its renew deadline without a successful<br />renewal, when at least one other instance is unreachable or names a<br />different target primary, so that it stops accepting writes it can no<br />longer safely serve. Its reaction time is set by the `primaryLease`<br />timings and by `requestTimeout`, not by the liveness probe settings this<br />stanza lives under. Enabled by default. |  |  |  |
 
 
 
@@ -1802,6 +1829,75 @@ _Appears in:_
 | `ensure` _[EnsureOption](#ensureoption)_ | Specifies whether an option should be present or absent in<br />the database. If set to `present`, the option will be<br />created if it does not exist. If set to `absent`, the<br />option will be removed if it exists. |  | present | Enum: [present absent] <br /> |
 
 
+#### PasswordConfiguration
+
+
+
+PasswordConfiguration configures how the operator manages the password of a
+DatabaseRole.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleSpec](#databaserolespec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `mode` _[PasswordMode](#passwordmode)_ | Mode governs how the operator manages the password of this role, and is<br />required whenever the `password` stanza is present: `generate` generates<br />and rotates a password kept in a Secret the operator owns; `secret`<br />reads the password from an existing Secret named by `secret`, without<br />generating or owning one; `external` stops managing it, deleting any<br />Secret previously generated and setting the password it held to NULL,<br />while leaving a password it never generated untouched; `setNull` sets the<br />password of the role to NULL in PostgreSQL, disabling password<br />authentication for it. It has no default, since asking for a password<br />without saying how it is managed is ambiguous, and cannot be removed<br />once set: the mode always has to say what happens to the password. | True |  | Enum: [generate secret external setNull] <br /> |
+| `secret` _string_ | Secret is the name of the Secret holding the password of this role: the<br />one the operator generates into and never overwrites if it does not own<br />(when `mode` is `generate`, defaulting to `<databaserole-name>-password`),<br />or an existing one to read the password from, required and never written<br />to (when `mode` is `secret`). Only meaningful in those two modes. |  |  |  |
+| `duration` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | Duration is the lifetime of the generated password, at least one minute:<br />once it is reached, minus `renewBefore`, the operator generates a new<br />password and applies it to the role. When unset, the password is generated<br />once and never rotated. Only allowed when `mode` is `generate`, since<br />nothing else here rotates a password. |  |  |  |
+| `renewBefore` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RenewBefore is how long before the end of its lifetime the password is<br />rotated. Only meaningful together with `duration`, and it must be at most<br />half of it, so that the password is not due for rotation as soon as it is<br />generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting<br />(7 days), capped at half of the lifetime. Only allowed when `mode` is<br />`generate`, since nothing else here rotates a password. |  |  |  |
+| `criteria` _[PasswordCriteria](#passwordcriteria)_ | Criteria constrains the generated password. Only meaningful when `mode`<br />is `generate`. |  |  |  |
+
+
+#### PasswordCriteria
+
+
+
+PasswordCriteria describes the shape of a generated password.
+
+Unless `allowRepeat` is set, every character of the password is drawn from a
+different one of the 52 letters, 10 digits and (by default) 30 symbols the
+generator knows: criteria asking for more than are available can never be
+satisfied, and are rejected here rather than failing at generation time.
+
+
+
+_Appears in:_
+
+- [PasswordConfiguration](#passwordconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `length` _integer_ | Length of the generated password. |  | 24 | Maximum: 1024 <br />Minimum: 8 <br /> |
+| `digits` _integer_ | Digits is the number of digits in the generated password. Defaults to 25%<br />of its length, and never to more than 10: unless `allowRepeat` is set, the<br />generator cannot use the same digit twice. |  |  | Minimum: 0 <br /> |
+| `symbols` _integer_ | Symbols is the number of symbol characters in the generated password.<br />Defaults to 0. |  |  | Minimum: 0 <br /> |
+| `symbolCharacters` _string_ | SymbolCharacters is the set of symbols the generated password can draw<br />from. Defaults to the symbols of the generator (``~!@#$%^&*()_+`-=\{\}\|[]\:"<>?,./``).<br />Only ASCII punctuation is accepted: a letter or a digit here would collide<br />with the rest of the password when `allowRepeat` is not set, and whitespace<br />would be trimmed away before the password is applied to the role. |  |  | MinLength: 1 <br />Pattern: `^[\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$` <br /> |
+| `noUpper` _boolean_ | NoUpper disables uppercase characters in the generated password. |  |  |  |
+| `allowRepeat` _boolean_ | AllowRepeat allows the same character to appear more than once in the<br />generated password. |  |  |  |
+
+
+#### PasswordMode
+
+_Underlying type:_ _string_
+
+PasswordMode governs how the operator manages the password of a DatabaseRole.
+
+
+
+_Appears in:_
+
+- [PasswordConfiguration](#passwordconfiguration)
+
+| Field | Description |
+| --- | --- |
+| `generate` | PasswordModeGenerate makes the operator generate the password of the role<br />and keep it in a Secret it owns, rotating it when a lifetime is requested.<br /> |
+| `secret` | PasswordModeSecret makes the operator read the password of the role from<br />an existing Secret named by `secret`, instead of generating one: the<br />Secret is not owned by the role, and the operator never writes to it.<br /> |
+| `external` | PasswordModeExternal stops the operator from managing the password: the<br />password set on the role in PostgreSQL is left untouched, as if managed<br />by something else. A password the operator had generated is the one<br />exception: its Secret is deleted, so nothing could read that password<br />any more, and it is set to NULL once before the role is left alone.<br /> |
+| `setNull` | PasswordModeSetNull makes the operator set the password of the role to<br />NULL in PostgreSQL, disabling password authentication for it.<br /> |
+
+
 #### PasswordState
 
 
@@ -1942,6 +2038,7 @@ _Appears in:_
 | `walCapabilities` _string array_ | WALCapabilities are the list of capabilities of the<br />plugin regarding the WAL management |  |  |  |
 | `backupCapabilities` _string array_ | BackupCapabilities are the list of capabilities of the<br />plugin regarding the Backup management |  |  |  |
 | `restoreJobHookCapabilities` _string array_ | RestoreJobHookCapabilities are the list of capabilities of the<br />plugin regarding the RestoreJobHook management |  |  |  |
+| `postgresCapabilities` _string array_ | PostgresCapabilities are the list of capabilities of the<br />plugin regarding the PostgreSQL configuration |  |  |  |
 | `status` _string_ | Status contain the status reported by the plugin through the SetStatusInCluster interface |  |  |  |
 
 
@@ -2669,7 +2766,7 @@ _Appears in:_
 | `ensure` _[EnsureOption](#ensureoption)_ | Ensure the role is `present` or `absent` - defaults to "present" |  | present | Enum: [present absent] <br /> |
 | `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present).<br />If null, the password will be ignored unless DisablePassword is set.<br />When set, the secret must follow the `kubernetes.io/basic-auth` format<br />and contain both a `username` and a `password` field. |  |  |  |
 | `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
-| `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
+| `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default).<br />On a `DatabaseRole` whose password the operator generates with a<br />`password.duration`, this is controlled by the operator instead: the role<br />is valid until the generated password expires, and setting `validUntil`<br />explicitly is rejected. |  |  |  |
 | `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty.<br />Changes to the list are applied to an existing role through<br />`GRANT` and `REVOKE` statements, not only at role creation. |  |  |  |
 | `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Default is `true`. |  | true |  |
 | `disablePassword` _boolean_ | DisablePassword indicates that a role's password should be set to NULL in Postgres |  |  |  |
@@ -3178,6 +3275,8 @@ _Appears in:_
 | `standbyNamesPost` _string array_ | A user-defined list of application names to be added to<br />`synchronous_standby_names` after local cluster pods (the order is<br />only useful for priority-based synchronous replication). |  |  |  |
 | `dataDurability` _[DataDurabilityLevel](#datadurabilitylevel)_ | If set to "required", data durability is strictly enforced. Write operations<br />with synchronous commit settings (`on`, `remote_write`, or `remote_apply`) will<br />block if there are insufficient healthy replicas, ensuring data persistence.<br />If set to "preferred", data durability is maintained when healthy replicas<br />are available, but the required number of instances will adjust dynamically<br />if replicas become unavailable. This setting relaxes strict durability enforcement<br />to allow for operational continuity. This setting is only applicable if both<br />`standbyNamesPre` and `standbyNamesPost` are unset (empty). |  |  | Enum: [required preferred] <br /> |
 | `failoverQuorum` _boolean_ | FailoverQuorum enables a quorum-based check before failover, improving<br />data durability and safety during failover events in CloudNativePG-managed<br />PostgreSQL clusters. |  |  |  |
+| `podFailureDomainKeys` _string array_ | PodFailureDomainKeys is a list of Pod label keys used to define failure<br />domains. The values are read exclusively from the labels of each<br />instance Pod: a listed label that is not present on the Pod makes the<br />whole topology extraction fail, so that the constraint is not applied,<br />and the Node hosting the Pod is never consulted. When<br />set, the operator selects synchronous replicas from instances whose<br />label values differ from the primary's for all the specified keys, so<br />that synchronous replication spans failure domains such as availability<br />zones or regions. Starting from Kubernetes 1.35, the<br />`topology.kubernetes.io/zone` and `topology.kubernetes.io/region`<br />labels are automatically copied from the Node onto each Pod at<br />scheduling time.<br />When the replicas in failure domains different from the primary's are<br />not enough to satisfy the configured number of synchronous standbys,<br />the constraint is not applied and synchronous replicas are selected as<br />if this field were not set.<br />Mutually exclusive with `nodeFailureDomainKeys`. |  |  |  |
+| `nodeFailureDomainKeys` _string array_ | NodeFailureDomainKeys is a list of Node label keys used to define<br />failure domains. The values are read exclusively from the labels of the<br />Node hosting each instance Pod: when a Node cannot be found (for<br />example, drained or deleted after the Pod was scheduled), the whole<br />topology extraction fails and the constraint is not applied. When set,<br />the operator selects synchronous replicas from instances running on<br />nodes whose label values differ from the primary's node for all the<br />specified keys, so that synchronous replication spans failure domains<br />such as availability zones or regions.<br />When the replicas in failure domains different from the primary's are<br />not enough to satisfy the configured number of synchronous standbys,<br />the constraint is not applied and synchronous replicas are selected as<br />if this field were not set.<br />Mutually exclusive with `podFailureDomainKeys`. |  |  |  |
 
 
 #### SynchronousReplicaConfigurationMethod
@@ -3214,6 +3313,26 @@ _Appears in:_
 | `storage` _[StorageConfiguration](#storageconfiguration)_ | The storage configuration for the tablespace | True |  |  |
 | `owner` _[DatabaseRoleRef](#databaseroleref)_ | Owner is the PostgreSQL user owning the tablespace |  |  |  |
 | `temporary` _boolean_ | When set to true, the tablespace will be added as a `temp_tablespaces`<br />entry in PostgreSQL, and will be available to automatically house temp<br />database objects, or other temporary files. Please refer to PostgreSQL<br />documentation for more information on the `temp_tablespaces` GUC. |  | false |  |
+
+
+#### TablespaceMappingEntry
+
+
+
+TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+location of the same tablespace in the source instance of a `pg_basebackup`
+bootstrap.
+
+
+
+_Appears in:_
+
+- [BootstrapPgBaseBackup](#bootstrappgbasebackup)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the tablespace, as declared in `spec.tablespaces`. | True |  | MinLength: 1 <br /> |
+| `sourceLocation` _string_ | Absolute path of the tablespace in the source instance. It must not<br />contain the `=` or `\` characters and must be unique among the entries. | True |  | MinLength: 1 <br /> |
 
 
 #### TablespaceState

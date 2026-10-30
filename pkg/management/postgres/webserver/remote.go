@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/watchdog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
@@ -138,6 +139,7 @@ func NewRemoteWebServer(
 	instance *postgres.Instance,
 	cancelFunc context.CancelFunc,
 	exitedConditions concurrency.MultipleExecuted,
+	leaseWatchdog *watchdog.LeaseWatchdog,
 ) (*Webserver, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
@@ -153,7 +155,7 @@ func NewRemoteWebServer(
 	endpoints := remoteWebserverEndpoints{
 		typedClient:      typedClient,
 		instance:         instance,
-		livenessChecker:  probes.NewLivenessChecker(instance, sharedCache),
+		livenessChecker:  probes.NewLivenessChecker(instance, leaseWatchdog),
 		readinessChecker: probes.NewReadinessChecker(instance, sharedCache),
 		startupChecker:   probes.NewStartupChecker(instance, sharedCache),
 	}
@@ -188,10 +190,7 @@ func NewRemoteWebServer(
 		Handler:           serveMux,
 		ReadTimeout:       DefaultReadTimeout,
 		ReadHeaderTimeout: DefaultReadHeaderTimeout,
-	}
-
-	if instance.StatusPortTLS {
-		server.TLSConfig = &tls.Config{
+		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS13,
 			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				return instance.GetServerCertificate(), nil
@@ -199,7 +198,7 @@ func NewRemoteWebServer(
 			// RequestClientCert asks the client to send a certificate but does not require it.
 			// Authentication is enforced per-endpoint by withOperatorAuth.
 			ClientAuth: tls.RequestClientCert,
-		}
+		},
 	}
 
 	srv := NewWebServer(server)
@@ -298,7 +297,10 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 
 // This is the failsafe entrypoint
 func (ws *remoteWebserverEndpoints) failSafe(w http.ResponseWriter, _ *http.Request) {
-	_, _ = fmt.Fprint(w, "OK")
+	resp := url.FailSafeResponse{TargetPrimary: ws.instance.GetClusterOrDefault().Status.TargetPrimary}
+	if err := url.WriteFailSafe(w, resp); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // This is the liveness probe

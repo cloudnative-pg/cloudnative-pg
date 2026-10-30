@@ -242,6 +242,12 @@ var _ = Describe("Secrets", func() {
 						},
 					},
 				},
+				EndpointCA: &apiv1.SecretKeySelector{
+					LocalObjectReference: apiv1.LocalObjectReference{
+						Name: "backup-origin-endpoint-ca-test",
+					},
+					Key: "ca.crt",
+				},
 			},
 		}
 	})
@@ -280,6 +286,11 @@ var _ = Describe("Secrets", func() {
 		Expect(secrets).To(ConsistOf("test-secret", "test-access", "test-region", "test-session", "test-endpoint-ca-name"))
 	})
 
+	It("includes the backup origin's endpoint CA secret", func() {
+		secrets := backupSecrets(cluster, backup)
+		Expect(secrets).To(ContainElement("backup-origin-endpoint-ca-test"))
+	})
+
 	It("should contain default secrets only", func() {
 		Expect(getInvolvedSecretNames(RoleOptions{Cluster: cluster})).To(Equal([]string{
 			"thisTest-app",
@@ -294,6 +305,7 @@ var _ = Describe("Secrets", func() {
 		Expect(getInvolvedSecretNames(RoleOptions{Cluster: cluster, BackupOrigin: backup})).To(Equal([]string{
 			"aws-status-secret-test",
 			"azure-storage-key-secret-test",
+			"backup-origin-endpoint-ca-test",
 			"google-application-secret-test",
 			"thisTest-app",
 			"thisTest-ca",
@@ -301,6 +313,25 @@ var _ = Describe("Secrets", func() {
 			"thisTest-server",
 			"thisTest-superuser",
 		}))
+	})
+
+	It("includes the recovery backup's direct endpoint CA secret", func() {
+		cluster.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+			Recovery: &apiv1.BootstrapRecovery{
+				Backup: &apiv1.BackupSource{
+					LocalObjectReference: apiv1.LocalObjectReference{Name: "some-backup"},
+					EndpointCA: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "recovery-backup-endpoint-ca-test",
+						},
+						Key: "ca.crt",
+					},
+				},
+			},
+		}
+
+		Expect(getInvolvedSecretNames(RoleOptions{Cluster: cluster})).To(
+			ContainElement("recovery-backup-endpoint-ca-test"))
 	})
 })
 
@@ -321,6 +352,24 @@ var _ = Describe("Database Roles", func() {
 				RoleConfiguration: apiv1.RoleConfiguration{
 					Name: "role6",
 				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "role7"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{
+					Name: "role7",
+				},
+				Password: &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "role8"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{
+					Name: "role8",
+				},
+				Password: &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate, Secret: "my_secret8"},
 			},
 		},
 	}
@@ -374,7 +423,10 @@ var _ = Describe("Database Roles", func() {
 				secretsPolicy = policy
 			}
 		}
-		Expect(secretsPolicy.ResourceNames).To(ContainElements("my_secret1", "my_secret3", "my_secret5"))
+		// The instance manager needs to read the Secrets the operator generates
+		// too, or it cannot apply the password it did not choose.
+		Expect(secretsPolicy.ResourceNames).To(ContainElements(
+			"my_secret1", "my_secret3", "my_secret5", "role7-password", "my_secret8"))
 	})
 })
 

@@ -89,6 +89,95 @@ var _ = Describe("PVC detection", func() {
 	})
 })
 
+var _ = Describe("PVC classification with a bootstrap init container", func() {
+	clusterName := "myCluster"
+
+	podWithBootstrapInitContainer := func(serial string, terminatedExitCode *int32) corev1.Pod {
+		pod := makePod(clusterName, serial, specs.ClusterRoleLabelPrimary)
+		containerStatus := corev1.ContainerStatus{Name: specs.BootstrapWorkContainerName}
+		if terminatedExitCode != nil {
+			containerStatus.State = corev1.ContainerState{
+				Terminated: &corev1.ContainerStateTerminated{ExitCode: *terminatedExitCode},
+			}
+		}
+		pod.Status.InitContainerStatuses = []corev1.ContainerStatus{containerStatus}
+		return pod
+	}
+
+	It("classifies a PVC as initializing while its Pod's init container has not completed", func(ctx SpecContext) {
+		pvcs := []corev1.PersistentVolumeClaim{
+			makePVC(clusterName, "1", "1", NewPgDataCalculator(), false),
+		}
+		cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName}}
+
+		EnrichStatus(
+			ctx,
+			cluster,
+			[]corev1.Pod{podWithBootstrapInitContainer("1", nil)},
+			nil,
+			pvcs,
+		)
+
+		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{clusterName + "-1"}))
+		Expect(cluster.Status.HealthyPVC).Should(BeEmpty())
+	})
+
+	It("classifies a PVC as initializing while its Pod's bootstrap init container failed", func(ctx SpecContext) {
+		pvcs := []corev1.PersistentVolumeClaim{
+			makePVC(clusterName, "1", "1", NewPgDataCalculator(), false),
+		}
+		cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName}}
+
+		EnrichStatus(
+			ctx,
+			cluster,
+			[]corev1.Pod{podWithBootstrapInitContainer("1", ptr.To(int32(1)))},
+			nil,
+			pvcs,
+		)
+
+		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{clusterName + "-1"}))
+		Expect(cluster.Status.HealthyPVC).Should(BeEmpty())
+	})
+
+	It("classifies a PVC as healthy once its Pod's bootstrap init container succeeded", func(ctx SpecContext) {
+		pvcs := []corev1.PersistentVolumeClaim{
+			makePVC(clusterName, "1", "1", NewPgDataCalculator(), false),
+		}
+		cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName}}
+
+		EnrichStatus(
+			ctx,
+			cluster,
+			[]corev1.Pod{podWithBootstrapInitContainer("1", ptr.To(int32(0)))},
+			nil,
+			pvcs,
+		)
+
+		Expect(cluster.Status.HealthyPVC).Should(Equal([]string{clusterName + "-1"}))
+		Expect(cluster.Status.InitializingPVC).Should(BeEmpty())
+	})
+
+	It("classifies a PVC as healthy when its Pod has no bootstrap init container at all "+
+		"(reattaching an already-ready PVC)", func(ctx SpecContext) {
+		pvcs := []corev1.PersistentVolumeClaim{
+			makePVC(clusterName, "1", "1", NewPgDataCalculator(), false),
+		}
+		cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName}}
+
+		EnrichStatus(
+			ctx,
+			cluster,
+			[]corev1.Pod{makePod(clusterName, "1", specs.ClusterRoleLabelPrimary)},
+			nil,
+			pvcs,
+		)
+
+		Expect(cluster.Status.HealthyPVC).Should(Equal([]string{clusterName + "-1"}))
+		Expect(cluster.Status.InitializingPVC).Should(BeEmpty())
+	})
+})
+
 var _ = Describe("PVC classification with resizing PVCs", func() {
 	clusterName := "myCluster"
 	makeCluster := func() *apiv1.Cluster {

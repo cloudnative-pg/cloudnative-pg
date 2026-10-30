@@ -86,14 +86,14 @@ func PatchStatusCondition(
 ) error {
 	cluster := &apiv1.Cluster{}
 	var err error
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err = retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 		cluster, err = clusterutils.Get(ctx, crudClient, namespace, clusterName)
 		if err != nil {
 			return err
 		}
 		clusterNoConditions := cluster.DeepCopy()
 		clusterNoConditions.Status.Conditions = nil
-		return crudClient.Patch(ctx, clusterNoConditions, client.MergeFrom(cluster))
+		return objects.Patch(ctx, crudClient, clusterNoConditions, client.MergeFrom(cluster))
 	})
 	if err != nil {
 		return err
@@ -264,5 +264,5 @@ func UpgradeSubscription(
 		return err
 	}
 
-	return crudClient.Patch(ctx, newSubscription, client.MergeFrom(subscription))
+	return objects.Patch(ctx, crudClient, newSubscription, client.MergeFrom(subscription))
 }

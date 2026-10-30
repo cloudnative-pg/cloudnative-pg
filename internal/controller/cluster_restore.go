@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -65,6 +66,10 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 
 	if res, err := ensureClusterRestoreCanStart(ctx, r.Client, cluster); res != nil || err != nil {
 		return res, err
+	}
+
+	if err := ensureOrphanPrimaryLeaseIsDeleted(ctx, r.Client, cluster); err != nil {
+		return nil, fmt.Errorf("encountered an error while deleting an orphan primary lease: %w", err)
 	}
 
 	if err := ensureOrphanPodsAreDeleted(ctx, r.Client, cluster); err != nil {
@@ -302,6 +307,42 @@ func ensureOrphanPodsAreDeleted(ctx context.Context, c client.Client, cluster *a
 	return nil
 }
 
+// ensureOrphanPrimaryLeaseIsDeleted deletes the primary Lease left behind by
+// the previous cluster, if it has no owner. Like the orphan Pods, it belongs
+// to instances that no longer run, so nothing renews it. Adopting it would
+// make the new primary wait a lease duration, unless it is the old holder.
+// The cluster controller creates a new Lease once the restore completes.
+//
+// A Lease that has an owner, or one found outside this path, is left to
+// reconcilePrimaryLease, which adopts it or refuses it.
+func ensureOrphanPrimaryLeaseIsDeleted(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx).WithName("orphan_primary_lease_cleaner")
+
+	var leaseList coordinationv1.LeaseList
+	if err := c.List(
+		ctx,
+		&leaseList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{utils.ClusterLabelName: cluster.Name},
+	); err != nil {
+		return err
+	}
+
+	for idx := range leaseList.Items {
+		lease := leaseList.Items[idx]
+		if len(lease.OwnerReferences) != 0 {
+			continue
+		}
+
+		contextLogger.Info("Found an orphan primary lease, deleting it", "leaseName", lease.Name)
+		if err := c.Delete(ctx, &lease); err != nil && !apierrs.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // getNodeSerialsFromPVCs tries to obtain the highestSerial and the primary serial from a group of PVCs
 func getNodeSerialsFromPVCs(
 	pvcs []corev1.PersistentVolumeClaim,
@@ -376,27 +417,27 @@ func ensureInitContainersAreCompleted(
 		return nil, err
 	}
 
-	// Get all pods with non-sidecar init containers
-	podsWithInitContainers := getPodsWithNonSidecarInitContainers(podList)
-	if len(podsWithInitContainers) == 0 {
+	// Get all pods with foreign init containers
+	podsWithForeignInitContainers := getPodsWithForeignInitContainers(podList)
+	if len(podsWithForeignInitContainers) == 0 {
 		return nil, nil
 	}
 
 	// Check all pods and their init containers
-	for _, pod := range podsWithInitContainers {
-		// Check all non-sidecar init containers in this pod
-		nonSidecarStatuses := getNonSidecarInitContainerStatuses(
+	for _, pod := range podsWithForeignInitContainers {
+		// Check all foreign init containers in this pod
+		foreignStatuses := getForeignInitContainerStatuses(
 			pod.Status.InitContainerStatuses,
 			pod.Spec.InitContainers,
 		)
 
-		if len(nonSidecarStatuses) == 0 {
+		if len(foreignStatuses) == 0 {
 			contextLogger.Info("waiting for init containers to start", "podName", pod.Name)
 			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 
-		// Check if any non-sidecar init container is still running or hasn't started
-		for _, status := range nonSidecarStatuses {
+		// Check if any foreign init container is still running or hasn't started
+		for _, status := range foreignStatuses {
 			if status.State.Terminated == nil {
 				contextLogger.Info("init container running, waiting for completion",
 					"podName", pod.Name,
@@ -405,8 +446,8 @@ func ensureInitContainersAreCompleted(
 			}
 		}
 
-		// Check if any non-sidecar init container failed
-		for _, status := range nonSidecarStatuses {
+		// Check if any foreign init container failed
+		for _, status := range foreignStatuses {
 			if status.State.Terminated.ExitCode != 0 {
 				contextLogger.Info("init container failed",
 					"podName", pod.Name,
@@ -423,20 +464,20 @@ func ensureInitContainersAreCompleted(
 	return nil, nil
 }
 
-func getPodsWithNonSidecarInitContainers(podList corev1.PodList) []*corev1.Pod {
-	var podsWithInitContainers []*corev1.Pod
+func getPodsWithForeignInitContainers(podList corev1.PodList) []*corev1.Pod {
+	var podsWithForeignInitContainers []*corev1.Pod
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
-		if hasNonSidecarInitContainers(&pod) {
-			podsWithInitContainers = append(podsWithInitContainers, &pod)
+		if hasForeignInitContainers(&pod) {
+			podsWithForeignInitContainers = append(podsWithForeignInitContainers, &pod)
 		}
 	}
-	return podsWithInitContainers
+	return podsWithForeignInitContainers
 }
 
-func hasNonSidecarInitContainers(pod *corev1.Pod) bool {
+func hasForeignInitContainers(pod *corev1.Pod) bool {
 	for _, initContainer := range pod.Spec.InitContainers {
-		if isSidecarInitContainer(&initContainer) {
+		if !isForeignInitContainer(&initContainer) {
 			continue
 		}
 		return true
@@ -449,7 +490,24 @@ func isSidecarInitContainer(initContainer *corev1.Container) bool {
 	return initContainer.RestartPolicy != nil && *initContainer.RestartPolicy == corev1.ContainerRestartPolicyAlways
 }
 
-func getNonSidecarInitContainerStatuses(
+// isForeignInitContainer tells whether the restore gate has to wait for the
+// given init container. The gate exists for the init containers a backup tool
+// adds to copy the PVC content back before the Pod is replaced. Sidecars never
+// terminate, and the operator's own bootstrap init containers were baked into
+// the Pod when it was first created: on a restored Pod they rerun on a volume
+// that already holds live data and never complete. Neither is waited on.
+func isForeignInitContainer(initContainer *corev1.Container) bool {
+	if isSidecarInitContainer(initContainer) {
+		return false
+	}
+	switch initContainer.Name {
+	case specs.BootstrapControllerContainerName, specs.BootstrapWorkContainerName:
+		return false
+	}
+	return true
+}
+
+func getForeignInitContainerStatuses(
 	statuses []corev1.ContainerStatus,
 	initContainers []corev1.Container,
 ) []corev1.ContainerStatus {
@@ -459,8 +517,8 @@ func getNonSidecarInitContainerStatuses(
 		initContainerSpecMap[initContainers[i].Name] = &initContainers[i]
 	}
 
-	// Collect all non-sidecar init container statuses
-	nonSidecarStatuses := make([]corev1.ContainerStatus, 0, len(statuses))
+	// Collect all foreign init container statuses
+	foreignStatuses := make([]corev1.ContainerStatus, 0, len(statuses))
 	for i := range statuses {
 		status := statuses[i]
 		initContainerSpec, exists := initContainerSpecMap[status.Name]
@@ -468,10 +526,10 @@ func getNonSidecarInitContainerStatuses(
 			continue
 		}
 
-		if !isSidecarInitContainer(initContainerSpec) {
-			nonSidecarStatuses = append(nonSidecarStatuses, status)
+		if isForeignInitContainer(initContainerSpec) {
+			foreignStatuses = append(foreignStatuses, status)
 		}
 	}
 
-	return nonSidecarStatuses
+	return foreignStatuses
 }

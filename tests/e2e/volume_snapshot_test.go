@@ -22,7 +22,6 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
@@ -45,6 +45,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -80,7 +81,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 		updateClusterSnapshotClass := func(namespace, clusterName, className string) {
 			cluster := &apiv1.Cluster{}
-			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			err := retry.OnError(retry.DefaultBackoff, objects.IsRetryableConflictOrTransientError, func() error {
 				var err error
 				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
@@ -214,18 +215,15 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 
 			It("correctly executes PITR with a cold snapshot", func() {
-				DeferCleanup(func() error {
-					for _, envvar := range []string{
+				DeferCleanup(func() {
+					for _, templateVar := range []string{
 						snapshotDataEnv,
 						snapshotWalEnv,
 						recoveryTargetTimeEnv,
 						recoveryTargetTimeRFC3339Env,
 					} {
-						if err := os.Unsetenv(envvar); err != nil {
-							return err
-						}
+						config.UnsetTemplateVariable(templateVar)
 					}
-					return nil
 				})
 
 				By("creating the cluster to snapshot", func() {
@@ -284,11 +282,11 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-					envVars := storage.EnvVarsForSnapshots{
+					templateVars := storage.SnapshotTemplateVariables{
 						DataSnapshot: snapshotDataEnv,
 						WalSnapshot:  snapshotWalEnv,
 					}
-					err = storage.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
+					err = storage.SetSnapshotTemplateVariables(&snapshotList, backup, templateVars)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -312,12 +310,10 @@ var _ = Describe("Verify Volume Snapshot",
 						namespace, clusterToSnapshotName,
 					)
 					Expect(err).ToNot(HaveOccurred())
-					err = os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
-					Expect(err).ToNot(HaveOccurred())
+					config.SetTemplateVariable(recoveryTargetTimeEnv, recoveryTargetTime)
 
 					recoveryTargetTimeRFC3339 := time.Now().Format(time.RFC3339)
-					Expect(os.Setenv(recoveryTargetTimeRFC3339Env, recoveryTargetTimeRFC3339)).
-						To(Succeed())
+					config.SetTemplateVariable(recoveryTargetTimeRFC3339Env, recoveryTargetTimeRFC3339)
 
 					forward, conn, err := postgres.ForwardPSQLConnection(
 						env.Ctx,
@@ -447,8 +443,8 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() {
-					_ = os.Unsetenv(snapshotDataEnv)
-					_ = os.Unsetenv(snapshotWalEnv)
+					config.UnsetTemplateVariable(snapshotDataEnv)
+					config.UnsetTemplateVariable(snapshotWalEnv)
 				})
 				clusterToBackupName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
@@ -508,11 +504,11 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				snapshotList := getAndVerifySnapshots(clusterToBackup, backup)
-				envVars := storage.EnvVarsForSnapshots{
+				templateVars := storage.SnapshotTemplateVariables{
 					DataSnapshot: snapshotDataEnv,
 					WalSnapshot:  snapshotWalEnv,
 				}
-				err = storage.SetSnapshotNameAsEnv(&snapshotList, &backup, envVars)
+				err = storage.SetSnapshotTemplateVariables(&snapshotList, &backup, templateVars)
 				Expect(err).ToNot(HaveOccurred())
 
 				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterToRestoreFilePath)
@@ -589,7 +585,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 					updated := cluster.DeepCopy()
 					updated.Spec.Instances = 1
-					err = env.Client.Patch(env.Ctx, updated, k8client.MergeFrom(cluster))
+					err = objects.Patch(env.Ctx, env.Client, updated, k8client.MergeFrom(cluster))
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -725,12 +721,9 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 
 			It("should execute a backup with online set to true", func() {
-				DeferCleanup(func() error {
-					if err := os.Unsetenv(snapshotDataEnv); err != nil {
-						return err
-					}
-
-					return os.Unsetenv(snapshotWalEnv)
+				DeferCleanup(func() {
+					config.UnsetTemplateVariable(snapshotDataEnv)
+					config.UnsetTemplateVariable(snapshotWalEnv)
 				})
 
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
@@ -811,11 +804,11 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(len(backupTaken.Status.BackupSnapshotStatus.Elements)))
 
-					envVars := storage.EnvVarsForSnapshots{
+					templateVars := storage.SnapshotTemplateVariables{
 						DataSnapshot: snapshotDataEnv,
 						WalSnapshot:  snapshotWalEnv,
 					}
-					err = storage.SetSnapshotNameAsEnv(&snapshotList, backupTaken, envVars)
+					err = storage.SetSnapshotTemplateVariables(&snapshotList, backupTaken, templateVars)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -880,11 +873,11 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(len(backupTaken.Status.BackupSnapshotStatus.Elements)))
 
-					envVars := storage.EnvVarsForSnapshots{
+					templateVars := storage.SnapshotTemplateVariables{
 						DataSnapshot: snapshotDataEnv,
 						WalSnapshot:  snapshotWalEnv,
 					}
-					err = storage.SetSnapshotNameAsEnv(&snapshotList, backupTaken, envVars)
+					err = storage.SetSnapshotTemplateVariables(&snapshotList, backupTaken, templateVars)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -901,28 +894,39 @@ var _ = Describe("Verify Volume Snapshot",
 				By("checking the new replicas have been created using the snapshot", func() {
 					pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
 					Expect(err).ToNot(HaveOccurred())
+					matched := 0
 					for _, pvc := range pvcList.Items {
 						if pvc.Labels[utils.ClusterInstanceRoleLabelName] == specs.ClusterRoleLabelReplica &&
 							pvc.Labels[utils.ClusterLabelName] == clusterToSnapshotName {
 							Expect(pvc.Spec.DataSource.Kind).To(Equal(apiv1.VolumeSnapshotKind))
 							Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(apiv1.VolumeSnapshotKind))
+							matched++
 						}
 					}
+					// Each new replica has both a PGDATA and a WAL PVC (this
+					// cluster configures separate walStorage), so 2 replicas
+					// means 4 matching PVCs, not 2.
+					Expect(matched).To(Equal(4), "expected 4 replica PVCs (PGDATA + WAL, x2 replicas) provisioned from the snapshot")
 				})
 
-				// we need to verify the streaming replica continue works
+				// Query each replica pod directly: a cluster-wide service
+				// connection always resolves to the primary, and would not
+				// confirm that a specific replica has caught up.
 				By("verifying the correct data exists in the new pod of the scaled cluster", func() {
 					podList, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace,
 						clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(podList.Items).To(HaveLen(2))
-					tableLocator := pgasserts.TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToSnapshotName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    tableName,
+					query := fmt.Sprintf("SELECT count(*) FROM %s", tableName)
+					for _, pod := range podList.Items {
+						Eventually(func() (string, error) {
+							stdOut, _, err := exec.QueryInInstancePod(
+								env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+								exec.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
+								postgres.AppDBName, query)
+							return strings.TrimSpace(stdOut), err
+						}, RetryTimeout).Should(Equal("6"), "replica pod %s did not catch up", pod.Name)
 					}
-					pgasserts.AssertDataExpectedCount(env, tableLocator, 6)
 				})
 			})
 
@@ -939,6 +943,13 @@ var _ = Describe("Verify Volume Snapshot",
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: namespace,
 								Name:      backupName,
+								Annotations: map[string]string{
+									// This now retries like any other volume snapshot
+									// error (see handleSnapshotErrors), so shorten the
+									// deadline to keep the test fast instead of waiting
+									// out the 10-minute default.
+									utils.BackupVolumeSnapshotDeadlineAnnotationName: "1",
+								},
 							},
 							Spec: apiv1.BackupSpec{
 								Target:  apiv1.BackupTargetPrimary,
@@ -949,6 +960,19 @@ var _ = Describe("Verify Volume Snapshot",
 					)
 					Expect(err).ToNot(HaveOccurred())
 
+					// The 1-minute deadline above means the backup should still be
+					// retrying, not failed, for at least the first half of that window.
+					Consistently(func(g Gomega) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      backupName,
+						}, failedBackup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(failedBackup.Status.Phase).ToNot(BeEquivalentTo(apiv1.BackupPhaseFailed))
+					}, "30s", "5s").Should(Succeed())
+
+					// Allow extra margin over RetryTimeout for the reconcile
+					// polling interval.
 					Eventually(func(g Gomega) {
 						err = env.Client.Get(env.Ctx, types.NamespacedName{
 							Namespace: namespace,
@@ -957,7 +981,7 @@ var _ = Describe("Verify Volume Snapshot",
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(failedBackup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
 						g.Expect(failedBackup.Status.Error).To(ContainSubstring("Failed to get snapshot class"))
-					}, RetryTimeout).Should(Succeed())
+					}, RetryTimeout+90).Should(Succeed())
 				})
 
 				By("verifying that the backup connection is cleaned up", func() {
@@ -983,7 +1007,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("resetting the snapshotClass value", func() {
-					updateClusterSnapshotClass(namespace, clusterToSnapshotName, os.Getenv("E2E_CSI_STORAGE_CLASS"))
+					updateClusterSnapshotClass(namespace, clusterToSnapshotName, env.CSIStorageClass)
 				})
 			})
 		})

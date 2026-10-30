@@ -379,6 +379,15 @@ type ClusterSpec struct {
 	// +optional
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
+	// The time in seconds that is allowed for a PostgreSQL instance to stop
+	// after an immediate shutdown request (used, for example, when a primary
+	// must step down and cannot wait for a graceful shutdown). Once this time
+	// has passed with PostgreSQL still running, the instance is considered
+	// unresponsive. Default value is 30 seconds.
+	// +kubebuilder:default:=30
+	// +optional
+	ImmediateShutdownTimeout int32 `json:"immediateShutdownTimeout,omitempty"`
+
 	// The amount of time (in seconds) to wait before triggering a failover
 	// after the primary PostgreSQL instance in the cluster was detected
 	// to be unhealthy
@@ -666,19 +675,21 @@ type LivenessProbe struct {
 	// Probe is the standard probe configuration
 	Probe `json:",inline"`
 
-	// Configure the feature that extends the liveness probe for a primary
-	// instance. In addition to the basic checks, this verifies whether the
-	// primary is isolated from the Kubernetes API server and from its
-	// replicas, ensuring that it can be safely shut down if network
-	// partition or API unavailability is detected. Enabled by default.
+	// Configure the primary isolation check, which stops a primary whose
+	// primary lease has gone past its renew deadline without a successful
+	// renewal, when at least one other instance is unreachable or names a
+	// different target primary, so that it stops accepting writes it can no
+	// longer safely serve. Its reaction time is set by the `primaryLease`
+	// timings and by `requestTimeout`, not by the liveness probe settings this
+	// stanza lives under. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
 }
 
-// IsolationCheckConfiguration contains the configuration for the isolation check
-// functionality in the liveness probe
+// IsolationCheckConfiguration contains the configuration for the primary
+// isolation check
 type IsolationCheckConfiguration struct {
-	// Whether primary isolation checking is enabled for the liveness probe
+	// Whether primary isolation checking is enabled
 	// +optional
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
@@ -1183,6 +1194,13 @@ const (
 	// has had at least one running instance, at which point it is set to True
 	// and never cleared.
 	ConditionInitialized ClusterConditionType = "Initialized"
+
+	// ConditionSyncReplicationTopologySatisfied is True when at least one
+	// synchronous replica is running in a different failure domain than the
+	// primary, as defined by .spec.postgresql.synchronous.podFailureDomainKeys
+	// or .spec.postgresql.synchronous.nodeFailureDomainKeys.
+	// Only set when one of those fields is configured.
+	ConditionSyncReplicationTopologySatisfied ClusterConditionType = "SyncReplicationTopologySatisfied"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1239,6 +1257,19 @@ const (
 	// BootstrapPending is the reason set on ConditionInitialized=False while the
 	// cluster has not yet completed its first bootstrap.
 	BootstrapPending ConditionReason = "BootstrapPending"
+
+	// ConditionReasonTopologySatisfied means at least one synchronous replica is
+	// in a different failure domain than the primary.
+	ConditionReasonTopologySatisfied ConditionReason = "Satisfied"
+
+	// ConditionReasonTopologyNotExtracted means topology labels could not be
+	// extracted from pods or nodes, so the constraint cannot be evaluated.
+	ConditionReasonTopologyNotExtracted ConditionReason = "TopologyNotExtracted"
+
+	// ConditionReasonInsufficientCrossDomainReplicas means failure domain keys
+	// are set but no synchronous replica in a different failure domain than
+	// the primary exists.
+	ConditionReasonInsufficientCrossDomainReplicas ConditionReason = "InsufficientCrossDomainReplicas"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
@@ -1451,6 +1482,10 @@ const (
 	// is gracefully shutdown during a switchover.
 	DefaultMaxSwitchoverDelay = 3600
 
+	// DefaultImmediateShutdownTimeout is the default for the pg_ctl timeout in seconds when a
+	// PostgreSQL instance is shut down with an immediate shutdown request.
+	DefaultImmediateShutdownTimeout = 30
+
 	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
 	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,
 	// the minimum value is 1
@@ -1505,6 +1540,7 @@ const (
 // Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
 // need to be considered.
 // +kubebuilder:validation:XValidation:rule="self.dataDurability!='preferred' || ((!has(self.standbyNamesPre) || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost) || self.standbyNamesPost.size()==0))",message="dataDurability set to 'preferred' requires empty 'standbyNamesPre' and empty 'standbyNamesPost'"
+// +kubebuilder:validation:XValidation:rule="!(has(self.podFailureDomainKeys) && self.podFailureDomainKeys.size() > 0 && has(self.nodeFailureDomainKeys) && self.nodeFailureDomainKeys.size() > 0)",message="podFailureDomainKeys and nodeFailureDomainKeys are mutually exclusive"
 type SynchronousReplicaConfiguration struct {
 	// Method to select synchronous replication standbys from the listed
 	// servers, accepting 'any' (quorum-based synchronous replication) or
@@ -1552,6 +1588,43 @@ type SynchronousReplicaConfiguration struct {
 	// PostgreSQL clusters.
 	// +optional
 	FailoverQuorum bool `json:"failoverQuorum"`
+
+	// PodFailureDomainKeys is a list of Pod label keys used to define failure
+	// domains. The values are read exclusively from the labels of each
+	// instance Pod: a listed label that is not present on the Pod makes the
+	// whole topology extraction fail, so that the constraint is not applied,
+	// and the Node hosting the Pod is never consulted. When
+	// set, the operator selects synchronous replicas from instances whose
+	// label values differ from the primary's for all the specified keys, so
+	// that synchronous replication spans failure domains such as availability
+	// zones or regions. Starting from Kubernetes 1.35, the
+	// `topology.kubernetes.io/zone` and `topology.kubernetes.io/region`
+	// labels are automatically copied from the Node onto each Pod at
+	// scheduling time.
+	// When the replicas in failure domains different from the primary's are
+	// not enough to satisfy the configured number of synchronous standbys,
+	// the constraint is not applied and synchronous replicas are selected as
+	// if this field were not set.
+	// Mutually exclusive with `nodeFailureDomainKeys`.
+	// +optional
+	PodFailureDomainKeys []string `json:"podFailureDomainKeys,omitempty"`
+
+	// NodeFailureDomainKeys is a list of Node label keys used to define
+	// failure domains. The values are read exclusively from the labels of the
+	// Node hosting each instance Pod: when a Node cannot be found (for
+	// example, drained or deleted after the Pod was scheduled), the whole
+	// topology extraction fails and the constraint is not applied. When set,
+	// the operator selects synchronous replicas from instances running on
+	// nodes whose label values differ from the primary's node for all the
+	// specified keys, so that synchronous replication spans failure domains
+	// such as availability zones or regions.
+	// When the replicas in failure domains different from the primary's are
+	// not enough to satisfy the configured number of synchronous standbys,
+	// the constraint is not applied and synchronous replicas are selected as
+	// if this field were not set.
+	// Mutually exclusive with `podFailureDomainKeys`.
+	// +optional
+	NodeFailureDomainKeys []string `json:"nodeFailureDomainKeys,omitempty"`
 }
 
 // PodSelectorRef defines a named pod label selector for use in pg_hba rules.
@@ -1582,6 +1655,7 @@ type PodSelectorRefStatus struct {
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
+// +kubebuilder:validation:XValidation:rule="!(has(self.syncReplicaElectionConstraint) && self.syncReplicaElectionConstraint.enabled && has(self.synchronous) && ((has(self.synchronous.podFailureDomainKeys) && self.synchronous.podFailureDomainKeys.size() > 0) || (has(self.synchronous.nodeFailureDomainKeys) && self.synchronous.nodeFailureDomainKeys.size() > 0)))",message="syncReplicaElectionConstraint and synchronous failure domain keys are mutually exclusive"
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
 	// +optional
@@ -1876,8 +1950,10 @@ type BootstrapInitDB struct {
 	// +optional
 	Options []string `json:"options,omitempty"`
 
-	// Whether the `-k` option should be passed to initdb,
-	// enabling checksums on data pages (default: `false`)
+	// Whether data checksums are enabled on data pages, to help detect
+	// corruption by the I/O system that would otherwise be silent
+	// (default: `false` before PostgreSQL 18, `true` from PostgreSQL 18 on,
+	// matching the initdb default in each case).
 	// +optional
 	DataChecksums *bool `json:"dataChecksums,omitempty"`
 
@@ -2200,6 +2276,39 @@ type BootstrapPgBaseBackup struct {
 	// created from scratch
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
+
+	// List of custom options to pass to the `pg_basebackup` command.
+	//
+	// IMPORTANT: Use with caution. The operator rejects the options it relies on,
+	// as listed in the bootstrap documentation, but it does not validate the
+	// others, and some of them may still interfere with its intended
+	// functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and PostgreSQL version.
+	//
+	// +optional
+	AdditionalArgs []string `json:"additionalArgs,omitempty"`
+
+	// Maps each tablespace declared in `spec.tablespaces` to its location
+	// in the source instance.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	TablespaceMapping []TablespaceMappingEntry `json:"tablespaceMapping,omitempty"`
+}
+
+// TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+// location of the same tablespace in the source instance of a `pg_basebackup`
+// bootstrap.
+type TablespaceMappingEntry struct {
+	// Name of the tablespace, as declared in `spec.tablespaces`.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Absolute path of the tablespace in the source instance. It must not
+	// contain the `=` or `\` characters and must be unique among the entries.
+	// +kubebuilder:validation:MinLength=1
+	SourceLocation string `json:"sourceLocation"`
 }
 
 // RecoveryTarget allows to configure the moment where the recovery process
@@ -2647,6 +2756,11 @@ type PluginStatus struct {
 	// +optional
 	RestoreJobHookCapabilities []string `json:"restoreJobHookCapabilities,omitempty"`
 
+	// PostgresCapabilities are the list of capabilities of the
+	// plugin regarding the PostgreSQL configuration
+	// +optional
+	PostgresCapabilities []string `json:"postgresCapabilities,omitempty"`
+
 	// Status contain the status reported by the plugin through the SetStatusInCluster interface
 	// +optional
 	Status string `json:"status,omitempty"`
@@ -2687,6 +2801,10 @@ type RoleConfiguration struct {
 
 	// Date and time after which the role's password is no longer valid.
 	// When omitted, the password will never expire (default).
+	// On a `DatabaseRole` whose password the operator generates with a
+	// `password.duration`, this is controlled by the operator instead: the role
+	// is valid until the generated password expires, and setting `validUntil`
+	// explicitly is rejected.
 	// +optional
 	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 
@@ -2759,6 +2877,7 @@ type RoleConfiguration struct {
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyInstances",description="Number of ready instances"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Cluster current status"
 // +kubebuilder:printcolumn:name="Primary",type="string",JSONPath=".status.currentPrimary",description="Primary pod"
+// +kubebuilder:printcolumn:name="SyncTopology",type="string",JSONPath=".status.conditions[?(@.type=='SyncReplicationTopologySatisfied')].reason",description="Failure domain topology satisfaction status",priority=1
 
 // Cluster defines the API schema for a highly available PostgreSQL database cluster
 // managed by CloudNativePG.
