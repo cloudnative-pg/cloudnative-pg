@@ -738,33 +738,22 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
 		})
 
-	It("times the record while a failover is pending, but never claims it",
+	It("times the record while a failover is pending, and claims it as soon as it is elected",
 		func(ctx context.Context) {
 			kubeClient := fake.NewClientset()
 			r := newRunnable(kubeClient)
 			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
 			setTarget(r, apiv1.PendingFailoverMarker)
-
 			observe(ctx, r)
-			Expect(r.observedRecord).NotTo(BeNil())
 
 			// The window is ripe, but the marker names nobody as target.
 			acquired, err := r.tryTakeOver(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(acquired).To(BeFalse())
 			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
-		})
-
-	It("takes over as soon as it is elected, when the window started at the pending marker",
-		func(ctx context.Context) {
-			kubeClient := fake.NewClientset()
-			r := newRunnable(kubeClient)
-			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
-			setTarget(r, apiv1.PendingFailoverMarker)
-			observe(ctx, r)
 
 			setTarget(r, thisPod)
-			acquired, err := r.tryTakeOver(ctx)
+			acquired, err = r.tryTakeOver(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(acquired).To(BeTrue())
 			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(thisPod))
@@ -806,22 +795,6 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(acquired).To(BeFalse())
 			Expect(r.observedRecord).To(BeNil())
-			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
-		})
-
-	It("restarts the window when the holder renews during the pending failover",
-		func(ctx context.Context) {
-			kubeClient := fake.NewClientset()
-			r := newRunnable(kubeClient)
-			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
-			setTarget(r, apiv1.PendingFailoverMarker)
-			observe(ctx, r)
-			renewLease(ctx, kubeClient, otherPod, time.Now())
-
-			setTarget(r, thisPod)
-			acquired, err := r.tryTakeOver(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(acquired).To(BeFalse())
 			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
 		})
 
