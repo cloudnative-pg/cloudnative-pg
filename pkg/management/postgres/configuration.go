@@ -396,7 +396,12 @@ func createPostgresqlConfiguration(
 	if isSynchronizeLogicalDecodingEnabled(cluster) {
 		slots := make([]string, 0, len(cluster.Status.InstanceNames)-1)
 		for _, instanceName := range cluster.Status.InstanceNames {
-			if instanceName == cluster.Status.CurrentPrimary {
+			// An instance still bootstrapping can't be promoted and its slot
+			// is inactive: waiting for it would stall logical decoding.
+			// InitializingPVC has PVC names: the PGDATA PVC is named after
+			// the instance.
+			if instanceName == cluster.Status.CurrentPrimary ||
+				slices.Contains(cluster.Status.InitializingPVC, instanceName) {
 				continue
 			}
 			slots = append(slots, cluster.GetSlotNameFromInstanceName(instanceName))
