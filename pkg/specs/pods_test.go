@@ -1145,8 +1145,8 @@ var _ = Describe("AddBootstrapInitContainer", func() {
 		)))
 		Expect(pod.Annotations).To(HaveKeyWithValue("cnpg.io/bootstrapPending", "true"))
 		// The Pod spec the operator compares to decide on a rollout is stored
-		// before the bootstrap container is added, so the variable rolls out
-		// no running instance.
+		// before the bootstrap container is added, so the variable does not
+		// roll out running instances.
 		Expect(pod.Annotations[utils.PodSpecAnnotationName]).To(Equal(storedPodSpec))
 		Expect(storedPodSpec).ToNot(ContainSubstring(BootstrapPendingEnvName))
 	})

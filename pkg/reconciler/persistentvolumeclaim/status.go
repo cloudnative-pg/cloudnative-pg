@@ -334,8 +334,8 @@ func hasPod(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
 // a Pod to a PVC that was already ready (no bootstrap needed), or for
 // PVC roles (e.g. WAL, tablespaces) that never require one of their own.
 //
-// Check pod.Spec for the container: pod.Status is still empty until the
-// kubelet first reports on the Pod, so a missing status entry doesn't mean
+// The container is looked up in pod.Spec because pod.Status is empty until
+// the kubelet first reports on the Pod, so a missing status entry doesn't mean
 // the bootstrap is done.
 func podBootstrapComplete(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
 	for _, pod := range podList {

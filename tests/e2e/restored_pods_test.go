@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"path"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -218,7 +219,7 @@ var _ = Describe("Pods restored with their PVCs", Label(tests.LabelBackupRestore
 						HaveField("State.Running", Not(BeNil())),
 						HaveField("State.Terminated", Not(BeNil())),
 					))
-				}, 60).Should(Succeed())
+				}, testTimeouts[timeouts.PodRollout]).Should(Succeed())
 			})
 		} else {
 			// The tool runs after bootstrap-instance, so the operator does
@@ -236,7 +237,7 @@ var _ = Describe("Pods restored with their PVCs", Label(tests.LabelBackupRestore
 						bootstrapStatusOf(g, namespace, podName, podUID,
 							HaveField("State.Terminated.ExitCode", BeEquivalentTo(0)))
 					}
-				}, 120).Should(Succeed())
+				}, testTimeouts[timeouts.PodRollout]).Should(Succeed())
 			})
 		}
 
@@ -258,8 +259,10 @@ var _ = Describe("Pods restored with their PVCs", Label(tests.LabelBackupRestore
 
 				timeout := 10 * time.Second
 				out, _, err := exec.CommandInInstancePod(env.Ctx, env.Client, env.Interface,
-					env.RestClientConfig, podLocator, &timeout, "sh", "-c",
-					"ls -d "+specs.PgDataPath+"_* "+specs.PgWalVolumePgWalPath+"_* 2>/dev/null; true")
+					env.RestClientConfig, podLocator, &timeout,
+					"find", path.Dir(specs.PgDataPath), specs.PgWalVolumePath, "-maxdepth", "1",
+					"(", "-name", path.Base(specs.PgDataPath)+"_*",
+					"-o", "-name", path.Base(specs.PgWalVolumePgWalPath)+"_*", ")")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(out).To(BeEmpty(), "the data directories of %s were moved aside", podLocator.PodName)
 			}

@@ -164,10 +164,8 @@ func updateClusterLabels(
 }
 
 // updateBootstrapPendingAnnotation removes the pending bootstrap mark from the
-// instance once its bootstrap init container has terminated successfully. The
-// container sees the annotation through the downward API and leaves the
-// volumes alone when it runs again without it in a Pod recreated as it was,
-// e.g. restored by a backup tool.
+// instance once its bootstrap init container has terminated successfully, see
+// postgres.IsBootstrapCompleted.
 //
 // Returns true if the instance needed updating
 func updateBootstrapPendingAnnotation(ctx context.Context, instance *corev1.Pod) bool {

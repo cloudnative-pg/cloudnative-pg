@@ -65,7 +65,7 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 			if completed {
-				contextLogger.Info("The bootstrap already succeeded in this Pod, leaving the volumes untouched")
+				contextLogger.Warning("The bootstrap is not pending in this Pod, leaving the volumes untouched")
 				return nil
 			}
 

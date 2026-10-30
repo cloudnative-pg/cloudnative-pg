@@ -129,13 +129,13 @@ type InitInfo struct {
 	TablespaceMapFile []byte
 }
 
-// IsBootstrapCompleted tells whether the bootstrap init container is running
-// again in a Pod where it already succeeded. The operator attaches it only to
-// a Pod whose PGDATA PVC is not ready, marking the Pod as pending, and removes
-// the mark once it succeeds, but Kubernetes runs it again whenever the Pod is
-// recreated as it was, as a backup tool does when it restores the Pod together
-// with its PVCs: the volumes then already hold the instance and must be left
-// untouched.
+// IsBootstrapCompleted reports whether the bootstrap already completed, that
+// is, whether the pending marker is missing or false. The operator attaches
+// the bootstrap init container only to a Pod whose PGDATA PVC is not ready,
+// marking the Pod as pending, and removes the mark once it succeeds, but
+// Kubernetes runs the container again whenever the Pod is recreated as it was,
+// as a backup tool does when it restores the Pod together with its PVCs: the
+// volumes then already hold the instance and must be left untouched.
 //
 // It returns an error when the pending marker holds an unexpected value,
 // as we cannot safely decide whether bootstrapping is needed.
