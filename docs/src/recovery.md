@@ -169,11 +169,20 @@ spec:
           serverName: cluster-example
 ```
 
-In case the backed-up cluster was using a separate PVC to store the WAL files,
-the recovery must include that too, unless the backup was taken
-[skipping the snapshot of the WAL volume](appendixes/backup_volumesnapshot.md#skipping-the-snapshot-of-the-wal-volume):
-in that case the WAL files are fetched from the archive defined in the
-`source` of the recovery, which is required:
+If the backed-up cluster stored its WAL files in a separate PVC, the example
+above is all you need in most cases. CloudNativePG does not snapshot the WAL
+volume of an online backup when the WAL archive is guaranteed to hold the WAL
+files needed to recover it, and reports `walVolumeSnapshotSkipped: true` in the
+`Backup` status.
+See [Skipping the snapshot of the WAL volume](appendixes/backup_volumesnapshot.md#skipping-the-snapshot-of-the-wal-volume)
+for the conditions.
+In that case, reference only the `storage` snapshot: the new cluster starts
+with an empty WAL volume, and PostgreSQL fetches the WAL files from the archive
+defined in the `source` of the recovery, which is therefore required.
+
+If the backup does include a snapshot of the WAL volume (for example, a cold
+backup), reference it in `.spec.bootstrap.recovery.volumeSnapshots.walStorage`
+too:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -196,6 +205,12 @@ spec:
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 ```
+
+:::note
+    In both cases, if the backed-up cluster stored its WAL files in a separate
+    PVC, the recovered cluster must define `.spec.walStorage` too, as the
+    snapshots don't carry the storage configuration of the new WAL volume.
+:::
 
 The previous example assumes that the application database and its owning user
 are named `app` by default. If the PostgreSQL cluster being restored uses
