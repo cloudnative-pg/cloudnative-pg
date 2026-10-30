@@ -397,15 +397,7 @@ func externalClusterSecrets(cluster *apiv1.Cluster) []string {
 				server.Password.Name)
 		}
 		if barmanObjStore := server.BarmanObjectStore; barmanObjStore != nil {
-			result = append(
-				result,
-				s3CredentialsSecrets(barmanObjStore.AWS)...)
-			result = append(
-				result,
-				azureCredentialsSecrets(barmanObjStore.Azure)...)
-			result = append(
-				result,
-				googleCredentialsSecrets(barmanObjStore.Google)...)
+			result = append(result, barmanObjStore.SecretNames()...)
 			if barmanObjStore.EndpointCA != nil {
 				result = append(result, barmanObjStore.EndpointCA.Name)
 			}
@@ -420,15 +412,7 @@ func backupSecrets(cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) []string 
 
 	// Secrets needed to access S3 and Azure
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-		result = append(
-			result,
-			s3CredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.AWS)...)
-		result = append(
-			result,
-			azureCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.Azure)...)
-		result = append(
-			result,
-			googleCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.Google)...)
+		result = append(result, cluster.Spec.Backup.BarmanObjectStore.SecretNames()...)
 	}
 
 	// Secrets needed by Barman, if set
@@ -439,87 +423,13 @@ func backupSecrets(cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) []string 
 	}
 
 	if backupOrigin != nil {
-		result = append(
-			result,
-			s3CredentialsSecrets(backupOrigin.Status.AWS)...)
-		result = append(
-			result,
-			azureCredentialsSecrets(backupOrigin.Status.Azure)...)
-		result = append(
-			result,
-			googleCredentialsSecrets(backupOrigin.Status.Google)...)
+		result = append(result, backupOrigin.Status.SecretNames()...)
 		if backupOrigin.Status.EndpointCA != nil {
 			result = append(result, backupOrigin.Status.EndpointCA.Name)
 		}
 	}
 
 	return result
-}
-
-func azureCredentialsSecrets(azureCredentials *apiv1.AzureCredentials) []string {
-	var result []string
-
-	if azureCredentials == nil {
-		return nil
-	}
-
-	if azureCredentials.ConnectionString != nil {
-		result = append(result,
-			azureCredentials.ConnectionString.Name)
-	}
-	if azureCredentials.StorageAccount != nil {
-		result = append(result,
-			azureCredentials.StorageAccount.Name)
-	}
-	if azureCredentials.StorageKey != nil {
-		result = append(result,
-			azureCredentials.StorageKey.Name)
-	}
-
-	if azureCredentials.StorageSasToken != nil {
-		result = append(result,
-			azureCredentials.StorageSasToken.Name)
-	}
-	return result
-}
-
-func s3CredentialsSecrets(s3Credentials *apiv1.S3Credentials) []string {
-	if s3Credentials == nil {
-		return nil
-	}
-
-	var secrets []string
-
-	if s3Credentials.AccessKeyIDReference != nil {
-		secrets = append(secrets, s3Credentials.AccessKeyIDReference.Name)
-	}
-
-	if s3Credentials.SecretAccessKeyReference != nil {
-		secrets = append(secrets, s3Credentials.SecretAccessKeyReference.Name)
-	}
-
-	if s3Credentials.RegionReference != nil {
-		secrets = append(secrets, s3Credentials.RegionReference.Name)
-	}
-
-	if s3Credentials.SessionToken != nil {
-		secrets = append(secrets, s3Credentials.SessionToken.Name)
-	}
-
-	return secrets
-}
-
-func googleCredentialsSecrets(googleCredentials *apiv1.GoogleCredentials) []string {
-	if googleCredentials == nil {
-		return nil
-	}
-	var secrets []string
-
-	if googleCredentials.ApplicationCredentials != nil {
-		return append(secrets, googleCredentials.ApplicationCredentials.Name)
-	}
-
-	return secrets
 }
 
 func managedRolesSecrets(cluster *apiv1.Cluster) []string {
