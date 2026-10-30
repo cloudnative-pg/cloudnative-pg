@@ -4,7 +4,9 @@
 #
 # It deliberately does NOT include the resources whose write access is close to
 # PostgreSQL superuser access, so that they can be granted separately:
-# - DatabaseRole: see databaserole-editor-role
+# - DatabaseRole: see databaserole-editor-role. Write access to Cluster can
+#   also set superuser and inRoles through inline managed roles
+#   (spec.managed.roles), as long as they are supported.
 # - Pooler: see pooler-editor-role (authQuery runs arbitrary SQL)
 # It also excludes ClusterImageCatalog (cluster-scoped, needs a
 # ClusterRoleBinding, see clusterimagecatalog-editor-role) and FailoverQuorum
