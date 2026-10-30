@@ -940,12 +940,12 @@ to maintain synchronization of logical replication slots across failovers.
 The guarantee above has a cost. Logical decoding sends changes only after
 every listed standby slot has confirmed the WAL, so a replica that is not
 caught up holds logical replication back. This is a deliberate choice of data
-safety over availability: leaving a lagging replica out of the list could let
-it be promoted behind a subscriber that has already consumed the data.
+safety over availability: if a lagging replica were left out of the list and
+promoted, a subscriber could already have data the new primary does not have.
 
 CloudNativePG lists the slots of all the replicas, with one exception: a new
 replica is added to the list only after its initial bootstrap, because it
-cannot be promoted before that. In the other cases logical replication waits:
+cannot be promoted before that. Otherwise, logical replication waits:
 
 - while a new replica catches up after its bootstrap, for example after a
   scale-up;
