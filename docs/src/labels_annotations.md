@@ -303,7 +303,7 @@ CloudNativePG manages the following predefined annotations:
     how long the operator should retry recoverable errors before considering the
     volume snapshot backup failed. In minutes, defaulting to 10.
 
-`cnpg.io/walSnapshotSkipped`
+`cnpg.io/walVolumeSnapshotSkipped`
 :   Set to `true` on the `VolumeSnapshot` resources of a backup that doesn't
     include the snapshot of the WAL volume, whose WAL files have to be fetched
     from the WAL archive when restoring it.

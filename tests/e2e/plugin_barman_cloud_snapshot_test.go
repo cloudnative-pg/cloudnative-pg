@@ -407,7 +407,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 						fmt.Sprintf("%s-online", clusterName), apiv1.BackupTargetPrimary, false, true, 1)
 					Expect(backupTaken.Status.BackupSnapshotStatus.Elements[0].Type).
 						To(BeEquivalentTo(utils.PVCRolePgData))
-					Expect(backupTaken.Status.BackupSnapshotStatus.WalSnapshotSkipped).To(BeTrue())
+					Expect(backupTaken.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeTrue())
 				})
 
 				By("fetching the volume snapshots", func() {
@@ -416,7 +416,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(1))
 					Expect(snapshotList.Items[0].Annotations).To(
-						HaveKeyWithValue(utils.WalSnapshotSkippedAnnotationName, "true"))
+						HaveKeyWithValue(utils.WalVolumeSnapshotSkippedAnnotationName, "true"))
 				})
 
 				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreManifest)
@@ -538,7 +538,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 				By("taking a snapshot of both the PGDATA and the WAL storage", func() {
 					backup := takeVolumeSnapshotBackup(namespace, clusterName,
 						fmt.Sprintf("%s-without-archiving", clusterName), apiv1.BackupTargetPrimary, false, true, 2)
-					Expect(backup.Status.BackupSnapshotStatus.WalSnapshotSkipped).To(BeFalse())
+					Expect(backup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeFalse())
 				})
 			})
 		})

@@ -464,9 +464,9 @@ spec:
                       - type
                       type: object
                     type: array
-                  walSnapshotSkipped:
+                  walVolumeSnapshotSkipped:
                     description: |-
-                      WalSnapshotSkipped is true when the WAL storage was not snapshotted,
+                      WalVolumeSnapshotSkipped is true when the WAL storage was not snapshotted,
                       because the WAL files needed to recover the backup are in the WAL archive
                     type: boolean
                 type: object

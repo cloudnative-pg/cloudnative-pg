@@ -1877,7 +1877,7 @@ func (r *ClusterReconciler) checkReadyForRecovery(
 				"backupPhase", backup.Status.Phase)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
-		if backup.Status.BackupSnapshotStatus.WalSnapshotSkipped && cluster.Spec.Bootstrap.Recovery.Source == "" {
+		if backup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped && cluster.Spec.Bootstrap.Recovery.Source == "" {
 			contextLogger.Info("The source backup has no WAL storage snapshot, a recovery source "+
 				"is required to fetch the WAL files from the archive, can't continue full recovery",
 				"backup", cluster.Spec.Bootstrap.Recovery.Backup)

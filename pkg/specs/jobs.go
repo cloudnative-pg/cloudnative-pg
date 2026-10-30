@@ -310,7 +310,7 @@ func BuildReplicaBootstrapCommandViaRestoreSnapshot(
 
 	// Without the WAL storage, PostgreSQL needs the backup label to fetch
 	// the WAL files from the archive, as crash recovery only reads pg_wal
-	if object != nil && object.Annotations[utils.WalSnapshotSkippedAnnotationName] == "true" {
+	if object != nil && object.Annotations[utils.WalVolumeSnapshotSkippedAnnotationName] == "true" {
 		initCommand = append(initCommand, buildBackupLabelFlags(object)...)
 	}
 

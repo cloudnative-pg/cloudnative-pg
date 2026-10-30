@@ -86,19 +86,19 @@ func (backupStatus *BackupStatus) SetAsStarted(podName, containerID, sessionID s
 // SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot
 func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volumesnapshotv1.VolumeSnapshot) {
 	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
-	walSnapshotSkipped := false
+	walVolumeSnapshotSkipped := false
 	for idx, volumeSnapshot := range snapshots {
 		snapshotNames[idx] = BackupSnapshotElementStatus{
 			Name:           volumeSnapshot.Name,
 			Type:           volumeSnapshot.Annotations[utils.PvcRoleLabelName],
 			TablespaceName: volumeSnapshot.Labels[utils.TablespaceNameLabelName],
 		}
-		if volumeSnapshot.Annotations[utils.WalSnapshotSkippedAnnotationName] == "true" {
-			walSnapshotSkipped = true
+		if volumeSnapshot.Annotations[utils.WalVolumeSnapshotSkippedAnnotationName] == "true" {
+			walVolumeSnapshotSkipped = true
 		}
 	}
 	snapshotStatus.Elements = snapshotNames
-	snapshotStatus.WalSnapshotSkipped = walSnapshotSkipped
+	snapshotStatus.WalVolumeSnapshotSkipped = walVolumeSnapshotSkipped
 }
 
 // IsDone check if a backup is completed or still in progress

@@ -517,7 +517,7 @@ var _ = Describe("check if bootstrap recovery can proceed", func() {
 				Status: apiv1.BackupStatus{
 					Phase: apiv1.BackupPhaseCompleted,
 					BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
-						WalSnapshotSkipped: true,
+						WalVolumeSnapshotSkipped: true,
 					},
 				},
 			},
@@ -712,7 +712,7 @@ var _ = Describe("replica bootstrap command", func() {
 		func(
 			ctx SpecContext,
 			dataSource *corev1.TypedLocalObjectReference,
-			walSnapshotSkipped bool,
+			walVolumeSnapshotSkipped bool,
 			expectedSubcommand string,
 			expectBackupLabel bool,
 		) {
@@ -725,8 +725,8 @@ var _ = Describe("replica bootstrap command", func() {
 					},
 				},
 			}
-			if walSnapshotSkipped {
-				snapshot.Annotations[utils.WalSnapshotSkippedAnnotationName] = "true"
+			if walVolumeSnapshotSkipped {
+				snapshot.Annotations[utils.WalVolumeSnapshotSkippedAnnotationName] = "true"
 			}
 			r := &ClusterReconciler{
 				Client: fake.NewClientBuilder().

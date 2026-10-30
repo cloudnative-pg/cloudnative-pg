@@ -217,8 +217,8 @@ snapshots it as usual:
 If the WAL archiver plugin is removed while such a backup is running, the
 backup fails, as the WAL files might not have been archived.
 
-Such a `Backup` reports `.status.snapshotBackupStatus.walSnapshotSkipped: true`,
-and its volume snapshots carry the `cnpg.io/walSnapshotSkipped: "true"`
+Such a `Backup` reports `.status.snapshotBackupStatus.walVolumeSnapshotSkipped: true`,
+and its volume snapshots carry the `cnpg.io/walVolumeSnapshotSkipped: "true"`
 annotation.
 When restoring it, CloudNativePG creates an empty WAL volume, and PostgreSQL
 fetches the WAL files from the archive: the recovery requires a `source`

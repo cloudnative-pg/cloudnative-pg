@@ -42,7 +42,7 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 	)
 	var cluster *apiv1.Cluster
 
-	pgDataSnapshot := func(walSnapshotSkipped bool) *volumesnapshotv1.VolumeSnapshot {
+	pgDataSnapshot := func(walVolumeSnapshotSkipped bool) *volumesnapshotv1.VolumeSnapshot {
 		snapshot := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
@@ -53,8 +53,8 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 				},
 			},
 		}
-		if walSnapshotSkipped {
-			snapshot.Annotations[utils.WalSnapshotSkippedAnnotationName] = "true"
+		if walVolumeSnapshotSkipped {
+			snapshot.Annotations[utils.WalVolumeSnapshotSkippedAnnotationName] = "true"
 		}
 		return snapshot
 	}
@@ -97,7 +97,7 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 						Elements: []apiv1.BackupSnapshotElementStatus{
 							{Name: snapshotName, Type: string(utils.PVCRolePgData)},
 						},
-						WalSnapshotSkipped: true,
+						WalVolumeSnapshotSkipped: true,
 					},
 				},
 			}
@@ -129,10 +129,10 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 	})
 
 	DescribeTable("verifies the WAL storage source is only omitted for a marked snapshot",
-		func(ctx SpecContext, walSnapshotSkipped bool, expectedErrors int) {
+		func(ctx SpecContext, walVolumeSnapshotSkipped bool, expectedErrors int) {
 			c := fake.NewClientBuilder().
 				WithScheme(scheme.BuildWithAllKnownScheme()).
-				WithObjects(pgDataSnapshot(walSnapshotSkipped)).
+				WithObjects(pgDataSnapshot(walVolumeSnapshotSkipped)).
 				Build()
 			dataSource := apiv1.DataSource{
 				Storage: corev1.TypedLocalObjectReference{

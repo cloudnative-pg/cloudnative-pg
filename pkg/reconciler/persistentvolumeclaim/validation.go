@@ -163,7 +163,7 @@ func VerifyDataSourceCoherence(
 		}
 		result.validateVolumeMetadata(source.WalStorage.Name, pgWal, NewPgWalCalculator())
 	} else if requiresWalStorage && pgData != nil &&
-		pgData.GetAnnotations()[utils.WalSnapshotSkippedAnnotationName] != "true" {
+		pgData.GetAnnotations()[utils.WalVolumeSnapshotSkippedAnnotationName] != "true" {
 		result.addErrorf(
 			source.Storage.Name,
 			"Missing WAL storage source: it can be omitted only for a snapshot taken without the WAL storage")
