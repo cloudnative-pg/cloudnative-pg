@@ -471,10 +471,11 @@ var _ = Describe("Runnable.observe", func() {
 			r := newRunnable(kubeClient)
 			r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) { return false, nil }
 			putLease(ctx, kubeClient, otherPod)
+			kubeClient.ClearActions()
 			config := Config{
 				LeaseDuration:         time.Second,
 				RenewDeadline:         800 * time.Millisecond,
-				RetryPeriod:           500 * time.Millisecond,
+				RetryPeriod:           100 * time.Millisecond,
 				ReleasedLeaseDuration: time.Second,
 			}
 
@@ -489,15 +490,17 @@ var _ = Describe("Runnable.observe", func() {
 				<-done
 			}()
 
-			// The holder stays silent for longer than the lease lasts before
-			// this pod is elected.
-			time.Sleep(config.LeaseDuration + 500*time.Millisecond)
+			// Once Start has read the lease, the holder stays silent for as long
+			// as the lease lasts before this pod is elected.
+			Eventually(kubeClient.Actions).ShouldNot(BeEmpty())
+			time.Sleep(config.LeaseDuration)
 			r.instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: thisPod}})
 
-			// A window started at the election would need the whole LeaseDuration.
-			acquireCtx, cancelAcquire := context.WithTimeout(ctx, config.RetryPeriod)
-			defer cancelAcquire()
-			Expect(r.Acquire(acquireCtx, config)).To(Succeed())
+			// A window started at the election would hold the claim back for
+			// the whole LeaseDuration.
+			start := time.Now()
+			Expect(r.Acquire(ctx, config)).To(Succeed())
+			Expect(time.Since(start)).To(BeNumerically("<", config.LeaseDuration))
 		})
 
 	It("has nothing to time on a released record or one naming this pod", func(ctx context.Context) {
