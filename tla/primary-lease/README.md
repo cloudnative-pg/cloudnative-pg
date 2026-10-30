@@ -126,6 +126,12 @@ Candidate side:
 * `CandidatePrimaryClaimEmptyLease`: immediate take-over of a released
   (empty-holder) lease.
 * `CandidatePrimaryStartClaimOwnedLease`: enter the observation window.
+  It stands for the replica's cached Cluster naming the pending failover
+  marker or the replica itself as target, whichever it sees first. From
+  then on the replica answers the peers' `/failsafe` with that target, so
+  the window and the "disagree" answer start together. The model has no
+  operator: which replica is elected, and that only the elected one may
+  claim, only remove behaviours from the claim actions.
 * `CandidatePrimaryClaimOwnedLease`: take over after the record sat
   unchanged for `>= LeaseDuration` (CAS against concurrent writers), the
   same comparison `tryTakeOver` makes.
@@ -242,8 +248,9 @@ node is the primary and a verdict only comes later, because a challenger's
 cached target flips after a probe that saw it agreeing, the verdict tick
 can run up to `retryPeriodSeconds + 2 * requestTimeout` after the flip,
 since the previous probe may have read the challenger just before it. The
-challenger starts its observation window when it becomes the target, so it
-claims no earlier than `leaseDurationSeconds` after the flip. The
+challenger starts its observation window when its cached target becomes the
+pending failover marker or itself, so it claims no earlier than
+`leaseDurationSeconds` after the flip. The
 model stops the node in the verdict tick, through the Ticker's age bound, so
 for this branch it assumes that `retryPeriodSeconds + 2 * requestTimeout <
 leaseDurationSeconds`, which nothing validates. At the defaults it is 4s
