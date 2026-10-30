@@ -167,6 +167,12 @@ func (r *InstanceReconciler) Reconcile(
 	// PostgreSQL is down or fenced must still stop renewing the lease it holds.
 	r.yieldPrimaryLeaseIfNotTarget(ctx, cluster)
 
+	// A primary with a stalled write path is handled before anything that could
+	// write to the (possibly blocked) data directory
+	if result := r.reconcileStalledWritePath(ctx, cluster); result != nil {
+		return *result, nil
+	}
+
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
 		return reconcile.Result{}, err
@@ -258,6 +264,10 @@ func (r *InstanceReconciler) Reconcile(
 
 		contextLogger.Info("Instance is still down, will retry in 1 second")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
+	if result := r.reconcileWalReceiverDuringFailover(ctx, cluster); result != nil {
+		return *result, nil
 	}
 
 	// Instance promotion will not automatically load the changed configuration files.
@@ -708,6 +718,109 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 	cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
 
 	return true, nil
+}
+
+// reconcileStalledWritePath handles the primary whose write path is stalled, as
+// detected by the write path check. It returns a result when the rest of the
+// reconciliation must be skipped.
+//
+//   - While this instance is still the target primary (nobody to fail over to),
+//     nothing else is done: every other step could touch the blocked data
+//     directory. The primary lease is not renewed (the write path monitor
+//     stopped it) and the instance keeps being reported as stalled, so the
+//     operator promotes a healthy replica as soon as there is one. When the
+//     stall is over, the regular reconciliation takes the lease back.
+//   - As soon as the target primary is another instance (or the pending failover
+//     marker), the stall is latched, so it can't be cleared anymore, and the
+//     instance is demoted with an immediate shutdown before doing anything else.
+//     Doing it first matters: the steps of the regular loop write to PGDATA (for
+//     example the `.check-empty-wal-archive` file removal and the configuration
+//     files), and a fast shutdown would first request a checkpoint. All of them
+//     would block the single reconciliation worker on a blocked disk. The
+//     unreachable-primary demotion above does not apply: a primary that can't
+//     write still answers read-only queries.
+func (r *InstanceReconciler) reconcileStalledWritePath(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) *reconcile.Result {
+	contextLogger := log.FromContext(ctx)
+
+	state := &r.instance.WritePath
+	if !state.Stalled() {
+		return nil
+	}
+
+	if cluster.Status.TargetPrimary == r.instance.GetPodName() {
+		contextLogger.Info("The write path of this primary is stalled, waiting for it to recover " +
+			"or for a healthy replica to be promoted")
+		return &reconcile.Result{RequeueAfter: time.Second}
+	}
+
+	state.Latch()
+
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil {
+		contextLogger.Error(err, "while checking the instance role, will retry")
+		return &reconcile.Result{RequeueAfter: time.Second}
+	}
+	if !isPrimary {
+		return nil
+	}
+
+	contextLogger.Info("This primary has a stalled write path and is no longer the target primary. "+
+		"Demoting it by shutting it down immediately: no checkpoint is attempted, because it would "+
+		"block, and the pending SIGQUIT takes effect as soon as the write path recovers, "+
+		"before any blocked commit can be acknowledged to a client.",
+		"targetPrimary", cluster.Status.TargetPrimary)
+	// Neither the request nor its outcome may park the reconciler, see reconcileOldPrimary
+	if !r.Instance().TryRequestImmediateShutdown() {
+		contextLogger.Info("The lifecycle manager is not ready to receive the shutdown request, will retry")
+	}
+	return &reconcile.Result{RequeueAfter: time.Second}
+}
+
+// reconcileWalReceiverDuringFailover terminates the WAL receiver of a replica while
+// a failover is pending, when the write path check is enabled.
+//
+// The operator waits for every WAL receiver to be down before promoting a replica
+// (see AreWalReceiversDown). A primary with a stalled write path keeps its
+// walsenders alive, and they keep sending keepalives, so the receivers never go
+// down by themselves. The primary can't be relied upon to end them: it is the
+// instance that is blocked. The connection is therefore ended from the replica side.
+//
+// Terminating the receiver is safe because the failover has already been decided
+// (the target primary is the pending marker, which the operator sets only when the
+// primary is not eligible anymore), and a primary whose WAL flush is blocked can't
+// have acknowledged a commit that this replica has not received: a commit is
+// acknowledged only after its WAL is flushed locally, and only flushed WAL is sent
+// to the standbys. The WAL already received by this replica stays. The receiver
+// can't reconnect to the old primary, because the operator removes it from the
+// read-write service when it starts the failover.
+func (r *InstanceReconciler) reconcileWalReceiverDuringFailover(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) *reconcile.Result {
+	if !cluster.IsWritePathCheckEnabled() ||
+		cluster.IsReplica() ||
+		cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker ||
+		cluster.Status.CurrentPrimary == r.instance.GetPodName() {
+		return nil
+	}
+
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil || isPrimary {
+		return nil
+	}
+
+	contextLogger := log.FromContext(ctx)
+	terminated, err := r.instance.TerminateWalReceiver(ctx)
+	if err != nil {
+		contextLogger.Error(err, "while terminating the WAL receiver during a failover, will retry")
+	} else if terminated {
+		contextLogger.Info("Failover in progress, the WAL receiver has been terminated")
+	}
+
+	return &reconcile.Result{RequeueAfter: time.Second}
 }
 
 // IsDBUp checks whether the superuserdb is reachable and returns an error if that's not the case

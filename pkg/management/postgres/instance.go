@@ -44,6 +44,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -55,6 +56,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/writepath"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -197,6 +199,14 @@ type Instance struct {
 
 	// InstanceManagerIsUpgrading tells if there is an instance manager upgrade in process
 	InstanceManagerIsUpgrading atomic.Bool
+
+	// WritePath tracks whether the write path of this instance is stalled,
+	// as detected by the write path check
+	WritePath writepath.State
+
+	// writePathConn is the connection used by the write path check. It is
+	// only used by the goroutine running the heartbeat.
+	writePathConn *pgx.Conn
 
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool

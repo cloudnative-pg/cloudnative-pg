@@ -282,6 +282,37 @@ func (r *Runnable) Yield(ctx context.Context) {
 	}
 	if r.cancelMonitor != nil {
 		r.cancelMonitor()
+		r.cancelMonitor = nil
+	}
+}
+
+// StopRenewing stops renewing the lease like Yield does, but keeps the
+// step-down monitor of the hold running. It is meant for a primary that can't
+// serve writes (see `.spec.probes.liveness.writePathCheck`), which must let a
+// replica take the lease over without being left unfenced: PostgreSQL is still
+// running, and once the lease goes stale the monitor stops it, through the peer
+// check, exactly as it does for a primary that can't reach the API server.
+//
+// As with Yield, the record is not blanked: it keeps naming this pod and goes
+// stale, so the new target waits for a full LeaseDuration, and the lock calls
+// of the polling loop keep the watchdog beating. The next Acquire takes the
+// lease back and blocks until it is renewed again; the monitor of the hold is
+// not started twice.
+func (r *Runnable) StopRenewing(ctx context.Context) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.yielded.Store(true)
+	select {
+	case <-r.heldCh:
+		log.FromContext(ctx).Info(
+			"No longer renewing the primary lease: the primary can't serve writes, " +
+				"the lease-age monitor keeps watching it")
+		r.heldCh = make(chan struct{})
+	default:
+	}
+	if r.cancelElector != nil {
+		r.cancelElector()
 	}
 }
 
@@ -712,9 +743,13 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			close(r.heldCh)
 			// One monitor per hold: a Yield cancels it, and the next hold
 			// starts a new one with no verdict carried over.
-			var holdCtx context.Context
-			holdCtx, r.cancelMonitor = context.WithCancel(monitorCtx)
-			go r.monitorLeaseAge(holdCtx)
+			// A StopRenewing keeps the monitor of the hold running: it is not
+			// started again when the hold is taken back.
+			if r.cancelMonitor == nil {
+				var holdCtx context.Context
+				holdCtx, r.cancelMonitor = context.WithCancel(monitorCtx)
+				go r.monitorLeaseAge(holdCtx)
+			}
 		}
 		r.mu.Unlock()
 
