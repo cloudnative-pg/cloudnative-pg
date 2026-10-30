@@ -5130,6 +5130,44 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
+                      writePathCheck:
+                        description: |-
+                          Configure the write path check of the primary instance. When enabled,
+                          the instance manager periodically performs a minimal local write
+                          (a WAL flush that does not wait for synchronous standbys) and, if it
+                          does not complete within the configured timeout, it reports the primary
+                          as having a stalled write path. If a healthy replica is available, the
+                          operator then fails over to it. Disabled by default.
+                        properties:
+                          clearAfterSuccesses:
+                            description: |-
+                              Number of consecutive successful heartbeats required to clear a
+                              stalled write path. A stall is never cleared once a failover or
+                              switchover away from this instance has started. Defaults to 3.
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          enabled:
+                            default: false
+                            description: Whether the write path check is enabled.
+                              Defaults to false.
+                            type: boolean
+                          periodSeconds:
+                            description: |-
+                              Interval in seconds between two heartbeats. A new heartbeat is started
+                              only when the previous one has completed. Defaults to 10.
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          timeoutSeconds:
+                            description: |-
+                              Duration in seconds after which a heartbeat that has not completed
+                              marks the write path of the primary as stalled. Defaults to 30.
+                              Must be greater than `periodSeconds`.
+                            format: int32
+                            minimum: 1
+                            type: integer
+                        type: object
                     type: object
                   readiness:
                     description: The readiness probe configuration

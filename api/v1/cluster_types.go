@@ -684,6 +684,44 @@ type LivenessProbe struct {
 	// stanza lives under. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
+
+	// Configure the write path check of the primary instance. When enabled,
+	// the instance manager periodically performs a minimal local write
+	// (a WAL flush that does not wait for synchronous standbys) and, if it
+	// does not complete within the configured timeout, it reports the primary
+	// as having a stalled write path. If a healthy replica is available, the
+	// operator then fails over to it. Disabled by default.
+	// +optional
+	WritePathCheck *WritePathCheckConfiguration `json:"writePathCheck,omitempty"`
+}
+
+// WritePathCheckConfiguration contains the configuration for the write path
+// check of the primary instance
+type WritePathCheckConfiguration struct {
+	// Whether the write path check is enabled. Defaults to false.
+	// +optional
+	// +kubebuilder:default:=false
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Interval in seconds between two heartbeats. A new heartbeat is started
+	// only when the previous one has completed. Defaults to 10.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	PeriodSeconds *int32 `json:"periodSeconds,omitempty"`
+
+	// Duration in seconds after which a heartbeat that has not completed
+	// marks the write path of the primary as stalled. Defaults to 30.
+	// Must be greater than `periodSeconds`.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+
+	// Number of consecutive successful heartbeats required to clear a
+	// stalled write path. A stall is never cleared once a failover or
+	// switchover away from this instance has started. Defaults to 3.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	ClearAfterSuccesses *int32 `json:"clearAfterSuccesses,omitempty"`
 }
 
 // IsolationCheckConfiguration contains the configuration for the primary

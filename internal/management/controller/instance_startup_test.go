@@ -42,8 +42,9 @@ import (
 // fakeLeaseAcquirer reports whatever acquirePrimaryLease's caller should see
 // and counts the yields it is asked for.
 type fakeLeaseAcquirer struct {
-	err    error
-	yields int
+	err          error
+	yields       int
+	stopRenewals int
 }
 
 func (f *fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
@@ -52,6 +53,10 @@ func (f *fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
 
 func (f *fakeLeaseAcquirer) Yield(context.Context) {
 	f.yields++
+}
+
+func (f *fakeLeaseAcquirer) StopRenewing(context.Context) {
+	f.stopRenewals++
 }
 
 var _ = Describe("verifyPgDataCoherenceForPrimary primary lease gate", func() {

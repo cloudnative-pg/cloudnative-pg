@@ -1638,6 +1638,7 @@ _Appears in:_
 | `failureThreshold` _integer_ | Minimum consecutive failures for the probe to be considered failed after having succeeded.<br />Defaults to 3. Minimum value is 1. |  |  |  |
 | `terminationGracePeriodSeconds` _integer_ | Optional duration in seconds the pod needs to terminate gracefully upon probe failure.<br />The grace period is the duration in seconds after the processes running in the pod are sent<br />a termination signal and the time when the processes are forcibly halted with a kill signal.<br />Set this value longer than the expected cleanup time for your process.<br />If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this<br />value overrides the value provided by the pod spec.<br />Value must be non-negative integer. The value zero indicates stop immediately via<br />the kill signal (no opportunity to shut down).<br />This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.<br />Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset. |  |  |  |
 | `isolationCheck` _[IsolationCheckConfiguration](#isolationcheckconfiguration)_ | Configure the primary isolation check, which stops a primary whose<br />primary lease has gone past its renew deadline without a successful<br />renewal, when at least one other instance is unreachable or names a<br />different target primary, so that it stops accepting writes it can no<br />longer safely serve. Its reaction time is set by the `primaryLease`<br />timings and by `requestTimeout`, not by the liveness probe settings this<br />stanza lives under. Enabled by default. |  |  |  |
+| `writePathCheck` _[WritePathCheckConfiguration](#writepathcheckconfiguration)_ | Configure the write path check of the primary instance. When enabled,<br />the instance manager periodically performs a minimal local write<br />(a WAL flush that does not wait for synchronous standbys) and, if it<br />does not complete within the configured timeout, it reports the primary<br />as having a stalled write path. If a healthy replica is available, the<br />operator then fails over to it. Disabled by default. |  |  |  |
 
 
 
@@ -3454,5 +3455,26 @@ _Appears in:_
 | `onlineConfiguration` _[OnlineConfiguration](#onlineconfiguration)_ | Configuration parameters to control the online/hot backup with volume snapshots |  | \{ immediateCheckpoint:false waitForArchive:true \} |  |
 
 
+
+
+#### WritePathCheckConfiguration
+
+
+
+WritePathCheckConfiguration contains the configuration for the write path
+check of the primary instance
+
+
+
+_Appears in:_
+
+- [LivenessProbe](#livenessprobe)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `enabled` _boolean_ | Whether the write path check is enabled. Defaults to false. |  | false |  |
+| `periodSeconds` _integer_ | Interval in seconds between two heartbeats. A new heartbeat is started<br />only when the previous one has completed. Defaults to 10. |  |  | Minimum: 1 <br /> |
+| `timeoutSeconds` _integer_ | Duration in seconds after which a heartbeat that has not completed<br />marks the write path of the primary as stalled. Defaults to 30.<br />Must be greater than `periodSeconds`. |  |  | Minimum: 1 <br /> |
+| `clearAfterSuccesses` _integer_ | Number of consecutive successful heartbeats required to clear a<br />stalled write path. A stall is never cleared once a failover or<br />switchover away from this instance has started. Defaults to 3. |  |  | Minimum: 1 <br /> |
 
 

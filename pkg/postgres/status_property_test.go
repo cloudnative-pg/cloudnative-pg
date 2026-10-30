@@ -75,6 +75,8 @@ func genPostgresqlStatus(t *run) PostgresqlStatus {
 		IsPrimary:   t.bool(),
 		ReceivedLsn: receivedLsn,
 		ReplayLsn:   replayLsn,
+
+		IsWritePathStalled: t.bool(),
 	}
 }
 
