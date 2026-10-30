@@ -352,6 +352,14 @@ Human users, such as Database Administrators (DBAs), should not need
 additional permissions a DBA needs, and shows which `kubectl cnpg` commands
 each one enables.
 
+### RBAC for automation
+
+Automation (CI/CD, GitOps controllers) that writes CloudNativePG resources in a
+namespace should not need `cluster-admin` either, nor a widened `cnpg-manager`
+role. The [RBAC for Users](rbac.md#editor-roles-for-automation) page describes
+the editor roles shipped with the operator, which keep the high-privilege
+resources (`DatabaseRole`, `Pooler`) separate from the aggregate role.
+
 ### Role Based Access Control (RBAC)
 
 This section covers the operator's *own* RBAC (the service account and roles it
