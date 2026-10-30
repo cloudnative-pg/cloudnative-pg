@@ -109,6 +109,11 @@ type PostgresqlStatus struct {
 	//
 	// This field is never populated in the instance manager.
 	IsFenced bool `json:"isFenced,omitempty"`
+
+	// IsWritePathStalled is true when the instance manager of a primary
+	// detected that the write path (the local WAL flush) is blocked, as
+	// configured by `.spec.probes.liveness.writePathCheck`.
+	IsWritePathStalled bool `json:"isWritePathStalled,omitempty"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
@@ -304,6 +309,17 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	case list.Items[i].IsFenced && !list.Items[j].IsFenced:
 		return false
 	case !list.Items[i].IsFenced && list.Items[j].IsFenced:
+		return true
+	}
+
+	// A primary with a stalled write path can't commit anything, so it sorts after
+	// every healthy instance, that is the ones that can be promoted. It still sorts
+	// before the instances with an incomplete status (handled above) and, when no
+	// healthy instance is left, it remains the first of the list: no failover.
+	switch {
+	case list.Items[i].IsWritePathStalled && !list.Items[j].IsWritePathStalled:
+		return false
+	case !list.Items[i].IsWritePathStalled && list.Items[j].IsWritePathStalled:
 		return true
 	}
 
