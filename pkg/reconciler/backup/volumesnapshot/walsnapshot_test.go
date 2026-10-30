@@ -111,13 +111,13 @@ var _ = Describe("WAL snapshot skipping", func() {
 	})
 
 	It("skips the WAL snapshot of an online backup", func() {
-		Expect(isWalSnapshotSkipped(cluster, backup)).To(BeTrue())
+		Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeTrue())
 	})
 
 	DescribeTable("keeps the WAL snapshot",
 		func(mutate func(*apiv1.Cluster, *apiv1.Backup)) {
 			mutate(cluster, backup)
-			Expect(isWalSnapshotSkipped(cluster, backup)).To(BeFalse())
+			Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeFalse())
 		},
 		Entry("for a cold backup", func(_ *apiv1.Cluster, b *apiv1.Backup) {
 			b.Spec.Online = ptr.To(false)
@@ -162,7 +162,7 @@ var _ = Describe("WAL snapshot skipping", func() {
 		Expect(snapshotList.Items).To(HaveLen(1))
 		Expect(snapshotList.Items[0].Name).To(Equal(backupName))
 		Expect(snapshotList.Items[0].Annotations).To(
-			HaveKeyWithValue(utils.WalSnapshotSkippedAnnotationName, "true"))
+			HaveKeyWithValue(utils.WalVolumeSnapshotSkippedAnnotationName, "true"))
 	})
 
 	It("doesn't mark the snapshot of an instance without a WAL PVC", func(ctx SpecContext) {
@@ -173,7 +173,7 @@ var _ = Describe("WAL snapshot skipping", func() {
 		var snapshotList volumesnapshotv1.VolumeSnapshotList
 		Expect(executor.cli.List(ctx, &snapshotList)).To(Succeed())
 		Expect(snapshotList.Items).To(HaveLen(1))
-		Expect(snapshotList.Items[0].Annotations).ToNot(HaveKey(utils.WalSnapshotSkippedAnnotationName))
+		Expect(snapshotList.Items[0].Annotations).ToNot(HaveKey(utils.WalVolumeSnapshotSkippedAnnotationName))
 	})
 
 	It("creates unmarked snapshots of every PVC when pg_backup_stop doesn't wait for the archiver",
@@ -186,7 +186,7 @@ var _ = Describe("WAL snapshot skipping", func() {
 			Expect(executor.cli.List(ctx, &snapshotList)).To(Succeed())
 			Expect(snapshotList.Items).To(HaveLen(2))
 			for _, snapshot := range snapshotList.Items {
-				Expect(snapshot.Annotations).ToNot(HaveKey(utils.WalSnapshotSkippedAnnotationName))
+				Expect(snapshot.Annotations).ToNot(HaveKey(utils.WalVolumeSnapshotSkippedAnnotationName))
 			}
 		})
 
@@ -200,8 +200,8 @@ var _ = Describe("WAL snapshot skipping", func() {
 					Name:      backupName,
 					Labels:    map[string]string{utils.BackupNameLabelName: backupName},
 					Annotations: map[string]string{
-						utils.PvcRoleLabelName:                 string(utils.PVCRolePgData),
-						utils.WalSnapshotSkippedAnnotationName: "true",
+						utils.PvcRoleLabelName:                       string(utils.PVCRolePgData),
+						utils.WalVolumeSnapshotSkippedAnnotationName: "true",
 					},
 				},
 			}
@@ -221,7 +221,7 @@ var _ = Describe("WAL snapshot skipping", func() {
 			var latestBackup apiv1.Backup
 			Expect(executor.cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: backupName},
 				&latestBackup)).To(Succeed())
-			Expect(latestBackup.Status.BackupSnapshotStatus.WalSnapshotSkipped).To(BeTrue())
+			Expect(latestBackup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeTrue())
 		})
 
 		It("fails when the WAL archiver plugin was removed during the backup", func(ctx SpecContext) {

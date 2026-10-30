@@ -517,7 +517,7 @@ var _ = Describe("check if bootstrap recovery can proceed", func() {
 				Status: apiv1.BackupStatus{
 					Phase: apiv1.BackupPhaseCompleted,
 					BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
-						WalSnapshotSkipped: true,
+						WalVolumeSnapshotSkipped: true,
 					},
 				},
 			},
