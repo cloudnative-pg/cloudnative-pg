@@ -1826,6 +1826,22 @@ var _ = Describe("GetServiceAccountName", func() {
 	})
 })
 
+var _ = Describe("AcceptsReferencesFrom", func() {
+	DescribeTable("tells whether the objects of a namespace may target the cluster",
+		func(enableCrossNamespaceResources bool, namespace string, expected bool) {
+			cluster := &Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "postgres"},
+				Spec:       ClusterSpec{EnableCrossNamespaceResources: enableCrossNamespaceResources},
+			}
+			Expect(cluster.AcceptsReferencesFrom(namespace)).To(Equal(expected))
+		},
+		Entry("own namespace, feature disabled", false, "postgres", true),
+		Entry("own namespace, feature enabled", true, "postgres", true),
+		Entry("other namespace, feature disabled", false, "app", false),
+		Entry("other namespace, feature enabled", true, "app", true),
+	)
+})
+
 var _ = Describe("RecoveryTarget.BuildPostgresOptions", func() {
 	It("returns an empty string for a nil receiver", func() {
 		var target *RecoveryTarget

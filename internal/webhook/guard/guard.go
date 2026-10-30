@@ -28,6 +28,8 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -161,6 +163,16 @@ func (g *Admission[T]) ensureResourceIsValid(ctx context.Context, params Admissi
 		return ctrl.Result{}, nil
 	}
 
+	// A validator that could not reach a verdict, for example because it
+	// failed to read another object, says so with an internal error. The
+	// resource is not known to be invalid: retry with a backoff instead of
+	// recording it as invalid and giving up on it.
+	if isInconclusive(validationErr) {
+		contextLogger.Info("Could not validate resource, retrying",
+			"validationError", validationErr.Error())
+		return ctrl.Result{}, validationErr
+	}
+
 	// The full validation error can embed field values such as connection
 	// strings, object-store URLs or secret names; keep it in the logs only and
 	// persist just a sanitized summary to the world-readable status.
@@ -181,6 +193,27 @@ func (g *Admission[T]) ensureResourceIsValid(ctx context.Context, params Admissi
 	}
 
 	return ctrl.Result{}, reconcile.TerminalError(validationErr)
+}
+
+// isInconclusive tells whether a validation error only reports checks that
+// could not be performed, as field.InternalError does. An error reporting at
+// least one field as invalid is a verdict, whatever else it reports.
+func isInconclusive(err error) bool {
+	var statusErr *apierrors.StatusError
+	if !errors.As(err, &statusErr) || statusErr.ErrStatus.Details == nil {
+		return false
+	}
+
+	causes := statusErr.ErrStatus.Details.Causes
+	if len(causes) == 0 {
+		return false
+	}
+	for _, cause := range causes {
+		if cause.Type != metav1.CauseType(field.ErrorTypeInternal) {
+			return false
+		}
+	}
+	return true
 }
 
 // sanitizeValidationError returns a summary of a validation error that is safe

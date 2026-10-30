@@ -33,11 +33,10 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -70,7 +69,7 @@ func newTestDatabaseRole() *apiv1.DatabaseRole {
 		},
 		Spec: apiv1.DatabaseRoleSpec{
 			RoleConfiguration: apiv1.RoleConfiguration{Name: testRoleName},
-			ClusterRef:        corev1.LocalObjectReference{Name: testClusterName},
+			ClusterRef:        apiv1.ClusterObjectReference{Name: testClusterName},
 			ReclaimPolicy:     apiv1.DatabaseRoleReclaimRetain,
 		},
 	}
@@ -256,8 +255,7 @@ var _ = Describe("DatabaseRole succeededReconciliation", func() {
 		role := newTestDatabaseRole()
 		role.Spec.Password = &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeExternal}
 		role.Status.Password = &apiv1.GeneratedPasswordState{PendingRevocation: true}
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient := newIndexedFakeClientBuilder().
 			WithObjects(role).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
@@ -278,8 +276,7 @@ var _ = Describe("DatabaseRole succeededReconciliation", func() {
 
 var _ = Describe("DatabaseRole shouldReconcile", func() {
 	reconcilerFor := func(role *apiv1.DatabaseRole) *DatabaseRoleReconciler {
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient := newIndexedFakeClientBuilder().
 			WithObjects(role).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
@@ -484,8 +481,7 @@ var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
 				corev1.BasicAuthPasswordKey: []byte("0mA3nCe0f6THe1dIvIne"),
 			},
 		}
-		cli := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		cli := newIndexedFakeClientBuilder().
 			WithObjects(role, secret).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
@@ -501,6 +497,89 @@ var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
 		Expect(statements).To(ContainElement(SatisfyAll(
 			HavePrefix("CREATE ROLE"),
 			ContainSubstring("VALID UNTIL '"+expiration.Format("2006-01-02 15:04:05")),
+		)))
+	})
+})
+
+var _ = Describe("DatabaseRole reconcileRole across namespaces", func() {
+	It("reads the password from the Secret in the namespace of the role", func() {
+		const tenantNamespace = "tenant"
+
+		var (
+			statements  []string
+			readSecrets []client.ObjectKey
+		)
+		recorder := sqlmock.QueryMatcherFunc(func(_, actualSQL string) error {
+			statements = append(statements, actualSQL)
+			return nil
+		})
+		db, dbMock, err := sqlmock.New(sqlmock.QueryMatcherOption(recorder))
+		Expect(err).NotTo(HaveOccurred())
+		// No rows from pg_authid, so reconcileRole takes the create path.
+		dbMock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{
+			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword",
+			"rolvaliduntil", "rolbypassrls", "comment", "xmin", "inroles",
+		}))
+		dbMock.ExpectBegin()
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+		dbMock.ExpectCommit()
+
+		role := newTestDatabaseRole()
+		role.Namespace = tenantNamespace
+		role.Spec.ClusterRef.Namespace = testNamespace
+		role.Spec.PasswordSecret = &apiv1.LocalObjectReference{Name: "app-role-password"}
+
+		newSecret := func(namespace, password string) *corev1.Secret {
+			return &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "app-role-password", Namespace: namespace},
+				Type:       corev1.SecretTypeBasicAuth,
+				Data: map[string][]byte{
+					corev1.BasicAuthUsernameKey: []byte(testRoleName),
+					corev1.BasicAuthPasswordKey: []byte(password),
+				},
+			}
+		}
+		// A Secret with the same name in the namespace of the cluster must
+		// not be used in place of the one next to the role
+		cli := newIndexedFakeClientBuilder().
+			WithObjects(
+				role,
+				newSecret(tenantNamespace, "tenant-password"),
+				newSecret(testNamespace, "cluster-namespace-password"),
+			).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(
+					ctx context.Context,
+					c client.WithWatch,
+					key client.ObjectKey,
+					obj client.Object,
+					opts ...client.GetOption,
+				) error {
+					if _, ok := obj.(*corev1.Secret); ok {
+						readSecrets = append(readSecrets, key)
+					}
+					return c.Get(ctx, key, obj, opts...)
+				},
+			}).
+			Build()
+		r := &DatabaseRoleReconciler{Client: cli, instance: &fakeRoleInstance{db: db}}
+
+		_, err = r.reconcileRole(context.Background(), role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+
+		// The password is hashed before reaching PostgreSQL, so check which
+		// Secret it came from
+		Expect(readSecrets).To(ConsistOf(
+			client.ObjectKey{Namespace: tenantNamespace, Name: "app-role-password"},
+		))
+		Expect(statements).To(ContainElement(SatisfyAll(
+			HavePrefix("CREATE ROLE"),
+			ContainSubstring("PASSWORD 'SCRAM-SHA-256$"),
 		)))
 	})
 })
@@ -523,8 +602,7 @@ var _ = Describe("DatabaseRole handleDeletion", func() {
 
 	// run persists the (deleting) role, then drives handleDeletion against it.
 	run := func(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) (client.Client, ctrl.Result) {
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient := newIndexedFakeClientBuilder().
 			WithObjects(role).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
@@ -644,8 +722,7 @@ var _ = Describe("DatabaseRole mapClusterToDatabaseRoles", func() {
 		foreign := newTestDatabaseRole()
 		foreign.Name = "role-cr-other-namespace"
 		foreign.Namespace = "another-namespace"
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient := newIndexedFakeClientBuilder().
 			WithObjects(mine, other, foreign).
 			Build()
 		r = &DatabaseRoleReconciler{Client: fakeClient, instance: &fakeRoleInstance{}}

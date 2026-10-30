@@ -1646,6 +1646,14 @@ func (cluster *Cluster) GetPodSelectorIPs() map[string][]string {
 	return result
 }
 
+// AcceptsReferencesFrom tells whether the Database, DatabaseRole, Publication
+// and Subscription objects of the passed namespace may target this cluster:
+// the ones of its own namespace always can, the ones of other namespaces only
+// when the cluster enables cross-namespace resources.
+func (cluster *Cluster) AcceptsReferencesFrom(namespace string) bool {
+	return namespace == cluster.Namespace || cluster.Spec.EnableCrossNamespaceResources
+}
+
 // GetServiceAccountName returns the name of the ServiceAccount for this cluster.
 func (cluster *Cluster) GetServiceAccountName() string {
 	if cluster.Spec.ServiceAccountName != "" {

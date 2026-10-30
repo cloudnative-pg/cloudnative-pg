@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -54,8 +53,14 @@ func (sub *Subscription) GetStatusApplied() *bool {
 }
 
 // GetClusterRef returns the cluster reference of the subscription
-func (sub *Subscription) GetClusterRef() corev1.LocalObjectReference {
+func (sub *Subscription) GetClusterRef() ClusterObjectReference {
 	return sub.Spec.ClusterRef
+}
+
+// GetClusterNamespace returns the namespace of the referenced cluster.
+// If not specified, defaults to the Subscription's namespace.
+func (sub *Subscription) GetClusterNamespace() string {
+	return sub.Spec.ClusterRef.namespaceOrDefault(sub.Namespace)
 }
 
 // GetName returns the subscription object name

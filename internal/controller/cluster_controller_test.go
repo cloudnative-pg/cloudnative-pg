@@ -1893,7 +1893,7 @@ var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 	expectedRequest := reconcile.Request{
 		NamespacedName: types.NamespacedName{Namespace: ns, Name: referencedName},
 	}
-	clusterRef := corev1.LocalObjectReference{Name: referencedName}
+	clusterRef := apiv1.ClusterObjectReference{Name: referencedName}
 
 	It("maps a Database to a reconcile request for the referenced cluster", func(ctx SpecContext) {
 		db := &apiv1.Database{

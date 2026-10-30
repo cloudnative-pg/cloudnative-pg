@@ -608,6 +608,27 @@ _Appears in:_
 | `enabled` _boolean_ | Enable TLS for the monitoring endpoint.<br />Changing this option will force a rollout of all instances. |  | false |  |
 
 
+#### ClusterObjectReference
+
+
+
+ClusterObjectReference references a Cluster, optionally in a different namespace.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleSpec](#databaserolespec)
+- [DatabaseSpec](#databasespec)
+- [PublicationSpec](#publicationspec)
+- [SubscriptionSpec](#subscriptionspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the Cluster. | True |  |  |
+| `namespace` _string_ | Namespace of the Cluster. Defaults to the namespace of the referring<br />object if empty. A Cluster in another namespace must have<br />`enableCrossNamespaceResources` set to true. |  |  |  |
+
+
 #### ClusterSpec
 
 
@@ -679,6 +700,7 @@ _Appears in:_
 | `plugins` _[PluginConfiguration](#pluginconfiguration) array_ | The plugins configuration, containing<br />any plugin to be loaded with the corresponding configuration |  |  |  |
 | `probes` _[ProbesConfiguration](#probesconfiguration)_ | The configuration of the probes to be injected<br />in the PostgreSQL Pods. |  |  |  |
 | `primaryLease` _[PrimaryLeaseConfiguration](#primaryleaseconfiguration)_ | Configuration of the Kubernetes `Lease` used to coordinate safe primary<br />election within the cluster. When omitted, the operator applies built-in<br />defaults; tune these values only if you understand the consequences for<br />failover timing. |  |  |  |
+| `enableCrossNamespaceResources` _boolean_ | EnableCrossNamespaceResources enables this cluster to manage the<br />Database, DatabaseRole, Publication and Subscription resources of other<br />namespaces. When enabled, a ClusterRole and a ClusterRoleBinding are<br />created to grant the cluster access to those resources in every<br />namespace, and a Role with its RoleBinding is created in each namespace<br />holding the password Secrets of its DatabaseRoles.<br />It cannot be disabled once enabled. |  | false |  |
 
 
 #### ClusterStatus
@@ -997,7 +1019,7 @@ _Appears in:_
 | `login` _boolean_ | Whether the role is allowed to log in. A role having the `login`<br />attribute can be thought of as a user. Roles without this attribute<br />are useful for managing database privileges, but are not users in<br />the usual sense of the word. Default is `false`. |  |  |  |
 | `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication. Default<br />is `false`. |  |  |  |
 | `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
-| `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
+| `cluster` _[ClusterObjectReference](#clusterobjectreference)_ | The corresponding cluster | True |  |  |
 | `databaseRoleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
 | `clientCertificate` _[ClientCertificateConfiguration](#clientcertificateconfiguration)_ | ClientCertificate configures the operator to generate and renew a TLS client<br />certificate for this role, signed by the cluster's client CA. The certificate<br />is stored in a Secret named `<databaserole-name>-client-cert`.<br />Requires login to be true. |  |  |  |
 | `password` _[PasswordConfiguration](#passwordconfiguration)_ | Password configures how the operator manages the password of this role,<br />instead of requiring a pre-existing Secret through `passwordSecret` or<br />disabling it through `disablePassword`. Mutually exclusive with both. |  |  |  |
@@ -1042,7 +1064,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The name of the PostgreSQL cluster hosting the database. | True |  |  |
+| `cluster` _[ClusterObjectReference](#clusterobjectreference)_ | The name of the PostgreSQL cluster hosting the database. | True |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Ensure the PostgreSQL database is `present` or `absent` - defaults to "present". |  | present | Enum: [present absent] <br /> |
 | `name` _string_ | The name of the database to create inside PostgreSQL. This setting cannot be changed. | True |  |  |
 | `owner` _string_ | Maps to the `OWNER` parameter of `CREATE DATABASE`.<br />Maps to the `OWNER TO` command of `ALTER DATABASE`.<br />The role name of the user who owns the database inside PostgreSQL. | True |  |  |
@@ -2564,7 +2586,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The name of the PostgreSQL cluster that identifies the "publisher" | True |  |  |
+| `cluster` _[ClusterObjectReference](#clusterobjectreference)_ | The name of the PostgreSQL cluster that identifies the "publisher" | True |  |  |
 | `name` _string_ | The name of the publication inside PostgreSQL | True |  |  |
 | `dbname` _string_ | The name of the database where the publication will be installed in<br />the "publisher" cluster | True |  |  |
 | `parameters` _object (keys:string, values:string)_ | Publication parameters part of the `WITH` clause as expected by<br />PostgreSQL `CREATE PUBLICATION` command |  |  |  |
@@ -3163,7 +3185,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The name of the PostgreSQL cluster that identifies the "subscriber" | True |  |  |
+| `cluster` _[ClusterObjectReference](#clusterobjectreference)_ | The name of the PostgreSQL cluster that identifies the "subscriber" | True |  |  |
 | `name` _string_ | The name of the subscription inside PostgreSQL | True |  |  |
 | `dbname` _string_ | The name of the database where the publication will be installed in<br />the "subscriber" cluster | True |  |  |
 | `parameters` _object (keys:string, values:string)_ | Subscription parameters included in the `WITH` clause of the PostgreSQL<br />`CREATE SUBSCRIPTION` command. Most parameters cannot be changed<br />after the subscription is created and will be ignored if modified<br />later, except for a limited set documented at:<br />https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET |  |  |  |

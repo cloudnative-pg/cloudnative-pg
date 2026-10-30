@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -45,8 +44,7 @@ var _ = Describe("DatabaseRole operator-side controller", func() {
 
 	buildRoleReconciler := func(objs ...client.Object) (*DatabaseRoleReconciler, client.Client) {
 		scheme := schemeBuilder.BuildWithAllKnownScheme()
-		cli := fake.NewClientBuilder().
-			WithScheme(scheme).
+		cli := newClusterIndexedFakeClientBuilder(scheme).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			WithObjects(objs...).
 			Build()
@@ -58,7 +56,7 @@ var _ = Describe("DatabaseRole operator-side controller", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
 			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{Name: name},
-				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+				ClusterRef:        apiv1.ClusterObjectReference{Name: "cluster-example"},
 			},
 		}
 		if secretName != "" {
@@ -231,7 +229,7 @@ var _ = Describe("DatabaseRole status patch", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "role-a", Namespace: "default"},
 			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{Name: "role-a"},
-				ClusterRef:        corev1.LocalObjectReference{Name: "cluster-example"},
+				ClusterRef:        apiv1.ClusterObjectReference{Name: "cluster-example"},
 			},
 			Status: apiv1.DatabaseRoleStatus{
 				Password: &apiv1.GeneratedPasswordState{SecretName: "role-a-password"},
@@ -244,8 +242,7 @@ var _ = Describe("DatabaseRole status patch", func() {
 		funcs interceptor.Funcs,
 	) (*DatabaseRoleReconciler, client.Client) {
 		scheme := schemeBuilder.BuildWithAllKnownScheme()
-		cli := fake.NewClientBuilder().
-			WithScheme(scheme).
+		cli := newClusterIndexedFakeClientBuilder(scheme).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			WithObjects(role).
 			WithInterceptorFuncs(funcs).

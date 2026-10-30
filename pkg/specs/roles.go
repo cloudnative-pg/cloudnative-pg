@@ -20,11 +20,15 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -318,6 +322,205 @@ func CreateRole(opts RoleOptions) rbacv1.Role {
 			},
 		},
 		Rules: rules,
+	}
+}
+
+// GetCrossNamespaceRoleName returns the name of the ClusterRole and of the
+// ClusterRoleBinding used by the cluster to access the resources referring to
+// it from other namespaces
+func GetCrossNamespaceRoleName(cluster apiv1.Cluster) string {
+	return GetCrossNamespaceRoleNameFor(cluster.Namespace, cluster.Name)
+}
+
+// GetCrossNamespaceRoleNameFor returns the name of the ClusterRole and of the
+// ClusterRoleBinding used to access the resources from other namespaces by the
+// cluster having the passed namespace and name. It allows computing the name
+// when the Cluster object is no longer available, such as while reconciling
+// its deletion.
+//
+// The objects are cluster-scoped, so their name must identify the namespace
+// and the name of the cluster. Both may contain dashes, so joining them would
+// be ambiguous: the name embeds a hash of the namespaced name instead, whose
+// separator cannot appear in either part.
+func GetCrossNamespaceRoleNameFor(namespace, name string) string {
+	sum := sha256.Sum256([]byte(namespace + "/" + name))
+	return "cnpg-cross-ns-" + hex.EncodeToString(sum[:])[:crossNamespaceRoleHashLength]
+}
+
+// crossNamespaceRoleHashLength is the number of hexadecimal digits of the hash
+// of the namespaced name of the cluster used in the name of its cross-namespace
+// ClusterRole: 64 bits make a collision between two clusters negligible
+const crossNamespaceRoleHashLength = 16
+
+// crossNamespaceManagedResources are the resources the instance manager
+// reconciles, which may refer to its cluster from other namespaces
+var crossNamespaceManagedResources = []string{
+	"databases",
+	"databaseroles",
+	"publications",
+	"subscriptions",
+}
+
+// CreateCrossNamespaceRole creates a ClusterRole with the permissions needed
+// by the instance manager to reconcile the Database, DatabaseRole,
+// Publication and Subscription resources from any namespace
+func CreateCrossNamespaceRole(cluster apiv1.Cluster) rbacv1.ClusterRole {
+	statusResources := make([]string, 0, len(crossNamespaceManagedResources))
+	for _, resource := range crossNamespaceManagedResources {
+		statusResources = append(statusResources, resource+"/status")
+	}
+
+	return rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   GetCrossNamespaceRoleName(cluster),
+			Labels: crossNamespaceRBACLabels(cluster),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{apiv1.SchemeGroupVersion.Group},
+				Resources: slices.Clone(crossNamespaceManagedResources),
+				Verbs:     []string{"get", "update", "list", "watch"},
+			},
+			{
+				APIGroups: []string{apiv1.SchemeGroupVersion.Group},
+				Resources: statusResources,
+				Verbs:     []string{"get", "patch", "update"},
+			},
+		},
+	}
+}
+
+// crossNamespaceRBACLabels returns the labels identifying the cluster owning
+// one of the RBAC objects granting access to other namespaces: those objects
+// cannot have an owner reference to the cluster, which lives in a namespace
+func crossNamespaceRBACLabels(cluster apiv1.Cluster) map[string]string {
+	return CrossNamespaceRBACLabelsFor(cluster.Namespace, cluster.Name)
+}
+
+// CrossNamespaceRBACLabelsFor returns the labels identifying the RBAC objects
+// granting access to other namespaces to the cluster having the passed
+// namespace and name. It allows finding them when the Cluster object is no
+// longer available.
+func CrossNamespaceRBACLabelsFor(namespace, name string) map[string]string {
+	return map[string]string{
+		utils.ClusterLabelName:                name,
+		utils.ClusterNamespaceLabelName:       namespace,
+		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+	}
+}
+
+// CrossNamespaceRBACSelector selects the RBAC objects the operator created
+// for the cross-namespace resources support of any cluster: the ones managed
+// by the operator and carrying the namespace and the name of their cluster
+func CrossNamespaceRBACSelector() (labels.Selector, error) {
+	managedBy, err := labels.NewRequirement(
+		utils.KubernetesAppManagedByLabelName, selection.Equals, []string{utils.ManagerName})
+	if err != nil {
+		return nil, err
+	}
+	clusterName, err := labels.NewRequirement(utils.ClusterLabelName, selection.Exists, nil)
+	if err != nil {
+		return nil, err
+	}
+	clusterNamespace, err := labels.NewRequirement(utils.ClusterNamespaceLabelName, selection.Exists, nil)
+	if err != nil {
+		return nil, err
+	}
+	return labels.NewSelector().Add(*managedBy, *clusterName, *clusterNamespace), nil
+}
+
+// IsCrossNamespaceRBACOwnedBy tells whether the labels of an RBAC object
+// identify it as created by the operator for the cluster having the passed
+// namespace and name
+func IsCrossNamespaceRBACOwnedBy(labels map[string]string, namespace, name string) bool {
+	return labels[utils.ClusterLabelName] == name &&
+		labels[utils.ClusterNamespaceLabelName] == namespace &&
+		labels[utils.KubernetesAppManagedByLabelName] == utils.ManagerName
+}
+
+// CreateCrossNamespaceRoleBinding creates a ClusterRoleBinding that binds
+// the cross-namespace ClusterRole to the cluster's ServiceAccount
+func CreateCrossNamespaceRoleBinding(cluster apiv1.Cluster) rbacv1.ClusterRoleBinding {
+	return rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   GetCrossNamespaceRoleName(cluster),
+			Labels: crossNamespaceRBACLabels(cluster),
+		},
+		Subjects: crossNamespaceRBACSubjects(cluster),
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     GetCrossNamespaceRoleName(cluster),
+		},
+	}
+}
+
+// crossNamespaceRBACSubjects returns the subjects of the bindings granting
+// access to other namespaces: the ServiceAccount the instances run with, which
+// is not named after the cluster when `serviceAccountName` is set
+func crossNamespaceRBACSubjects(cluster apiv1.Cluster) []rbacv1.Subject {
+	return []rbacv1.Subject{
+		{
+			Kind:      "ServiceAccount",
+			Name:      cluster.GetServiceAccountName(),
+			Namespace: cluster.Namespace,
+		},
+	}
+}
+
+// GetCrossNamespaceSecretNames returns the names of the password Secrets the
+// instance manager must read to apply the passwords of the passed
+// DatabaseRoles, sorted and without duplicates
+func GetCrossNamespaceSecretNames(roles []apiv1.DatabaseRole) []string {
+	return cleanupResourceList(customResourceRolesSecrets(roles))
+}
+
+// CreateCrossNamespaceSecretsRole creates the Role allowing the instance
+// manager to read, in the passed namespace, the password Secrets of the
+// DatabaseRoles of the cluster living there.
+//
+// A ClusterRole cannot be used here, as its resource names would match the
+// Secrets of every namespace. The caller must not create the Role when
+// there is no Secret to read: a rule without resource names would grant
+// access to every Secret of the namespace.
+func CreateCrossNamespaceSecretsRole(
+	cluster apiv1.Cluster,
+	namespace string,
+	secretNames []string,
+) rbacv1.Role {
+	return rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GetCrossNamespaceRoleName(cluster),
+			Namespace: namespace,
+			Labels:    crossNamespaceRBACLabels(cluster),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				Verbs:         []string{"get", "watch"},
+				ResourceNames: slices.Clone(secretNames),
+			},
+		},
+	}
+}
+
+// CreateCrossNamespaceSecretsRoleBinding creates the RoleBinding granting,
+// in the passed namespace, the Role created by CreateCrossNamespaceSecretsRole
+// to the ServiceAccount of the cluster
+func CreateCrossNamespaceSecretsRoleBinding(cluster apiv1.Cluster, namespace string) rbacv1.RoleBinding {
+	return rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GetCrossNamespaceRoleName(cluster),
+			Namespace: namespace,
+			Labels:    crossNamespaceRBACLabels(cluster),
+		},
+		Subjects: crossNamespaceRBACSubjects(cluster),
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     GetCrossNamespaceRoleName(cluster),
+		},
 	}
 }
 

@@ -24,12 +24,12 @@ import (
 	"errors"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -38,8 +38,11 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	ctx context.Context,
 	namespacedName types.NamespacedName,
 ) error {
+	// The owned resources may refer to a cluster living in another namespace,
+	// so they are looked up in every namespace through the index of their
+	// cluster reference, instead of being listed in the namespace of the cluster.
 	var dbList apiv1.DatabaseList
-	if err := r.List(ctx, &dbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+	if err := r.List(ctx, &dbList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
 	}
 
@@ -54,7 +57,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	}
 
 	var pbList apiv1.PublicationList
-	if err := r.List(ctx, &pbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+	if err := r.List(ctx, &pbList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
 	}
 
@@ -69,7 +72,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	}
 
 	var sbList apiv1.SubscriptionList
-	if err := r.List(ctx, &sbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+	if err := r.List(ctx, &sbList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
 	}
 
@@ -84,7 +87,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	}
 
 	var roleList apiv1.DatabaseRoleList
-	if err := r.List(ctx, &roleList, client.InNamespace(namespacedName.Namespace)); err != nil {
+	if err := r.List(ctx, &roleList, clusterindex.MatchingCluster(namespacedName)); err != nil {
 		return err
 	}
 
@@ -101,7 +104,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 // capabilities
 type clusterOwnedResourceWithStatus interface {
 	client.Object
-	GetClusterRef() corev1.LocalObjectReference
+	clusterindex.ClusterReferrer
 	GetStatusMessage() string
 	SetAsFailed(err error)
 	SetStatusObservedGeneration(obsGeneration int64)
@@ -130,7 +133,12 @@ func notifyOwnedResourceDeletion[T clusterOwnedResourceWithStatus](
 			"resourceName", obj.GetName(),
 			"finalizerName", finalizerName,
 		)
-		if obj.GetClusterRef().Name != namespacedName.Name {
+		// The resources are matched on the namespace of the referenced cluster
+		// too, and not just on its name: a cross-namespace resource may be
+		// listed from any namespace, and a resource referring to a cluster
+		// having the same name in another namespace must be left alone.
+		if obj.GetClusterRef().Name != namespacedName.Name ||
+			obj.GetClusterNamespace() != namespacedName.Namespace {
 			continue
 		}
 

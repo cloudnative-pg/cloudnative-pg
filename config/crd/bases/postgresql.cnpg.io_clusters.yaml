@@ -2249,6 +2249,17 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              enableCrossNamespaceResources:
+                default: false
+                description: |-
+                  EnableCrossNamespaceResources enables this cluster to manage the
+                  Database, DatabaseRole, Publication and Subscription resources of other
+                  namespaces. When enabled, a ClusterRole and a ClusterRoleBinding are
+                  created to grant the cluster access to those resources in every
+                  namespace, and a Role with its RoleBinding is created in each namespace
+                  holding the password Secrets of its DatabaseRoles.
+                  It cannot be disabled once enabled.
+                type: boolean
               enablePDB:
                 default: true
                 description: |-

@@ -476,6 +476,77 @@ var _ = Describe("EnsureResourceIsAdmitted", func() {
 		Expect(recorded).ToNot(ContainSubstring(sensitive))
 	})
 
+	It("retries without recording anything when the validator could not reach a verdict", func() {
+		// e.g. the validator failed to read the Cluster a Database refers to
+		validationError := apierrors.NewInvalid(
+			schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Database"},
+			"db-example",
+			field.ErrorList{
+				field.InternalError(field.NewPath("spec", "cluster"), errors.New("connection refused")),
+			},
+		)
+		statusUpdateCalled := false
+		mockCl.StatusUpdateFunc = func(
+			_ context.Context, _ client.Object, _ ...client.SubResourceUpdateOption,
+		) error {
+			statusUpdateCalled = true
+			return nil
+		}
+
+		guard := &Admission[*mockAdmittableObject]{
+			Validator: &mockValidator{
+				ValidateCreateFunc: func(_ context.Context, _ *mockAdmittableObject) (admission.Warnings, error) {
+					return nil, validationError
+				},
+			},
+		}
+
+		result, err := guard.EnsureResourceIsAdmitted(ctx, AdmissionParams[*mockAdmittableObject]{
+			Object:       obj,
+			Client:       mockCl,
+			ApplyChanges: true,
+		})
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, reconcile.TerminalError(nil))).To(BeFalse())
+		Expect(result.IsZero()).To(BeTrue())
+		Expect(statusUpdateCalled).To(BeFalse())
+		Expect(obj.AdmissionError).To(BeEmpty())
+	})
+
+	It("records the admission error when an invalid field comes with a check it could not perform", func() {
+		validationError := apierrors.NewInvalid(
+			schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Database"},
+			"db-example",
+			field.ErrorList{
+				field.InternalError(field.NewPath("spec", "cluster"), errors.New("connection refused")),
+				field.Invalid(field.NewPath("spec", "name"), "", "must not be empty"),
+			},
+		)
+		statusUpdateCalled := false
+		mockCl.StatusUpdateFunc = func(
+			_ context.Context, _ client.Object, _ ...client.SubResourceUpdateOption,
+		) error {
+			statusUpdateCalled = true
+			return nil
+		}
+
+		guard := &Admission[*mockAdmittableObject]{
+			Validator: &mockValidator{
+				ValidateCreateFunc: func(_ context.Context, _ *mockAdmittableObject) (admission.Warnings, error) {
+					return nil, validationError
+				},
+			},
+		}
+
+		_, err := guard.EnsureResourceIsAdmitted(ctx, AdmissionParams[*mockAdmittableObject]{
+			Object:       obj,
+			Client:       mockCl,
+			ApplyChanges: true,
+		})
+		Expect(errors.Is(err, reconcile.TerminalError(nil))).To(BeTrue())
+		Expect(statusUpdateCalled).To(BeTrue())
+	})
+
 	It("propagates an error from the status update", func() {
 		validationError := errors.New("validation failed")
 		updateError := errors.New("status update failed")

@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 )
@@ -463,32 +464,29 @@ func (r *DatabaseRoleReconciler) mapClientCASecretToRoles() handler.MapFunc {
 			return nil
 		}
 
-		// Collect the clusters whose client CA is the changed Secret.
-		matchingClusters := make(map[string]struct{})
-		for i := range clusters.Items {
-			if clusters.Items[i].GetClientCASecretName() == secret.Name {
-				matchingClusters[clusters.Items[i].Name] = struct{}{}
-			}
-		}
-		if len(matchingClusters) == 0 {
-			return nil
-		}
-
-		var roles apiv1.DatabaseRoleList
-		if err := r.List(ctx, &roles, client.InNamespace(secret.Namespace)); err != nil {
-			log.FromContext(ctx).Error(err, "while listing roles for CA secret", "secret", secret.Name)
-			return nil
-		}
-
+		// The roles of the clusters whose client CA is the changed Secret may
+		// live in any namespace, so they are looked up through the cluster index.
 		var result []reconcile.Request
-		for i := range roles.Items {
-			role := &roles.Items[i]
-			if !role.IsClientCertificateEnabled() {
+		for i := range clusters.Items {
+			if clusters.Items[i].GetClientCASecretName() != secret.Name {
 				continue
 			}
-			if _, ok := matchingClusters[role.Spec.ClusterRef.Name]; ok {
+
+			var roles apiv1.DatabaseRoleList
+			if err := r.List(ctx, &roles,
+				clusterindex.MatchingCluster(client.ObjectKeyFromObject(&clusters.Items[i])),
+			); err != nil {
+				log.FromContext(ctx).Error(err, "while listing roles for CA secret", "secret", secret.Name)
+				return nil
+			}
+
+			for j := range roles.Items {
+				role := &roles.Items[j]
+				if !role.IsClientCertificateEnabled() {
+					continue
+				}
 				result = append(result, reconcile.Request{
-					NamespacedName: types.NamespacedName{Name: role.Name, Namespace: role.Namespace},
+					NamespacedName: client.ObjectKeyFromObject(role),
 				})
 			}
 		}
@@ -506,19 +504,16 @@ func (r *DatabaseRoleReconciler) mapClusterToRoles() handler.MapFunc {
 		}
 
 		var roles apiv1.DatabaseRoleList
-		if err := r.List(ctx, &roles, client.InNamespace(cluster.Namespace)); err != nil {
+		if err := r.List(ctx, &roles, clusterindex.MatchingCluster(client.ObjectKeyFromObject(cluster))); err != nil {
 			log.FromContext(ctx).Error(err, "while listing roles for cluster", "cluster", cluster.Name)
 			return nil
 		}
 
-		var result []reconcile.Request
+		result := make([]reconcile.Request, 0, len(roles.Items))
 		for i := range roles.Items {
-			role := &roles.Items[i]
-			if role.Spec.ClusterRef.Name == cluster.Name {
-				result = append(result, reconcile.Request{
-					NamespacedName: types.NamespacedName{Name: role.Name, Namespace: role.Namespace},
-				})
-			}
+			result = append(result, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&roles.Items[i]),
+			})
 		}
 		return result
 	}

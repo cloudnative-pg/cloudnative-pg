@@ -21,24 +21,31 @@ package v1
 
 import (
 	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 type managedResourceComparer interface {
 	GetName() string
+	GetNamespace() string
 	GetManagedObjectName() string
-	GetClusterRef() corev1.LocalObjectReference
+	GetClusterRef() ClusterObjectReference
+	GetClusterNamespace() string
 	HasReconciliations() bool
 }
 
 func ensureManagedResourceExclusivity[T managedResourceComparer](t1 T, list []T) error {
 	for _, t2 := range list {
-		if t1.GetName() == t2.GetName() {
+		// The candidates may come from any namespace, so the object name alone
+		// does not identify the resource being checked
+		if t1.GetNamespace() == t2.GetNamespace() && t1.GetName() == t2.GetName() {
 			continue
 		}
 
+		// Check if both resources reference the same cluster (name and namespace)
 		if t1.GetClusterRef().Name != t2.GetClusterRef().Name {
+			continue
+		}
+
+		if t1.GetClusterNamespace() != t2.GetClusterNamespace() {
 			continue
 		}
 
@@ -49,12 +56,22 @@ func ensureManagedResourceExclusivity[T managedResourceComparer](t1 T, list []T)
 		if t1.GetManagedObjectName() == t2.GetManagedObjectName() {
 			return fmt.Errorf(
 				"%q is already managed by object %q",
-				t1.GetManagedObjectName(), t2.GetName(),
+				t1.GetManagedObjectName(), managerName(t1, t2),
 			)
 		}
 	}
 
 	return nil
+}
+
+// managerName returns the name of the manager object to report in a conflict
+// with the passed reference: the namespace is only added when it is not the
+// one of the reference, keeping the message unchanged in the common case
+func managerName[T managedResourceComparer](reference, manager T) string {
+	if reference.GetNamespace() == manager.GetNamespace() {
+		return manager.GetName()
+	}
+	return manager.GetNamespace() + "/" + manager.GetName()
 }
 
 // toSliceWithPointers converts a slice of items to a slice of pointers to the items

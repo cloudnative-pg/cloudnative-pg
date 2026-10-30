@@ -31,10 +31,13 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,6 +51,7 @@ import (
 	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -172,6 +176,19 @@ func RunController(
 		setupLog.Info("Plugin EndpointSlice watch disabled: OPERATOR_NAMESPACE not set")
 	}
 
+	// The only ClusterRoles and ClusterRoleBindings the operator reads are the
+	// ones it creates for the clusters enabling the cross-namespace resources
+	// support. Caching only those, through their labels, avoids both caching
+	// every RBAC object of the Kubernetes cluster and reading them from the
+	// API server at every reconciliation of a cluster.
+	crossNamespaceRBACSelector, err := specs.CrossNamespaceRBACSelector()
+	if err != nil {
+		setupLog.Error(err, "unable to build the selector of the cross-namespace RBAC objects")
+		return err
+	}
+	cacheFilters[&rbacv1.ClusterRole{}] = cache.ByObject{Label: crossNamespaceRBACSelector}
+	cacheFilters[&rbacv1.ClusterRoleBinding{}] = cache.ByObject{Label: crossNamespaceRBACSelector}
+
 	managerOptions.Cache = cache.Options{ByObject: cacheFilters}
 
 	if conf.WatchNamespace != "" {
@@ -257,6 +274,12 @@ func RunController(
 		"availableArchitectures", utils.GetAvailableArchitectures(),
 	)
 
+	canManageClusterRBAC, err := canManageCrossNamespaceRBAC(ctx, mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to check the access to ClusterRoles and ClusterRoleBindings")
+		return err
+	}
+
 	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir, conf); err != nil {
 		return err
 	}
@@ -283,6 +306,7 @@ func RunController(
 		operatorClientCert,
 		conf,
 		maxConcurrentReconciles,
+		canManageClusterRBAC,
 	); err != nil {
 		return err
 	}
@@ -302,6 +326,43 @@ func RunController(
 	return nil
 }
 
+// canManageCrossNamespaceRBAC tells whether the operator can list and watch
+// the ClusterRoles and ClusterRoleBindings it creates for the clusters
+// enabling the cross-namespace resources support.
+//
+// The RBAC of an operator installed before that support existed, as by an
+// older Helm chart, does not allow it. Watching those objects anyway would
+// stop the operator from starting, as their informers would never sync: the
+// support is unavailable instead, until the operator is granted the access
+// and restarted.
+func canManageCrossNamespaceRBAC(ctx context.Context, restConfig *rest.Config) (bool, error) {
+	kubeClient, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return false, err
+	}
+
+	allowed, reason, err := utils.CheckClusterWideAccess(
+		ctx,
+		kubeClient,
+		rbacv1.GroupName,
+		[]string{"clusterroles", "clusterrolebindings"},
+		[]string{"list", "watch"},
+	)
+	if err != nil {
+		return false, err
+	}
+
+	if !allowed {
+		setupLog.Warning(
+			"The operator cannot manage ClusterRoles and ClusterRoleBindings: the clusters enabling "+
+				"the cross-namespace resources support will not be granted access to other namespaces "+
+				"until the operator is granted it and restarted",
+			"reason", reason)
+	}
+
+	return allowed, nil
+}
+
 // setupReconcilers registers every operator reconciler with the manager.
 func setupReconcilers(
 	ctx context.Context,
@@ -311,6 +372,7 @@ func setupReconcilers(
 	operatorClientCert *tls.Certificate,
 	conf *configuration.Data,
 	maxConcurrentReconciles int,
+	canManageClusterRBAC bool,
 ) error {
 	if err := controller.NewClusterReconciler(
 		mgr,
@@ -319,6 +381,7 @@ func setupReconcilers(
 		conf.DrainTaints,
 		operatorClientCert,
 		webhookv1.NewClusterAdmissionGuard(),
+		canManageClusterRBAC,
 	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
@@ -368,6 +431,18 @@ func setupReconcilers(
 		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-databaserole"), //nolint:staticcheck
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DatabaseRole")
+		return err
+	}
+
+	// Removes the cross-namespace RBAC objects of the clusters deleted while
+	// the operator was not running
+	if err := mgr.Add(controller.NewCrossNamespaceRBACSweeper(
+		mgr.GetClient(),
+		mgr.GetAPIReader(),
+		conf.WatchedNamespaces(),
+		canManageClusterRBAC,
+	)); err != nil {
+		setupLog.Error(err, "unable to add the cross-namespace RBAC sweeper")
 		return err
 	}
 

@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	pgpostgres "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -85,7 +86,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Roles for other clusters are handled by their own instance managers.
-	if role.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+	if !isForThisInstance(r.instance, &role) {
 		return ctrl.Result{}, nil
 	}
 
@@ -524,16 +525,13 @@ func (r *DatabaseRoleReconciler) mapClusterToDatabaseRoles(
 	}
 
 	var roles apiv1.DatabaseRoleList
-	if err := r.List(ctx, &roles, client.InNamespace(obj.GetNamespace())); err != nil {
+	if err := r.List(ctx, &roles, clusterindex.MatchingCluster(client.ObjectKeyFromObject(obj))); err != nil {
 		log.FromContext(ctx).Error(err, "while listing DatabaseRoles to react to a cluster change")
 		return nil
 	}
 
 	requests := make([]reconcile.Request, 0, len(roles.Items))
 	for i := range roles.Items {
-		if roles.Items[i].Spec.ClusterRef.Name != obj.GetName() {
-			continue
-		}
 		requests = append(requests, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(&roles.Items[i]),
 		})
@@ -632,7 +630,7 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	}
 
 	passwordVersion, err := dbRole.ApplyPassword(
-		ctx, r.Client, role.GetPasswordSecretName(), passwordSetToNull(role), r.instance.GetNamespaceName(),
+		ctx, r.Client, role.GetPasswordSecretName(), passwordSetToNull(role), role.Namespace,
 	)
 	if err != nil {
 		return "", fmt.Errorf("while getting the role password: %w", err)

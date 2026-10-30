@@ -21,13 +21,16 @@ package v1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -40,16 +43,17 @@ var databaseLog = log.WithName("database-resource").WithValues("version", "v1")
 // SetupDatabaseWebhookWithManager registers the webhook for Database in the manager.
 func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Database{}).
-		WithValidator(newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{})).
+		WithValidator(newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{client: mgr.GetAPIReader()})).
 		WithDefaulter(&DatabaseCustomDefaulter{}).
 		Complete()
 }
 
 // NewDatabaseAdmissionGuard creates a guard to protect a reconciliation loop.
-func NewDatabaseAdmissionGuard() *guard.Admission[*apiv1.Database] {
+// The reader is used to check the Cluster referenced from another namespace.
+func NewDatabaseAdmissionGuard(reader client.Reader) *guard.Admission[*apiv1.Database] {
 	return &guard.Admission[*apiv1.Database]{
 		Defaulter: &DatabaseCustomDefaulter{},
-		Validator: newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{}),
+		Validator: newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{client: reader}),
 	}
 }
 
@@ -73,17 +77,24 @@ func (d *DatabaseCustomDefaulter) Default(_ context.Context, database *apiv1.Dat
 
 // DatabaseCustomValidator is responsible for validating the Database
 // resource when it is created, updated, or deleted.
-type DatabaseCustomValidator struct{}
+type DatabaseCustomValidator struct {
+	// client reads the referenced Cluster. It should not be backed by a
+	// cache: a stale copy would reject a Database right after the Cluster
+	// opted in, and a cache limited to some namespaces cannot read the
+	// Clusters living elsewhere.
+	client client.Reader
+}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Database .
 func (v *DatabaseCustomValidator) ValidateCreate(
-	_ context.Context, database *apiv1.Database,
+	ctx context.Context, database *apiv1.Database,
 ) (admission.Warnings, error) {
 	databaseLog.Info(
 		"Validation for Database upon creation",
 		"name", database.GetName(), "namespace", database.GetNamespace())
 
 	allErrs := v.validate(database)
+	allErrs = append(allErrs, v.validateCrossNamespaceCluster(ctx, database)...)
 	allWarnings := v.getAdmissionWarnings(database)
 
 	if len(allErrs) == 0 {
@@ -97,17 +108,22 @@ func (v *DatabaseCustomValidator) ValidateCreate(
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Database .
 func (v *DatabaseCustomValidator) ValidateUpdate(
-	_ context.Context,
+	ctx context.Context,
 	oldDatabase *apiv1.Database, database *apiv1.Database,
 ) (admission.Warnings, error) {
 	databaseLog.Info(
 		"Validation for Database upon update",
 		"name", database.GetName(), "namespace", database.GetNamespace())
 
-	allErrs := append(
-		v.validate(database),
-		v.validateDatabaseChanges(database, oldDatabase)...,
-	)
+	allErrs := v.validate(database)
+	// The reference was checked when the Database was created, and the opt-in
+	// of the cluster cannot be withdrawn. Checking it again on every update
+	// would reject the patch removing the finalizer of a Database whose
+	// cluster was deleted, leaving it stuck, so the cluster is only read
+	// again when the reference changes, which the CRD itself forbids.
+	if oldDatabase.Spec.ClusterRef != database.Spec.ClusterRef {
+		allErrs = append(allErrs, v.validateCrossNamespaceCluster(ctx, database)...)
+	}
 	allWarnings := v.getAdmissionWarnings(database)
 
 	if len(allErrs) == 0 {
@@ -119,7 +135,56 @@ func (v *DatabaseCustomValidator) ValidateUpdate(
 		database.Name, allErrs)
 }
 
-func (v *DatabaseCustomValidator) validateDatabaseChanges(_ *apiv1.Database, _ *apiv1.Database) field.ErrorList {
+// validateCrossNamespaceCluster validates that if the Database references a Cluster
+// in a different namespace, the Cluster must have EnableCrossNamespaceResources set to true.
+func (v *DatabaseCustomValidator) validateCrossNamespaceCluster(
+	ctx context.Context,
+	db *apiv1.Database,
+) field.ErrorList {
+	// If not cross-namespace, no validation needed
+	if !db.IsCrossNamespace() {
+		return nil
+	}
+
+	// Fetch the referenced Cluster
+	cluster := &apiv1.Cluster{}
+	clusterKey := types.NamespacedName{
+		Name:      db.Spec.ClusterRef.Name,
+		Namespace: db.Spec.ClusterRef.Namespace,
+	}
+
+	if err := v.client.Get(ctx, clusterKey, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return field.ErrorList{
+				field.NotFound(
+					field.NewPath("spec", "cluster"),
+					fmt.Sprintf("%s/%s", db.Spec.ClusterRef.Namespace, db.Spec.ClusterRef.Name),
+				),
+			}
+		}
+		// Any other error leaves the reference unverified. Rejecting it only
+		// affects the Database objects referring to a cluster in another
+		// namespace, a deliberate and infrequent operation, while admitting
+		// them would grant an authorization that could not be checked.
+		databaseLog.Error(err, "Failed to fetch cluster for cross-namespace validation",
+			"cluster", clusterKey)
+		return field.ErrorList{
+			field.InternalError(field.NewPath("spec", "cluster"), err),
+		}
+	}
+
+	if !cluster.AcceptsReferencesFrom(db.Namespace) {
+		return field.ErrorList{
+			field.Forbidden(
+				field.NewPath("spec", "cluster", "namespace"),
+				fmt.Sprintf(
+					"cluster %q does not have enableCrossNamespaceResources set to true",
+					db.Spec.ClusterRef.Name,
+				),
+			),
+		}
+	}
+
 	return nil
 }
 

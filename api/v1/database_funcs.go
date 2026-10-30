@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -54,8 +53,20 @@ func (db *Database) GetStatusApplied() *bool {
 }
 
 // GetClusterRef returns the cluster reference of the database
-func (db *Database) GetClusterRef() corev1.LocalObjectReference {
+func (db *Database) GetClusterRef() ClusterObjectReference {
 	return db.Spec.ClusterRef
+}
+
+// GetClusterNamespace returns the namespace of the referenced cluster.
+// If not specified, defaults to the Database's namespace.
+func (db *Database) GetClusterNamespace() string {
+	return db.Spec.ClusterRef.namespaceOrDefault(db.Namespace)
+}
+
+// IsCrossNamespace returns true if the Database references a Cluster
+// in a different namespace.
+func (db *Database) IsCrossNamespace() bool {
+	return db.Spec.ClusterRef.isCrossNamespace(db.Namespace)
 }
 
 // GetManagedObjectName returns the name of the managed database object

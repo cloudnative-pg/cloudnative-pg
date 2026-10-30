@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -61,7 +60,7 @@ const (
 type DatabaseSpec struct {
 	// The name of the PostgreSQL cluster hosting the database.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster reference is immutable after creation"
-	ClusterRef corev1.LocalObjectReference `json:"cluster"`
+	ClusterRef ClusterObjectReference `json:"cluster"`
 
 	// Ensure the PostgreSQL database is `present` or `absent` - defaults to "present".
 	// +kubebuilder:default:="present"
@@ -376,6 +375,7 @@ type DatabaseObjectStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
+// +kubebuilder:printcolumn:name="Cluster Namespace",type="string",JSONPath=".spec.cluster.namespace"
 // +kubebuilder:printcolumn:name="PG Name",type="string",JSONPath=".spec.name"
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest reconciliation message"
