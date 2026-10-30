@@ -106,6 +106,7 @@ func NewCmd() *cobra.Command {
 			return info.upgradeSubCommand(ctx, instance)
 		},
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
+			management.ShutdownLogExport()
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}
