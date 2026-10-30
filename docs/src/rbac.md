@@ -215,8 +215,12 @@ write access to `postgresql.cnpg.io` resources in a namespace. Bind them with a
 | `cnpg-clusterimagecatalog-editor-role` | Write access to `ClusterImageCatalog` | `ClusterImageCatalog` is cluster-scoped, so this role needs a `ClusterRoleBinding`, which users who cannot create one cannot use. |
 
 `cnpg-editor-role` does not include the high-privilege resources, so they can be
-granted separately. `FailoverQuorum` has no editor role: it is written by the
-operator and read-only for users, who already see it through the viewer roles.
+granted separately. Write access to `Cluster` can still set `superuser` and
+`inRoles`, though, through
+[inline managed roles](declarative_role_management.md#inline-managed-roles), as
+long as they are supported. `FailoverQuorum` has no editor role: it is written
+by the operator and read-only for users, who already see it through the viewer
+roles.
 
 :::warning
     Like `cnpg-viewer-role`, these roles come with the operator manifest, not
