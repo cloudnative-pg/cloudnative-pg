@@ -310,6 +310,121 @@ two are complementary, and disabling the isolation check leaves the lease
 coordinating promotions with no mechanism stopping an isolated primary.
 :::
 
+### Write path check
+
+A PostgreSQL primary can be alive, accept connections and be reported as ready,
+while every write blocks, for example because the underlying storage hangs in
+a way that makes `fsync` never return. The liveness and readiness probes do not
+notice it, and no failover happens.
+
+The **write path check** detects this situation. It is **disabled by default**
+and is enabled with:
+
+```yaml
+spec:
+  probes:
+    liveness:
+      writePathCheck:
+        enabled: true
+        # optional, these are the defaults
+        periodSeconds: 10
+        timeoutSeconds: 30
+        clearAfterSuccesses: 3
+```
+
+When enabled, the instance manager of the primary executes a *heartbeat* every
+`periodSeconds`, on a dedicated connection:
+
+```sql
+BEGIN;
+SET LOCAL synchronous_commit = local;
+SELECT pg_catalog.pg_logical_emit_message(true, 'cnpg-write-path-check', '');
+COMMIT;
+```
+
+The heartbeat only waits for the *local* WAL flush: it doesn't wait for the
+synchronous standbys, so a missing or slow replica is never reported as a
+stalled write path. A new heartbeat starts only when the previous one has
+completed.
+
+If a heartbeat has not completed after `timeoutSeconds`, the write path is
+considered **stalled**. An *error* of the heartbeat (for example a full disk)
+is not a stall: it is only logged, and no failover happens. This is consistent
+with the fact that CloudNativePG does not fail over when the disk is full.
+
+When the write path is stalled:
+
+- the instance manager reports `isWritePathStalled: true` in its status;
+- the instance stops renewing the [primary lease](failover.md#safe-primary-election),
+  without releasing it, so that another instance can take it over after the
+  usual observation window. The liveness probe keeps succeeding, and the
+  [primary isolation](#primary-isolation) monitor keeps watching the age of the
+  lease;
+- the operator sorts the instance **after** the healthy ones when electing the
+  primary, so that the regular [failover](failover.md) procedure starts and
+  promotes the most advanced healthy replica, honoring `.spec.failoverDelay`.
+  The operator reconciles a cluster with the check enabled at least once every
+  `periodSeconds`, because a stalled primary doesn't change any resource the
+  operator watches;
+- while the failover is pending, the instance manager of each replica
+  terminates its own WAL receiver. A primary whose WAL flush is blocked keeps
+  its WAL senders connected, and the operator waits for all the WAL receivers
+  to be down before promoting a replica, but the blocked instance can't be
+  relied upon to end them. The old primary is marked unhealthy and removed from
+  the read-write service when the failover starts, so the replicas can't
+  reconnect to it.
+
+Once the target primary is another instance, the stall is made *permanent* for
+the life of the instance manager, and the former primary is shut down with an
+**immediate** shutdown, without a checkpoint (which would block too). This is done before any other
+reconciliation step that writes to the data directory. The shutdown request
+takes effect as soon as the storage recovers, before any blocked commit can be
+acknowledged to a client. The instance then restarts and rejoins the cluster as
+a replica, running `pg_rewind` if needed, as after any failover. If the storage
+recovers *before* a failover started, the stall is cleared after
+`clearAfterSuccesses` consecutive successful heartbeats, and the instance
+renews the primary lease again.
+
+In a test with a two-instance PostgreSQL 16 cluster, with the filesystem of
+the primary volume frozen for 5 minutes while a client wrote one row per
+second, the stall was detected after about 30 seconds, the failover started
+after 47 seconds, the replica was promoted after 48 seconds, and the read-write
+service accepted writes again after 111 seconds. The operator's status poll of
+the frozen Pod had timed out twice, about 31 seconds each time, before it set
+the primary label. No acknowledged commit was lost, and the old primary
+rejoined as a replica using `pg_rewind`. Your timings depend on the settings
+above and on how the storage fails.
+
+:::warning
+The write path check has some limits:
+
+- **No healthy replica, no failover.** If there is no healthy replica to be
+  promoted, the stalled primary stays the primary, as it would have been
+  without the check. The same happens when the
+  [failover quorum](failover.md#failover-quorum-quorum-based-failover) prevents
+  the failover. The primary lease is not renewed while the primary is stalled.
+- **No failover on a full disk.** A heartbeat that fails with an error never
+  triggers a failover.
+- **Interaction with the primary isolation check.** The primary isolation
+  check keeps running on a stalled primary, because the lease it doesn't renew
+  gets older. When the isolation check is enabled and the cluster has more than
+  one instance, a stalled primary that can't reach at least one of the other
+  instances is shut down immediately, even if there is no healthy replica to
+  fail over to. This is the same decision that is taken for any primary that
+  can't renew the lease. If the isolation check is disabled, only the
+  mechanism described above demotes the stalled primary.
+- **A postmaster that ignores the shutdown can be restarted by the kubelet.**
+  When PostgreSQL doesn't stop within `.spec.immediateShutdownTimeout` after
+  the immediate shutdown request, for example because the postmaster is stuck
+  in a state that ignores signals on the blocked storage, the
+  [liveness probe](#liveness-probe) fails, and the kubelet restarts the
+  container. This only happens after the instance has been demoted, never
+  because of the stall itself.
+- The check adds a small WAL record every `periodSeconds`: on an otherwise idle
+  cluster this makes the WAL archive and the checkpoints run as if the cluster
+  was not idle.
+:::
+
 ## Readiness Probe
 
 The readiness probe starts once the startup probe has successfully completed.

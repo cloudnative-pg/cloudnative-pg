@@ -80,7 +80,12 @@ Holder side:
   re-adopts an "already ours" lease and `le.Run` writes again. Never
   forced, so "the renewal loop is wedged but the monitor still runs" is
   one of the explored behaviours. `lastRenew` moves only on a successful
-  CAS, as `confirmingLock` stamps only successful writes. A successful
+  CAS, as `confirmingLock` stamps only successful writes. The same
+  behaviour stands for `Runnable.StopRenewing`, used by a primary whose write
+  path is stalled (`.spec.probes.liveness.writePathCheck`): it stops the
+  renewals but, unlike `Runnable.Yield`, keeps the monitor, so the node stays
+  `held` and is stopped by the monitor as above. The model allows a renewal at
+  any time, so it covers a node that never renews. A successful
   renewal also clears `stepDownAt`: the monitor sees a fresh lease and
   withdraws a verdict that was not delivered yet.
 * `MonitorDecidesStepDown` / `MonitorKeepsLeading`: the peer check

@@ -254,6 +254,17 @@ expected outage.
 Enabling a new configuration option to delay failover provides a mechanism to
 prevent premature failover for short-lived network or node instability.
 
+## Primary with a stalled write path
+
+A primary whose storage blocks every write is, by default, neither restarted
+nor replaced: it is alive, and it accepts connections. You can enable the
+[write path check](instance_manager.md#write-path-check) to have CloudNativePG
+detect it and fail over to a healthy replica. The check is disabled by default,
+it requires a healthy replica to fail over to, and it doesn't trigger a
+failover when the disk is full. A stalled primary stops renewing the
+[primary lease](#safe-primary-election), and the new target primary takes it
+over after the usual observation window.
+
 ## Detection of node-level failures
 
 When the node hosting the primary becomes unreachable (for example, due to a
