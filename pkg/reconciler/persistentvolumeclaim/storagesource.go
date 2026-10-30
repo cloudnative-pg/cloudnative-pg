@@ -42,6 +42,11 @@ type StorageSource struct {
 	// The (optional) data source that should be used for WALs
 	WALSource *corev1.TypedLocalObjectReference `json:"walSource"`
 
+	// WALVolumeSnapshotSkipped is true when the WAL storage was deliberately left
+	// out of the snapshots: the WAL PVC is created empty, and the WAL files
+	// are fetched from the WAL archive
+	WALVolumeSnapshotSkipped bool `json:"walVolumeSnapshotSkipped,omitempty"`
+
 	// The (optional) data source that should be used for TABLESPACE
 	TablespaceSource map[string]corev1.TypedLocalObjectReference `json:"tablespaceSource"`
 }
@@ -214,7 +219,7 @@ func getCandidateSourceFromBackupList(
 }
 
 func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
-	var result StorageSource
+	result := StorageSource{WALVolumeSnapshotSkipped: backup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped}
 	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
 		reference := corev1.TypedLocalObjectReference{
 			APIGroup: ptr.To(volumesnapshotv1.GroupName),
@@ -296,8 +301,11 @@ func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSou
 
 	volumeSnapshots := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
 	return &StorageSource{
-		DataSource:       volumeSnapshots.Storage,
-		WALSource:        volumeSnapshots.WalStorage,
-		TablespaceSource: volumeSnapshots.TablespaceStorage,
+		DataSource: volumeSnapshots.Storage,
+		WALSource:  volumeSnapshots.WalStorage,
+		// VerifyDataSourceCoherence accepts a missing WAL source only when
+		// the PGDATA snapshot is marked as taken without the WAL storage
+		WALVolumeSnapshotSkipped: volumeSnapshots.WalStorage == nil,
+		TablespaceSource:         volumeSnapshots.TablespaceStorage,
 	}
 }

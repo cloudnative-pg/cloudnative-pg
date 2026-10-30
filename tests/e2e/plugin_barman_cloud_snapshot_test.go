@@ -41,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -86,14 +87,16 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 		}
 
 		// takeVolumeSnapshotBackup creates a volumeSnapshot-method backup of the
-		// cluster on the given target and waits for it to complete with two snapshot
-		// elements (PGDATA and WAL). WAL archiving is provided by plugin-barman-cloud.
-		// A cold snapshot needs a checkpoint to reach a consistent stop point; an
-		// online (hot) one is expected to produce a backup label file.
+		// cluster on the given target and waits for it to complete with the given
+		// number of snapshot elements (PGDATA and, unless skipped, WAL). WAL archiving
+		// is provided by plugin-barman-cloud. A cold snapshot needs a checkpoint to
+		// reach a consistent stop point; an online (hot) one is expected to produce a
+		// backup label file.
 		takeVolumeSnapshotBackup := func(
 			namespace, clusterName, backupName string,
 			target apiv1.BackupTarget,
 			triggerCheckpoint, requireBackupLabelFile bool,
+			expectedElements int,
 		) *apiv1.Backup {
 			GinkgoHelper()
 			backup, err := backups.Create(env.Ctx, env.Client, apiv1.Backup{
@@ -119,7 +122,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 					BeEquivalentTo(apiv1.BackupPhaseCompleted),
 					"Backup should be completed correctly, error message is '%s'",
 					backup.Status.Error)
-				g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+				g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(expectedElements))
 				if requireBackupLabelFile {
 					g.Expect(backup.Status.BackupLabelFile).ToNot(BeEmpty())
 				}
@@ -228,7 +231,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 				var backup *apiv1.Backup
 				By("creating a snapshot and waiting until it's completed", func() {
 					backup = takeVolumeSnapshotBackup(namespace, clusterName,
-						fmt.Sprintf("%s-example", clusterName), apiv1.BackupTargetStandby, true, false)
+						fmt.Sprintf("%s-example", clusterName), apiv1.BackupTargetStandby, true, false, 2)
 				})
 
 				By("fetching the volume snapshots", func() {
@@ -334,6 +337,32 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 			var namespace, clusterName string
 			var backupTaken *apiv1.Backup
 
+			// expectEmptyWalPVCs checks that the WAL PVCs of the given instances
+			// were created empty, while their PGDATA PVCs come from a snapshot
+			expectEmptyWalPVCs := func(clusterName string, role string, expectedInstances int) {
+				GinkgoHelper()
+				pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
+				Expect(err).ToNot(HaveOccurred())
+				var pgData, pgWal int
+				for _, pvc := range pvcList.Items {
+					if pvc.Labels[utils.ClusterLabelName] != clusterName ||
+						pvc.Labels[utils.ClusterInstanceRoleLabelName] != role {
+						continue
+					}
+					switch utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName]) {
+					case utils.PVCRolePgData:
+						Expect(pvc.Spec.DataSource).ToNot(BeNil(), "PVC %s", pvc.Name)
+						Expect(pvc.Spec.DataSource.Kind).To(Equal(apiv1.VolumeSnapshotKind))
+						pgData++
+					case utils.PVCRolePgWal:
+						Expect(pvc.Spec.DataSource).To(BeNil(), "PVC %s", pvc.Name)
+						pgWal++
+					}
+				}
+				Expect(pgData).To(Equal(expectedInstances))
+				Expect(pgWal).To(Equal(expectedInstances))
+			}
+
 			BeforeAll(func() {
 				var err error
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
@@ -373,23 +402,35 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 					insertDataAndArchiveWAL(namespace, clusterName, tableName, true, 3, 4)
 				})
 
-				By("creating a snapshot and waiting until it's completed", func() {
+				By("creating a snapshot of the PGDATA storage only", func() {
 					backupTaken = takeVolumeSnapshotBackup(namespace, clusterName,
-						fmt.Sprintf("%s-online", clusterName), apiv1.BackupTargetPrimary, false, true)
+						fmt.Sprintf("%s-online", clusterName), apiv1.BackupTargetPrimary, false, true, 1)
+					Expect(backupTaken.Status.BackupSnapshotStatus.Elements[0].Type).
+						To(BeEquivalentTo(utils.PVCRolePgData))
+					Expect(backupTaken.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeTrue())
 				})
 
 				By("fetching the volume snapshots", func() {
 					captureSnapshotNames(backupTaken, clusterName, namespace, snapshotDataEnv, snapshotWalEnv)
+					snapshotList, err := getSnapshots(backupTaken.Name, clusterName, namespace)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(1))
+					Expect(snapshotList.Items[0].Annotations).To(
+						HaveKeyWithValue(utils.WalVolumeSnapshotSkippedAnnotationName, "true"))
 				})
 
 				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreManifest)
 				Expect(err).ToNot(HaveOccurred())
 
-				By("creating the cluster to be restored through snapshot", func() {
+				By("creating the cluster to be restored, fetching the WALs from the archive", func() {
 					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, restoreManifest)
 					clusterasserts.AssertClusterIsReady(
 						env, namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
 					)
+				})
+
+				By("checking the restored cluster has an empty WAL PVC", func() {
+					expectEmptyWalPVCs(clusterToRestoreName, specs.ClusterRoleLabelPrimary, 1)
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
@@ -425,22 +466,8 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 					clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 				})
 
-				By("checking the new replicas have been created using the snapshot", func() {
-					pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
-					Expect(err).ToNot(HaveOccurred())
-					matched := 0
-					for _, pvc := range pvcList.Items {
-						if pvc.Labels[utils.ClusterInstanceRoleLabelName] == specs.ClusterRoleLabelReplica &&
-							pvc.Labels[utils.ClusterLabelName] == clusterName {
-							Expect(pvc.Spec.DataSource.Kind).To(Equal(apiv1.VolumeSnapshotKind))
-							Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(apiv1.VolumeSnapshotKind))
-							matched++
-						}
-					}
-					// Each new replica has both a PGDATA and a WAL PVC (this
-					// cluster configures separate walStorage), so 2 replicas
-					// means 4 matching PVCs, not 2.
-					Expect(matched).To(Equal(4), "expected 4 replica PVCs (PGDATA + WAL, x2 replicas) provisioned from the snapshot")
+				By("checking the new replicas have been created using the snapshot and an empty WAL PVC", func() {
+					expectEmptyWalPVCs(clusterName, specs.ClusterRoleLabelReplica, 2)
 				})
 
 				// Query each replica pod directly: a cluster-wide service
@@ -460,6 +487,58 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 							return strings.TrimSpace(stdOut), err
 						}, RetryTimeout).Should(Equal("6"), "replica pod %s did not catch up", pod.Name)
 					}
+				})
+			})
+
+			It("snapshots the WAL storage while PostgreSQL runs without WAL archiving", func() {
+				patchCluster := func(mutate func(*apiv1.Cluster)) {
+					GinkgoHelper()
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					originalCluster := cluster.DeepCopy()
+					mutate(cluster)
+					Expect(objects.Patch(env.Ctx, env.Client, cluster, k8client.MergeFrom(originalCluster))).To(Succeed())
+				}
+
+				expectPrimaryArchiveMode := func(archiveMode string) {
+					GinkgoHelper()
+					Eventually(func(g Gomega) {
+						primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+						g.Expect(err).ToNot(HaveOccurred())
+						stdOut, _, err := exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+							postgres.AppDBName, "SHOW archive_mode")
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(strings.TrimSpace(stdOut)).To(Equal(archiveMode))
+					}, testTimeouts[timeouts.ClusterIsReady]).Should(Succeed())
+				}
+
+				By("disabling WAL archiving", func() {
+					patchCluster(func(cluster *apiv1.Cluster) {
+						if cluster.Annotations == nil {
+							cluster.Annotations = map[string]string{}
+						}
+						cluster.Annotations[utils.SkipWalArchiving] = "enabled"
+					})
+					expectPrimaryArchiveMode("off")
+					clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+				})
+
+				By("enabling WAL archiving again, without restarting the primary", func() {
+					patchCluster(func(cluster *apiv1.Cluster) {
+						cluster.Spec.PrimaryUpdateStrategy = apiv1.PrimaryUpdateStrategySupervised
+						delete(cluster.Annotations, utils.SkipWalArchiving)
+					})
+					clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
+						[]string{apiv1.PhaseWaitingForUser}, testTimeouts[timeouts.ClusterIsReady])
+					expectPrimaryArchiveMode("off")
+				})
+
+				By("taking a snapshot of both the PGDATA and the WAL storage", func() {
+					backup := takeVolumeSnapshotBackup(namespace, clusterName,
+						fmt.Sprintf("%s-without-archiving", clusterName), apiv1.BackupTargetPrimary, false, true, 2)
+					Expect(backup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeFalse())
 				})
 			})
 		})

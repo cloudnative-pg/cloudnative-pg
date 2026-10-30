@@ -642,6 +642,7 @@ WALCapabilities
 WALs
 WalBackupConfiguration
 WalClassName
+WalVolumeSnapshotSkipped
 Wallner
 WebSocket
 XXu
