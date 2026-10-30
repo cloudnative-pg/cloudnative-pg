@@ -269,8 +269,11 @@ func classifyPVC(
 		// The Pod may carry a bootstrap init container that has not finished
 		// populating this PVC yet (e.g. initdb/join/restore): until it
 		// completes, the PVC is not actually usable, even though a Pod
-		// already references it.
-		if !podBootstrapComplete(pvc, podList) {
+		// already references it. Once the PGDATA PVC is ready the bootstrap
+		// is done: the init container running again because Kubernetes
+		// recreated the Pod sandbox (e.g. after a node reboot) doesn't make
+		// the instance initializing.
+		if !podBootstrapComplete(pvc, podList) && !isPgDataReady(pvcList, instanceName) {
 			return initializing
 		}
 		if isResizing(pvc) {
@@ -327,9 +330,21 @@ func hasPod(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
 	return false
 }
 
+// isPgDataReady checks if the PGDATA PVC of the instance is marked as ready
+func isPgDataReady(pvcList []corev1.PersistentVolumeClaim, instanceName string) bool {
+	for _, pvc := range pvcList {
+		if pvc.Name == NewPgDataCalculator().GetName(instanceName) {
+			return pvc.Annotations[utils.PVCStatusAnnotationName] == StatusReady
+		}
+	}
+	return false
+}
+
 // podBootstrapComplete checks whether the PVC's Pod, if it carries a
 // bootstrap init container (specs.BootstrapWorkContainerName), has already
-// completed it successfully. A PVC whose Pod has no such init container is
+// completed it successfully. A Pod that declares the init container but has
+// no status for it yet (the kubelet has not reported it) has not completed
+// it. A PVC whose Pod has no such init container is
 // treated as already bootstrapped: this is the normal case when reattaching
 // a Pod to a PVC that was already ready (no bootstrap needed), or for
 // PVC roles (e.g. WAL, tablespaces) that never require one of their own.
@@ -344,6 +359,9 @@ func podBootstrapComplete(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod
 			}
 			return containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 0
 		}
+		return !slices.ContainsFunc(pod.Spec.InitContainers, func(container corev1.Container) bool {
+			return container.Name == specs.BootstrapWorkContainerName
+		})
 	}
 	return true
 }
