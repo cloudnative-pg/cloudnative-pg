@@ -171,7 +171,11 @@ func (e pinger) ensureInstancesAreReachable(cluster *apiv1.Cluster, ourIdentity 
 			reportedPrimary, err := e.probe(target.host, target.ip)
 			switch {
 			case err != nil:
-				failures[i] = err
+				// An unreachable peer is a sign of isolation, not proof that
+				// we were replaced: it counts only with the check enabled.
+				if e.config.Enabled != nil && *e.config.Enabled {
+					failures[i] = err
+				}
 			case reportedPrimary != "" && reportedPrimary != ourIdentity:
 				failures[i] = &SupersededError{
 					Host:          target.host,
@@ -183,19 +187,13 @@ func (e pinger) ensureInstancesAreReachable(cluster *apiv1.Cluster, ourIdentity 
 	}
 	wg.Wait()
 
-	// A superseded answer wins over an unreachable peer: with the isolation
-	// check disabled it is the only failure that counts.
-	var first error
 	for _, err := range failures {
-		if errors.As(err, new(*SupersededError)) {
+		if err != nil {
 			return err
-		}
-		if first == nil {
-			first = err
 		}
 	}
 
-	return first
+	return nil
 }
 
 // PingError is raised when the instance connectivity test failed. It is
@@ -241,10 +239,6 @@ func (e *SupersededError) Error() string {
 		e.Host, e.TargetPrimary, e.OurIdentity)
 }
 
-// newReachabilityChecker is a variable so shouldStepDown can be unit-tested
-// without the server CA on disk.
-var newReachabilityChecker = buildInstanceReachabilityChecker
-
 // shouldStepDown reports whether this primary should stop believing it is
 // still the legitimate primary: either because it cannot reach some peer
 // instance, or because a reachable peer reports a different target primary
@@ -266,20 +260,14 @@ func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, 
 		return false, nil
 	}
 
-	checker, err := newReachabilityChecker(cfg)
+	checker, err := buildInstanceReachabilityChecker(cfg)
 	if err != nil {
 		return false, fmt.Errorf("failed to build instance reachability checker: %w", err)
 	}
 
-	err = checker.ensureInstancesAreReachable(cluster, ourIdentity)
-	switch {
-	case err == nil:
-		return false, nil
-	case cfg.Enabled != nil && *cfg.Enabled:
+	if err := checker.ensureInstancesAreReachable(cluster, ourIdentity); err != nil {
 		return true, err
-	case errors.As(err, new(*SupersededError)):
-		return true, err
-	default:
-		return false, nil
 	}
+
+	return false, nil
 }

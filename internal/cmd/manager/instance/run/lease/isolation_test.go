@@ -24,6 +24,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/utils/ptr"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -106,8 +108,11 @@ var _ = Describe("pinger.ensureInstancesAreReachable", func() {
 		Expect(elapsed).To(BeNumerically("<", 2*probeDelay))
 	})
 
+	enabled := &apiv1.IsolationCheckConfiguration{Enabled: ptr.To(true)}
+	disabled := &apiv1.IsolationCheckConfiguration{Enabled: ptr.To(false)}
+
 	It("reports a peer that cannot be reached", func() {
-		checker := pinger{probe: func(host, _ string) (string, error) {
+		checker := pinger{config: enabled, probe: func(host, _ string) (string, error) {
 			if host == "cluster-example-3" {
 				return "", errors.New("unreachable")
 			}
@@ -132,10 +137,18 @@ var _ = Describe("pinger.ensureInstancesAreReachable", func() {
 		Expect(superseded.TargetPrimary).To(Equal("cluster-example-9"))
 	})
 
-	It("prefers a superseded answer over unreachable peers", func() {
+	It("ignores unreachable peers when the check is disabled", func() {
+		checker := pinger{config: disabled, probe: func(_, _ string) (string, error) {
+			return "", errors.New("unreachable")
+		}}
+
+		Expect(checker.ensureInstancesAreReachable(fourInstances, ourIdentity)).To(Succeed())
+	})
+
+	It("reports a peer that names another target primary when the check is disabled", func() {
 		// The peer order is random: repeat so that the superseded one is also
 		// probed after an unreachable one.
-		checker := pinger{probe: func(host, _ string) (string, error) {
+		checker := pinger{config: disabled, probe: func(host, _ string) (string, error) {
 			if host == "cluster-example-4" {
 				return "cluster-example-9", nil
 			}
