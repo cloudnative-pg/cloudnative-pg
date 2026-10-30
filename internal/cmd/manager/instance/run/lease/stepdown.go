@@ -164,7 +164,7 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 			}
 			switch {
 			case stepDown:
-				contextLogger.Warning("Primary should step down, requesting an immediate shutdown",
+				contextLogger.Warning("Primary should step down, requesting a fast shutdown",
 					"leaseAge", age, "reason", reason)
 				stepDownDecided = true
 			case reason != nil:
@@ -194,9 +194,9 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		// pg_ctl failed, or a restart is still waiting for PostgreSQL, so stop
 		// PostgreSQL here and exit.
 		if !shutdownRequested {
-			shutdownRequested = r.instance.TryRequestImmediateShutdown()
+			shutdownRequested = r.instance.TryRequestStepDownShutdown()
 			if shutdownRequested {
-				contextLogger.Info("Immediate shutdown requested, waiting for PostgreSQL to stop")
+				contextLogger.Info("Fast shutdown requested, waiting for PostgreSQL to stop")
 			} else {
 				contextLogger.Warning(
 					"The lifecycle manager is busy, could not request the shutdown yet, retrying")

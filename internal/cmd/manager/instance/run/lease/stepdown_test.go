@@ -256,13 +256,13 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 		Consistently(r.lastConfirmed.Load, 100*time.Millisecond).Should(BeIdenticalTo(confirmed))
 	})
 
-	It("requests an immediate shutdown once the lease is stale and the peers agree", func(ctx context.Context) {
+	It("requests a step-down shutdown once the lease is stale and the peers agree", func(ctx context.Context) {
 		verdict(true, nil)
 		received := readCommands(r)
 
 		start(ctx)
 
-		Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownImmediate"))))
+		Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownStepDown"))))
 	})
 
 	It("keeps running without requesting a shutdown when the peers say this is still the primary",
@@ -330,7 +330,7 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 			// The monitor is still alive and delivers as soon as a reader appears.
 			received := readCommands(r)
 
-			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownImmediate"))))
+			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownStepDown"))))
 
 			// And exactly once: the real consumer exits after handling a shutdown,
 			// so a second send would park the monitor forever. The reader above is
@@ -388,7 +388,7 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 			start(ctx)
 
-			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownImmediate"))))
+			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownStepDown"))))
 			Eventually(hardStops.Load).Should(BeEquivalentTo(1))
 			Consistently(received, 100*time.Millisecond).ShouldNot(Receive())
 		})
@@ -405,7 +405,7 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 			start(ctx)
 
-			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownImmediate"))))
+			Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownStepDown"))))
 			delivered := r.lastConfirmed.Load()
 			// A stamp an hour ahead keeps the lease fresh for the rest of the
 			// spec, as renewals that keep succeeding would.
