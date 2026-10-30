@@ -243,27 +243,62 @@ var _ = Describe("checkImmediateShutdownUnresponsive", func() {
 		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
 	})
 
-	It("does not ask an unresponsive PostgreSQL to shut down immediately again", func(ctx context.Context) {
-		// "status" reports the server running and "stop" fails, as it does
-		// when the timeout runs out. Every call is recorded.
+	// "status" reports the server running and "stop" fails, as it does when the
+	// timeout runs out. Every call is recorded, and the returned function lists
+	// the "stop" ones.
+	fakePgCtlFailingToStop := func() func() []string {
 		calls := filepath.Join(binDir, "calls")
 		script := fmt.Sprintf("#!/bin/sh\necho \"$*\" >> %s\ncase \"$*\" in\n*status*) exit 0 ;;\n*) exit 1 ;;\nesac\n",
 			calls)
 		//nolint:gosec // executable fake pg_ctl needs the execute bit
 		Expect(os.WriteFile(filepath.Join(binDir, "pg_ctl"), []byte(script), 0o700)).To(Succeed())
-		stops := func() int {
+		return func() []string {
 			content, err := os.ReadFile(calls) //nolint:gosec // path under the spec's temporary directory
 			Expect(err).ToNot(HaveOccurred())
-			return strings.Count(string(content), " stop ")
+			var stops []string
+			for _, line := range strings.Split(string(content), "\n") {
+				if strings.Contains(line, " stop ") {
+					stops = append(stops, line)
+				}
+			}
+			return stops
 		}
+	}
+
+	It("does not ask an unresponsive PostgreSQL to shut down immediately again", func(ctx context.Context) {
+		stops := fakePgCtlFailingToStop()
 
 		instance := &Instance{}
 		Expect(instance.TryShuttingDownImmediate(ctx)).To(HaveOccurred())
 		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
-		Expect(stops()).To(Equal(1))
+		Expect(stops()).To(HaveLen(1))
 
 		Expect(instance.TryShuttingDownImmediate(ctx)).To(MatchError(ContainSubstring("not retrying")))
-		Expect(stops()).To(Equal(1))
+		Expect(stops()).To(HaveLen(1))
+	})
+
+	It("steps down with a fast shutdown bounded by the retry period, then an immediate one", func(ctx context.Context) {
+		stops := fakePgCtlFailingToStop()
+
+		instance := &Instance{}
+		instance.SetCluster(&apiv1.Cluster{Spec: apiv1.ClusterSpec{
+			PrimaryLease: &apiv1.PrimaryLeaseConfiguration{RetryPeriodSeconds: ptr.To[int32](5)},
+		}})
+		Expect(instance.TryShuttingDownStepDown(ctx)).To(HaveOccurred())
+		Expect(stops()).To(HaveLen(2))
+		Expect(stops()[0]).To(And(ContainSubstring("-m fast"), ContainSubstring("-t 5")))
+		Expect(stops()[1]).To(ContainSubstring("-m immediate"))
+	})
+
+	It("does not step down again once PostgreSQL is found unresponsive", func(ctx context.Context) {
+		stops := fakePgCtlFailingToStop()
+
+		instance := &Instance{}
+		Expect(instance.TryShuttingDownStepDown(ctx)).To(HaveOccurred())
+		Expect(stops()).To(HaveLen(2))
+
+		Expect(instance.TryShuttingDownStepDown(ctx)).To(MatchError(ContainSubstring("not retrying")))
+		Expect(stops()).To(HaveLen(2))
 	})
 })
 
