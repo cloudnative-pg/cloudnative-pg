@@ -802,6 +802,58 @@ func (cluster *Cluster) GetPrimaryLeaseReleasedDuration() time.Duration {
 	return DefaultPrimaryLeaseReleasedDurationSeconds * time.Second
 }
 
+const (
+	// DefaultWritePathCheckPeriodSeconds is the default interval, in seconds, between write path heartbeats
+	DefaultWritePathCheckPeriodSeconds int32 = 10
+
+	// DefaultWritePathCheckTimeoutSeconds is the default time, in seconds, after which
+	// an unfinished write path heartbeat marks the write path as stalled
+	DefaultWritePathCheckTimeoutSeconds int32 = 30
+
+	// DefaultWritePathCheckClearAfterSuccesses is the default number of consecutive
+	// successful heartbeats needed to clear a stalled write path
+	DefaultWritePathCheckClearAfterSuccesses int32 = 3
+)
+
+func (cluster *Cluster) getWritePathCheck() *WritePathCheckConfiguration {
+	if cluster.Spec.Probes == nil || cluster.Spec.Probes.Liveness == nil {
+		return nil
+	}
+	return cluster.Spec.Probes.Liveness.WritePathCheck
+}
+
+// IsWritePathCheckEnabled returns whether the write path check of the primary is enabled
+func (cluster *Cluster) IsWritePathCheckEnabled() bool {
+	cfg := cluster.getWritePathCheck()
+	return cfg != nil && cfg.Enabled != nil && *cfg.Enabled
+}
+
+// GetWritePathCheckPeriod returns the interval between two write path heartbeats
+func (cluster *Cluster) GetWritePathCheckPeriod() time.Duration {
+	if cfg := cluster.getWritePathCheck(); cfg != nil && cfg.PeriodSeconds != nil {
+		return time.Duration(*cfg.PeriodSeconds) * time.Second
+	}
+	return time.Duration(DefaultWritePathCheckPeriodSeconds) * time.Second
+}
+
+// GetWritePathCheckTimeout returns how long a write path heartbeat may run before
+// the write path is considered stalled
+func (cluster *Cluster) GetWritePathCheckTimeout() time.Duration {
+	if cfg := cluster.getWritePathCheck(); cfg != nil && cfg.TimeoutSeconds != nil {
+		return time.Duration(*cfg.TimeoutSeconds) * time.Second
+	}
+	return time.Duration(DefaultWritePathCheckTimeoutSeconds) * time.Second
+}
+
+// GetWritePathCheckClearAfterSuccesses returns the number of consecutive successful
+// heartbeats needed to clear a stalled write path
+func (cluster *Cluster) GetWritePathCheckClearAfterSuccesses() int {
+	if cfg := cluster.getWritePathCheck(); cfg != nil && cfg.ClearAfterSuccesses != nil {
+		return int(*cfg.ClearAfterSuccesses)
+	}
+	return int(DefaultWritePathCheckClearAfterSuccesses)
+}
+
 // GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover
 func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 	if cluster.Spec.MaxSwitchoverDelay > 0 {
