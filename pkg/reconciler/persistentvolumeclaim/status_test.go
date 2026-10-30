@@ -170,6 +170,7 @@ var _ = Describe("PVC classification with a bootstrap init container", func() {
 
 		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{clusterName + "-1"}))
 		Expect(cluster.Status.HealthyPVC).Should(BeEmpty())
+		Expect(cluster.Status.DanglingPVC).Should(BeEmpty())
 	})
 
 	It("classifies a PVC as healthy when its Pod has no bootstrap init container at all "+
