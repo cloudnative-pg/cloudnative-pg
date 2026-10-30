@@ -94,6 +94,7 @@ var _ = Describe("PVC classification with a bootstrap init container", func() {
 
 	podWithBootstrapInitContainer := func(serial string, terminatedExitCode *int32) corev1.Pod {
 		pod := makePod(clusterName, serial, specs.ClusterRoleLabelPrimary)
+		pod.Spec.InitContainers = []corev1.Container{{Name: specs.BootstrapWorkContainerName}}
 		containerStatus := corev1.ContainerStatus{Name: specs.BootstrapWorkContainerName}
 		if terminatedExitCode != nil {
 			containerStatus.State = corev1.ContainerState{
@@ -121,6 +122,21 @@ var _ = Describe("PVC classification with a bootstrap init container", func() {
 		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{clusterName + "-1"}))
 		Expect(cluster.Status.HealthyPVC).Should(BeEmpty())
 	})
+
+	It("classifies a PVC as initializing before the kubelet reports its Pod's bootstrap init container",
+		func(ctx SpecContext) {
+			pvcs := []corev1.PersistentVolumeClaim{
+				makePVC(clusterName, "1", "1", NewPgDataCalculator(), false),
+			}
+			cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName}}
+			pod := podWithBootstrapInitContainer("1", nil)
+			pod.Status.InitContainerStatuses = nil
+
+			EnrichStatus(ctx, cluster, []corev1.Pod{pod}, nil, pvcs)
+
+			Expect(cluster.Status.InitializingPVC).Should(Equal([]string{clusterName + "-1"}))
+			Expect(cluster.Status.HealthyPVC).Should(BeEmpty())
+		})
 
 	It("classifies a PVC as initializing while its Pod's bootstrap init container failed", func(ctx SpecContext) {
 		pvcs := []corev1.PersistentVolumeClaim{

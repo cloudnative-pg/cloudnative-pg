@@ -58,6 +58,9 @@ func ReconcileMetadata(
 		// Update any modified/new annotations coming from the cluster resource
 		modified = updateClusterAnnotations(ctx, cluster, instance) || modified
 
+		// Record on the Pod that its bootstrap succeeded
+		modified = updateBootstrapPendingAnnotation(ctx, instance) || modified
+
 		if !modified {
 			continue
 		}
@@ -158,6 +161,32 @@ func updateClusterLabels(
 	contextLogger.Info("Updating cluster labels on pod", "pod", instance.Name)
 	utils.InheritLabels(&instance.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 	return true
+}
+
+// updateBootstrapPendingAnnotation removes the pending bootstrap mark from the
+// instance once its bootstrap init container has terminated successfully, see
+// postgres.IsBootstrapCompleted.
+//
+// Returns true if the instance needed updating
+func updateBootstrapPendingAnnotation(ctx context.Context, instance *corev1.Pod) bool {
+	if _, ok := instance.Annotations[utils.BootstrapPendingAnnotationName]; !ok {
+		return false
+	}
+
+	for _, containerStatus := range instance.Status.InitContainerStatuses {
+		if containerStatus.Name != specs.BootstrapWorkContainerName {
+			continue
+		}
+		if containerStatus.State.Terminated == nil || containerStatus.State.Terminated.ExitCode != 0 {
+			return false
+		}
+
+		log.FromContext(ctx).Info("Marking the bootstrap as completed", "pod", instance.Name)
+		delete(instance.Annotations, utils.BootstrapPendingAnnotationName)
+		return true
+	}
+
+	return false
 }
 
 // Make sure that primary and replicas are correctly labelled as such
