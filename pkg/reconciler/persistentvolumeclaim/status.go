@@ -269,8 +269,11 @@ func classifyPVC(
 		// The Pod may carry a bootstrap init container that has not finished
 		// populating this PVC yet (e.g. initdb/join/restore): until it
 		// completes, the PVC is not actually usable, even though a Pod
-		// already references it.
-		if !podBootstrapComplete(pvc, podList) {
+		// already references it. Once the PGDATA PVC is ready the bootstrap
+		// is done: the init container running again because Kubernetes
+		// recreated the Pod sandbox (e.g. after a node reboot) doesn't make
+		// the instance initializing.
+		if !podBootstrapComplete(pvc, podList) && !isPgDataReady(pvcList, instanceName) {
 			return initializing
 		}
 		if isResizing(pvc) {
@@ -322,6 +325,16 @@ func hasPod(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
 	for _, pod := range podList {
 		if podUsesPVC(pod, pvc) {
 			return true
+		}
+	}
+	return false
+}
+
+// isPgDataReady checks if the PGDATA PVC of the instance is marked as ready
+func isPgDataReady(pvcList []corev1.PersistentVolumeClaim, instanceName string) bool {
+	for _, pvc := range pvcList {
+		if pvc.Name == NewPgDataCalculator().GetName(instanceName) {
+			return pvc.Annotations[utils.PVCStatusAnnotationName] == StatusReady
 		}
 	}
 	return false
