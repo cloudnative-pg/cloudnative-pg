@@ -1539,6 +1539,67 @@ var _ = Describe("ServiceAccount with custom name", func() {
 		Expect(rb.Subjects[0].Name).To(Equal("shared-sa"))
 		Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
 	})
+
+	It("should update the RoleBinding when the ServiceAccount changes", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		getRoleBinding := func() rbacv1.RoleBinding {
+			var rb rbacv1.RoleBinding
+			Expect(env.client.Get(ctx, types.NamespacedName{
+				Name:      cluster.Name,
+				Namespace: namespace,
+			}, &rb)).To(Succeed())
+			return rb
+		}
+
+		By("creating the RoleBinding for the default ServiceAccount", func() {
+			Expect(env.clusterReconciler.createOrPatchRoleBinding(ctx, cluster)).To(Succeed())
+			rb := getRoleBinding()
+			Expect(rb.Subjects).To(HaveLen(1))
+			Expect(rb.Subjects[0].Name).To(Equal(cluster.Name))
+		})
+
+		By("switching the cluster to a custom ServiceAccount", func() {
+			cluster.Spec.ServiceAccountName = "shared-sa"
+			Expect(env.clusterReconciler.createOrPatchRoleBinding(ctx, cluster)).To(Succeed())
+			rb := getRoleBinding()
+			Expect(rb.Subjects).To(HaveLen(1))
+			Expect(rb.Subjects[0].Kind).To(Equal("ServiceAccount"))
+			Expect(rb.Subjects[0].Name).To(Equal("shared-sa"))
+			Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
+			Expect(rb.RoleRef.Name).To(Equal(cluster.Name))
+		})
+
+		By("switching back to the default ServiceAccount", func() {
+			cluster.Spec.ServiceAccountName = ""
+			Expect(env.clusterReconciler.createOrPatchRoleBinding(ctx, cluster)).To(Succeed())
+			rb := getRoleBinding()
+			Expect(rb.Subjects).To(HaveLen(1))
+			Expect(rb.Subjects[0].Name).To(Equal(cluster.Name))
+		})
+	})
+
+	It("should not patch a RoleBinding that is already up to date", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.ServiceAccountName = "shared-sa"
+
+		Expect(env.clusterReconciler.createOrPatchRoleBinding(ctx, cluster)).To(Succeed())
+		var before rbacv1.RoleBinding
+		Expect(env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: namespace,
+		}, &before)).To(Succeed())
+
+		Expect(env.clusterReconciler.createOrPatchRoleBinding(ctx, cluster)).To(Succeed())
+		var after rbacv1.RoleBinding
+		Expect(env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: namespace,
+		}, &after)).To(Succeed())
+		Expect(after.ResourceVersion).To(Equal(before.ResourceVersion))
+	})
 })
 
 var _ = Describe("generateNodeSerial", func() {
