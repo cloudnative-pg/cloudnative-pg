@@ -448,7 +448,7 @@ jobs:
           docker run --rm \
             -v ./docs/src:/website/docs \
             ghcr.io/cloudnative-pg/docs:latest \
-            yarn build
+            npm run build
 
   crd:
     name: Verify CRD is up to date
