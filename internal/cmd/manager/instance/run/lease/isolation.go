@@ -171,7 +171,11 @@ func (e pinger) ensureInstancesAreReachable(cluster *apiv1.Cluster, ourIdentity 
 			reportedPrimary, err := e.probe(target.host, target.ip)
 			switch {
 			case err != nil:
-				failures[i] = err
+				// An unreachable peer is a sign of isolation, not proof that
+				// we were replaced: it counts only with the check enabled.
+				if e.config.Enabled != nil && *e.config.Enabled {
+					failures[i] = err
+				}
 			case reportedPrimary != "" && reportedPrimary != ourIdentity:
 				failures[i] = &SupersededError{
 					Host:          target.host,
@@ -238,16 +242,18 @@ func (e *SupersededError) Error() string {
 // shouldStepDown reports whether this primary should stop believing it is
 // still the legitimate primary: either because it cannot reach some peer
 // instance, or because a reachable peer reports a different target primary
-// (see SupersededError). It returns (false, nil) without checking anything
-// if the isolation check is disabled or the cluster has a single instance.
-// On any step-down verdict or checker build failure, reason carries the
-// specific cause for the caller to log.
+// (see SupersededError). With the isolation check disabled only the second
+// cause counts: an unreachable peer is not proof of having been replaced, a
+// peer naming another primary is. It returns (false, nil) without checking
+// anything if the check has no configuration or the cluster has a single
+// instance. On any step-down verdict or checker build failure, reason carries
+// the specific cause for the caller to log.
 func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, reason error) {
 	var cfg *apiv1.IsolationCheckConfiguration
 	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
 		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
 	}
-	if cfg == nil || cfg.Enabled == nil || !*cfg.Enabled {
+	if cfg == nil {
 		return false, nil
 	}
 	if cluster.Spec.Instances == 1 {

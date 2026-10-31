@@ -263,8 +263,8 @@ replica is allowed to claim the lease, it sends `SIGQUIT` to the PostgreSQL
 postmaster and exits with code `5`. Once the immediate shutdown has been
 accepted, a later lease renewal does not postpone this stop. The kubelet restarts the container. If the pod is still the target
 primary, it waits for the lease before it starts PostgreSQL again, otherwise it
-rejoins as a replica. The check never acts when it is disabled or when the
-cluster has a single instance.
+rejoins as a replica. The check never acts when the cluster has a single
+instance.
 
 It is **enabled by default** and can be disabled by adding the following:
 
@@ -275,6 +275,12 @@ spec:
       isolationCheck:
         enabled: false
 ```
+
+Disabling it switches off the reaction to unreachable instances only: an
+isolated primary is not stopped, so once its lease expires a replica can be
+promoted while it keeps accepting writes. A primary that still reaches an
+instance reporting a different target primary is stopped in any case, because
+that is proof it has been replaced, not a sign of isolation.
 
 :::info[Important]
     The reaction time is set by the primary lease timings
@@ -307,7 +313,8 @@ are two uses of the same primary lease, and they answer different questions. The
 lease coordinates *which instance is allowed to promote*; the isolation check
 uses the age of that lease to decide *when the current primary has to stop*. The
 two are complementary, and disabling the isolation check leaves the lease
-coordinating promotions with no mechanism stopping an isolated primary.
+coordinating promotions with no mechanism stopping an isolated primary that
+cannot reach any other instance.
 :::
 
 ## Readiness Probe

@@ -115,7 +115,7 @@ The two mechanisms are complementary and both are enabled by default:
 Keep both enabled. Disabling the isolation check leaves the lease
 alone responsible for primary safety, and the lease alone cannot
 prevent split-brain when the former primary cannot reach the API
-server but remains otherwise healthy.
+server or the other instances but remains otherwise healthy.
 
 ### Inspecting the primary lease
 
@@ -294,11 +294,12 @@ manager requests an immediate PostgreSQL shutdown once its last successful lease
 renewal is older than the renew deadline and either at least one other instance
 is unreachable or a reachable one names a different target primary, within the
 timings described under [Primary Isolation](instance_manager.md#primary-isolation).
-When PostgreSQL stops, the instance manager exits and the kubelet restarts the
-container, so the step-down shows up as a container restart, not as a liveness
-probe failure. Full high availability (recreation of the old primary on
-a healthy node by the operator) is still gated on the taint-based eviction
-actually deleting the pod.
+With `enabled: false` only the second cause stops it, so an isolated primary
+keeps running. When PostgreSQL stops, the instance manager exits and the
+kubelet restarts the container, so the step-down shows up as a container
+restart, not as a liveness probe failure. Full high availability (recreation of
+the old primary on a healthy node by the operator) is still gated on the
+taint-based eviction actually deleting the pod.
 
 ## Failover Quorum (Quorum-based Failover)
 

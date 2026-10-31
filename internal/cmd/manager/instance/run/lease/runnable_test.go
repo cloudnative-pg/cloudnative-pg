@@ -805,17 +805,17 @@ var _ = Describe("shouldStepDown", func() {
 		}
 	}
 
-	It("skips the check when isolation checking is disabled", func() {
-		stepDown, err := shouldStepDown(newCluster(false, 3), ourIdentity)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stepDown).To(BeFalse())
-	})
-
-	It("skips the check when the cluster has a single instance", func() {
-		stepDown, err := shouldStepDown(newCluster(true, 1), ourIdentity)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stepDown).To(BeFalse())
-	})
+	DescribeTable("skips the check when the cluster has a single instance",
+		func(enabled bool) {
+			// Building the checker fails without the server CA on disk, so no
+			// error proves the check returned before probing.
+			stepDown, err := shouldStepDown(newCluster(enabled, 1), ourIdentity)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(stepDown).To(BeFalse())
+		},
+		Entry("enabled", true),
+		Entry("disabled", false),
+	)
 
 	It("skips the check when no probes configuration is set", func() {
 		stepDown, err := shouldStepDown(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}, ourIdentity)
@@ -823,13 +823,18 @@ var _ = Describe("shouldStepDown", func() {
 		Expect(stepDown).To(BeFalse())
 	})
 
-	It("fails open when the reachability checker cannot be built", func() {
-		// In the test environment there is no server CA certificate on disk,
-		// so building the checker fails; this must not be reported as a step-down.
-		stepDown, err := shouldStepDown(newCluster(true, 3), ourIdentity)
-		Expect(err).To(HaveOccurred())
-		Expect(stepDown).To(BeFalse())
-	})
+	DescribeTable("fails open when the reachability checker cannot be built",
+		func(enabled bool) {
+			// In the test environment there is no server CA certificate on disk,
+			// so building the checker fails; this must not be reported as a
+			// step-down. Reaching the build proves a disabled check still probes.
+			stepDown, err := shouldStepDown(newCluster(enabled, 3), ourIdentity)
+			Expect(err).To(HaveOccurred())
+			Expect(stepDown).To(BeFalse())
+		},
+		Entry("enabled", true),
+		Entry("disabled", false),
+	)
 })
 
 // held reports whether the lease is held: taken by the run loop and not yielded
