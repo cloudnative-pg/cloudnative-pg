@@ -108,7 +108,7 @@ var _ = Describe("Validate schedule", func() {
 			},
 		}
 		warnings, result := v.validate(scheduledBackup)
-		Expect(warnings).To(BeEmpty())
+		Expect(warnings).To(HaveLen(1))
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.online"))
 	})
@@ -122,8 +122,39 @@ var _ = Describe("Validate schedule", func() {
 			},
 		}
 		warnings, result := v.validate(scheduledBackup)
-		Expect(warnings).To(BeEmpty())
+		Expect(warnings).To(HaveLen(1))
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.onlineConfiguration"))
 	})
+})
+
+var _ = Describe("ScheduledBackup in-tree Barman Cloud warnings", func() {
+	v := &ScheduledBackupCustomValidator{}
+
+	DescribeTable("on create and update",
+		func(ctx SpecContext, method apiv1.BackupMethod, warned bool) {
+			sb := &apiv1.ScheduledBackup{Spec: apiv1.ScheduledBackupSpec{
+				Schedule: "0 0 0 * * *",
+				Method:   method,
+			}}
+			utils.SetVolumeSnapshot(true)
+
+			createWarnings, err := v.ValidateCreate(ctx, sb)
+			Expect(err).ToNot(HaveOccurred())
+			updateWarnings, err := v.ValidateUpdate(ctx, sb, sb)
+			Expect(err).ToNot(HaveOccurred())
+
+			if warned {
+				Expect(createWarnings).To(HaveLen(1))
+				Expect(createWarnings[0]).To(ContainSubstring("removed in CloudNativePG 1.32.0"))
+				Expect(updateWarnings).To(Equal(createWarnings))
+			} else {
+				Expect(createWarnings).To(BeEmpty())
+				Expect(updateWarnings).To(BeEmpty())
+			}
+		},
+		Entry("barmanObjectStore", apiv1.BackupMethodBarmanObjectStore, true),
+		Entry("volumeSnapshot", apiv1.BackupMethodVolumeSnapshot, false),
+		Entry("plugin", apiv1.BackupMethodPlugin, false),
+	)
 })
