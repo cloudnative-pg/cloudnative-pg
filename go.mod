@@ -17,7 +17,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-logr/logr v1.4.4
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.4
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/jackc/pgx/v5 v5.12.0
 	github.com/jackc/puddle/v2 v2.2.3
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.7.0
