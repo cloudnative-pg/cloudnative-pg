@@ -68,14 +68,22 @@ func getPreserveNamespaces() []string {
 
 // CleanupClusterLogs cleans up the cluster logs of a given namespace
 func CleanupClusterLogs(namespace string, testFailed bool) error {
-	exists, _ := fileutils.FileExists(path.Join(SternLogDirectory, namespace))
-	if exists && !testFailed {
-		if err := fileutils.RemoveDirectory(path.Join(SternLogDirectory, namespace)); err != nil {
-			return err
-		}
+	dir := path.Join(SternLogDirectory, namespace)
+	exists, _ := fileutils.FileExists(dir)
+	if !exists || testFailed {
+		return nil
 	}
 
-	return nil
+	// The log streamer may create new files in the directory while we
+	// remove it, which makes the removal fail with "directory not empty".
+	// Renaming it first is atomic: the streamer creates any new file in a
+	// fresh directory, and we remove a directory nobody writes into anymore.
+	removing := dir + ".removing"
+	if err := os.Rename(dir, removing); err != nil {
+		return err
+	}
+
+	return os.RemoveAll(removing)
 }
 
 // cleanupNamespace does cleanup duty related to the tear-down of a namespace,
@@ -100,11 +108,14 @@ func cleanupNamespace(
 		return fmt.Errorf("namespace is empty")
 	}
 
+	deleteErr := deleteNamespace(ctx, crudClient, namespace)
+
+	// Best effort: a leftover log directory must not fail the spec.
 	if err := CleanupClusterLogs(namespace, testFailed); err != nil {
-		return err
+		fmt.Printf("could not clean up the logs of namespace %v: %v\n", namespace, err)
 	}
 
-	return deleteNamespace(ctx, crudClient, namespace)
+	return deleteErr
 }
 
 // dumpGoroutineStacks sends SIGQUIT to every container, regular and init
