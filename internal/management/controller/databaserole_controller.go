@@ -196,7 +196,7 @@ func (r *DatabaseRoleReconciler) handleDeletion(
 func shouldDropRole(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) bool {
 	return role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete &&
 		role.HasReconciliations() &&
-		!isClusterManagingRole(cluster, role.Spec.Name) && !cluster.IsReplica()
+		!cluster.ContainsManagedRole(role.Spec.Name) && !cluster.IsReplica()
 }
 
 // passwordSetToNull reports whether the password of the role must be set to
@@ -306,7 +306,7 @@ func (r *DatabaseRoleReconciler) shouldReconcile(
 
 	// If the role is already managed by the cluster, we stop the
 	// reconciliation here.
-	if isClusterManagingRole(cluster, role.Spec.Name) {
+	if cluster.ContainsManagedRole(role.Spec.Name) {
 		result, err := r.failedReconciliation(ctx, role, errClusterIsManagingRole)
 		return &result, err
 	}
@@ -425,7 +425,7 @@ func (r *DatabaseRoleReconciler) reconcileAppliedRole(
 	// the designated primary reports the conflict. Re-applying (adopting the
 	// role back) once the inline entry is removed is handled by the re-apply
 	// path below.
-	if isDesignatedPrimary && isClusterManagingRole(cluster, role.Spec.Name) {
+	if isDesignatedPrimary && cluster.ContainsManagedRole(role.Spec.Name) {
 		result, err := r.failedReconciliation(ctx, role, errClusterIsManagingRole)
 		return &result, err
 	}
@@ -538,22 +538,6 @@ func (r *DatabaseRoleReconciler) mapClusterToDatabaseRoles(
 	}
 
 	return requests
-}
-
-// isClusterManagingRole checks if the given role is already managed by the
-// cluster in the cluster.spec.managed.roles section
-func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
-	if cluster.Spec.Managed == nil {
-		return false
-	}
-
-	for i := range cluster.Spec.Managed.Roles {
-		if cluster.Spec.Managed.Roles[i].Name == roleName {
-			return true
-		}
-	}
-
-	return false
 }
 
 // updateExistingRole applies membership changes, attribute updates, and

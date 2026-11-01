@@ -248,8 +248,9 @@ over once the managing object is gone.
 
 The operator does not issue a
 [client certificate](declarative_role_management.md#generated-certificate-secret)
-for a rejected `DatabaseRole` either: the certificate would let the namespace
-of the rejected object log in as a role managed by another object. A
+for a rejected `DatabaseRole` either, nor for one naming a role that the
+cluster manages in its `managed.roles` section: the certificate would let the
+namespace of the object log in as a role managed by someone else. A
 certificate issued before the object was rejected, as when two objects claim
 the same role before either is reconciled, is deleted. The reason is recorded
 in `status.clientCertificate.message`.

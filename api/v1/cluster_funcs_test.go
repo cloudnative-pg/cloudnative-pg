@@ -1031,6 +1031,8 @@ var _ = Describe("Managed Roles", func() {
 			},
 		}
 		Expect(cluster.ContainsManagedRolesConfiguration()).To(BeTrue())
+		Expect(cluster.ContainsManagedRole("test_user")).To(BeTrue())
+		Expect(cluster.ContainsManagedRole("another_user")).To(BeFalse())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeTrue())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets1")).To(BeFalse())
 		Expect(cluster.Spec.Managed.Roles[0].GetRoleInherit()).To(BeTrue())
@@ -1042,6 +1044,7 @@ var _ = Describe("Managed Roles", func() {
 			Spec: ClusterSpec{},
 		}
 		Expect(cluster.ContainsManagedRolesConfiguration()).To(BeFalse())
+		Expect(cluster.ContainsManagedRole("test_user")).To(BeFalse())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeFalse())
 	})
 })

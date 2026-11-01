@@ -96,10 +96,11 @@ func (r *DatabaseRoleReconciler) withdrawClientCertificate(
 //
 // The certificate authenticates as the PostgreSQL role, so it is only issued
 // to the object entitled to manage that role: never for a cluster that does
-// not accept the roles of the namespace, and never for a duplicate claiming a
-// role already managed by another object, possibly from another namespace.
-// The instance manager refuses to apply such a duplicate, but a certificate
-// issued for it would still let its namespace log in as the role.
+// not accept the roles of the namespace, never for a role the cluster manages
+// in its managed.roles section, and never for a duplicate claiming a role
+// already managed by another object, possibly from another namespace. The
+// instance manager refuses to apply such a role, but a certificate issued for
+// it would still let its namespace log in as the role.
 func (r *DatabaseRoleReconciler) clientCertificateRefusal(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
@@ -107,6 +108,11 @@ func (r *DatabaseRoleReconciler) clientCertificateRefusal(
 ) (string, error) {
 	if reason := crossNamespaceRefusal(role, cluster); reason != "" {
 		return reason + ": no client certificate is issued for a role in another namespace", nil
+	}
+
+	if cluster.ContainsManagedRole(role.Spec.Name) {
+		return fmt.Sprintf("no client certificate is issued: role %q is managed by cluster %q "+
+			"in its spec.managed.roles section", role.Spec.Name, cluster.Name), nil
 	}
 
 	var roles apiv1.DatabaseRoleList

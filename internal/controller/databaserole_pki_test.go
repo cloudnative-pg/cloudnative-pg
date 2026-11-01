@@ -741,6 +741,52 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(r.Get(ctx, certSecretKey(owner), &corev1.Secret{})).To(Succeed())
 		})
 
+		DescribeTable("issues no certificate for a role the cluster manages in spec.managed.roles",
+			func(ctx SpecContext, inTenantNamespace bool) {
+				cluster.Spec.EnableCrossNamespaceResources = true
+				cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+					Roles: []apiv1.RoleConfiguration{{Name: "app_owner", Login: true}},
+				}
+
+				var role *apiv1.DatabaseRole
+				var secretKey types.NamespacedName
+				if inTenantNamespace {
+					role = newTenantRole("intruder", "app_owner")
+					secretKey = tenantCertSecretKey(role)
+				} else {
+					role = newRole("app_owner", true)
+					secretKey = certSecretKey(role)
+				}
+
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+				err := r.Get(ctx, secretKey, &corev1.Secret{})
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
+				Expect(role.Status.ClientCertificate.Expiration).To(BeEmpty())
+				Expect(role.Status.ClientCertificate.Message).To(ContainSubstring("spec.managed.roles"))
+			},
+			Entry("from another namespace", true),
+			Entry("from the namespace of the cluster", false),
+		)
+
+		It("withdraws the certificate of a role the cluster starts managing in spec.managed.roles",
+			func(ctx SpecContext) {
+				cluster.Spec.EnableCrossNamespaceResources = true
+				role := newTenantRole("tenant-app", "tenant_app")
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+				Expect(r.Get(ctx, tenantCertSecretKey(role), &corev1.Secret{})).To(Succeed())
+
+				cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+					Roles: []apiv1.RoleConfiguration{{Name: "tenant_app", Login: true}},
+				}
+
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+				err := r.Get(ctx, tenantCertSecretKey(role), &corev1.Secret{})
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
+				Expect(role.Status.ClientCertificate.Message).To(ContainSubstring("spec.managed.roles"))
+			})
+
 		It("withdraws the certificate issued to a role before it was refused", func(ctx SpecContext) {
 			cluster.Spec.EnableCrossNamespaceResources = true
 

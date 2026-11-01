@@ -39,8 +39,9 @@ for moving across.
 The two methods can be used at the same time, on different roles, which is what
 makes a gradual migration possible. When the **same** role name is defined in
 both places, **the Cluster specification (`managed.roles`) always takes
-precedence**: the `DatabaseRole` is not reconciled, and reports the conflict in
-its status.
+precedence**: the `DatabaseRole` is not reconciled, is not issued a
+[client certificate](#client-certificate-authentication), and reports the
+conflict in its status.
 :::
 
 :::note
