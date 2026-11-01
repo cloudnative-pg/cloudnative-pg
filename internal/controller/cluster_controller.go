@@ -113,6 +113,10 @@ type ClusterReconciler struct {
 	// the API server never syncs, which would stop the operator from starting
 	// and hang every reconciliation reading those objects.
 	clusterRBACForbidden bool
+
+	// apiReader reads from the API server, bypassing the cache, the objects
+	// the cache may not hold yet
+	apiReader client.Reader
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it.
@@ -142,6 +146,7 @@ func NewClusterReconciler(
 		drainTaints:          drainTaints,
 		admission:            admission,
 		clusterRBACForbidden: !canManageClusterRBAC,
+		apiReader:            mgr.GetAPIReader(),
 	}
 }
 

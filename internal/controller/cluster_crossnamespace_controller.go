@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -51,11 +52,16 @@ type crossNamespaceRBACReconciler struct {
 
 // Reconcile creates, repairs and removes the cross-namespace RBAC objects of
 // a cluster. The objects of a deleted cluster are removed while its deletion
-// is reconciled by the cluster controller, and by the sweep.
+// is reconciled by the cluster controller; the ones left behind, as when an
+// object is re-created by a reconciliation racing with that deletion, are
+// removed here once the cluster is gone, and by the sweep.
 func (r crossNamespaceRBACReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var cluster apiv1.Cluster
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		if !apierrs.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, r.deleteCrossNamespaceRBACOfMissingCluster(ctx, req.NamespacedName)
 	}
 
 	if !cluster.GetDeletionTimestamp().IsZero() {
@@ -87,6 +93,27 @@ func (r crossNamespaceRBACReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// deleteCrossNamespaceRBACOfMissingCluster deletes the cross-namespace RBAC
+// objects of a cluster missing from the cache, once the API server confirms
+// that the cluster does not exist: a cluster created moments ago may not be
+// cached yet, and removing its access would break its instances until the
+// next reconciliation.
+func (r crossNamespaceRBACReconciler) deleteCrossNamespaceRBACOfMissingCluster(
+	ctx context.Context,
+	key types.NamespacedName,
+) error {
+	err := r.apiReader.Get(ctx, key, &apiv1.Cluster{})
+	switch {
+	case err == nil:
+		// The cache will catch up and enqueue the cluster again
+		return nil
+	case !apierrs.IsNotFound(err):
+		return fmt.Errorf("while checking whether cluster %s exists: %w", key, err)
+	}
+
+	return r.deleteCrossNamespaceRBACByKey(ctx, key, nil)
 }
 
 // enablesCrossNamespaceResources tells whether the passed object is a

@@ -52,7 +52,7 @@ var _ = Describe("cross-namespace RBAC controller", func() {
 
 	var (
 		ctx        context.Context
-		fakeClient k8client.Client
+		fakeClient k8client.WithWatch
 		recorder   *record.FakeRecorder
 		reconciler crossNamespaceRBACReconciler
 		cluster    *apiv1.Cluster
@@ -72,17 +72,43 @@ var _ = Describe("cross-namespace RBAC controller", func() {
 		}
 	}
 
+	// build creates the reconciler. The passed interceptors stand for the
+	// cache: they apply to the client of the reconciler, while fakeClient
+	// and the API reader of the reconciler see the objects as they are.
 	build := func(funcs interceptor.Funcs, objects ...k8client.Object) {
 		fakeClient = newClusterIndexedFakeClientBuilder(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(objects...).
-			WithInterceptorFuncs(funcs).
 			Build()
 		recorder = record.NewFakeRecorder(1000)
 		reconciler = crossNamespaceRBACReconciler{ClusterReconciler: &ClusterReconciler{
-			Client:   fakeClient,
-			Recorder: recorder,
-			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
+			Client:    interceptor.NewClient(fakeClient, funcs),
+			Recorder:  recorder,
+			Scheme:    schemeBuilder.BuildWithAllKnownScheme(),
+			apiReader: fakeClient,
 		}}
+	}
+
+	// notCached hides the cluster from the cache
+	notCached := interceptor.Funcs{
+		Get: func(
+			ctx context.Context, cli k8client.WithWatch, key k8client.ObjectKey, obj k8client.Object,
+			opts ...k8client.GetOption,
+		) error {
+			if _, ok := obj.(*apiv1.Cluster); ok {
+				return apierrs.NewNotFound(schema.GroupResource{Resource: "clusters"}, key.Name)
+			}
+			return cli.Get(ctx, key, obj, opts...)
+		},
+	}
+
+	// leftovers returns the RBAC objects created for the cluster, with
+	// a tenant namespace
+	leftovers := func() []k8client.Object {
+		clusterRole := specs.CreateCrossNamespaceRole(*cluster)
+		clusterRoleBinding := specs.CreateCrossNamespaceRoleBinding(*cluster)
+		role := specs.CreateCrossNamespaceSecretsRole(*cluster, healthyTenant, []string{"bob-secret"})
+		roleBinding := specs.CreateCrossNamespaceSecretsRoleBinding(*cluster, healthyTenant)
+		return []k8client.Object{&clusterRole, &clusterRoleBinding, &role, &roleBinding}
 	}
 
 	// events drains the events recorded so far
@@ -164,6 +190,48 @@ var _ = Describe("cross-namespace RBAC controller", func() {
 
 		_, err := reconciler.Reconcile(ctx, request())
 		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("removes the RBAC objects left for a cluster that no longer exists", func() {
+		build(interceptor.Funcs{}, leftovers()...)
+
+		_, err := reconciler.Reconcile(ctx, request())
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(exists(&rbacv1.ClusterRole{}, "")).To(BeFalse())
+		Expect(exists(&rbacv1.ClusterRoleBinding{}, "")).To(BeFalse())
+		Expect(exists(&rbacv1.Role{}, healthyTenant)).To(BeFalse())
+		Expect(exists(&rbacv1.RoleBinding{}, healthyTenant)).To(BeFalse())
+	})
+
+	It("keeps the RBAC objects of a cluster missing only from the cache", func() {
+		build(notCached, append(leftovers(), cluster)...)
+
+		_, err := reconciler.Reconcile(ctx, request())
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(exists(&rbacv1.ClusterRole{}, "")).To(BeTrue())
+		Expect(exists(&rbacv1.ClusterRoleBinding{}, "")).To(BeTrue())
+		Expect(exists(&rbacv1.Role{}, healthyTenant)).To(BeTrue())
+		Expect(exists(&rbacv1.RoleBinding{}, healthyTenant)).To(BeTrue())
+	})
+
+	It("keeps the RBAC objects when the cluster cannot be read", func() {
+		unavailable := errors.New("connection refused")
+		build(notCached, leftovers()...)
+		reconciler.apiReader = interceptor.NewClient(fakeClient, interceptor.Funcs{
+			Get: func(context.Context, k8client.WithWatch, k8client.ObjectKey, k8client.Object,
+				...k8client.GetOption,
+			) error {
+				return unavailable
+			},
+		})
+
+		_, err := reconciler.Reconcile(ctx, request())
+		Expect(err).To(MatchError(unavailable))
+
+		Expect(exists(&rbacv1.ClusterRole{}, "")).To(BeTrue())
+		Expect(exists(&rbacv1.Role{}, healthyTenant)).To(BeTrue())
 	})
 
 	It("reports a ClusterRole hidden from the cache as not owned", func() {
