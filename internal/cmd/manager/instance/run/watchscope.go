@@ -36,11 +36,17 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// clusterWideAccessRetryDelay is how long to wait before checking again whether
-// the managed resources can be watched in every namespace. The operator grants
-// that access right after the cross-namespace resources support is enabled, so
-// a short delay is enough.
-const clusterWideAccessRetryDelay = 5 * time.Second
+// clusterWideAccessRetryDelay and clusterWideAccessMaxRetryDelay bound how
+// long to wait before checking again whether the managed resources can be
+// watched in every namespace. The operator grants that access right after the
+// cross-namespace resources support is enabled, so the first delay is short.
+// It doubles after every refusal: an operator unable to grant the access, as
+// one whose own RBAC predates the feature, may never do it, and every check
+// costs the API server one SelfSubjectAccessReview per resource and verb.
+const (
+	clusterWideAccessRetryDelay    = 5 * time.Second
+	clusterWideAccessMaxRetryDelay = 5 * time.Minute
+)
 
 // restartHeldBackRetryDelay is how long to wait before checking again whether
 // the instance manager can be restarted, after the restart was held back. The
@@ -86,6 +92,17 @@ type watchScopeReconciler struct {
 	// checkAccess tells whether this instance manager can already list and watch
 	// the managed resources in every namespace
 	checkAccess clusterWideAccessChecker
+
+	// accessRetryDelay is the time waited after the last refusal of the
+	// cluster-wide access, and nextAccessCheck the time it can be checked
+	// again: a reconciliation triggered earlier by a change of the cluster
+	// does not check it. They need no lock, as the reconciliations of a
+	// controller run one at a time.
+	accessRetryDelay time.Duration
+	nextAccessCheck  time.Time
+
+	// now returns the current time. It is a field to keep the reconciler testable.
+	now func() time.Time
 }
 
 // clusterWideAccessChecker reports whether the managed resources can be listed
@@ -122,6 +139,7 @@ func newWatchScopeReconciler(
 		exitedCondition: exitedCondition,
 		restart:         upgrade.RestartInstanceManager,
 		checkAccess:     newClusterWideAccessChecker(kubeClient),
+		now:             time.Now,
 	}
 }
 
@@ -160,17 +178,12 @@ func (r *watchScopeReconciler) Reconcile(
 	// the kubelet restart PostgreSQL. Wait until the access is usable.
 	// Narrowing the scope needs no new permission.
 	if cluster.Spec.EnableCrossNamespaceResources {
-		allowed, reason, err := r.checkAccess(ctx)
+		wait, err := r.untilClusterWideAccess(ctx)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if !allowed {
-			contextLogger.Info(
-				"Cross-namespace resources support enabled, waiting for the cluster-wide access "+
-					"before restarting the instance manager",
-				"reason", reason,
-				"retryAfter", clusterWideAccessRetryDelay)
-			return ctrl.Result{RequeueAfter: clusterWideAccessRetryDelay}, nil
+		if wait > 0 {
+			return ctrl.Result{RequeueAfter: wait}, nil
 		}
 	}
 
@@ -196,6 +209,34 @@ func (r *watchScopeReconciler) Reconcile(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// untilClusterWideAccess returns how long to wait before checking again
+// whether this instance manager can watch the managed resources in every
+// namespace, or zero when it can
+func (r *watchScopeReconciler) untilClusterWideAccess(ctx context.Context) (time.Duration, error) {
+	now := r.now()
+	if now.Before(r.nextAccessCheck) {
+		return r.nextAccessCheck.Sub(now), nil
+	}
+
+	allowed, reason, err := r.checkAccess(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if allowed {
+		r.accessRetryDelay = 0
+		return 0, nil
+	}
+
+	r.accessRetryDelay = min(max(2*r.accessRetryDelay, clusterWideAccessRetryDelay), clusterWideAccessMaxRetryDelay)
+	r.nextAccessCheck = now.Add(r.accessRetryDelay)
+	log.FromContext(ctx).Info(
+		"Cross-namespace resources support enabled, waiting for the cluster-wide access "+
+			"before restarting the instance manager",
+		"reason", reason,
+		"retryAfter", r.accessRetryDelay)
+	return r.accessRetryDelay, nil
 }
 
 // restartHeldBackReason returns why the instance manager must not be restarted

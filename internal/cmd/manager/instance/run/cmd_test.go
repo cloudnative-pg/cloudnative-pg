@@ -22,6 +22,7 @@ package run
 import (
 	"context"
 	"errors"
+	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -226,6 +227,8 @@ var _ = Describe("watchScopeReconciler", func() {
 		accessChecks  int
 		accessAllowed bool
 		accessErr     error
+
+		clock time.Time
 	)
 
 	reconcilerFor := func(
@@ -263,6 +266,7 @@ var _ = Describe("watchScopeReconciler", func() {
 				}
 				return false, "list databases.postgresql.cnpg.io in every namespace is forbidden", accessErr
 			},
+			now: func() time.Time { return clock },
 		}
 	}
 
@@ -275,6 +279,7 @@ var _ = Describe("watchScopeReconciler", func() {
 		accessChecks = 0
 		accessAllowed = true
 		accessErr = nil
+		clock = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	})
 
 	DescribeTable("keeps the instance manager running when the setting did not change",
@@ -357,6 +362,65 @@ var _ = Describe("watchScopeReconciler", func() {
 			_, err := reconciler.Reconcile(ctx, request)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(accessChecks).To(Equal(1))
+			Expect(restarts).To(Equal(1))
+		})
+
+		It("checks the access less and less often while it is refused", func(ctx SpecContext) {
+			accessAllowed = false
+			reconciler := reconcilerFor(newWatchScopeCluster(true), false)
+
+			delays := make([]time.Duration, 0, 8)
+			for range 8 {
+				result, err := reconciler.Reconcile(ctx, request)
+				Expect(err).ToNot(HaveOccurred())
+				delays = append(delays, result.RequeueAfter)
+				clock = clock.Add(result.RequeueAfter)
+			}
+
+			Expect(delays).To(Equal([]time.Duration{
+				5 * time.Second,
+				10 * time.Second,
+				20 * time.Second,
+				40 * time.Second,
+				80 * time.Second,
+				160 * time.Second,
+				clusterWideAccessMaxRetryDelay,
+				clusterWideAccessMaxRetryDelay,
+			}))
+			Expect(accessChecks).To(Equal(8))
+			Expect(restarts).To(BeZero())
+		})
+
+		It("does not check the access again before the delay elapsed", func(ctx SpecContext) {
+			accessAllowed = false
+			reconciler := reconcilerFor(newWatchScopeCluster(true), false)
+
+			first, err := reconciler.Reconcile(ctx, request)
+			Expect(err).ToNot(HaveOccurred())
+
+			// A change of the cluster triggers a reconciliation before the delay elapsed
+			clock = clock.Add(2 * time.Second)
+			second, err := reconciler.Reconcile(ctx, request)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(accessChecks).To(Equal(1))
+			Expect(second.RequeueAfter).To(Equal(first.RequeueAfter - 2*time.Second))
+			Expect(restarts).To(BeZero())
+		})
+
+		It("restarts once the access refused before is granted", func(ctx SpecContext) {
+			accessAllowed = false
+			reconciler := reconcilerFor(newWatchScopeCluster(true), false)
+
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(restarts).To(BeZero())
+
+			accessAllowed = true
+			clock = clock.Add(result.RequeueAfter)
+			_, err = reconciler.Reconcile(ctx, request)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(accessChecks).To(Equal(2))
 			Expect(restarts).To(Equal(1))
 		})
 

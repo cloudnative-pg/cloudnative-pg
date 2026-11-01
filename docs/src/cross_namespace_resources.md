@@ -66,11 +66,12 @@ This scope is decided when the instance manager starts.
 
 When `enableCrossNamespaceResources` is set on a running cluster, each instance
 manager waits until the operator has granted it access to every namespace
-(it checks that through a `SelfSubjectAccessReview`), and then **restarts
-itself** to widen its watch. **PostgreSQL keeps running** across this restart:
-the Pod is not recreated, and no switchover or connection drop is involved.
-Cross-namespace objects created before the restart are reconciled as soon as
-the new instance manager is up.
+(it checks that through a `SelfSubjectAccessReview`, at growing intervals of
+up to five minutes), and then **restarts itself** to widen its watch.
+**PostgreSQL keeps running** across this restart: the Pod is not recreated,
+and no switchover or connection drop is involved. Cross-namespace objects
+created before the restart are reconciled as soon as the new instance manager
+is up.
 
 The instance manager is briefly unavailable while it restarts, so the restart
 is held back until the cluster is healthy, with no switchover, failover,
