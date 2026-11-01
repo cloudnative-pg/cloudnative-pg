@@ -254,6 +254,69 @@ var _ = Describe("cross-namespace RBAC controller", func() {
 		Expect(err).To(MatchError(errCrossNamespaceRBACNotOwned))
 	})
 
+	Describe("an object created for the cluster but not cached yet", func() {
+		// hiddenFromCache hides the RBAC objects of the passed type from the
+		// cache, as when they were created moments ago
+		hiddenFromCache := func(isHidden func(k8client.Object) bool) interceptor.Funcs {
+			return interceptor.Funcs{
+				Get: func(
+					ctx context.Context, cli k8client.WithWatch, key k8client.ObjectKey, obj k8client.Object,
+					opts ...k8client.GetOption,
+				) error {
+					if isHidden(obj) {
+						return apierrs.NewNotFound(schema.GroupResource{Group: rbacv1.GroupName}, key.Name)
+					}
+					return cli.Get(ctx, key, obj, opts...)
+				},
+			}
+		}
+
+		It("is not reported as not owned when it is a ClusterRole", func() {
+			clusterRole := specs.CreateCrossNamespaceRole(*cluster)
+			build(hiddenFromCache(func(obj k8client.Object) bool {
+				_, ok := obj.(*rbacv1.ClusterRole)
+				return ok
+			}), cluster, &clusterRole)
+
+			_, err := reconciler.Reconcile(ctx, request())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(exists(&rbacv1.ClusterRoleBinding{}, "")).To(BeTrue())
+			Expect(events()).NotTo(ContainElement(ContainSubstring("CrossNamespaceRBACFailed")))
+		})
+
+		It("gets the RoleBinding when it is a tenant Role", func() {
+			role := specs.CreateCrossNamespaceSecretsRole(*cluster, healthyTenant, []string{"bob-secret"})
+			build(hiddenFromCache(func(obj k8client.Object) bool {
+				_, ok := obj.(*rbacv1.Role)
+				return ok
+			}), cluster, newRole(healthyTenant, "bob"), &role)
+
+			_, err := reconciler.Reconcile(ctx, request())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(exists(&rbacv1.RoleBinding{}, healthyTenant)).To(BeTrue())
+			Expect(events()).NotTo(ContainElement(ContainSubstring("CrossNamespaceRBACNotOwned")))
+		})
+
+		It("is retried when it was deleted while being created", func() {
+			build(interceptor.Funcs{
+				Create: func(
+					ctx context.Context, cli k8client.WithWatch, obj k8client.Object, opts ...k8client.CreateOption,
+				) error {
+					if _, ok := obj.(*rbacv1.ClusterRole); ok {
+						return apierrs.NewAlreadyExists(schema.GroupResource{Group: rbacv1.GroupName}, obj.GetName())
+					}
+					return cli.Create(ctx, obj, opts...)
+				},
+			}, cluster)
+
+			_, err := reconciler.Reconcile(ctx, request())
+			Expect(err).To(MatchError(ContainSubstring("deleted while being created")))
+			Expect(err).NotTo(MatchError(errCrossNamespaceRBACNotOwned))
+		})
+	})
+
 	It("does not bind the ServiceAccount to a Role not created for the cluster", func() {
 		foreign := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: rbacName, Namespace: healthyTenant}}
 		build(interceptor.Funcs{}, cluster, newRole(healthyTenant, "bob"), foreign)

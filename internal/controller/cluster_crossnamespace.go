@@ -120,14 +120,43 @@ func (r *ClusterReconciler) ensureCrossNamespaceRBACObject(
 	r.Recorder.Event(cluster, "Normal", "Creating"+kind,
 		fmt.Sprintf("Creating %s %s for %s", kind, name, purpose))
 	if err := r.Create(ctx, desired); err != nil {
-		// Only the cluster-scoped objects created by the operator are cached:
-		// one having the same name but not their labels cannot be read, and
-		// is only detected when creating the desired one
 		if apierrs.IsAlreadyExists(err) {
-			return fmt.Errorf("%s %s %w", kind, name, errCrossNamespaceRBACNotOwned)
+			return r.checkUncachedCrossNamespaceRBACObject(ctx, cluster, desired, existing)
 		}
 		return fmt.Errorf("while creating %s %s: %w", kind, name, err)
 	}
+	return nil
+}
+
+// checkUncachedCrossNamespaceRBACObject checks an RBAC object having the
+// desired name, which exists although it is missing from the cache. The cache
+// does not hold yet an object created moments ago by a previous
+// reconciliation, and never holds a cluster-scoped object lacking the labels
+// of the operator, so the object is read from the API server.
+//
+// An object created for the cluster is left as it is: its arrival in the
+// cache enqueues the cluster again, and the object is then repaired if needed.
+// Otherwise errCrossNamespaceRBACNotOwned is returned.
+func (r *ClusterReconciler) checkUncachedCrossNamespaceRBACObject(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	desired client.Object,
+	existing client.Object,
+) error {
+	kind, name := crossNamespaceRBACKindOf(desired), crossNamespaceRBACDisplayName(desired)
+
+	if err := r.apiReader.Get(ctx, client.ObjectKeyFromObject(desired), existing); err != nil {
+		if apierrs.IsNotFound(err) {
+			return fmt.Errorf("%s %s was deleted while being created, retrying", kind, name)
+		}
+		return fmt.Errorf("while getting %s %s: %w", kind, name, err)
+	}
+
+	if !specs.IsCrossNamespaceRBACOwnedBy(existing.GetLabels(), cluster.Namespace, cluster.Name) {
+		return fmt.Errorf("%s %s %w", kind, name, errCrossNamespaceRBACNotOwned)
+	}
+
+	log.FromContext(ctx).Debug("Found an RBAC object not cached yet", "kind", kind, "name", name)
 	return nil
 }
 
