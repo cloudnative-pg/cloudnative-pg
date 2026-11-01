@@ -23,7 +23,6 @@ import (
 	"path"
 	"time"
 
-	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -177,14 +176,7 @@ var _ = Describe("Pods restored with their PVCs", Label(tests.LabelBackupRestore
 			}, 60).Should(BeTrue())
 		})
 
-		By("deleting the Pods and the primary Lease, as lost with the Kubernetes cluster", func() {
-			// The operator cannot adopt the Lease of a previous Cluster yet,
-			// as it is not allowed to delete Leases: drop it, so that the
-			// restored Cluster can elect its primary.
-			Expect(env.Client.Delete(env.Ctx, &coordinationv1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
-			})).To(Succeed())
-
+		By("deleting the Pods, as lost with the Kubernetes cluster", func() {
 			quickDelete := &ctrlclient.DeleteOptions{GracePeriodSeconds: &quickDeletionPeriod}
 			for idx := range backedUpPods {
 				Expect(podutils.Delete(env.Ctx, env.Client, namespace, backedUpPods[idx].Name,
