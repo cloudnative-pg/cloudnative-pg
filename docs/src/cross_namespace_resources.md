@@ -72,6 +72,11 @@ the Pod is not recreated, and no switchover or connection drop is involved.
 Cross-namespace objects created before the restart are reconciled as soon as
 the new instance manager is up.
 
+The instance manager is briefly unavailable while it restarts, so the restart
+is held back until the cluster is healthy, with no switchover, failover,
+rolling update or online upgrade in progress, and until no backup is being
+taken from that instance.
+
 The same restart happens if an instance manager cannot read its cluster when
 it starts, for example during a brief unavailability of the API server, or if
 it starts before the operator granted it access to every namespace: it then

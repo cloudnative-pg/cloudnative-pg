@@ -21,6 +21,7 @@ package run
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -41,6 +42,12 @@ import (
 // a short delay is enough.
 const clusterWideAccessRetryDelay = 5 * time.Second
 
+// restartHeldBackRetryDelay is how long to wait before checking again whether
+// the instance manager can be restarted, after the restart was held back. The
+// end of a switchover or of a rolling update changes the cluster, which
+// triggers a new check by itself, but the end of a backup does not.
+const restartHeldBackRetryDelay = 30 * time.Second
+
 // clusterWideResources are the managed resources that the cache of the
 // instance manager watches in every namespace when the cross-namespace
 // resources support is enabled
@@ -60,6 +67,11 @@ var clusterWideVerbs = []string{"list", "watch"}
 // pod is recreated, this reconciler replaces the instance manager process with a
 // new one, which reads the current definition of the cluster while starting.
 // PostgreSQL keeps running across the restart.
+//
+// The instance manager is not available while it restarts, so the restart is
+// held back while it could interrupt its work: while the cluster is not
+// healthy, as during a switchover, a failover, a rolling update or an online
+// upgrade, and while a backup is taken from this instance, which would fail.
 type watchScopeReconciler struct {
 	client          client.Client
 	instance        *postgres.Instance
@@ -130,6 +142,18 @@ func (r *watchScopeReconciler) Reconcile(
 		return ctrl.Result{}, nil
 	}
 
+	reason, err := r.restartHeldBackReason(ctx, &cluster)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if reason != "" {
+		contextLogger.Info(
+			"Cross-namespace resources support changed, holding back the restart of the instance manager",
+			"reason", reason,
+			"retryAfter", restartHeldBackRetryDelay)
+		return ctrl.Result{RequeueAfter: restartHeldBackRetryDelay}, nil
+	}
+
 	// A new process would start its informers in every namespace right away.
 	// If the operator did not grant that access yet, they would be refused,
 	// the cache would never sync and the probes would stop answering, making
@@ -172,6 +196,34 @@ func (r *watchScopeReconciler) Reconcile(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// restartHeldBackReason returns why the instance manager must not be restarted
+// yet, or an empty string when it can be
+func (r *watchScopeReconciler) restartHeldBackReason(ctx context.Context, cluster *apiv1.Cluster) (string, error) {
+	if cluster.Status.Phase != apiv1.PhaseHealthy {
+		return fmt.Sprintf("the cluster is not healthy (phase: %q)", cluster.Status.Phase), nil
+	}
+
+	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary {
+		return "a switchover or a failover is in progress", nil
+	}
+
+	var backups apiv1.BackupList
+	if err := r.client.List(ctx, &backups, client.InNamespace(cluster.Namespace)); err != nil {
+		return "", fmt.Errorf("while listing the backups: %w", err)
+	}
+	for i := range backups.Items {
+		backup := &backups.Items[i]
+		if backup.Spec.Cluster.Name == cluster.Name &&
+			backup.Status.IsExecuting() &&
+			backup.Status.InstanceID != nil &&
+			backup.Status.InstanceID.PodName == r.instance.GetPodName() {
+			return fmt.Sprintf("backup %q is running on this instance", backup.Name), nil
+		}
+	}
+
+	return "", nil
 }
 
 // SetupWithManager registers the reconciler inside the controller manager

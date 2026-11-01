@@ -57,8 +57,11 @@ var _ = Describe("NewCmd", func() {
 const (
 	watchScopeNamespace   = "postgres"
 	watchScopeClusterName = "cluster-example"
+	watchScopePodName     = "cluster-example-1"
 )
 
+// newWatchScopeCluster returns a healthy cluster, whose instance managers may
+// be restarted
 func newWatchScopeCluster(crossNamespace bool) *apiv1.Cluster {
 	return &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -68,6 +71,29 @@ func newWatchScopeCluster(crossNamespace bool) *apiv1.Cluster {
 		Spec: apiv1.ClusterSpec{
 			Instances:                     1,
 			EnableCrossNamespaceResources: crossNamespace,
+		},
+		Status: apiv1.ClusterStatus{
+			Phase:          apiv1.PhaseHealthy,
+			CurrentPrimary: watchScopePodName,
+			TargetPrimary:  watchScopePodName,
+		},
+	}
+}
+
+// newWatchScopeBackup returns a backup of the cluster in the passed phase,
+// taken from the passed Pod
+func newWatchScopeBackup(phase apiv1.BackupPhase, podName string) *apiv1.Backup {
+	return &apiv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backup",
+			Namespace: watchScopeNamespace,
+		},
+		Spec: apiv1.BackupSpec{
+			Cluster: apiv1.LocalObjectReference{Name: watchScopeClusterName},
+		},
+		Status: apiv1.BackupStatus{
+			Phase:      phase,
+			InstanceID: &apiv1.InstanceID{PodName: podName},
 		},
 	}
 }
@@ -202,17 +228,23 @@ var _ = Describe("watchScopeReconciler", func() {
 		accessErr     error
 	)
 
-	reconcilerFor := func(cluster *apiv1.Cluster, bootValue bool) *watchScopeReconciler {
+	reconcilerFor := func(
+		cluster *apiv1.Cluster,
+		bootValue bool,
+		backups ...client.Object,
+	) *watchScopeReconciler {
 		instance = postgres.NewInstance().
 			WithNamespace(watchScopeNamespace).
-			WithClusterName(watchScopeClusterName)
+			WithClusterName(watchScopeClusterName).
+			WithPodName(watchScopePodName)
 		cancelled = false
 		restarts = 0
 
-		objects := make([]client.Object, 0, 1)
+		objects := make([]client.Object, 0, 1+len(backups))
 		if cluster != nil {
 			objects = append(objects, cluster)
 		}
+		objects = append(objects, backups...)
 
 		return &watchScopeReconciler{
 			client:         newWatchScopeClient(objects...),
@@ -337,6 +369,82 @@ var _ = Describe("watchScopeReconciler", func() {
 			Expect(restarts).To(BeZero())
 			Expect(cancelled).To(BeFalse())
 			Expect(instance.InstanceManagerIsUpgrading.Load()).To(BeFalse())
+		})
+	})
+
+	Context("holding back the restart", func() {
+		expectHeldBack := func(ctx SpecContext, reconciler *watchScopeReconciler) {
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(restartHeldBackRetryDelay))
+			Expect(restarts).To(BeZero())
+			Expect(cancelled).To(BeFalse())
+			Expect(accessChecks).To(BeZero())
+			Expect(instance.InstanceManagerIsUpgrading.Load()).To(BeFalse())
+		}
+
+		DescribeTable("waits while the cluster is not healthy",
+			func(ctx SpecContext, phase string) {
+				cluster := newWatchScopeCluster(true)
+				cluster.Status.Phase = phase
+
+				expectHeldBack(ctx, reconcilerFor(cluster, false))
+			},
+			Entry("during a switchover", apiv1.PhaseSwitchover),
+			Entry("during a failover", apiv1.PhaseFailOver),
+			Entry("during a rolling update", apiv1.PhaseUpgrade),
+			Entry("during an online upgrade", apiv1.PhaseOnlineUpgrading),
+			Entry("before the phase is set", ""),
+		)
+
+		It("waits while a new primary is being promoted", func(ctx SpecContext) {
+			cluster := newWatchScopeCluster(true)
+			cluster.Status.TargetPrimary = "cluster-example-2"
+
+			expectHeldBack(ctx, reconcilerFor(cluster, false))
+		})
+
+		DescribeTable("waits while a backup is taken from this instance",
+			func(ctx SpecContext, phase string) {
+				backup := newWatchScopeBackup(apiv1.BackupPhase(phase), watchScopePodName)
+
+				expectHeldBack(ctx, reconcilerFor(newWatchScopeCluster(true), false, backup))
+			},
+			Entry("when it started", apiv1.BackupPhaseStarted),
+			Entry("when it is running", apiv1.BackupPhaseRunning),
+		)
+
+		DescribeTable("restarts when no backup is taken from this instance",
+			func(ctx SpecContext, backup *apiv1.Backup) {
+				reconciler := reconcilerFor(newWatchScopeCluster(true), false, backup)
+
+				_, err := reconciler.Reconcile(ctx, request)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(restarts).To(Equal(1))
+			},
+			Entry("when the backup is taken from another instance",
+				newWatchScopeBackup(apiv1.BackupPhaseRunning, "cluster-example-2")),
+			Entry("when the backup is completed",
+				newWatchScopeBackup(apiv1.BackupPhaseCompleted, watchScopePodName)),
+			Entry("when the backup belongs to another cluster", func() *apiv1.Backup {
+				backup := newWatchScopeBackup(apiv1.BackupPhaseRunning, watchScopePodName)
+				backup.Spec.Cluster.Name = "another-cluster"
+				return backup
+			}()),
+		)
+
+		It("fails without restarting when the backups cannot be listed", func(ctx SpecContext) {
+			reconciler := reconcilerFor(newWatchScopeCluster(true), false)
+			listErr := errors.New("connection refused")
+			reconciler.client = interceptor.NewClient(reconciler.client.(client.WithWatch), interceptor.Funcs{
+				List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+					return listErr
+				},
+			})
+
+			_, err := reconciler.Reconcile(ctx, request)
+			Expect(err).To(MatchError(listErr))
+			Expect(restarts).To(BeZero())
 		})
 	})
 
