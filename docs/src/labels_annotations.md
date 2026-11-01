@@ -164,6 +164,12 @@ CloudNativePG manages the following predefined annotations:
 : The WAL at the start of a backup.
   This annotation is available only on `VolumeSnapshot` resources.
 
+`cnpg.io/bootstrapPending`
+:   Set to `true` by the operator on an instance pod created with the
+    `bootstrap-instance` init container, and removed once that container has
+    completed successfully. When a backup tool restores the pod as it was, the
+    init container runs again without it, so it leaves the volumes untouched.
+
 `cnpg.io/coredumpFilter`
 :   Filter to control the coredump of Postgres processes, expressed with a
     bitmask. By default it's set to `0x31` to exclude shared memory

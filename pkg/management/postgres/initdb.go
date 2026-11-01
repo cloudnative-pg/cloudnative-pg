@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
@@ -50,6 +51,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
 
@@ -125,6 +127,30 @@ type InitInfo struct {
 
 	// TablespaceMapFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
 	TablespaceMapFile []byte
+}
+
+// IsBootstrapCompleted reports whether the bootstrap already completed, that
+// is, whether the pending marker is missing or false. The operator attaches
+// the bootstrap init container only to a Pod whose PGDATA PVC is not ready,
+// marking the Pod as pending, and removes the mark once it succeeds, but
+// Kubernetes runs the container again whenever the Pod is recreated as it was,
+// as a backup tool does when it restores the Pod together with its PVCs: the
+// volumes then already hold the instance and must be left untouched.
+//
+// It returns an error when the pending marker holds an unexpected value,
+// as we cannot safely decide whether bootstrapping is needed.
+func IsBootstrapCompleted() (bool, error) {
+	rawValue := os.Getenv(specs.BootstrapPendingEnvName)
+	if rawValue == "" {
+		return true, nil
+	}
+
+	pending, err := strconv.ParseBool(rawValue)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s value %q: %w", specs.BootstrapPendingEnvName, rawValue, err)
+	}
+
+	return !pending, nil
 }
 
 // EnsureTargetDirectoriesDoNotExist ensures that the target data and WAL directories do not exist.

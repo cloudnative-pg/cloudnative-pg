@@ -55,15 +55,19 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "init [options]",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
-				Name:      clusterName,
-				Namespace: namespace,
-			})
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			contextLogger := log.FromContext(ctx)
+
+			completed, err := postgres.IsBootstrapCompleted()
+			if err != nil {
+				contextLogger.Error(err, "Error while checking bootstrap status")
+				return err
+			}
+			if completed {
+				contextLogger.Warning("The bootstrap is not pending in this Pod, leaving the volumes untouched")
+				return nil
+			}
 
 			initDBFlags, err := shellquote.Split(initDBFlagsString)
 			if err != nil {
@@ -86,6 +90,13 @@ func NewCmd() *cobra.Command {
 			postInitTemplateSQL, err := shellquote.Split(postInitTemplateSQLStr)
 			if err != nil {
 				contextLogger.Error(err, "Error while parsing post init template SQL queries")
+				return err
+			}
+
+			if err := management.WaitForGetCluster(ctx, ctrl.ObjectKey{
+				Name:      clusterName,
+				Namespace: namespace,
+			}); err != nil {
 				return err
 			}
 
