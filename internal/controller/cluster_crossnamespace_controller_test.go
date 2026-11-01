@@ -32,6 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -237,6 +238,36 @@ var _ = Describe("cross-namespace RBAC controller", func() {
 
 			Expect(exists(&rbacv1.Role{}, healthyTenant)).To(BeFalse())
 			Expect(exists(&rbacv1.RoleBinding{}, healthyTenant)).To(BeFalse())
+		})
+	})
+
+	Describe("crossNamespaceResourcesPredicate", func() {
+		var disabled *apiv1.Cluster
+
+		BeforeEach(func() {
+			disabled = cluster.DeepCopy()
+			disabled.Spec.EnableCrossNamespaceResources = false
+		})
+
+		It("passes the events of a cluster enabling the feature", func() {
+			Expect(crossNamespaceResourcesPredicate.Create(event.CreateEvent{Object: cluster})).To(BeTrue())
+			Expect(crossNamespaceResourcesPredicate.Delete(event.DeleteEvent{Object: cluster})).To(BeTrue())
+			Expect(crossNamespaceResourcesPredicate.Update(
+				event.UpdateEvent{ObjectOld: cluster, ObjectNew: cluster})).To(BeTrue())
+			Expect(crossNamespaceResourcesPredicate.Update(
+				event.UpdateEvent{ObjectOld: disabled, ObjectNew: cluster})).To(BeTrue())
+		})
+
+		It("passes the update disabling the feature", func() {
+			Expect(crossNamespaceResourcesPredicate.Update(
+				event.UpdateEvent{ObjectOld: cluster, ObjectNew: disabled})).To(BeTrue())
+		})
+
+		It("drops the events of a cluster never enabling the feature", func() {
+			Expect(crossNamespaceResourcesPredicate.Create(event.CreateEvent{Object: disabled})).To(BeFalse())
+			Expect(crossNamespaceResourcesPredicate.Delete(event.DeleteEvent{Object: disabled})).To(BeFalse())
+			Expect(crossNamespaceResourcesPredicate.Update(
+				event.UpdateEvent{ObjectOld: disabled, ObjectNew: disabled})).To(BeFalse())
 		})
 	})
 

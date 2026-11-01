@@ -28,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -88,17 +89,38 @@ func (r crossNamespaceRBACReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
+// enablesCrossNamespaceResources tells whether the passed object is a
+// cluster enabling the cross-namespace resources support
+func enablesCrossNamespaceResources(obj client.Object) bool {
+	cluster, ok := obj.(*apiv1.Cluster)
+	return ok && cluster.Spec.EnableCrossNamespaceResources
+}
+
+// crossNamespaceResourcesPredicate passes the events of the clusters enabling
+// the cross-namespace resources support, and the update disabling it, which
+// bypasses the webhook: the RBAC objects of that cluster are deleted right
+// away rather than by the next sweep
+var crossNamespaceResourcesPredicate = predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		return enablesCrossNamespaceResources(e.Object)
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return enablesCrossNamespaceResources(e.ObjectOld) || enablesCrossNamespaceResources(e.ObjectNew)
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return enablesCrossNamespaceResources(e.Object)
+	},
+	GenericFunc: func(e event.GenericEvent) bool {
+		return enablesCrossNamespaceResources(e.Object)
+	},
+}
+
 // setupCrossNamespaceRBACController registers the crossNamespaceRBACReconciler
 func (r *ClusterReconciler) setupCrossNamespaceRBACController(mgr ctrl.Manager) error {
-	enabledPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
-		cluster, ok := obj.(*apiv1.Cluster)
-		return ok && cluster.Spec.EnableCrossNamespaceResources
-	})
-
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("cluster-cross-namespace-rbac").
 		For(&apiv1.Cluster{}, builder.WithPredicates(
-			enabledPredicate,
+			crossNamespaceResourcesPredicate,
 			predicate.GenerationChangedPredicate{},
 		)).
 		// The password Secrets of the roles decide which tenant namespaces
