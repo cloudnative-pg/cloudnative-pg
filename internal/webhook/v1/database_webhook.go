@@ -21,6 +21,7 @@ package v1
 
 import (
 	"context"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
@@ -186,18 +187,20 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 
 	schemaNames := stringset.New()
 	for i, schemaSpec := range d.Spec.Schemas {
+		itemPath := field.NewPath("spec", "schemas").Index(i)
+
 		name := schemaSpec.Name
 		if schemaNames.Has(name) {
-			result = append(
-				result,
-				field.Duplicate(
-					field.NewPath("spec", "schemas").Index(i).Child("name"),
-					name,
-				),
-			)
+			result = append(result, field.Duplicate(itemPath.Child("name"), name))
 		}
 
 		schemaNames.Put(name)
+
+		if schemaSpec.Permissions != nil {
+			permissionsPath := itemPath.Child("permissions")
+			result = append(result, validateUsageNames(permissionsPath.Child("usage"), schemaSpec.Permissions.Usage)...)
+			result = append(result, validateUsageNames(permissionsPath.Child("create"), schemaSpec.Permissions.Create)...)
+		}
 	}
 
 	return result
@@ -281,13 +284,37 @@ func validateNameOptionsUsages(
 		optionNames.Put(option.Name)
 	}
 
+	errs = append(errs, validateUsageNames(itemPath.Child("usages"), usages)...)
+
+	return errs
+}
+
+// validateUsageNames validates that no role name appears more than once within a usage list.
+//
+// Role names are emitted as quoted identifiers and are therefore
+// case-sensitive, with one exception: every spelling of `public` resolves to
+// the same PostgreSQL PUBLIC pseudo-role. Those are folded together, so a list
+// naming both `public` and `PUBLIC` is reported as a duplicate instead of
+// silently emitting two statements against the same grantee.
+func validateUsageNames(usagesPath *field.Path, usages []apiv1.UsageSpec) field.ErrorList {
+	var errs field.ErrorList
+
 	usageNames := stringset.New()
 	for i, usage := range usages {
-		if usageNames.Has(usage.Name) {
-			errs = append(errs, field.Duplicate(itemPath.Child("usages").Index(i).Child("name"), usage.Name))
+		name := usage.Name
+		if strings.EqualFold(name, publicRole) {
+			name = publicRole
 		}
-		usageNames.Put(usage.Name)
+
+		if usageNames.Has(name) {
+			errs = append(errs, field.Duplicate(usagesPath.Index(i).Child("name"), usage.Name))
+		}
+		usageNames.Put(name)
 	}
 
 	return errs
 }
+
+// publicRole is the PostgreSQL PUBLIC pseudo-role, which the instance manager
+// emits verbatim rather than as a quoted identifier when applying grants.
+const publicRole = "PUBLIC"
