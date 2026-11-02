@@ -75,7 +75,6 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 		setClientCertMessage(ctx, role, fmt.Sprintf(
 			"client CA secret %q not found: no client certificate can be issued until it exists",
 			cluster.GetClientCASecretName()))
-		role.Status.ClientCertificate.Expiration = ""
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("while getting client CA secret %q: %w", cluster.GetClientCASecretName(), err)
@@ -260,7 +259,8 @@ func clientCertSecretKey(role *apiv1.DatabaseRole) client.ObjectKey {
 
 // setClientCertMessage records why the client certificate could not be issued,
 // keeping any expiration already observed: a certificate signed before the
-// problem appeared is still usable until it expires.
+// problem appeared is still usable until it expires. A caller clears it when
+// the Secret holding that certificate is not the operator's.
 func setClientCertMessage(ctx context.Context, role *apiv1.DatabaseRole, message string) {
 	log.FromContext(ctx).Info(message, "role", role.Name)
 	if role.Status.ClientCertificate == nil {

@@ -288,6 +288,27 @@ var _ = Describe("databaserole_pki", func() {
 			},
 		)
 
+		It("keeps the expiration of a still-usable certificate when the client CA disappears",
+			func(ctx SpecContext) {
+				_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+				role := newRole("hugo", true)
+
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+				expiration := role.Status.ClientCertificate.Expiration
+				Expect(expiration).NotTo(BeEmpty())
+
+				var caSecret corev1.Secret
+				Expect(r.Get(ctx, types.NamespacedName{
+					Name: cluster.GetClientCASecretName(), Namespace: namespace,
+				}, &caSecret)).To(Succeed())
+				Expect(r.Delete(ctx, &caSecret)).To(Succeed())
+				Expect(r.reconcileClientCertificate(ctx, role, cluster)).To(Succeed())
+
+				Expect(role.Status.ClientCertificate.Expiration).To(Equal(expiration))
+				Expect(role.Status.ClientCertificate.Message).To(ContainSubstring("not found"))
+			},
+		)
+
 		It("drops the message once the reason it was recorded is gone", func(ctx SpecContext) {
 			role := newRole("henry", true)
 

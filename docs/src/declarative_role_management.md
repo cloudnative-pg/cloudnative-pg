@@ -525,9 +525,9 @@ status:
     expiration: "2026-07-01T12:00:00Z"
 ```
 
-When no certificate could be issued, `expiration` is empty unless a
-certificate was issued earlier, and `status.clientCertificate.message` explains
-why.
+When no certificate could be issued, `status.clientCertificate.message`
+explains why. The `expiration` of a certificate issued earlier is kept, as that
+certificate stays valid until then, unless the Secret is not owned by the role.
 
 ### Configuring `pg_hba.conf`
 
