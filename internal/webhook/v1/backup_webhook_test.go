@@ -119,3 +119,53 @@ var _ = Describe("Backup webhook validate", func() {
 		Expect(result).To(BeEmpty())
 	})
 })
+
+var _ = Describe("Backup in-tree Barman Cloud warnings", func() {
+	v := &BackupCustomValidator{}
+
+	DescribeTable("on create and update",
+		func(ctx SpecContext, spec apiv1.BackupSpec, warned bool) {
+			backup := &apiv1.Backup{Spec: spec}
+			utils.SetVolumeSnapshot(true)
+
+			createWarnings, err := v.ValidateCreate(ctx, backup)
+			Expect(err).ToNot(HaveOccurred())
+			updateWarnings, err := v.ValidateUpdate(ctx, backup, backup)
+			Expect(err).ToNot(HaveOccurred())
+
+			if warned {
+				Expect(createWarnings).To(HaveLen(1))
+				Expect(createWarnings[0]).To(ContainSubstring("removed in CloudNativePG 1.32.0"))
+				Expect(updateWarnings).To(Equal(createWarnings))
+			} else {
+				Expect(createWarnings).To(BeEmpty())
+				Expect(updateWarnings).To(BeEmpty())
+			}
+		},
+		Entry("barmanObjectStore",
+			apiv1.BackupSpec{Method: apiv1.BackupMethodBarmanObjectStore}, true),
+		Entry("volumeSnapshot",
+			apiv1.BackupSpec{Method: apiv1.BackupMethodVolumeSnapshot}, false),
+		Entry("plugin",
+			apiv1.BackupSpec{
+				Method:              apiv1.BackupMethodPlugin,
+				PluginConfiguration: &apiv1.BackupPluginConfiguration{Name: "barman-cloud.cloudnative-pg.io"},
+			}, false),
+	)
+
+	It("returns the warning together with a validation error", func(ctx SpecContext) {
+		backup := &apiv1.Backup{Spec: apiv1.BackupSpec{
+			Method: apiv1.BackupMethodBarmanObjectStore,
+			Online: ptr.To(true),
+		}}
+
+		createWarnings, err := v.ValidateCreate(ctx, backup)
+		Expect(err).To(HaveOccurred())
+		Expect(createWarnings).To(HaveLen(1))
+		Expect(createWarnings[0]).To(ContainSubstring("removed in CloudNativePG 1.32.0"))
+
+		updateWarnings, err := v.ValidateUpdate(ctx, backup, backup)
+		Expect(err).To(HaveOccurred())
+		Expect(updateWarnings).To(Equal(createWarnings))
+	})
+})
