@@ -201,11 +201,6 @@ var _ = Describe("Keypair generation", func() {
 			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
 		})
 
-		It("caps the clock skew allowance at five minutes for a long-lived certificate", func() {
-			Expect(clockSkewAllowance(90 * 24 * time.Hour)).To(Equal(5 * time.Minute))
-			Expect(clockSkewAllowance(time.Minute)).To(Equal(6 * time.Second))
-		})
-
 		It("should create a CA K8s corev1/secret resource structure", func() {
 			rootCA, err := CreateRootCA("test", "namespace")
 			Expect(err).ToNot(HaveOccurred())

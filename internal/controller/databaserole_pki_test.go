@@ -175,6 +175,10 @@ var _ = Describe("databaserole_pki", func() {
 				ctx, &caSecret, &secondSecret, leafOf(secondSecret))).To(BeTrue())
 
 			Expect(leafOf(secondSecret).Subject.CommonName).To(Equal("ada"))
+			Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
+				ContainSubstring("Normal ClientCertificateRenewed"),
+				ContainSubstring("the client CA changed"),
+			)))
 		})
 
 		It("re-issues a certificate it cannot read", func(ctx SpecContext) {
@@ -575,6 +579,10 @@ var _ = Describe("databaserole_pki", func() {
 			Expect(second.Data[certs.TLSCertKey]).NotTo(Equal(firstCert))
 			cert := leafOf(second)
 			Expect(cert.NotAfter.Sub(cert.NotBefore)).To(Equal(24 * time.Hour))
+			Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
+				ContainSubstring("Normal ClientCertificateRenewed"),
+				ContainSubstring("the requested lifetime"),
+			)))
 		})
 
 		It("re-issues the certificate of a role that sets no duration when CERTIFICATE_DURATION changes",
@@ -597,6 +605,10 @@ var _ = Describe("databaserole_pki", func() {
 				Expect(second.Data[certs.TLSCertKey]).NotTo(Equal(first.Data[certs.TLSCertKey]))
 				cert := leafOf(second)
 				Expect(cert.NotAfter.Sub(cert.NotBefore)).To(Equal(30 * 24 * time.Hour))
+				Expect(recordedEvents(&r)).To(ContainElement(SatisfyAll(
+					ContainSubstring("Normal ClientCertificateRenewed"),
+					ContainSubstring("the requested lifetime"),
+				)))
 			},
 		)
 
