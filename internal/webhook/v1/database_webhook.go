@@ -56,7 +56,7 @@ type DatabaseCustomDefaulter struct{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Database.
 func (d *DatabaseCustomDefaulter) Default(_ context.Context, database *apiv1.Database) error {
-	databaseLog.Info("Defaulting for database", "name", database.GetName(), "namespace", database.GetNamespace())
+	databaseLog.Debug("Defaulting for database", "name", database.GetName(), "namespace", database.GetNamespace())
 
 	// database.Default()
 
