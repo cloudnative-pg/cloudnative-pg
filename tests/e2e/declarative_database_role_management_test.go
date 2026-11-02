@@ -362,6 +362,181 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			})
 		})
 
+		When("Role CR memberships carry options", func() {
+			It("grants, updates and revokes the memberships with their options", func() {
+				var role *apiv1.DatabaseRole
+				pgRoleName := fmt.Sprintf("role-grants-%d", funk.RandomInt(0, 9999))
+				// inherit and set exist only from PostgreSQL 16
+				supportsInheritAndSet := env.PostgresVersion >= 16
+				optionFor := func(value bool) *bool {
+					if !supportsInheritAndSet {
+						return nil
+					}
+					return ptr.To(value)
+				}
+				// name:admin:inherit:set for each grant of a membership, "-" for
+				// the options PostgreSQL 14 and 15 lack
+				membership := func(name string, admin, inherit, set bool) string {
+					if !supportsInheritAndSet {
+						return fmt.Sprintf("%s:%t:-:-", name, admin)
+					}
+					return fmt.Sprintf("%s:%t:%t:%t", name, admin, inherit, set)
+				}
+				optionColumns := `'-:-'`
+				if supportsInheritAndSet {
+					optionColumns = `am.inherit_option || ':' || am.set_option`
+				}
+				membershipsQuery := `SELECT pg_catalog.string_agg(m, ',' ORDER BY m) FROM (
+					SELECT pg_catalog.pg_get_userbyid(am.roleid) || ':' || am.admin_option || ':' ||
+						` + optionColumns + ` AS m
+					FROM pg_catalog.pg_auth_members AS am
+					JOIN pg_catalog.pg_roles AS r ON r.oid = am.member
+					WHERE r.rolname = ` + pq.QuoteLiteral(pgRoleName) + `) AS memberships`
+				roleNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      "role-" + pgRoleName,
+				}
+
+				assertApplied := func() {
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, roleNamespacedName, role)).To(Succeed())
+						g.Expect(role.Status.ObservedGeneration).To(Equal(role.Generation))
+						g.Expect(role.Status.Applied).To(HaveValue(BeTrue()))
+					}, 300).WithPolling(5 * time.Second).Should(Succeed())
+				}
+				assertMemberships := func(expected ...string) {
+					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+						membershipsQuery, strings.Join(expected, ",")), 30).Should(Succeed())
+				}
+				assertRejected := func(message string) {
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, roleNamespacedName, role)).To(Succeed())
+						g.Expect(role.Status.Applied).To(HaveValue(BeFalse()))
+						g.Expect(role.Status.Message).To(ContainSubstring(message))
+					}, 300).WithPolling(5 * time.Second).Should(Succeed())
+				}
+				patchRoleGrants := func(roleGrants []apiv1.RoleGrant) {
+					Expect(env.Client.Get(env.Ctx, roleNamespacedName, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.RoleGrants = roleGrants
+					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
+				}
+
+				By("creating a role with memberships in inRoles and roleGrants", func() {
+					role = &apiv1.DatabaseRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      roleNamespacedName.Name,
+							Namespace: namespace,
+						},
+						Spec: apiv1.DatabaseRoleSpec{
+							RoleConfiguration: apiv1.RoleConfiguration{
+								Name:    pgRoleName,
+								InRoles: []string{"pg_monitor"},
+							},
+							RoleGrants: []apiv1.RoleGrant{
+								{Name: "pg_signal_backend", Admin: ptr.To(true), Inherit: optionFor(false)},
+								{Name: "pg_read_all_data", Set: optionFor(false)},
+							},
+							ClusterRef:    corev1.LocalObjectReference{Name: clusterName},
+							ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
+						},
+					}
+					Expect(env.Client.Create(env.Ctx, role)).To(Succeed())
+					assertApplied()
+				})
+
+				By("verifying the memberships and their options in PostgreSQL", func() {
+					assertMemberships(
+						membership("pg_monitor", false, true, true),
+						membership("pg_read_all_data", false, true, false),
+						membership("pg_signal_backend", true, false, true),
+					)
+				})
+
+				By("changing the options and removing a roleGrants entry", func() {
+					patchRoleGrants([]apiv1.RoleGrant{
+						{Name: "pg_signal_backend", Admin: ptr.To(false), Inherit: optionFor(true)},
+					})
+					assertApplied()
+				})
+
+				By("verifying the admin option is revoked and the membership removed", func() {
+					assertMemberships(
+						membership("pg_monitor", false, true, true),
+						membership("pg_signal_backend", false, true, true),
+					)
+				})
+
+				By("rejecting a role listed in both inRoles and roleGrants", func() {
+					patchRoleGrants([]apiv1.RoleGrant{
+						{Name: "pg_signal_backend", Admin: ptr.To(false)},
+						{Name: "pg_monitor", Admin: ptr.To(true)},
+					})
+					assertRejected(`role "pg_monitor" is listed in both inRoles and roleGrants`)
+				})
+
+				if !supportsInheritAndSet {
+					By("rejecting the inherit option before PostgreSQL 16", func() {
+						patchRoleGrants([]apiv1.RoleGrant{
+							{Name: "pg_signal_backend", Inherit: ptr.To(false)},
+						})
+						assertRejected("require PostgreSQL 16 or later")
+					})
+				}
+
+				By("verifying the rejected specifications left the memberships alone", func() {
+					assertMemberships(
+						membership("pg_monitor", false, true, true),
+						membership("pg_signal_backend", false, true, true),
+					)
+				})
+
+				if supportsInheritAndSet {
+					By("acting on the grants made by another role too", func() {
+						// From PostgreSQL 16 another role holding the admin option
+						// grants a membership of its own, next to the operator's
+						grantor := pq.QuoteIdentifier(pgRoleName + "_admin")
+						member := pq.QuoteIdentifier(pgRoleName)
+						primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+						Expect(err).ToNot(HaveOccurred())
+						_, _, err = exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							exec.PodLocator{Namespace: namespace, PodName: primaryPodInfo.Name},
+							postgres.PostgresDBName,
+							"CREATE ROLE "+grantor+"; "+
+								"GRANT pg_signal_backend, pg_read_all_data TO "+grantor+" WITH ADMIN OPTION; "+
+								"SET ROLE "+grantor+"; "+
+								"GRANT pg_signal_backend TO "+member+" WITH INHERIT FALSE; "+
+								"GRANT pg_read_all_data TO "+member+"; "+
+								"RESET ROLE")
+						Expect(err).ToNot(HaveOccurred())
+						assertMemberships(
+							membership("pg_monitor", false, true, true),
+							membership("pg_read_all_data", false, true, true),
+							membership("pg_signal_backend", false, false, true),
+							membership("pg_signal_backend", false, true, true),
+						)
+
+						patchRoleGrants([]apiv1.RoleGrant{
+							{Name: "pg_signal_backend", Admin: ptr.To(false), Inherit: ptr.To(true), Set: ptr.To(true)},
+						})
+						assertApplied()
+						assertMemberships(
+							membership("pg_monitor", false, true, true),
+							membership("pg_signal_backend", false, true, true),
+							membership("pg_signal_backend", false, true, true),
+						)
+					})
+				}
+
+				By("cleaning up", func() {
+					Expect(objects.Delete(env.Ctx, env.Client, role)).To(Succeed())
+				})
+			})
+		})
+
 		When("Two Role CRs are managing the same PostgreSQL Role", func() {
 			It("will make sure that only one is managing it", func() {
 				var (

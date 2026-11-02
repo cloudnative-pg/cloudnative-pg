@@ -29,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -266,15 +267,15 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	for _, role := range rolesByAction[roleUpdateMemberships] {
 		// NOTE: revoking / granting to a role does not alter its TransactionID
 		dbRole := role.toDatabaseRole()
-		grants, revokes, err := GetRoleMembershipDiff(ctx, db, role.InRoles, dbRole)
-		handleRoleError(err, role.Name, roleUpdateMemberships)
-
 		pgMajorVersion, err := sr.getPostgresMajorVersion()
 		if err != nil {
 			handleRoleError(err, role.Name, roleUpdateMemberships)
 			continue
 		}
-		err = UpdateMembership(ctx, db, dbRole, grants, revokes, pgMajorVersion)
+		changes, err := GetRoleMembershipDiff(ctx, db, dbRole, nil, pgMajorVersion)
+		handleRoleError(err, role.Name, roleUpdateMemberships)
+
+		err = UpdateMembership(ctx, db, dbRole, changes, pgMajorVersion)
 		handleRoleError(err, role.Name, roleUpdateMemberships)
 	}
 
@@ -286,21 +287,26 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	return appliedChanges, unreconciledRoles
 }
 
-// GetRoleMembershipDiff returns the roles to be granted, and the grants of
-// membership to be revoked
+// GetRoleMembershipDiff returns the changes that make the role a member of
+// exactly the roles in its InRoles, with the PostgreSQL defaults, and in
+// roleGrants, with the options they set
 func GetRoleMembershipDiff(
 	ctx context.Context,
 	db *sql.DB,
-	desiredRoleMemberships []string,
 	dbRole DatabaseRole,
-) (toGrant []string, toRevoke []Membership, err error) {
-	inRoleInDB, err := GetParentRoles(ctx, db, dbRole)
+	roleGrants []apiv1.RoleGrant,
+	pgMajorVersion int,
+) (MembershipChanges, error) {
+	inRoleInDB, err := GetParentRoles(ctx, db, dbRole, pgMajorVersion)
 	if err != nil {
-		return nil, nil, err
+		return MembershipChanges{}, err
 	}
-	rolesToGrant := getRolesToGrant(inRoleInDB, desiredRoleMemberships)
-	rolesToRevoke := getRolesToRevoke(inRoleInDB, desiredRoleMemberships)
-	return rolesToGrant, rolesToRevoke, nil
+	inRoleInSpec := make([]apiv1.RoleGrant, 0, len(dbRole.InRoles)+len(roleGrants))
+	for _, name := range dbRole.InRoles {
+		inRoleInSpec = append(inRoleInSpec, apiv1.RoleGrant{Name: name})
+	}
+	inRoleInSpec = append(inRoleInSpec, roleGrants...)
+	return getMembershipChanges(inRoleInDB, inRoleInSpec), nil
 }
 
 // applyRoleCreateUpdate creates/updates a role, getting the password from Kubernetes
@@ -414,24 +420,55 @@ func getPasswordSecretResourceVersion(
 	return re
 }
 
-func getRolesToGrant(inRoleInDB []Membership, inRoleInSpec []string) []string {
-	var roleToGrant []string
-	for _, v := range inRoleInSpec {
-		if !slices.ContainsFunc(inRoleInDB, func(m Membership) bool { return m.Name == v }) {
-			roleToGrant = append(roleToGrant, v)
+// getMembershipChanges compares the grants of membership in the DB with the
+// memberships in the spec. A membership missing in the DB is granted, without
+// the admin option unless the spec turns it on. Every grant in the DB of a
+// membership in the spec is changed to the options the spec sets, as any of
+// them can give the member what the spec denies, and every grant of a
+// membership missing in the spec is revoked, whoever granted it.
+func getMembershipChanges(inRoleInDB []Membership, inRoleInSpec []apiv1.RoleGrant) MembershipChanges {
+	var changes MembershipChanges
+	for _, wanted := range inRoleInSpec {
+		granted := false
+		for _, grant := range inRoleInDB {
+			if grant.Name != wanted.Name {
+				continue
+			}
+			granted = true
+			if update := optionsToChange(grant, wanted); update.hasOptions() {
+				changes.Update = append(changes.Update, update)
+			}
+		}
+		if !granted {
+			newGrant := Membership{Name: wanted.Name, Inherit: wanted.Inherit, Set: wanted.Set}
+			if ptr.Deref(wanted.Admin, false) {
+				newGrant.Admin = wanted.Admin
+			}
+			changes.Grant = append(changes.Grant, newGrant)
 		}
 	}
-	return roleToGrant
+	for _, grant := range inRoleInDB {
+		if !slices.ContainsFunc(inRoleInSpec, func(r apiv1.RoleGrant) bool { return r.Name == grant.Name }) {
+			changes.Revoke = append(changes.Revoke, grant)
+		}
+	}
+	return changes
 }
 
-// getRolesToRevoke returns every grant of the memberships missing in the
-// spec, whoever granted it
-func getRolesToRevoke(inRoleInDB []Membership, inRoleInSpec []string) []Membership {
-	var roleToRevoke []Membership
-	for _, v := range inRoleInDB {
-		if !slices.Contains(inRoleInSpec, v.Name) {
-			roleToRevoke = append(roleToRevoke, v)
+// optionsToChange returns the grant with only the options the spec sets to a
+// value the grant does not have
+func optionsToChange(grant Membership, wanted apiv1.RoleGrant) Membership {
+	toChange := func(inDB, inSpec *bool) *bool {
+		if inSpec == nil || ptr.Equal(inDB, inSpec) {
+			return nil
 		}
+		return inSpec
 	}
-	return roleToRevoke
+	return Membership{
+		Name:    grant.Name,
+		Grantor: grant.Grantor,
+		Admin:   toChange(grant.Admin, wanted.Admin),
+		Inherit: toChange(grant.Inherit, wanted.Inherit),
+		Set:     toChange(grant.Set, wanted.Set),
+	}
 }

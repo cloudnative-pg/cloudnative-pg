@@ -627,8 +627,8 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			noParents := sqlmock.NewRows([]string{"name", "grantor"})
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
+			noParents := membershipRows()
+			mock.ExpectQuery(expectedMembershipStmtBefore16).WithArgs("role_to_test1").WillReturnRows(noParents)
 			mock.ExpectBegin()
 			expectedMembershipExecs := []string{
 				`GRANT "role1" TO "role_to_test1"`,
@@ -664,8 +664,8 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			rows := sqlmock.NewRows([]string{"name", "grantor"}).AddRow("foo", "postgres")
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test2").WillReturnRows(rows)
+			rows := membershipRows().AddRow("foo", "postgres", false, nil, nil)
+			mock.ExpectQuery(expectedMembershipStmtBefore16).WithArgs("role_to_test2").WillReturnRows(rows)
 			mock.ExpectBegin()
 
 			mock.ExpectExec(`REVOKE "foo" FROM "role_to_test2"`).
@@ -698,9 +698,9 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			rows := sqlmock.NewRows([]string{"name", "grantor"}).
-				AddRow("foo", "admin_role").
-				AddRow("foo", "postgres")
+			rows := membershipRows().
+				AddRow("foo", "admin_role", false, true, true).
+				AddRow("foo", "postgres", false, true, true)
 			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test2").WillReturnRows(rows)
 			mock.ExpectBegin()
 			mock.ExpectExec(`REVOKE "foo" FROM "role_to_test2" GRANTED BY "admin_role"`).
@@ -842,8 +842,8 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			}
 
-			noParents := sqlmock.NewRows([]string{"name", "grantor"})
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
+			noParents := membershipRows()
+			mock.ExpectQuery(expectedMembershipStmtBefore16).WithArgs("role_to_test1").WillReturnRows(noParents)
 			mock.ExpectBegin()
 
 			mock.ExpectExec(`GRANT "role1" TO "role_to_test1"`).

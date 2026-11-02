@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -563,14 +564,13 @@ func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
 	return false
 }
 
-// updateExistingRole applies attribute updates, comment updates, and
-// membership changes to an existing PostgreSQL role.
+// updateExistingRole applies attribute updates and comment updates to an
+// existing PostgreSQL role.
 func updateExistingRole(
 	ctx context.Context,
 	db *sql.DB,
 	dbRole roles.DatabaseRole,
 	existingDBRole *roles.DatabaseRole,
-	pgMajorVersion int,
 ) error {
 	if err := roles.Update(ctx, db, dbRole); err != nil {
 		return err
@@ -580,18 +580,46 @@ func updateExistingRole(
 			return fmt.Errorf("while updating comment: %w", err)
 		}
 	}
+	return nil
+}
 
-	// Memberships come after the attributes: from PostgreSQL 16, a membership
-	// takes its inherit option from the inherit attribute the role has when it
-	// is granted.
-	toGrant, toRevoke, err := roles.GetRoleMembershipDiff(
-		ctx, db, dbRole.InRoles, dbRole,
-	)
+// updateMemberships grants, changes and revokes what makes the role a member
+// of exactly the roles in inRoles and roleGrants, with the options roleGrants
+// sets.
+func updateMemberships(
+	ctx context.Context,
+	db *sql.DB,
+	dbRole roles.DatabaseRole,
+	roleGrants []apiv1.RoleGrant,
+	pgMajorVersion int,
+) error {
+	changes, err := roles.GetRoleMembershipDiff(ctx, db, dbRole, roleGrants, pgMajorVersion)
 	if err != nil {
 		return fmt.Errorf("while getting the membership updates required: %w", err)
 	}
-	if err = roles.UpdateMembership(ctx, db, dbRole, toGrant, toRevoke, pgMajorVersion); err != nil {
+	if err = roles.UpdateMembership(ctx, db, dbRole, changes, pgMajorVersion); err != nil {
 		return fmt.Errorf("while updating membership: %w", err)
+	}
+	return nil
+}
+
+// validateRoleGrants rejects the roleGrants the role cannot be reconciled
+// with, before anything is applied. The CRD cannot check that a role is not
+// in inRoles too within its validation cost budget, and the inherit and set
+// options depend on the PostgreSQL version: ignoring them before PostgreSQL
+// 16 would hide that the membership follows the inherit attribute of the
+// role, and always allows SET ROLE.
+func validateRoleGrants(role *apiv1.DatabaseRole, pgMajorVersion int) error {
+	for _, grant := range role.Spec.RoleGrants {
+		if slices.Contains(role.Spec.InRoles, grant.Name) {
+			return fmt.Errorf("role %q is listed in both inRoles and roleGrants: keep it in only one of them",
+				grant.Name)
+		}
+		if pgMajorVersion < 16 && (grant.Inherit != nil || grant.Set != nil) {
+			return fmt.Errorf(
+				"the inherit and set options of roleGrants require PostgreSQL 16 or later, and this cluster "+
+					"runs PostgreSQL %d: remove them from the %q entry", pgMajorVersion, grant.Name)
+		}
 	}
 	return nil
 }
@@ -602,6 +630,14 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	// Guard against reserved roles (belt-and-suspenders with CEL validation on the CRD)
 	if pgpostgres.IsRoleReserved(role.Spec.Name) {
 		return "", fmt.Errorf("role name %q is reserved and cannot be managed via DatabaseRole", role.Spec.Name)
+	}
+
+	pgMajorVersion, err := r.getPostgresMajorVersion()
+	if err != nil {
+		return "", fmt.Errorf("while getting the PostgreSQL major version: %w", err)
+	}
+	if err := validateRoleGrants(role, pgMajorVersion); err != nil {
+		return "", err
 	}
 
 	db, err := r.instance.GetSuperUserDB()
@@ -649,14 +685,17 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	}
 
 	if existingDBRole != nil {
-		pgMajorVersion, err := r.getPostgresMajorVersion()
-		if err != nil {
-			return "", fmt.Errorf("while getting the PostgreSQL major version: %w", err)
-		}
-		if err := updateExistingRole(ctx, db, dbRole, existingDBRole, pgMajorVersion); err != nil {
+		if err := updateExistingRole(ctx, db, dbRole, existingDBRole); err != nil {
 			return "", err
 		}
 	} else if err := roles.Create(ctx, db, dbRole); err != nil {
+		return "", err
+	}
+
+	// Memberships come after the attributes: from PostgreSQL 16, a membership
+	// granted without an inherit option takes it from the inherit attribute
+	// the role has at that moment.
+	if err := updateMemberships(ctx, db, dbRole, role.Spec.RoleGrants, pgMajorVersion); err != nil {
 		return "", err
 	}
 

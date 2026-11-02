@@ -43,7 +43,14 @@ const (
 	) mem ON member = oid
 	WHERE rolname not like 'pg\_%'`
 
-	expectedMembershipStmt = `SELECT pg_catalog.pg_get_userbyid(am.roleid), pg_catalog.pg_get_userbyid(am.grantor)
+	expectedMembershipStmt = `SELECT pg_catalog.pg_get_userbyid(am.roleid), pg_catalog.pg_get_userbyid(am.grantor),
+		am.admin_option, am.inherit_option, am.set_option
+		FROM pg_catalog.pg_auth_members AS am
+		JOIN pg_catalog.pg_authid AS auth ON auth.oid = am.member
+		WHERE auth.rolname = $1`
+
+	expectedMembershipStmtBefore16 = `SELECT pg_catalog.pg_get_userbyid(am.roleid), pg_catalog.pg_get_userbyid(am.grantor),
+		am.admin_option, NULL::boolean, NULL::boolean
 		FROM pg_catalog.pg_auth_members AS am
 		JOIN pg_catalog.pg_authid AS auth ON auth.oid = am.member
 		WHERE auth.rolname = $1`
@@ -80,6 +87,12 @@ var scramAwareMatcher = sqlmock.QueryMatcherFunc(func(expectedSQL, actualSQL str
 	}
 	return nil
 })
+
+// membershipRows returns the rows of the grants of membership GetParentRoles
+// reads, to which each test adds its grants
+func membershipRows() *sqlmock.Rows {
+	return sqlmock.NewRows([]string{"name", "grantor", "admin", "inherit", "set"})
+}
 
 func TestReconciler(t *testing.T) {
 	RegisterFailHandler(Fail)

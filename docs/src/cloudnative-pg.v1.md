@@ -999,6 +999,7 @@ _Appears in:_
 | `login` _boolean_ | Whether the role is allowed to log in. A role having the `login`<br />attribute can be thought of as a user. Roles without this attribute<br />are useful for managing database privileges, but are not users in<br />the usual sense of the word. Default is `false`. |  |  |  |
 | `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication. Default<br />is `false`. |  |  |  |
 | `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
+| `roleGrants` _[RoleGrant](#rolegrant) array_ | RoleGrants lists the roles this role is a member of, like `inRoles`,<br />with the options of each membership. An entry carrying only a `name`<br />is the same as listing the role in `inRoles`. A role listed in both<br />fails the reconciliation, rather than one of the two entries silently<br />winning. Changes are applied through `GRANT` and `REVOKE` statements,<br />and removing an entry revokes the membership. |  |  |  |
 | `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
 | `databaseRoleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
 | `clientCertificate` _[ClientCertificateConfiguration](#clientcertificateconfiguration)_ | ClientCertificate configures the operator to generate and renew a TLS client<br />certificate for this role, signed by the cluster's client CA. The certificate<br />is stored in a Secret named `<databaserole-name>-client-cert`.<br />Requires login to be true. |  |  |  |
@@ -2778,6 +2779,29 @@ _Appears in:_
 | `login` _boolean_ | Whether the role is allowed to log in. A role having the `login`<br />attribute can be thought of as a user. Roles without this attribute<br />are useful for managing database privileges, but are not users in<br />the usual sense of the word. Default is `false`. |  |  |  |
 | `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication. Default<br />is `false`. |  |  |  |
 | `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
+
+
+#### RoleGrant
+
+
+
+RoleGrant is the membership of a role in another role, with its options.
+An option left out is not managed: PostgreSQL applies its default when the
+membership is granted, and removing an option later leaves the membership
+as it is, rather than resetting the option to its default.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleSpec](#databaserolespec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the role to be a member of | True |  | MinLength: 1 <br /> |
+| `admin` _boolean_ | Admin allows the member to grant membership in the role to other roles,<br />and to revoke it from them (`WITH ADMIN OPTION`), which makes it a<br />privileged option. PostgreSQL defaults to false. |  |  |  |
+| `inherit` _boolean_ | Inherit makes the member inherit the privileges of the role<br />(`WITH INHERIT`). PostgreSQL defaults to the `inherit` attribute of<br />the member at the time the membership is granted. Requires PostgreSQL<br />16 or later. |  |  |  |
+| `set` _boolean_ | Set allows the member to switch to the role through `SET ROLE`<br />(`WITH SET`). PostgreSQL defaults to true. Requires PostgreSQL 16 or<br />later. |  |  |  |
 
 
 #### RoleStatus
