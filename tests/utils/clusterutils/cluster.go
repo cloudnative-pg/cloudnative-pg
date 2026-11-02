@@ -181,7 +181,7 @@ func GetPrimary(
 			}
 		}
 		err = fmt.Errorf("all pod with primary role has deletion timestamp")
-		return &(podList.Items[0]), err
+		return &podList.Items[0], err
 	}
 	err = fmt.Errorf("no primary found")
 	return &corev1.Pod{}, err
@@ -259,7 +259,7 @@ func ScaleSize(
 	}
 	originalCluster := cluster.DeepCopy()
 	cluster.Spec.Instances = newClusterSize
-	err = crudClient.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+	err = objects.Patch(ctx, crudClient, cluster, client.MergeFrom(originalCluster))
 	if err != nil {
 		return err
 	}

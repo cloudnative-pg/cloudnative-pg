@@ -1,0 +1,11 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: cluster-plugin-backup-standby
+spec:
+  method: plugin
+  target: prefer-standby
+  cluster:
+    name: cluster-plugin-backup
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

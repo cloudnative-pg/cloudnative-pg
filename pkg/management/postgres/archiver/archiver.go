@@ -204,8 +204,8 @@ func internalRun(
 	}
 
 	// Step 1: Check if the archive location is safe to perform archiving
-	if utils.IsEmptyWalArchiveCheckEnabled(&cluster.ObjectMeta) {
-		if err := checkWalArchive(ctx, cluster, walArchiver, pgData); err != nil {
+	if shouldCheckEmptyWalArchive(ctx, cluster, pgData) {
+		if err := checkWalArchive(ctx, cluster, walArchiver); err != nil {
 			return err
 		}
 	}
@@ -301,7 +301,21 @@ func archiveWALViaPlugins(
 		}
 	}
 
-	return client.ArchiveWAL(ctx, cluster, postgres.BuildWALPath(pgData, walName))
+	// The marker file is ours to manage (created after bootstrap, removed
+	// once the first WAL archives), so we resolve the full decision here
+	// rather than asking the plugin to inspect it too.
+	checkEmptyWalArchive := shouldCheckEmptyWalArchive(ctx, cluster, pgData)
+
+	return client.ArchiveWAL(ctx, cluster, postgres.BuildWALPath(pgData, walName), checkEmptyWalArchive)
+}
+
+// shouldCheckEmptyWalArchive combines the Cluster's annotation with the
+// first-archive marker file to decide whether the WAL archive destination
+// should be verified before this upload. Used identically by the in-tree
+// archiving path and by archiveWALViaPlugins, so the composition rule lives
+// in exactly one place.
+func shouldCheckEmptyWalArchive(ctx context.Context, cluster *apiv1.Cluster, pgData string) bool {
+	return utils.IsEmptyWalArchiveCheckEnabled(&cluster.ObjectMeta) && isCheckWalArchiveFlagFilePresent(ctx, pgData)
 }
 
 // isCheckWalArchiveFlagFilePresent returns true if the file CheckEmptyWalArchiveFile is present in the PGDATA directory
@@ -326,7 +340,6 @@ func checkWalArchive(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	walArchiver *barmanArchiver.WALArchiver,
-	pgData string,
 ) error {
 	contextLogger := log.FromContext(ctx)
 	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(
@@ -334,10 +347,6 @@ func checkWalArchive(
 	if err != nil {
 		contextLogger.Error(err, "while getting barman-cloud-wal-archive options")
 		return err
-	}
-
-	if !isCheckWalArchiveFlagFilePresent(ctx, pgData) {
-		return nil
 	}
 
 	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {

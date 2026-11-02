@@ -20,11 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package roles
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -47,7 +50,13 @@ type DatabaseRole struct {
 	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
 	InRoles         []string         `json:"inRoles,omitempty"`
 	password        sql.NullString   `json:"-"`
-	transactionID   int64            `json:"-"`
+	// passwordPassthrough, when true, instructs the instance manager to send the
+	// password literal verbatim rather than SCRAM-SHA-256 encoding it
+	// client-side. It is populated from the cnpg.io/passwordPassthrough
+	// annotation on the Secret backing the role. Write-only: List() results
+	// always carry false, since PostgreSQL has no concept of the annotation.
+	passwordPassthrough bool  `json:"-"`
+	transactionID       int64 `json:"-"`
 }
 
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
@@ -122,4 +131,48 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	}
 
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
+}
+
+// ApplyPassword updates a database role with the password held by the named
+// Secret, the one the role refers to through `passwordSecret` or the one the
+// operator generated for it, and returns that Secret's resource version.
+// Without a Secret the password is set to NULL when disablePassword says so,
+// and left untouched otherwise.
+func (d *DatabaseRole) ApplyPassword(
+	ctx context.Context,
+	cl client.Client,
+	secretName string,
+	disablePassword bool,
+	namespace string,
+) (string, error) {
+	switch {
+	case secretName == "" && !disablePassword:
+		d.ignorePassword = true
+		return "", nil
+	case secretName == "" && disablePassword:
+		// Overrides the "leave the password alone" default, the same way
+		// reading one from a Secret does below.
+		d.ignorePassword = false
+		d.password = sql.NullString{}
+		return "", nil
+	case secretName != "" && disablePassword:
+		// For DatabaseRole CRDs this is prevented by CEL validation.
+		// For inline managed roles this is a runtime error.
+		return "",
+			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
+				secretName)
+	default:
+		passwordSecret, err := getPassword(ctx, cl, d.Name, secretName, namespace)
+		if err != nil {
+			return "", err
+		}
+
+		// A role built from a RoleConfiguration carrying no `passwordSecret`
+		// defaults to ignoring the password, which is what a generated password
+		// looks like: now that one has been read, it must be applied.
+		d.ignorePassword = false
+		d.password = sql.NullString{Valid: true, String: passwordSecret.password}
+		d.passwordPassthrough = passwordSecret.passthrough
+		return passwordSecret.version, nil
+	}
 }

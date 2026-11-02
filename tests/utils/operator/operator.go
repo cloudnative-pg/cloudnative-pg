@@ -250,7 +250,7 @@ func ScaleOperatorDeployment(
 	updatedOperatorDeployment := *operatorDeployment.DeepCopy()
 	updatedOperatorDeployment.Spec.Replicas = ptr.To(replicas)
 
-	err = crudClient.Patch(ctx, &updatedOperatorDeployment, client.MergeFrom(&operatorDeployment))
+	err = objects.Patch(ctx, crudClient, &updatedOperatorDeployment, client.MergeFrom(&operatorDeployment))
 	if err != nil {
 		return err
 	}

@@ -120,7 +120,7 @@ var _ = Describe("Status enrichment", func() {
 		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonDeletingPods))
 	})
 
-	It("doesn't enrich the status while the cluster is not ready", func(ctx SpecContext) {
+	It("sets a WaitingForHealthy condition when the cluster is not ready", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -134,7 +134,35 @@ var _ = Describe("Status enrichment", func() {
 
 		EnrichStatus(ctx, &cluster, []corev1.Pod{{}})
 		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
-		Expect(hibernationCondition).To(BeNil())
+		Expect(hibernationCondition).ToNot(BeNil())
+		Expect(hibernationCondition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonWaitingForHealthy))
+	})
+
+	It("transitions from WaitingForHealthy to DeletingPods when the cluster becomes healthy", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: HibernationOn,
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				Phase: apiv1.PhaseCreatingReplica,
+			},
+		}
+
+		// First call: cluster not healthy
+		EnrichStatus(ctx, &cluster, []corev1.Pod{{}})
+		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
+		Expect(hibernationCondition).ToNot(BeNil())
+		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonWaitingForHealthy))
+
+		// Cluster becomes healthy
+		cluster.Status.Phase = apiv1.PhaseHealthy
+		EnrichStatus(ctx, &cluster, []corev1.Pod{{}})
+		hibernationCondition = meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
+		Expect(hibernationCondition).ToNot(BeNil())
+		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonDeletingPods))
 	})
 
 	It("waits for each Pod to be deleted gracefully", func(ctx SpecContext) {

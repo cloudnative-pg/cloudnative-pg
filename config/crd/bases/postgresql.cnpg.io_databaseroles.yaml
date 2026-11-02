@@ -1,0 +1,531 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: databaseroles.postgresql.cnpg.io
+spec:
+  group: postgresql.cnpg.io
+  names:
+    kind: DatabaseRole
+    listKind: DatabaseRoleList
+    plural: databaseroles
+    singular: databaserole
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .spec.cluster.name
+      name: Cluster
+      type: string
+    - jsonPath: .spec.name
+      name: PG Name
+      type: string
+    - jsonPath: .status.applied
+      name: Applied
+      type: boolean
+    - description: Latest reconciliation message
+      jsonPath: .status.message
+      name: Message
+      type: string
+    - description: When the generated password expires
+      jsonPath: .status.password.expiration
+      name: Password Expiration
+      type: string
+    - description: When the generated client certificate expires
+      jsonPath: .status.clientCertificate.expiration
+      name: Certificate Expiration
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: DatabaseRole is the Schema for the databaseroles API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              Specification of the desired DatabaseRole.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+            properties:
+              bypassrls:
+                description: |-
+                  Whether a role bypasses every row-level security (RLS) policy.
+                  Default is `false`.
+                type: boolean
+              clientCertificate:
+                description: |-
+                  ClientCertificate configures the operator to generate and renew a TLS client
+                  certificate for this role, signed by the cluster's client CA. The certificate
+                  is stored in a Secret named `<databaserole-name>-client-cert`.
+                  Requires login to be true.
+                properties:
+                  enabled:
+                    default: true
+                    description: |-
+                      Enabled turns on client certificate issuance for this role. When true,
+                      the role must have login enabled. Defaults to true when the block is present.
+                    type: boolean
+                type: object
+              cluster:
+                description: The corresponding cluster
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: cluster reference is immutable after creation
+                  rule: self == oldSelf
+              comment:
+                description: Description of the role
+                type: string
+              connectionLimit:
+                default: -1
+                description: |-
+                  If the role can log in, this specifies how many concurrent
+                  connections the role can make. `-1` (the default) means no limit.
+                format: int64
+                type: integer
+              createdb:
+                description: |-
+                  When set to `true`, the role being defined will be allowed to create
+                  new databases. Specifying `false` (default) will deny a role the
+                  ability to create databases.
+                type: boolean
+              createrole:
+                description: |-
+                  Whether the role will be permitted to create, alter, drop, comment
+                  on, change the security label for, and grant or revoke membership in
+                  other roles. Default is `false`.
+                type: boolean
+              databaseRoleReclaimPolicy:
+                default: retain
+                description: The policy for end-of-life maintenance of this role
+                enum:
+                - delete
+                - retain
+                type: string
+              disablePassword:
+                description: DisablePassword indicates that a role's password should
+                  be set to NULL in Postgres
+                type: boolean
+              ensure:
+                default: present
+                description: Ensure the role is `present` or `absent` - defaults to
+                  "present"
+                enum:
+                - present
+                - absent
+                type: string
+              inRoles:
+                description: |-
+                  List of one or more existing roles to which this role will be
+                  immediately added as a new member. Default empty.
+                  Changes to the list are applied to an existing role through
+                  `GRANT` and `REVOKE` statements, not only at role creation.
+                items:
+                  type: string
+                type: array
+              inherit:
+                default: true
+                description: |-
+                  Whether a role "inherits" the privileges of roles it is a member of.
+                  Default is `true`.
+                type: boolean
+              login:
+                description: |-
+                  Whether the role is allowed to log in. A role having the `login`
+                  attribute can be thought of as a user. Roles without this attribute
+                  are useful for managing database privileges, but are not users in
+                  the usual sense of the word. Default is `false`.
+                type: boolean
+              name:
+                description: Name of the role
+                type: string
+              password:
+                description: |-
+                  Password configures how the operator manages the password of this role,
+                  instead of requiring a pre-existing Secret through `passwordSecret` or
+                  disabling it through `disablePassword`. Mutually exclusive with both.
+                properties:
+                  criteria:
+                    description: |-
+                      Criteria constrains the generated password. Only meaningful when `mode`
+                      is `generate`.
+                    properties:
+                      allowRepeat:
+                        description: |-
+                          AllowRepeat allows the same character to appear more than once in the
+                          generated password.
+                        type: boolean
+                      digits:
+                        description: |-
+                          Digits is the number of digits in the generated password. Defaults to 25%
+                          of its length, and never to more than 10: unless `allowRepeat` is set, the
+                          generator cannot use the same digit twice.
+                        minimum: 0
+                        type: integer
+                      length:
+                        default: 24
+                        description: Length of the generated password.
+                        maximum: 1024
+                        minimum: 8
+                        type: integer
+                      noUpper:
+                        description: NoUpper disables uppercase characters in the
+                          generated password.
+                        type: boolean
+                      symbolCharacters:
+                        description: |-
+                          SymbolCharacters is the set of symbols the generated password can draw
+                          from. Defaults to the symbols of the generator (``~!@#$%^&*()_+`-={}|[]\:"<>?,./``).
+                          Only ASCII punctuation is accepted: a letter or a digit here would collide
+                          with the rest of the password when `allowRepeat` is not set, and whitespace
+                          would be trimmed away before the password is applied to the role.
+                        minLength: 1
+                        pattern: ^[\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$
+                        type: string
+                      symbols:
+                        description: |-
+                          Symbols is the number of symbol characters in the generated password.
+                          Defaults to 0.
+                        minimum: 0
+                        type: integer
+                    type: object
+                    x-kubernetes-validations:
+                    - message: the number of digits and symbols must not exceed the
+                        password length
+                      rule: '(has(self.digits) ? self.digits : (self.length / 4 >
+                        10 ? 10 : self.length / 4)) + (has(self.symbols) ? self.symbols
+                        : 0) <= self.length'
+                    - message: 'without allowRepeat the password cannot contain more
+                        letters than are available: 52, or 26 with noUpper. Shorten
+                        the length, or ask for more digits and symbols'
+                      rule: '(has(self.allowRepeat) && self.allowRepeat) || self.length
+                        - (has(self.digits) ? self.digits : (self.length / 4 > 10
+                        ? 10 : self.length / 4)) - (has(self.symbols) ? self.symbols
+                        : 0) <= ((has(self.noUpper) && self.noUpper) ? 26 : 52)'
+                    - message: without allowRepeat the password cannot contain more
+                        than 10 digits
+                      rule: (has(self.allowRepeat) && self.allowRepeat) || !has(self.digits)
+                        || self.digits <= 10
+                    - message: without allowRepeat the password cannot contain more
+                        symbols than the length of symbolCharacters (30 symbols by
+                        default)
+                      rule: '(has(self.allowRepeat) && self.allowRepeat) || !has(self.symbols)
+                        || self.symbols <= (has(self.symbolCharacters) ? size(self.symbolCharacters)
+                        : 30)'
+                  duration:
+                    description: |-
+                      Duration is the lifetime of the generated password, at least one minute:
+                      once it is reached, minus `renewBefore`, the operator generates a new
+                      password and applies it to the role. When unset, the password is generated
+                      once and never rotated. Only allowed when `mode` is `generate`, since
+                      nothing else here rotates a password.
+                    type: string
+                  mode:
+                    description: |-
+                      Mode governs how the operator manages the password of this role, and is
+                      required whenever the `password` stanza is present: `generate` generates
+                      and rotates a password kept in a Secret the operator owns; `secret`
+                      reads the password from an existing Secret named by `secret`, without
+                      generating or owning one; `external` stops managing it, deleting any
+                      Secret previously generated and setting the password it held to NULL,
+                      while leaving a password it never generated untouched; `setNull` sets the
+                      password of the role to NULL in PostgreSQL, disabling password
+                      authentication for it. It has no default, since asking for a password
+                      without saying how it is managed is ambiguous, and cannot be removed
+                      once set: the mode always has to say what happens to the password.
+                    enum:
+                    - generate
+                    - secret
+                    - external
+                    - setNull
+                    type: string
+                  renewBefore:
+                    description: |-
+                      RenewBefore is how long before the end of its lifetime the password is
+                      rotated. Only meaningful together with `duration`, and it must be at most
+                      half of it, so that the password is not due for rotation as soon as it is
+                      generated. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting
+                      (7 days), capped at half of the lifetime. Only allowed when `mode` is
+                      `generate`, since nothing else here rotates a password.
+                    type: string
+                  secret:
+                    description: |-
+                      Secret is the name of the Secret holding the password of this role: the
+                      one the operator generates into and never overwrites if it does not own
+                      (when `mode` is `generate`, defaulting to `<databaserole-name>-password`),
+                      or an existing one to read the password from, required and never written
+                      to (when `mode` is `secret`). Only meaningful in those two modes.
+                    type: string
+                required:
+                - mode
+                type: object
+                x-kubernetes-validations:
+                - message: renewBefore requires duration, and must be at most half
+                    of it
+                  rule: '!has(self.renewBefore) || (has(self.duration) && duration(self.renewBefore).getSeconds()
+                    * 2 <= duration(self.duration).getSeconds())'
+                - message: duration must be at least 1m
+                  rule: '!has(self.duration) || duration(self.duration) >= duration(''1m'')'
+                - message: secret is required when mode is secret
+                  rule: self.mode != 'secret' || has(self.secret)
+                - message: secret is only meaningful when mode is generate or secret
+                  rule: self.mode == 'generate' || self.mode == 'secret' || !has(self.secret)
+                - message: criteria is only meaningful when mode is generate
+                  rule: self.mode == 'generate' || !has(self.criteria)
+                - message: duration and renewBefore are only meaningful when mode
+                    is generate
+                  rule: self.mode == 'generate' || (!has(self.duration) && !has(self.renewBefore))
+              passwordSecret:
+                description: |-
+                  Secret containing the password of the role (if present).
+                  If null, the password will be ignored unless DisablePassword is set.
+                  When set, the secret must follow the `kubernetes.io/basic-auth` format
+                  and contain both a `username` and a `password` field.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    type: string
+                required:
+                - name
+                type: object
+              replication:
+                description: |-
+                  Whether a role is a replication role. A role must have this
+                  attribute (or be a superuser) in order to be able to connect to the
+                  server in replication mode (physical or logical replication) and in
+                  order to be able to create or drop replication slots. A role having
+                  the `replication` attribute is a very highly privileged role, and
+                  should only be used on roles actually used for replication. Default
+                  is `false`.
+                type: boolean
+              superuser:
+                description: |-
+                  Whether the role is a `superuser` who can override all access
+                  restrictions within the database - superuser status is dangerous and
+                  should be used only when really needed. You must yourself be a
+                  superuser to create a new superuser. Defaults is `false`.
+                type: boolean
+              validUntil:
+                description: |-
+                  Date and time after which the role's password is no longer valid.
+                  When omitted, the password will never expire (default).
+                  On a `DatabaseRole` whose password the operator generates with a
+                  `password.duration`, this is controlled by the operator instead: the role
+                  is valid until the generated password expires, and setting `validUntil`
+                  explicitly is rejected.
+                format: date-time
+                type: string
+            required:
+            - cluster
+            - name
+            type: object
+            x-kubernetes-validations:
+            - message: name is immutable
+              rule: self.name == oldSelf.name
+            - message: 'ensure: absent is not supported for DatabaseRole; delete the
+                resource with databaseRoleReclaimPolicy: delete instead'
+              rule: '!has(self.ensure) || self.ensure != ''absent'''
+            - message: the role name postgres is reserved
+              rule: self.name != 'postgres'
+            - message: the role name streaming_replica is reserved
+              rule: self.name != 'streaming_replica'
+            - message: role names starting with pg_ are reserved by PostgreSQL
+              rule: '!self.name.startsWith(''pg_'')'
+            - message: role names starting with cnpg_ are reserved by the operator
+              rule: '!self.name.startsWith(''cnpg_'')'
+            - message: role name must not be empty
+              rule: self.name.size() != 0
+            - message: passwordSecret and disablePassword are mutually exclusive
+              rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
+            - message: clientCertificate requires the role to have login enabled
+              rule: '!has(self.clientCertificate) || !self.clientCertificate.enabled
+                || self.login'
+            - message: password and passwordSecret are mutually exclusive
+              rule: '!has(self.password) || !has(self.passwordSecret)'
+            - message: password and disablePassword are mutually exclusive
+              rule: '!has(self.password) || !has(self.disablePassword) || !self.disablePassword'
+            - message: 'validUntil cannot be set when the operator generates a password
+                with a duration: the expiration of the generated password is what
+                the role is valid until'
+              rule: '!has(self.validUntil) || !has(self.password) || self.password.mode
+                != ''generate'' || !has(self.password.duration)'
+            - message: 'password cannot be removed once set: pick the mode that describes
+                how the password is managed now, such as external'
+              rule: '!has(oldSelf.password) || has(self.password)'
+          status:
+            description: |-
+              Most recently observed status of the DatabaseRole. This data may not be up
+              to date. Populated by the system. Read-only.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+            properties:
+              applied:
+                description: Applied is true if the role was reconciled correctly
+                type: boolean
+              clientCertificate:
+                description: |-
+                  ClientCertificate holds the observed state of the generated TLS client
+                  certificate, when client certificate issuance is enabled.
+                properties:
+                  expiration:
+                    description: Expiration is the expiration time of the generated
+                      client certificate, in RFC3339 format.
+                    type: string
+                  message:
+                    description: |-
+                      Message contains a human-readable explanation of the current certificate status,
+                      such as why issuance was skipped or why an existing Secret was left untouched.
+                    type: string
+                type: object
+              conditions:
+                description: Conditions for the DatabaseRole object
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              message:
+                description: Message is the reconciliation error message
+                type: string
+              observedGeneration:
+                description: |-
+                  A sequence number representing the latest
+                  desired state that was synchronized
+                format: int64
+                type: integer
+              password:
+                description: |-
+                  Password holds the observed state of the generated password, when password
+                  generation is enabled.
+                properties:
+                  appliedExpiration:
+                    description: |-
+                      AppliedExpiration is the expiration last applied to the role as its
+                      VALID UNTIL, in RFC3339 format. Written by the instance manager, not the
+                      operator, and used to tell whether the role still needs to be applied
+                      after `expiration` moved without the password Secret changing.
+                    type: string
+                  expiration:
+                    description: |-
+                      Expiration is the time at which the generated password is considered
+                      expired, in RFC3339 format: the operator rotates it `renewBefore` ahead of
+                      that. It is empty when rotation is not enabled.
+                    type: string
+                  issuedAt:
+                    description: |-
+                      IssuedAt is the time the current generated password was issued, in RFC3339
+                      format. The expiration and rotation deadline are derived from it and the
+                      role's current duration/renewBefore, recomputed on every reconciliation.
+                    type: string
+                  message:
+                    description: |-
+                      Message contains a human-readable explanation of the current password
+                      status, such as why generation was skipped or why an existing Secret was
+                      left untouched.
+                    type: string
+                  pendingRevocation:
+                    description: |-
+                      PendingRevocation is set by the operator when it deleted the Secret
+                      holding a password it had generated, and the role stopped managing the
+                      password instead of replacing it: the password is still set on the role
+                      in PostgreSQL and nothing can read it any more, so it has to be set to
+                      NULL. The instance manager clears it once it has done so.
+                    type: boolean
+                  secretName:
+                    description: |-
+                      SecretName is the name of the Secret the password was generated into. The
+                      operator records it to recognize the Secret as its own once the role stops
+                      generating a password, or starts generating it somewhere else, and delete
+                      what it left behind.
+                    type: string
+                type: object
+              secretResourceVersion:
+                description: |-
+                  SecretResourceVersion is the resource version of the password secret
+                  last applied to the role; a change to it triggers reconciliation.
+                type: string
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

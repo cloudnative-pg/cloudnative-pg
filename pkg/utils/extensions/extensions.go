@@ -23,8 +23,14 @@ package extensions
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
+
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // ResolveFromCatalog returns a list of requested Extensions from a Catalog for a given
@@ -102,6 +108,12 @@ func ResolveFromCatalog(
 		if len(extension.LdLibraryPath) > 0 {
 			resultExtension.LdLibraryPath = extension.LdLibraryPath
 		}
+		if len(extension.BinPath) > 0 {
+			resultExtension.BinPath = extension.BinPath
+		}
+		if len(extension.Env) > 0 {
+			resultExtension.Env = extension.Env
+		}
 
 		resolvedExtensions = append(resolvedExtensions, resultExtension)
 	}
@@ -124,4 +136,194 @@ func ValidateWithoutCatalog(cluster *apiv1.Cluster) ([]apiv1.ExtensionConfigurat
 	}
 
 	return extensions, nil
+}
+
+// CollectLibraryPaths returns a list of paths which should be added to LD_LIBRARY_PATH
+// given a list of extensions mounted under baseDir.
+// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
+// trailing "/" are cleaned), so "/lib", "./lib", and "lib" all resolve to the
+// same directory under the extension mount point.
+func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
+	capacity := 0
+	for _, ext := range extensionList {
+		capacity += len(ext.LdLibraryPath)
+	}
+	result := make([]string, 0, capacity)
+
+	for _, extension := range extensionList {
+		for _, libraryPath := range extension.LdLibraryPath {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", libraryPath)) {
+				log.Warning("Skipping extension LdLibraryPath entry that escapes the extension directory",
+					"extension", extension.Name, "path", libraryPath)
+				continue
+			}
+
+			result = append(
+				result,
+				filepath.Join(baseDir, extension.Name, libraryPath),
+			)
+		}
+	}
+
+	return result
+}
+
+// CollectExtensionControlPaths returns a list of paths which should be added
+// to extension_control_path given a list of extensions mounted under baseDir.
+// Extensions not declaring any path contribute their `share` directory.
+func CollectExtensionControlPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
+	return collectPaths(
+		extensionList,
+		baseDir,
+		"ExtensionControlPath",
+		"share",
+		func(ext apiv1.ExtensionConfiguration) []string {
+			return ext.ExtensionControlPath
+		},
+	)
+}
+
+// CollectDynamicLibraryPaths returns a list of paths which should be added
+// to dynamic_library_path given a list of extensions mounted under baseDir.
+// Extensions not declaring any path contribute their `lib` directory.
+func CollectDynamicLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
+	return collectPaths(
+		extensionList,
+		baseDir,
+		"DynamicLibraryPath",
+		"lib",
+		func(ext apiv1.ExtensionConfiguration) []string {
+			return ext.DynamicLibraryPath
+		},
+	)
+}
+
+// collectPaths joins under baseDir the paths selected by `field` for each
+// extension, falling back to defaultPath when an extension declares none.
+// fieldName is only used to report skipped entries.
+func collectPaths(
+	extensionList []apiv1.ExtensionConfiguration,
+	baseDir string,
+	fieldName string,
+	defaultPath string,
+	field func(apiv1.ExtensionConfiguration) []string,
+) []string {
+	result := make([]string, 0, len(extensionList))
+
+	for _, extension := range extensionList {
+		paths := field(extension)
+		if len(paths) == 0 {
+			paths = []string{defaultPath}
+		}
+
+		for _, entry := range paths {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			//
+			// The check is purely lexical: it does not resolve symbolic links
+			// that may exist inside the extension image. This is acceptable
+			// because the image is already trusted (it provides the libraries
+			// Postgres loads) and the result is only a path handed to Postgres,
+			// never one the operator reads or writes through.
+			if !filepath.IsLocal(filepath.Join(".", entry)) {
+				log.Warning("Skipping extension path that escapes the extension directory",
+					"extension", extension.Name, "field", fieldName, "path", entry)
+				continue
+			}
+
+			result = append(result, filepath.Join(baseDir, extension.Name, entry))
+		}
+	}
+
+	return result
+}
+
+// dedicatedEnvVars names env vars whose values come from dedicated extension
+// fields (LdLibraryPath, BinPath); custom Env entries targeting them are skipped.
+var dedicatedEnvVars = map[string]bool{
+	"PATH":            true,
+	"LD_LIBRARY_PATH": true,
+}
+
+// SetEnvVars applies custom Env entries from the given extensions (mounted
+// under baseDir) into envMap, expanding placeholders like ${image_root}
+// against baseDir. Names reserved for operator use or covered by dedicated
+// fields are skipped; overrides are logged as warnings.
+func SetEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap, baseDir string) {
+	setBy := make(map[string]string)
+
+	for _, extension := range extensionList {
+		for _, envVar := range extension.Env {
+			if postgres.IsReservedEnvironmentVariable(envVar.Name) || dedicatedEnvVars[envVar.Name] {
+				log.Warning("Skipping reserved environment variable from extension",
+					"extension", extension.Name, "variable", envVar.Name)
+				continue
+			}
+
+			if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
+				log.Warning("Extension environment variable contains unknown placeholders",
+					"extension", extension.Name, "variable", envVar.Name, "unknownPlaceholders", unknown)
+			}
+
+			if prev, ok := setBy[envVar.Name]; ok {
+				log.Warning("Extension environment variable overrides value from a previous extension",
+					"variable", envVar.Name, "extension", extension.Name, "previousExtension", prev)
+			} else if _, exists := envMap[envVar.Name]; exists {
+				log.Warning("Extension environment variable overrides an existing value",
+					"variable", envVar.Name, "extension", extension.Name)
+			}
+
+			envMap[envVar.Name] = postgres.ExpandEnvPlaceholders(envVar.Value, extension.Name, baseDir)
+			setBy[envVar.Name] = extension.Name
+		}
+	}
+}
+
+// AppendPaths returns existing (a colon-separated list, possibly empty)
+// with extra appended. Returns existing unchanged when extra is empty.
+func AppendPaths(existing string, extra []string) string {
+	if len(extra) == 0 {
+		return existing
+	}
+	if existing == "" {
+		return strings.Join(extra, ":")
+	}
+	return existing + ":" + strings.Join(extra, ":")
+}
+
+// CollectBinPaths returns a list of paths which should be added to PATH given
+// a list of extensions mounted under baseDir.
+// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
+// trailing "/" are cleaned), so "/bin", "./bin", and "bin" all resolve to the
+// same directory under the extension mount point.
+func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
+	capacity := 0
+	for _, ext := range extensionList {
+		capacity += len(ext.BinPath)
+	}
+	result := make([]string, 0, capacity)
+
+	for _, extension := range extensionList {
+		for _, binPath := range extension.BinPath {
+			// The webhook rejects escaping paths at admission time; this is a
+			// second, independent check for callers that read the Cluster
+			// spec directly without going through admission (e.g. a Job).
+			if !filepath.IsLocal(filepath.Join(".", binPath)) {
+				log.Warning("Skipping extension BinPath entry that escapes the extension directory",
+					"extension", extension.Name, "path", binPath)
+				continue
+			}
+
+			result = append(
+				result,
+				filepath.Join(baseDir, extension.Name, binPath),
+			)
+		}
+	}
+
+	return result
 }

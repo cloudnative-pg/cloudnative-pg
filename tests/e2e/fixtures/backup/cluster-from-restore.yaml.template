@@ -18,6 +18,9 @@ spec:
   storage:
     size: 1Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  walStorage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
   bootstrap:
     recovery:
@@ -25,7 +28,7 @@ spec:
         name: cluster-backup
         endpointCA:
           key: ca.crt
-          name: minio-server-ca-secret
+          name: object-store-ca-secret
 
 
   monitoring:

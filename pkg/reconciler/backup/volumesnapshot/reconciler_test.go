@@ -28,12 +28,16 @@ import (
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -55,6 +59,52 @@ var _ = Describe("getSnapshotName", func() {
 		Expect(name).To(Equal("backup123-wal"))
 	})
 })
+
+// newSnapshotPair builds a VolumeSnapshotList for a PG_DATA/PG_WAL pair of
+// snapshots belonging to the given backup. The snapshots have been provisioned,
+// and readyToUse tells whether they are also ready to be used.
+func newSnapshotPair(namespace, backupName string, readyToUse bool) volumesnapshotv1.VolumeSnapshotList {
+	return volumesnapshotv1.VolumeSnapshotList{
+		Items: []volumesnapshotv1.VolumeSnapshot{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      backupName,
+					Labels: map[string]string{
+						utils.BackupNameLabelName: backupName,
+					},
+					Annotations: map[string]string{
+						"avoid": "nil",
+					},
+				},
+				Status: &volumesnapshotv1.VolumeSnapshotStatus{
+					ReadyToUse:                     ptr.To(readyToUse),
+					Error:                          nil,
+					BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backupName)),
+					CreationTime:                   ptr.To(metav1.Now()),
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      backupName + "-wal",
+					Labels: map[string]string{
+						utils.BackupNameLabelName: backupName,
+					},
+					Annotations: map[string]string{
+						"avoid": "nil",
+					},
+				},
+				Status: &volumesnapshotv1.VolumeSnapshotStatus{
+					ReadyToUse:                     ptr.To(readyToUse),
+					Error:                          nil,
+					BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backupName)),
+					CreationTime:                   ptr.To(metav1.Now()),
+				},
+			},
+		},
+	}
+}
 
 var _ = Describe("Volumesnapshot reconciler", func() {
 	const (
@@ -120,6 +170,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      backupName,
+			},
+			Spec: apiv1.BackupSpec{
+				Method: apiv1.BackupMethodVolumeSnapshot,
 			},
 			Status: apiv1.BackupStatus{
 				StartedAt:    ptr.To(startedAt),
@@ -212,46 +265,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should unfence the target pod when the snapshots have been provisioned", func(ctx SpecContext) {
-		snapshots := volumesnapshotv1.VolumeSnapshotList{
-			Items: []volumesnapshotv1.VolumeSnapshot{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name,
-						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
-						},
-						Annotations: map[string]string{
-							"avoid": "nil",
-						},
-					},
-					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse:                     ptr.To(false),
-						Error:                          nil,
-						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
-						CreationTime:                   ptr.To(metav1.Now()),
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name + "-wal",
-						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
-						},
-						Annotations: map[string]string{
-							"avoid": "nil",
-						},
-					},
-					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse:                     ptr.To(false),
-						Error:                          nil,
-						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
-						CreationTime:                   ptr.To(metav1.Now()),
-					},
-				},
-			},
-		}
+		snapshots := newSnapshotPair(namespace, backup.Name, false)
 
 		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
@@ -288,46 +302,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should mark the backup as completed when the snapshots are ready", func(ctx SpecContext) {
-		snapshots := volumesnapshotv1.VolumeSnapshotList{
-			Items: []volumesnapshotv1.VolumeSnapshot{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name,
-						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
-						},
-						Annotations: map[string]string{
-							"avoid": "nil",
-						},
-					},
-					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
-						ReadyToUse:                     ptr.To(true),
-						Error:                          nil,
-						CreationTime:                   ptr.To(metav1.Now()),
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name + "-wal",
-						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
-						},
-						Annotations: map[string]string{
-							"avoid": "nil",
-						},
-					},
-					Status: &volumesnapshotv1.VolumeSnapshotStatus{
-						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
-						ReadyToUse:                     ptr.To(true),
-						Error:                          nil,
-						CreationTime:                   ptr.To(metav1.Now()),
-					},
-				},
-			},
-		}
+		snapshots := newSnapshotPair(namespace, backup.Name, true)
 
 		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
@@ -355,6 +330,67 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		data, err := utils.GetFencedInstances(latestCluster.Annotations)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(data.Len()).To(Equal(0))
+	})
+
+	It("should honor the Backup's spec.online over the cluster default when finalizing", func(ctx SpecContext) {
+		// the cluster has no explicit online setting, which defaults to true (hot backup)
+		cluster.Spec.Backup.VolumeSnapshot.Online = nil
+		// but this specific Backup requests a cold (offline) backup
+		backup.Spec.Online = ptr.To(false)
+
+		snapshots := newSnapshotPair(namespace, backup.Name, false)
+
+		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, targetPod, backup).
+			WithStatusSubresource(backup).
+			WithLists(&snapshots).
+			Build()
+		fakeRecorder := record.NewFakeRecorder(3)
+
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+			Build()
+
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+
+		var latestBackup apiv1.Backup
+		err = mockClient.Get(ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &latestBackup)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(latestBackup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFinalizing))
+		Expect(latestBackup.Status.Online).To(HaveValue(BeFalse()))
+	})
+
+	It("should annotate the snapshots with the effective online setting", func(ctx SpecContext) {
+		// the cluster requests cold backups, but this specific Backup asks for a hot one
+		cluster.Spec.Backup.VolumeSnapshot.Online = ptr.To(false)
+		backup.Spec.Online = ptr.To(true)
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod).
+			Build()
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).
+			Build()
+
+		// the snapshots are created before the backup is finalized, so the backup
+		// status is still empty at this point
+		Expect(backup.Status.Online).To(BeNil())
+		Expect(executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])).To(Succeed())
+
+		var snapshotList volumesnapshotv1.VolumeSnapshotList
+		err := mockClient.List(ctx, &snapshotList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(snapshotList.Items).ToNot(BeEmpty())
+
+		for _, snapshot := range snapshotList.Items {
+			Expect(snapshot.Annotations).To(HaveKeyWithValue(utils.IsOnlineBackupLabelName, "true"))
+		}
 	})
 
 	It("should properly enrich the backup with labels", func(ctx SpecContext) {
@@ -390,6 +426,88 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupYearLabelName, strconv.Itoa(time.Now().Year())))
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.MajorVersionLabelName, "18"))
 		}
+	})
+
+	It("reuses a pre-existing VolumeSnapshot that belongs to the backup", func(ctx SpecContext) {
+		// Simulate the cached-list-lag race: a VolumeSnapshot we created in a
+		// previous reconciliation cycle already exists, carrying this backup's
+		// label, but the Create call collides with it.
+		existing := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name),
+				Labels: map[string]string{
+					utils.BackupNameLabelName: backup.Name,
+				},
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod, existing).
+			Build()
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
+
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("fails when a foreign VolumeSnapshot collides with the backup name", func(ctx SpecContext) {
+		// A VolumeSnapshot with the same name exists but does not belong to
+		// this backup: the collision must surface as an error instead of
+		// looping forever.
+		existing := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name),
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod, existing).
+			Build()
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
+
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		Expect(apierrs.IsAlreadyExists(err)).To(BeTrue())
+		Expect(err.Error()).To(ContainSubstring("is not owned by backup"))
+	})
+
+	It("tolerates an AlreadyExists collision the cache still hides on Get", func(ctx SpecContext) {
+		// The cache lag that made the reconciler attempt the Create can also
+		// keep the object hidden from the follow-up Get. The API server already
+		// confirmed it exists via AlreadyExists, so the collision must be
+		// tolerated instead of failing the backup.
+		mockClient := interceptor.NewClient(
+			fake.NewClientBuilder().
+				WithScheme(scheme.BuildWithAllKnownScheme()).
+				WithObjects(backup, cluster, targetPod).
+				Build(),
+			interceptor.Funcs{
+				Create: func(
+					_ context.Context, _ k8client.WithWatch, obj k8client.Object, _ ...k8client.CreateOption,
+				) error {
+					return apierrs.NewAlreadyExists(
+						schema.GroupResource{Group: volumesnapshotv1.GroupName, Resource: "volumesnapshots"},
+						obj.GetName())
+				},
+				Get: func(
+					_ context.Context, _ k8client.WithWatch, key k8client.ObjectKey,
+					_ k8client.Object, _ ...k8client.GetOption,
+				) error {
+					return apierrs.NewNotFound(
+						schema.GroupResource{Group: volumesnapshotv1.GroupName, Resource: "volumesnapshots"},
+						key.Name)
+				},
+			})
+
+		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
+
+		err := executor.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[0])
+		Expect(err).ToNot(HaveOccurred())
 	})
 })
 
@@ -599,6 +717,80 @@ var _ = Describe("isDeadlineExceeded", func() {
 		exceeded, err := isDeadlineExceeded(backup)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(exceeded).To(BeTrue())
+	})
+})
+
+var _ = Describe("handleSnapshotErrors", func() {
+	var (
+		ctx      context.Context
+		backup   *apiv1.Backup
+		cli      k8client.Client
+		executor *Reconciler
+	)
+
+	BeforeEach(func() {
+		ctx = context.TODO()
+		backup = &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-backup",
+			},
+			Status: apiv1.BackupStatus{
+				PluginMetadata: make(map[string]string),
+			},
+		}
+		cli = fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup).
+			WithStatusSubresource(&apiv1.Backup{}).
+			Build()
+		executor = NewReconcilerBuilder(cli, record.NewFakeRecorder(3)).Build()
+	})
+
+	It("requeues a message that would previously have been treated as permanent", func() {
+		snapshotErr := &volumeSnapshotError{
+			InternalError: volumesnapshotv1.VolumeSnapshotError{
+				Message: ptr.To("Failed to get snapshot class with name wrongSnapshotClass"),
+			},
+			Name:      "snapshot",
+			Namespace: backup.Namespace,
+		}
+
+		res, err := executor.handleSnapshotErrors(ctx, backup, snapshotErr)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeEquivalentTo(&ctrl.Result{RequeueAfter: 10 * time.Second}))
+	})
+
+	It("requeues an error with no message at all", func() {
+		snapshotErr := &volumeSnapshotError{
+			InternalError: volumesnapshotv1.VolumeSnapshotError{Message: nil},
+			Name:          "snapshot",
+			Namespace:     backup.Namespace,
+		}
+
+		res, err := executor.handleSnapshotErrors(ctx, backup, snapshotErr)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeEquivalentTo(&ctrl.Result{RequeueAfter: 10 * time.Second}))
+	})
+
+	It("fails the backup once the deadline is exceeded, regardless of the message", func() {
+		data := metadata{VolumeSnapshotFirstDetectedFailure: time.Now().Add(-20 * time.Minute).Unix()}
+		rawData, err := json.Marshal(data)
+		Expect(err).ToNot(HaveOccurred())
+		backup.Status.PluginMetadata[pluginName] = string(rawData)
+		Expect(cli.Status().Update(ctx, backup)).To(Succeed())
+
+		snapshotErr := &volumeSnapshotError{
+			InternalError: volumesnapshotv1.VolumeSnapshotError{
+				Message: ptr.To("Failed to get snapshot class with name wrongSnapshotClass"),
+			},
+			Name:      "snapshot",
+			Namespace: backup.Namespace,
+		}
+
+		res, err := executor.handleSnapshotErrors(ctx, backup, snapshotErr)
+		Expect(res).To(BeNil())
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("deadline exceeded"))
 	})
 })
 

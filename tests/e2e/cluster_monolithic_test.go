@@ -22,12 +22,13 @@ package e2e
 import (
 	"database/sql"
 	"fmt"
-	"os"
 
 	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -78,7 +79,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			Expect(err).ToNot(HaveOccurred())
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, sourceClusterName, sourceClusterFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceClusterFile)
 		})
 
 		By("creating several roles, one of them a superuser and source databases", func() {
@@ -138,8 +139,8 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		})
 
 		By("creating target cluster", func() {
-			postgresImage := os.Getenv("POSTGRES_IMG")
-			Expect(postgresImage).ShouldNot(BeEmpty(), "POSTGRES_IMG env should not be empty")
+			postgresImage := config.Current().Postgres.Image
+			Expect(postgresImage).ShouldNot(BeEmpty(), "the postgres image should not be empty")
 			expectedImageName, err := postgres.BumpPostgresImageMajorVersion(postgresImage)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(expectedImageName).ShouldNot(BeEmpty(), "imageName could not be empty")
@@ -155,7 +156,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				sourceRoles,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			AssertClusterIsReady(namespace, targetClusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, targetClusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		By("connect to the imported cluster", func() {
@@ -203,7 +204,8 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			databaseSuperUser), func() {
 			row := connTarget.QueryRow(fmt.Sprintf(
 				"SELECT usesuper FROM pg_catalog.pg_user WHERE usename='%s'",
-				databaseSuperUser))
+				databaseSuperUser,
+			))
 			var superUser bool
 			err := row.Scan(&superUser)
 			Expect(err).ToNot(HaveOccurred())

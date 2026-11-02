@@ -366,6 +366,8 @@ Instances status
 [...]
 ```
 
+Please note that above output is available in verbose mode only (`kubectl cnpg status -v`).
+
 ## Limitations
 
 Currently, you can't remove tablespaces from an existing CloudNativePG

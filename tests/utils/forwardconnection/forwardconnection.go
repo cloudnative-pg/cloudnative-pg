@@ -32,12 +32,12 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 // PostgresPortMap is the default port map for the PostgreSQL Pod
@@ -141,7 +141,7 @@ func NewForwardConnection(
 	}
 
 	var err error
-	fc.forwarder, err = portforward.New(
+	fc.forwarder, err = portforward.NewForStreaming(
 		dialer,
 		portMaps,
 		fc.stopChannel,
@@ -175,7 +175,7 @@ func NewDialer(
 	if err != nil {
 		return nil, err
 	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+	dialer := spdy.NewDialerForStreaming(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 	return dialer, nil
 }
 

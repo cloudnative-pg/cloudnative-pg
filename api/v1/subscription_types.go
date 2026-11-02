@@ -41,6 +41,7 @@ const (
 // SubscriptionSpec defines the desired state of Subscription
 type SubscriptionSpec struct {
 	// The name of the PostgreSQL cluster that identifies the "subscriber"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster reference is immutable after creation"
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
 	// The name of the subscription inside PostgreSQL
@@ -120,8 +121,4 @@ type SubscriptionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Subscription `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Subscription{}, &SubscriptionList{})
 }

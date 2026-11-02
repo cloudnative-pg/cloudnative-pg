@@ -35,7 +35,11 @@ import (
 func GetServerConnectionString(
 	server *apiv1.ExternalCluster,
 	databaseName string,
-) string {
+) (string, error) {
+	if err := validateExternalClusterPaths(server); err != nil {
+		return "", err
+	}
+
 	connectionParameters := maps.Clone(server.ConnectionParameters)
 
 	if server.SSLCert != nil {
@@ -62,7 +66,7 @@ func GetServerConnectionString(
 		connectionParameters["dbname"] = databaseName
 	}
 
-	return configfile.CreateConnectionString(connectionParameters)
+	return configfile.CreateConnectionString(connectionParameters), nil
 }
 
 // ConfigureConnectionToServer creates a connection string to the external
@@ -75,6 +79,10 @@ func ConfigureConnectionToServer(
 	namespace string,
 	server *apiv1.ExternalCluster,
 ) (string, error) {
+	if err := validateExternalClusterPaths(server); err != nil {
+		return "", err
+	}
+
 	connectionParameters := maps.Clone(server.ConnectionParameters)
 
 	if server.SSLCert != nil {

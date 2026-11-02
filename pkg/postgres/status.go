@@ -92,15 +92,23 @@ type PostgresqlStatus struct {
 	// allowing detection of restarts that don't change the container ID or executable hash.
 	SessionID string `json:"sessionID"`
 
-	// This field represents the Kubelet point-of-view of the readiness
-	// status of this instance and may be slightly stale when the Kubelet has
-	// not still invoked the readiness probe.
+	// IsPodReady mirrors the Pod's PodReady condition, as set by the kubelet
+	// while the node is healthy and by the node lifecycle controller once the
+	// node stops reporting. It is a readiness signal driven by the readiness
+	// probe plus any readiness gates, so it may be briefly stale compared to
+	// the actual PostgreSQL state.
 	//
-	// If you want to check the latest detected status of PostgreSQL, you
-	// need to call HasHTTPStatus().
+	// For the latest PostgreSQL health as seen by the instance manager, use
+	// HasHTTPStatus() instead.
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
+
+	// IsFenced is true when the cluster has fenced this instance. A fenced
+	// instance has PostgreSQL shut down and cannot become primary.
+	//
+	// This field is never populated in the instance manager.
+	IsFenced bool `json:"isFenced,omitempty"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
@@ -253,6 +261,7 @@ func (list *PostgresqlStatusList) LogStatus(ctx context.Context) {
 			"replayLsn", item.ReplayLsn,
 			"isPrimary", item.IsPrimary,
 			"isPodReady", item.IsPodReady,
+			"isFenced", item.IsFenced,
 			"pendingRestart", item.PendingRestart,
 			"pendingRestartForDecrease", item.PendingRestartForDecrease,
 			"statusCollectionError", item.Error)
@@ -288,6 +297,16 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 		return true
 	}
 
+	// A fenced instance has PostgreSQL shut down and cannot become primary,
+	// so it always sorts after a non-fenced one, regardless of how caught-up
+	// its replayed LSN was when it got fenced.
+	switch {
+	case list.Items[i].IsFenced && !list.Items[j].IsFenced:
+		return false
+	case !list.Items[i].IsFenced && list.Items[j].IsFenced:
+		return true
+	}
+
 	// Manage primary servers
 	switch {
 	case list.Items[i].IsPrimary && list.Items[j].IsPrimary:
@@ -315,9 +334,13 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	// We rely on the `CurrentPrimary` field to identify the designated primary
 	// instance that is replicating from the external cluster, ensuring it is
 	// sorted first among the standbys.
-	if list.IsReplicaCluster &&
-		(list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary) {
-		return true
+	if list.IsReplicaCluster {
+		switch {
+		case list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary:
+			return true
+		case list.Items[j].Pod.Name == list.CurrentPrimary && list.Items[i].Pod.Name != list.CurrentPrimary:
+			return false
+		}
 	}
 
 	return list.Items[i].Pod.Name < list.Items[j].Pod.Name
@@ -348,6 +371,28 @@ func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
 	}
 
 	return false
+}
+
+// IsPodReadyAndNotReporting returns true if the pod with the given name is
+// marked as ready by the kubelet but is not successfully reporting its status
+// via the /pg/status endpoint. This indicates a likely transient failure
+// (e.g. a network hiccup between the operator and the pod) rather than a
+// genuine PostgreSQL health problem. The second return value is the
+// underlying /pg/status error, meaningful only when the boolean is true.
+//
+// "Not reporting" is the negation of IsPodReporting: the /pg/status call
+// against the pod returned an error.
+func (list PostgresqlStatusList) IsPodReadyAndNotReporting(podname string) (bool, error) {
+	for _, item := range list.Items {
+		if item.Pod.Name == podname {
+			if item.IsPodReady && item.Error != nil {
+				return true, item.Error
+			}
+			return false, nil
+		}
+	}
+
+	return false, nil
 }
 
 // IsComplete checks the PostgreSQL status list for Pods which
@@ -427,6 +472,22 @@ func (list PostgresqlStatusList) InstancesReportingStatus() int {
 	}
 
 	return n
+}
+
+// InstancesReportingStatusIgnoringFenced is like InstancesReportingStatus, but does
+// not count a fenced instance. A fenced instance's MightBeUnavailable flag would
+// otherwise count it as reporting even though its Pod can never become
+// kubelet-Ready while fenced, which would stop the two counts from ever
+// converging.
+func (list PostgresqlStatusList) InstancesReportingStatusIgnoringFenced() int {
+	nonFenced := PostgresqlStatusList{}
+	for _, item := range list.Items {
+		if !item.IsFenced {
+			nonFenced.Items = append(nonFenced.Items, item)
+		}
+	}
+
+	return nonFenced.InstancesReportingStatus()
 }
 
 // PrimaryNames get the names of each primary instance of this Cluster. Under

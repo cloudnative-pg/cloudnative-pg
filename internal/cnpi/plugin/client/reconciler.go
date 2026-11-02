@@ -49,12 +49,14 @@ func newTerminateResult(identifier string) ReconcilerHookResult {
 }
 
 // newReconcilerRequeueResult creates a new result instructing
-// a reconciler to schedule a loop in the passed time frame
+// a reconciler to schedule a loop in the passed time frame.
+// The delay is optional in CNPG-I and an empty RequeueAfter does not
+// requeue, so it is at least one second
 func newReconcilerRequeueResult(identifier string, after int64) ReconcilerHookResult {
 	return ReconcilerHookResult{
 		Err:                nil,
 		StopReconciliation: true,
-		Result:             ctrl.Result{Requeue: true, RequeueAfter: time.Second * time.Duration(after)},
+		Result:             ctrl.Result{RequeueAfter: max(time.Second*time.Duration(after), time.Second)},
 		Identifier:         identifier,
 	}
 }

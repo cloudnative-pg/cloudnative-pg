@@ -1,0 +1,35 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: cluster-example-reporting
+spec:
+  cluster:
+    name: cluster-example
+  name: reporting
+  login: true
+  password:
+    mode: generate
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: cluster-example-dante
+spec:
+  cluster:
+    name: cluster-example
+  name: dante
+  comment: "Dante Alighieri"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 5
+  password:
+    mode: generate
+    duration: 1008h    # 6 weeks
+    renewBefore: 96h   # 4 days
+  clientCertificate:
+    enabled: true

@@ -35,6 +35,9 @@ const (
 	// LabelDeclarativeDatabases is a label for selecting the declarative databases test
 	LabelDeclarativeDatabases = "declarative-databases"
 
+	// LabelDeclarativeDatabaseRoles is a label for selecting the declarative roles test
+	LabelDeclarativeDatabaseRoles = "declarative-database-roles"
+
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"
 
@@ -58,6 +61,10 @@ const (
 
 	// LabelPlugin is a label for selecting plugin tests
 	LabelPlugin = "plugin"
+
+	// LabelPluginBarmanCloud is a label for selecting the tests that back up
+	// and restore through plugin-barman-cloud
+	LabelPluginBarmanCloud = "plugin-barman-cloud"
 
 	// LabelPodScheduling is a label for selecting pod-scheduling test
 	LabelPodScheduling = "pod-scheduling"

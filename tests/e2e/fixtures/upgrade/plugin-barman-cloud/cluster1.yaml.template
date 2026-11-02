@@ -1,0 +1,70 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster1
+spec:
+  instances: 3
+  imageName: "${POSTGRES_IMG}"
+  description: "Example of cluster"
+  startDelay: 300
+  stopDelay: 300
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  postgresql:
+    parameters:
+      shared_buffers: '32MB'
+      max_connections: '15'
+      log_checkpoints: 'on'
+      log_lock_waits: 'on'
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+      wal_receiver_timeout: '2s'
+    pg_hba:
+      - host all all 10.244.0.0/16 md5
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
+      secret:
+        name: cluster-app-user
+  superuserSecret:
+    name: cluster-superuser
+
+  # Archive WALs through plugin-barman-cloud. The referenced ObjectStore is
+  # created by the test.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: ${OBJECT_STORE_NAME}
+        serverName: ${SERVER_NAME}
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "0.1"
+    limits:
+      memory: "1Gi"
+      cpu: "0.5"
+
+  affinity:
+    enablePodAntiAffinity: true
+
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: false
+
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

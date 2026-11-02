@@ -179,3 +179,34 @@ var _ = Describe("Pod spec reconciliation", func() {
 		Expect(IsPodSpecReconciliationDisabled(objectMeta)).To(BeTrue())
 	})
 })
+
+var _ = Describe("Password passthrough annotation", func() {
+	var objectMeta *metav1.ObjectMeta
+	BeforeEach(func() {
+		objectMeta = &metav1.ObjectMeta{Annotations: map[string]string{}}
+	})
+
+	It("is not enabled when the annotation is absent", func() {
+		Expect(IsPasswordPassthroughEnabled(objectMeta)).To(BeFalse())
+	})
+
+	It("is not enabled for an unrelated value", func() {
+		objectMeta.Annotations[PasswordPassthroughAnnotationName] = "true"
+		Expect(IsPasswordPassthroughEnabled(objectMeta)).To(BeFalse())
+	})
+
+	It("is not enabled for the empty value", func() {
+		objectMeta.Annotations[PasswordPassthroughAnnotationName] = ""
+		Expect(IsPasswordPassthroughEnabled(objectMeta)).To(BeFalse())
+	})
+
+	It("is not enabled when explicitly disabled", func() {
+		objectMeta.Annotations[PasswordPassthroughAnnotationName] = string(annotationStatusDisabled)
+		Expect(IsPasswordPassthroughEnabled(objectMeta)).To(BeFalse())
+	})
+
+	It("is enabled when the annotation value is 'enabled'", func() {
+		objectMeta.Annotations[PasswordPassthroughAnnotationName] = string(annotationStatusEnabled)
+		Expect(IsPasswordPassthroughEnabled(objectMeta)).To(BeTrue())
+	})
+})

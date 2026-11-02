@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -514,6 +515,78 @@ var _ = Describe("configuration change validation", func() {
 		v = &ClusterCustomValidator{}
 	})
 
+	It("accepts well-formed parameter names, including namespaced custom GUCs", func() {
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"work_mem":                      "16MB",
+						"auto_explain.log_min_duration": "100ms",
+						"some$ext.param$1":              "value",
+					},
+				},
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "10Gi",
+				},
+			},
+		}
+		Expect(v.validateConfiguration(clusterNew)).To(BeEmpty())
+	})
+
+	DescribeTable("rejects a parameter name that could inject a directive",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "/bin/evil",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
+					},
+				},
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		Entry("leading comment then newline", "#\narchive_command"),
+		Entry("valid name with a trailing newline injection", "archive_command\nrestart_after = 0"),
+		Entry("carriage return", "archive_command\rrestart_after = 0"),
+	)
+
+	DescribeTable("rejects a malformed parameter name",
+		func(key string) {
+			clusterNew := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							key: "value",
+						},
+					},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "10Gi",
+					},
+				},
+			}
+			errs := v.validateConfiguration(clusterNew)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(HavePrefix("spec.postgresql.parameters"))
+		},
+		// The end anchor in the name regex matches end-of-text, not end-of-line,
+		// so a trailing newline is caught even though it carries no injected directive.
+		Entry("trailing newline", "archive_command\n"),
+		Entry("embedded NUL byte", "work_mem\x00"),
+		Entry("equals sign", "work_mem=128MB"),
+		Entry("leading whitespace", " work_mem"),
+		Entry("space in the middle", "work mem"),
+		Entry("hash character", "work#mem"),
+		Entry("empty string", ""),
+	)
+
 	It("produces no error when WAL size settings are correct", func() {
 		clusterNew := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -811,7 +884,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -869,7 +942,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 2,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -933,7 +1006,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -954,7 +1027,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -974,7 +1047,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level": "minimal",
+						"wal_level": walLevelMinimal,
 					},
 				},
 			},
@@ -1027,7 +1100,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -1047,7 +1120,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -1065,7 +1138,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 						"shared_buffers":  "512MB",
 					},
@@ -1562,7 +1635,7 @@ var _ = Describe("recovery target", func() {
 						RecoveryTarget: &apiv1.RecoveryTarget{
 							BackupID:        "",
 							TargetTLI:       "",
-							TargetXID:       "1/1",
+							TargetXID:       "1234",
 							TargetName:      "",
 							TargetLSN:       "",
 							TargetTime:      "",
@@ -1779,6 +1852,88 @@ var _ = Describe("recovery target", func() {
 			Expect(v.validateRecoveryTarget(cluster)).To(HaveLen(1))
 		})
 	})
+
+	When("TargetXID is specified", func() {
+		recoveryTargetWith := func(xid string) *apiv1.Cluster {
+			return &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							RecoveryTarget: &apiv1.RecoveryTarget{
+								BackupID:  "backup-id",
+								TargetXID: xid,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		It("accepts a non-negative integer", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("1234"))).To(BeEmpty())
+		})
+
+		It("rejects a non-numeric value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("not-a-number"))).To(HaveLen(1))
+		})
+
+		It("rejects an LSN-shaped value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("1/1"))).To(HaveLen(1))
+		})
+
+		It("rejects a negative value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("-1"))).To(HaveLen(1))
+		})
+
+		It("accepts the largest 32-bit XID", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("4294967295"))).To(BeEmpty())
+		})
+
+		It("rejects a value above 2^32-1 to avoid silent epoch truncation", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("4294967296"))).To(HaveLen(1))
+		})
+	})
+
+	When("TargetName is specified", func() {
+		recoveryTargetWith := func(name string) *apiv1.Cluster {
+			return &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							RecoveryTarget: &apiv1.RecoveryTarget{
+								BackupID:   "backup-id",
+								TargetName: name,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		It("accepts an arbitrary printable string", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("my'restore point"))).To(BeEmpty())
+		})
+
+		It("rejects an embedded newline", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("line1\nline2"))).To(HaveLen(1))
+		})
+
+		It("rejects an embedded NUL byte", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("a\x00b"))).To(HaveLen(1))
+		})
+
+		It("rejects a DEL byte", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("a\x7fb"))).To(HaveLen(1))
+		})
+
+		It("accepts a 63-byte name", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith(strings.Repeat("a", 63)))).To(BeEmpty())
+		})
+
+		It("rejects a 64-byte name", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith(strings.Repeat("a", 64)))).To(HaveLen(1))
+		})
+	})
 })
 
 var _ = Describe("primary update strategy", func() {
@@ -1912,6 +2067,121 @@ var _ = Describe("Number of synchronous replicas", func() {
 			}
 			Expect(v.validateMaxSyncReplicas(cluster)).To(BeEmpty())
 		})
+	})
+})
+
+var _ = Describe("validatePrimaryLease", func() {
+	var v *ClusterCustomValidator
+
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("is valid when the stanza is omitted", func() {
+		cluster := &apiv1.Cluster{}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("is valid with the default timings", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(apiv1.DefaultPrimaryLeaseDurationSeconds)),
+					RenewDeadlineSeconds: ptr.To(int32(apiv1.DefaultPrimaryLeaseRenewDeadlineSeconds)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("rejects a lease duration not greater than the renew deadline", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("validates a partially-specified stanza against the defaults", func() {
+		// Only renewDeadline is set; leaseDuration falls back to the default (15),
+		// which is still greater than the configured renew deadline.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					RenewDeadlineSeconds: ptr.To(int32(8)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+
+		// A renew deadline at or above the default lease duration is rejected.
+		cluster.Spec.PrimaryLease.RenewDeadlineSeconds = ptr.To(int32(20))
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("rejects a renew deadline that is not greater than retryPeriod*1.2", func() {
+		// renewDeadline == retryPeriod: leaseDuration > renewDeadline holds, so the
+		// gap this guards is the one client-go's NewLeaderElector would reject at
+		// runtime (renewDeadline must exceed retryPeriod*1.2), crash-looping the
+		// primary. The webhook must catch it before it ever reaches the instance.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("rejects a renew deadline just below the retryPeriod*1.2 boundary", func() {
+		// retryPeriod=10 => boundary is 12. renewDeadline=11 is below it and must
+		// be rejected even though leaseDuration (15) > renewDeadline (11).
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(11)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("accepts a renew deadline just above the retryPeriod*1.2 boundary", func() {
+		// retryPeriod=10 => boundary is 12. renewDeadline=13 clears it.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(13)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("accepts the documented non-default tuning example", func() {
+		// Mirrors the failover.md example (60/40/15) plus the fixture's released TTL.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds:         ptr.To(int32(60)),
+					RenewDeadlineSeconds:         ptr.To(int32(40)),
+					RetryPeriodSeconds:           ptr.To(int32(15)),
+					ReleasedLeaseDurationSeconds: ptr.To(int32(2)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
 	})
 })
 
@@ -2207,6 +2477,80 @@ var _ = Describe("validation of an external cluster", func() {
 		cluster.Spec.ExternalClusters[0].BarmanObjectStore = &apiv1.BarmanObjectStoreConfiguration{}
 		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
 	})
+
+	DescribeTable("rejects names and secret selectors that would escape the secrets directory",
+		func(mutate func(*apiv1.ExternalCluster)) {
+			ec := apiv1.ExternalCluster{
+				Name:                 "one",
+				ConnectionParameters: map[string]string{"dbname": "postgres"},
+			}
+			mutate(&ec)
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{ExternalClusters: []apiv1.ExternalCluster{ec}},
+			}
+			Expect(v.validateExternalClusters(cluster)).ToNot(BeEmpty())
+		},
+		Entry("traversal in the name", func(ec *apiv1.ExternalCluster) {
+			ec.Name = "../pwned"
+		}),
+		Entry("separator in the name", func(ec *apiv1.ExternalCluster) {
+			ec.Name = "nested/pwned"
+		}),
+		Entry("traversal in the sslCert secret name", func(ec *apiv1.ExternalCluster) {
+			ec.SSLCert = &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "../pwned"},
+				Key:                  "tls.crt",
+			}
+		}),
+		Entry("traversal in the sslCert secret key", func(ec *apiv1.ExternalCluster) {
+			ec.SSLCert = &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "cert"},
+				Key:                  "../pwned",
+			}
+		}),
+	)
+
+	It("does not reject a password selector whose value would be unsafe as a path", func() {
+		// The password selector name and key are never joined into a
+		// filesystem path, so the webhook must leave them untouched.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                 "one",
+						ConnectionParameters: map[string]string{"dbname": "postgres"},
+						Password: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "../pwned"},
+							Key:                  "../pwned",
+						},
+					},
+				},
+			},
+		}
+		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
+	})
+
+	It("accepts a well-formed name and secret selectors", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name:                 "one",
+						ConnectionParameters: map[string]string{"dbname": "postgres"},
+						SSLCert: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "cert"},
+							Key:                  "tls.crt",
+						},
+						Password: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "creds"},
+							Key:                  "password",
+						},
+					},
+				},
+			},
+		}
+		Expect(v.validateExternalClusters(cluster)).To(BeEmpty())
+	})
 })
 
 var _ = Describe("bootstrap base backup validation", func() {
@@ -2283,6 +2627,74 @@ var _ = Describe("bootstrap base backup validation", func() {
 		}
 		result := v.validateBootstrapPgBaseBackupSource(recoveryCluster)
 		Expect(result).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("pg_basebackup additionalArgs validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	clusterWithArgs := func(args ...string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:         "test",
+						AdditionalArgs: args,
+					},
+				},
+			},
+		}
+	}
+
+	It("doesn't complain when pg_basebackup is not used or there are no arguments", func() {
+		Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(&apiv1.Cluster{})).To(BeEmpty())
+		Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs())).To(BeEmpty())
+	})
+
+	DescribeTable("accepts the arguments that don't interfere with the operator",
+		func(args ...string) {
+			Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs(args...))).To(BeEmpty())
+		},
+		Entry("long options, with an attached or a separate value",
+			"--max-rate=50M", "--checkpoint", "fast", "--sync-method=syncfs", "--no-estimate-size"),
+		Entry("grouped short flags", "-vP"),
+		Entry("short options, with an attached or a separate value", "-r50M", "-c", "fast"),
+		Entry("a forbidden letter inside the value of an option", "-lbackup-D", "--label=my-D-backup"),
+		Entry("an abbreviation of an allowed option", "--check=fast"),
+	)
+
+	DescribeTable("rejects the options managed by the operator, however they are spelled",
+		func(arg string, expectedOption string) {
+			result := v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs(arg))
+			Expect(result).To(HaveLen(1))
+			Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+			Expect(result[0].Detail).To(ContainSubstring(expectedOption))
+		},
+		Entry("short option", "-D", "-D"),
+		Entry("short option with an attached value", "-D/tmp/pgdata", "-D"),
+		Entry("long option with a value", "--pgdata=/tmp/pgdata", "--pgdata"),
+		Entry("long option without a value", "--help", "--help"),
+		Entry("short option grouped with allowed ones", "-nNPR", "-R"),
+		Entry("creation of a permanent slot", "--create-slot", "--create-slot"),
+		Entry("creation of a permanent slot, grouped short option", "-vC", "-C"),
+	)
+
+	// getopt_long accepts any unambiguous abbreviation of a long option
+	It("rejects the abbreviations of the options managed by the operator", func() {
+		result := v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs("--pgd=/tmp/pgdata"))
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Detail).To(ContainSubstring("abbreviation of --pgdata"))
+	})
+
+	It("reports every forbidden argument, and only those", func() {
+		result := v.validateBootstrapPgBaseBackupAdditionalArgs(
+			clusterWithArgs("--host=foo", "--max-rate=50M", "-D", "/tmp"))
+		Expect(result).To(HaveLen(2))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[0]"))
+		Expect(result[1].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[2]"))
 	})
 })
 
@@ -3906,16 +4318,6 @@ var _ = Describe("Environment variables validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
 		v = &ClusterCustomValidator{}
-	})
-
-	When("an environment variable is given", func() {
-		It("detects if it is valid", func() {
-			Expect(isReservedEnvironmentVariable("PGDATA")).To(BeTrue())
-		})
-
-		It("detects if it is not valid", func() {
-			Expect(isReservedEnvironmentVariable("LC_ALL")).To(BeFalse())
-		})
 	})
 
 	When("a ClusterSpec is given", func() {
@@ -5568,6 +5970,31 @@ var _ = Describe("validateExtensions", func() {
 		Expect(v.validateExtensions(cluster)).To(BeEmpty())
 	})
 
+	It("returns no error when LdLibraryPath and BinPath are valid", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							LdLibraryPath: []string{
+								"/opt/custom/lib",
+							},
+							BinPath: []string{
+								"/opt/custom/bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
 	It("returns errors for duplicate ExtensionControlPath entries", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -5677,6 +6104,234 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[0].Field).To(ContainSubstring("extensions[0].ld_library_path[1]"))
 	})
 
+	It("returns errors for duplicate BinPath entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							BinPath: []string{
+								"/usr/local/bin",
+								"/opt/custom/bin",
+								"/usr/local/bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].bin_path[2]"))
+		Expect(err[0].BadValue).To(Equal("/usr/local/bin"))
+	})
+
+	It("returns an error for empty BinPath entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							BinPath: []string{
+								"/valid/path",
+								"",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].bin_path[1]"))
+	})
+
+	It("returns an error for path traversal in path lists", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../../etc",
+							},
+							DynamicLibraryPath: []string{
+								"../escape",
+							},
+							LdLibraryPath: []string{
+								"lib/../../../secret",
+							},
+							BinPath: []string{
+								"../bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(4))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+		Expect(err[1].Field).To(ContainSubstring("dynamic_library_path[0]"))
+		Expect(err[2].Field).To(ContainSubstring("ld_library_path[0]"))
+		Expect(err[3].Field).To(ContainSubstring("bin_path[0]"))
+	})
+
+	It("returns an error for an absolute path with embedded traversal that escapes", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/a/../../../../etc",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
+	It("returns no error for a path traversal that does not escape", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/opt/custom/share",
+							},
+							DynamicLibraryPath: []string{
+								"a/b/../../share",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
+	It("returns an error for a relative path that escapes via leading traversal", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../../mount-evil",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+	})
+
+	It("returns an error for a path that escapes only once joined under a deeper, realistic mount point", func() {
+		// the Collect*Paths functions join these paths under a
+		// multi-segment mount point at runtime (e.g. "/extensions/<name>"),
+		// not a single-segment one. A containment check resolved against a
+		// shallower placeholder base would wrongly accept these.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../mount/lib",
+							},
+							DynamicLibraryPath: []string{
+								"../../../mount/x",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+		Expect(err[1].Field).To(ContainSubstring("dynamic_library_path[0]"))
+	})
+
+	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							LdLibraryPath: []string{
+								"/usr/lib/postgresql/lib",
+								"/usr/lib/postgresql/lib",
+							},
+							BinPath: []string{
+								"/usr/lib/postgresql/bin",
+								"/usr/lib/postgresql/bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].BadValue).To(Equal("/usr/lib/postgresql/lib"))
+
+		Expect(err[1].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[1].BadValue).To(Equal("/usr/lib/postgresql/bin"))
+	})
+
 	It("returns errors for duplicates in both ExtensionControlPath and DynamicLibraryPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -5709,6 +6364,177 @@ var _ = Describe("validateExtensions", func() {
 
 		Expect(err[1].Type).To(Equal(field.ErrorTypeDuplicate))
 		Expect(err[1].BadValue).To(Equal("/usr/lib/postgresql/lib"))
+	})
+
+	It("returns an error for forbidden env entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "PATH",
+									Value: "/my/binary/path",
+								},
+								{
+									Name:  "LD_LIBRARY_PATH",
+									Value: "/my/library/path",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[0].name"))
+
+		Expect(err[1].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(err[1].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
+	})
+
+	It("returns an error for reserved env entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "PGDATA",
+									Value: "/some/path",
+								},
+								{
+									Name:  "CNPG_SECRET",
+									Value: "some_value",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[0].name"))
+		Expect(err[0].BadValue).To(Equal("PGDATA"))
+
+		Expect(err[1].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[1].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
+		Expect(err[1].BadValue).To(Equal("CNPG_SECRET"))
+	})
+
+	It("returns an error for duplicate env entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "FOO",
+									Value: "foo",
+								},
+								{
+									Name:  "FOO",
+									Value: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].BadValue).To(Equal("FOO"))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
+	})
+
+	It("returns an error for unknown placeholders in env values", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "GOOD",
+									Value: "${image_root}/lib",
+								},
+								{
+									Name:  "BAD",
+									Value: "${image_rot}/lib",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[1].value"))
+	})
+
+	It("accepts escaped placeholders in env values", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "LITERAL",
+									Value: "$${not_a_placeholder}",
+								},
+								{
+									Name:  "MIXED",
+									Value: "$${escaped}/${image_root}/lib",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(BeEmpty())
 	})
 
 	It("returns an error when extension names collide after underscore sanitization", func() {
@@ -5849,6 +6675,7 @@ var _ = Describe("getInTreeBarmanWarnings", func() {
 		warnings := getInTreeBarmanWarnings(cluster)
 		Expect(warnings).To(HaveLen(1))
 		Expect(warnings[0]).To(ContainSubstring("spec.backup.barmanObjectStore"))
+		Expect(warnings[0]).To(ContainSubstring("removed in CloudNativePG 1.32.0"))
 	})
 
 	It("returns warnings for multiple external clusters with BarmanObjectStore", func() {
@@ -6190,5 +7017,514 @@ var _ = Describe("failoverQuorum validation", func() {
 
 		errList := v.validateFailoverQuorum(cluster)
 		Expect(errList).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("podSelectorRefs validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("accepts a valid configuration", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"hostssl mydb myuser ${podselector:app-pods} scram-sha-256",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts an empty configuration", func() {
+		cluster := &apiv1.Cluster{}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects undefined pod selector in pg_hba", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"hostssl mydb myuser ${podselector:undefined-ref} scram-sha-256",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(result[0].Detail).To(ContainSubstring("undefined-ref"))
+	})
+
+	It("rejects duplicate podSelectorRefs names", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "other"},
+						},
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+	})
+
+	It("rejects invalid label selector", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "bad-selector",
+						Selector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "app",
+									Operator: "InvalidOperator",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects multiple podselector references in a single pg_hba line", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app1",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "one"},
+						},
+					},
+					{
+						Name: "app2",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "two"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"host all all ${podselector:app1} ${podselector:app2} md5",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeInvalid))
+	})
+
+	It("accepts defined but unreferenced selectors", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"host all all 10.0.0.0/8 md5",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+})
+
+var _ = Describe("ServiceAccount configuration validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("accepts cluster without serviceAccountName or serviceAccountTemplate", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts cluster with only serviceAccountName specified", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountName: "shared-sa",
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts cluster with only serviceAccountTemplate specified", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{},
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects cluster with both serviceAccountName and serviceAccountTemplate", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountName:     "shared-sa",
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{},
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.serviceAccountName"))
+		Expect(result[0].Detail).To(ContainSubstring("mutually exclusive"))
+	})
+})
+
+var _ = Describe("getPrimaryIsolationTimingWarnings", func() {
+	clusterWith := func(enabled *bool, requestTimeout int, lease *apiv1.PrimaryLeaseConfiguration) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:    3,
+				PrimaryLease: lease,
+				Probes: &apiv1.ProbesConfiguration{
+					Liveness: &apiv1.LivenessProbe{
+						IsolationCheck: &apiv1.IsolationCheckConfiguration{
+							Enabled:        enabled,
+							RequestTimeout: requestTimeout,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("returns no warning with the default timings", func() {
+		Expect(getPrimaryIsolationTimingWarnings(clusterWith(ptr.To(true), 1000, nil))).To(BeEmpty())
+	})
+
+	DescribeTable("warns when the step-down bound is not below the lease duration",
+		func(requestTimeout int, renewDeadline int32) {
+			cluster := clusterWith(ptr.To(true), requestTimeout, &apiv1.PrimaryLeaseConfiguration{
+				RenewDeadlineSeconds: ptr.To(renewDeadline),
+			})
+			warnings := getPrimaryIsolationTimingWarnings(cluster)
+			Expect(warnings).To(HaveLen(1))
+			Expect(warnings[0]).To(ContainSubstring("15s"))
+		},
+		// 12s + 2s + 1s = 15s: a replica may promote at the same instant the
+		// isolated primary asks for its shutdown, so there is no margin left.
+		Entry("exactly at the lease duration", 1000, int32(12)),
+		Entry("past it through the request timeout alone", 3000, int32(10)),
+	)
+
+	It("returns no warning when the isolation check is disabled", func() {
+		cluster := clusterWith(ptr.To(false), 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		Expect(getPrimaryIsolationTimingWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the isolation check has not been defaulted", func() {
+		cluster := clusterWith(nil, 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		Expect(getPrimaryIsolationTimingWarnings(cluster)).To(BeEmpty())
+		Expect(getPrimaryIsolationTimingWarnings(&apiv1.Cluster{})).To(BeEmpty())
+	})
+
+	It("is reported through the admission warnings", func() {
+		cluster := clusterWith(ptr.To(true), 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		v := &ClusterCustomValidator{}
+		Expect(v.getAdmissionWarnings(cluster)).To(ContainElement(ContainSubstring("isolated primary")))
+	})
+})
+
+var _ = Describe("getSynchronousReplicationWarnings", func() {
+	It("returns no warning for a single-instance cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 1},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a multi-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning when the current synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method: apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number: 1,
+					},
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the legacy synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MinSyncReplicas: 1,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when only maxSyncReplicas is set", func() {
+		// minSyncReplicas is the floor that self-healing can't erase: with it
+		// left at zero, a transient shortfall of ready replicas collapses the
+		// effective synchronous requirement to zero (see getSyncReplicasData
+		// in pkg/postgres/replication/legacy.go), so maxSyncReplicas alone does
+		// not guarantee durability.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: 2,
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns no warning for a replica cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+				},
+			},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning for a two-instance cluster with no synchronous replication", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 2},
+		}
+		Expect(getSynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("is raised on both creation and update", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{Instances: 3},
+		}
+		v := &ClusterCustomValidator{}
+
+		createWarnings, _ := v.ValidateCreate(context.Background(), cluster)
+		Expect(createWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
+
+		updateWarnings, _ := v.ValidateUpdate(context.Background(), cluster, cluster)
+		Expect(updateWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
+	})
+})
+
+var _ = Describe("getFailureDomainTopologyWarnings", func() {
+	makeCluster := func(failureDomainKeys []string, conditions []metav1.Condition) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{}
+		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+			Method:                apiv1.SynchronousReplicaConfigurationMethodAny,
+			Number:                1,
+			NodeFailureDomainKeys: failureDomainKeys,
+		}
+		cluster.Status.Conditions = conditions
+		return cluster
+	}
+
+	It("returns no warning when no failure domain keys are set", func() {
+		cluster := makeCluster(nil, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+				Message: "No cross-domain replica exists.",
+			},
+		})
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the condition is True", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionTrue,
+				Reason:  string(apiv1.ConditionReasonTopologySatisfied),
+				Message: "Enough electable synchronous standbys are in a different failure domain than the primary.",
+			},
+		})
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the condition is absent", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, nil)
+		Expect(getFailureDomainTopologyWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when the condition is False due to insufficient cross-domain replicas", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonInsufficientCrossDomainReplicas),
+				Message: "Not enough electable synchronous standbys in a different failure domain than the primary.",
+			},
+		})
+		warnings := getFailureDomainTopologyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
+		Expect(warnings[0]).To(ContainSubstring("Not enough electable synchronous standbys"))
+	})
+
+	It("returns a warning when the condition is False due to topology not extracted", func() {
+		cluster := makeCluster([]string{"topology.kubernetes.io/zone"}, []metav1.Condition{
+			{
+				Type:    string(apiv1.ConditionSyncReplicationTopologySatisfied),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonTopologyNotExtracted),
+				Message: "Topology labels could not be extracted from pods or nodes.",
+			},
+		})
+		warnings := getFailureDomainTopologyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
+		Expect(warnings[0]).To(ContainSubstring("Topology labels could not be extracted"))
+	})
+})
+
+var _ = Describe("pg_basebackup tablespaceMapping validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	clusterWithMapping := func(entries ...apiv1.TablespaceMappingEntry) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{{Name: "origin"}},
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					{Name: "fast"},
+					{Name: "archive"},
+				},
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:            "origin",
+						TablespaceMapping: entries,
+					},
+				},
+			},
+		}
+	}
+
+	It("accepts a valid mapping", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/fast"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data/pg/archive"},
+		)
+		Expect(v.validateBootstrapPgBaseBackupSource(cluster)).To(BeEmpty())
+	})
+
+	It("accepts a missing mapping", func() {
+		Expect(v.validateBootstrapPgBaseBackupSource(clusterWithMapping())).To(BeEmpty())
+	})
+
+	It("rejects a tablespace not declared in spec.tablespaces", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "unknown", SourceLocation: "/data/pg/unknown"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].name"))
+	})
+
+	It("rejects a relative source location", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "data/pg/fast"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
+	It("rejects a source location containing '='", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg=fast"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
+	It("rejects a source location containing a backslash", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: `/data/pg\fast`})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
+	It("rejects a duplicated source location", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/ts"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data/pg/ts"},
+		)
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].sourceLocation"))
+	})
+
+	// pg_basebackup canonicalizes the paths before matching them
+	It("rejects the same source location written in a different way", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/ts"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data//pg/./ts/"},
+		)
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].sourceLocation"))
 	})
 })

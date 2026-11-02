@@ -22,6 +22,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -48,17 +49,25 @@ type backupCommandOptions struct {
 	online              *bool
 	immediateCheckpoint *bool
 	waitForArchive      *bool
+	clusterOnlineConfig apiv1.OnlineConfiguration
 	pluginName          string
 	pluginParameters    pluginParameters
+	dryRun              bool
 }
 
 func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfiguration {
-	var onlineConfiguration *apiv1.OnlineConfiguration
-	if options.immediateCheckpoint != nil || options.waitForArchive != nil {
-		onlineConfiguration = &apiv1.OnlineConfiguration{
-			WaitForArchive:      options.waitForArchive,
-			ImmediateCheckpoint: options.immediateCheckpoint,
-		}
+	if options.immediateCheckpoint == nil && options.waitForArchive == nil {
+		return nil
+	}
+
+	// The online configuration of the Backup replaces the one of the cluster
+	// as a whole, so it starts from it to keep the options that are not set
+	onlineConfiguration := options.clusterOnlineConfig.DeepCopy()
+	if options.immediateCheckpoint != nil {
+		onlineConfiguration.ImmediateCheckpoint = options.immediateCheckpoint
+	}
+	if options.waitForArchive != nil {
+		onlineConfiguration.WaitForArchive = options.waitForArchive
 	}
 	return onlineConfiguration
 }
@@ -67,6 +76,7 @@ func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfig
 func NewCmd() *cobra.Command {
 	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive, pluginName string
 	var pluginParameters pluginParameters
+	var dryRun bool
 
 	backupMethods := []string{
 		string(apiv1.BackupMethodBarmanObjectStore),
@@ -89,7 +99,7 @@ func NewCmd() *cobra.Command {
 				backupName = fmt.Sprintf(
 					"%s-%s",
 					clusterName,
-					pgTime.ToCompactISO8601(time.Now()),
+					pgTime.ToCompactISO8601(time.Now().UTC()),
 				)
 			}
 
@@ -154,6 +164,11 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("while parsing the wait-for-archive value: %w", err)
 			}
 
+			var clusterOnlineConfig apiv1.OnlineConfiguration
+			if cluster.Spec.Backup != nil && cluster.Spec.Backup.VolumeSnapshot != nil {
+				clusterOnlineConfig = cluster.Spec.Backup.VolumeSnapshot.OnlineConfiguration
+			}
+
 			return createBackup(
 				cmd.Context(),
 				backupCommandOptions{
@@ -164,8 +179,10 @@ func NewCmd() *cobra.Command {
 					online:              parsedOnline,
 					immediateCheckpoint: parsedImmediateCheckpoint,
 					waitForArchive:      parsedWaitForArchive,
+					clusterOnlineConfig: clusterOnlineConfig,
 					pluginName:          pluginName,
 					pluginParameters:    pluginParameters,
+					dryRun:              dryRun,
 				})
 		},
 	}
@@ -228,12 +245,20 @@ func NewCmd() *cobra.Command {
 			"is allowed only when the backup method is set to 'plugin'",
 	)
 
+	backupSubcommand.Flags().BoolVar(&dryRun, "dry-run", false,
+		"When true prints the Backup manifest instead of creating it",
+	)
+
 	return backupSubcommand
 }
 
 // createBackup handles the Backup resource creation
 func createBackup(ctx context.Context, options backupCommandOptions) error {
 	backup := apiv1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiv1.SchemeGroupVersion.String(),
+			Kind:       apiv1.BackupKind,
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: plugin.Namespace,
 			Name:      options.backupName,
@@ -255,6 +280,10 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 			Name:       options.pluginName,
 			Parameters: options.pluginParameters,
 		}
+	}
+
+	if options.dryRun {
+		return plugin.Print(&backup, plugin.OutputFormatYAML, os.Stdout)
 	}
 
 	err := plugin.Client.Create(ctx, &backup)

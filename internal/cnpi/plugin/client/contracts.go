@@ -23,6 +23,7 @@ import (
 	"context"
 
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
+	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -145,21 +146,27 @@ type LifecycleCapabilities interface {
 // WalCapabilities describes a set of behavior needed to archive and recover WALs
 type WalCapabilities interface {
 	// ArchiveWAL calls the loaded plugins to archive a WAL file.
-	// This call is a no-op if there's no plugin implementing WAL archiving
+	// This call is a no-op if there's no plugin implementing WAL archiving.
+	// checkEmptyWalArchive tells the plugin whether it should verify the
+	// archive destination is empty before this upload; the caller already
+	// combines the Cluster's annotation with the first-archive marker file.
 	ArchiveWAL(
 		ctx context.Context,
 		cluster client.Object,
 		sourceFileName string,
+		checkEmptyWalArchive bool,
 	) error
 
 	// RestoreWAL calls the loaded plugins to archive a WAL file.
 	// This call returns a boolean indicating if the WAL was restored
-	// by a plugin and the occurred error.
+	// by a plugin and the occurred error. The mode tells the plugins
+	// the context the WAL file is being restored in.
 	RestoreWAL(
 		ctx context.Context,
 		cluster client.Object,
 		sourceWALName string,
 		destinationFileName string,
+		mode wal.WALRestoreRequest_Mode,
 	) (bool, error)
 }
 

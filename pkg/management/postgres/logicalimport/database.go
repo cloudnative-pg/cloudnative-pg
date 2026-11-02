@@ -287,9 +287,30 @@ func (ds *databaseSnapshotter) executePostImportQueries(
 		return err
 	}
 
+	// The pool pins search_path to pg_catalog. User-authored import
+	// scripts expect the standard `"$user", public` resolution, so we
+	// set that once at the start of the batch on a dedicated *sql.Conn
+	// and reset at the end. Any user SET inside the script persists
+	// across statements within the same batch.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring dedicated connection for post-import queries: %w", err)
+	}
+	defer func() {
+		// Reset in a defer so the pin is restored even if a query fails;
+		// pooled pgx connections keep session GUCs across reuse.
+		if _, resetErr := conn.ExecContext(ctx, `RESET search_path`); resetErr != nil {
+			contextLogger.Error(resetErr, "while resetting search_path after post-import queries")
+		}
+		_ = conn.Close()
+	}()
+
+	if _, err := conn.ExecContext(ctx, `SET search_path TO "$user", public`); err != nil {
+		return fmt.Errorf("setting search_path before post-import queries: %w", err)
+	}
+
 	for _, query := range postImportQueries {
-		_, err := db.Exec(query)
-		if err != nil {
+		if _, err := conn.ExecContext(ctx, query); err != nil {
 			return err
 		}
 	}

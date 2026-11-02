@@ -24,16 +24,16 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"iter"
 	"math"
-	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 )
 
 // WalLevelValue a value that is assigned to the 'wal_level' configuration field
@@ -99,6 +99,7 @@ const (
 #
 
 # Grant local access ('local' user map)
+local all cnpg_metrics_exporter peer map=cnpg_metrics_exporter
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
@@ -110,9 +111,9 @@ hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 # USER-DEFINED RULES
 #
 
-{{ range $rule := .UserRules }}
-{{ $rule -}}
-{{ end }}
+{{ range $rule := .UserRules }}{{ range $expanded := expandRule $rule $.SelectorIPs }}
+{{ $expanded -}}
+{{ end }}{{ end }}
 
 {{ if .LDAPConfiguration }}
 #
@@ -142,6 +143,9 @@ cnpg_streaming_replica streaming_replica streaming_replica
 
 # Grant cnpg_pooler_pgbouncer access ('cnpg_pooler_pgbouncer' user map)
 cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
+
+# Grant cnpg_metrics_exporter access via peer authentication on the Unix socket
+cnpg_metrics_exporter {{.Username}} cnpg_metrics_exporter
 
 #
 # USER-DEFINED RULES
@@ -272,10 +276,21 @@ cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 
 	// ExtensionsBaseDirectory is the base directory to store ImageVolume Extensions
 	ExtensionsBaseDirectory = "/extensions"
+
+	// UpgradeTargetExtensionsBaseDirectory is where target-version ImageVolume
+	// extensions are mounted during a major upgrade so they can coexist with the
+	// source-version ones at their original location.
+	UpgradeTargetExtensionsBaseDirectory = "/new-extensions"
 )
 
-// hbaTemplate is the template used to create the HBA configuration
-var hbaTemplate = template.Must(template.New("pg_hba.conf").Parse(hbaTemplateString))
+// hbaTemplate is the template used to create the HBA configuration.
+// The "expandRule" function expands ${podselector:NAME} references
+// inline, producing one output line per matched pod IP.
+var hbaTemplate = template.Must(
+	template.New("pg_hba.conf").
+		Funcs(template.FuncMap{"expandRule": hba.ExpandLine}).
+		Parse(hbaTemplateString),
+)
 
 // identTemplate is the template used to create the HBA configuration
 var identTemplate = template.Must(template.New("pg_ident.conf").Parse(identTemplateString))
@@ -380,8 +395,9 @@ type ConfigurationInfo struct {
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
 
-	// The list of additional extensions to be loaded into the PostgreSQL configuration
-	AdditionalExtensions []AdditionalExtensionConfiguration
+	// The directories of the additional extensions to be loaded into the
+	// PostgreSQL configuration, nil when there are no additional extensions
+	AdditionalExtensions *AdditionalExtensionConfiguration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -524,7 +540,6 @@ var (
 		"ssl_cert_file":                          fixedConfigurationParameter,
 		"ssl_crl_file":                           fixedConfigurationParameter,
 		"ssl_dh_params_file":                     fixedConfigurationParameter,
-		"ssl_ecdh_curve":                         fixedConfigurationParameter,
 		"ssl_key_file":                           fixedConfigurationParameter,
 		"ssl_passphrase_command":                 fixedConfigurationParameter,
 		"ssl_passphrase_command_supports_reload": fixedConfigurationParameter,
@@ -585,25 +600,34 @@ var (
 	}
 )
 
-// CreateHBARules will create the content of pg_hba.conf file given
-// the rules set by the cluster spec
-func CreateHBARules(
-	hba []string,
-	defaultAuthenticationMethod, ldapConfigString string,
-) (string, error) {
-	var hbaContent bytes.Buffer
+// HBAOptions holds the configuration for rendering a pg_hba.conf file.
+type HBAOptions struct {
+	// DefaultAuthenticationMethod is the fallback auth method (e.g. "scram-sha-256").
+	DefaultAuthenticationMethod string
+	// LDAPConfigString is the optional LDAP configuration block.
+	LDAPConfigString string
+	// SelectorIPs maps podSelectorRef names to resolved pod IPs.
+	// When non-nil, ${podselector:NAME} tokens in the address field are
+	// expanded to one line per IP with /32 (IPv4) or /128 (IPv6) masks.
+	SelectorIPs map[string][]string
+}
 
-	templateData := struct {
+// CreateHBARules produces the final pg_hba.conf content from the given
+// user-defined rules and rendering options. ${podselector:NAME} tokens
+// in user rules are expanded inline by the template's "expandRule" function.
+func CreateHBARules(hbaLines []string, opts HBAOptions) (string, error) {
+	var hbaContent bytes.Buffer
+	if err := hbaTemplate.Execute(&hbaContent, struct {
 		UserRules                   []string
+		SelectorIPs                 map[string][]string
 		LDAPConfiguration           string
 		DefaultAuthenticationMethod string
 	}{
-		UserRules:                   hba,
-		LDAPConfiguration:           ldapConfigString,
-		DefaultAuthenticationMethod: defaultAuthenticationMethod,
-	}
-
-	if err := hbaTemplate.Execute(&hbaContent, templateData); err != nil {
+		UserRules:                   hbaLines,
+		SelectorIPs:                 opts.SelectorIPs,
+		LDAPConfiguration:           opts.LDAPConfigString,
+		DefaultAuthenticationMethod: opts.DefaultAuthenticationMethod,
+	}); err != nil {
 		return "", err
 	}
 
@@ -674,18 +698,6 @@ func (p *PgConfiguration) AddSharedPreloadLibrary(newLibrary string) {
 // GetConfig retrieves a configuration from the map of configurations, given the key
 func (p *PgConfiguration) GetConfig(key string) string {
 	return p.configs[key]
-}
-
-// GetSortedList returns a sorted list of configurations
-func (p *PgConfiguration) GetSortedList() []string {
-	parameters := make([]string, len(p.configs))
-	i := 0
-	for key := range p.configs {
-		parameters[i] = key
-		i++
-	}
-	sort.Strings(parameters)
-	return parameters
 }
 
 // CreatePostgresqlConfiguration creates the configuration from the settings
@@ -793,7 +805,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	// Setup additional extensions
-	if len(info.AdditionalExtensions) > 0 {
+	if info.AdditionalExtensions != nil {
 		configuration.setExtensionControlPath(info)
 		configuration.setDynamicLibraryPath(info)
 	}
@@ -854,98 +866,63 @@ func (p *PgConfiguration) setUserSharedPreloadLibraries(info ConfigurationInfo) 
 }
 
 // CreatePostgresqlConfFile creates the contents of the postgresql.conf file
+// and returns them with the hash identifying the configuration
 func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
-	// We need to be able to compare two configurations generated
-	// by operator to know if they are different or not. To do
-	// that we sort the configuration by parameter name as order
-	// is really irrelevant for our purposes
-	parameters := configuration.GetSortedList()
-	var postgresConf strings.Builder
-	var cnpgConf strings.Builder
-	for _, parameter := range parameters {
-		line := fmt.Sprintf(
-			"%v = %v\n",
-			parameter,
-			escapePostgresConfValue(configuration.configs[parameter]))
-		if strings.HasPrefix(parameter, "cnpg.") {
-			cnpgConf.WriteString(line)
+	pgPart, _ := renderPostgresqlConfSections(configuration)
+	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(pgPart)))
+
+	return CreatePostgresqlConfFileWithHash(configuration, sha256sum), sha256sum
+}
+
+// CreatePostgresqlConfFileWithHash creates the contents of the postgresql.conf
+// file, identifying the configuration with the passed hash
+func CreatePostgresqlConfFileWithHash(configuration *PgConfiguration, sha256sum string) string {
+	pgPart, cnpgPart := renderPostgresqlConfSections(configuration)
+
+	// Emit the cnpg.* keys (sorted), then always emit the sha256 line LAST.
+	// The sha256-last layout is legacy behaviour; preserving it prevents a
+	// byte-level diff in postgresql.conf (and an avoidable pg_reload_conf())
+	// on operator upgrade for clusters that already have other cnpg.* keys
+	// such as cnpg.synchronous_standby_names_metadata.
+	sha256Line := configfile.RenderPostgresConfiguration(map[string]string{
+		CNPGConfigSha256: sha256sum,
+	})
+
+	return pgPart + cnpgPart + sha256Line
+}
+
+// renderPostgresqlConfSections renders the regular PostgreSQL section (whose
+// hash defines the identity of the configuration) and the cnpg.* section
+// (which carries operator-internal state and must not contribute to the hash)
+func renderPostgresqlConfSections(configuration *PgConfiguration) (string, string) {
+	pgOptions := map[string]string{}
+	cnpgOptions := map[string]string{}
+	for name, value := range configuration.configs {
+		if strings.HasPrefix(name, "cnpg.") {
+			cnpgOptions[name] = value
 		} else {
-			postgresConf.WriteString(line)
+			pgOptions[name] = value
 		}
 	}
 
-	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf.String())))
-	postgresConf.WriteString(cnpgConf.String())
-	fmt.Fprintf(&postgresConf, "%v = %v\n", CNPGConfigSha256,
-		escapePostgresConfValue(sha256sum))
-
-	return postgresConf.String(), sha256sum
+	return configfile.RenderPostgresConfiguration(pgOptions), configfile.RenderPostgresConfiguration(cnpgOptions)
 }
 
-// escapePostgresConfValue escapes a value to make its representation
-// directly embeddable in the PostgreSQL configuration file
-func escapePostgresConfValue(value string) string {
-	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
-}
-
-// AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
+// AdditionalExtensionConfiguration holds the directories, inside the
+// extensions' ImageVolumes, to be added to the path-like GUCs
 type AdditionalExtensionConfiguration struct {
-	// The name of the Extension
-	Name string
-
-	// The list of directories that should be added to ExtensionControlPath.
+	// The list of absolute directories that should be added to ExtensionControlPath.
 	ExtensionControlPath []string
 
-	// The list of directories that should be added to DynamicLibraryPath.
+	// The list of absolute directories that should be added to DynamicLibraryPath.
 	DynamicLibraryPath []string
-}
-
-// absolutizePaths returns an iterator over the passed paths, absolutized
-// using the name of the extension
-func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for _, path := range paths {
-			if !yield(filepath.Join(ExtensionsBaseDirectory, ext.Name, path)) {
-				break
-			}
-		}
-	}
-}
-
-// getRuntimeExtensionControlPath collects the absolute directories to be put
-// into the `extension_control_path` GUC to support this additional extension
-func (ext *AdditionalExtensionConfiguration) getRuntimeExtensionControlPath() iter.Seq[string] {
-	paths := []string{"share"}
-	if len(ext.ExtensionControlPath) > 0 {
-		paths = ext.ExtensionControlPath
-	}
-
-	return ext.absolutizePaths(paths)
-}
-
-// getDynamicLibraryPath collects the absolute directories to be put
-// into the `dynamic_library_path` GUC to support this additional extension
-func (ext *AdditionalExtensionConfiguration) getDynamicLibraryPath() iter.Seq[string] {
-	paths := []string{"lib"}
-	if len(ext.DynamicLibraryPath) > 0 {
-		paths = ext.DynamicLibraryPath
-	}
-
-	return ext.absolutizePaths(paths)
 }
 
 // setExtensionControlPath manages the `extension_control_path` GUC, merging
 // the paths defined by the user with the ones provided by the
 // `.spec.postgresql.extensions` stanza
 func (p *PgConfiguration) setExtensionControlPath(info ConfigurationInfo) {
-	extensionControlPath := []string{"$system"}
-
-	for _, extension := range info.AdditionalExtensions {
-		extensionControlPath = slices.AppendSeq(
-			extensionControlPath,
-			extension.getRuntimeExtensionControlPath(),
-		)
-	}
+	extensionControlPath := append([]string{"$system"}, info.AdditionalExtensions.ExtensionControlPath...)
 
 	extensionControlPath = slices.AppendSeq(
 		extensionControlPath,
@@ -964,13 +941,7 @@ func (p *PgConfiguration) setExtensionControlPath(info ConfigurationInfo) {
 // paths defined by the user with the ones provided by the
 // `.spec.postgresql.extensions` stanza
 func (p *PgConfiguration) setDynamicLibraryPath(info ConfigurationInfo) {
-	dynamicLibraryPath := []string{"$libdir"}
-
-	for _, extension := range info.AdditionalExtensions {
-		dynamicLibraryPath = slices.AppendSeq(
-			dynamicLibraryPath,
-			extension.getDynamicLibraryPath())
-	}
+	dynamicLibraryPath := append([]string{"$libdir"}, info.AdditionalExtensions.DynamicLibraryPath...)
 
 	dynamicLibraryPath = slices.AppendSeq(
 		dynamicLibraryPath,

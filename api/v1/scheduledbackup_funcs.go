@@ -20,6 +20,10 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"fmt"
+	"time"
+
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -64,6 +68,14 @@ func (scheduledBackup *ScheduledBackup) GetStatus() *ScheduledBackupStatus {
 	return &scheduledBackup.Status
 }
 
+// BackupName returns the deterministic name of the Backup that this
+// ScheduledBackup creates for an iteration scheduled at the given time.
+// The name is unique per (ScheduledBackup, scheduledTime) pair at second
+// resolution, which is what makes the controller idempotent against retries.
+func (scheduledBackup *ScheduledBackup) BackupName(scheduledTime time.Time) string {
+	return fmt.Sprintf("%s-%s", scheduledBackup.Name, pgTime.ToCompactISO8601(scheduledTime))
+}
+
 // CreateBackup creates a backup from this scheduled backup
 func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 	backup := Backup{
@@ -91,4 +103,14 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 	}
 
 	return &backup
+}
+
+// SetAdmissionError sets the admission error status on the ScheduledBackup resource
+func (scheduledBackup *ScheduledBackup) SetAdmissionError(msg string) {
+	scheduledBackup.Status.Error = msg
+}
+
+// GetAdmissionError returns the admission error recorded on the ScheduledBackup status
+func (scheduledBackup *ScheduledBackup) GetAdmissionError() string {
+	return scheduledBackup.Status.Error
 }

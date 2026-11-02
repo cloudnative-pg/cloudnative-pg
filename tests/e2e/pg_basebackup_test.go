@@ -20,8 +20,15 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"fmt"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -36,6 +43,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 		srcCluster      = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
 		dstClusterBasic = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml.template"
 		dstClusterTLS   = fixturesDir + "/pg_basebackup/cluster-dst-tls.yaml.template"
+		dstClusterTbs   = fixturesDir + "/pg_basebackup/cluster-dst-tablespace-mapping.yaml.template"
 		tableName       = "to_bootstrap"
 		appUser         = "appuser"
 		level           = tests.High
@@ -56,35 +64,35 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			// Create the source Cluster
 			srcClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, srcCluster)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
-			tableLocator := TableLocator{
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, srcClusterName, srcCluster)
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  srcClusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 		})
 
 		It("using basic authentication", func() {
 			// Create the destination Cluster
 			dstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, dstClusterBasic)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, dstClusterName, dstClusterBasic, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, dstClusterName, dstClusterBasic)
 			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
 
 			secretName := dstClusterName + apiv1.ApplicationUserSecretSuffix
 
 			By("checking the dst cluster with auto generated app password connectable", func() {
-				AssertApplicationDatabaseConnection(namespace, dstClusterName,
+				pgasserts.AssertApplicationDatabaseConnection(env, namespace, dstClusterName,
 					appUser, postgres.AppDBName, "", secretName)
 			})
 
 			By("update user application password for dst cluster and verify connectivity", func() {
 				const newPassword = "eeh2Zahohx"
-				AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
-				AssertApplicationDatabaseConnection(
+				secretsasserts.AssertUpdateSecret(env, namespace, dstClusterName, secretName, "password", newPassword, 30)
+				pgasserts.AssertApplicationDatabaseConnection(env,
 					namespace,
 					dstClusterName,
 					appUser,
@@ -94,13 +102,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			})
 
 			By("checking data have been copied correctly", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  dstClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
@@ -119,17 +127,17 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					forward.Close()
 				}()
 				Expect(err).ToNot(HaveOccurred())
-				insertRecordIntoTable(tableName, 3, conn)
+				pgasserts.InsertRecordIntoTable(tableName, 3, conn)
 			})
 
 			By("checking the src cluster was not modified", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  srcClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 
@@ -137,18 +145,18 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			// Create the destination Cluster
 			dstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, dstClusterTLS)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, dstClusterName, dstClusterTLS, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, dstClusterName, dstClusterTLS)
 			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
 
 			By("checking data have been copied correctly", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  dstClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
@@ -167,17 +175,92 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					forward.Close()
 				}()
 				Expect(err).ToNot(HaveOccurred())
-				insertRecordIntoTable(tableName, 3, conn)
+				pgasserts.InsertRecordIntoTable(tableName, 3, conn)
 			})
 
 			By("checking the src cluster was not modified", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  srcClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+			})
+		})
+	})
+
+	Context("can relocate the tablespaces of the source", Ordered, func() {
+		const (
+			tablespaceName  = "moved"
+			sourceLocation  = "/var/lib/postgresql/data/moved"
+			targetLocation  = "/var/lib/postgresql/tablespaces/moved/data"
+			tablespaceTable = "in_moved_tablespace"
+		)
+
+		BeforeAll(func() {
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			srcClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, srcCluster)
+			Expect(err).ToNot(HaveOccurred())
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, srcClusterName, srcCluster)
+
+			By("creating a tablespace outside the CloudNativePG layout in the source", func() {
+				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, srcClusterName)
+				Expect(err).ToNot(HaveOccurred())
+				podLocator := exec.PodLocator{Namespace: namespace, PodName: primary.Name}
+
+				_, _, err = exec.CommandInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					podLocator, nil, "mkdir", sourceLocation)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, query := range []string{
+					fmt.Sprintf("CREATE TABLESPACE %s LOCATION '%s'", tablespaceName, sourceLocation),
+					fmt.Sprintf("CREATE TABLE %s TABLESPACE %s AS SELECT generate_series(1, 10) AS id",
+						tablespaceTable, tablespaceName),
+				} {
+					_, _, err = exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						podLocator, postgres.AppDBName, query)
+					Expect(err).ToNot(HaveOccurred())
+				}
+			})
+		})
+
+		It("maps the tablespace to its volume in every instance", func() {
+			dstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, dstClusterTbs)
+			Expect(err).ToNot(HaveOccurred())
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, dstClusterName, dstClusterTbs)
+			clusterasserts.AssertClusterIsReady(env, namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+
+			dstCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, dstClusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertDatabaseContainsTablespaces(dstCluster, testTimeouts[timeouts.Short])
+
+			By("checking the location and the content of the tablespace in every instance", func() {
+				pods, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, dstClusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(pods.Items).To(HaveLen(2))
+				for _, pod := range pods.Items {
+					podLocator := exec.PodLocator{Namespace: namespace, PodName: pod.Name}
+					Eventually(func(g Gomega) {
+						location, _, err := exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							podLocator, postgres.AppDBName,
+							fmt.Sprintf("SELECT pg_catalog.pg_tablespace_location(oid) "+
+								"FROM pg_catalog.pg_tablespace WHERE spcname = '%s'", tablespaceName))
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(location).To(Equal(targetLocation+"\n"), "pod %s", pod.Name)
+
+						count, _, err := exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							podLocator, postgres.AppDBName,
+							fmt.Sprintf("SELECT count(*) FROM %s", tablespaceTable))
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(count).To(Equal("10\n"), "pod %s", pod.Name)
+					}, testTimeouts[timeouts.Short]).Should(Succeed())
+				}
 			})
 		})
 	})

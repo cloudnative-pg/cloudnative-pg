@@ -71,7 +71,7 @@ var _ = Describe("Properly builds ListStatusPods", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -85,7 +85,7 @@ var _ = Describe("Properly builds ListStatusPods", func() {
 			Phase: corev1.PodRunning,
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionFalse,
 				},
 			},
@@ -99,7 +99,7 @@ var _ = Describe("Properly builds ListStatusPods", func() {
 			Phase: corev1.PodFailed,
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionFalse,
 				},
 			},
@@ -116,7 +116,7 @@ var _ = Describe("Properly builds ListStatusPods", func() {
 			Phase: corev1.PodRunning,
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				},
 			},

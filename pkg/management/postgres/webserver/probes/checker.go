@@ -132,9 +132,9 @@ func getProbeRunnerFromCluster(probeType probeType, cluster apiv1.Cluster) runne
 
 	switch {
 	case probe == nil:
-		return pgIsReadyChecker{}
+		return newPgIsReadyChecker(probeType)
 	case probe.Type == apiv1.ProbeStrategyPgIsReady:
-		return pgIsReadyChecker{}
+		return newPgIsReadyChecker(probeType)
 	case probe.Type == apiv1.ProbeStrategyQuery:
 		return pgQueryChecker{}
 	case probe.Type == apiv1.ProbeStrategyStreaming:
@@ -145,5 +145,14 @@ func getProbeRunnerFromCluster(probeType probeType, cluster apiv1.Cluster) runne
 		return result
 	}
 
+	return newPgIsReadyChecker(probeType)
+}
+
+// newPgIsReadyChecker creates the pg_isready strategy runner for the passed
+// probe type, wrapping it in startupPgIsReadyChecker for the startup probe.
+func newPgIsReadyChecker(probeType probeType) runner {
+	if probeType == probeTypeStartup {
+		return startupPgIsReadyChecker{inner: pgIsReadyChecker{}}
+	}
 	return pgIsReadyChecker{}
 }

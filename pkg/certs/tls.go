@@ -35,21 +35,31 @@ type contextKey string
 // contextKeyTLSConfig is the context key holding the TLS configuration
 const contextKeyTLSConfig contextKey = "tlsConfig"
 
+// TLSConfigOptions holds the parameters required to build a TLS client configuration.
+type TLSConfigOptions struct {
+	// Client is the Kubernetes client used to fetch the CA secret.
+	Client client.Client
+
+	// CASecret is the namespaced name of the secret containing the server CA certificate.
+	CASecret types.NamespacedName
+
+	// ClientCert is the certificate presented to the server during the TLS handshake.
+	// Pass nil when the caller does not need to authenticate itself (e.g. isolation
+	// probes, diagnostic commands).
+	ClientCert *tls.Certificate
+}
+
 // newTLSConfigFromSecret creates a tls.Config from the given CA secret.
-func newTLSConfigFromSecret(
-	ctx context.Context,
-	cli client.Client,
-	caSecret types.NamespacedName,
-) (*tls.Config, error) {
+func newTLSConfigFromSecret(ctx context.Context, opts TLSConfigOptions) (*tls.Config, error) {
 	secret := &corev1.Secret{}
-	err := cli.Get(ctx, caSecret, secret)
+	err := opts.Client.Get(ctx, opts.CASecret, secret)
 	if err != nil {
-		return nil, fmt.Errorf("while getting caSecret %s: %w", caSecret.Name, err)
+		return nil, fmt.Errorf("while getting caSecret %s: %w", opts.CASecret.Name, err)
 	}
 
 	caCertificate, ok := secret.Data[CACertKey]
 	if !ok {
-		return nil, fmt.Errorf("missing %s entry in secret %s", CACertKey, caSecret.Name)
+		return nil, fmt.Errorf("missing %s entry in secret %s", CACertKey, opts.CASecret.Name)
 	}
 
 	// The operator will verify the certificates only against the CA, ignoring the DNS name.
@@ -61,6 +71,26 @@ func newTLSConfigFromSecret(
 	return NewTLSConfigFromCertPool(caCertPool), nil
 }
 
+// verifyCertificates validates the peer certificate chain against the trusted CA pool.
+func verifyCertificates(certPool *x509.CertPool, certs []*x509.Certificate) error {
+	if len(certs) == 0 {
+		return fmt.Errorf("no certificates provided")
+	}
+	opts := x509.VerifyOptions{
+		Roots:         certPool,
+		Intermediates: x509.NewCertPool(),
+	}
+	for _, cert := range certs[1:] {
+		opts.Intermediates.AddCert(cert)
+	}
+	_, err := certs[0].Verify(opts)
+	if err != nil {
+		return &tls.CertificateVerificationError{UnverifiedCertificates: certs, Err: err}
+	}
+
+	return nil
+}
+
 // NewTLSConfigFromCertPool creates a tls.Config object from X509 cert pool
 // containing the expected server CA
 func NewTLSConfigFromCertPool(
@@ -70,51 +100,27 @@ func NewTLSConfigFromCertPool(
 		MinVersion:         tls.VersionTLS13,
 		RootCAs:            certPool,
 		InsecureSkipVerify: true, //#nosec G402 -- we are verifying the certificate ourselves
-		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-			// Code adapted from https://go.dev/src/crypto/tls/handshake_client.go#L986
-			if len(rawCerts) == 0 {
-				return fmt.Errorf("no raw certificates provided")
-			}
-
-			certs := make([]*x509.Certificate, len(rawCerts))
-			for i, rawCert := range rawCerts {
-				cert, err := x509.ParseCertificate(rawCert)
-				if err != nil {
-					return fmt.Errorf("failed to parse certificate: %v", err)
-				}
-				certs[i] = cert
-			}
-
-			opts := x509.VerifyOptions{
-				Roots:         certPool,
-				Intermediates: x509.NewCertPool(),
-			}
-
-			for _, cert := range certs[1:] {
-				opts.Intermediates.AddCert(cert)
-			}
-			_, err := certs[0].Verify(opts)
-			if err != nil {
-				return &tls.CertificateVerificationError{UnverifiedCertificates: certs, Err: err}
-			}
-
-			return nil
+		// VerifyConnection runs on every completed handshake, including resumed
+		// TLS 1.3 sessions where no certificate exchange occurs but the original
+		// peer certificates remain available in tls.ConnectionState.
+		VerifyConnection: func(conn tls.ConnectionState) error {
+			return verifyCertificates(certPool, conn.PeerCertificates)
 		},
 	}
 
 	return &tlsConfig
 }
 
-// NewTLSConfigForContext creates a tls.config with the provided data and returns an expanded context that contains
-// the *tls.Config
-func NewTLSConfigForContext(
-	ctx context.Context,
-	cli client.Client,
-	caSecret types.NamespacedName,
-) (context.Context, error) {
-	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret)
+// NewTLSConfigForContext creates a tls.Config from the given options and stores it
+// in the returned context.
+func NewTLSConfigForContext(ctx context.Context, opts TLSConfigOptions) (context.Context, error) {
+	conf, err := newTLSConfigFromSecret(ctx, opts)
 	if err != nil {
 		return ctx, err
+	}
+
+	if opts.ClientCert != nil {
+		conf.Certificates = []tls.Certificate{*opts.ClientCert}
 	}
 
 	return context.WithValue(ctx, contextKeyTLSConfig, conf), nil

@@ -70,6 +70,21 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		return r.instance.Demote(ctx, cluster)
 
 	case targetPrimary == r.instance.GetPodName():
+		// This PGDATA is already a primary (per IsPrimary() above) and this pod
+		// is the designated target primary: PostgreSQL is about to be started
+		// directly as a live primary, with no promotion step to gate on. Block
+		// that start on holding the primary lease, so this instance manager
+		// never runs a live primary postmaster concurrently with another one
+		// still holding the lease. This runs once, during initialize(), before
+		// systemInitialization is broadcast and PostgreSQL is allowed to start.
+		if err := r.acquirePrimaryLease(ctx, cluster); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				contextLogger.Warning("Primary lease not yet acquired, retrying")
+				return controller.ErrNextLoop
+			}
+			return fmt.Errorf("acquiring primary lease: %w", err)
+		}
+
 		if currentPrimary == "" {
 			// This means that this cluster has been just started up and the
 			// current primary still need to be written
@@ -125,6 +140,12 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			contextLogger.Error(
 				err, "Error while changing mode of the postgresql.auto.conf file before pg_rewind, skipped")
 		}
+
+		// Wait for the log-destination FIFOs before pg_rewind's restore_command
+		// (which shells out and writes there) runs, and before invoking any
+		// WAL-archive plugin below, since a third-party plugin's internals
+		// aren't ours to assume about.
+		r.instance.WaitForLogPipesReady()
 
 		// We archive every WAL that have not been archived from the latest postmaster invocation.
 		if err := archiver.ArchiveAllReadyWALs(ctx, cluster, r.instance.PgData); err != nil {

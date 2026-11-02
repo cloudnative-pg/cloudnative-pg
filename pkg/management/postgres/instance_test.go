@@ -21,12 +21,17 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/jackc/pgx/v5/pgconn"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,6 +181,92 @@ var _ = Describe("testing replica instance methods", Ordered, func() {
 	})
 })
 
+var _ = Describe("checkImmediateShutdownUnresponsive", func() {
+	var origPath string
+	var binDir string
+
+	// fakePgCtl installs a fake `pg_ctl` executable ahead of the real one on PATH,
+	// whose "status" subcommand exits 0 (running) or 3 (not running, matching the
+	// real pg_ctl's exit code) depending on running.
+	fakePgCtl := func(running bool) {
+		exitCode := "3"
+		if running {
+			exitCode = "0"
+		}
+		script := fmt.Sprintf("#!/bin/sh\nexit %s\n", exitCode)
+		//nolint:gosec // executable fake pg_ctl needs the execute bit
+		Expect(os.WriteFile(filepath.Join(binDir, "pg_ctl"), []byte(script), 0o700)).To(Succeed())
+	}
+
+	BeforeEach(func() {
+		var err error
+		binDir, err = os.MkdirTemp("", "fake-pg-ctl")
+		Expect(err).ToNot(HaveOccurred())
+		origPath = os.Getenv("PATH")
+		Expect(os.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)).To(Succeed())
+	})
+
+	AfterEach(func() {
+		Expect(os.Setenv("PATH", origPath)).To(Succeed())
+		Expect(os.RemoveAll(binDir)).To(Succeed())
+	})
+
+	It("does nothing when the shutdown attempt did not error", func() {
+		fakePgCtl(true)
+		instance := &Instance{}
+		instance.checkImmediateShutdownUnresponsive(context.Background(), nil)
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeFalse())
+	})
+
+	It("does nothing when PostgreSQL is no longer running despite the error", func() {
+		fakePgCtl(false)
+		instance := &Instance{}
+		instance.checkImmediateShutdownUnresponsive(context.Background(), errors.New("pg_ctl: server did not shut down"))
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeFalse())
+	})
+
+	It("marks the instance unresponsive when PostgreSQL is still running after the error", func() {
+		fakePgCtl(true)
+		instance := &Instance{}
+		instance.checkImmediateShutdownUnresponsive(context.Background(), errors.New("pg_ctl: server did not shut down"))
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
+	})
+
+	It("never clears the flag once set", func() {
+		instance := &Instance{}
+		fakePgCtl(true)
+		instance.checkImmediateShutdownUnresponsive(context.Background(), errors.New("boom"))
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
+
+		fakePgCtl(false)
+		instance.checkImmediateShutdownUnresponsive(context.Background(), nil)
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
+	})
+
+	It("does not ask an unresponsive PostgreSQL to shut down immediately again", func(ctx context.Context) {
+		// "status" reports the server running and "stop" fails, as it does
+		// when the timeout runs out. Every call is recorded.
+		calls := filepath.Join(binDir, "calls")
+		script := fmt.Sprintf("#!/bin/sh\necho \"$*\" >> %s\ncase \"$*\" in\n*status*) exit 0 ;;\n*) exit 1 ;;\nesac\n",
+			calls)
+		//nolint:gosec // executable fake pg_ctl needs the execute bit
+		Expect(os.WriteFile(filepath.Join(binDir, "pg_ctl"), []byte(script), 0o700)).To(Succeed())
+		stops := func() int {
+			content, err := os.ReadFile(calls) //nolint:gosec // path under the spec's temporary directory
+			Expect(err).ToNot(HaveOccurred())
+			return strings.Count(string(content), " stop ")
+		}
+
+		instance := &Instance{}
+		Expect(instance.TryShuttingDownImmediate(ctx)).To(HaveOccurred())
+		Expect(instance.IsImmediateShutdownUnresponsive()).To(BeTrue())
+		Expect(stops()).To(Equal(1))
+
+		Expect(instance.TryShuttingDownImmediate(ctx)).To(MatchError(ContainSubstring("not retrying")))
+		Expect(stops()).To(Equal(1))
+	})
+})
+
 var _ = Describe("testing environment variables", func() {
 	It("should return the default Socket Directory", func() {
 		socketDir := GetSocketDir()
@@ -315,8 +406,8 @@ var _ = Describe("buildPostgresEnv", func() {
 
 	Context("Extensions enabled, LD_LIBRARY_PATH undefined", func() {
 		It("should be empty by default", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEmpty())
+			env := instance.buildPostgresEnv()
+			Expect(env).ToNot(ContainElement(HavePrefix("LD_LIBRARY_PATH=")))
 		})
 	})
 
@@ -339,14 +430,55 @@ var _ = Describe("buildPostgresEnv", func() {
 		})
 
 		It("should be defined", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(Equal(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
 		})
 		It("should retain existing values", func() {
 			GinkgoT().Setenv("LD_LIBRARY_PATH", "/my/library/path")
 
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
+		})
+	})
+
+	Context("Extensions enabled, no bin_path configured", func() {
+		It("should not be modified", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement("PATH=/my/default/path"))
+		})
+	})
+
+	Context("Extensions enabled, PATH defined", func() {
+		const (
+			path1 = postgres.ExtensionsBaseDirectory + "/foo/bindir"
+			path2 = postgres.ExtensionsBaseDirectory + "/foo/sample"
+			path3 = postgres.ExtensionsBaseDirectory + "/bar/bindir"
+			path4 = postgres.ExtensionsBaseDirectory + "/bar/sample"
+		)
+		finalPaths := strings.Join([]string{path1, path2, path3, path4}, ":")
+
+		BeforeEach(func() {
+			// Update the spec
+			cluster.Spec.PostgresConfiguration.Extensions[0].BinPath = []string{"/bindir", "sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[1].BinPath = []string{"./bindir", "./sample/"}
+			// Update the status
+			cluster.Status.PGDataImageInfo.Extensions[0].BinPath = []string{"/bindir", "sample/"}
+			cluster.Status.PGDataImageInfo.Extensions[1].BinPath = []string{"./bindir", "./sample/"}
+		})
+
+		It("should be defined", func() {
+			GinkgoT().Setenv("PATH", "")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("PATH=%s", finalPaths)))
+		})
+		It("should retain existing values", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("PATH=/my/default/path:%s", finalPaths)))
 		})
 	})
 
@@ -356,24 +488,17 @@ var _ = Describe("buildPostgresEnv", func() {
 			cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
 		})
 		It("LD_LIBRARY_PATH should be empty", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEmpty())
+			env := instance.buildPostgresEnv()
+			Expect(env).ToNot(ContainElement(HavePrefix("LD_LIBRARY_PATH=")))
+		})
+		It("PATH should not be modified", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement("PATH=/my/default/path"))
 		})
 	})
 })
-
-func getLibraryPathFromEnv(envs []string) string {
-	var ldLibraryPath string
-
-	for i := len(envs) - 1; i >= 0; i-- {
-		if strings.HasPrefix(envs[i], "LD_LIBRARY_PATH=") {
-			ldLibraryPath = envs[i]
-			break
-		}
-	}
-
-	return ldLibraryPath
-}
 
 var _ = Describe("GetPrimaryConnInfo", func() {
 	var instance *Instance
@@ -582,4 +707,136 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 		result := instance.RequiresDesignatedPrimaryTransition()
 		Expect(result).To(BeFalse())
 	})
+})
+
+var _ = Describe("EnrichMetricsConnError", func() {
+	const recoveryHint = "see the troubleshooting documentation for recovery steps"
+
+	It("returns nil unchanged", func() {
+		Expect(EnrichMetricsConnError(nil)).To(Succeed())
+	})
+
+	It("wraps a 28000 error that names the metrics exporter role", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `role "cnpg_metrics_exporter" does not exist`,
+		}
+		err := EnrichMetricsConnError(original)
+		Expect(err).To(MatchError(ContainSubstring(recoveryHint)))
+		Expect(errors.Is(err, original)).To(BeTrue())
+	})
+
+	It("leaves a 28000 error that does not name the role unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `peer authentication failed for user "someone_else"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves a 28000 ident-misconfig error that names the role unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `no pg_ident.conf entry for host "...", user "cnpg_metrics_exporter", database "postgres"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves errors with a different SQLSTATE unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28P01",
+			Message: `password authentication failed for user "cnpg_metrics_exporter"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves non-pgconn errors unchanged", func() {
+		original := errors.New("plain network error")
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+})
+
+var _ = Describe("pgRewindShouldRetry", func() {
+	It("retries regardless of the error while the context is live", func() {
+		ctx := context.Background()
+		Expect(pgRewindShouldRetry(ctx, nil)).To(BeTrue())
+		Expect(pgRewindShouldRetry(ctx, errors.New("could not restore file from archive"))).To(BeTrue())
+		Expect(pgRewindShouldRetry(ctx, errors.New("connection refused"))).To(BeTrue())
+	})
+
+	It("stops retrying once the context is cancelled, regardless of the error", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		Expect(pgRewindShouldRetry(ctx, nil)).To(BeFalse())
+		Expect(pgRewindShouldRetry(ctx, errors.New("could not restore file from archive"))).To(BeFalse())
+	})
+})
+
+var _ = Describe("TryRequestImmediateShutdown", func() {
+	It("declines the request when the lifecycle manager is not receiving", func() {
+		instance := NewInstance()
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+	})
+
+	It("leaves nothing on the channel when it declines", func() {
+		instance := NewInstance()
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+
+		// A declined send must not be observable later: the channel is
+		// unbuffered, so a receiver arriving afterwards has to find it empty.
+		var received InstanceCommand
+		select {
+		case received = <-instance.instanceCommandChan:
+			Fail(fmt.Sprintf("a declined request was delivered anyway: %s", received))
+		default:
+		}
+	})
+
+	It("delivers the immediate shutdown request when the lifecycle manager is receiving, "+
+		"then declines again once that receiver is gone", func() {
+		instance := NewInstance()
+		received := make(chan InstanceCommand, 1)
+		go func() {
+			received <- <-instance.instanceCommandChan
+		}()
+
+		Eventually(instance.TryRequestImmediateShutdown).Should(BeTrue())
+		Expect(<-received).To(Equal(shutDownImmediate))
+		Expect(instance.TryRequestImmediateShutdown()).To(BeFalse())
+	})
+})
+
+var _ = Describe("local connections", func() {
+	// A stopped postmaster (SIGSTOP, or stuck in the kernel) still has its
+	// socket listening: the kernel completes the connection, and the startup
+	// message is never answered. A listener that never accepts does the same.
+	BeforeEach(func() {
+		// Short enough for the Unix socket path limit on every platform.
+		socketDir, err := os.MkdirTemp("/tmp", "pgsock")
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(os.RemoveAll, socketDir)
+		GinkgoT().Setenv("PGHOST", socketDir)
+
+		listener, err := net.Listen("unix", filepath.Join(socketDir, fmt.Sprintf(".s.PGSQL.%d", GetServerPort())))
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(listener.Close)
+	})
+
+	DescribeTable("give up on a postmaster that does not answer",
+		func(getDB func(*Instance) (*sql.DB, error)) {
+			db, err := getDB(&Instance{})
+			Expect(err).ToNot(HaveOccurred())
+
+			pinged := make(chan error, 1)
+			go func() { pinged <- db.Ping() }()
+			Eventually(pinged, 10*time.Second).Should(Receive(HaveOccurred()))
+		},
+		Entry("superuser", (*Instance).GetSuperUserDB),
+		Entry("metrics exporter", func(instance *Instance) (*sql.DB, error) {
+			return instance.GetMetricsDB("postgres")
+		}),
+		Entry("WAL archive check", func(*Instance) (*sql.DB, error) {
+			return newWalArchiveBootstrapperForPrimary().dbFactory()
+		}),
+	)
 })

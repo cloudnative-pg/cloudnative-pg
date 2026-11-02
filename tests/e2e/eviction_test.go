@@ -31,8 +31,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -80,7 +82,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		pod.Status.Phase = "Failed"
 		pod.Status.Reason = "Evicted"
 		// Patching the Pod status
-		err = env.Client.Status().Patch(env.Ctx, &pod, patch)
+		err = objects.PatchStatus(env.Ctx, env.Client, &pod, patch)
 		if err != nil {
 			return fmt.Errorf("failed to patch status for Pod: %v", pod.Name)
 		}
@@ -88,7 +90,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		// Checking the Pod is actually evicted and resource version changed
 		err = retry.New(
 			retry.Delay(2*time.Second),
-			retry.Attempts(timeoutSeconds)).
+			retry.Attempts(timeoutSeconds),
+		).
 			Do(
 				func() error {
 					err = env.Client.Get(env.Ctx,
@@ -133,7 +136,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				// Create a cluster in a namespace we'll delete after the test
 				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, singleInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, singleInstanceSampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, singleInstanceSampleFile)
 			})
 		})
 
@@ -160,7 +163,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 			})
 		})
 	})
@@ -190,7 +193,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				// Create a cluster in a namespace and shared in containers, we'll delete after the test
 				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, multiInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, multiInstanceSampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, multiInstanceSampleFile)
 			})
 
 			By("retrieving the nodeName for primary pod", func() {
@@ -252,7 +255,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 			})
 		})
 
@@ -298,7 +301,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 
 			// Pod need rejoin, need more time
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 			})
 		})
 	})

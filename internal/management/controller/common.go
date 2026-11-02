@@ -32,9 +32,13 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
+	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -82,6 +86,59 @@ func markAsUnknown(
 	return cli.Status().Update(ctx, resource)
 }
 
+type replicaTransitionAware interface {
+	markableAsUnknown
+	GetStatusApplied() *bool
+}
+
+// handleReplicaRoleTransition decides what to do with a resource whose
+// current generation has already been reconciled, reacting to its cluster
+// moving in or out of the replica role.
+//
+// When the cluster is demoted, the designated primary reports the replica
+// condition on the resource, keeping the recorded reconciliation so the
+// resource retains the ownership of the Postgres object it manages. When the
+// cluster is promoted back (or the last evaluation didn't succeed), it asks
+// the caller to evaluate the resource again by returning proceed=true; the
+// regular reconciliation flow then decides which pod acts.
+func handleReplicaRoleTransition(
+	ctx context.Context,
+	cli client.Client,
+	instance instanceInterface,
+	cluster *apiv1.Cluster,
+	resource replicaTransitionAware,
+	requeueAfter time.Duration,
+) (result ctrl.Result, proceed bool, err error) {
+	if !resource.GetDeletionTimestamp().IsZero() {
+		return ctrl.Result{}, false, nil
+	}
+
+	applied := resource.GetStatusApplied()
+
+	if !cluster.IsReplica() {
+		proceed := applied == nil || !*applied
+		return ctrl.Result{}, proceed, nil
+	}
+
+	isDesignatedPrimary := cluster.Status.CurrentPrimary == instance.GetPodName()
+
+	if isDesignatedPrimary && applied != nil {
+		if err := markAsUnknown(ctx, cli, resource, errClusterIsReplica); err != nil {
+			return ctrl.Result{}, false, err
+		}
+	}
+
+	// Keep polling while the designated primary awaits the promotion, or
+	// while the primary recorded in the cluster status is still settling
+	// (e.g. a failover concurrent with the demotion): status-only updates
+	// don't retrigger the cluster watch.
+	if isDesignatedPrimary || applied != nil {
+		return ctrl.Result{RequeueAfter: requeueAfter}, false, nil
+	}
+
+	return ctrl.Result{}, false, nil
+}
+
 type markableAsReady interface {
 	client.Object
 	SetAsReady()
@@ -95,6 +152,59 @@ func markAsReady(
 ) error {
 	resource.SetAsReady()
 	return cli.Status().Update(ctx, resource)
+}
+
+// clusterScopedResource is a resource bound to a Cluster through a local
+// object reference.
+type clusterScopedResource interface {
+	client.Object
+	GetClusterRef() corev1.LocalObjectReference
+}
+
+// mapClusterToManagedResources builds a watch mapper that enqueues every item
+// of the given list type targeting this instance's cluster, to react to
+// cluster spec changes (e.g. a demotion to replica).
+func mapClusterToManagedResources(
+	instance instanceInterface,
+	cli client.Client,
+	newList func() client.ObjectList,
+) handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+		if obj.GetName() != instance.GetClusterName() ||
+			obj.GetNamespace() != instance.GetNamespaceName() {
+			return nil
+		}
+
+		list := newList()
+		if err := cli.List(ctx, list, client.InNamespace(obj.GetNamespace())); err != nil {
+			log.FromContext(ctx).Error(err, "while listing resources to react to a cluster change",
+				"kind", fmt.Sprintf("%T", list))
+			return nil
+		}
+
+		items, err := apimeta.ExtractList(list)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "while extracting the resource list",
+				"kind", fmt.Sprintf("%T", list))
+			return nil
+		}
+
+		requests := make([]reconcile.Request, 0, len(items))
+		for _, item := range items {
+			resource, ok := item.(clusterScopedResource)
+			if !ok || resource.GetClusterRef().Name != obj.GetName() {
+				continue
+			}
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: resource.GetNamespace(),
+					Name:      resource.GetName(),
+				},
+			})
+		}
+
+		return requests
+	}
 }
 
 func getClusterFromInstance(

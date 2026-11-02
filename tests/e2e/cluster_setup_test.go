@@ -30,6 +30,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -61,7 +63,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		By("having three PostgreSQL pods with status ready", func() {
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
@@ -129,7 +131,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				return int32(-1), nil
 			}, timeout).Should(BeEquivalentTo(restart + 1))
 
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 
 			forward, conn, err = postgres.ForwardPSQLConnection(
 				env.Ctx,
@@ -174,11 +176,11 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		})
 
 		By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-			CreateResourceFromFile(namespace, sampleFile)
+			resources.CreateResourceFromFile(env, namespace, sampleFile)
 		})
 
 		By("verifying cluster reaches ready condition", func() {
-			AssertClusterReadinessStatusIsReached(namespace, clusterName, apiv1.ConditionTrue, 600, env)
+			clusterasserts.AssertClusterReadinessStatusIsReached(env, namespace, clusterName, apiv1.ConditionTrue, 600)
 		})
 
 		// scale up the cluster to verify if the cluster remains in Ready
@@ -189,11 +191,11 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 
 		By("verifying cluster readiness condition is false just after scale-up", func() {
 			// Just after scale up the cluster, the condition status set to be `False` and cluster is not ready state.
-			AssertClusterReadinessStatusIsReached(namespace, clusterName, apiv1.ConditionFalse, 180, env)
+			clusterasserts.AssertClusterReadinessStatusIsReached(env, namespace, clusterName, apiv1.ConditionFalse, 180)
 		})
 
 		By("verifying cluster reaches ready condition after additional waiting", func() {
-			AssertClusterReadinessStatusIsReached(namespace, clusterName, apiv1.ConditionTrue, 180, env)
+			clusterasserts.AssertClusterReadinessStatusIsReached(env, namespace, clusterName, apiv1.ConditionTrue, 180)
 		})
 	})
 })

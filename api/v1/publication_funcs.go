@@ -48,6 +48,11 @@ func (pub *Publication) GetStatusMessage() string {
 	return pub.Status.Message
 }
 
+// GetStatusApplied returns the applied status of the publication
+func (pub *Publication) GetStatusApplied() *bool {
+	return pub.Status.Applied
+}
+
 // GetClusterRef returns the cluster reference of the publication
 func (pub *Publication) GetClusterRef() corev1.LocalObjectReference {
 	return pub.Spec.ClusterRef

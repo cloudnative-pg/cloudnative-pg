@@ -53,39 +53,47 @@ func roleAdapterFromName(name string) roleConfigurationAdapter {
 }
 
 // toDatabaseRole converts the contained apiv1.RoleConfiguration into the equivalent DatabaseRole
-//
-// NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
-// provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
 func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
+	return DatabaseRoleFromConfiguration(role.RoleConfiguration, role.validUntilNullIsInfinity)
+}
+
+// DatabaseRoleFromConfiguration builds the DatabaseRole equivalent of a RoleConfiguration.
+// When validUntilNullIsInfinity is true, a nil ValidUntil is translated to
+// VALID UNTIL 'infinity', because PostgreSQL cannot restore a NULL ValidUntil
+// once it has been changed.
+//
+// NOTE: for passwords, the default behavior, if the RoleConfiguration neither
+// provides a PasswordSecret nor sets DisablePassword, is to IGNORE the password.
+func DatabaseRoleFromConfiguration(config apiv1.RoleConfiguration, validUntilNullIsInfinity bool) DatabaseRole {
 	dbRole := DatabaseRole{
-		Name:            role.Name,
-		Comment:         role.Comment,
-		Superuser:       role.Superuser,
-		CreateDB:        role.CreateDB,
-		CreateRole:      role.CreateRole,
-		Inherit:         role.GetRoleInherit(),
-		Login:           role.Login,
-		Replication:     role.Replication,
-		BypassRLS:       role.BypassRLS,
-		ConnectionLimit: role.ConnectionLimit,
-		InRoles:         role.InRoles,
+		Name:            config.Name,
+		Comment:         config.Comment,
+		Superuser:       config.Superuser,
+		CreateDB:        config.CreateDB,
+		CreateRole:      config.CreateRole,
+		Inherit:         config.GetRoleInherit(),
+		Login:           config.Login,
+		Replication:     config.Replication,
+		BypassRLS:       config.BypassRLS,
+		ConnectionLimit: config.ConnectionLimit,
+		InRoles:         config.InRoles,
 	}
 	switch {
-	case role.ValidUntil != nil:
+	case config.ValidUntil != nil:
 		dbRole.ValidUntil = pgtype.Timestamp{
 			Valid: true,
-			Time:  role.ValidUntil.Time,
+			Time:  config.ValidUntil.Time,
 		}
-	case role.ValidUntil == nil && role.validUntilNullIsInfinity:
+	case config.ValidUntil == nil && validUntilNullIsInfinity:
 		dbRole.ValidUntil = pgtype.Timestamp{
 			Valid:            true,
 			InfinityModifier: pgtype.Infinity,
 		}
 	}
 	switch {
-	case role.PasswordSecret == nil && !role.DisablePassword:
+	case config.PasswordSecret == nil && !config.DisablePassword:
 		dbRole.ignorePassword = true
-	case role.PasswordSecret == nil && role.DisablePassword:
+	case config.PasswordSecret == nil && config.DisablePassword:
 		dbRole.password = sql.NullString{}
 	}
 	return dbRole
@@ -112,6 +120,22 @@ func (r rolesByAction) convertToRolesByStatus() rolesByStatus {
 	}
 
 	return rolesByStatus
+}
+
+// passwordSecretIsRequiredButMissing reports whether the spec asks for a
+// password secret that getPasswordSecretResourceVersion was unable to fetch.
+// Such roles must be routed through the update path so the synchronizer can
+// surface the failure in CannotReconcile rather than silently classifying
+// them as reconciled.
+func passwordSecretIsRequiredButMissing(
+	inSpec apiv1.RoleConfiguration,
+	latestSecretResourceVersion map[string]string,
+) bool {
+	if inSpec.PasswordSecret == nil || inSpec.DisablePassword {
+		return false
+	}
+	_, ok := latestSecretResourceVersion[inSpec.Name]
+	return !ok
 }
 
 // evaluateNextRoleActions evaluates the action needed for each role in the DB and/or the Spec.
@@ -148,7 +172,8 @@ func evaluateNextRoleActions(
 				roleAdapterFromName(role.Name))
 		case isInSpec &&
 			(!role.isEquivalentTo(inSpec) ||
-				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
+				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion) ||
+				passwordSecretIsRequiredButMissing(inSpec, latestSecretResourceVersion)):
 			internalRole := roleConfigurationAdapter{
 				RoleConfiguration:        inSpec,
 				validUntilNullIsInfinity: role.ValidUntil.Valid,

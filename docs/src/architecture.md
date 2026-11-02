@@ -407,6 +407,12 @@ Instead of a primary instance, a replica cluster has a **designated primary**
 instance, which is a standby server with an arbitrary number of cascading
 standby servers in streaming replication (symmetric architecture).
 
+:::important
+If you configure a WAL archive as the source for the designated primary, make
+sure you are running a PostgreSQL version that includes the fix described in
+["Configuring Replication"](replica_cluster.md#configuring-replication).
+:::
+
 The designated primary can be promoted at any time, transforming the replica
 cluster into a primary cluster capable of accepting write connections.
 This is typically triggered by:

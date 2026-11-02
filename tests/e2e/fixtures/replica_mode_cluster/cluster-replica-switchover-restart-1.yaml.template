@@ -10,14 +10,21 @@ spec:
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  postgresql:
+    parameters:
+      max_wal_size: 256MB
 
   backup:
     barmanObjectStore:
       destinationPath: s3://cluster-backups/
-      endpointURL: https://minio-service.minio:9000
+      endpointURL: https://object-store.object-store:9000
       endpointCA:
         key: ca.crt
-        name: minio-server-ca-secret
+        name: object-store-ca-secret
       s3Credentials:
         accessKeyId:
           name: backup-storage-creds
@@ -39,10 +46,10 @@ spec:
     barmanObjectStore:
       serverName: replica-switchover-restart-a
       destinationPath: s3://cluster-backups/
-      endpointURL: https://minio-service.minio:9000
+      endpointURL: https://object-store.object-store:9000
       endpointCA:
         key: ca.crt
-        name: minio-server-ca-secret
+        name: object-store-ca-secret
       s3Credentials:
         accessKeyId:
           name: backup-storage-creds
@@ -56,10 +63,10 @@ spec:
     barmanObjectStore:
       serverName: replica-switchover-restart-b
       destinationPath: s3://cluster-backups/
-      endpointURL: https://minio-service.minio:9000
+      endpointURL: https://object-store.object-store:9000
       endpointCA:
         key: ca.crt
-        name: minio-server-ca-secret
+        name: object-store-ca-secret
       s3Credentials:
         accessKeyId:
           name: backup-storage-creds

@@ -32,16 +32,30 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 )
 
+// PrimaryLeaseAcquirer is the interface the primary lease runnable exposes to the reconciler.
+type PrimaryLeaseAcquirer interface {
+	// Acquire blocks until this pod holds the primary lease, or ctx is done.
+	// It also undoes a previous Yield.
+	Acquire(ctx context.Context, config lease.Config) error
+
+	// Yield stops renewing the primary lease, without stopping PostgreSQL and
+	// without releasing the lease record, so that a new target primary can take
+	// it over once it goes stale. The next Acquire takes the lease back.
+	Yield(ctx context.Context)
+}
+
 // InstanceReconciler reconciles the status of the Cluster resource with
 // the one of this PostgreSQL instance. Also, the configuration in the
-// ConfigMap is applied when needed
+// ConfigMap is applied when needed.
 type InstanceReconciler struct {
 	client        ctrl.Client
 	instance      *postgres.Instance
@@ -54,8 +68,25 @@ type InstanceReconciler struct {
 	firstReconcileDone    atomic.Bool
 	metricsServerExporter *metricserver.Exporter
 
+	// pendingReload is set when the configuration files have been changed
+	// and PostgreSQL has not been reloaded yet
+	pendingReload bool
+
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
+	primaryLeaseAcquirer  PrimaryLeaseAcquirer
+
+	// promotionRequested is set before the first pg_ctl promote of this
+	// process. Once set, this pod may be or become a primary whatever
+	// standby.signal says, so the lease is never yielded. Written and read
+	// only by Reconcile. Never reset: a stale true only means never yield.
+	promotionRequested bool
+
+	// promoteInstance is what handlePromotion runs to promote PostgreSQL. Nil
+	// means instance.PromoteAndWait; tests set a stub.
+	promoteInstance func(ctx context.Context) error
+
+	admission *guard.Admission[*apiv1.Cluster]
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -64,6 +95,8 @@ func NewInstanceReconciler(
 	client ctrl.Client,
 	metricsExporter *metricserver.Exporter,
 	pluginRepository repository.Interface,
+	primaryLeaseAcquirer PrimaryLeaseAcquirer,
+	admission *guard.Admission[*apiv1.Cluster],
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -74,12 +107,14 @@ func NewInstanceReconciler(
 		metricsServerExporter: metricsExporter,
 		certificateReconciler: instancecertificate.NewReconciler(client, instance),
 		pluginRepository:      pluginRepository,
+		primaryLeaseAcquirer:  primaryLeaseAcquirer,
+		admission:             admission,
 	}
 }
 
-// GetExecutedCondition returns the condition that can be checked in order to
+// GetInitializedCondition returns the condition that can be checked in order to
 // be sure initialization has been done
-func (r *InstanceReconciler) GetExecutedCondition() *concurrency.Executed {
+func (r *InstanceReconciler) GetInitializedCondition() *concurrency.Executed {
 	return r.systemInitialization
 }
 

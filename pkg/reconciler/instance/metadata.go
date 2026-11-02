@@ -58,6 +58,9 @@ func ReconcileMetadata(
 		// Update any modified/new annotations coming from the cluster resource
 		modified = updateClusterAnnotations(ctx, cluster, instance) || modified
 
+		// Record on the Pod that its bootstrap succeeded
+		modified = updateBootstrapPendingAnnotation(ctx, instance) || modified
+
 		if !modified {
 			continue
 		}
@@ -160,6 +163,32 @@ func updateClusterLabels(
 	return true
 }
 
+// updateBootstrapPendingAnnotation removes the pending bootstrap mark from the
+// instance once its bootstrap init container has terminated successfully, see
+// postgres.IsBootstrapCompleted.
+//
+// Returns true if the instance needed updating
+func updateBootstrapPendingAnnotation(ctx context.Context, instance *corev1.Pod) bool {
+	if _, ok := instance.Annotations[utils.BootstrapPendingAnnotationName]; !ok {
+		return false
+	}
+
+	for _, containerStatus := range instance.Status.InitContainerStatuses {
+		if containerStatus.Name != specs.BootstrapWorkContainerName {
+			continue
+		}
+		if containerStatus.State.Terminated == nil || containerStatus.State.Terminated.ExitCode != 0 {
+			return false
+		}
+
+		log.FromContext(ctx).Info("Marking the bootstrap as completed", "pod", instance.Name)
+		delete(instance.Annotations, utils.BootstrapPendingAnnotationName)
+		return true
+	}
+
+	return false
+}
+
 // Make sure that primary and replicas are correctly labelled as such
 //
 // Returns true if the instance needed updating
@@ -193,10 +222,14 @@ func updateRoleLabels(
 
 	switch instance.Name {
 	case cluster.Status.CurrentPrimary:
+		// A failover in progress owns this pod's label via markOldPrimaryAsUnhealthy.
+		if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary {
+			return false
+		}
 		if !hasRole || podRole != specs.ClusterRoleLabelPrimary || !newHasRole ||
 			newPodRole != specs.ClusterRoleLabelPrimary {
 			contextLogger.Info("Setting primary label", "pod", instance.Name)
-			utils.SetInstanceRole(instance.ObjectMeta, specs.ClusterRoleLabelPrimary)
+			utils.SetInstanceRole(&instance.ObjectMeta, specs.ClusterRoleLabelPrimary)
 			return true
 		}
 
@@ -204,7 +237,7 @@ func updateRoleLabels(
 		if !hasRole || podRole != specs.ClusterRoleLabelReplica || !newHasRole ||
 			newPodRole != specs.ClusterRoleLabelReplica {
 			contextLogger.Info("Setting replica label", "pod", instance.Name)
-			utils.SetInstanceRole(instance.ObjectMeta, specs.ClusterRoleLabelReplica)
+			utils.SetInstanceRole(&instance.ObjectMeta, specs.ClusterRoleLabelReplica)
 			return true
 		}
 	}

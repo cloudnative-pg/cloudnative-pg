@@ -53,6 +53,9 @@ const (
 
 	// BackupPhaseWalArchivingFailing means wal archiving isn't properly working
 	BackupPhaseWalArchivingFailing = "walArchivingFailing"
+
+	// BackupPhaseDefinitionInvalid means the backup definition is invalid
+	BackupPhaseDefinitionInvalid = "invalid backup definition"
 )
 
 // BarmanCredentials an object containing the potential credentials for each cloud provider
@@ -363,8 +366,4 @@ type BackupList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of backups
 	Items []Backup `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Backup{}, &BackupList{})
 }

@@ -39,6 +39,7 @@ import (
 // SetAsPending marks a certain backup as pending
 func (backupStatus *BackupStatus) SetAsPending() {
 	backupStatus.Phase = BackupPhasePending
+	backupStatus.Error = ""
 }
 
 // SetAsFailed marks a certain backup as invalid
@@ -72,6 +73,7 @@ func (backupStatus *BackupStatus) SetAsCompleted() {
 // SetAsStarted marks a certain backup as started
 func (backupStatus *BackupStatus) SetAsStarted(podName, containerID, sessionID string, method BackupMethod) {
 	backupStatus.Phase = BackupPhaseStarted
+	backupStatus.Error = ""
 	backupStatus.InstanceID = &InstanceID{
 		PodName:     podName,
 		ContainerID: containerID,
@@ -142,17 +144,23 @@ func (backupStatus *BackupStatus) IsInProgress() bool {
 		backupStatus.Phase == BackupPhaseRunning
 }
 
+// IsExecuting check if a certain backup is being executed
+func (backupStatus *BackupStatus) IsExecuting() bool {
+	return backupStatus.Phase == BackupPhaseStarted ||
+		backupStatus.Phase == BackupPhaseRunning
+}
+
 // GetPendingBackupNames returns the pending backup list
 func (list BackupList) GetPendingBackupNames() []string {
 	// Retry the backup if another backup is running
 	pendingBackups := make([]string, 0, len(list.Items))
 	for _, concurrentBackup := range list.Items {
-		if concurrentBackup.Status.IsDone() {
+		if concurrentBackup.Status.IsDone() ||
+			concurrentBackup.Status.IsExecuting() {
 			continue
 		}
-		if !concurrentBackup.Status.IsInProgress() {
-			pendingBackups = append(pendingBackups, concurrentBackup.Name)
-		}
+
+		pendingBackups = append(pendingBackups, concurrentBackup.Name)
 	}
 
 	return pendingBackups
@@ -161,34 +169,26 @@ func (list BackupList) GetPendingBackupNames() []string {
 // CanExecuteBackup control if we can start a reconciliation loop for a certain backup.
 //
 // A reconciliation loop can start if:
-// - there's no backup running, and if the first of the sorted list of backups
-// - the current backup is running and is the first running backup of the list
+//   - the backup is currently being executed (Started or Running), or
+//   - no other backup is being executed and the backup is the oldest pending one
+//     (with backup name used as a tie-breaker for backups created at the same time).
 //
-// As a side effect, this function will sort the backup list
+// As a side effect, this function will sort the backup list by creation time.
 func (list *BackupList) CanExecuteBackup(backupName string) bool {
-	var foundRunningBackup bool
-
-	list.SortByName()
+	list.SortByCreationTimeAndName()
 
 	for _, concurrentBackup := range list.Items {
-		if concurrentBackup.Status.IsInProgress() {
-			if backupName == concurrentBackup.Name && !foundRunningBackup {
-				return true
-			}
-
-			foundRunningBackup = true
-			if backupName != concurrentBackup.Name {
-				return false
-			}
+		if concurrentBackup.Status.IsExecuting() {
+			return backupName == concurrentBackup.Name
 		}
 	}
 
 	pendingBackups := list.GetPendingBackupNames()
-	if len(pendingBackups) > 0 && pendingBackups[0] != backupName {
-		return false
+	if len(pendingBackups) > 0 && pendingBackups[0] == backupName {
+		return true
 	}
 
-	return true
+	return false
 }
 
 // SortByName sorts the backup items in alphabetical order
@@ -204,6 +204,19 @@ func (list *BackupList) SortByReverseCreationTime() {
 	// Sort the list of backups in reverse creation time
 	sort.Slice(list.Items, func(i, j int) bool {
 		return list.Items[i].CreationTimestamp.Compare(list.Items[j].CreationTimestamp.Time) > 0
+	})
+}
+
+// SortByCreationTimeAndName sorts the backup items in creation time order and,
+// in case of backups with the same creation time, in alphabetical order
+func (list *BackupList) SortByCreationTimeAndName() {
+	sort.Slice(list.Items, func(i, j int) bool {
+		ti := list.Items[i].CreationTimestamp.Time
+		tj := list.Items[j].CreationTimestamp.Time
+		if ti.Equal(tj) {
+			return list.Items[i].Name < list.Items[j].Name
+		}
+		return ti.Before(tj)
 	})
 }
 
@@ -310,4 +323,29 @@ func (b BackupMethod) IsManagedByInstance() bool {
 // IsManagedByOperator returns true if the backup is managed by the operator
 func (b BackupMethod) IsManagedByOperator() bool {
 	return b == BackupMethodVolumeSnapshot
+}
+
+// SetAdmissionError sets the admission error status on the Backup resource
+func (backup *Backup) SetAdmissionError(msg string) {
+	if len(msg) > 0 {
+		backup.Status.Phase = BackupPhaseDefinitionInvalid
+		backup.Status.Error = msg
+		return
+	}
+
+	// Reset the phase from a previous validation failure so the start gates
+	// fire again once the definition is valid, and clear the error. The guard
+	// persists this cleared status, so the change reaches the API server.
+	if backup.Status.Phase == BackupPhaseDefinitionInvalid {
+		backup.Status.Phase = ""
+		backup.Status.Error = ""
+	}
+}
+
+// GetAdmissionError returns the admission error recorded on the Backup status
+func (backup *Backup) GetAdmissionError() string {
+	if backup.Status.Phase == BackupPhaseDefinitionInvalid {
+		return backup.Status.Error
+	}
+	return ""
 }

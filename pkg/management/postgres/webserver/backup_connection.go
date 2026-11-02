@@ -95,7 +95,7 @@ func newBackupConnection(
 		immediateCheckpoint:  immediateCheckpoint,
 		waitForArchive:       waitForArchive,
 		conn:                 conn,
-		postgresMajorVersion: vers.Major,
+		postgresMajorVersion: vers.Major(),
 		data: BackupResultData{
 			BackupName: backupName,
 			Phase:      Starting,

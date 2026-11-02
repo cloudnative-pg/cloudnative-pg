@@ -100,6 +100,28 @@ var _ = Describe("testing create function", func() {
 		})
 	})
 
+	Context("when a PVC with the same name is still terminating", func() {
+		It("should return ErrNextLoop instead of silently succeeding", func() {
+			terminating := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pvcName,
+					Namespace: "default",
+					// A finalizer keeps the object around after Delete, so the
+					// fake client reports it as terminating (DeletionTimestamp set).
+					Finalizers: []string{"cnpg.io/test"},
+				},
+			}
+			cli = fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithObjects(terminating).
+				Build()
+			Expect(cli.Delete(ctx, terminating)).To(Succeed())
+
+			err := createIfNotExists(ctx, cli, cluster, cc)
+			Expect(err).To(Equal(utils.ErrNextLoop))
+		})
+	})
+
 	It("should return ErrNextLoop on invalid size", func() {
 		cc.Storage.Size = "typo"
 		err := createIfNotExists(ctx, cli, cluster, cc)

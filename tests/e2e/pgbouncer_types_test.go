@@ -27,6 +27,8 @@ import (
 
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -61,20 +63,20 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 		Expect(err).ToNot(HaveOccurred())
 		clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 	})
 
 	It("should have proper service ip and host details for ro and rw with default installation", func() {
 		By(fmt.Sprintf("setting up read write type pgbouncer pooler in %s", namespace), func() {
-			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateRWSampleFile, 2)
+			pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerCertificateRWSampleFile, 2)
 		})
 
 		By("setting up read only type pgbouncer pooler", func() {
-			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateROSampleFile, 2)
+			pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerCertificateROSampleFile, 2)
 		})
 
 		By("verify that read-only pooler endpoints contain the correct pod addresses", func() {
-			assertPGBouncerEndpointsContainsPodsIP(namespace, poolerCertificateROSampleFile, 2)
+			pgbouncerasserts.AssertPgBouncerEndpointsContainsPodsIP(env, namespace, poolerCertificateROSampleFile, 2)
 		})
 
 		By("verify that read-only pooler pgbouncer.ini contains the correct host service", func() {
@@ -85,11 +87,11 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
-			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
+			pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(env, poolerServiceRO, podList)
 		})
 
 		By("verify that read-write pooler endpoints contain the correct pod addresses.", func() {
-			assertPGBouncerEndpointsContainsPodsIP(namespace, poolerCertificateRWSampleFile, 2)
+			pgbouncerasserts.AssertPgBouncerEndpointsContainsPodsIP(env, namespace, poolerCertificateRWSampleFile, 2)
 		})
 
 		By("verify that read-write pooler pgbouncer.ini contains the correct host service", func() {
@@ -100,7 +102,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
-			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
+			pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(env, poolerServiceRW, podList)
 		})
 	})
 
@@ -113,7 +115,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				Expect(err).ToNot(HaveOccurred())
 
 				// verifying if PGBouncer pooler pods are ready after scale up
-				assertPGBouncerPodsAreReady(namespace, poolerCertificateROSampleFile, instances)
+				pgbouncerasserts.AssertPgBouncerPodsAreReady(env, namespace, poolerCertificateROSampleFile, instances)
 
 				// // scale up command for 3 replicas for read write
 				command = fmt.Sprintf("kubectl scale pooler %s -n %s --replicas=%v",
@@ -122,11 +124,11 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				Expect(err).ToNot(HaveOccurred())
 
 				// verifying if PGBouncer pooler pods are ready after scale up
-				assertPGBouncerPodsAreReady(namespace, poolerCertificateRWSampleFile, instances)
+				pgbouncerasserts.AssertPgBouncerPodsAreReady(env, namespace, poolerCertificateRWSampleFile, instances)
 			})
 
 			By("verifying that read-only pooler endpoints contain the correct pod addresses", func() {
-				assertPGBouncerEndpointsContainsPodsIP(namespace, poolerCertificateROSampleFile, instances)
+				pgbouncerasserts.AssertPgBouncerEndpointsContainsPodsIP(env, namespace, poolerCertificateROSampleFile, instances)
 			})
 
 			By("verifying that read-only pooler pgbouncer.ini contains the correct host service", func() {
@@ -137,11 +139,11 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 					ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 				Expect(err).ToNot(HaveOccurred())
 
-				assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
+				pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(env, poolerServiceRO, podList)
 			})
 
 			By("verifying that read-write pooler endpoints contain the correct pod addresses.", func() {
-				assertPGBouncerEndpointsContainsPodsIP(namespace, poolerCertificateRWSampleFile, instances)
+				pgbouncerasserts.AssertPgBouncerEndpointsContainsPodsIP(env, namespace, poolerCertificateRWSampleFile, instances)
 			})
 
 			By("verifying that read-write pooler pgbouncer.ini contains the correct host service", func() {
@@ -151,7 +153,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
 					ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 				Expect(err).ToNot(HaveOccurred())
-				assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
+				pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(env, poolerServiceRW, podList)
 			})
 		}
 	}

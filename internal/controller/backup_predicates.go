@@ -35,34 +35,41 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// clusterCanHaveBackups tells whether a cluster can be the target of backups:
+// either it has an in-core backup configuration or its backups are managed
+// through a CNPG-I plugin, which requires no backup section.
+func clusterCanHaveBackups(cluster *apiv1.Cluster) bool {
+	return cluster.Spec.Backup != nil || len(cluster.Spec.Plugins) > 0
+}
+
 var clustersWithBackupPredicate = predicate.Funcs{
 	CreateFunc: func(e event.CreateEvent) bool {
 		cluster, ok := e.Object.(*apiv1.Cluster)
 		if !ok {
 			return false
 		}
-		return cluster.Spec.Backup != nil
+		return clusterCanHaveBackups(cluster)
 	},
 	DeleteFunc: func(e event.DeleteEvent) bool {
 		cluster, ok := e.Object.(*apiv1.Cluster)
 		if !ok {
 			return false
 		}
-		return cluster.Spec.Backup != nil
+		return clusterCanHaveBackups(cluster)
 	},
 	GenericFunc: func(e event.GenericEvent) bool {
 		cluster, ok := e.Object.(*apiv1.Cluster)
 		if !ok {
 			return false
 		}
-		return cluster.Spec.Backup != nil
+		return clusterCanHaveBackups(cluster)
 	},
 	UpdateFunc: func(e event.UpdateEvent) bool {
 		cluster, ok := e.ObjectNew.(*apiv1.Cluster)
 		if !ok {
 			return false
 		}
-		return cluster.Spec.Backup != nil
+		return clusterCanHaveBackups(cluster)
 	},
 }
 
@@ -72,28 +79,35 @@ func (r *BackupReconciler) mapClustersToBackup() handler.MapFunc {
 		if !ok {
 			return nil
 		}
-		var backups apiv1.BackupList
-		err := r.List(ctx, &backups,
-			client.MatchingFields{
-				backupPhase: apiv1.BackupPhaseRunning,
-			},
-			client.InNamespace(cluster.GetNamespace()))
-		if err != nil {
-			log.FromContext(ctx).Error(err, "while getting running backups for cluster", "cluster", cluster.GetName())
-		}
 		var requests []reconcile.Request
-		for _, backup := range backups.Items {
-			if backup.Spec.Cluster.Name == cluster.Name {
+		// Backups in the "started" phase are included because the instance
+		// manager running them may die before they move to "running"; a
+		// cluster event is then the earliest chance to detect the loss.
+		for _, phase := range []string{apiv1.BackupPhaseStarted, apiv1.BackupPhaseRunning} {
+			var backups apiv1.BackupList
+			err := r.List(ctx, &backups,
+				client.MatchingFields{
+					backupPhase: phase,
+				},
+				client.InNamespace(cluster.GetNamespace()))
+			if err != nil {
+				log.FromContext(ctx).Error(err, "while getting in-progress backups for cluster",
+					"cluster", cluster.GetName(), "phase", phase)
 				continue
 			}
-			requests = append(requests,
-				reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      backup.Name,
-						Namespace: backup.Namespace,
+			for i := range backups.Items {
+				if backups.Items[i].Spec.Cluster.Name != cluster.Name {
+					continue
+				}
+				requests = append(requests,
+					reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      backups.Items[i].Name,
+							Namespace: backups.Items[i].Namespace,
+						},
 					},
-				},
-			)
+				)
+			}
 		}
 		return requests
 	}

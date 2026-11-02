@@ -21,6 +21,8 @@ package fence
 
 import (
 	"encoding/json"
+	"io"
+	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +37,17 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func redirectStdoutToGinkgoWriter() {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	DeferCleanup(func() {
+		_ = w.Close()
+		os.Stdout = old
+		_, _ = io.Copy(GinkgoWriter, r)
+	})
+}
+
 var _ = Describe("fencingOn", func() {
 	const (
 		clusterName = "cluster-example"
@@ -43,6 +56,7 @@ var _ = Describe("fencingOn", func() {
 
 	BeforeEach(func() {
 		plugin.Namespace = namespace
+		redirectStdoutToGinkgoWriter()
 	})
 
 	It("should fence a known instance", func(ctx SpecContext) {
@@ -139,6 +153,7 @@ var _ = Describe("fencingOff", func() {
 
 	BeforeEach(func() {
 		plugin.Namespace = namespace
+		redirectStdoutToGinkgoWriter()
 	})
 
 	It("should unfence a known fenced instance", func(ctx SpecContext) {

@@ -89,7 +89,24 @@ the `.spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec.
 Use this field only in case of
 [PostgreSQL running with `posix` shared memory dynamic allocation](postgresql_conf.md#dynamic-shared-memory-settings).
 
+## ServiceAccount token mount
+
+The `automountServiceAccountToken` field of the cluster specification
+controls the automatic mount of the `ServiceAccount` token in the instance
+Pods and in the Jobs run by the operator. Setting it to `false` helps comply
+with admission policies enforced in hardened environments; the operator then
+mounts an equivalent projected volume so that the instance manager can keep
+working. See
+["Disabling the automatic mount of the ServiceAccount token"](security.md#disabling-the-automatic-mount-of-the-serviceaccount-token)
+for the details.
+
 ## Environment variables
+
+:::important
+Environment variables reserved for operator usage (names starting with `PG` or
+`CNPG_`, plus `POD_NAME`, `NAMESPACE`, and `CLUSTER_NAME`) cannot be set
+through the `env` and `envFrom` fields and are rejected at admission time.
+:::
 
 You can customize some system behavior using environment variables. One example
 is the `LDAPCONF` variable, which can point to a custom LDAP configuration

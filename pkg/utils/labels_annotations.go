@@ -216,6 +216,14 @@ const (
 	// The status can be "initializing", "ready" or "detached"
 	PVCStatusAnnotationName = MetadataNamespace + "/pvcStatus"
 
+	// BootstrapPendingAnnotationName is the name of the annotation the operator
+	// sets to "true" on an instance Pod created with the bootstrap init
+	// container, and removes once that container has terminated successfully.
+	//
+	// A pending marker is used instead of a completion one so that a missing
+	// annotation, the normal and safe default, means the bootstrap is done.
+	BootstrapPendingAnnotationName = MetadataNamespace + "/bootstrapPending"
+
 	// LegacyBackupAnnotationName is the name of the annotation represents whether taking a backup without passing
 	// the name argument even on barman version 3.3.0+. The value can be "true" or "false"
 	LegacyBackupAnnotationName = MetadataNamespace + "/forceLegacyBackup"
@@ -231,6 +239,13 @@ const (
 	// OperatorManagedSecretsAnnotationName is the name of the annotation containing
 	// the secrets managed by the operator inside the generated service account
 	OperatorManagedSecretsAnnotationName = MetadataNamespace + "/managedSecrets"
+
+	// RotatePasswordAnnotationName is the name of the annotation a user sets on
+	// a DatabaseRole to request that its generated password be rotated
+	// immediately, regardless of its renewal deadline. The operator removes
+	// the annotation once the rotation it asked for has happened: it is a
+	// one-shot request, not a persistent setting.
+	RotatePasswordAnnotationName = MetadataNamespace + "/rotatePassword"
 
 	// FencedInstanceAnnotation is the annotation to be used for fencing instances, the value should be a
 	// JSON list of all the instances we want to be fenced, e.g. `["cluster-example-1","cluster-example-2`"].
@@ -276,6 +291,11 @@ const (
 	// UpdateStrategyAnnotation is the name of the annotation used to indicate how to update the given resource
 	UpdateStrategyAnnotation = MetadataNamespace + "/updateStrategy"
 
+	// LastAppliedSpecAnnotationName is the name of the annotation containing
+	// the last applied spec, used for three-way merge during reconciliation
+	// to detect intentional field removals
+	LastAppliedSpecAnnotationName = MetadataNamespace + "/lastAppliedSpec"
+
 	// PluginClientSecretAnnotationName is the name of the annotation containing
 	// the secret containing the TLS credentials that the operator should use to
 	// connect to the plugin
@@ -318,6 +338,15 @@ const (
 	// operator if a instance is recoverable or not. Not recoverable instances will
 	// be deleted with the contents of their PVCs.
 	UnrecoverableInstanceAnnotationName = AlphaMetadataNamespace + "/unrecoverable"
+
+	// PasswordPassthroughAnnotationName is the name of the annotation that, when
+	// set to "enabled" on a basic-auth Secret consumed by the operator, instructs
+	// the role reconciler to send the password literal verbatim in
+	// CREATE/ALTER ROLE statements instead of SCRAM-SHA-256 encoding it
+	// client-side. PostgreSQL then encodes the value according to its own
+	// password_encryption setting, restoring the behavior the operator had
+	// before client-side encoding was introduced.
+	PasswordPassthroughAnnotationName = MetadataNamespace + "/passwordPassthrough"
 )
 
 type annotationStatus string
@@ -455,16 +484,6 @@ func InheritLabels(
 }
 
 func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) map[string]string {
-	containsContainerWithName := func(name string, containers ...corev1.Container) bool {
-		for _, container := range containers {
-			if container.Name == name {
-				return true
-			}
-		}
-
-		return false
-	}
-
 	appArmorAnnotations := make(map[string]string)
 	for annotation, value := range annotations {
 		if strings.HasPrefix(annotation, AppArmorAnnotationPrefix) {
@@ -474,7 +493,7 @@ func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) 
 			}
 
 			containerName := appArmorSplit[1]
-			if containsContainerWithName(containerName, append(spec.Containers, spec.InitContainers...)...) {
+			if PodSpecHasContainer(spec, containerName) {
 				appArmorAnnotations[annotation] = value
 			}
 		}
@@ -535,6 +554,13 @@ func IsWalArchivingDisabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[SkipWalArchiving] == string(annotationStatusEnabled)
 }
 
+// IsPasswordPassthroughEnabled reports whether the given Secret's metadata
+// opts the role reconciler out of client-side SCRAM-SHA-256 encoding and
+// asks the operator to forward the password value verbatim.
+func IsPasswordPassthroughEnabled(object *metav1.ObjectMeta) bool {
+	return object.Annotations[PasswordPassthroughAnnotationName] == string(annotationStatusEnabled)
+}
+
 // GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map
 func GetInstanceRole(labels map[string]string) (string, bool) {
 	if value := labels[ClusterRoleLabelName]; value != "" {
@@ -548,7 +574,7 @@ func GetInstanceRole(labels map[string]string) (string, bool) {
 }
 
 // SetInstanceRole sets both ClusterRoleLabelName and ClusterInstanceRoleLabelName on the given ObjectMeta
-func SetInstanceRole(meta metav1.ObjectMeta, role string) {
+func SetInstanceRole(meta *metav1.ObjectMeta, role string) {
 	if meta.Labels == nil {
 		meta.Labels = map[string]string{}
 	}
