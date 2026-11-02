@@ -499,7 +499,7 @@ spec:
 turn issuance off while keeping the block in place.
 
 The optional `duration` and `renewBefore` fields override the operator-wide
-certificate lifetime for this role; see [Renewal](#renewal).
+certificate lifetime for this role; see [Certificate renewal](#certificate-renewal).
 
 :::important
 `login: true` is required when `clientCertificate` issuance is enabled. The
