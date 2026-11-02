@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -50,7 +51,9 @@ var synchronousStandbyNamesRegex = regexp.MustCompile(`(?:ANY|FIRST) ([0-9]+) \(
 type Exporter struct {
 	instance *postgres.Instance
 	Metrics  *metrics
-	queries  *m.QueriesCollector
+	// queries is replaced by the instance reconciler while scrapes are
+	// running, so each scrape must load it once and use that same collector
+	queries atomic.Pointer[m.QueriesCollector]
 	// this is used for two reasons:
 	// - to ensure we are able to unit test
 	// - to make the struct adhere to the composition pattern instead of hardcoding dependencies inside the functions
@@ -293,8 +296,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.LastAvailableBackupTimestamp.Describe(ch)
 	e.Metrics.NodesUsed.Describe(ch)
 
-	if e.queries != nil {
-		e.queries.Describe(ch)
+	if queries := e.queries.Load(); queries != nil {
+		queries.Describe(ch)
 	}
 
 	if version, _ := e.instance.GetPgVersion(); version.Major() >= 14 {
@@ -322,33 +325,35 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.updateInstanceMetrics()
 	e.collectInstanceMetrics(ch)
 
-	if e.queries != nil {
+	// Load the collector once: if the reconciler swaps it while this scrape
+	// is running, we must still collect from the one we updated
+	if queries := e.queries.Load(); queries != nil {
 		var defaultClusterForTTL apiv1.Cluster
 		ttl := defaultClusterForTTL.GetMetricsQueriesTTL().Duration
 		if cluster, _ := e.getCluster(); cluster != nil {
 			ttl = cluster.GetMetricsQueriesTTL().Duration
 		}
 
-		if e.queries.ShouldUpdate(ttl) {
+		if queries.ShouldUpdate(ttl) {
 			log.Trace("no cache, updating metrics from queries", "ttlSeconds", ttl.Seconds())
-			e.updateMetricsFromQueries()
+			e.updateMetricsFromQueries(queries)
 		} else {
 			log.Debug("using cached metrics from queries, as TTL is not exceeded",
 				"ttlSeconds", ttl.Seconds())
-			e.queries.RecordCacheHit()
+			queries.RecordCacheHit()
 		}
 		log.Debug("collecting metrics from queries")
-		e.queries.Collect(ch)
+		queries.Collect(ch)
 	}
 }
 
-func (e *Exporter) updateMetricsFromQueries() {
+func (e *Exporter) updateMetricsFromQueries(queries *m.QueriesCollector) {
 	// Work on predefined metrics and custom queries
-	label := "Collect." + e.queries.Name()
+	label := "Collect." + queries.Name()
 	collectionStart := time.Now()
 	log.Debug("updating metrics from queries")
-	if err := e.queries.Update(); err != nil {
-		log.Error(err, "Error during query update", "collector", e.queries.Name())
+	if err := queries.Update(); err != nil {
+		log.Error(err, "Error during query update", "collector", queries.Name())
 		e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
 		e.Metrics.Error.Set(1)
 	}
@@ -632,7 +637,7 @@ type PgCollector interface {
 
 // SetCustomQueries sets the custom queries from the passed content
 func (e *Exporter) SetCustomQueries(queries *m.QueriesCollector) {
-	e.queries = queries
+	e.queries.Store(queries)
 }
 
 // DefaultQueries is the set of default queries for postgresql
