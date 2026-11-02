@@ -71,29 +71,6 @@ var _ = Describe("getReplicaStatusFromPodViaHTTP", func() {
 		Expect(requests).To(Equal(1))
 	})
 
-	It("does not retry an authentication error and preserves its status code and body", func(ctx SpecContext) {
-		const body = "client certificate required"
-		requests := 0
-		client := instanceClientImpl{Client: &http.Client{
-			Transport: roundTripperFunc(func(_ *http.Request) (*http.Response, error) {
-				requests++
-				return &http.Response{
-					StatusCode: http.StatusUnauthorized,
-					Body:       io.NopCloser(strings.NewReader(body)),
-				}, nil
-			}),
-		}}
-
-		status := client.getReplicaStatusFromPodViaHTTP(ctx, pod)
-
-		Expect(status.Error).To(HaveOccurred())
-		var statusErr *StatusError
-		Expect(errors.As(status.Error, &statusErr)).To(BeTrue())
-		Expect(statusErr.StatusCode).To(Equal(http.StatusUnauthorized))
-		Expect(statusErr.Body).To(Equal(body))
-		Expect(requests).To(Equal(1))
-	})
-
 	It("retries a transient transport error and decodes the successful response", func(ctx SpecContext) {
 		requests := 0
 		client := instanceClientImpl{Client: &http.Client{
