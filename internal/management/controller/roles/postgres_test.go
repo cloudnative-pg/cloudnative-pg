@@ -492,16 +492,17 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
-		rows := sqlmock.NewRows([]string{
-			"inroles",
-		}).
-			AddRow([]byte(`{"role1","role2"}`))
+		rows := sqlmock.NewRows([]string{"name", "grantor"}).
+			AddRow("role1", "postgres").
+			AddRow("role2", "admin_role")
 		mock.ExpectQuery(expectedMembershipStmt).WithArgs("foo").WillReturnRows(rows)
 
 		roles, err := GetParentRoles(ctx, db, DatabaseRole{Name: "foo"})
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(roles).To(HaveLen(2))
-		Expect(roles).To(ConsistOf("role1", "role2"))
+		Expect(roles).To(Equal([]Membership{
+			{Name: "role1", Grantor: "postgres"},
+			{Name: "role2", Grantor: "admin_role"},
+		}))
 	})
 
 	It("GetParentRoles will error if there is a problem querying the database", func(ctx context.Context) {
@@ -533,9 +534,31 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectCommit()
 
-		err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []string{"pg_monitor", "quux"}, []string{"bar"})
+		err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []string{"pg_monitor", "quux"},
+			[]Membership{{Name: "bar", Grantor: "admin_role"}}, 15)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
+
+	It("UpdateMembership will name the grantor of each grant it revokes from PostgreSQL 16",
+		func(ctx context.Context) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			Expect(err).ToNot(HaveOccurred())
+
+			mock.ExpectBegin()
+			for _, ex := range []string{
+				`GRANT "pg_monitor" TO "foo"`,
+				`REVOKE "bar" FROM "foo" GRANTED BY "admin_role"`,
+				`REVOKE "bar" FROM "foo" GRANTED BY "postgres"`,
+			} {
+				mock.ExpectExec(ex).WillReturnResult(sqlmock.NewResult(0, 0))
+			}
+			mock.ExpectCommit()
+
+			err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []string{"pg_monitor"},
+				[]Membership{{Name: "bar", Grantor: "admin_role"}, {Name: "bar", Grantor: "postgres"}}, 16)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(mock.ExpectationsWereMet()).To(Succeed())
+		})
 
 	It("UpdateMembership will roll back if there is an error in the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
@@ -552,7 +575,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectRollback()
 
-		err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []string{"pg_monitor", "quux"}, []string{"bar"})
+		err = UpdateMembership(ctx, db, DatabaseRole{Name: "foo"}, []string{"pg_monitor", "quux"},
+			[]Membership{{Name: "bar", Grantor: "admin_role"}}, 15)
 		Expect(err).Should(HaveOccurred())
 	})
 
