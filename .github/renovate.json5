@@ -20,7 +20,7 @@
     'licenses/**',
   ],
   postUpdateOptions: [
-    'gomodTidy',
+    'gomodTidyAll',
   ],
   semanticCommits: 'enabled',
   labels: [
