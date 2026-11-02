@@ -563,8 +563,8 @@ func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
 	return false
 }
 
-// updateExistingRole applies membership changes, attribute updates, and
-// comment updates to an existing PostgreSQL role.
+// updateExistingRole applies attribute updates, comment updates, and
+// membership changes to an existing PostgreSQL role.
 func updateExistingRole(
 	ctx context.Context,
 	db *sql.DB,
@@ -572,6 +572,18 @@ func updateExistingRole(
 	existingDBRole *roles.DatabaseRole,
 	pgMajorVersion int,
 ) error {
+	if err := roles.Update(ctx, db, dbRole); err != nil {
+		return err
+	}
+	if existingDBRole.Comment != dbRole.Comment {
+		if err := roles.UpdateComment(ctx, db, dbRole); err != nil {
+			return fmt.Errorf("while updating comment: %w", err)
+		}
+	}
+
+	// Memberships come after the attributes: from PostgreSQL 16, a membership
+	// takes its inherit option from the inherit attribute the role has when it
+	// is granted.
 	toGrant, toRevoke, err := roles.GetRoleMembershipDiff(
 		ctx, db, dbRole.InRoles, dbRole,
 	)
@@ -580,14 +592,6 @@ func updateExistingRole(
 	}
 	if err = roles.UpdateMembership(ctx, db, dbRole, toGrant, toRevoke, pgMajorVersion); err != nil {
 		return fmt.Errorf("while updating membership: %w", err)
-	}
-	if err = roles.Update(ctx, db, dbRole); err != nil {
-		return err
-	}
-	if existingDBRole.Comment != dbRole.Comment {
-		if err = roles.UpdateComment(ctx, db, dbRole); err != nil {
-			return fmt.Errorf("while updating comment: %w", err)
-		}
 	}
 	return nil
 }
