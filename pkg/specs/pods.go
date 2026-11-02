@@ -85,6 +85,11 @@ const (
 	// the instance-bootstrap command (init/join/restore/restoresnapshot/pgbasebackup)
 	BootstrapWorkContainerName = "bootstrap-instance"
 
+	// BootstrapPendingEnvName is the environment variable through which the
+	// bootstrap init container sees the utils.BootstrapPendingAnnotationName
+	// annotation of its Pod
+	BootstrapPendingEnvName = "BOOTSTRAP_PENDING"
+
 	// PgDataPath is the path to PGDATA variable
 	PgDataPath = "/var/lib/postgresql/data/pgdata"
 
@@ -650,6 +655,17 @@ func AddBootstrapInitContainer(pod *corev1.Pod, cluster apiv1.Cluster, bootstrap
 		}
 		break
 	}
+
+	// Mark the bootstrap as pending, see postgres.IsBootstrapCompleted
+	pod.Annotations[utils.BootstrapPendingAnnotationName] = "true"
+	initContainer.Container.Env = append(initContainer.Container.Env, corev1.EnvVar{
+		Name: BootstrapPendingEnvName,
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: fmt.Sprintf("metadata.annotations['%s']", utils.BootstrapPendingAnnotationName),
+			},
+		},
+	})
 
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer.Container)
 	pod.Spec.Volumes = append(pod.Spec.Volumes, initContainer.Volumes...)
