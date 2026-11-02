@@ -1107,15 +1107,10 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			Label(tests.LabelDeclarativeDatabaseRoles), func() {
 				const (
 					roleCRName = "role-shortcert"
-					// The shortest configuration the API accepts, so a renewal is
-					// observable within the test rather than hours later. A one
-					// minute lifetime is backdated six seconds for clock skew, so
-					// renewing thirty seconds early puts the certificate inside its
-					// renewal window twenty four seconds after issuance, and the
-					// operator acts on it at its next reconcile of the role, which
-					// for this renewal window falls every fifteen seconds. Measured
-					// against a real cluster, certificates are therefore re-issued
-					// on a steady thirty second cadence.
+					// The shortest configuration the API accepts, so a renewal shows
+					// up within the test. With 6s of backdate, the renewal window
+					// opens 24s after issuance and the role is requeued every 15s,
+					// so the certificate is re-issued every 24 to 39s.
 					lifetime    = time.Minute
 					renewBefore = 30 * time.Second
 				)
@@ -1148,11 +1143,8 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				var firstKey []byte
 				var firstExpiration string
 				By("issuing a certificate with the requested lifetime, still valid", func() {
-					// The certificate rotates every thirty seconds, so the private key
-					// is taken from the same read as the certificate it belongs to:
-					// reading it afterwards could pick up the next generation, and the
-					// renewal would then be compared against a key that never
-					// accompanied firstLeaf.
+					// Read the key together with its certificate: the pair rotates
+					// fast enough that a later read could return the next one.
 					Eventually(func(g Gomega) {
 						var certSecret corev1.Secret
 						g.Expect(env.Client.Get(env.Ctx, types.NamespacedName{
@@ -1191,10 +1183,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						g.Expect(leaf.NotBefore).To(BeTemporally(">", firstLeaf.NotBefore))
 						g.Expect(leaf.NotAfter.Sub(leaf.NotBefore)).To(Equal(lifetime))
 						g.Expect(leaf.NotAfter).To(BeTemporally(">", time.Now()))
-						// The renewal has to land while the certificate it
-						// replaces is still valid, which is the whole point of
-						// renewBefore. The two are never usable at once, since
-						// the Secret only ever holds the newer pair.
+						// The renewal must land while the old certificate is valid.
 						g.Expect(leaf.NotBefore).To(BeTemporally("<", firstLeaf.NotAfter))
 						g.Expect(leaf.Subject.CommonName).To(Equal("shortcert"))
 
@@ -1202,9 +1191,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						g.Expect(env.Client.Get(env.Ctx, types.NamespacedName{
 							Namespace: namespace, Name: certSecretName,
 						}, &certSecret)).To(Succeed())
-						// Re-issuing generates a fresh private key alongside the
-						// certificate, and the stored pair must stay internally
-						// consistent rather than a new certificate over a stale key.
+						// A re-issue replaces the key, and the pair must match.
 						g.Expect(certSecret.Data[corev1.TLSPrivateKeyKey]).NotTo(Equal(firstKey))
 						_, err = tls.X509KeyPair(certSecret.Data[corev1.TLSCertKey], certSecret.Data[corev1.TLSPrivateKeyKey])
 						g.Expect(err).ToNot(HaveOccurred())
@@ -1220,14 +1207,8 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						renewedLeaf = leaf
 					}, 120).WithPolling(2 * time.Second).Should(Succeed())
 
-					// Certificates are backdated for clock skew, so a renewal window
-					// covering most of the lifetime leaves every freshly issued
-					// certificate already inside its own renewal window. Since the
-					// reconciler watches the Secret it owns, that would trigger the
-					// next re-issue immediately instead of holding steady. Ten
-					// seconds is deliberately shorter than the thirty seconds at
-					// which this certificate is honestly re-issued again, so this
-					// catches a re-issue loop without racing the next renewal.
+					// A re-issue loop would renew again at once. 10s is shorter than
+					// the 24s minimum interval, so this cannot race a real renewal.
 					Consistently(func(g Gomega) {
 						leaf, err := clientCertLeaf(namespace, certSecretName)
 						g.Expect(err).ToNot(HaveOccurred())

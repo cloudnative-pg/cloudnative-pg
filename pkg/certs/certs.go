@@ -163,7 +163,7 @@ func (pair KeyPair) CreateAndSignPairWithDuration(
 // clockSkewAllowance returns how far back a certificate's notBefore is set, so
 // that a verifier whose clock runs behind still accepts a freshly issued
 // certificate. It scales with the lifetime because a fixed five minutes would
-// push notAfter into the past for anything shorter than ten minutes.
+// push notAfter into the past for any lifetime below five minutes.
 func clockSkewAllowance(duration time.Duration) time.Duration {
 	const maxSkew = 5 * time.Minute
 	return min(duration/10, maxSkew)

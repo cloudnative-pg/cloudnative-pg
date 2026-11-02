@@ -526,8 +526,8 @@ status:
 ```
 
 When no certificate could be issued, `status.clientCertificate.message`
-explains why. The `expiration` of a certificate issued earlier is kept, as that
-certificate stays valid until then, unless the Secret is not owned by the role.
+explains why. The `expiration` of a certificate issued earlier is kept, since
+the Secret still holds it, unless that Secret is not owned by the role.
 
 ### Configuring `pg_hba.conf`
 
