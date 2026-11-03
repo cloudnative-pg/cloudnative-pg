@@ -599,6 +599,16 @@ liveness probe. By way of the `restore_command`, PostgreSQL starts fetching WAL
 files from the archive. You can speed up this phase by setting the
 `maxParallel` option and enabling the parallel WAL restore capability.
 
+A transient failure of `restore_command` during this phase (for example a
+network blip or a flaky object store) is distinct from a missing WAL segment.
+If PostgreSQL gave up on it, recovery would end early and the new cluster would
+open without WAL that is still in the archive. For this reason, the instance
+manager retries transient failures for up to `.spec.walRestoreRetryTimeout`
+(default 5 minutes). When the budget is exhausted, `restore_command` exits with
+code `143` and the pod restarts. A missing WAL segment returns immediately.
+The retry applies only while a cluster is being bootstrapped, not when an
+instance is promoted.
+
 This phase terminates when PostgreSQL reaches the target, either the end of the
 WAL or the required target in case of PITR. You can optionally specify a
 `recoveryTarget` to perform a PITR. If left unspecified, the recovery continues

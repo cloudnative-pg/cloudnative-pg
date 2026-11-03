@@ -58,22 +58,19 @@ SPDX-License-Identifier: Apache-2.0
 // instance manager sees a healthy primary and proceeds normally. Any WAL that
 // existed in the archive but was not applied is silently lost.
 //
-// This affects two scenarios:
+// This affects bootstrap from backup: a standalone cluster bootstrapped via
+// spec.bootstrap.recovery replays WAL from the archive to reach either a
+// specific recovery target (PITR) or the latest available WAL. In both cases
+// PostgreSQL is not in standby mode. PITR and "recover to latest" do not
+// differ in outcome — any transient failure leaves WAL in the archive
+// unapplied and PostgreSQL opens as primary without it. The only practical
+// difference is that longer recoveries raise the probability of encountering
+// a transient error, not the severity of the outcome.
 //
-//  1. Post-promotion archive draining: when CNPG promotes a replica, PostgreSQL
-//     leaves standby mode and drains remaining WAL from the archive before
-//     opening for writes. A transient restore_command failure at this point
-//     causes the new primary to open with a gap relative to the old primary's
-//     committed transactions.
-//
-//  2. Bootstrap from backup: a standalone cluster bootstrapped via
-//     spec.bootstrap.recovery replays WAL from the archive to reach either a
-//     specific recovery target (PITR) or the latest available WAL. In both
-//     cases PostgreSQL is not in standby mode. PITR and "recover to latest"
-//     do not differ in outcome — any transient failure leaves WAL in the
-//     archive unapplied and PostgreSQL opens as primary without it. The only
-//     practical difference is that longer recoveries raise the probability of
-//     encountering a transient error, not the severity of the outcome.
+// The same hazard exists when a standby is promoted and drains the archive
+// before opening for writes. It is not covered here: the instance has no
+// reliable way to know which WAL it still has to reach, so a retry budget
+// would only be a guess that delays the failover.
 //
 // Replica clusters are not affected in any of their pods. The designated
 // primary replicates from an external primary in standby mode, so a
@@ -87,26 +84,22 @@ SPDX-License-Identifier: Apache-2.0
 //
 // To prevent the silent data-loss outcome, this package retries transient
 // restore_command failures instead of returning immediately to PostgreSQL.
-// The retry loop applies in two situations on standard (non-replica)
-// clusters, which together cover the dangerous scenarios above and exclude
-// normal standby replicas:
+// The retry loop applies only to the bootstrap of a standard (non-replica)
+// cluster (cluster.Status.CurrentPrimary == ""): the first pod is replaying a
+// base backup in non-standby mode. setPrimaryInstance (cluster_create.go)
+// sets TargetPrimary before the restore job is created, well before the
+// PostgreSQL pod starts calling restore_command.
 //
-//   - Bootstrap of a standard cluster (cluster.Status.CurrentPrimary == ""):
-//     the first pod is replaying a base backup in non-standby mode.
-//     setPrimaryInstance (cluster_create.go) sets TargetPrimary before the
-//     restore job is created, well before the PostgreSQL pod starts calling
-//     restore_command.
-//   - New primary of a standard cluster being promoted
-//     (cluster.Status.TargetPrimary == podName && !cluster.IsReplica()):
-//     this pod is draining the archive in preparation for promotion. CNPG
-//     sets TargetPrimary to the promoted pod before the instance manager
-//     triggers promotion, so the cache is consistent by the time WAL recovery
-//     begins.
-//
-// The designated primary of a replica cluster in steady state is deliberately
-// excluded: it never leaves standby mode under PostgreSQL's own logic, so
+// Every other pod keeps the single-attempt behavior. This includes standbys
+// being promoted (see above), including the designated primary of a replica
+// cluster when it is promoted, since it already has a CurrentPrimary. While in
+// standby, that pod never leaves standby mode under PostgreSQL's own logic, so
 // exit 1 from restore_command does not risk XLREAD_FAIL — streaming
 // replication from the external source is the natural fallback.
+//
+// When a cluster is restored in place from existing PVCs, replicas may still
+// see an empty CurrentPrimary at startup and retry for up to the budget
+// before falling back to streaming. That only costs time.
 //
 // When the retry budget is exhausted we exit with code 143 (128+SIGTERM).
 // PostgreSQL detects this as SIGTERM and calls proc_exit(1) — a clean

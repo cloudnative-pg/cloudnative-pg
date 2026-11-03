@@ -163,27 +163,33 @@ var _ = Describe("shouldRetryRestore", func() {
 		return c
 	}
 
-	DescribeTable("retries only when a transient failure could promote this pod on a partial archive",
+	DescribeTable("retries only while a standard cluster is bootstrapping",
 		func(cluster *apiv1.Cluster, expected bool) {
-			Expect(shouldRetryRestore(cluster, podName)).To(Equal(expected))
+			Expect(shouldRetryRestore(cluster)).To(Equal(expected))
 		},
 		// Cache unavailable: fall back to the legacy single-attempt path.
 		Entry("nil cluster → no retry", (*apiv1.Cluster)(nil), false),
 
-		// Standard cluster — the two protected cases.
+		// Standard cluster bootstrapping: the only protected case.
 		Entry("standard cluster bootstrapping (no current primary) → retry",
 			standard("", ""), true),
-		Entry("standard cluster, this pod is the target primary being promoted → retry",
-			standard("other-pod", podName), true),
 		Entry("standard cluster, bootstrapping and target primary at once → retry",
 			standard("", podName), true),
 
-		// Standard cluster, a healthy non-target replica keeps legacy behavior:
+		// A standby being promoted keeps the single-attempt behavior: it cannot
+		// know which WAL it still has to reach.
+		Entry("standard cluster, this pod is the target primary being promoted → no retry",
+			standard("other-pod", podName), false),
+
+		Entry("standard cluster, this pod was just promoted → no retry",
+			standard(podName, podName), false),
+
+		// A healthy non-target replica keeps the single-attempt behavior:
 		// streaming from the primary is the natural fallback.
 		Entry("standard cluster, a healthy non-target replica → no retry",
 			standard("other-pod", "other-pod"), false),
 
-		// Replica clusters are excluded from BOTH cases: standby.signal makes
+		// Replica clusters are excluded: standby.signal makes
 		// restore_command failures harmless. This is the regression guard for
 		// the e1a96abac fix — the earlier gating retried replica bootstrap.
 		Entry("replica cluster bootstrapping (no current primary) → no retry",

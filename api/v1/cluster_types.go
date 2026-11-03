@@ -397,12 +397,12 @@ type ClusterSpec struct {
 
 	// WalRestoreRetryTimeout bounds how long a single invocation of
 	// `manager wal-restore` retries transient failures (network blips,
-	// flaky object stores, plugin glitches) before asking PostgreSQL to
-	// stop log-shipping replication.
+	// flaky object stores, plugin glitches) while the cluster is being
+	// bootstrapped from a backup. When the budget is exhausted, the
+	// command exits and the pod restarts.
 	//
-	// Without this bound, a transient failure during a replica promotion
-	// can cause the replica to promote on a partial archive, losing
-	// already-archived transactions.
+	// Without this bound, a transient failure during recovery can make
+	// PostgreSQL end recovery early, leaving already-archived WAL unapplied.
 	//
 	// Must be positive. Defaults to 5 minutes when unset.
 	// +optional
