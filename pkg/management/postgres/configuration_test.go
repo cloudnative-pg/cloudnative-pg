@@ -497,3 +497,55 @@ var _ = Describe("the override.conf file writers", func() {
 		Expect(content).To(ContainSubstring("primary_slot_name = '_cnpg_test'"))
 	})
 })
+
+var _ = Describe("synchronized_standby_slots", func() {
+	newCluster := func() *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+			Spec: apiv1.ClusterSpec{
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled:                    ptr.To(true),
+						SynchronizeLogicalDecoding: true,
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{"sync_replication_slots": "on"},
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "test-1",
+				InstanceNames:  []string{"test-1", "test-2", "test-3"},
+			},
+		}
+	}
+
+	It("lists every replica", func(ctx SpecContext) {
+		config, _, err := createPostgresqlConfiguration(
+			ctx, newCluster(), true, 17, postgres.OperationType_TYPE_UNSPECIFIED,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).To(ContainSubstring("synchronized_standby_slots = '_cnpg_test_2,_cnpg_test_3'"))
+	})
+
+	It("skips the replicas that are still bootstrapping", func(ctx SpecContext) {
+		cluster := newCluster()
+		cluster.Status.InitializingPVC = []string{"test-3"}
+		config, _, err := createPostgresqlConfiguration(
+			ctx, cluster, true, 17, postgres.OperationType_TYPE_UNSPECIFIED,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).To(ContainSubstring("synchronized_standby_slots = '_cnpg_test_2'"))
+	})
+
+	It("doesn't set the parameter when the only replica is bootstrapping", func(ctx SpecContext) {
+		cluster := newCluster()
+		cluster.Status.InstanceNames = []string{"test-1", "test-2"}
+		cluster.Status.InitializingPVC = []string{"test-2"}
+		config, _, err := createPostgresqlConfiguration(
+			ctx, cluster, true, 17, postgres.OperationType_TYPE_UNSPECIFIED,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(ContainSubstring("synchronized_standby_slots"))
+	})
+})
