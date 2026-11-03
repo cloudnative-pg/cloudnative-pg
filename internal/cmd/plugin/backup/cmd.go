@@ -49,18 +49,25 @@ type backupCommandOptions struct {
 	online              *bool
 	immediateCheckpoint *bool
 	waitForArchive      *bool
+	clusterOnlineConfig apiv1.OnlineConfiguration
 	pluginName          string
 	pluginParameters    pluginParameters
 	dryRun              bool
 }
 
 func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfiguration {
-	var onlineConfiguration *apiv1.OnlineConfiguration
-	if options.immediateCheckpoint != nil || options.waitForArchive != nil {
-		onlineConfiguration = &apiv1.OnlineConfiguration{
-			WaitForArchive:      options.waitForArchive,
-			ImmediateCheckpoint: options.immediateCheckpoint,
-		}
+	if options.immediateCheckpoint == nil && options.waitForArchive == nil {
+		return nil
+	}
+
+	// The online configuration of the Backup replaces the one of the cluster
+	// as a whole, so it starts from it to keep the options that are not set
+	onlineConfiguration := options.clusterOnlineConfig.DeepCopy()
+	if options.immediateCheckpoint != nil {
+		onlineConfiguration.ImmediateCheckpoint = options.immediateCheckpoint
+	}
+	if options.waitForArchive != nil {
+		onlineConfiguration.WaitForArchive = options.waitForArchive
 	}
 	return onlineConfiguration
 }
@@ -157,6 +164,11 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("while parsing the wait-for-archive value: %w", err)
 			}
 
+			var clusterOnlineConfig apiv1.OnlineConfiguration
+			if cluster.Spec.Backup != nil && cluster.Spec.Backup.VolumeSnapshot != nil {
+				clusterOnlineConfig = cluster.Spec.Backup.VolumeSnapshot.OnlineConfiguration
+			}
+
 			return createBackup(
 				cmd.Context(),
 				backupCommandOptions{
@@ -167,6 +179,7 @@ func NewCmd() *cobra.Command {
 					online:              parsedOnline,
 					immediateCheckpoint: parsedImmediateCheckpoint,
 					waitForArchive:      parsedWaitForArchive,
+					clusterOnlineConfig: clusterOnlineConfig,
 					pluginName:          pluginName,
 					pluginParameters:    pluginParameters,
 					dryRun:              dryRun,

@@ -159,6 +159,11 @@ var _ = Describe("Roles", func() {
 							Name: "testS3Session",
 						},
 					},
+					SSECustomerKey: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "testS3SSECKey",
+						},
+					},
 				},
 			},
 		},
@@ -189,6 +194,7 @@ var _ = Describe("Roles", func() {
 			"testS3Access",
 			"testS3Region",
 			"testS3Session",
+			"testS3SSECKey",
 			"testAzureStorageAccount",
 			"testAzureStorageKey",
 			"testAzureStorageSasToken",
@@ -224,6 +230,11 @@ var _ = Describe("Secrets", func() {
 						AccessKeyIDReference: &apiv1.SecretKeySelector{
 							LocalObjectReference: apiv1.LocalObjectReference{
 								Name: "aws-status-secret-test",
+							},
+						},
+						SSECustomerKey: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
+								Name: "aws-status-sse-c-key-test",
 							},
 						},
 					},
@@ -273,6 +284,9 @@ var _ = Describe("Secrets", func() {
 							SessionToken: &apiv1.SecretKeySelector{
 								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-session"},
 							},
+							SSECustomerKey: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-sse-c-key"},
+							},
 						},
 					},
 					EndpointCA: &apiv1.SecretKeySelector{
@@ -283,12 +297,14 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 		secrets = backupSecrets(cluster, nil)
-		Expect(secrets).To(ConsistOf("test-secret", "test-access", "test-region", "test-session", "test-endpoint-ca-name"))
+		Expect(secrets).To(ConsistOf("test-secret", "test-access", "test-region", "test-session",
+			"test-sse-c-key", "test-endpoint-ca-name"))
 	})
 
 	It("includes the backup origin's endpoint CA secret", func() {
 		secrets := backupSecrets(cluster, backup)
 		Expect(secrets).To(ContainElement("backup-origin-endpoint-ca-test"))
+		Expect(secrets).To(ContainElement("aws-status-sse-c-key-test"))
 	})
 
 	It("should contain default secrets only", func() {
@@ -304,6 +320,7 @@ var _ = Describe("Secrets", func() {
 	It("should created an ordered string list with the backup secrets", func() {
 		Expect(getInvolvedSecretNames(RoleOptions{Cluster: cluster, BackupOrigin: backup})).To(Equal([]string{
 			"aws-status-secret-test",
+			"aws-status-sse-c-key-test",
 			"azure-storage-key-secret-test",
 			"backup-origin-endpoint-ca-test",
 			"google-application-secret-test",
@@ -352,6 +369,24 @@ var _ = Describe("Database Roles", func() {
 				RoleConfiguration: apiv1.RoleConfiguration{
 					Name: "role6",
 				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "role7"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{
+					Name: "role7",
+				},
+				Password: &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "role8"},
+			Spec: apiv1.DatabaseRoleSpec{
+				RoleConfiguration: apiv1.RoleConfiguration{
+					Name: "role8",
+				},
+				Password: &apiv1.PasswordConfiguration{Mode: apiv1.PasswordModeGenerate, Secret: "my_secret8"},
 			},
 		},
 	}
@@ -405,7 +440,10 @@ var _ = Describe("Database Roles", func() {
 				secretsPolicy = policy
 			}
 		}
-		Expect(secretsPolicy.ResourceNames).To(ContainElements("my_secret1", "my_secret3", "my_secret5"))
+		// The instance manager needs to read the Secrets the operator generates
+		// too, or it cannot apply the password it did not choose.
+		Expect(secretsPolicy.ResourceNames).To(ContainElements(
+			"my_secret1", "my_secret3", "my_secret5", "role7-password", "my_secret8"))
 	})
 })
 

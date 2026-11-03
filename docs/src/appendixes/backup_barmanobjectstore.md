@@ -10,9 +10,12 @@ title: Appendix B - Backup on object stores
 :::warning
     As of CloudNativePG 1.26, **native Barman Cloud support is deprecated** in
     favor of the **Barman Cloud Plugin**. This page has been moved to the appendix
-    for reference purposes. While the native integration remains functional for
-    now, we strongly recommend beginning a gradual migration to the plugin-based
-    interface after appropriate testing.  For guidance, see
+    for reference purposes. **CloudNativePG 1.31 is the last minor release that
+    ships with native Barman Cloud support, which is removed starting from
+    1.32.0.** Releases up to and including 1.31, and their patch releases, keep
+    native support for as long as they are supported. You must migrate to the
+    plugin before upgrading to 1.32 or later. We strongly recommend migrating to
+    the plugin-based interface after appropriate testing. For guidance, see
     [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/).
 :::
 

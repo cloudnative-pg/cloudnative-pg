@@ -379,6 +379,15 @@ type ClusterSpec struct {
 	// +optional
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
+	// The time in seconds that is allowed for a PostgreSQL instance to stop
+	// after an immediate shutdown request (used, for example, when a primary
+	// must step down and cannot wait for a graceful shutdown). Once this time
+	// has passed with PostgreSQL still running, the instance is considered
+	// unresponsive. Default value is 30 seconds.
+	// +kubebuilder:default:=30
+	// +optional
+	ImmediateShutdownTimeout int32 `json:"immediateShutdownTimeout,omitempty"`
+
 	// The amount of time (in seconds) to wait before triggering a failover
 	// after the primary PostgreSQL instance in the cluster was detected
 	// to be unhealthy
@@ -666,19 +675,23 @@ type LivenessProbe struct {
 	// Probe is the standard probe configuration
 	Probe `json:",inline"`
 
-	// Configure the feature that extends the liveness probe for a primary
-	// instance. In addition to the basic checks, this verifies whether the
-	// primary is isolated from the Kubernetes API server and from its
-	// replicas, ensuring that it can be safely shut down if network
-	// partition or API unavailability is detected. Enabled by default.
+	// Configure the primary isolation check, which stops a primary whose
+	// primary lease has gone past its renew deadline without a successful
+	// renewal, when at least one other instance is unreachable or names a
+	// different target primary, so that it stops accepting writes it can no
+	// longer safely serve. Its reaction time is set by the `primaryLease`
+	// timings and by `requestTimeout`, not by the liveness probe settings this
+	// stanza lives under. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
 }
 
-// IsolationCheckConfiguration contains the configuration for the isolation check
-// functionality in the liveness probe
+// IsolationCheckConfiguration contains the configuration for the primary
+// isolation check
 type IsolationCheckConfiguration struct {
-	// Whether primary isolation checking is enabled for the liveness probe
+	// Whether primary isolation checking is enabled. When disabled, an
+	// isolated primary is not stopped, but a primary that reaches a peer
+	// reporting a different target primary still is.
 	// +optional
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
@@ -1471,6 +1484,10 @@ const (
 	// is gracefully shutdown during a switchover.
 	DefaultMaxSwitchoverDelay = 3600
 
+	// DefaultImmediateShutdownTimeout is the default for the pg_ctl timeout in seconds when a
+	// PostgreSQL instance is shut down with an immediate shutdown request.
+	DefaultImmediateShutdownTimeout = 30
+
 	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
 	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,
 	// the minimum value is 1
@@ -1935,8 +1952,10 @@ type BootstrapInitDB struct {
 	// +optional
 	Options []string `json:"options,omitempty"`
 
-	// Whether the `-k` option should be passed to initdb,
-	// enabling checksums on data pages (default: `false`)
+	// Whether data checksums are enabled on data pages, to help detect
+	// corruption by the I/O system that would otherwise be silent
+	// (default: `false` before PostgreSQL 18, `true` from PostgreSQL 18 on,
+	// matching the initdb default in each case).
 	// +optional
 	DataChecksums *bool `json:"dataChecksums,omitempty"`
 
@@ -2259,6 +2278,39 @@ type BootstrapPgBaseBackup struct {
 	// created from scratch
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
+
+	// List of custom options to pass to the `pg_basebackup` command.
+	//
+	// IMPORTANT: Use with caution. The operator rejects the options it relies on,
+	// as listed in the bootstrap documentation, but it does not validate the
+	// others, and some of them may still interfere with its intended
+	// functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and PostgreSQL version.
+	//
+	// +optional
+	AdditionalArgs []string `json:"additionalArgs,omitempty"`
+
+	// Maps each tablespace declared in `spec.tablespaces` to its location
+	// in the source instance.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	TablespaceMapping []TablespaceMappingEntry `json:"tablespaceMapping,omitempty"`
+}
+
+// TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+// location of the same tablespace in the source instance of a `pg_basebackup`
+// bootstrap.
+type TablespaceMappingEntry struct {
+	// Name of the tablespace, as declared in `spec.tablespaces`.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Absolute path of the tablespace in the source instance. It must not
+	// contain the `=` or `\` characters and must be unique among the entries.
+	// +kubebuilder:validation:MinLength=1
+	SourceLocation string `json:"sourceLocation"`
 }
 
 // RecoveryTarget allows to configure the moment where the recovery process
@@ -2706,6 +2758,11 @@ type PluginStatus struct {
 	// +optional
 	RestoreJobHookCapabilities []string `json:"restoreJobHookCapabilities,omitempty"`
 
+	// PostgresCapabilities are the list of capabilities of the
+	// plugin regarding the PostgreSQL configuration
+	// +optional
+	PostgresCapabilities []string `json:"postgresCapabilities,omitempty"`
+
 	// Status contain the status reported by the plugin through the SetStatusInCluster interface
 	// +optional
 	Status string `json:"status,omitempty"`
@@ -2746,6 +2803,10 @@ type RoleConfiguration struct {
 
 	// Date and time after which the role's password is no longer valid.
 	// When omitted, the password will never expire (default).
+	// On a `DatabaseRole` whose password the operator generates with a
+	// `password.duration`, this is controlled by the operator instead: the role
+	// is valid until the generated password expires, and setting `validUntil`
+	// explicitly is rejected.
 	// +optional
 	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 

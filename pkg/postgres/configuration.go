@@ -24,9 +24,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"iter"
 	"math"
-	"path/filepath"
 	"slices"
 	"strings"
 	"text/template"
@@ -397,8 +395,9 @@ type ConfigurationInfo struct {
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
 
-	// The list of additional extensions to be loaded into the PostgreSQL configuration
-	AdditionalExtensions []AdditionalExtensionConfiguration
+	// The directories of the additional extensions to be loaded into the
+	// PostgreSQL configuration, nil when there are no additional extensions
+	AdditionalExtensions *AdditionalExtensionConfiguration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -806,7 +805,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	// Setup additional extensions
-	if len(info.AdditionalExtensions) > 0 {
+	if info.AdditionalExtensions != nil {
 		configuration.setExtensionControlPath(info)
 		configuration.setDynamicLibraryPath(info)
 	}
@@ -867,10 +866,35 @@ func (p *PgConfiguration) setUserSharedPreloadLibraries(info ConfigurationInfo) 
 }
 
 // CreatePostgresqlConfFile creates the contents of the postgresql.conf file
+// and returns them with the hash identifying the configuration
 func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
-	// Split the parameters into the regular PostgreSQL section (whose hash
-	// defines the identity of the configuration) and the cnpg.* section (which
-	// carries operator-internal state and must not contribute to the hash).
+	pgPart, _ := renderPostgresqlConfSections(configuration)
+	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(pgPart)))
+
+	return CreatePostgresqlConfFileWithHash(configuration, sha256sum), sha256sum
+}
+
+// CreatePostgresqlConfFileWithHash creates the contents of the postgresql.conf
+// file, identifying the configuration with the passed hash
+func CreatePostgresqlConfFileWithHash(configuration *PgConfiguration, sha256sum string) string {
+	pgPart, cnpgPart := renderPostgresqlConfSections(configuration)
+
+	// Emit the cnpg.* keys (sorted), then always emit the sha256 line LAST.
+	// The sha256-last layout is legacy behaviour; preserving it prevents a
+	// byte-level diff in postgresql.conf (and an avoidable pg_reload_conf())
+	// on operator upgrade for clusters that already have other cnpg.* keys
+	// such as cnpg.synchronous_standby_names_metadata.
+	sha256Line := configfile.RenderPostgresConfiguration(map[string]string{
+		CNPGConfigSha256: sha256sum,
+	})
+
+	return pgPart + cnpgPart + sha256Line
+}
+
+// renderPostgresqlConfSections renders the regular PostgreSQL section (whose
+// hash defines the identity of the configuration) and the cnpg.* section
+// (which carries operator-internal state and must not contribute to the hash)
+func renderPostgresqlConfSections(configuration *PgConfiguration) (string, string) {
 	pgOptions := map[string]string{}
 	cnpgOptions := map[string]string{}
 	for name, value := range configuration.configs {
@@ -881,89 +905,24 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 		}
 	}
 
-	pgPart := configfile.RenderPostgresConfiguration(pgOptions)
-	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(pgPart)))
-
-	// Emit the cnpg.* keys (sorted), then always emit the sha256 line LAST.
-	// The sha256-last layout is legacy behaviour; preserving it prevents a
-	// byte-level diff in postgresql.conf (and an avoidable pg_reload_conf())
-	// on operator upgrade for clusters that already have other cnpg.* keys
-	// such as cnpg.synchronous_standby_names_metadata.
-	cnpgPart := configfile.RenderPostgresConfiguration(cnpgOptions)
-	sha256Line := configfile.RenderPostgresConfiguration(map[string]string{
-		CNPGConfigSha256: sha256sum,
-	})
-
-	return pgPart + cnpgPart + sha256Line, sha256sum
+	return configfile.RenderPostgresConfiguration(pgOptions), configfile.RenderPostgresConfiguration(cnpgOptions)
 }
 
-// AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
+// AdditionalExtensionConfiguration holds the directories, inside the
+// extensions' ImageVolumes, to be added to the path-like GUCs
 type AdditionalExtensionConfiguration struct {
-	// MountPath is the directory where the extension's ImageVolume is mounted
-	// (e.g. /extensions/postgis or /new-extensions/postgis during a major upgrade).
-	MountPath string
-
-	// The list of directories that should be added to ExtensionControlPath.
+	// The list of absolute directories that should be added to ExtensionControlPath.
 	ExtensionControlPath []string
 
-	// The list of directories that should be added to DynamicLibraryPath.
+	// The list of absolute directories that should be added to DynamicLibraryPath.
 	DynamicLibraryPath []string
-}
-
-// absolutizePaths returns an iterator over paths joined to the extension's MountPath.
-func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for _, path := range paths {
-			// The webhook rejects escaping paths at admission time; this is a
-			// second, independent check for callers that read the Cluster
-			// spec directly without going through admission (e.g. a Job).
-			if !filepath.IsLocal(filepath.Join(".", path)) {
-				log.Warning("Skipping extension path that escapes the extension directory",
-					"mountPath", ext.MountPath, "path", path)
-				continue
-			}
-
-			if !yield(filepath.Join(ext.MountPath, path)) {
-				break
-			}
-		}
-	}
-}
-
-// getRuntimeExtensionControlPath collects the absolute directories to be put
-// into the `extension_control_path` GUC to support this additional extension
-func (ext *AdditionalExtensionConfiguration) getRuntimeExtensionControlPath() iter.Seq[string] {
-	paths := []string{"share"}
-	if len(ext.ExtensionControlPath) > 0 {
-		paths = ext.ExtensionControlPath
-	}
-
-	return ext.absolutizePaths(paths)
-}
-
-// getDynamicLibraryPath collects the absolute directories to be put
-// into the `dynamic_library_path` GUC to support this additional extension
-func (ext *AdditionalExtensionConfiguration) getDynamicLibraryPath() iter.Seq[string] {
-	paths := []string{"lib"}
-	if len(ext.DynamicLibraryPath) > 0 {
-		paths = ext.DynamicLibraryPath
-	}
-
-	return ext.absolutizePaths(paths)
 }
 
 // setExtensionControlPath manages the `extension_control_path` GUC, merging
 // the paths defined by the user with the ones provided by the
 // `.spec.postgresql.extensions` stanza
 func (p *PgConfiguration) setExtensionControlPath(info ConfigurationInfo) {
-	extensionControlPath := []string{"$system"}
-
-	for _, extension := range info.AdditionalExtensions {
-		extensionControlPath = slices.AppendSeq(
-			extensionControlPath,
-			extension.getRuntimeExtensionControlPath(),
-		)
-	}
+	extensionControlPath := append([]string{"$system"}, info.AdditionalExtensions.ExtensionControlPath...)
 
 	extensionControlPath = slices.AppendSeq(
 		extensionControlPath,
@@ -982,13 +941,7 @@ func (p *PgConfiguration) setExtensionControlPath(info ConfigurationInfo) {
 // paths defined by the user with the ones provided by the
 // `.spec.postgresql.extensions` stanza
 func (p *PgConfiguration) setDynamicLibraryPath(info ConfigurationInfo) {
-	dynamicLibraryPath := []string{"$libdir"}
-
-	for _, extension := range info.AdditionalExtensions {
-		dynamicLibraryPath = slices.AppendSeq(
-			dynamicLibraryPath,
-			extension.getDynamicLibraryPath())
-	}
+	dynamicLibraryPath := append([]string{"$libdir"}, info.AdditionalExtensions.DynamicLibraryPath...)
 
 	dynamicLibraryPath = slices.AppendSeq(
 		dynamicLibraryPath,

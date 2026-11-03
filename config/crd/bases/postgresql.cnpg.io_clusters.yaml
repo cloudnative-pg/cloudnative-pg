@@ -2,8 +2,6 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
   name: clusters.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -1157,12 +1155,13 @@ spec:
                             description: |-
                               Compress a backup file (a tar file per tablespace) while streaming it
                               to the object store. Available options are empty string (no
-                              compression, default), `gzip`, `bzip2`, `lz4`, and `snappy`.
+                              compression, default), `gzip`, `bzip2`, `lz4`, `snappy`, and `zstd`.
                             enum:
                             - bzip2
                             - gzip
                             - lz4
                             - snappy
+                            - zstd
                             type: string
                           encryption:
                             description: |-
@@ -1268,6 +1267,16 @@ spec:
                           HistoryTags is a list of key value pairs that will be passed to the
                           Barman --history-tags option.
                         type: object
+                      s3AddressingStyle:
+                        description: |-
+                          How bucket names appear in S3 requests: `virtual` (bucket.endpoint/key),
+                          `path` (endpoint/bucket/key) or `auto` (boto3 decides, same as unset).
+                          Requires s3Credentials and Barman 3.18 or later.
+                        enum:
+                        - auto
+                        - virtual
+                        - path
+                        type: string
                       s3Credentials:
                         description: The credentials to use to upload data to S3
                         properties:
@@ -1317,6 +1326,26 @@ spec:
                             type: object
                           sessionToken:
                             description: The references to the session key
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          sseCustomerKey:
+                            description: |-
+                              Reference to the secret holding the key for Server-Side Encryption with
+                              Customer-provided keys (SSE-C): a base64-encoded 256-bit AES key.
+                              barman-cloud uses it to encrypt the objects it uploads and to read them
+                              back. Meant for S3-compatible providers that only support SSE-C
+                              (e.g. Hetzner Object Storage). Cannot be combined with `encryption`.
+                              Works with any authentication method. Changing the key makes the
+                              existing objects unreadable: use a new `destinationPath` or `serverName`.
                             properties:
                               key:
                                 description: The key to select
@@ -1420,6 +1449,11 @@ spec:
                     required:
                     - destinationPath
                     type: object
+                    x-kubernetes-validations:
+                    - fieldPath: .s3AddressingStyle
+                      message: s3AddressingStyle requires s3Credentials
+                      reason: FieldValueForbidden
+                      rule: '!has(self.s3AddressingStyle) || has(self.s3Credentials)'
                   retentionPolicy:
                     description: |-
                       RetentionPolicy is the retention policy to be used for backups
@@ -1532,8 +1566,10 @@ spec:
                         type: string
                       dataChecksums:
                         description: |-
-                          Whether the `-k` option should be passed to initdb,
-                          enabling checksums on data pages (default: `false`)
+                          Whether data checksums are enabled on data pages, to help detect
+                          corruption by the I/O system that would otherwise be silent
+                          (default: `false` before PostgreSQL 18, `true` from PostgreSQL 18 on,
+                          matching the initdb default in each case).
                         type: boolean
                       database:
                         description: 'Name of the database used by the application.
@@ -1901,6 +1937,19 @@ spec:
                       Bootstrap the cluster taking a physical backup of another compatible
                       PostgreSQL instance
                     properties:
+                      additionalArgs:
+                        description: |-
+                          List of custom options to pass to the `pg_basebackup` command.
+
+                          IMPORTANT: Use with caution. The operator rejects the options it relies on,
+                          as listed in the bootstrap documentation, but it does not validate the
+                          others, and some of them may still interfere with its intended
+                          functionality or design.
+                          You are responsible for ensuring that the provided options are compatible
+                          with your environment and PostgreSQL version.
+                        items:
+                          type: string
+                        type: array
                       database:
                         description: 'Name of the database used by the application.
                           Default: `app`.'
@@ -1927,6 +1976,35 @@ spec:
                           a physical backup
                         minLength: 1
                         type: string
+                      tablespaceMapping:
+                        description: |-
+                          Maps each tablespace declared in `spec.tablespaces` to its location
+                          in the source instance.
+                        items:
+                          description: |-
+                            TablespaceMappingEntry maps a tablespace managed by CloudNativePG to the
+                            location of the same tablespace in the source instance of a `pg_basebackup`
+                            bootstrap.
+                          properties:
+                            name:
+                              description: Name of the tablespace, as declared in
+                                `spec.tablespaces`.
+                              minLength: 1
+                              type: string
+                            sourceLocation:
+                              description: |-
+                                Absolute path of the tablespace in the source instance. It must not
+                                contain the `=` or `\` characters and must be unique among the entries.
+                              minLength: 1
+                              type: string
+                          required:
+                          - name
+                          - sourceLocation
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
                     required:
                     - source
                     type: object
@@ -2770,12 +2848,13 @@ spec:
                               description: |-
                                 Compress a backup file (a tar file per tablespace) while streaming it
                                 to the object store. Available options are empty string (no
-                                compression, default), `gzip`, `bzip2`, `lz4`, and `snappy`.
+                                compression, default), `gzip`, `bzip2`, `lz4`, `snappy`, and `zstd`.
                               enum:
                               - bzip2
                               - gzip
                               - lz4
                               - snappy
+                              - zstd
                               type: string
                             encryption:
                               description: |-
@@ -2881,6 +2960,16 @@ spec:
                             HistoryTags is a list of key value pairs that will be passed to the
                             Barman --history-tags option.
                           type: object
+                        s3AddressingStyle:
+                          description: |-
+                            How bucket names appear in S3 requests: `virtual` (bucket.endpoint/key),
+                            `path` (endpoint/bucket/key) or `auto` (boto3 decides, same as unset).
+                            Requires s3Credentials and Barman 3.18 or later.
+                          enum:
+                          - auto
+                          - virtual
+                          - path
+                          type: string
                         s3Credentials:
                           description: The credentials to use to upload data to S3
                           properties:
@@ -2930,6 +3019,26 @@ spec:
                               type: object
                             sessionToken:
                               description: The references to the session key
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            sseCustomerKey:
+                              description: |-
+                                Reference to the secret holding the key for Server-Side Encryption with
+                                Customer-provided keys (SSE-C): a base64-encoded 256-bit AES key.
+                                barman-cloud uses it to encrypt the objects it uploads and to read them
+                                back. Meant for S3-compatible providers that only support SSE-C
+                                (e.g. Hetzner Object Storage). Cannot be combined with `encryption`.
+                                Works with any authentication method. Changing the key makes the
+                                existing objects unreadable: use a new `destinationPath` or `serverName`.
                               properties:
                                 key:
                                   description: The key to select
@@ -3033,6 +3142,11 @@ spec:
                       required:
                       - destinationPath
                       type: object
+                      x-kubernetes-validations:
+                      - fieldPath: .s3AddressingStyle
+                        message: s3AddressingStyle requires s3Credentials
+                        reason: FieldValueForbidden
+                        rule: '!has(self.s3AddressingStyle) || has(self.s3Credentials)'
                     connectionParameters:
                       additionalProperties:
                         type: string
@@ -3249,6 +3363,16 @@ spec:
                   - name
                   type: object
                 type: array
+              immediateShutdownTimeout:
+                default: 30
+                description: |-
+                  The time in seconds that is allowed for a PostgreSQL instance to stop
+                  after an immediate shutdown request (used, for example, when a primary
+                  must step down and cannot wait for a graceful shutdown). Once this time
+                  has passed with PostgreSQL still running, the instance is considered
+                  unresponsive. Default value is 30 seconds.
+                format: int32
+                type: integer
               inheritedMetadata:
                 description: Metadata that will be inherited by all objects related
                   to the Cluster
@@ -3399,6 +3523,10 @@ spec:
                           description: |-
                             Date and time after which the role's password is no longer valid.
                             When omitted, the password will never expire (default).
+                            On a `DatabaseRole` whose password the operator generates with a
+                            `password.duration`, this is controlled by the operator instead: the role
+                            is valid until the generated password expires, and setting `validUntil`
+                            explicitly is rejected.
                           format: date-time
                           type: string
                       required:
@@ -4946,11 +5074,13 @@ spec:
                         type: integer
                       isolationCheck:
                         description: |-
-                          Configure the feature that extends the liveness probe for a primary
-                          instance. In addition to the basic checks, this verifies whether the
-                          primary is isolated from the Kubernetes API server and from its
-                          replicas, ensuring that it can be safely shut down if network
-                          partition or API unavailability is detected. Enabled by default.
+                          Configure the primary isolation check, which stops a primary whose
+                          primary lease has gone past its renew deadline without a successful
+                          renewal, when at least one other instance is unreachable or names a
+                          different target primary, so that it stops accepting writes it can no
+                          longer safely serve. Its reaction time is set by the `primaryLease`
+                          timings and by `requestTimeout`, not by the liveness probe settings this
+                          stanza lives under. Enabled by default.
                         properties:
                           connectionTimeout:
                             default: 1000
@@ -4959,8 +5089,10 @@ spec:
                             type: integer
                           enabled:
                             default: true
-                            description: Whether primary isolation checking is enabled
-                              for the liveness probe
+                            description: |-
+                              Whether primary isolation checking is enabled. When disabled, an
+                              isolated primary is not stopped, but a primary that reaches a peer
+                              reporting a different target primary still is.
                             type: boolean
                           requestTimeout:
                             default: 1000
@@ -7479,6 +7611,13 @@ spec:
                       description: |-
                         OperatorCapabilities are the list of capabilities of the
                         plugin regarding the reconciler
+                      items:
+                        type: string
+                      type: array
+                    postgresCapabilities:
+                      description: |-
+                        PostgresCapabilities are the list of capabilities of the
+                        plugin regarding the PostgreSQL configuration
                       items:
                         type: string
                       type: array

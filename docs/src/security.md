@@ -338,15 +338,27 @@ per namespace with Kubernetes RBAC, relying on
 [Namespace Isolation](#namespace-isolation) to bound the impact.
 
 The RBAC discussed here governs access to CloudNativePG's own custom resources.
-The next section covers the complementary side: the RBAC that the operator
-itself relies on to manage Kubernetes resources on your behalf.
+The next sections cover two complementary topics: the permissions to grant to
+a read-only Database Administrator (detailed in [RBAC for Users](rbac.md)), and
+the RBAC that the operator itself relies on to manage Kubernetes resources on
+your behalf.
+
+### RBAC for Database Administrators
+
+Human users, such as Database Administrators (DBAs), should not need
+`cluster-admin` to inspect Clusters and connect to PostgreSQL. The
+[RBAC for Users](rbac.md) page describes a read-only persona, with the
+`cnpg-viewer-role` shipped with the operator and sample roles for the
+additional permissions a DBA needs, and shows which `kubectl cnpg` commands
+each one enables.
 
 ### Role Based Access Control (RBAC)
 
 This section covers the operator's *own* RBAC (the service account and roles it
 uses to manage Kubernetes resources on your behalf), as opposed to the user
 access to custom resources discussed in
-[RBAC on Custom Resources](#rbac-on-custom-resources) above.
+[RBAC on Custom Resources](#rbac-on-custom-resources) and
+[RBAC for Users](rbac.md) above.
 
 The operator interacts with the Kubernetes API server using a dedicated service
 account named `cnpg-manager`. This service account is typically installed in
@@ -895,23 +907,9 @@ unauthenticated.
 The certificate is never written to disk and is regenerated on every operator
 restart, so trust derives from fingerprint pinning rather than CA validation.
 
-This protection has a hard requirement: the status port **must** be served over
-TLS, which has been the default since v1.24. A client certificate can only be
-presented over a TLS connection, so the protected endpoints are reachable by the
-operator only when the status port uses TLS.
-
-:::warning
-If the status port is not served over TLS, the instance manager cannot
-authenticate the operator and **permanently** rejects every call to its
-protected endpoints (backup, `pg_controldata`, partial WAL archive, and
-instance-manager upgrade) with `401 Unauthorized`. This is not a transient
-condition and will not resolve on its own. It can affect instances created by an
-operator older than v1.24 (whose status port serves plain HTTP) once their
-instance manager is upgraded to a version that enforces this authentication: such
-instances must be rolled out so their Pods are recreated with a TLS-enabled status
-port. Newly created instances always enable TLS on the status port and are
-unaffected.
-:::
+A client certificate can only be presented over a TLS connection, and the
+instance manager always serves the status port over TLS, so this protection is
+unconditional.
 
 ### PostgreSQL
 

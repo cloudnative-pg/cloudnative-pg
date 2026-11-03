@@ -1,5 +1,5 @@
 apiVersion: v1
-baseDomain: ${AWS_BASE_DOMAIN}
+baseDomain: ${BASE_DOMAIN}
 compute:
 - architecture: amd64
   hyperthreading: Enabled
@@ -30,5 +30,5 @@ platform:
     region: ${AWS_REGION}
 publish: External
 pullSecret: '${REDHAT_PULL}'
-sshKey: ${SSH_PUBLIC_KEY}
+sshKey: '${SSH_PUBLIC_KEY}'
 credentialsMode: Mint

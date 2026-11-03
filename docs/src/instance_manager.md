@@ -168,7 +168,11 @@ probes:
 
 The liveness probe begins after the startup probe successfully completes. Its
 primary role is to ensure the PostgreSQL instance manager is operating
-correctly.
+correctly. It fails when the primary lease loop has stopped attempting to renew
+or take over the lease, and when PostgreSQL is still running after
+`.spec.immediateShutdownTimeout` seconds from an immediate shutdown request.
+Primary isolation itself is not handled by this probe, but by the primary lease
+(see [Primary Isolation](#primary-isolation)).
 
 Following Kubernetes standards, if the liveness probe fails, the kubelet will
 terminate the container, which will then be restarted.
@@ -225,14 +229,42 @@ spec:
 
 ### Primary Isolation
 
-CloudNativePG 1.27 introduces an additional behavior for the liveness
-probe of a PostgreSQL primary, which will report a failure if **both** of the
-following conditions are met:
+A primary that cannot renew its primary lease, typically because it cannot reach
+the Kubernetes API server, and has also lost contact with part of its cluster,
+cannot tell a network partition from a cluster in which it has already been
+replaced. CloudNativePG **stops such a primary** so that it stops accepting
+writes, if **both** of the following conditions are met:
 
-1. The instance manager cannot reach the Kubernetes API server
-2. The instance manager cannot reach **any** other instance via the instance manager’s REST API
+1. The instance manager has not managed to renew the
+   [primary lease](failover.md#safe-primary-election) for longer than its renew
+   deadline, typically because it cannot reach the Kubernetes API server, but
+   whatever the cause
+2. The instance manager cannot reach **at least one** of the other instances via
+   the instance manager's REST API, or an instance it can reach reports a
+   different instance as the target primary
 
-The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
+The second condition is deliberately conservative: a single instance the primary
+can no longer reach is enough, because a primary that has lost both the API
+server and a peer cannot rule out having been replaced.
+
+The check is driven by the primary lease. The instance manager keeps track of
+the last time it renewed the lease successfully. On its first retry-period tick
+after that time is older than the renew deadline, it probes the other instances
+and, if they confirm the isolation, requests an immediate PostgreSQL shutdown.
+Open transactions are aborted and the next start runs crash recovery. The
+decision is taken once, and the request is retried until the instance manager
+accepts it, unless a lease renewal lands first and withdraws it. The step-down
+is logged under the `primary-lease` logger.
+
+The instance manager may be busy with another command, for example a restart,
+or the immediate shutdown may fail. Once the instance manager has decided to
+step down, if it is still running on the last retry-period tick before a
+replica is allowed to claim the lease, it sends `SIGQUIT` to the PostgreSQL
+postmaster and exits with code `5`. Once the immediate shutdown has been
+accepted, a later lease renewal does not postpone this stop. The kubelet restarts the container. If the pod is still the target
+primary, it waits for the lease before it starts PostgreSQL again, otherwise it
+rejoins as a replica. The check never acts when the cluster has a single
+instance.
 
 It is **enabled by default** and can be disabled by adding the following:
 
@@ -244,10 +276,20 @@ spec:
         enabled: false
 ```
 
+Disabling it switches off the reaction to unreachable instances only: an
+isolated primary is not stopped, so once its lease expires a replica can be
+promoted while it keeps accepting writes. A primary that still reaches an
+instance reporting a different target primary is stopped in any case, because
+that is proof it has been replaced, not a sign of isolation.
+
 :::info[Important]
-    Be aware that the default liveness probe settings—automatically derived from `livenessProbeTimeout`—might
-    be aggressive (30 seconds). As such, we recommend explicitly setting the
-    liveness probe configuration to suit your environment.
+    The reaction time is set by the primary lease timings
+    (`.spec.primaryLease`) and by `isolationCheck.requestTimeout`, not by the
+    liveness probe periods: with the defaults the shutdown is requested between
+    10 and 13 seconds after the last successful lease renewal. `periodSeconds`,
+    `failureThreshold` and `livenessProbeTimeout` have no effect on it. Keep
+    `renewDeadlineSeconds` plus `retryPeriodSeconds` plus `requestTimeout` below
+    `leaseDurationSeconds`; the admission webhook warns otherwise.
 :::
 
 The spec also accepts two optional network settings: `requestTimeout`
@@ -266,10 +308,13 @@ spec:
 ```
 
 :::info
-Primary isolation is distinct from the [safe primary election](failover.md#safe-primary-election)
-mechanism. The isolation check *fences* a primary that has lost connectivity to
-both the API server and the other instances, while the primary lease coordinates
-*which instance is allowed to promote*. The two mechanisms are complementary.
+Primary isolation and [safe primary election](failover.md#safe-primary-election)
+are two uses of the same primary lease, and they answer different questions. The
+lease coordinates *which instance is allowed to promote*; the isolation check
+uses the age of that lease to decide *when the current primary has to stop*. The
+two are complementary, and disabling the isolation check leaves the lease
+coordinating promotions with no mechanism stopping an isolated primary that
+cannot reach any other instance.
 :::
 
 ## Readiness Probe
@@ -421,6 +466,11 @@ the WAL files. By default it is set to `3600` (1 hour).
     the risk of data loss while leaving the cluster without an active primary for a
     longer time during the switchover.
 :::
+
+If PostgreSQL on the former primary is unreachable, the `CHECKPOINT` and the fast
+shutdown are skipped and an immediate shutdown is issued right away. Since
+`.spec.switchoverDelay` is the timeout of that fast shutdown, it does not apply
+to this path. See the ["Failover" section](failover.md) for details.
 
 ## Failover
 

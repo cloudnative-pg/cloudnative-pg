@@ -238,7 +238,7 @@ func (env TestingEnvironment) CreateUniqueTestNamespace(
 ) (string, error) {
 	name := env.createdNamespaces.generateUniqueName(namespacePrefix)
 
-	return name, namespaces.CreateTestNamespace(ctx, crudClient, name, opts...)
+	return name, namespaces.CreateTestNamespace(ctx, crudClient, env.Interface, env.RestClientConfig, name, opts...)
 }
 
 // StandardImageName returns the full image name for a standard Postgres image.

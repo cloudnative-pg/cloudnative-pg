@@ -259,7 +259,9 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 			return true
 		},
 		update: func(pvc *corev1.PersistentVolumeClaim) {
-			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+			if pvc.Labels == nil {
+				pvc.Labels = map[string]string{}
+			}
 
 			// Set common labels
 			pvc.Labels[utils.KubernetesAppManagedByLabelName] = utils.ManagerName
@@ -301,6 +303,8 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 					break
 				}
 			}
+
+			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 		},
 	}
 }

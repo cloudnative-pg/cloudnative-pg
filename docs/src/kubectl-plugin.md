@@ -38,11 +38,11 @@ them in your systems.
 
 #### Debian packages
 
-For example, let's install the 1.30.0 release of the plugin, for an Intel based
+For example, let's install the 1.30.1 release of the plugin, for an Intel based
 64 bit server. First, we download the right `.deb` file.
 
 ```sh
-wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/kubectl-cnpg_1.30.0_linux_x86_64.deb \
+wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.1/kubectl-cnpg_1.30.1_linux_x86_64.deb \
   --output-document kube-plugin.deb
 ```
 
@@ -53,17 +53,17 @@ $ sudo dpkg -i kube-plugin.deb
 Selecting previously unselected package cnpg.
 (Reading database ... 6688 files and directories currently installed.)
 Preparing to unpack kube-plugin.deb ...
-Unpacking cnpg (1.30.0) ...
-Setting up cnpg (1.30.0) ...
+Unpacking cnpg (1.30.1) ...
+Setting up cnpg (1.30.1) ...
 ```
 
 #### RPM packages
 
-As in the example for `.rpm` packages, let's install the 1.30.0 release for an
+As in the example for `.rpm` packages, let's install the 1.30.1 release for an
 Intel 64 bit machine. Note the `--output` flag to provide a file name.
 
 ```sh
-curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/kubectl-cnpg_1.30.0_linux_x86_64.rpm \
+curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.1/kubectl-cnpg_1.30.1_linux_x86_64.rpm \
   --output kube-plugin.rpm
 ```
 
@@ -77,7 +77,7 @@ Dependencies resolved.
  Package            Architecture         Version                   Repository                  Size
 ====================================================================================================
 Installing:
- cnpg               x86_64               1.30.0-1                  @commandline                20 M
+ cnpg               x86_64               1.30.1-1                  @commandline                20 M
 
 Transaction Summary
 ====================================================================================================
@@ -306,9 +306,9 @@ sandbox-3  0/604DE38  0/604DE38  0/604DE38  0/604DE38   00:00:00   00:00:00   00
 Instances status
 Name       Current LSN  Replication role  Status  QoS         Manager Version  Node
 ----       -----------  ----------------  ------  ---         ---------------  ----
-sandbox-1  0/604DE38    Primary           OK      BestEffort  1.30.0           k8s-eu-worker
-sandbox-2  0/604DE38    Standby (async)   OK      BestEffort  1.30.0           k8s-eu-worker2
-sandbox-3  0/604DE38    Standby (async)   OK      BestEffort  1.30.0           k8s-eu-worker
+sandbox-1  0/604DE38    Primary           OK      BestEffort  1.30.1           k8s-eu-worker
+sandbox-2  0/604DE38    Standby (async)   OK      BestEffort  1.30.1           k8s-eu-worker2
+sandbox-3  0/604DE38    Standby (async)   OK      BestEffort  1.30.1           k8s-eu-worker
 ```
 
 If you require more detailed status information, use the `--verbose` option (or
@@ -362,9 +362,9 @@ sandbox-primary  primary  1              1                1                     
 Instances status
 Name       Current LSN  Replication role  Status  QoS         Manager Version  Node
 ----       -----------  ----------------  ------  ---         ---------------  ----
-sandbox-1  0/6053720    Primary           OK      BestEffort  1.30.0           k8s-eu-worker
-sandbox-2  0/6053720    Standby (async)   OK      BestEffort  1.30.0           k8s-eu-worker2
-sandbox-3  0/6053720    Standby (async)   OK      BestEffort  1.30.0           k8s-eu-worker
+sandbox-1  0/6053720    Primary           OK      BestEffort  1.30.1           k8s-eu-worker
+sandbox-2  0/6053720    Standby (async)   OK      BestEffort  1.30.1           k8s-eu-worker2
+sandbox-3  0/6053720    Standby (async)   OK      BestEffort  1.30.1           k8s-eu-worker
 ```
 
 With an additional `-v` (e.g. `kubectl cnpg status sandbox -v -v`), you can
@@ -640,12 +640,12 @@ Archive:  report_operator_<TIMESTAMP>.zip
 
 ```output
 ====== Beginning of Previous Log =====
-2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.30.0","build":{"Version":"1.30.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.30.1","build":{"Version":"1.30.1+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
 2023-03-28T12:56:41.251851909Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
   <snipped …>
 
 ====== End of Previous Log =====
-2023-03-28T12:57:09.854306024Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.30.0","build":{"Version":"1.30.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:57:09.854306024Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.30.1","build":{"Version":"1.30.1+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
 2023-03-28T12:57:09.854363943Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
 ```
 
@@ -1479,7 +1479,7 @@ kubectl cnpg subscription sync-sequences destination-cluster \
 The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
 popular terminal-based UI to interact with Kubernetes clusters.
 
-See [`k9s/plugins.yml`](samples/k9s/plugins.yml) for details.
+See [`K9s repo`](https://github.com/derailed/k9s/blob/master/plugins/cloudnative-pg.yaml) for details. <!-- wokeignore:rule=master -->
 
 ## Permissions required by the plugin
 
@@ -1508,13 +1508,16 @@ table contains the full details:
 | report cluster  | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list<br/>PVCs: list                                                                                                                                                                                                                                                         |
 | report operator | **Required:**<br/>deployments: get<br/>**Optional (for full report):**<br/>configmaps: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/>validatingwebhookconfigurations: list[^1]<br/>**If OLM is present:**<br/>clusterserviceversions: list[^1]<br/>installplans: list[^1]<br/>subscriptions: list[^1] |
 | restart         | clusters: get,patch<br/>pods: get,delete                                                                                                                                                                                                                                                                                                              |
-| status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                                    |
+| status          | clusters: get<br/>pods: list<br/>pods/exec: create (optional)<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                         |
 | subscription    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
 | version         | none                                                                                                                                                                                                                                                                                                                                                  |
 
 [^1]: The permissions are cluster scope ClusterRole resources.
 
 ///Footnotes Go Here///
+
+Without `pods/exec`, `status` still works: the cluster size and, with
+`--verbose`, the PostgreSQL configuration are shown as not permitted.
 
 Additionally, assigning the `list` permission on the `clusters` will enable
 autocompletion for multiple commands.

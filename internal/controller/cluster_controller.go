@@ -140,7 +140,7 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;patch
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;patch;create;watch
-// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;delete
 // +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;create;list;watch;delete;patch
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;delete;get;list;watch;update;patch
@@ -424,7 +424,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
 
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		if cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 	}
 
 	if cluster.ShouldPromoteFromReplicaCluster() {
@@ -614,6 +616,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 //     kubelet has not yet flipped the readiness probe to True (typical for a
 //     short window after un-fencing an instance). Waiting here prevents
 //     electing a primary that Kubernetes will refuse to route traffic to.
+//     A currently fenced instance is skipped: it reports a healthy /pg/status
+//     with PostgreSQL shut down and its pod permanently not Ready, so this is
+//     the expected steady state rather than a stale probe to wait out.
 //
 //   - Primary pod is Ready but its /pg/status endpoint is failing. A failing
 //     /pg/status on an otherwise Ready pod usually indicates an
@@ -648,7 +653,7 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 	hasHTTPStatus := firstInstance.HasHTTPStatus()
 	isPodReady := firstInstance.IsPodReady
 
-	if hasHTTPStatus && !isPodReady {
+	if hasHTTPStatus && !isPodReady && !firstInstance.IsFenced {
 		// The readiness probe status from the kubelet has not been refreshed
 		// yet, so we wait rather than electing a primary that Kubernetes will
 		// refuse to route traffic to.
@@ -757,6 +762,10 @@ func (r *ClusterReconciler) handleSwitchover(
 		}
 		if errors.Is(err, ErrWalReceiversRunning) {
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
+		if errors.Is(err, ErrQuorumCheckFailed) {
+			contextLogger.Info("Quorum check no longer satisfied, waiting before completing the failover")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
@@ -1371,8 +1380,9 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		Watches(
 			&apiv1.DatabaseRole{},
 			handler.EnqueueRequestsFromMapFunc(mapClusterOwnedResourceToCluster),
-			// The cluster only consumes spec.passwordSecret (to maintain the
-			// instance RBAC), so status-only changes are irrelevant here. OR-ed with
+			// The cluster only consumes the name of the role's password Secret (to
+			// maintain the instance RBAC), so status-only changes are irrelevant
+			// here. OR-ed with
 			// isBeingDeletedPredicate so a reconciliation loop can be enqueued
 			// to remove the finalizer from the resource.
 			builder.WithPredicates(predicate.Or(

@@ -37,7 +37,9 @@ CloudNativePG supports recovery via:
 - **Native recovery from volume snapshots**, where supported by the underlying
   Kubernetes storage infrastructure.
 - **Native recovery from object stores via Barman Cloud**, which is
-  **deprecated** as of version 1.26 in favor of the plugin-based approach.
+  **deprecated** as of version 1.26 in favor of the plugin-based approach
+  (1.31 is the last minor release with native support, which is removed
+  starting from 1.32.0).
 
 With the deprecation of native Barman Cloud support in version 1.26, this
 section now focuses on two supported recovery methods: using the **Barman Cloud

@@ -14,3 +14,4 @@ resources:
 - publication_viewer_role.yaml
 - database_editor_role.yaml
 - database_viewer_role.yaml
+- viewer_role.yaml

@@ -2630,6 +2630,74 @@ var _ = Describe("bootstrap base backup validation", func() {
 	})
 })
 
+var _ = Describe("pg_basebackup additionalArgs validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	clusterWithArgs := func(args ...string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:         "test",
+						AdditionalArgs: args,
+					},
+				},
+			},
+		}
+	}
+
+	It("doesn't complain when pg_basebackup is not used or there are no arguments", func() {
+		Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(&apiv1.Cluster{})).To(BeEmpty())
+		Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs())).To(BeEmpty())
+	})
+
+	DescribeTable("accepts the arguments that don't interfere with the operator",
+		func(args ...string) {
+			Expect(v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs(args...))).To(BeEmpty())
+		},
+		Entry("long options, with an attached or a separate value",
+			"--max-rate=50M", "--checkpoint", "fast", "--sync-method=syncfs", "--no-estimate-size"),
+		Entry("grouped short flags", "-vP"),
+		Entry("short options, with an attached or a separate value", "-r50M", "-c", "fast"),
+		Entry("a forbidden letter inside the value of an option", "-lbackup-D", "--label=my-D-backup"),
+		Entry("an abbreviation of an allowed option", "--check=fast"),
+	)
+
+	DescribeTable("rejects the options managed by the operator, however they are spelled",
+		func(arg string, expectedOption string) {
+			result := v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs(arg))
+			Expect(result).To(HaveLen(1))
+			Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+			Expect(result[0].Detail).To(ContainSubstring(expectedOption))
+		},
+		Entry("short option", "-D", "-D"),
+		Entry("short option with an attached value", "-D/tmp/pgdata", "-D"),
+		Entry("long option with a value", "--pgdata=/tmp/pgdata", "--pgdata"),
+		Entry("long option without a value", "--help", "--help"),
+		Entry("short option grouped with allowed ones", "-nNPR", "-R"),
+		Entry("creation of a permanent slot", "--create-slot", "--create-slot"),
+		Entry("creation of a permanent slot, grouped short option", "-vC", "-C"),
+	)
+
+	// getopt_long accepts any unambiguous abbreviation of a long option
+	It("rejects the abbreviations of the options managed by the operator", func() {
+		result := v.validateBootstrapPgBaseBackupAdditionalArgs(clusterWithArgs("--pgd=/tmp/pgdata"))
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Detail).To(ContainSubstring("abbreviation of --pgdata"))
+	})
+
+	It("reports every forbidden argument, and only those", func() {
+		result := v.validateBootstrapPgBaseBackupAdditionalArgs(
+			clusterWithArgs("--host=foo", "--max-rate=50M", "-D", "/tmp"))
+		Expect(result).To(HaveLen(2))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[0]"))
+		Expect(result[1].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[2]"))
+	})
+})
+
 var _ = Describe("bootstrap recovery validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
@@ -6199,7 +6267,7 @@ var _ = Describe("validateExtensions", func() {
 	})
 
 	It("returns an error for a path that escapes only once joined under a deeper, realistic mount point", func() {
-		// CollectBinPaths and absolutizePaths join these paths under a
+		// the Collect*Paths functions join these paths under a
 		// multi-segment mount point at runtime (e.g. "/extensions/<name>"),
 		// not a single-segment one. A containment check resolved against a
 		// shallower placeholder base would wrongly accept these.
@@ -6607,6 +6675,7 @@ var _ = Describe("getInTreeBarmanWarnings", func() {
 		warnings := getInTreeBarmanWarnings(cluster)
 		Expect(warnings).To(HaveLen(1))
 		Expect(warnings[0]).To(ContainSubstring("spec.backup.barmanObjectStore"))
+		Expect(warnings[0]).To(ContainSubstring("removed in CloudNativePG 1.32.0"))
 	})
 
 	It("returns warnings for multiple external clusters with BarmanObjectStore", func() {
@@ -7147,6 +7216,67 @@ var _ = Describe("ServiceAccount configuration validation", func() {
 	})
 })
 
+var _ = Describe("getPrimaryIsolationTimingWarnings", func() {
+	clusterWith := func(enabled *bool, requestTimeout int, lease *apiv1.PrimaryLeaseConfiguration) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:    3,
+				PrimaryLease: lease,
+				Probes: &apiv1.ProbesConfiguration{
+					Liveness: &apiv1.LivenessProbe{
+						IsolationCheck: &apiv1.IsolationCheckConfiguration{
+							Enabled:        enabled,
+							RequestTimeout: requestTimeout,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("returns no warning with the default timings", func() {
+		Expect(getPrimaryIsolationTimingWarnings(clusterWith(ptr.To(true), 1000, nil))).To(BeEmpty())
+	})
+
+	DescribeTable("warns when the step-down bound is not below the lease duration",
+		func(requestTimeout int, renewDeadline int32) {
+			cluster := clusterWith(ptr.To(true), requestTimeout, &apiv1.PrimaryLeaseConfiguration{
+				RenewDeadlineSeconds: ptr.To(renewDeadline),
+			})
+			warnings := getPrimaryIsolationTimingWarnings(cluster)
+			Expect(warnings).To(HaveLen(1))
+			Expect(warnings[0]).To(ContainSubstring("15s"))
+		},
+		// 12s + 2s + 1s = 15s: a replica may promote at the same instant the
+		// isolated primary asks for its shutdown, so there is no margin left.
+		Entry("exactly at the lease duration", 1000, int32(12)),
+		Entry("past it through the request timeout alone", 3000, int32(10)),
+	)
+
+	It("returns no warning when the isolation check is disabled", func() {
+		cluster := clusterWith(ptr.To(false), 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		Expect(getPrimaryIsolationTimingWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the isolation check has not been defaulted", func() {
+		cluster := clusterWith(nil, 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		Expect(getPrimaryIsolationTimingWarnings(cluster)).To(BeEmpty())
+		Expect(getPrimaryIsolationTimingWarnings(&apiv1.Cluster{})).To(BeEmpty())
+	})
+
+	It("is reported through the admission warnings", func() {
+		cluster := clusterWith(ptr.To(true), 1000, &apiv1.PrimaryLeaseConfiguration{
+			RenewDeadlineSeconds: ptr.To(int32(14)),
+		})
+		v := &ClusterCustomValidator{}
+		Expect(v.getAdmissionWarnings(cluster)).To(ContainElement(ContainSubstring("isolated primary")))
+	})
+})
+
 var _ = Describe("getSynchronousReplicationWarnings", func() {
 	It("returns no warning for a single-instance cluster", func() {
 		cluster := &apiv1.Cluster{
@@ -7304,5 +7434,97 @@ var _ = Describe("getFailureDomainTopologyWarnings", func() {
 		Expect(warnings).To(HaveLen(1))
 		Expect(warnings[0]).To(ContainSubstring("topology constraint is not currently satisfied"))
 		Expect(warnings[0]).To(ContainSubstring("Topology labels could not be extracted"))
+	})
+})
+
+var _ = Describe("pg_basebackup tablespaceMapping validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	clusterWithMapping := func(entries ...apiv1.TablespaceMappingEntry) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{{Name: "origin"}},
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					{Name: "fast"},
+					{Name: "archive"},
+				},
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:            "origin",
+						TablespaceMapping: entries,
+					},
+				},
+			},
+		}
+	}
+
+	It("accepts a valid mapping", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/fast"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data/pg/archive"},
+		)
+		Expect(v.validateBootstrapPgBaseBackupSource(cluster)).To(BeEmpty())
+	})
+
+	It("accepts a missing mapping", func() {
+		Expect(v.validateBootstrapPgBaseBackupSource(clusterWithMapping())).To(BeEmpty())
+	})
+
+	It("rejects a tablespace not declared in spec.tablespaces", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "unknown", SourceLocation: "/data/pg/unknown"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].name"))
+	})
+
+	It("rejects a relative source location", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "data/pg/fast"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
+	It("rejects a source location containing '='", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg=fast"})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
+	It("rejects a source location containing a backslash", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: `/data/pg\fast`})
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[0].sourceLocation"))
+	})
+
+	It("rejects a duplicated source location", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/ts"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data/pg/ts"},
+		)
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].sourceLocation"))
+	})
+
+	// pg_basebackup canonicalizes the paths before matching them
+	It("rejects the same source location written in a different way", func() {
+		cluster := clusterWithMapping(
+			apiv1.TablespaceMappingEntry{Name: "fast", SourceLocation: "/data/pg/ts"},
+			apiv1.TablespaceMappingEntry{Name: "archive", SourceLocation: "/data//pg/./ts/"},
+		)
+		result := v.validateBootstrapPgBaseBackupSource(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].sourceLocation"))
 	})
 })

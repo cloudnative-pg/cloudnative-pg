@@ -40,7 +40,9 @@ import (
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -97,6 +99,11 @@ var _ = Describe("plugin-barman-cloud replica cluster from backup",
 		})
 	})
 
+// switchoverLoadInterval is the pause between two inserts of the load.
+// Without it, the load fills the small volumes with WAL and WAL restore
+// fails with "No space left on device".
+const switchoverLoadInterval = 500 * time.Millisecond
+
 // Plugin port of the "Replica switchover" scenario:
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
@@ -127,12 +134,15 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
 			Expect(err).ToNot(HaveOccurred())
 
-			_, _, err = exec.QueryInInstancePod(
+			_, _, err = exec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{Namespace: namespace, PodName: primary.Name},
 				"postgres",
-				fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (marker text); INSERT INTO %s VALUES ('%s');",
-					replicationTable, replicationTable, marker),
+				fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (marker text); "+
+					"INSERT INTO %[1]s SELECT '%[2]s' WHERE NOT EXISTS (SELECT 1 FROM %[1]s WHERE marker = '%[2]s');",
+					replicationTable, marker),
+				environment.RetryTimeout,
+				objects.PollingTime,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			_ = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
@@ -242,7 +252,7 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 							case <-stopLoad:
 								GinkgoWriter.Println("Terminating load")
 								return
-							case <-time.After(100 * time.Millisecond):
+							case <-time.After(switchoverLoadInterval):
 							}
 						}
 					}()
@@ -376,6 +386,8 @@ var _ = Describe("plugin-barman-cloud replica cluster promotion/demotion",
 						pgasserts.AssertPgRecoveryMode(env, &pod, true)
 					}
 				})
+
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterBName, testTimeouts[timeouts.ClusterIsReady])
 
 				By("verifying replication from new primary works everywhere", func() {
 					validateReplication(namespace, clusterAName, clusterBName)

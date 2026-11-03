@@ -1470,7 +1470,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster)
 	}
 
-	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial, true)
+	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to build replica instance: %w", err)
 	}
@@ -1620,8 +1620,11 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
+	// A fenced instance keeps answering the status endpoint while PostgreSQL is
+	// shut down, so it is counted as reporting status while its pod can never
+	// become Ready, and the comparison below would never converge.
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&
-		instancesStatus.InstancesReportingStatus() != cluster.Status.ReadyInstances {
+		instancesStatus.InstancesReportingStatusIgnoringFenced() != cluster.Status.ReadyInstances {
 		// A pod is not ready, let's retry
 		contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
@@ -1728,7 +1731,7 @@ func findInstancePodToCreate(
 		if err != nil {
 			return nil, err
 		}
-		return specs.NewInstance(ctx, *cluster, serial, true)
+		return specs.NewInstance(ctx, *cluster, serial)
 	}
 
 	return nil, nil

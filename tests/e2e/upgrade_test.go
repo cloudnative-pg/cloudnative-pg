@@ -45,6 +45,7 @@ import (
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -309,7 +310,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return err
 		}
 		for _, pod := range pods.Items {
-			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod, true)
+			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod)
 			if err != nil {
 				continue
 			}
@@ -500,9 +501,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 	assertClustersWorkAfterOperatorUpgrade := func(upgradeNamespace, operatorManifest string, online bool) {
 		databaseName := "appdb"
-		// generate random serverNames for the clusters each time
-		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
-		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
+		// Derive the serverNames from the namespace, unique for each run: the
+		// object store is shared and the assertions search it across buckets.
+		serverName1 := fmt.Sprintf("%s-%s", clusterName1, upgradeNamespace)
+		serverName2 := fmt.Sprintf("%s-%s", clusterName2, upgradeNamespace)
 		// Create the secrets used by the clusters and the object store
 		By("creating the postgres secrets", func() {
 			resources.CreateResourceFromFile(env, upgradeNamespace, pgSecrets)
@@ -708,28 +710,34 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"
-			out, _, err := exec.QueryInInstancePod(
+			out, _, err := exec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
 					Namespace: upgradeNamespace,
 					PodName:   primary,
 				},
 				exec.DatabaseName(databaseName),
-				"SELECT count(*) FROM to_restore")
+				"SELECT count(*) FROM to_restore",
+				environment.RetryTimeout,
+				objects.PollingTime,
+			)
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 
 			// Restored primary should be a timeline higher than 1, because
 			// we expect a promotion. We can't enforce "2" because the timeline
 			// ID will also depend on the history files existing in the cloud
 			// storage and we don't know the status of that.
-			out, _, err = exec.QueryInInstancePod(
+			out, _, err = exec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
 					Namespace: upgradeNamespace,
 					PodName:   primary,
 				},
 				exec.DatabaseName(databaseName),
-				"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
+				"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+				environment.RetryTimeout,
+				objects.PollingTime,
+			)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(strconv.Atoi(strings.Trim(out, "\n"))).To(
 				BeNumerically(">", 1))

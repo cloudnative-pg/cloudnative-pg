@@ -2,8 +2,6 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
   name: poolers.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -5098,6 +5096,7 @@ spec:
                                 Domain names *.k8s.io and *.kubernetes.io are reserved.
                                 This field must be unique for each responder.
                                 This field is required.
+                              minLength: 1
                               type: string
                             priority:
                               description: |-
@@ -5114,12 +5113,15 @@ spec:
                                 The interval 0-999 is reserved for responders with *.k8s.io suffix.
                                 This field is required.
                               format: int32
+                              maximum: 100000
+                              minimum: 0
                               type: integer
                           required:
                           - name
                           - priority
                           type: object
                           x-kubernetes-map-type: atomic
+                        maxItems: 10
                         type: array
                         x-kubernetes-list-map-keys:
                         - name

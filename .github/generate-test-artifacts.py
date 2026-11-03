@@ -282,6 +282,11 @@ if __name__ == "__main__":
     try:
         with open(file_report) as json_file:
             testResults = json.load(json_file)
+            if not testResults:
+                raise ValueError(
+                    "Ginkgo report is empty: a parallel worker probably died"
+                    " before reporting"
+                )
             for t in testResults[0]["SpecReports"]:
                 if (t["State"] != "skipped") and is_user_spec(t):
                     test1 = convert_ginkgo_test(t, matrix)

@@ -16,7 +16,7 @@ jobs:
 
   check-version:
     name: Evaluate release tag
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       is_latest: ${{ steps.check-release.outputs.is_latest }}
       is_stable: ${{ steps.check-release.outputs.is_stable }}
@@ -53,7 +53,7 @@ jobs:
 
   release:
     name: Create Github release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       id-token: write
@@ -182,11 +182,11 @@ jobs:
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
         name: Install Syft
-        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
       -
         name: Run GoReleaser
         id: goreleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         with:
           distribution: goreleaser
           version: v2
@@ -225,22 +225,22 @@ jobs:
           echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       -
         name: Login to ghcr.io
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -335,7 +335,7 @@ jobs:
 
   olm-bundle:
     name: Create OLM bundle and catalog
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       packages: write
@@ -356,7 +356,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
@@ -367,10 +367,10 @@ jobs:
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Login to ghcr.io
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -398,7 +398,7 @@ jobs:
           make olm-catalog
 
       - name: Archive the bundle manifests
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: bundle
           path: |
@@ -408,7 +408,7 @@ jobs:
 
   operatorhub_pr:
     name: Create remote PR for OperatorHub
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - check-version
       - release-binaries
@@ -429,7 +429,7 @@ jobs:
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: bundle
 
@@ -501,7 +501,7 @@ jobs:
       github.repository_owner == 'cloudnative-pg'
     env:
       VERSION: ${{ needs.release-binaries.outputs.version }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       -
         name: Checkout artifact
@@ -521,7 +521,7 @@ jobs:
           git config user.name "${AUTHOR_NAME}"
       -
         name: Download the bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: bundle
       -

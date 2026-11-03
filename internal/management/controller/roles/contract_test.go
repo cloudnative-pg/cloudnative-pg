@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package roles
 
 import (
+	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -30,6 +32,29 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("ApplyPassword", func() {
+	It("sets the password to NULL when disabled, whatever the role was built from", func() {
+		// A `password.mode: setNull` DatabaseRole is built from a configuration
+		// that does not disable the password, so it starts out ignoring it, and
+		// only ApplyPassword asks for the password to be disabled. That has to
+		// override the earlier "leave it alone", or the role keeps whatever
+		// password it already had in PostgreSQL.
+		// A role whose password the operator generates carries no
+		// `passwordSecret`, which on its own means "leave the password alone".
+		dbRole := DatabaseRoleFromConfiguration(apiv1.RoleConfiguration{Name: "dante", Login: true}, false)
+		Expect(dbRole.ignorePassword).To(BeTrue())
+
+		// No Secret is read when the password is disabled.
+		version, err := dbRole.ApplyPassword(context.Background(), nil, "", true, "default")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(version).To(BeEmpty())
+
+		var query strings.Builder
+		Expect(appendPasswordOption(dbRole, &query)).To(Succeed())
+		Expect(query.String()).To(ContainSubstring("PASSWORD NULL"))
+	})
+})
 
 var _ = Describe("DatabaseRole implementation test", func() {
 	fixedTime := time.Date(2023, 4, 4, 0, 0, 0, 0, time.UTC)

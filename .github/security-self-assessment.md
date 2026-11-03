@@ -6,7 +6,7 @@ self-assessment. It is referenced from
 self-assessment evidence.
 
 The assessment follows the [Gemara](https://github.com/ossf/gemara) model
-(version 1.2.0) and maps capabilities and threats to the FINOS
+(version 1.6.0) and maps capabilities and threats to the FINOS
 [Common Cloud Controls (CCC) Core](https://github.com/finos/common-cloud-controls)
 v2025.10. It is split across two machine-readable catalogs:
 

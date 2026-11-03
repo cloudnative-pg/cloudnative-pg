@@ -31,6 +31,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -138,9 +139,17 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 			shellquote.Join(options...))
 		return initCommand
 	}
-	if config.DataChecksums != nil &&
-		*config.DataChecksums {
-		options = append(options, "-k")
+	if config.DataChecksums != nil {
+		majorVersion, err := cluster.GetPostgresqlMajorVersion()
+		if err != nil {
+			log.Warning("cannot detect the PostgreSQL major version, "+
+				"skipping the explicit initdb data checksums flag",
+				"cluster", cluster.Name,
+				"namespace", cluster.Namespace,
+				"err", err)
+		} else if flag := postgres.DataChecksumsInitdbFlag(majorVersion, *config.DataChecksums); flag != "" {
+			options = append(options, flag)
+		}
 	}
 	if logLevel := cluster.Spec.LogLevel; log.DebugLevelString == logLevel ||
 		log.TraceLevelString == logLevel {
@@ -233,6 +242,25 @@ func BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster apiv1.Cluster) *Instanc
 		"instance",
 		"pgbasebackup",
 	)
+
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil {
+		pgBaseBackup := cluster.Spec.Bootstrap.PgBaseBackup
+		pgBaseBackupArgs := make([]string, 0,
+			len(pgBaseBackup.TablespaceMapping)+len(pgBaseBackup.AdditionalArgs))
+		for _, entry := range pgBaseBackup.TablespaceMapping {
+			pgBaseBackupArgs = append(pgBaseBackupArgs, fmt.Sprintf(
+				"--tablespace-mapping=%s=%s",
+				entry.SourceLocation,
+				LocationForTablespace(entry.Name),
+			))
+		}
+		pgBaseBackupArgs = append(pgBaseBackupArgs, pgBaseBackup.AdditionalArgs...)
+		if len(pgBaseBackupArgs) > 0 {
+			initCommand = append(initCommand,
+				"--pgbasebackup-additional-args",
+				shellquote.Join(pgBaseBackupArgs...))
+		}
+	}
 
 	initCommand = append(initCommand, commonFlags...)
 

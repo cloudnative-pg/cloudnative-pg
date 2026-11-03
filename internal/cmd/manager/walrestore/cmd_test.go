@@ -21,7 +21,7 @@ package walrestore
 
 import (
 	"errors"
-	"fmt"
+	"path/filepath"
 
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	"k8s.io/utils/ptr"
@@ -168,35 +168,33 @@ var _ = Describe("Function shouldUseEndOfWALStreamFlag", func() {
 	})
 })
 
-var _ = Describe("Function isEndOfWALStream", func() {
-	It("returns true when the requested WAL was not found", func() {
-		results := []barmanRestorer.Result{
-			{Err: barmanRestorer.ErrWALNotFound},
-		}
-		Expect(isEndOfWALStream(results)).To(BeTrue())
+var _ = Describe("Function checkEndOfWALStreamFlag", func() {
+	var spoolDirectory string
+	var walRestorer *barmanRestorer.WALRestorer
+
+	BeforeEach(func(ctx SpecContext) {
+		spoolDirectory = GinkgoT().TempDir()
+		var err error
+		walRestorer, err = barmanRestorer.New(ctx, nil, spoolDirectory)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, err = walRestorer.SetEndOfWALStreamFromResults([]barmanRestorer.Result{
+			{WalName: "000000010000000000000002", Err: barmanRestorer.ErrWALNotFound},
+		})
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("returns true when only a prefetched WAL was not found", func() {
-		results := []barmanRestorer.Result{
-			{Err: nil},
-			{Err: fmt.Errorf("while restoring the prefetched WAL: %w", barmanRestorer.ErrWALNotFound)},
-		}
-		Expect(isEndOfWALStream(results)).To(BeTrue())
+	It("ignores the flag of another timeline", func() {
+		Expect(checkEndOfWALStreamFlag(walRestorer, "000000020000000000000003")).To(Succeed())
+		Expect(filepath.Join(spoolDirectory, "end-of-wal-stream-00000001")).To(BeAnExistingFile())
 	})
 
-	It("returns false when every WAL was restored", func() {
-		results := []barmanRestorer.Result{
-			{Err: nil},
-			{Err: nil},
-		}
-		Expect(isEndOfWALStream(results)).To(BeFalse())
-	})
+	It("fails once and removes the flag of the requested timeline", func() {
+		Expect(checkEndOfWALStreamFlag(walRestorer, "000000010000000000000003")).
+			To(MatchError(ErrEndOfWALStreamReached))
+		Expect(filepath.Join(spoolDirectory, "end-of-wal-stream-00000001")).ToNot(BeAnExistingFile())
 
-	It("returns false when a restore failed with an error other than not-found", func() {
-		results := []barmanRestorer.Result{
-			{Err: errors.New("connection reset by peer")},
-		}
-		Expect(isEndOfWALStream(results)).To(BeFalse())
+		Expect(checkEndOfWALStreamFlag(walRestorer, "000000010000000000000003")).To(Succeed())
 	})
 })
 

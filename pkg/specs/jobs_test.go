@@ -22,8 +22,10 @@ package specs
 import (
 	"slices"
 
+	"github.com/kballard/go-shellquote"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -88,6 +90,96 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(initdbFlags).Should(ContainSubstring("'--icu-rules=&A < z <<< Z'"))
 	})
 
+	DescribeTable("leaves the initdb data checksums default alone when dataChecksums is unset",
+		func(imageName string) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: imageName,
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						InitDB: &apiv1.BootstrapInitDB{},
+					},
+				},
+			}
+			cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+			jobCommand := cmd.Command
+			initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+			Expect(initdbFlags).ShouldNot(ContainSubstring("--data-checksums"))
+		},
+		Entry("on PostgreSQL 17", "postgres:17.0"),
+		Entry("on PostgreSQL 18", "postgres:18.0"),
+	)
+
+	It("does not set --data-checksums or --no-data-checksums when dataChecksums is true on PostgreSQL 18+", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						DataChecksums: ptr.To(true),
+					},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		jobCommand := cmd.Command
+		initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+		Expect(initdbFlags).ShouldNot(ContainSubstring("--data-checksums"))
+	})
+
+	It("sets --no-data-checksums when dataChecksums is false on PostgreSQL 18+", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						DataChecksums: ptr.To(false),
+					},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		jobCommand := cmd.Command
+		initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+		Expect(initdbFlags).Should(ContainSubstring("--no-data-checksums"))
+	})
+
+	It("sets --data-checksums when dataChecksums is true on PostgreSQL versions before 18", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:17.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						DataChecksums: ptr.To(true),
+					},
+				},
+			},
+		}
+		cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+		jobCommand := cmd.Command
+		initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+		Expect(initdbFlags).Should(ContainSubstring("--data-checksums"))
+		Expect(initdbFlags).ShouldNot(ContainSubstring("--no-data-checksums"))
+	})
+
+	It("does not set --data-checksums or --no-data-checksums when dataChecksums is false on PostgreSQL versions before 18",
+		func() {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:17.0",
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						InitDB: &apiv1.BootstrapInitDB{
+							DataChecksums: ptr.To(false),
+						},
+					},
+				},
+			}
+			cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+			jobCommand := cmd.Command
+			initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+			Expect(initdbFlags).ShouldNot(ContainSubstring("--no-data-checksums"))
+			Expect(initdbFlags).ShouldNot(ContainSubstring("--data-checksums"))
+		})
+
 	It("contains correct labels", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -136,6 +228,76 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
+	})
+})
+
+var _ = Describe("Job created via pg_basebackup", func() {
+	It("passes the additional arguments to the pgbasebackup command", func() {
+		args := []string{"--max-rate=50M", "--label", "my 'quoted' label"}
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source:         "source",
+						AdditionalArgs: args,
+					},
+				},
+			},
+		}
+		jobCommand := BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster).Command
+		Expect(jobCommand).Should(ContainElement("--pgbasebackup-additional-args"))
+		parsedArgs, err := shellquote.Split(
+			jobCommand[slices.Index(jobCommand, "--pgbasebackup-additional-args")+1])
+		Expect(err).ToNot(HaveOccurred())
+		Expect(parsedArgs).To(Equal(args))
+	})
+
+	It("passes the tablespace mappings before the additional arguments", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source: "origin",
+						TablespaceMapping: []apiv1.TablespaceMappingEntry{
+							{Name: "fast", SourceLocation: "/data/pg/fast"},
+							{Name: "archive", SourceLocation: "/data/pg/my archive"},
+						},
+						AdditionalArgs: []string{"--max-rate=50M"},
+					},
+				},
+			},
+		}
+
+		command := BuildPrimaryBootstrapCommandViaPgBaseBackup(cluster).Command
+		Expect(command).To(ContainElement("--pgbasebackup-additional-args"))
+		parsedArgs, err := shellquote.Split(
+			command[slices.Index(command, "--pgbasebackup-additional-args")+1])
+		Expect(err).ToNot(HaveOccurred())
+		Expect(parsedArgs).To(Equal([]string{
+			"--tablespace-mapping=/data/pg/fast=/var/lib/postgresql/tablespaces/fast/data",
+			"--tablespace-mapping=/data/pg/my archive=/var/lib/postgresql/tablespaces/archive/data",
+			"--max-rate=50M",
+		}))
+	})
+
+	It("doesn't pass the tablespace mapping when joining a replica", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
+						Source: "origin",
+						TablespaceMapping: []apiv1.TablespaceMappingEntry{
+							{Name: "fast", SourceLocation: "/data/pg/fast"},
+						},
+					},
+				},
+			},
+		}
+
+		command := BuildReplicaBootstrapCommandViaJoin(cluster).Command
+		for _, arg := range command {
+			Expect(arg).ToNot(ContainSubstring("--tablespace-mapping"))
+		}
 	})
 })
 

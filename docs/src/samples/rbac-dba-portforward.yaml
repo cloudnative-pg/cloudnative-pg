@@ -1,0 +1,42 @@
+# Optional: allow a DBA to open a local tunnel to PostgreSQL with
+# `kubectl port-forward`, without granting a shell inside the database
+# containers (`pods/exec` and `pods/attach` are not included).
+#
+# This is a separate role on purpose: many environments cannot grant it as a
+# standing permission, and require an approved change or incident to do so.
+# Bind it only when needed, and remove the binding afterwards.
+#
+# Kubernetes RBAC cannot select Pods by label: this role allows a tunnel to ANY
+# Pod in the namespace where it is bound, not only to PostgreSQL Pods. Bind it
+# only in namespaces that hold databases.
+#
+# Combine it with `cnpg-dba-viewer` (see `rbac-dba-viewer.yaml`) if the DBA
+# also needs to inspect the Cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-dba-portforward
+rules:
+  # `kubectl port-forward` resolves services and pods before tunnelling
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"]
+---
+# Example: grant the role to a group of DBAs in a single namespace.
+# Replace the namespace and the group name with your own.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cnpg-dba-portforward
+  namespace: default
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: dbas
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cnpg-dba-portforward

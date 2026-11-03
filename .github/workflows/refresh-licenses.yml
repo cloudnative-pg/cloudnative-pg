@@ -11,7 +11,7 @@ permissions: read-all
 jobs:
   licenses:
     name: Refresh licenses
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -34,6 +34,8 @@ jobs:
           body: "Refresh the licenses directory"
           branch: "license-updater"
           author: "license-updater <license-updater@users.noreply.github.com>"
+          committer: "license-updater <license-updater@users.noreply.github.com>"
+          labels: no-issue,automated
           add-paths: |
             licenses/**
           commit-message: "chore: refresh licenses directory"

@@ -164,6 +164,12 @@ CloudNativePG manages the following predefined annotations:
 : The WAL at the start of a backup.
   This annotation is available only on `VolumeSnapshot` resources.
 
+`cnpg.io/bootstrapPending`
+:   Set to `true` by the operator on an instance pod created with the
+    `bootstrap-instance` init container, and removed once that container has
+    completed successfully. When a backup tool restores the pod as it was, the
+    init container runs again without it, so it leaves the volumes untouched.
+
 `cnpg.io/coredumpFilter`
 :   Filter to control the coredump of Postgres processes, expressed with a
     bitmask. By default it's set to `0x31` to exclude shared memory
@@ -267,6 +273,13 @@ CloudNativePG manages the following predefined annotations:
 
 `cnpg.io/reloadedAt`
 :   Contains the latest cluster `reload` time. `reload` is triggered by the user through a plugin.
+
+`cnpg.io/rotatePassword`
+:   When set to any value on a `DatabaseRole` whose password the operator
+    generates, it asks for that password to be rotated immediately, regardless
+    of its renewal deadline. The operator removes the annotation once the
+    rotation has happened, so it is a one-shot request. See
+    [Manual rotation](declarative_role_management.md#manual-rotation).
 
 `cnpg.io/skipEmptyWalArchiveCheck`
 :   When set to `enabled` on a `Cluster` resource, the operator disables the check

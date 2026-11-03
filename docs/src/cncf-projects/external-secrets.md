@@ -110,6 +110,7 @@ spec:
       metadata:
         labels:
           cnpg.io/reload: "true"
+      type: kubernetes.io/basic-auth
       data:
         password: "{{ .password }}"
         pgpass: "cluster-example-rw:5432:app:app:{{ .password }}"
@@ -145,12 +146,75 @@ kubectl get secret cluster-example-app \
 You should see the password change every 30 seconds, confirming that the
 rotation is working correctly.
 
-### There's More
+### Managing the Password of a `DatabaseRole`
 
-While the example above focuses on the default `cluster-example-app` secret
-created by CloudNativePG, the same approach can be extended to manage any
-custom secrets or PostgreSQL users you create to regularly rotate their
-password.
+The example above updates `cluster-example-app`, a secret CloudNativePG created
+itself. The same generator can instead own the password of a role you declare
+with a [`DatabaseRole`](../declarative_role_management.md), by pairing it with
+[`mode: secret`](../declarative_role_management.md#mode-secret): External
+Secrets generates and rotates the password, and CloudNativePG reads that secret
+and applies it to PostgreSQL.
+
+The secret must be of type `kubernetes.io/basic-auth` and hold a `username` key
+carrying the role name, alongside `password`. It must also carry the
+`cnpg.io/reload: "true"` label: the instance manager is deliberately not
+allowed to watch secrets, so the operator watches the labeled ones on its
+behalf and signals the change through the status of the role. Without that
+label a rotation is never noticed.
+
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: stevie-password
+spec:
+  refreshInterval: "24h"
+  target:
+    name: stevie-eso-password
+    creationPolicy: CreateOrMerge
+    template:
+      metadata:
+        labels:
+          cnpg.io/reload: "true"
+      type: kubernetes.io/basic-auth
+      data:
+        # Must match the role name in the DatabaseRole below
+        username: "stevie"
+        password: "{{ .password | toString }}"
+        pgpass: "cluster-example-rw:5432:app:stevie:{{ .password }}"
+        jdbc-uri: "jdbc:postgresql://cluster-example-rw.default:5432/app?password={{ .password }}&user=stevie"
+        uri: "postgresql://stevie:{{ .password }}@cluster-example-rw.default:5432/app"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: pg-password-generator
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: stevie
+spec:
+  cluster:
+    name: cluster-example
+  name: stevie
+  login: true
+  password:
+    mode: secret
+    secret: stevie-eso-password
+```
+
+:::warning
+Do not reach for
+[`mode: external`](../declarative_role_management.md#mode-external) here. That
+mode tells the operator to stop managing the password altogether, so the
+generated secret would never be applied and the role would be left with no
+password at all.
+:::
+
+The same approach extends to any custom secret or PostgreSQL user you create
+and want to rotate regularly.
 
 
 ## Example: Integration with an External KMS

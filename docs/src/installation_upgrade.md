@@ -14,12 +14,12 @@ title: Installation and upgrades
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.0.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.0.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
 ```
 
 You can verify that with:
@@ -387,9 +387,14 @@ requires no configuration; the lease timings can optionally be tuned via
 This feature requires the operator to manage `Lease` objects in the
 `coordination.k8s.io` API group. The bundled operator manifest and the Helm
 chart grant the required permissions automatically. If you manage the
-operator's RBAC yourself, you must add the `create`, `get`, `list`, `update`
-and `watch` verbs on `leases` in the `coordination.k8s.io` API group before
-upgrading, otherwise primaries will be unable to promote.
+operator's RBAC yourself, you must add the `create`, `delete`, `get`, `list`,
+`update` and `watch` verbs on `leases` in the `coordination.k8s.io` API group
+before upgrading, otherwise primaries will be unable to promote. The `delete`
+verb is needed when a `Cluster` is recreated over the resources left behind by
+a previous one, for example by a backup tool. The API server only lets the
+operator adopt the leftover `Lease` if it can delete it. When the `Cluster` is
+restored over orphan PVCs, the operator deletes the `Lease` along with the
+orphan Pods instead, and creates a new one.
 :::
 
 #### Operator-to-instance authentication (`GHSA-7qwx-x8ff-3px9`)
@@ -399,22 +404,13 @@ sensitive endpoints of the instance manager's status port (backup,
 `pg_controldata`, partial WAL archive, and instance-manager upgrade) by pinning
 an in-memory client certificate. This is enabled automatically and requires no
 configuration. Status, health, and probe endpoints remain unauthenticated.
-This hardening is not backported; on releases earlier than 1.30.0, continue to
-restrict the status port (TCP 8000) with a `NetworkPolicy`, which remains its
-security boundary there. See
+This protection has a hard requirement: the status port **must** be served
+over TLS, which has been the default since v1.24. This hardening is not
+backported; on releases earlier than 1.30.0, continue to restrict the status
+port (TCP 8000) with a `NetworkPolicy`, which remains its security boundary
+there. See
 [Operator-to-instance authentication](security.md#operator-to-instance-authentication)
 for details.
-
-:::warning
-This protection has a hard requirement: the status port **must** be served over
-TLS, which has been the default since v1.24. Instances created by an operator
-older than v1.24 serve the status port over plain HTTP; once their instance
-manager is upgraded to 1.30.0 the operator can no longer authenticate to them
-and every call to the protected endpoints is **permanently** rejected with
-`401 Unauthorized`. If you still run such instances, perform a rolling update so
-their Pods are recreated with a TLS-enabled status port. Instances created by
-v1.24 or later are unaffected.
-:::
 
 #### Metrics exporter privilege separation (`CVE-2026-44477`)
 

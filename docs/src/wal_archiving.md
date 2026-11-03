@@ -16,7 +16,7 @@ strategies.
 ## Plugin-Based Architecture
 
 CloudNativePG supports WAL archiving through a **plugin-based mechanism**,
-defined via the [`spec.pluginConfiguration`](cloudnative-pg.v1.md#clusterspec)
+defined via the [`spec.plugins`](cloudnative-pg.v1.md#clusterspec)
 section of the `Cluster` resource.
 
 Only **one plugin at a time** can be responsible for WAL archiving. This is
@@ -34,7 +34,8 @@ For full documentation, configuration options, and best practices, see the
 
 CloudNativePG still supports WAL archiving natively through the
 `.spec.backup.barmanObjectStore` field. While still functional, **this
-interface is deprecated** and will be removed in a future release.
+interface is deprecated**: CloudNativePG 1.31 is the last minor release that
+ships with it, and it is removed starting from 1.32.0.
 
 :::info[Important]
     All new deployments are strongly encouraged to adopt the plugin-based
