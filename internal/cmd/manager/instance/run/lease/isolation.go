@@ -245,7 +245,7 @@ func (e *SupersededError) Error() string {
 // (see SupersededError). With the isolation check disabled only the second
 // cause counts: an unreachable peer is not proof of having been replaced, a
 // peer naming another primary is. It returns (false, nil) without checking
-// anything if the check has no configuration or the cluster has a single
+// anything if the Cluster has not been loaded yet or the cluster has a single
 // instance. On any step-down verdict or checker build failure, reason carries
 // the specific cause for the caller to log.
 func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, reason error) {
@@ -253,6 +253,11 @@ func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, 
 	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
 		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
 	}
+	// The defaulting logic always sets the isolation check configuration on
+	// a Cluster that has been reconciled, so it is missing only when the
+	// instance manager has not cached the Cluster yet and the caller got the
+	// empty placeholder from GetClusterOrDefault. There is nothing to check
+	// in that case.
 	if cfg == nil {
 		return false, nil
 	}
