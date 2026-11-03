@@ -1798,7 +1798,7 @@ func (instance *Instance) HandleInstanceCommandRequests(
 		return false, nil
 	case shutDownStepDown:
 		if err := instance.TryShuttingDownStepDown(ctx); err != nil {
-			contextLogger.Error(err, "error shutting down instance, proceeding")
+			contextLogger.Error(err, "error shutting down instance for the primary step-down, proceeding")
 		}
 		return false, nil
 	default:
