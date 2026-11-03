@@ -38,7 +38,7 @@ production timings):
 | `RenewDeadline` | `2` | Holder whose last confirmed write is older than this is overdue | `renewDeadlineSeconds`, default 10s |
 | `RenewPeriod` | `1` | Minimum spacing between holder renewals; also the monitor's tick | `retryPeriodSeconds`, default 2s |
 | `StepDownDelay` | `1` | Ticks an overdue leader may take to run one peer check | `retryPeriodSeconds` + `isolationCheck.requestTimeout` (2s + 1000ms): the ticker phase plus one parallel probe round |
-| `DeliveryDelay` | `1` | Ticks between a step-down verdict and the soft stop | `W + X`, neither bounded by the code: `W` is the wait for the lifecycle manager to accept `TryRequestImmediateShutdown` (non-blocking send, retried every `retryPeriodSeconds`), `X` the time `pg_ctl stop -m immediate` takes to deliver the signal (a failure is logged and not retried) |
+| `DeliveryDelay` | `1` | Ticks between a step-down verdict and the soft stop | `W + X`, neither bounded by the code: `W` is the wait for the lifecycle manager to accept `TryRequestStepDownShutdown` (non-blocking send, retried every `retryPeriodSeconds`), `X` the time `pg_ctl stop` takes to start the stop (a failure is logged and not retried) |
 | `WatchdogMaxSilence` | `2` | Silence of the lease loop after which the liveness probe fails | `defaultWatchdogMaxSilence`, `renewDeadlineSeconds + 2 * retryPeriodSeconds`, 14s at the defaults |
 | `ProbeDelay` | `6` | Ticks from the silence bound being crossed to the kubelet kill | liveness `periodSeconds * failureThreshold`, 10s * 3 = 30s at the defaults |
 | `MonitorWorks` | `TRUE` | `FALSE` switches the lease-age monitor off | none: stands for a `monitorLeaseAge` goroutine that no longer runs |
