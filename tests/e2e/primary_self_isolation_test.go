@@ -42,10 +42,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDisruptive), func() {
+var _ = Describe("Primary self isolation", Serial, Label(tests.LabelDisruptive), func() {
 	const (
 		level           = tests.Lowest
-		namespacePrefix = "self-fencing"
+		namespacePrefix = "primary-self-isolation"
 	)
 
 	BeforeEach(func() {
@@ -57,14 +57,14 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 		}
 	})
 
-	verifyIsolatedPrimary := func(namespace, isolatedPod, isolatedNode string, livenessPingerEnabled bool) {
+	verifyIsolatedPrimary := func(namespace, isolatedPod, isolatedNode string, isolationCheckEnabled bool) {
 		By("verifying the isolatedPod behaviour", func() {
 			defaultCommand := fmt.Sprintf(
 				"docker exec %v crictl ps -a -q "+
 					"--label io.kubernetes.pod.namespace=%s,io.kubernetes.pod.name=%s "+
 					"--name postgres", isolatedNode, namespace, isolatedPod)
 
-			if livenessPingerEnabled {
+			if isolationCheckEnabled {
 				Eventually(func(g Gomega) {
 					out, _, err := run.Unchecked(fmt.Sprintf("%s -s Exited", defaultCommand))
 					g.Expect(err).ToNot(HaveOccurred())
@@ -88,7 +88,7 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 		})
 	}
 
-	assertLivenessPinger := func(clusterManifest string, livenessPingerEnabled bool) {
+	assertPrimaryIsolation := func(clusterManifest string, isolationCheckEnabled bool) {
 		var namespace, clusterName, isolatedNode string
 		var err error
 		var oldPrimaryPod *corev1.Pod
@@ -139,7 +139,7 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 			}, testTimeouts[timeouts.NewPrimaryAfterFailover]).Should(Succeed())
 		})
 
-		verifyIsolatedPrimary(namespace, oldPrimaryPod.Name, isolatedNode, livenessPingerEnabled)
+		verifyIsolatedPrimary(namespace, oldPrimaryPod.Name, isolatedNode, isolationCheckEnabled)
 
 		By("reconnecting the isolated Node", func() {
 			_, _, err = run.Unchecked(fmt.Sprintf("docker network connect kind %v", isolatedNode))
@@ -163,17 +163,17 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 		})
 	}
 
-	When("livenessPinger is enabled", func() {
-		const sampleFile = fixturesDir + "/self-fencing/cluster-liveness-pinger-enabled.yaml.template"
+	When("the primary isolation check is enabled", func() {
+		const sampleFile = fixturesDir + "/primary_self_isolation/cluster-primary-isolation-enabled.yaml.template"
 		It("will terminate an isolated primary", func() {
-			assertLivenessPinger(sampleFile, true)
+			assertPrimaryIsolation(sampleFile, true)
 		})
 	})
 
-	When("livenessPinger is disabled", func() {
-		const sampleFile = fixturesDir + "/self-fencing/cluster-liveness-pinger-disabled.yaml.template"
+	When("the primary isolation check is disabled", func() {
+		const sampleFile = fixturesDir + "/primary_self_isolation/cluster-primary-isolation-disabled.yaml.template"
 		It("will not restart an isolated primary", func() {
-			assertLivenessPinger(sampleFile, false)
+			assertPrimaryIsolation(sampleFile, false)
 		})
 	})
 })

@@ -4,6 +4,7 @@ metadata:
   name: diskspace
 spec:
   instances: 3
+  failoverDelay: 900
 
   postgresql:
     parameters:

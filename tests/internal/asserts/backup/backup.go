@@ -43,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	pgutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -366,7 +367,7 @@ func AssertClusterRestore(
 		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 
 		// Restored primary should be on timeline 2
-		out, _, err := exec.QueryInInstancePod(
+		out, _, err := exec.EventuallyExecQueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 			exec.PodLocator{
 				Namespace: namespace,
@@ -374,6 +375,8 @@ func AssertClusterRestore(
 			},
 			pgutils.AppDBName,
 			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+			environment.RetryTimeout,
+			objects.PollingTime,
 		)
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 

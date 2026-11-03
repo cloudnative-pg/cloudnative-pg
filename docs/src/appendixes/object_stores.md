@@ -8,11 +8,15 @@ title: Appendix C - Common object stores for backups
 
 :::warning
     As of CloudNativePG 1.26, **native Barman Cloud support is deprecated** in
-    favor of the **Barman Cloud Plugin**. While the native integration remains
-    functional for now, we strongly recommend beginning a gradual migration to
-    the plugin-based interface after appropriate testing. The Barman Cloud
-    Plugin documentation describes
-    [how to use common object stores](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/).
+    favor of the **Barman Cloud Plugin**. **CloudNativePG 1.31 is the last
+    minor release that ships with native Barman Cloud support, which is removed
+    starting from 1.32.0.** Releases up to and including 1.31, and their patch
+    releases, keep native support for as long as they are supported. You must
+    migrate to the plugin before upgrading to 1.32 or later. We strongly
+    recommend migrating to the plugin-based interface after appropriate testing.
+    The Barman Cloud Plugin documentation describes
+    [how to use common object stores](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/)
+    and [how to migrate from the built-in backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/).
 :::
 
 You can store the [backup](../backup.md) files in any service that is supported
@@ -136,6 +140,15 @@ In case you're using S3-compatible object storage, like **MinIO** or
 **Linode Object Storage**, you can specify an endpoint instead of using the
 default S3 one.
 
+:::warning
+Barman Cloud uses the Boto3 SDK and takes AWS S3 as its reference
+implementation. Issues you can reproduce on AWS S3 are treated as Barman Cloud
+defects. Issues that happen only on a third-party object store are API
+incompatibilities, and you must resolve them with your storage vendor. See the
+[Barman Cloud documentation](https://docs.pgbarman.org/release/latest/) for
+known workarounds.
+:::
+
 In this example, it will use the `bucket` of **Linode** in the region
 `us-east1`.
 
@@ -187,6 +200,69 @@ spec:
       value: when_required
 ```
 :::
+
+### Server-Side Encryption with customer-provided keys (SSE-C)
+
+Some S3-compatible providers, such as Hetzner Object Storage, do not offer
+bucket-managed server-side encryption (SSE-S3 / SSE-KMS) and only support
+Server-Side Encryption with customer-provided keys (SSE-C). With SSE-C, the
+encryption key is supplied with every request, and the provider uses it to
+encrypt and decrypt objects without storing it.
+
+To enable SSE-C, set the `sseCustomerKey` field in the `s3Credentials` section
+to a reference to a secret holding a base64-encoded 256-bit (32-byte) AES key.
+SSE-C requires Barman Cloud 3.20 or later in the operand image: with an older
+version, WAL archiving and backups fail with
+`unrecognized arguments: --sse-customer-key`.
+
+Generate the key and store it in a Kubernetes secret:
+
+```sh
+openssl rand 32 | base64 > encryption.key
+
+kubectl create secret generic aws-sse-c \
+  --from-file=key=encryption.key
+```
+
+:::warning
+    Keep this key safe and backed up **outside** the object store. If you lose
+    it, your backups and WAL files become permanently unrecoverable: the
+    provider cannot decrypt them for you.
+:::
+
+Then reference the secret in the `Cluster` definition:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://BUCKET_NAME/path/to/folder"
+      endpointURL: "https://fsn1.your-objectstorage.com"
+      s3Credentials:
+        accessKeyId:
+          name: aws-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: aws-creds
+          key: ACCESS_SECRET_KEY
+        sseCustomerKey:
+          name: aws-sse-c
+          key: key
+      [...]
+```
+
+The same key is used for every operation: base backups, WAL archiving, WAL
+restore and recovery. It must remain unchanged and available for the whole
+lifetime of the backups it protects. To use a new key, use a new
+`destinationPath` or `serverName`.
+
+`sseCustomerKey` works with any authentication method, including
+`inheritFromIAMRole`. It cannot be combined with the bucket-managed
+`encryption` setting of the `data` and `wal` sections: a `Cluster` that sets
+both is rejected.
 
 ### Using Object Storage with a private CA
 

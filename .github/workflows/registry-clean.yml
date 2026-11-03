@@ -7,16 +7,16 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions: {}
+
 env:
   IMAGE_NAME: "cloudnative-pg-testing"
-  CONTAINER_IMAGE_NAMES: "pgbouncer-testing, postgresql-testing, postgis-testing"
-
-permissions: read-all
 
 jobs:
   clean-ghcr:
     name: delete old testing container images
     permissions:
+      contents: read
       packages: write
     runs-on: ubuntu-latest
     steps:
@@ -28,13 +28,3 @@ jobs:
           keep-n-most-recent: 1
           account: ${{ github.repository_owner }}
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Delete '-testing' operand images
-        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
-        if: ${{ github.repository_owner == 'cloudnative-pg' }}
-        with:
-          image-names: ${{ env.CONTAINER_IMAGE_NAMES }}
-          cut-off: 1w
-          keep-n-most-recent: 1
-          account: "cloudnative-pg"
-          token: ${{ secrets.REPO_GHA_PAT }}

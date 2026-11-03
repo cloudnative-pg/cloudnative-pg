@@ -26,8 +26,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// Transaction is a function that modifies a cluster
-type Transaction func(cluster *apiv1.Cluster)
+// Transaction is a function that modifies a cluster. It is an alias, so that a
+// list of transactions can be handed straight to PatchObjectWithOptimisticLock.
+type Transaction = func(cluster *apiv1.Cluster)
 
 // SetClusterReadyCondition updates the cluster's readiness condition
 // according to the cluster phase

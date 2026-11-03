@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-failure-domain
+spec:
+  instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

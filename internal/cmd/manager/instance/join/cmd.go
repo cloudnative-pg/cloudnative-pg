@@ -28,7 +28,6 @@ import (
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
@@ -47,14 +46,20 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "join [options]",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
-				Name:      clusterName,
-				Namespace: namespace,
-			})
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			contextLogger := log.FromContext(ctx)
+
+			completed, err := postgres.IsBootstrapCompleted()
+			if err != nil {
+				contextLogger.Error(err, "Error while checking bootstrap status")
+				return err
+			}
+			if completed {
+				contextLogger.Warning("The bootstrap is not pending in this Pod, leaving the volumes untouched")
+				return nil
+			}
+
 			// The fields in the instance are needed to correctly
 			// download the secret containing the TLS
 			// certificates
@@ -107,24 +112,25 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
-	// Download the cluster definition from the API server
-	var cluster apiv1.Cluster
-	if err := client.Get(ctx,
-		ctrl.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
-		&cluster,
-	); err != nil {
-		contextLogger.Error(err, "Error while getting cluster")
+	// Bootstrap starts as soon as the Pod does, often before the operator
+	// writes the certificate status. Use the Cluster this call returns; see
+	// WaitForClusterCertificates for why.
+	cluster, err := management.WaitForClusterCertificates(ctx, client, ctrl.ObjectKey{
+		Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName(),
+	})
+	if err != nil {
+		contextLogger.Error(err, "Error while waiting for the certificate status")
 		return err
 	}
-	instance.SetCluster(&cluster)
+	instance.SetCluster(cluster)
 
-	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
+	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, cluster); err != nil {
 		contextLogger.Error(err, "Error while refreshing secrets")
 		return err
 	}
 
 	// Run "pg_basebackup" to download the data directory from the primary
-	if err := info.Join(ctx, &cluster); err != nil {
+	if err := info.Join(ctx, cluster); err != nil {
 		contextLogger.Error(err, "Error joining node")
 		return err
 	}

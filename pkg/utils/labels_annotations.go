@@ -216,6 +216,14 @@ const (
 	// The status can be "initializing", "ready" or "detached"
 	PVCStatusAnnotationName = MetadataNamespace + "/pvcStatus"
 
+	// BootstrapPendingAnnotationName is the name of the annotation the operator
+	// sets to "true" on an instance Pod created with the bootstrap init
+	// container, and removes once that container has terminated successfully.
+	//
+	// A pending marker is used instead of a completion one so that a missing
+	// annotation, the normal and safe default, means the bootstrap is done.
+	BootstrapPendingAnnotationName = MetadataNamespace + "/bootstrapPending"
+
 	// LegacyBackupAnnotationName is the name of the annotation represents whether taking a backup without passing
 	// the name argument even on barman version 3.3.0+. The value can be "true" or "false"
 	LegacyBackupAnnotationName = MetadataNamespace + "/forceLegacyBackup"
@@ -231,6 +239,13 @@ const (
 	// OperatorManagedSecretsAnnotationName is the name of the annotation containing
 	// the secrets managed by the operator inside the generated service account
 	OperatorManagedSecretsAnnotationName = MetadataNamespace + "/managedSecrets"
+
+	// RotatePasswordAnnotationName is the name of the annotation a user sets on
+	// a DatabaseRole to request that its generated password be rotated
+	// immediately, regardless of its renewal deadline. The operator removes
+	// the annotation once the rotation it asked for has happened: it is a
+	// one-shot request, not a persistent setting.
+	RotatePasswordAnnotationName = MetadataNamespace + "/rotatePassword"
 
 	// FencedInstanceAnnotation is the annotation to be used for fencing instances, the value should be a
 	// JSON list of all the instances we want to be fenced, e.g. `["cluster-example-1","cluster-example-2`"].
@@ -469,16 +484,6 @@ func InheritLabels(
 }
 
 func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) map[string]string {
-	containsContainerWithName := func(name string, containers ...corev1.Container) bool {
-		for _, container := range containers {
-			if container.Name == name {
-				return true
-			}
-		}
-
-		return false
-	}
-
 	appArmorAnnotations := make(map[string]string)
 	for annotation, value := range annotations {
 		if strings.HasPrefix(annotation, AppArmorAnnotationPrefix) {
@@ -488,7 +493,7 @@ func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) 
 			}
 
 			containerName := appArmorSplit[1]
-			if containsContainerWithName(containerName, append(spec.Containers, spec.InitContainers...)...) {
+			if PodSpecHasContainer(spec, containerName) {
 				appArmorAnnotations[annotation] = value
 			}
 		}

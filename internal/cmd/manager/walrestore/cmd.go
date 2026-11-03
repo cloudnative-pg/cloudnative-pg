@@ -92,6 +92,11 @@ func NewCmd() *cobra.Command {
 					"end-of-wal-stream flag found." +
 						"Exiting with error once to let Postgres try switching to streaming replication")
 				return err
+			case errors.Is(err, barmanRestorer.ErrConnectivity):
+				// Barman reports transient network errors with exit code 2
+				// starting from 3.20.0
+				contextLog.Info("transient connectivity issue while restoring WAL, will retry",
+					"walName", args[0], "error", err)
 			default:
 				contextLog.Info("wal-restore command failed", "error", err)
 			}
@@ -150,7 +155,7 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 		return nil
 	}
 
-	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
+	options, env, maxParallel, err := getWALRestoreSettings(ctx, cacheClient, cluster, podName, rewindMode)
 	if errors.Is(err, ErrNoBackupConfigured) {
 		// Backup not configured, skipping WAL
 		contextLog.Trace("Skipping WAL restore, there is no backup configuration",
@@ -161,20 +166,8 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 		return err
 	}
 	if err != nil {
-		return fmt.Errorf("while getting recover configuration: %w", err)
+		return err
 	}
-
-	options, err := barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, recoverClusterName)
-	if err != nil {
-		return fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
-	}
-
-	env, err := cacheClient.GetEnv(cache.WALRestoreKey)
-	if err != nil {
-		return fmt.Errorf("failed to get envs: %w", err)
-	}
-
-	mergeEnv(env, recoverEnv)
 
 	// Create the restorer
 	var walRestorer *barmanRestorer.WALRestorer
@@ -196,17 +189,20 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 	}
 
 	// Step 2: return error if the end-of-wal-stream flag is set.
+	// A restore_command failure tells PostgreSQL the WAL is not in the archive,
+	// so it can switch to streaming. Prefetch sets the flag when it exhausts the
+	// archive for a timeline, and one failure is returned per flag.
+	//
 	// We skip this step if the flag machinery does not apply to this invocation
 	useEndOfWALStreamFlag := shouldUseEndOfWALStreamFlag(cluster, podName, rewindMode)
 	if useEndOfWALStreamFlag {
-		if err := checkEndOfWALStreamFlag(walRestorer); err != nil {
+		if err := checkEndOfWALStreamFlag(walRestorer, walName); err != nil {
 			return err
 		}
 	}
 
 	// Step 3: gather the WAL files names to restore. If the required file isn't a regular WAL, we download it directly.
 	var walFilesList []string
-	maxParallel := maxWALFilesPerInvocation(barmanConfiguration, rewindMode)
 	if postgres.IsWALFile(walName) {
 		// If this is a regular WAL file, we try to prefetch
 		if walFilesList, err = gatherWALFilesToRestore(walName, maxParallel); err != nil {
@@ -228,16 +224,16 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 		return walStatus[0].Err
 	}
 
-	// Step 5: set end-of-wal-stream flag if any download job returned file-not-found
+	// Step 5: set end-of-wal-stream flag if any regular WAL download job returned file-not-found
 	// We skip this step if the flag machinery does not apply to this invocation
-	endOfWALStream := isEndOfWALStream(walStatus)
-	if useEndOfWALStreamFlag && endOfWALStream {
-		contextLog.Info(
-			"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
-
-		err = walRestorer.SetEndOfWALStream()
-		if err != nil {
+	endOfWALStream := false
+	if useEndOfWALStreamFlag {
+		if endOfWALStream, err = walRestorer.SetEndOfWALStreamFromResults(walStatus); err != nil {
 			return err
+		}
+		if endOfWALStream {
+			contextLog.Info(
+				"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
 		}
 	}
 
@@ -300,34 +296,17 @@ func restoreWALViaPlugins(
 	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName), mode)
 }
 
-// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
-func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer) error {
-	contain, err := walRestorer.IsEndOfWALStream()
+// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set for the
+// timeline of the requested WAL, and removes the flag so it fails only once.
+func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer, walName string) error {
+	contains, err := walRestorer.ConsumeEndOfWALStreamForWAL(walName)
 	if err != nil {
 		return err
 	}
-
-	if contain {
-		err := walRestorer.ResetEndOfWalStream()
-		if err != nil {
-			return err
-		}
-
+	if contains {
 		return ErrEndOfWALStreamReached
 	}
 	return nil
-}
-
-// isEndOfWALStream returns true if one of the downloads has returned
-// a file-not-found error
-func isEndOfWALStream(results []barmanRestorer.Result) bool {
-	for _, result := range results {
-		if errors.Is(result.Err, barmanRestorer.ErrWALNotFound) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // mergeEnv merges all the values inside incomingEnv into env
@@ -343,6 +322,92 @@ func mergeEnv(env []string, incomingEnv []string) {
 			}
 		}
 	}
+}
+
+// getWALRestoreSettings resolves the barman-cloud-wal-restore command-line
+// options, the environment carrying the object store credentials, and the
+// prefetch parallelism to use for a WAL restore. See the bootstrap-recovery
+// gate below for how a Job-populated cache fits into this.
+func getWALRestoreSettings(
+	ctx context.Context,
+	cacheClient local.CacheClient,
+	cluster *apiv1.Cluster,
+	podName string,
+	rewindMode bool,
+) (options []string, env []string, maxParallel int, err error) {
+	// During a bootstrap recovery no primary has been elected yet and there is no
+	// instance-manager cache. The Job resolves the recovery source object store
+	// (for a recovery.backup reference it lives only in the referenced Backup CR,
+	// so it is not derivable from the cluster spec here) and caches it for us.
+	// Gating on CurrentPrimary keeps this lookup off a running instance's hot
+	// path, where the key is never set.
+	//
+	// This gate relies on CurrentPrimary never reverting to empty once set.
+	// If that ever stopped being true, a long-running instance could
+	// re-enter this branch and, on a cache miss, silently fall through to
+	// GetRecoverConfiguration below instead of hitting its intended hot-path
+	// resolution.
+	if cluster.Status.CurrentPrimary == "" {
+		barmanConfiguration, configErr := cacheClient.GetBarmanObjectStore(cache.WALRestoreConfigKey)
+		switch {
+		case configErr == nil:
+			// The cached recovery-source store's ServerName is always populated by
+			// loadBackup (from the Backup CR, or from the external cluster's
+			// GetServerName()), so passing it again here is not a real fallback.
+			return walRestoreSettingsFromStore(
+				ctx, cacheClient, barmanConfiguration, barmanConfiguration.ServerName, nil, rewindMode)
+		case !errors.Is(configErr, cache.ErrCacheMiss):
+			// A real failure resolving the bootstrap-cached recovery source store
+			// must not be mistaken for "nothing cached yet": falling through here
+			// would silently restore WALs from the cluster's own (unrelated, and
+			// possibly empty) backup destination instead of the recovery source.
+			return nil, nil, 0, fmt.Errorf("while getting the cached recovery source object store: %w", configErr)
+		}
+	}
+
+	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
+	if err != nil {
+		if errors.Is(err, ErrNoBackupConfigured) {
+			// returned unwrapped so the caller can detect it and skip the WAL
+			return nil, nil, 0, err
+		}
+		return nil, nil, 0, fmt.Errorf("while getting recover configuration: %w", err)
+	}
+
+	return walRestoreSettingsFromStore(ctx, cacheClient, barmanConfiguration, recoverClusterName, recoverEnv, rewindMode)
+}
+
+// walRestoreSettingsFromStore builds the barman-cloud-wal-restore options, loads
+// the credentials environment, and computes the prefetch parallelism from a
+// resolved object store configuration. recoverEnv carries extra environment
+// (e.g. the endpoint CA bundle location) to merge on top of the cached
+// credentials; it is nil for a bootstrap recovery, whose cached credentials
+// already include it.
+func walRestoreSettingsFromStore(
+	ctx context.Context,
+	cacheClient local.CacheClient,
+	barmanConfiguration *apiv1.BarmanObjectStoreConfiguration,
+	serverName string,
+	recoverEnv []string,
+	rewindMode bool,
+) (options []string, env []string, maxParallel int, err error) {
+	options, err = barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, serverName)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
+	}
+
+	env, err = cacheClient.GetEnv(cache.WALRestoreKey)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("failed to get envs: %w", err)
+	}
+	mergeEnv(env, recoverEnv)
+
+	maxParallel = 1
+	if !rewindMode && barmanConfiguration.Wal != nil && barmanConfiguration.Wal.MaxParallel > 1 {
+		maxParallel = barmanConfiguration.Wal.MaxParallel
+	}
+
+	return options, env, maxParallel, nil
 }
 
 // GetRecoverConfiguration get the appropriate recover Configuration for a given cluster
@@ -413,24 +478,6 @@ func gatherWALFilesToRestore(walName string, parallel int) (walList []string, er
 	}
 
 	return walList, err
-}
-
-// maxWALFilesPerInvocation returns how many WAL files a single wal-restore
-// invocation may fetch: the requested one, plus the ones that follow it up to
-// the configured maxParallel, to be prefetched into the spool. Prefetching is
-// disabled when restoring on behalf of pg_rewind, which walks the WAL
-// backward: the following segments would never be requested, and past the end
-// of the timeline they do not even exist
-func maxWALFilesPerInvocation(barmanConfiguration *apiv1.BarmanObjectStoreConfiguration, rewindMode bool) int {
-	if rewindMode {
-		return 1
-	}
-
-	if barmanConfiguration.Wal != nil && barmanConfiguration.Wal.MaxParallel > 1 {
-		return barmanConfiguration.Wal.MaxParallel
-	}
-
-	return 1
 }
 
 // shouldUseEndOfWALStreamFlag returns true when the end-of-wal-stream flag

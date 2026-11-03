@@ -168,8 +168,8 @@ var _ = Describe("Pooler validateMonitoring", func() {
 				PgBouncer: &apiv1.PgBouncerSpec{
 					ClientTLSSecret: clientTLSSecret,
 				},
-				Monitoring: &apiv1.PoolerMonitoringConfiguration{ //nolint:staticcheck
-					EnablePodMonitor: enablePodMonitor,
+				Monitoring: &apiv1.PoolerMonitoringConfiguration{
+					EnablePodMonitor: enablePodMonitor, //nolint:staticcheck
 					TLSConfig:        &apiv1.PoolerMonitoringTLSConfiguration{Enabled: true},
 				},
 			},
@@ -211,8 +211,8 @@ var _ = Describe("Pooler validateMonitoring", func() {
 	It("rejects when pgbouncer is nil", func() {
 		pooler := &apiv1.Pooler{
 			Spec: apiv1.PoolerSpec{
-				Monitoring: &apiv1.PoolerMonitoringConfiguration{ //nolint:staticcheck
-					EnablePodMonitor: true,
+				Monitoring: &apiv1.PoolerMonitoringConfiguration{
+					EnablePodMonitor: true, //nolint:staticcheck
 					TLSConfig:        &apiv1.PoolerMonitoringTLSConfiguration{Enabled: true},
 				},
 			},

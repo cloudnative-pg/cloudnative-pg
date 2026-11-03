@@ -31,7 +31,7 @@ env:
 jobs:
 
   check-public-clouds-k8s-versions:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       EOL_FILTER: '
         def ver: split(".") | map(tonumber);
@@ -92,7 +92,7 @@ jobs:
           # and write them to a file, starting from the MINIMAL_K8S
           for baseversion in $(seq $MINIMAL_K8S 0.01 99); do
             URL="https://registry.hub.docker.com/v2/repositories/kindest/node/tags?name=${baseversion}&ordering=last_updated"
-            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | grep -v "alpha" | sort -Vr | head -n1) || RC=$?
+            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | grep -vE "alpha|beta|rc" | sort -Vr | head -n1) || RC=$?
             if [[ -z "${v}" ]]; then
                break
             fi
@@ -144,7 +144,7 @@ jobs:
           branch: "k8s-cloud-versions-update"
           author: "public-cloud-k8s-versions-check <public-cloud-k8s-versions-check@users.noreply.github.com>"
           committer: "public-cloud-k8s-versions-check <public-cloud-k8s-versions-check@users.noreply.github.com>"
-          labels: "no-issue"
+          labels: "no-issue,automated"
           add-paths: |
             .github/**
             Makefile

@@ -32,7 +32,8 @@ function _curl_github() {
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     auth_header="Authorization: Bearer ${GITHUB_TOKEN}"
   fi
-  curl -H "${auth_header}" "$@"
+  # --retry alone skips connection resets; --retry-all-errors covers them.
+  curl --retry 5 --retry-delay 2 --retry-all-errors -H "${auth_header}" "$@"
 }
 
 # _apply_github: fetches a manifest from a raw.githubusercontent.com URL
@@ -42,7 +43,27 @@ function _curl_github() {
 # network errors, not the fix for 429s.
 function _apply_github() {
   local url=$1
-  _curl_github -fsSL --retry 5 --retry-delay 2 "${url}" | "${K8S_CLI}" apply -f -
+  _curl_github -fsSL "${url}" | "${K8S_CLI}" apply -f -
+}
+
+# _resolve_github_symlink_dir(base_url, path)
+# Prints the real path behind a symlinked directory, following up to 5 links.
+# raw.githubusercontent.com does not follow directory symlinks (a path through
+# one is a 404), but it serves the symlink itself as a 200 whose body is the
+# target: a single token, relative to the symlink's parent. A real directory
+# is a 404 too, so a failed probe means "path" is already the real one. The
+# probe is not retried, as retrying the expected 404 would add ~10s.
+function _resolve_github_symlink_dir() {
+  local base_url=$1 path=$2 target
+  for _ in 1 2 3 4 5; do
+    target=$(_curl_github --retry 0 -fsSL "${base_url}/${path}" 2>/dev/null) || break
+    [[ -n "${target}" && ! "${target}" =~ [[:space:]] ]] || break
+    if [[ "${path}" == */* ]]; then
+      target="${path%/*}/${target}"
+    fi
+    path=${target}
+  done
+  echo "${path}"
 }
 
 # wait_for(type, namespace, name, interval, retries)
@@ -91,6 +112,67 @@ function version_gte() {
   local threshold=$1
   local version=$2
   [[ "$(printf '%s\n' "$threshold" "$version" | sort -V | head -n1)" == "$threshold" ]]
+}
+
+# wait_for_all_nodes: waits until every expected node has registered with the
+# API server. The expected count is derived from $NODES, mirroring the
+# create_cluster_kind/create_cluster_k3d formula: worker/agent nodes join the
+# control plane asynchronously, so `kind create cluster` / `k3d cluster
+# create` returning is no guarantee that every Node object exists yet. Callers
+# that need to operate on the complete node set (e.g.
+# label_failure_domain_topology) must call this first.
+function wait_for_all_nodes() {
+    # shellcheck disable=SC2153 # NODES is set by the caller (kind/k3d setup.sh) before sourcing this file
+    local expected_nodes=$(( NODES > 1 ? NODES + 1 : 1 ))
+
+    local iter=0
+    while [[ "$(${K8S_CLI} get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')" -lt "${expected_nodes}" ]]; do
+        if [[ $iter -ge 120 ]]; then
+            # this runs on every cluster creation, so it must not be the reason
+            # a test run never starts: the tests needing every node say so
+            echo "WARNING: timed out waiting for ${expected_nodes} nodes to register, continuing" >&2
+            break
+        fi
+        sleep 1
+        ((++iter))
+    done
+}
+
+# label_failure_domain_topology: labels every node with
+# topology.kubernetes.io/region (fixed to "cnpg") and topology.kubernetes.io/zone
+# (az-<N>, where N is the trailing number in the node's name -- e.g.
+# "...-worker3" becomes az-3 -- and defaults to 1 for a node name with no
+# trailing number, such as the control-plane or the first worker), so that
+# CloudNativePG's failure domain-aware synchronous replication
+# (nodeFailureDomainKeys/podFailureDomainKeys) has real, node-distinct
+# topology labels to read on a local kind/k3d cluster -- neither engine sets
+# these by default. Only sets a label when it isn't already present, so a
+# node that genuinely carries real topology labels (e.g. a non-local engine)
+# is left untouched. Assumes every node is already registered; call
+# wait_for_all_nodes first.
+function label_failure_domain_topology() {
+    local region="cnpg"
+
+    local node
+    while IFS= read -r node; do
+        local seq=1
+        if [[ "${node}" =~ ([0-9]+)$ ]]; then
+            seq="${BASH_REMATCH[1]}"
+        fi
+        local zone="az-${seq}"
+
+        if [[ -z "$(${K8S_CLI} get node "${node}" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/region}')" ]]; then
+            ${K8S_CLI} label node "${node}" "topology.kubernetes.io/region=${region}"
+        fi
+        if [[ -z "$(${K8S_CLI} get node "${node}" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}')" ]]; then
+            ${K8S_CLI} label node "${node}" "topology.kubernetes.io/zone=${zone}"
+        fi
+    # A trailing newline after every name (rather than joining with spaces
+    # and translating) matters here: `while read` silently drops the last
+    # line of input when it isn't newline-terminated, which would otherwise
+    # skip the last node returned by the list -- deterministically, not just
+    # under a registration race.
+    done < <(${K8S_CLI} get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 }
 
 # get_default_storage_class detects the default K8s storage class
@@ -221,7 +303,7 @@ function reset_operator_namespace() {
 # When installed via manifest or the cnpg plugin the deployment is called
 # cnpg-controller-manager; when installed via Helm it is called
 # cnpg-cloudnative-pg. See:
-# https://cloudnative-pg.io/docs/1.29/installation_upgrade#using-the-helm-chart
+# https://cloudnative-pg.io/docs/current/installation_upgrade#using-the-helm-chart
 function wait_operator_ready() {
     local deploy_name="${1:-cnpg-controller-manager}"
     ${K8S_CLI} -n cnpg-system rollout status deploy/"${deploy_name}" --timeout=5m
@@ -263,7 +345,7 @@ function deploy_operator_from_manifest() {
     fi
 
     local manifest_file="${TEMP_DIR}/cnpg-operator-manifest.yaml"
-    if ! _curl_github -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+    if ! _curl_github -fsSL -o "${manifest_file}" "${manifest_url}"; then
         printf '%bError: Manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         printf '%bInterpreted %s as a %s.%b\n' "${bright}" "${operator}" "${mode}" "${reset}" >&2
         exit 1
@@ -311,20 +393,24 @@ function deploy_csi_host_path() {
 
   # --- 3. Install Driver and Plugin ---
 
+  local hostpath_deploy_url="${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy"
+  local hostpath_dir
+  hostpath_dir=$(_resolve_github_symlink_dir "${hostpath_deploy_url}" kubernetes-latest)
+
   ## Create a temporary file for the modified plugin deployment. This updates the image tag.
   local plugin_file="${TEMP_DIR}/csi-hostpath-plugin.yaml"
-  _curl_github -fsSL --retry 5 --retry-delay 2 "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
+  _curl_github -fsSL "${hostpath_deploy_url}/${hostpath_dir}/hostpath/csi-hostpath-plugin.yaml" |
     sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
 
   # Apply driver info and plugin deployment
-  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-driverinfo.yaml"
+  _apply_github "${hostpath_deploy_url}/${hostpath_dir}/hostpath/csi-hostpath-driverinfo.yaml"
   "${K8S_CLI}" apply -f "${plugin_file}"
   rm "${plugin_file}"
 
   # --- 4. Configure Storage Classes ---
 
   ## Create VolumeSnapshotClass
-  _apply_github "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-snapshotclass.yaml"
+  _apply_github "${hostpath_deploy_url}/${hostpath_dir}/hostpath/csi-hostpath-snapshotclass.yaml"
 
   ## Patch VolumeSnapshotClass to allow snapshots of running PostgreSQL instances
   ## by ignoring read failures during snapshot creation
@@ -469,7 +555,7 @@ function ensure_cert_manager() {
     # Split so renovate's regex (needs a bare "X_VERSION=", not "local X_VERSION=") still matches.
     local CERT_MANAGER_DEFAULT_VERSION
     # renovate: datasource=github-releases depName=cert-manager/cert-manager
-    CERT_MANAGER_DEFAULT_VERSION="v1.21.0"
+    CERT_MANAGER_DEFAULT_VERSION="v1.21.3"
     local cert_manager_version="${CERT_MANAGER_VERSION:-${CERT_MANAGER_DEFAULT_VERSION}}"
 
     # shellcheck disable=SC2154
@@ -479,7 +565,7 @@ function ensure_cert_manager() {
         echo -e "${bright}Installing cert-manager ${cert_manager_version}...${reset}"
         # Download once, then retry only the apply, as deploy_operator_from_manifest does.
         local manifest_file="${TEMP_DIR:-/tmp}/cert-manager-manifest.yaml"
-        if ! _curl_github -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" \
+        if ! _curl_github -fsSL -o "${manifest_file}" \
             "https://github.com/cert-manager/cert-manager/releases/download/${cert_manager_version}/cert-manager.yaml"; then
             printf '%bError: could not download the cert-manager %s manifest%b\n' \
                 "${bright}" "${cert_manager_version}" "${reset}" >&2
@@ -565,7 +651,7 @@ function install_barman_cloud_plugin() {
     # does. The retry absorbs the cert-manager webhook readiness race: the
     # plugin manifest creates cert-manager Issuer/Certificate resources.
     local manifest_file="${TEMP_DIR:-/tmp}/plugin-barman-cloud-manifest.yaml"
-    if ! _curl_github -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+    if ! _curl_github -fsSL -o "${manifest_file}" "${manifest_url}"; then
         printf '%bError: manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         return 1
     fi

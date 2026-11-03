@@ -9,15 +9,20 @@ AZs
 AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
+AdzerKI
 AffinityConfiguration
 AllNamespaces
+AllowRepeat
 Anand
 AntiAffinity
 AppArmor
 AppArmorProfile
+AppliedExpiration
+ArgoCD
 Armando
 AuthQuery
 AuthQuerySecret
+AutomountServiceAccountToken
 Autoscaler
 AvailableArchitecture
 AvailableArchitectures
@@ -123,6 +128,7 @@ CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
 DBA
+DBAs
 DBaaS
 DISA
 DNS
@@ -194,6 +200,7 @@ FQDN
 FQDNs
 FailoverQuorum
 FailoverQuorumStatus
+FailureDomainKeys
 Fei
 Filesystem
 Fluentd
@@ -201,6 +208,7 @@ Francesco
 GC
 GCE
 GCS
+GHSA
 GID
 GIS
 GKE
@@ -210,6 +218,8 @@ GUCs
 GabriFedi
 Gabriele
 GaugeVec
+GellertBabel
+GeneratedPasswordState
 GeoSpatial
 Gi
 GitOps
@@ -223,8 +233,10 @@ GrantUsageSpecType
 HH
 HPA
 HashiCorp
+Hetzner
 HistoryTags
 Homebrew
+HoniSanders
 Huß
 IAM
 INPLACE
@@ -249,14 +261,18 @@ InstanceID
 InstanceReportedState
 IsolationCheckConfiguration
 Isovalent
+IssuedAt
 Istio
 Istio's
 JSON
+Jamstah
 JefeDavis
 Joda
+KEP
 KV
 Karpenter
 KinD
+Klio
 Krew
 KubeCon
 Kubegres
@@ -316,7 +332,9 @@ Namespaces
 Nenciarini
 NetworkPolicies
 NetworkPolicy
+NoUpper
 NodeAffinity
+NodeFailureDomainKeys
 NodeMaintenanceWindow
 NodeSelector
 NodesUsed
@@ -358,9 +376,17 @@ PSA
 PV
 PVCs
 PascalBourdier
+PasswordConfiguration
+PasswordCriteria
+PasswordMode
+PasswordModeExternal
+PasswordModeGenerate
+PasswordModeSecret
+PasswordModeSetNull
 PasswordState
 PasswordStatus
 Patroni
+PendingRevocation
 Percona
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
@@ -377,6 +403,7 @@ PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
 PodDisruptionBudgets
+PodFailureDomainKeys
 PodMonitor
 PodName
 PodSecurityContext
@@ -409,6 +436,7 @@ PostInitApplicationSQLRefs
 PostInitSQLRefs
 PostInitTemplateSQLRefs
 Postgres
+PostgresCapabilities
 PostgresConfiguration
 PrimaryLeaseConfiguration
 PrimaryUpdateMethod
@@ -454,6 +482,7 @@ RUNTIME
 ReadWriteOnce
 RedHat
 RelabelConfig
+RenewBefore
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationSlotsConfiguration
@@ -499,6 +528,7 @@ ScheduledBackupList
 ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
+SchemaPermissionsSpec
 SchemaSpec
 Scorsolini
 Seccomp
@@ -517,6 +547,7 @@ ServerSpec
 ServerTLSSecret
 ServiceAccount
 ServiceAccountTemplate
+ServiceAccounts
 ServiceMonitor
 ServiceSelectorType
 ServiceSelectorTypeR
@@ -551,7 +582,10 @@ SubscriptionStatus
 SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
+SymbolCharacters
+Symlinked
 SyncReplicaElectionConstraints
+SyncReplicationTopologySatisfied
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
@@ -567,6 +601,7 @@ TTY
 TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile
+TablespaceMappingEntry
 TablespaceName
 TablespaceState
 TablespaceStatus
@@ -641,6 +676,7 @@ allowPrivilegeEscalation
 allowVolumeExpansion
 alm
 amd
+andrew
 angus
 anonymization
 api
@@ -669,6 +705,7 @@ authQuerySecret
 authn
 authz
 autocompletion
+automounted
 autoscaler
 autoscalers
 autovacuum
@@ -787,6 +824,7 @@ clusterspec
 clusterstatus
 cmd
 cn
+cncf
 cnp
 cnpg
 codebase
@@ -821,6 +859,7 @@ coreos
 corev
 cp
 cpu
+crashloop
 crds
 createdAt
 createdb
@@ -847,6 +886,7 @@ customresourcedefinitions
 cutover
 cyber
 dT
+daanvinken
 danglingPVC
 dataChecksums
 dataDurability
@@ -871,12 +911,14 @@ datallowconn
 datasource
 datistemplate
 datname
+dba
 dbe
 dbname
 ddf
 ddl
 de
 declaratively
+decrypt
 defaultMode
 demotionToken
 dennispidun
@@ -929,6 +971,7 @@ ephemeralVolumesSizeLimit
 ephemeralvolumessizelimitconfiguration
 ermakov
 eu
+evan
 excludePatterns
 executables
 expirations
@@ -953,6 +996,7 @@ failoverquorumstatus
 failovers
 failureThreshold
 faq
+farries
 fastpath
 fb
 fd
@@ -980,6 +1024,7 @@ gce
 gcp
 gcs
 gcsCredentials
+generatedpasswordstate
 geocoder
 ghcr
 github
@@ -1074,6 +1119,7 @@ jaconi
 jdbc
 jmealo
 jobCount
+jonasbadstuebner
 jq
 json
 jsonpath
@@ -1181,6 +1227,7 @@ minSyncReplicas
 minikube
 minio
 misconfigurations
+mjlshen
 mmap
 monitoringconfiguration
 mountPath
@@ -1198,6 +1245,7 @@ networkpolicy
 nextScheduleTime
 nginx
 nodeAffinity
+nodeFailureDomainKeys
 nodeLabelsAntiAffinity
 nodeMaintenanceWindow
 nodeSelector
@@ -1245,9 +1293,13 @@ passwd
 passwordSecret
 passwordState
 passwordStatus
+passwordconfiguration
+passwordcriteria
+passwordmode
 passwordstate
 pc
 pchovelon
+pcj
 pdf
 periodSeconds
 persistentVolumeClaims
@@ -1297,6 +1349,7 @@ podAntiAffinity
 podAntiAffinityType
 podCount
 podDisruptionBudgets
+podFailureDomainKeys
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
@@ -1327,6 +1380,7 @@ poolersecrets
 poolerspec
 poolerstatus
 poolertype
+portforward
 pos
 posix
 postImportApplicationSQL
@@ -1349,6 +1403,7 @@ pprof
 pre
 preferredDuringSchedulingIgnoredDuringExecution
 prefetched
+prefetching
 preload
 prepended
 prepends
@@ -1386,6 +1441,7 @@ pvc
 pvcCount
 pvcName
 pvcTemplate
+qc
 quantile
 queryable
 quickstart
@@ -1413,6 +1469,7 @@ rehydrated
 rehydration
 relabelings
 relatime
+renewBefore
 replicaclusterconfiguration
 replicationSecretVersion
 replicationSlots
@@ -1466,6 +1523,7 @@ scheduledbackupspec
 scheduledbackupstatus
 schedulerName
 schemaOnly
+schemapermissionsspec
 schemas
 schemaspec
 sdk
@@ -1503,6 +1561,8 @@ serviceselectortype
 servicetemplatespec
 serviceupdatestrategy
 sessionToken
+setNull
+setnull
 sha
 sharifmshaker
 sharma
@@ -1530,6 +1590,7 @@ sqlrefs
 src
 sre
 ssc
+sse
 ssl
 sslCert
 sslKey
@@ -1565,6 +1626,7 @@ subcommand
 subcommands
 subdirectory
 subresource
+subresources
 subscriptionReclaimPolicy
 subscriptionreclaimpolicy
 subscriptionspec
@@ -1589,6 +1651,7 @@ synchronizereplicasconfiguration
 synchronousreplicaconfiguration
 synchronousreplicaconfigurationmethod
 syncreplicaelectionconstraints
+syncreplicas
 sys
 syslog
 systemID
@@ -1604,6 +1667,7 @@ tablespaceName
 tablespaceStatus
 tablespaceStorage
 tablespaceconfiguration
+tablespacemappingentry
 tablespaces
 tablespacesStatus
 tablespacestate
@@ -1638,6 +1702,7 @@ toto
 transactionID
 transactional
 transactionid
+trixie
 tx
 ubi
 ui
@@ -1680,6 +1745,7 @@ volumeSnapshot
 volumeSnapshots
 volumesnapshot
 volumesnapshotconfiguration
+vp
 vpa
 waitForArchive
 wal

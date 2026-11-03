@@ -672,8 +672,8 @@ func checkPodEnvironmentIsOutdated(_ context.Context, pod *corev1.Pod, cluster *
 }
 
 // newInstanceForRunningPod evaluates the instance specification that the given
-// running Pod should currently match. It derives the node serial and status
-// scheme from the Pod, then calls specs.NewInstance, which runs the plugins'
+// running Pod should currently match. It derives the node serial from the Pod,
+// then calls specs.NewInstance, which runs the plugins'
 // OperationVerbEvaluate lifecycle hook so the returned spec already includes any
 // sidecars they inject.
 func newInstanceForRunningPod(
@@ -686,8 +686,7 @@ func newInstanceForRunningPod(
 		return nil, fmt.Errorf("while getting the pod serial value: %w", err)
 	}
 
-	tlsEnabled := remote.GetStatusSchemeFromPod(pod).IsHTTPS()
-	targetPod, err := specs.NewInstance(ctx, *cluster, serial, tlsEnabled)
+	targetPod, err := specs.NewInstance(ctx, *cluster, serial)
 	if err != nil {
 		return nil, fmt.Errorf("while creating a new instance pod: %w", err)
 	}

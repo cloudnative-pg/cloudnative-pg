@@ -330,7 +330,7 @@ func generateFakeClusterPods(
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {
 		idx++
-		pod, _ := specs.NewInstance(context.TODO(), *cluster, idx, true)
+		pod, _ := specs.NewInstance(context.TODO(), *cluster, idx)
 		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
 
 		err := c.Create(context.Background(), pod)
@@ -367,7 +367,8 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	var jobs []batchv1.Job
 	for idx < cluster.Spec.Instances {
 		idx++
-		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
+		cmd := specs.BuildPrimaryBootstrapCommandViaInitdb(*cluster)
+		job := specs.CreatePrimaryJob(*cluster, idx, cmd.Role, cmd.Command, nil)
 		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 
 		err := c.Create(context.Background(), job)

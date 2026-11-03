@@ -48,15 +48,16 @@ spec:
         summary: Checks the last time archiving failed. Will be < 0 when it has not failed.
       expr: |-
         (cnpg_pg_stat_archiver_last_failed_time - cnpg_pg_stat_archiver_last_archived_time) > 1
+        and on(namespace, pod) cnpg_pg_replication_in_recovery == 0
       for: 1m
       labels:
         severity: warning
     - alert: DatabaseDeadlockConflicts
       annotations:
-        description: There are over 10 deadlock conflicts in {{ $labels.pod }}
+        description: There have been over 10 deadlocks in the last hour in {{ $labels.pod }}
         summary: Checks the number of database conflicts
       expr: |-
-        cnpg_pg_stat_database_deadlocks > 10
+        increase(cnpg_pg_stat_database_deadlocks[1h]) > 10
       for: 1m
       labels:
         severity: warning

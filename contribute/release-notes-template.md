@@ -7,8 +7,8 @@ Prepend a new "## Version X.Y.Z" block to the existing
 
 Get the commit range for the branch being released:
 
-  LAST_TAG=v1.29.0
-  BRANCH=release-1.29
+  LAST_TAG=v1.30.0
+  BRANCH=release-1.30
   git log ${LAST_TAG}..origin/${BRANCH} --pretty="format:%h;%s"
 
 For each PR you mention, find the supported branches that also carry it

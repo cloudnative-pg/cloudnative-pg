@@ -22,7 +22,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -41,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/config"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
@@ -74,16 +74,16 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		namespacePrefix = "tablespaces"
 	)
 	var (
-		clusterName string
-		cluster     *apiv1.Cluster
+		clusterName      string
+		cluster          *apiv1.Cluster
+		storageClassName string
 	)
-
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+		storageClassName = config.Current().Storage.StorageClass
 	})
 
 	clusterSetup := func(namespace, clusterManifest string) {
@@ -344,9 +344,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		})
 
 		It("can create the cluster by restoring from the object store", func() {
-			barmanBackupNameEnv := "BARMAN_BACKUP_NAME"
-			err := os.Setenv(barmanBackupNameEnv, fullBackupName)
-			Expect(err).ToNot(HaveOccurred())
+			config.SetTemplateVariable("BARMAN_BACKUP_NAME", fullBackupName)
 
 			const clusterRestoreFromBarmanManifest string = fixturesDir +
 				"/tablespaces/restore-cluster-from-barman.yaml.template"
@@ -546,8 +544,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 		It(fmt.Sprintf("can create the cluster by restoring from the backup %v using volume snapshot", backupName),
 			func() {
-				err = os.Setenv("BACKUP_NAME", backupName)
-				Expect(err).ToNot(HaveOccurred())
+				config.SetTemplateVariable("BACKUP_NAME", backupName)
 
 				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme,
 					clusterVolumesnapshoRestoreManifest)
@@ -624,8 +621,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						namespace, clusterName,
 					)
 					Expect(err).ToNot(HaveOccurred())
-					err = os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
-					Expect(err).ToNot(HaveOccurred())
+					config.SetTemplateVariable(recoveryTargetTimeEnv, recoveryTargetTime)
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
 					pgasserts.InsertRecordIntoTable(table1, 5, conn)
@@ -643,12 +639,12 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(len(backupObject.Status.BackupSnapshotStatus.Elements)))
 
-					envVars := storage.EnvVarsForSnapshots{
+					templateVars := storage.SnapshotTemplateVariables{
 						DataSnapshot:             snapshotDataEnv,
 						WalSnapshot:              snapshotWalEnv,
 						TablespaceSnapshotPrefix: snapshotTbsEnv,
 					}
-					err = storage.SetSnapshotNameAsEnv(&snapshotList, backupObject, envVars)
+					err = storage.SetSnapshotTemplateVariables(&snapshotList, backupObject, templateVars)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -1090,6 +1086,20 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 	namespace := cluster.Namespace
 	clusterName := cluster.Name
+	// The instance manager creates a tablespace only after its PVCs are
+	// healthy in every instance, so it can lag behind the cluster being ready.
+	// Callers often pass a short timeout, so this wait uses its own.
+	By("waiting for the tablespaces to be reconciled", func() {
+		Eventually(func(g Gomega) {
+			current, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(current.Status.TablespacesStatus).To(HaveLen(len(cluster.Spec.Tablespaces)))
+			for _, tbs := range current.Status.TablespacesStatus {
+				g.Expect(tbs.State).To(Equal(apiv1.TablespaceStatusReconciled),
+					"tablespace %s: %s", tbs.Name, tbs.Error)
+			}
+		}, testTimeouts[timeouts.PodRollout]).Should(Succeed())
+	})
 	By("checking the expected tablespaces are in the database", func() {
 		Eventually(func(g Gomega) {
 			instances, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)

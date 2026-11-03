@@ -48,11 +48,16 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		level          = tests.High
 		PgWalPath      = specs.PgWalPath
 		SpoolDirectory = walrestore.SpoolDirectory
+		// Markers are scoped by timeline; the numbered wals are on timeline 1.
+		endOfWALStreamFlag = "end-of-wal-stream-00000001"
+		// A forged timeline 2 segment (child of timeline 1) and its marker.
+		childWALFile            = "0000000200000000000000F9"
+		childEndOfWALStreamFlag = "end-of-wal-stream-00000002"
 	)
 
 	var namespace string
 	var primary, standby, latestWAL string
-	var walFile1, walFile2, walFile3, walFile4, walFile5, walFile6, walFile7, walFile8 string
+	var walFile1, walFile2, walFile3, walFile4, walFile5, walFile6, walFile7, walFile8, walFile9 string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -201,7 +206,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"#3 wal is in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeFalse(),
@@ -231,7 +236,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"#3 wal is in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeFalse(),
@@ -284,7 +289,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"#5 wal is in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
@@ -322,7 +327,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"no wal files exist in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
@@ -375,7 +380,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"no wals in the spool directory")
 			Eventually(func() bool {
 				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
-					"end-of-wal-stream")
+					endOfWALStreamFlag)
 			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
@@ -427,7 +432,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					"#7 wal is in the output location")
 			Eventually(listSpoolContents).
 				WithTimeout(RetryTimeout).
-				Should(Equal("end-of-wal-stream"),
+				Should(Equal(endOfWALStreamFlag),
 					"the spool directory contains the untouched end-of-wal-stream flag "+
 						"and no prefetched wals")
 		})
@@ -484,6 +489,70 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				Should(BeEmpty(),
 					"the spool directory is empty: no prefetched wals, and no "+
 						"end-of-wal-stream flag set by the rewind mode")
+		})
+
+		// Generate the #9 wal and the same segment on the child timeline.
+		// The archive holds no later segment on either timeline.
+		By("forging the #9 wal and a child-timeline wal", func() {
+			walFile9 = "0000000100000000000000F9"
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
+				walFile9)).
+				ShouldNot(HaveOccurred())
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
+				childWALFile)).
+				ShouldNot(HaveOccurred())
+		})
+
+		// Invoke the wal-restore command through exec requesting the #9 file.
+		// Expected outcome:
+		//		exit code 0, #9 is in the output location, no prefetched wals in the spool directory.
+		//		The flag is set because #10 and #11 are not present.
+		By("invoking the wal-restore command requesting #9 wal", func() {
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile9, PgWalPath+"/"+walFile9)
+			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile9) }).
+				WithTimeout(RetryTimeout).
+				Should(BeTrue(),
+					"#9 wal is in the output location")
+			Eventually(listSpoolContents).
+				WithTimeout(RetryTimeout).
+				Should(Equal(endOfWALStreamFlag),
+					"the spool directory contains only the end-of-wal-stream flag "+
+						"set for #10 and #11 wal not present")
+		})
+
+		// The parent-timeline flag must not fail a child-timeline request
+		// (cloudnative-pg/barman-cloud#276).
+		// Expected outcome:
+		//		exit code 0, the child-timeline wal is in the output location.
+		//		The parent-timeline flag is untouched, the child-timeline flag is set.
+		By("invoking the wal-restore command requesting a child-timeline wal", func() {
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", childWALFile, PgWalPath+"/"+childWALFile)
+			Expect(err).ToNot(HaveOccurred(),
+				"exit code should be 0: the parent-timeline flag must not fail a child-timeline request")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, childWALFile) }).
+				WithTimeout(RetryTimeout).
+				Should(BeTrue(),
+					"the child-timeline wal is in the output location")
+			Eventually(listSpoolContents).
+				WithTimeout(RetryTimeout).
+				Should(Equal(endOfWALStreamFlag+"\n"+childEndOfWALStreamFlag),
+					"the spool directory contains the untouched parent-timeline flag, "+
+						"the child-timeline flag and no prefetched wals")
 		})
 	})
 })

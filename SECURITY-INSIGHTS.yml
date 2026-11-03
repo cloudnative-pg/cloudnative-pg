@@ -1,7 +1,7 @@
 header:
   schema-version: 2.2.0
-  last-updated: '2026-02-25'
-  last-reviewed: '2026-02-25'
+  last-updated: '2026-10-27'
+  last-reviewed: '2026-10-27'
   url: https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/SECURITY-INSIGHTS.yml
 
 project:
@@ -116,7 +116,7 @@ repository:
       primary: false
   documentation:
     # OSPS-DO-02.01, OSPS-GV-03.01, OSPS-DO-07.01, OSPS-GV-03.02, OSPS-DO-03.02
-    contributing-guide: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/CONTRIBUTING.md
+    contributing-guide: https://github.com/cloudnative-pg/governance/blob/main/CONTRIBUTING.md
     review-policy: https://github.com/cloudnative-pg/cloudnative-pg/tree/main/contribute#about-our-development-workflow
     # OSPS-VM-02.01, OSPS-VM-01.01, OSPS-VM-03.01, OSPS-VM-04.01
     security-policy: https://github.com/cloudnative-pg/cloudnative-pg/security/policy

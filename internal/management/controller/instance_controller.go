@@ -163,6 +163,10 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.instance.SetCluster(cluster)
 
+	// Before the early returns for a fenced or down instance: a replica whose
+	// PostgreSQL is down or fenced must still stop renewing the lease it holds.
+	r.yieldPrimaryLeaseIfNotTarget(ctx, cluster)
+
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
 		return reconcile.Result{}, err
@@ -198,18 +202,25 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Reconcile secrets and cryptographic material
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
-	reloadNeeded, err := r.certificateReconciler.RefreshSecrets(ctx, cluster)
+	reloadSecretsNeeded, err := r.certificateReconciler.RefreshSecrets(ctx, cluster)
+	// The reload is kept pending until it is executed: this loop can end
+	// before reaching it, e.g. while PostgreSQL is starting up, and the
+	// next loops will find the files already updated
+	r.pendingReload = r.pendingReload || reloadSecretsNeeded
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("while refreshing secrets: %w", err)
 	}
 
 	reloadConfigNeeded, err := r.refreshConfigurationFiles(ctx, cluster)
+	r.pendingReload = r.pendingReload || reloadConfigNeeded
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	reloadNeeded = reloadNeeded || reloadConfigNeeded
 
-	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
+	// here we execute initialization tasks that need to be executed only on the first reconciliation loop.
+	// Notably, if this PGDATA is already a primary, initialize() also acquires the primary lease
+	// (see verifyPgDataCoherenceForPrimary) before returning: this blocks the Broadcast() below, and
+	// therefore PostgreSQL's start, until the lease is held.
 	if !r.firstReconcileDone.Load() {
 		if err = r.initialize(ctx, cluster); err != nil {
 			return handleErrNextLoop(err)
@@ -219,10 +230,10 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Reconcile cluster role without DB
 	reloadClusterRoleConfig, err := r.reconcileClusterRoleWithoutDB(ctx, cluster)
+	r.pendingReload = r.pendingReload || reloadClusterRoleConfig
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	reloadNeeded = reloadNeeded || reloadClusterRoleConfig
 
 	r.systemInitialization.Broadcast()
 
@@ -237,6 +248,14 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	if err := r.instance.IsReady(); err != nil {
+		if errors.Is(err, postgresManagement.ErrNoConnectionEstablished) {
+			// This never reports a completed shutdown: an unreachable instance is not
+			// waited for, it is requeued below like any other instance that is down.
+			if _, err := r.reconcileOldPrimary(ctx, cluster, true); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+
 		contextLogger.Info("Instance is still down, will retry in 1 second")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
@@ -259,7 +278,7 @@ func (r *InstanceReconciler) Reconcile(
 		return result, nil
 	}
 
-	restarted, err := r.reconcileOldPrimary(ctx, cluster)
+	restarted, err := r.reconcileOldPrimary(ctx, cluster, false)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -274,7 +293,12 @@ func (r *InstanceReconciler) Reconcile(
 	}
 	restarted = restarted || restartedInplace
 
-	if reloadNeeded && !restarted {
+	// A restart loads the configuration files too
+	if restarted {
+		r.pendingReload = false
+	}
+
+	if r.pendingReload {
 		contextLogger.Info("reloading the instance")
 
 		// IMPORTANT
@@ -291,6 +315,7 @@ func (r *InstanceReconciler) Reconcile(
 		if err = r.instance.Reload(ctx); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
 		}
+		r.pendingReload = false
 		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 		}
@@ -425,7 +450,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 
 	reloadIdent, err := r.instance.RefreshPGIdent(ctx, cluster.Spec.PostgresConfiguration.PgIdent)
 	if err != nil {
-		return false, err
+		return reloadNeeded, err
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
 
@@ -441,16 +466,12 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 		postgresClient.OperationType_TYPE_RECONCILE,
 	)
 	if err != nil {
-		return false, err
+		return reloadNeeded, err
 	}
 	reloadNeeded = reloadNeeded || reloadConfig
 
 	reloadReplicaConfig, err := r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
-	if err != nil {
-		return false, err
-	}
-	reloadNeeded = reloadNeeded || reloadReplicaConfig
-	return reloadNeeded, nil
+	return reloadNeeded || reloadReplicaConfig, err
 }
 
 func (r *InstanceReconciler) requiresImagesRollout(ctx context.Context, cluster *apiv1.Cluster) bool {
@@ -587,7 +608,16 @@ func (r *InstanceReconciler) verifyParametersForFollower(
 	for key, enforcedparam := range controldataParams {
 		clusterparam, found := clusterParams[key]
 		if !found {
-			continue
+			// The parameter is not in the cluster spec, so the instance will
+			// start with the value resolved from the configuration files,
+			// usually the PostgreSQL default (#10395). Enforcing the
+			// pg_controldata value unconditionally instead would make the
+			// configuration permanently diverge from the cluster spec,
+			// causing an endless restart loop.
+			clusterparam, err = postgresManagement.LoadStartupParameterValue(r.instance.PgData, key)
+			if err != nil {
+				return err
+			}
 		}
 		// if the values from `pg_controldata` are higher than the cluster spec,
 		// they are the safer choice, so set them in config
@@ -610,10 +640,16 @@ func (r *InstanceReconciler) verifyParametersForFollower(
 	return nil
 }
 
-// reconcileOldPrimary shuts down the instance in case it is an old primary
+// reconcileOldPrimary shuts down the instance in case it is an old primary.
+//
+// When unreachable is true, PostgreSQL did not answer pg_isready: there is no working
+// connection to run a checkpoint against, so the shutdown skips straight to immediate
+// mode, and does nothing at all if the request cannot be delivered without blocking.
+// Otherwise, a fast shutdown (preceded by a CHECKPOINT) is requested.
 func (r *InstanceReconciler) reconcileOldPrimary(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
+	unreachable bool,
 ) (restarted bool, err error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -626,6 +662,36 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 		return false, err
 	}
 
+	if unreachable {
+		contextLogger.Info("This is an unreachable former primary instance, "+
+			"no longer the target primary. Demoting it by shutting it down immediately, "+
+			"since PostgreSQL is not reachable for a checkpoint.",
+			"targetPrimary", cluster.Status.TargetPrimary)
+
+		// Requesting this shutdown is what makes the instance manager exit, and the
+		// instance manager exiting is what lets the failover proceed. An immediate
+		// shutdown is used, skipping fast and its checkpoint, because there is no
+		// reachable backend to run one against.
+		//
+		// Neither the request nor its outcome may park this goroutine, and both would
+		// if we let them. PostgreSQL being unreachable says nothing about the lifecycle
+		// manager still listening on the command channel: a postmaster wedged long
+		// enough to stop answering pg_isready while the lifecycle manager is already
+		// shutting it down on its own (the SIGTERM path) leaves nobody receiving, and
+		// the channel is unbuffered. A postmaster that is not processing signals at all
+		// never completes the immediate shutdown either: pg_ctl gives up on its own, the
+		// lifecycle manager logs the failure and carries on, and so the instance manager
+		// is never asked to terminate and this context is never cancelled. Since the
+		// controller runs a single worker, parking on either account stops every later
+		// reconciliation, the retries of this very demotion included. So we request what
+		// can be requested now and leave the caller to requeue.
+		if !r.Instance().TryRequestImmediateShutdown() {
+			contextLogger.Info("The lifecycle manager is not ready to receive the shutdown request, will retry")
+		}
+
+		return false, nil
+	}
+
 	contextLogger.Info("This is the former primary instance. Shutting it down to allow it to be demoted to a replica.")
 
 	// Perform a fast shutdown on the instance and wait for the instance manager to stop.
@@ -633,9 +699,10 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 	// When the Pod restarts, it will be demoted to act as a replica of the new primary.
 	r.Instance().RequestFastImmediateShutdown()
 
-	// We wait for the lifecycle manager to have received the immediate shutdown request
+	// We wait for the lifecycle manager to have received the shutdown request
 	// and, having processed it, to request the termination of the instance manager.
 	// When the termination has been requested, this context will be cancelled.
+	// A fast shutdown of a reachable instance does complete, so this wait ends.
 	<-ctx.Done()
 
 	cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
@@ -1196,22 +1263,27 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 	)
 }
 
-// Reconciler primary logic. DB needed.
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (reconcile.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	if cluster.Status.TargetPrimary != r.instance.GetPodName() || cluster.IsReplica() {
-		return reconcile.Result{}, nil
-	}
-
-	// Wait long enough that a candidate primary can take over a lease whose
-	// previous holder did not release cleanly, in a single Acquire call. The
-	// runnable's preAcquire loop polls jitter-free every RetryPeriod and takes
-	// over a still-held lease once it has observed the record unchanged for a
-	// full LeaseDuration, so the take-over moment lands at most one RetryPeriod
-	// past LeaseDuration (the poll granularity). Sizing acquireTimeout to
-	// LeaseDuration + 3*RetryPeriod keeps that take-over inside a single
-	// Acquire call with margin for the take-over write and scheduling overhead.
+// acquirePrimaryLease blocks until this pod holds the primary lease, or the
+// bounded wait below expires. It is the shared helper backing both call
+// sites:
+//   - the initial start of an already-primary PGDATA, gated from
+//     verifyPgDataCoherenceForPrimary before PostgreSQL is ever started, and
+//   - reconcilePrimary, called at the top of every reconcile where this pod
+//     is target primary; when promoting a replica, this incidentally also
+//     gates pg_promote, which runs later in the same function.
+//
+// Wait long enough that a candidate primary can take over a lease whose
+// previous holder did not release cleanly, in a single Acquire call. The
+// runnable's preAcquire loop polls jitter-free every RetryPeriod and takes
+// over a still-held lease once it has observed the record unchanged for a
+// full LeaseDuration. Sizing acquireTimeout to LeaseDuration +
+// 3*RetryPeriod keeps that take-over inside a single Acquire call, with
+// margin for the poll granularity, the take-over write and scheduling
+// overhead, as long as the API server answers promptly. It can be exceeded
+// when the API server is slow, since a single poll is then budgeted up to
+// RenewDeadline; callers must treat context.DeadlineExceeded as a benign
+// retry, not a failure.
+func (r *InstanceReconciler) acquirePrimaryLease(ctx context.Context, cluster *apiv1.Cluster) error {
 	leaseDuration := cluster.GetPrimaryLeaseDuration()
 	retryPeriod := cluster.GetPrimaryLeaseRetryPeriod()
 	acquireTimeout := leaseDuration + 3*retryPeriod
@@ -1223,13 +1295,51 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		RetryPeriod:           retryPeriod,
 		ReleasedLeaseDuration: cluster.GetPrimaryLeaseReleasedDuration(),
 	}
-	if err := r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig); err != nil {
+	return r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig)
+}
+
+// yieldPrimaryLeaseIfNotTarget makes a replica stop renewing the primary
+// lease when it is not the target primary, or the cluster is a replica
+// cluster. A target that was replaced before it promoted must behave like a
+// replica that was never the target, or its renewals would keep the new
+// target from ever taking the lease. A primary that is no longer the target
+// (a switchover) keeps renewing until Release at exit. promotionRequested
+// covers a promotion that failed while PostgreSQL may still complete it:
+// standby.signal alone cannot be trusted then.
+func (r *InstanceReconciler) yieldPrimaryLeaseIfNotTarget(ctx context.Context, cluster *apiv1.Cluster) {
+	if cluster.Status.TargetPrimary == r.instance.GetPodName() && !cluster.IsReplica() {
+		return
+	}
+
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil {
+		log.FromContext(ctx).Error(err, "Cannot tell if this instance is a primary, not yielding the primary lease")
+		return
+	}
+
+	// Yield only a replica that never tried to promote: it is in recovery and
+	// no pg_ctl promote was issued by this process. A promotion that failed may
+	// still complete in PostgreSQL, so in that case the lease is kept.
+	if !isPrimary && !r.promotionRequested {
+		r.primaryLeaseAcquirer.Yield(ctx)
+	}
+}
+
+// Reconciler primary logic. DB needed.
+func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (reconcile.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if cluster.Status.TargetPrimary != r.instance.GetPodName() || cluster.IsReplica() {
+		return reconcile.Result{}, nil
+	}
+
+	if err := r.acquirePrimaryLease(ctx, cluster); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			contextLogger.Warning("Primary lease not yet acquired, retrying")
 			// Retry soon: the runnable's preAcquire loop may complete the
 			// take-over in the background just after our context fired, in
 			// which case the next Acquire returns immediately via heldCh.
-			return reconcile.Result{RequeueAfter: retryPeriod}, nil
+			return reconcile.Result{RequeueAfter: cluster.GetPrimaryLeaseRetryPeriod()}, nil
 		}
 		return reconcile.Result{}, fmt.Errorf("acquiring primary lease: %w", err)
 	}
@@ -1288,6 +1398,9 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	return reconcile.Result{}, nil
 }
 
+// handlePromotion promotes this instance. The caller must have acquired the
+// primary lease first (reconcilePrimary does, via acquirePrimaryLease): the
+// lease is what gates pg_ctl promote, and promotionRequested relies on it.
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
@@ -1302,9 +1415,16 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	}
 
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
+
 	// I must promote my instance here
-	err := r.instance.PromoteAndWait(ctx)
-	if err != nil {
+	r.promotionRequested = true
+
+	// PromoteAndWait is replaced by a stub in the unit tests
+	promote := r.promoteInstance
+	if promote == nil {
+		promote = r.instance.PromoteAndWait
+	}
+	if err := promote(ctx); err != nil {
 		return fmt.Errorf("error promoting instance: %w", err)
 	}
 	return nil
@@ -1494,7 +1614,10 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(
 	contextLogger := log.FromContext(ctx)
 
 	syncReplicaConstraint := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint
-	if !syncReplicaConstraint.Enabled {
+	sync := cluster.Spec.PostgresConfiguration.Synchronous
+	failureDomainsConfigured := syncReplicaConstraint.Enabled ||
+		(sync != nil && len(sync.FailureDomainKeys()) > 0)
+	if !failureDomainsConfigured {
 		return false
 	}
 	if primary, _ := r.instance.IsPrimary(); !primary {
@@ -1503,7 +1626,7 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(
 
 	topologyStatus := cluster.Status.Topology
 	if !topologyStatus.SuccessfullyExtracted || len(topologyStatus.Instances) != cluster.Spec.Instances {
-		contextLogger.Info("missing topology information while syncReplicaElectionConstraint are enabled, " +
+		contextLogger.Info("missing topology information while failure domain constraints are enabled, " +
 			"will requeue to calculate correctly the synchronous names")
 		return true
 	}

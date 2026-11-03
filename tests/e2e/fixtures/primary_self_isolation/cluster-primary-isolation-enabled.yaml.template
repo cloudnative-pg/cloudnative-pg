@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-liveness-pinger-disabled
+  name: postgresql-primary-isolation-enabled
   annotations:
-    alpha.cnpg.io/livenessPinger: '{"enabled": false}'
+    alpha.cnpg.io/livenessPinger: '{"enabled": true}'
 spec:
   instances: 3
 

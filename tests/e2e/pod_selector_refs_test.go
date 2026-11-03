@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,7 +61,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "pod-selector-refs-e2e")
 			Expect(err).ToNot(HaveOccurred())
 
-			storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+			storageClass := env.DefaultStorageClass
 			Expect(storageClass).ToNot(BeEmpty())
 
 			cluster := &apiv1.Cluster{

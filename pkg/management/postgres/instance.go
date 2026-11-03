@@ -135,7 +135,7 @@ var (
 	// ErrPgRejectingConnection postgres is alive, but rejecting connections
 	ErrPgRejectingConnection = fmt.Errorf("server is alive but rejecting connections")
 
-	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
+	// ErrNoConnectionEstablished no response was received from postgres
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
 
 	// ErrNoFreeWALSpace is returned when there isn't enough disk space
@@ -204,6 +204,10 @@ type Instance struct {
 	// logPipesReady becomes satisfied once the log-destination FIFOs are ready.
 	logPipesReady concurrency.MultipleExecuted
 
+	// postmasterPID is the PID of the postmaster the lifecycle manager is
+	// running, or zero when there is none.
+	postmasterPID atomic.Int64
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -216,6 +220,11 @@ type Instance struct {
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
 
+	// immediateShutdownUnresponsive is set when an immediate shutdown ran out
+	// its timeout with PostgreSQL still running. The liveness probe reads it.
+	// It never clears: the Pod has to be killed and recreated.
+	immediateShutdownUnresponsive atomic.Bool
+
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
 	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
 
@@ -224,9 +233,6 @@ type Instance struct {
 
 	// tablespaceSynchronizerChan is used to send tablespace configuration to the tablespace synchronizer
 	tablespaceSynchronizerChan chan map[string]apiv1.TablespaceConfiguration
-
-	// StatusPortTLS enables TLS on the status port used to communicate with the operator
-	StatusPortTLS bool
 
 	// MetricsPortTLS enables TLS on the port used to publish metrics over HTTP/HTTPS
 	MetricsPortTLS bool
@@ -239,6 +245,10 @@ type Instance struct {
 	// authentication middleware) while being written by the reconciliation loop,
 	// so access is synchronized through an atomic pointer.
 	cluster atomic.Pointer[apiv1.Cluster]
+
+	// systemID caches the pg_control system identifier, which never changes
+	systemID      string
+	systemIDMutex sync.Mutex
 }
 
 type serverCertificateHandler struct {
@@ -302,6 +312,18 @@ func (instance *Instance) SetFencing(enabled bool) {
 	if enabled {
 		instance.SetMightBeUnavailable(true)
 	}
+}
+
+// SetPostmasterPID records the PID of the running postmaster, or zero when it
+// has exited.
+func (instance *Instance) SetPostmasterPID(pid int) {
+	instance.postmasterPID.Store(int64(pid))
+}
+
+// GetPostmasterPID returns the PID of the running postmaster, or zero when
+// there is none.
+func (instance *Instance) GetPostmasterPID() int {
+	return int(instance.postmasterPID.Load())
 }
 
 // SetCanCheckReadiness marks whether the instance should be checked for readiness
@@ -455,6 +477,11 @@ const (
 	// shutDownFastImmediate means the instance has to be shut down by first
 	// issuing a fast shut down and in case of errors an immediate one
 	shutDownFastImmediate InstanceCommand = "ShutDownFastImmediate"
+
+	// shutDownImmediate means the instance has to be shut down by
+	// skipping straight to an immediate shutdown, with no checkpoint
+	// and no fast-shutdown attempt beforehand
+	shutDownImmediate InstanceCommand = "ShutDownImmediate"
 )
 
 // NewInstance creates a new Instance object setting the defaults
@@ -704,14 +731,71 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	if errors.As(err, &exitError) {
 		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
+		immediateShutdownTimeout := instance.GetClusterOrDefault().GetImmediateShutdownTimeout()
 		err = instance.Shutdown(ctx,
 			shutdownOptions{
-				Mode: shutdownModeImmediate,
-				Wait: true,
+				Mode:    shutdownModeImmediate,
+				Wait:    true,
+				Timeout: &immediateShutdownTimeout,
 			},
 		)
+		instance.checkImmediateShutdownUnresponsive(ctx, err)
 	}
 	return err
+}
+
+// TryShuttingDownImmediate skips straight to an "immediate" shutdown request, with no
+// checkpoint and no "fast" attempt beforehand.
+// This is meant for a former primary whose PostgreSQL is unreachable: the checkpoint needs
+// a working connection we don't have, and a postmaster that stopped answering pg_isready is
+// not expected to complete the graceful shutdown that "fast" asks for.
+// Note: an immediate shutdown may lead to data loss.
+func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Another attempt would only keep the lifecycle manager from the kubelet's
+	// termination signal for one more timeout.
+	if instance.IsImmediateShutdownUnresponsive() {
+		return errors.New("PostgreSQL was already found unresponsive to an immediate shutdown, not retrying")
+	}
+
+	contextLogger.Info("Requesting immediate shutdown of the PostgreSQL instance")
+	immediateShutdownTimeout := instance.GetClusterOrDefault().GetImmediateShutdownTimeout()
+	err := instance.Shutdown(
+		ctx,
+		shutdownOptions{
+			Mode:    shutdownModeImmediate,
+			Wait:    true,
+			Timeout: &immediateShutdownTimeout,
+		},
+	)
+	instance.checkImmediateShutdownUnresponsive(ctx, err)
+	return err
+}
+
+// checkImmediateShutdownUnresponsive is called after an immediate-mode Shutdown attempt. If that
+// attempt failed and PostgreSQL is still running, its configured timeout ran out without
+// PostgreSQL honoring the shutdown request (e.g. a backend or the postmaster stuck in an
+// uninterruptible state, or stopped via SIGSTOP): mark the instance as unresponsive so the
+// liveness probe can report it. If shutdownErr is nil, or the instance is no longer running,
+// this was a slow-but-successful stop (or an unrelated failure), not the condition we track.
+func (instance *Instance) checkImmediateShutdownUnresponsive(ctx context.Context, shutdownErr error) {
+	if shutdownErr == nil {
+		return
+	}
+	if instance.isStatusRunning() {
+		log.FromContext(ctx).Error(shutdownErr,
+			"PostgreSQL did not honor the immediate shutdown request within its timeout, "+
+				"marking the instance as unresponsive")
+		instance.immediateShutdownUnresponsive.Store(true)
+	}
+}
+
+// IsImmediateShutdownUnresponsive reports whether PostgreSQL failed to stop within its configured
+// timeout after an immediate shutdown request. It never clears once set: the appropriate recovery
+// at that point is for the Pod to be killed and recreated, not for the instance manager to retry.
+func (instance *Instance) IsImmediateShutdownUnresponsive() bool {
+	return instance.immediateShutdownUnresponsive.Load()
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status
@@ -968,8 +1052,9 @@ func (instance *Instance) ConnectionPool() pool.Pooler {
 	const applicationName = "cnpg-instance-manager"
 	if instance.pool == nil {
 		socketDir := GetSocketDir()
+		// A stuck postmaster accepts connections but never answers; every query opens one.
 		dsn := fmt.Sprintf(
-			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			"host=%s port=%v user=%v sslmode=disable application_name=%v connect_timeout=5",
 			socketDir,
 			GetServerPort(),
 			"postgres",
@@ -987,7 +1072,7 @@ func (instance *Instance) metricsConnectionPool() pool.Pooler {
 	instance.initializeMetricsPool.Do(func() {
 		socketDir := GetSocketDir()
 		dsn := fmt.Sprintf(
-			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			"host=%s port=%v user=%v sslmode=disable application_name=%v connect_timeout=5",
 			socketDir,
 			GetServerPort(),
 			apiv1.MetricsExporterUserName,
@@ -1429,6 +1514,26 @@ func (instance *Instance) GetPgControldata() (string, error) {
 	return string(out), nil
 }
 
+// GetSystemID returns the system identifier from pg_control, or an empty
+// string if it can't be read. It works while PostgreSQL is down.
+func (instance *Instance) GetSystemID() string {
+	instance.systemIDMutex.Lock()
+	defer instance.systemIDMutex.Unlock()
+
+	if instance.systemID != "" {
+		return instance.systemID
+	}
+
+	pgControlData, err := instance.GetPgControldata()
+	if err != nil {
+		log.Debug("Cannot read the system ID from pg_control", "err", err)
+		return ""
+	}
+
+	instance.systemID = utils.ParsePgControldataOutput(pgControlData).GetDatabaseSystemIdentifier()
+	return instance.systemID
+}
+
 // GetInstanceCommandChan is the channel where the lifecycle manager will
 // wait for the operations requested on the instance
 func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
@@ -1459,6 +1564,23 @@ func (instance *Instance) GetArchitecture() string {
 // PostgreSQL using the fast strategy and then the immediate strategy.
 func (instance *Instance) RequestFastImmediateShutdown() {
 	instance.instanceCommandChan <- shutDownFastImmediate
+}
+
+// TryRequestImmediateShutdown asks the lifecycle manager to run
+// TryShuttingDownImmediate, without blocking. If the lifecycle manager's
+// command loop isn't immediately ready to receive (e.g. because it is
+// itself shutting PostgreSQL down), the request is dropped rather than
+// waited on. It reports whether the request was actually delivered. The
+// command channel is unbuffered and a send on it cannot be interrupted by
+// a context cancellation, so a caller that must not be parked has no other
+// way to ask.
+func (instance *Instance) TryRequestImmediateShutdown() bool {
+	select {
+	case instance.instanceCommandChan <- shutDownImmediate:
+		return true
+	default:
+		return false
+	}
 }
 
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
@@ -1622,6 +1744,11 @@ func (instance *Instance) HandleInstanceCommandRequests(
 		return true, instance.TryShuttingDownSmartFast(ctx)
 	case shutDownFastImmediate:
 		if err := instance.TryShuttingDownFastImmediate(ctx); err != nil {
+			contextLogger.Error(err, "error shutting down instance, proceeding")
+		}
+		return false, nil
+	case shutDownImmediate:
+		if err := instance.TryShuttingDownImmediate(ctx); err != nil {
 			contextLogger.Error(err, "error shutting down instance, proceeding")
 		}
 		return false, nil

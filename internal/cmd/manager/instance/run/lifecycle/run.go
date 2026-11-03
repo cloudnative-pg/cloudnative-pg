@@ -115,6 +115,8 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		}
 
 		contextLogger.Info("postmaster started", "postMasterPID", postMasterPID)
+		i.instance.SetPostmasterPID(postMasterPID)
+		defer i.instance.SetPostmasterPID(0)
 
 		// Now we'll wait for PostgreSQL to accept connections, and setup everything required
 		// for replication and pg_rewind to work correctly.

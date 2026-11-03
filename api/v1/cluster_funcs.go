@@ -182,6 +182,16 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 	maps.Copy(sa.Annotations, st.Metadata.Annotations)
 }
 
+// FailureDomainKeys returns the label keys defining the failure domains,
+// coming from either podFailureDomainKeys or nodeFailureDomainKeys (the two
+// fields are mutually exclusive)
+func (s *SynchronousReplicaConfiguration) FailureDomainKeys() []string {
+	if len(s.PodFailureDomainKeys) > 0 {
+		return s.PodFailureDomainKeys
+	}
+	return s.NodeFailureDomainKeys
+}
+
 // MatchesTopology checks if the two topologies have
 // the same label values (labels are specified in SyncReplicaElectionConstraints.NodeLabelsAntiAffinity)
 func (topologyLabels PodTopologyLabels) MatchesTopology(instanceTopology PodTopologyLabels) bool {
@@ -798,6 +808,15 @@ func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 		return cluster.Spec.MaxSwitchoverDelay
 	}
 	return DefaultMaxSwitchoverDelay
+}
+
+// GetImmediateShutdownTimeout get the amount of time PostgreSQL has to stop after an immediate
+// shutdown request before the instance is considered unresponsive
+func (cluster *Cluster) GetImmediateShutdownTimeout() int32 {
+	if cluster.Spec.ImmediateShutdownTimeout > 0 {
+		return cluster.Spec.ImmediateShutdownTimeout
+	}
+	return DefaultImmediateShutdownTimeout
 }
 
 // GetPrimaryUpdateStrategy get the cluster primary update strategy,
@@ -1667,7 +1686,14 @@ func (cluster *Cluster) SetAdmissionError(msg string) {
 		return
 	}
 
-	cluster.Status.PhaseReason = ""
+	// Only clear the reason we set above for a previous admission error.
+	// PhaseReason is shared with the normal phase-reporting machinery, so
+	// clearing it unconditionally here would wipe an unrelated, legitimate
+	// message (e.g. "Some instances are not yet active") on every successful
+	// admission check.
+	if cluster.Status.Phase == PhaseDefinitionInvalid {
+		cluster.Status.PhaseReason = ""
+	}
 }
 
 // GetAdmissionError always returns an empty string: the Cluster encodes the
