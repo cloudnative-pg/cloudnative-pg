@@ -173,7 +173,7 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 				continue
 			default:
 				contextLogger.Warning(
-					"Not stepping down: the other instances are reachable and agree this is the primary, retrying",
+					"Not stepping down: no peer reports another target primary, retrying",
 					"leaseAge", age)
 				continue
 			}

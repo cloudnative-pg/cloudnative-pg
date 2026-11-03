@@ -689,7 +689,9 @@ type LivenessProbe struct {
 // IsolationCheckConfiguration contains the configuration for the primary
 // isolation check
 type IsolationCheckConfiguration struct {
-	// Whether primary isolation checking is enabled
+	// Whether primary isolation checking is enabled. When disabled, an
+	// isolated primary is not stopped, but a primary that reaches a peer
+	// reporting a different target primary still is.
 	// +optional
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
