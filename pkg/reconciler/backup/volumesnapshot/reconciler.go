@@ -51,7 +51,6 @@ type Reconciler struct {
 	cli                  client.Client
 	recorder             record.EventRecorder
 	instanceStatusClient remote.InstanceClient
-	backupClient         remote.BackupClient
 }
 
 // ExecutorBuilder is a struct capable of creating a Reconciler
@@ -69,7 +68,6 @@ func NewReconcilerBuilder(
 			cli:                  cli,
 			recorder:             recorder,
 			instanceStatusClient: remote.NewClient().Instance(),
-			backupClient:         remote.NewClient().Backup(),
 		},
 	}
 }
@@ -288,12 +286,6 @@ func (se *Reconciler) finalizeSnapshotBackupStep(
 	}
 
 	backup.Status.BackupSnapshotStatus.SetSnapshotElements(snapshots)
-	// Without a WAL archiver plugin, WAL archiving succeeds without archiving
-	// anything, and pg_backup_stop might have returned without waiting
-	if backup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped && cluster.GetEnabledWALArchivePluginName() == "" {
-		return nil, fmt.Errorf("the WAL storage was not snapshotted, " +
-			"but the WAL archiver plugin was removed while the backup was running")
-	}
 	if err := backupStatusFromSnapshots(snapshots, &backup.Status); err != nil {
 		contextLogger.Error(err, "while enriching the backup status")
 	}
@@ -414,15 +406,14 @@ func EnsurePodIsUnfenced(
 	return nil
 }
 
-// isWalVolumeSnapshotSkipped tells whether the WAL storage can be left out of the
-// snapshots. This requires an online backup where pg_backup_stop waits for
-// the WAL archiver plugin to archive every WAL file needed to recover the
-// backup.
+// isWalVolumeSnapshotSkipped tells whether the WAL storage is left out of the
+// snapshots. This is the case of every online backup: the snapshots are cut
+// before pg_backup_stop, so recovering to the consistent point it records
+// requires the WAL archive whether or not the WAL storage is snapshotted.
+// Whether pg_backup_stop waits for the archiver is up to the user, through
+// the waitForArchive option.
 func isWalVolumeSnapshotSkipped(cluster *apiv1.Cluster, backup *apiv1.Backup) bool {
-	onlineConfiguration := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot).OnlineConfiguration
-	return backup.GetOnlineOrDefault(cluster) &&
-		onlineConfiguration.GetWaitForArchive() &&
-		cluster.GetEnabledWALArchivePluginName() != ""
+	return backup.GetOnlineOrDefault(cluster)
 }
 
 // snapshotPVCGroup creates a volumeSnapshot resource for every PVC
@@ -439,19 +430,10 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 		slices.ContainsFunc(pvcs, func(pvc corev1.PersistentVolumeClaim) bool {
 			return pvc.Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgWal)
 		})
-	if walVolumeSnapshotSkipped {
-		// The running backup tells whether pg_backup_stop waits for the
-		// archiver, as the role label of the Pod can lag behind a switchover
-		status, err := se.backupClient.StatusWithErrors(ctx, targetPod)
-		if err != nil {
-			return err
-		}
-		walVolumeSnapshotSkipped = status.Data != nil && status.Data.StopWaitsForArchive
-	}
 	for i := range pvcs {
 		if walVolumeSnapshotSkipped && pvcs[i].Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgWal) {
 			se.recorder.Eventf(backup, "Normal", "SkipSnapshot",
-				"Skipping VolumeSnapshot for PVC %v, the WAL files are in the WAL archive", pvcs[i].Name)
+				"Skipping VolumeSnapshot for PVC %v, the WAL files are fetched from the WAL archive on recovery", pvcs[i].Name)
 			continue
 		}
 

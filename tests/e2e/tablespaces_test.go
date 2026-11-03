@@ -455,7 +455,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
 					}
 				}).Should(Succeed())
-				Expect(len(backupObject.Status.BackupSnapshotStatus.Elements)).To(BeIdenticalTo(4))
+				// 3 snapshots: PGDATA and the 2 tablespaces, the WAL volume is skipped.
+				Expect(len(backupObject.Status.BackupSnapshotStatus.Elements)).To(BeIdenticalTo(3))
 			})
 		})
 
@@ -523,7 +524,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
-						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(4))
+						// 3 snapshots: PGDATA and the 2 tablespaces, the WAL volume is skipped.
+						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(3))
 					}
 				}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
 			})
@@ -549,6 +551,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme,
 					clusterVolumesnapshoRestoreManifest)
 				Expect(err).ToNot(HaveOccurred())
+
+				By("creating the ObjectStore the recovery fetches the WAL files from", func() {
+					Expect(env.Client.Create(env.Ctx, newObjectStore(namespace, clusterName))).To(Succeed())
+				})
 
 				By("creating the cluster to be restored through snapshot", func() {
 					resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoRestoreManifest)

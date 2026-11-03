@@ -171,11 +171,10 @@ spec:
 
 If the backed-up cluster stored its WAL files in a separate PVC, the example
 above is all you need in most cases. CloudNativePG does not snapshot the WAL
-volume of an online backup when the WAL archive is guaranteed to hold the WAL
-files needed to recover it, and reports `walVolumeSnapshotSkipped: true` in the
+volume of an online backup, and reports `walVolumeSnapshotSkipped: true` in the
 `Backup` status.
 See [Skipping the snapshot of the WAL volume](appendixes/backup_volumesnapshot.md#skipping-the-snapshot-of-the-wal-volume)
-for the conditions.
+for details.
 In that case, reference only the `storage` snapshot: the new cluster starts
 with an empty WAL volume, and PostgreSQL fetches the WAL files from the archive
 defined in the `source` of the recovery, which is therefore required.

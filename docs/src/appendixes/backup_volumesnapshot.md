@@ -192,30 +192,23 @@ you can add this section:
 
 ### Skipping the snapshot of the WAL volume
 
-When a cluster has a separate volume for WAL files (`.spec.walStorage`), a
-volume snapshot backup includes a snapshot of that volume too. For online
-backups the WAL files required to recover the backup are also archived, and
-CloudNativePG avoids paying for the duplicated storage by leaving the WAL
-volume out of the backup when all these conditions are met, and otherwise
-snapshots it as usual:
+When a cluster has a separate volume for WAL files (`.spec.walStorage`), an
+online volume snapshot backup only snapshots `PGDATA` (and the tablespaces, if
+any). The snapshots are cut before `pg_backup_stop`, so recovering the backup
+requires the WAL archive anyway, and keeping the WAL files twice would waste
+storage space and increase costs.
 
-- the backup is online
-- `onlineConfiguration.waitForArchive` is `true`, so that the backup
-  completes only once the WAL archiver has archived every WAL file needed to
-  recover it
-- WAL archiving is performed by a [CNPG-I plugin](../cnpg_i.md), such as
-  the Barman Cloud plugin
-- the backup is taken on the primary while PostgreSQL archives WAL files, as
-  `pg_backup_stop` doesn't wait for the archiver on a standby, nor while
-  `archive_mode` is `off`. As the default backup `target` is
-  `prefer-standby`, this requires the `primary` target on a cluster with
-  replicas. The instances of a
-  [replica cluster](../replica_cluster.md) are all standbys, and
-  `archive_mode` stays `off` after the removal of the
-  `cnpg.io/skipWalArchiving` annotation until the primary is restarted
+The `onlineConfiguration.waitForArchive` option is only passed to
+`pg_backup_stop`: making sure the WAL archive is complete is up to you. Keep in
+mind that `pg_backup_stop` doesn't wait for the archiver when:
 
-If the WAL archiver plugin is removed while such a backup is running, the
-backup fails, as the WAL files might not have been archived.
+- the backup is taken on a standby of a cluster that is not a
+  [replica cluster](../replica_cluster.md): set the backup `target` to `primary`
+- `archive_mode` is `off`, which CloudNativePG sets while the
+  `cnpg.io/skipWalArchiving` annotation is present, and until the primary is
+  restarted after you remove it
+- a plugin streams the WAL files without `archive_command`, and is not set as
+  the WAL archiver (`isWALArchiver: true`)
 
 Such a `Backup` reports `.status.snapshotBackupStatus.walVolumeSnapshotSkipped: true`,
 and its volume snapshots carry the `cnpg.io/walVolumeSnapshotSkipped: "true"`

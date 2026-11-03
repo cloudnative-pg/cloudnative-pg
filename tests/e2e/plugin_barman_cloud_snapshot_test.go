@@ -41,7 +41,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -230,8 +229,9 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 
 				var backup *apiv1.Backup
 				By("creating a snapshot and waiting until it's completed", func() {
+					// 1 snapshot: PGDATA only, the online backup skips the WAL volume.
 					backup = takeVolumeSnapshotBackup(namespace, clusterName,
-						fmt.Sprintf("%s-example", clusterName), apiv1.BackupTargetStandby, true, false, 2)
+						fmt.Sprintf("%s-example", clusterName), apiv1.BackupTargetStandby, true, false, 1)
 				})
 
 				By("fetching the volume snapshots", func() {
@@ -487,58 +487,6 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 							return strings.TrimSpace(stdOut), err
 						}, RetryTimeout).Should(Equal("6"), "replica pod %s did not catch up", pod.Name)
 					}
-				})
-			})
-
-			It("snapshots the WAL storage while PostgreSQL runs without WAL archiving", func() {
-				patchCluster := func(mutate func(*apiv1.Cluster)) {
-					GinkgoHelper()
-					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-					Expect(err).ToNot(HaveOccurred())
-					originalCluster := cluster.DeepCopy()
-					mutate(cluster)
-					Expect(objects.Patch(env.Ctx, env.Client, cluster, k8client.MergeFrom(originalCluster))).To(Succeed())
-				}
-
-				expectPrimaryArchiveMode := func(archiveMode string) {
-					GinkgoHelper()
-					Eventually(func(g Gomega) {
-						primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-						g.Expect(err).ToNot(HaveOccurred())
-						stdOut, _, err := exec.QueryInInstancePod(
-							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-							exec.PodLocator{Namespace: namespace, PodName: primary.Name},
-							postgres.AppDBName, "SHOW archive_mode")
-						g.Expect(err).ToNot(HaveOccurred())
-						g.Expect(strings.TrimSpace(stdOut)).To(Equal(archiveMode))
-					}, testTimeouts[timeouts.ClusterIsReady]).Should(Succeed())
-				}
-
-				By("disabling WAL archiving", func() {
-					patchCluster(func(cluster *apiv1.Cluster) {
-						if cluster.Annotations == nil {
-							cluster.Annotations = map[string]string{}
-						}
-						cluster.Annotations[utils.SkipWalArchiving] = "enabled"
-					})
-					expectPrimaryArchiveMode("off")
-					clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
-				})
-
-				By("enabling WAL archiving again, without restarting the primary", func() {
-					patchCluster(func(cluster *apiv1.Cluster) {
-						cluster.Spec.PrimaryUpdateStrategy = apiv1.PrimaryUpdateStrategySupervised
-						delete(cluster.Annotations, utils.SkipWalArchiving)
-					})
-					clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
-						[]string{apiv1.PhaseWaitingForUser}, testTimeouts[timeouts.ClusterIsReady])
-					expectPrimaryArchiveMode("off")
-				})
-
-				By("taking a snapshot of both the PGDATA and the WAL storage", func() {
-					backup := takeVolumeSnapshotBackup(namespace, clusterName,
-						fmt.Sprintf("%s-without-archiving", clusterName), apiv1.BackupTargetPrimary, false, true, 2)
-					Expect(backup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeFalse())
 				})
 			})
 		})

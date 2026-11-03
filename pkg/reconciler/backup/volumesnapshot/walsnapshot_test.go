@@ -33,7 +33,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -79,9 +78,6 @@ var _ = Describe("WAL snapshot skipping", func() {
 						Online:    ptr.To(true),
 					},
 				},
-				Plugins: []apiv1.PluginConfiguration{
-					{Name: "barman-cloud.cloudnative-pg.io", IsWALArchiver: ptr.To(true)},
-				},
 			},
 		}
 		backup = &apiv1.Backup{
@@ -114,46 +110,26 @@ var _ = Describe("WAL snapshot skipping", func() {
 		Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeTrue())
 	})
 
-	DescribeTable("keeps the WAL snapshot",
-		func(mutate func(*apiv1.Cluster, *apiv1.Backup)) {
-			mutate(cluster, backup)
-			Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeFalse())
-		},
-		Entry("for a cold backup", func(_ *apiv1.Cluster, b *apiv1.Backup) {
-			b.Spec.Online = ptr.To(false)
-		}),
-		Entry("when pg_backup_stop doesn't wait for the archive", func(c *apiv1.Cluster, _ *apiv1.Backup) {
-			c.Spec.Backup.VolumeSnapshot.OnlineConfiguration.WaitForArchive = ptr.To(false)
-		}),
-		Entry("without a WAL archiver plugin", func(c *apiv1.Cluster, _ *apiv1.Backup) {
-			c.Spec.Plugins[0].IsWALArchiver = ptr.To(false)
-		}),
-		Entry("when the WAL archiver plugin is disabled", func(c *apiv1.Cluster, _ *apiv1.Backup) {
-			c.Spec.Plugins[0].Enabled = ptr.To(false)
-		}),
-		Entry("when the Backup doesn't wait for the archive", func(_ *apiv1.Cluster, b *apiv1.Backup) {
-			b.Spec.OnlineConfiguration = &apiv1.OnlineConfiguration{WaitForArchive: ptr.To(false)}
-		}),
-	)
+	It("keeps the WAL snapshot of a cold backup", func() {
+		backup.Spec.Online = ptr.To(false)
+		Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeFalse())
+	})
 
-	newExecutor := func(stopWaitsForArchive bool) *Reconciler {
+	It("skips the WAL snapshot whatever the archiver configuration", func() {
+		cluster.Spec.Backup.VolumeSnapshot.OnlineConfiguration.WaitForArchive = ptr.To(false)
+		Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeTrue())
+	})
+
+	newExecutor := func() *Reconciler {
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithObjects(backup, cluster, targetPod).
 			Build()
-		executor := NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
-		executor.backupClient = &fakeBackupClient{response: &webserver.Response[webserver.BackupResultData]{
-			Data: &webserver.BackupResultData{
-				BackupName:          backupName,
-				Phase:               webserver.Started,
-				StopWaitsForArchive: stopWaitsForArchive,
-			},
-		}}
-		return executor
+		return NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
 	}
 
 	It("creates and marks only the PGDATA snapshot", func(ctx SpecContext) {
-		executor := newExecutor(true)
+		executor := newExecutor()
 
 		Expect(executor.createSnapshotPVCGroupStep(ctx, cluster, pvcs, backup, targetPod)).To(Succeed())
 
@@ -166,7 +142,7 @@ var _ = Describe("WAL snapshot skipping", func() {
 	})
 
 	It("doesn't mark the snapshot of an instance without a WAL PVC", func(ctx SpecContext) {
-		executor := newExecutor(true)
+		executor := newExecutor()
 
 		Expect(executor.createSnapshotPVCGroupStep(ctx, cluster, pvcs[:1], backup, targetPod)).To(Succeed())
 
@@ -176,19 +152,19 @@ var _ = Describe("WAL snapshot skipping", func() {
 		Expect(snapshotList.Items[0].Annotations).ToNot(HaveKey(utils.WalVolumeSnapshotSkippedAnnotationName))
 	})
 
-	It("creates unmarked snapshots of every PVC when pg_backup_stop doesn't wait for the archiver",
-		func(ctx SpecContext) {
-			executor := newExecutor(false)
+	It("creates snapshots of every PVC of a cold backup", func(ctx SpecContext) {
+		backup.Spec.Online = ptr.To(false)
+		executor := newExecutor()
 
-			Expect(executor.createSnapshotPVCGroupStep(ctx, cluster, pvcs, backup, targetPod)).To(Succeed())
+		Expect(executor.createSnapshotPVCGroupStep(ctx, cluster, pvcs, backup, targetPod)).To(Succeed())
 
-			var snapshotList volumesnapshotv1.VolumeSnapshotList
-			Expect(executor.cli.List(ctx, &snapshotList)).To(Succeed())
-			Expect(snapshotList.Items).To(HaveLen(2))
-			for _, snapshot := range snapshotList.Items {
-				Expect(snapshot.Annotations).ToNot(HaveKey(utils.WalVolumeSnapshotSkippedAnnotationName))
-			}
-		})
+		var snapshotList volumesnapshotv1.VolumeSnapshotList
+		Expect(executor.cli.List(ctx, &snapshotList)).To(Succeed())
+		Expect(snapshotList.Items).To(HaveLen(2))
+		for _, snapshot := range snapshotList.Items {
+			Expect(snapshot.Annotations).ToNot(HaveKey(utils.WalVolumeSnapshotSkippedAnnotationName))
+		}
+	})
 
 	Context("when finalizing", func() {
 		var executor *Reconciler
@@ -222,12 +198,6 @@ var _ = Describe("WAL snapshot skipping", func() {
 			Expect(executor.cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: backupName},
 				&latestBackup)).To(Succeed())
 			Expect(latestBackup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeTrue())
-		})
-
-		It("fails when the WAL archiver plugin was removed during the backup", func(ctx SpecContext) {
-			cluster.Spec.Plugins = nil
-			_, err := executor.finalizeSnapshotBackupStep(ctx, fakeFinalizeExecutor{}, cluster, backup, targetPod)
-			Expect(err).To(MatchError(ContainSubstring("WAL archiver plugin was removed")))
 		})
 	})
 })
