@@ -11,12 +11,12 @@ require (
 	github.com/avast/retry-go/v5 v5.0.0
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/cloudnative-pg v0.0.0-00010101000000-000000000000
-	github.com/cloudnative-pg/machinery v0.6.2-0.20261028124740-32c682fe6c93
+	github.com/cloudnative-pg/machinery v0.6.2-0.20261103130510-8265ac9ccb12
 	github.com/go-logr/logr v1.4.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.7.0
 	github.com/lib/pq v1.12.3
-	github.com/onsi/ginkgo/v2 v2.33.1
+	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.94.2
 	github.com/stern/stern v1.35.0
