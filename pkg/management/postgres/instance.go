@@ -613,7 +613,8 @@ func (instance *Instance) ShutdownConnections() {
 }
 
 // Shutdown stops a PostgreSQL instance that was previously started with Startup.
-// Before shutting down, it attempts to execute a CHECKPOINT.
+// Before shutting down, it attempts to execute a CHECKPOINT, unless
+// options.SkipCheckpoint is set.
 // The function returns an error if PostgreSQL remains running after the shutdown request.
 func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions) error {
 	contextLogger := log.FromContext(ctx)

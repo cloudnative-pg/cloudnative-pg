@@ -280,6 +280,23 @@ var _ = Describe("checkImmediateShutdownUnresponsive", func() {
 	It("steps down with a fast shutdown bounded by the retry period, then an immediate one", func(ctx context.Context) {
 		stops := fakePgCtlFailingToStop()
 
+		// A CHECKPOINT would connect to this socket: the step-down must not run
+		// one, so that the primary stops accepting writes at once.
+		socketDir, err := os.MkdirTemp("/tmp", "pgsock")
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(os.RemoveAll, socketDir)
+		GinkgoT().Setenv("PGHOST", socketDir)
+		listener, err := net.Listen("unix", filepath.Join(socketDir, fmt.Sprintf(".s.PGSQL.%d", GetServerPort())))
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(listener.Close)
+		connected := make(chan struct{}, 1)
+		go func() {
+			if conn, err := listener.Accept(); err == nil {
+				connected <- struct{}{}
+				_ = conn.Close()
+			}
+		}()
+
 		instance := &Instance{}
 		instance.SetCluster(&apiv1.Cluster{Spec: apiv1.ClusterSpec{
 			PrimaryLease: &apiv1.PrimaryLeaseConfiguration{RetryPeriodSeconds: ptr.To[int32](5)},
@@ -288,6 +305,7 @@ var _ = Describe("checkImmediateShutdownUnresponsive", func() {
 		Expect(stops()).To(HaveLen(2))
 		Expect(stops()[0]).To(And(ContainSubstring("-m fast"), ContainSubstring("-t 5")))
 		Expect(stops()[1]).To(ContainSubstring("-m immediate"))
+		Expect(connected).ToNot(Receive())
 	})
 
 	It("does not step down again once PostgreSQL is found unresponsive", func(ctx context.Context) {
