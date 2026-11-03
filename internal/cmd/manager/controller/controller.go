@@ -291,7 +291,12 @@ func RunController(
 		return err
 	}
 
-	if err = mgr.Add(controller.NewNativeBarmanCloudWarning(mgr)); err != nil {
+	nativeBarmanCloudWarning, err := controller.NewNativeBarmanCloudWarning(ctx, mgr)
+	if err != nil {
+		setupLog.Error(err, "unable to set up the native Barman Cloud deprecation check")
+		return err
+	}
+	if err = mgr.Add(nativeBarmanCloudWarning); err != nil {
 		setupLog.Error(err, "unable to add the native Barman Cloud deprecation check")
 		return err
 	}

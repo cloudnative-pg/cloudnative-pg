@@ -294,6 +294,15 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					fmt.Sprintf("kubectl cnpg backup %s -n %s --backup-name %s",
 						clusterName, namespace, fullBackupName))
 				Expect(err).ShouldNot(HaveOccurred(), "stderr: "+stderr)
+				// The only output expected on stderr is the deprecation warning
+				// for the barmanObjectStore backup method
+				for _, line := range strings.Split(strings.TrimSpace(stderr), "\n") {
+					if line == "" {
+						continue
+					}
+					Expect(line).To(ContainSubstring("removed in CloudNativePG 1.32.0"),
+						"unexpected stderr: "+stderr)
+				}
 				AssertBackupConditionTimestampChangedInClusterStatus(
 					namespace,
 					clusterName,

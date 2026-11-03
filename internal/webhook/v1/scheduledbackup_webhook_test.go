@@ -109,6 +109,7 @@ var _ = Describe("Validate schedule", func() {
 		}
 		warnings, result := v.validate(scheduledBackup)
 		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("removed in CloudNativePG 1.32.0"))
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.online"))
 	})
@@ -123,6 +124,7 @@ var _ = Describe("Validate schedule", func() {
 		}
 		warnings, result := v.validate(scheduledBackup)
 		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("removed in CloudNativePG 1.32.0"))
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.onlineConfiguration"))
 	})

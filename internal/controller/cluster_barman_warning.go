@@ -60,12 +60,21 @@ func nativeBarmanCloudIndexFunc(rawObj client.Object) []string {
 	return nil
 }
 
-// NewNativeBarmanCloudWarning returns a Runnable that warns about every Cluster
-// using the native Barman Cloud support, which is removed in CloudNativePG
-// 1.32.0. The manager starts it each time this operator becomes the leader,
-// and it repeats the warning every 24 hours, so that clusters which are never
-// re-applied get the warning too.
-func NewNativeBarmanCloudWarning(mgr ctrl.Manager) manager.Runnable {
+// NewNativeBarmanCloudWarning registers the field index it relies on and
+// returns a Runnable that warns about every Cluster using the native Barman
+// Cloud support, which is removed in CloudNativePG 1.32.0. The manager starts
+// it each time this operator becomes the leader, and it repeats the warning
+// every 24 hours, so that clusters which are never re-applied get the warning
+// too.
+func NewNativeBarmanCloudWarning(ctx context.Context, mgr ctrl.Manager) (manager.Runnable, error) {
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Cluster{},
+		nativeBarmanCloudClusterKey, nativeBarmanCloudIndexFunc,
+	); err != nil {
+		return nil, err
+	}
+
 	recorder := mgr.GetEventRecorderFor("cloudnative-pg") //nolint:staticcheck
 	return manager.RunnableFunc(func(ctx context.Context) error {
 		ticker := time.NewTicker(nativeBarmanCloudWarningInterval)
@@ -79,7 +88,7 @@ func NewNativeBarmanCloudWarning(mgr ctrl.Manager) manager.Runnable {
 			case <-ticker.C:
 			}
 		}
-	})
+	}), nil
 }
 
 // warnNativeBarmanCloudClusters logs a warning and records an event, one every
