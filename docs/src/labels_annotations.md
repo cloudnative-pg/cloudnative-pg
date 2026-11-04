@@ -263,6 +263,7 @@ CloudNativePG manages the following predefined annotations:
       - Topology or affinity
       - Scheduler
       - Volumes or containers
+      - Image pull secrets added to `.spec.imagePullSecrets`
 
     When set to `disabled` on a `Pooler`, the operator restricts any modifications
     to the deployment specification, except for changes to `spec.instances`.
