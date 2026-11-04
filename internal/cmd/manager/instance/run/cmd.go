@@ -251,21 +251,26 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	exitedConditions := concurrency.MultipleExecuted{}
 
 	pluginRepository := repository.New()
-	if _, err = pluginRepository.RegisterUnixSocketPluginsInPath(
+	availablePluginNames, err := pluginRepository.RegisterUnixSocketPluginsInPath(
 		configuration.Current.PluginSocketDir,
-	); err != nil {
+	)
+	if err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
 	defer pluginRepository.Close()
 
 	leaseRunnable := lease.New(kubeClientset, instance)
 
-	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
+	metricsExporter := metricserver.NewExporter(
+		instance,
+		metrics.NewPluginCollector(pluginRepository, availablePluginNames),
+	)
 	reconciler := controller.NewInstanceReconciler(
 		instance,
 		mgr.GetClient(),
 		metricsExporter,
 		pluginRepository,
+		availablePluginNames,
 		leaseRunnable,
 		webhookv1.NewClusterAdmissionGuard(),
 	)
