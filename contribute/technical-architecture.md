@@ -174,6 +174,20 @@ documentation):
   (`.spec.probes.readiness.type`) also requires a replica to be streaming and,
   with `maximumLag`, to be within that lag.
 
+## Instance Manager Endpoints
+
+The Instance Manager listens on three ports. The status server uses TLS 1.3
+with the cluster's server certificate, and accepts but does not require a
+client certificate, so that the kubelet can reach the probes:
+
+| Port | Endpoints | Callers | Authentication |
+| --- | --- | --- | --- |
+| `8000` (HTTPS) | `/healthz`, `/readyz`, `/startupz` | Kubelet | None |
+| `8000` (HTTPS) | `/pg/status`, `/failsafe` | Operator, `kubectl cnpg status` through the API server proxy | None |
+| `8000` (HTTPS) | `/pg/mode/backup`, `/pg/controldata`, `/pg/archive/partial`, `/update` | Operator | Client certificate whose public key fingerprint matches `status.operatorCertificateFingerprint` |
+| `8010` (HTTP, `localhost` only) | `/pg/backup`, `/cache/`, `/cluster/status/condition/wal/archive` | `manager` subcommands inside the Pod, such as `manager backup` and WAL archiving | None |
+| `9187` (HTTP, or HTTPS with `.spec.monitoring.tls.enabled`) | `/metrics` | Prometheus | None |
+
 ## Cluster Lifecycle: Orchestrated Resources
 
 When a `Cluster` is created, the Operator generates several native objects to
@@ -249,6 +263,24 @@ graph LR
     style Cluster fill:#f96,stroke:#333,stroke-width:2px
 ```
 
+### 3. Rolling Updates
+
+When a change requires the instances to restart (a new image, a PostgreSQL
+parameter that needs a restart, a new operator version), the Operator updates
+the replicas one at a time, starting from the most lagged, and the primary
+last. The primary is then restarted in place (`.spec.primaryUpdateMethod:
+restart`, the default) or replaced through a switchover to the most aligned
+replica (`switchover`). With `.spec.primaryUpdateStrategy: supervised`, the
+Operator waits for the user to trigger that last step. A decrease of a hot
+standby sensitive parameter is the exception: the primary restarts first (see
+[Managing "Sensitive" Parameters](#2-managing-sensitive-parameters)).
+
+With `ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` set in the operator
+configuration, an operator upgrade does not roll the Pods out: the Operator
+uploads the new Instance Manager binary to each instance through the `/update`
+endpoint, and the new process adopts the running PostgreSQL server (see
+[In-place updates of the instance manager](../docs/src/installation_upgrade.md#in-place-updates-of-the-instance-manager)).
+
 ## Declarative Objects Inside PostgreSQL
 
 The `Cluster` describes the *infrastructure* of a PostgreSQL cluster. A second
@@ -288,6 +320,45 @@ Networking is purely label-driven. The Operator manages the
    Service selects it. Once the transition completes, the Operator
    relabels the demoted instance as `replica` and the Kubernetes API
    Server updates the Service **Endpoints** accordingly.
+
+## Changing the Primary
+
+A switchover or a failover is a hand-over between the Operator and the
+Instance Managers, coordinated through two fields of the `Cluster` status and
+the primary `Lease`. The Operator writes `status.targetPrimary`, the instance
+that must become primary (`kubectl cnpg promote` writes it too, to request a
+switchover). Only the Instance Manager of that instance writes
+`status.currentPrimary`, once it has actually promoted. While the two differ,
+a transition is in progress.
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator
+    participant API as API Server
+    participant Old as Old primary IM
+    participant New as New primary IM
+
+    Op->>API: targetPrimary = new instance
+    Op->>API: label old primary Pod "unhealthy"
+    Old->>Old: fast shutdown of PostgreSQL, then exit
+    Old->>API: release the Lease
+    New->>API: acquire the Lease
+    New->>New: pg_ctl promote
+    New->>API: currentPrimary = new instance
+    Op->>API: label new primary "primary", others "replica"
+    Old->>Old: restart and rejoin as a replica
+```
+
+In a **switchover**, the Operator sets the target directly. In a **failover**,
+it first sets `status.targetPrimary` to the `pending` marker and waits for the
+WAL receivers of the replicas to stop, so that the LSNs it compares are final,
+and only then picks the most advanced replica. The old primary, if still
+running, shuts itself down as soon as it sees that it is no longer the target.
+If it cannot release the `Lease` (crash, node failure), the new primary takes
+it once the lease has stayed unchanged for
+`.spec.primaryLease.leaseDurationSeconds`, counted from the `pending` marker
+in a failover or from the target change in a switchover (see
+[Safe primary election](../docs/src/failover.md#safe-primary-election)).
 
 ## Source Code Reference
 
