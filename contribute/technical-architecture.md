@@ -24,13 +24,14 @@ API** as the single source of truth.
 
 ### Key Principles
 
-- **No Sidecars:** Management logic is integrated into the primary container as
-  an **Instance Manager (PID 1)**.
+- **No Sidecars:** Management logic is integrated into the `postgres` container
+  as an **Instance Manager (PID 1)**. The operator injects no sidecar of its
+  own; only [CNPG-I plugins](../docs/src/cnpg_i.md) can add one.
 - **Direct Pod Management:** Does **not** use `StatefulSets`, allowing for more
   granular control over individual instances.
 - **Native Integration:** Leverages Kubernetes primitives (Pods, PVCs,
-  Services, ConfigMaps, Secrets, StorageClasses, VolumeSnapshots) for all
-  database cluster operations.
+  Services, ConfigMaps, Secrets, Leases, StorageClasses, VolumeSnapshots) for
+  all database cluster operations.
 - **Security by Design:** Minimal attack surface by reducing the number of
   moving parts and using non-root, immutable application containers.
 
@@ -45,6 +46,7 @@ graph TD
         Cluster[Cluster CRD]
         Operator[CNPG Operator]
         K8sAPI[API Server]
+        Lease[(Lease: primary)]
     end
 
     subgraph Node ["Worker Node"]
@@ -65,21 +67,23 @@ graph TD
     SvcR[Service: -r]
 
     %% Probes
-    Kubelet -->|HTTP startup probe| IM
-    Kubelet -->|HTTP liveness probe| IM
-    Kubelet -->|HTTP readiness probe| IM
+    Kubelet -->|HTTPS startup probe| IM
+    Kubelet -->|HTTPS liveness probe| IM
+    Kubelet -->|HTTPS readiness probe| IM
 
     %% Logic & Persistence
     Cluster -->|Watched by| Operator
     Operator -->|Reconciles| K8sAPI
-    IM -.->|Reports Health & LSN| K8sAPI
+    Operator -->|"Polls /pg/status: role, LSN, health"| IM
+    IM -.->|Watches Cluster, patches status| K8sAPI
+    IM -.->|Holds while primary| Lease
 
     PG ---|Mounts Data/WAL| PVC
 
     %% Traffic Routing
-    K8sAPI ---|Selector: role=primary| SvcRW
-    K8sAPI ---|Selector: role=replica| SvcRO
-    K8sAPI ---|Selector: all ready| SvcR
+    K8sAPI ---|"Selector: cnpg.io/instanceRole=primary"| SvcRW
+    K8sAPI ---|"Selector: cnpg.io/instanceRole=replica"| SvcRO
+    K8sAPI ---|"Selector: cnpg.io/podRole=instance"| SvcR
 
 ```
 
@@ -92,9 +96,12 @@ gains surgical control over the cluster state.
 ### 1. Granular Failover and Promotion
 
 `StatefulSets` are bound by ordinal logic (0, 1, 2). CloudNativePG can promote
-any replica based on the **Log Sequence Number (LSN)** reported by the Instance
-Manager, ensuring the most up-to-date instance is always chosen as the new primary,
-regardless of its name or index.
+any replica based on the **Log Sequence Number (LSN)** that the Operator
+collects from each Instance Manager, ensuring the most up-to-date instance is
+always chosen as the new primary, regardless of its name or index. The chosen
+instance promotes only once it holds the primary `Lease`, which the previous
+primary must release or let expire (see
+[Safe primary election](../docs/src/failover.md#safe-primary-election)).
 
 ### 2. Managing "Sensitive" Parameters
 
@@ -110,24 +117,36 @@ configuration changes.
 
 ### 3. Synchronous Replication Control
 
-The Operator dynamically manages `synchronous_standby_names` by watching Pod
-status and updating the PostgreSQL configuration accordingly. Users configure
-this via the declarative `synchronous` section, which supports priority-based
-(`first`) and quorum-based (`any`) methods, allowing users to toggle between
-`required` (strict durability) and `preferred` (availability-first) modes
-without manual intervention.
+`synchronous_standby_names` is managed dynamically: the Operator records the
+instances and their health in the `Cluster` status, and the Instance Manager of
+the primary derives the setting from that status and writes it into the
+PostgreSQL configuration. Users configure this via the declarative
+`synchronous` section, which supports priority-based (`first`) and
+quorum-based (`any`) methods, and a `dataDurability` of `required` (strict
+durability: commits wait for `number` standbys even while some are down) or
+`preferred` (availability-first: only healthy replicas are listed, and
+`number` is capped to how many there are).
 
 ## The Role of the Instance Manager (PID 1)
 
 The Instance Manager is a Go binary that acts as the entry point for the
 container. Its responsibilities include:
 
-- **Postgres Lifecycle:** Initializing the cluster (`initdb`), starting the
-  database, and managing clean shutdowns.
+- **Postgres Lifecycle:** Starting the database with the configuration it
+  generates from the `Cluster`, restarting it when that configuration requires
+  it, and managing clean shutdowns. The data directory is prepared beforehand
+  by the same binary, in an init container (see
+  [Bootstrap Phase](#1-bootstrap-phase-init-containers)).
 - **Self-Healing:** Participating in failover by executing `pg_ctl promote`
-  when the Operator identifies it as the new leader.
-- **Kubernetes Awareness:** Communicating directly with the K8s API to report
-  status, replication lag, and LSN.
+  when the Operator sets its Pod as `status.targetPrimary`, once it holds the
+  primary `Lease`, and then recording itself as `status.currentPrimary`.
+- **Status Reporting:** Serving the instance status (role, timeline, LSNs,
+  replication state) at `/pg/status` on its HTTPS port, which the Operator
+  polls on every instance; the `Cluster` status does not carry the LSNs.
+- **Primary Lease:** Renewing the `Lease` while primary, and stopping
+  PostgreSQL when it cannot renew it and has also lost contact with at least
+  one other instance (see
+  [Primary Isolation](../docs/src/instance_manager.md#primary-isolation)).
 - **Declarative Object Reconciliation:** Running its own `controller-runtime`
   manager to apply the CRDs that describe objects *inside* PostgreSQL, as
   described in
@@ -135,36 +154,53 @@ container. Its responsibilities include:
 
 ## Intelligent Probes
 
-The Instance Manager provides a database-aware HTTP server for Kubelet probes:
+The Instance Manager provides a database-aware HTTPS server for Kubelet probes
+(details in the [instance manager](../docs/src/instance_manager.md)
+documentation):
 
-- **Startup Probe:** Prevents restarts during `initdb`, recovery, or WAL
-  replay.
+- **Startup Probe:** Uses `pg_isready` by default, and treats a server that is
+  alive but still rejecting connections as started, so that crash recovery or
+  WAL replay does not get the container restarted. It also succeeds while
+  `pg_rewind` runs or the Instance Manager is restarting or fencing PostgreSQL.
+  Bootstrap (`initdb`, restore, cloning) is not covered: it completes in an
+  init container before this container starts.
 - **Liveness Probe:** Fails when the primary lease loop stops attempting lock
   operations, or when PostgreSQL ignores an immediate shutdown for longer than
-  `.spec.immediateShutdownTimeout`. Primary isolation fencing lives in the
+  `.spec.immediateShutdownTimeout`. The lease check only applies once the
+  instance has held the lease. Primary isolation fencing lives in the
   primary lease (`internal/cmd/manager/instance/run/lease`), not here.
-- **Readiness Probe:** Ensures `pg_isready` succeeds on the primary and
-  validates replication lag/hot-standby status on replicas before allowing
-  traffic.
+- **Readiness Probe:** Uses `pg_isready` by default, on the primary and on the
+  replicas alike, so a lagging replica stays ready. The `streaming` strategy
+  (`.spec.probes.readiness.type`) also requires a replica to be streaming and,
+  with `maximumLag`, to be within that lag.
 
 ## Cluster Lifecycle: Orchestrated Resources
 
 When a `Cluster` is created, the Operator generates several native objects to
 manage the identity, security, and connectivity of the instances.
 
-### 1. Bootstrap Phase: Initialization and Join Jobs
+### 1. Bootstrap Phase: Init Containers
 
-Before long-running Pods start, CloudNativePG uses temporary **Jobs** to
-prepare the storage:
+Each instance is bootstrapped on its own Pod, with no separate Job. Every
+instance Pod starts with the `bootstrap-controller` init container, which
+copies the Instance Manager binary from the operator image into the shared
+`/controller` volume. While the instance's PVCs are not yet bootstrapped, the
+Operator also adds the `bootstrap-instance` init container, which runs that
+binary with the PostgreSQL image to prepare the data directory on the PVC:
 
-- **initdb:** Created for the first instance to initialize the PostgreSQL data
-  directory on the PVC.
-- **recovery:** Created when bootstrapping from a backup or volume snapshot,
-  restoring the data directory for point-in-time recovery.
-- **pg_basebackup:** Created when cloning from an external cluster via
-  streaming replication.
-- **join:** Created for subsequent replicas to clone data from the primary
+- **`instance init`:** For the first instance, to initialize the PostgreSQL
+  data directory with `initdb`.
+- **`instance restore`:** For the first instance when bootstrapping from a
+  backup, restoring the data directory for point-in-time recovery.
+- **`instance restoresnapshot`:** When bootstrapping from volume snapshots.
+- **`instance pgbasebackup`:** For the first instance when cloning from an
+  external cluster via streaming replication.
+- **`instance join`:** For subsequent replicas to clone data from the primary
   using `pg_basebackup`.
+
+The `postgres` container, and with it the Instance Manager, starts only after
+this init container completes. Jobs are still used for major version upgrades
+(`pg_upgrade`).
 
 ### 2. Operational Phase: Resource Hierarchy
 
@@ -204,6 +240,9 @@ graph LR
     Cluster --> PDB1[PodDisruptionBudget: cluster-example-primary]
     Cluster --> PDB2[PodDisruptionBudget: cluster-example]
 
+    %% Primary election (held by the primary's Instance Manager)
+    Cluster --> Lease[Lease: cluster-example]
+
     %% Monitoring (namespace-level, not owned by the Cluster)
     Cluster -.-> CM(ConfigMap: cnpg-default-monitoring)
 
@@ -215,12 +254,14 @@ graph LR
 The `Cluster` describes the *infrastructure* of a PostgreSQL cluster. A second
 family of CRDs describes objects living *inside* PostgreSQL, which cannot be
 applied through the Kubernetes API alone. CloudNativePG therefore runs a second
-`controller-runtime` manager inside every Instance Manager, active only on the
-primary and only for resources referencing its own `Cluster`.
+`controller-runtime` manager inside every Instance Manager, whose controllers
+for these CRDs act only on the primary and only for resources referencing its
+own `Cluster`.
 
 | CRD | Reconciled by | Where the work happens |
 | --- | --- | --- |
-| `Cluster`, `Pooler`, `Backup`, `ScheduledBackup` | Operator | Kubernetes API |
+| `Cluster`, `Pooler`, `ScheduledBackup` | Operator | Kubernetes API |
+| `Backup` | Operator | Instance Manager of the target instance for object store and plugin backups; Kubernetes API for volume snapshots |
 | `Database`, `Publication`, `Subscription` | Instance Manager | SQL on the primary |
 | `DatabaseRole` | **Both** | Kubernetes API *and* SQL on the primary |
 
@@ -260,6 +301,8 @@ the remaining entries are peripheral CRDs for specific feature areas.
 | **Core** | Instance Manager | N/A | [`pkg/management/postgres/`](../pkg/management/postgres/) |
 | **Core** | Operator Controller | N/A | [`cluster_controller.go`](../internal/controller/cluster_controller.go) |
 | **Core** | Instance Manager Controllers | N/A | [`internal/management/controller/`](../internal/management/controller/) |
+| **Core** | Instance Manager Probes | N/A | [`pkg/management/postgres/webserver/probes/`](../pkg/management/postgres/webserver/probes/) |
+| **Core** | Primary Lease | N/A | [`internal/cmd/manager/instance/run/lease/`](../internal/cmd/manager/instance/run/lease/) |
 | **High availability** | `FailoverQuorum` | [`failoverquorum_types.go`](../api/v1/failoverquorum_types.go) | [`replicas_quorum.go`](../internal/controller/replicas_quorum.go) |
 | **Image management** | `ClusterImageCatalog` | [`clusterimagecatalog_types.go`](../api/v1/clusterimagecatalog_types.go) | [`clusterimagecatalog_funcs.go`](../api/v1/clusterimagecatalog_funcs.go) |
 | **Image management** | `ImageCatalog` | [`imagecatalog_types.go`](../api/v1/imagecatalog_types.go) | [`imagecatalog_funcs.go`](../api/v1/imagecatalog_funcs.go) |
