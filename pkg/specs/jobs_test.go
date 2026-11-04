@@ -341,3 +341,40 @@ var _ = Describe("Job service account token", func() {
 		}
 	})
 })
+
+var _ = Describe("Command restoring a volume snapshot", func() {
+	snapshot := &metav1.ObjectMeta{
+		Annotations: map[string]string{
+			utils.BackupLabelFileAnnotationName:         "YmFja3VwX2xhYmVs",
+			utils.BackupTablespaceMapFileAnnotationName: "dGFibGVzcGFjZV9tYXA=",
+		},
+	}
+	cluster := apiv1.Cluster{
+		Spec: apiv1.ClusterSpec{WalStorage: &apiv1.StorageConfiguration{Size: "1Gi"}},
+	}
+
+	It("passes the backup label and the tablespace map to a replica as it does to a primary", func() {
+		primary := BuildPrimaryBootstrapCommandViaRestoreSnapshot(cluster, snapshot)
+		replica := BuildReplicaBootstrapCommandViaRestoreSnapshot(cluster, snapshot)
+
+		Expect(primary.Command).To(ContainElements(
+			"--backuplabel=YmFja3VwX2xhYmVs", "--tablespacemap=dGFibGVzcGFjZV9tYXA=", "--pg-wal"))
+		Expect(primary.Command).ToNot(ContainElement("--immediate"))
+		// The only difference is --immediate
+		Expect(slices.DeleteFunc(slices.Clone(replica.Command), func(arg string) bool {
+			return arg == "--immediate"
+		})).To(Equal(primary.Command))
+		Expect(replica.Command).To(ContainElement("--immediate"))
+	})
+
+	It("passes neither when the snapshot has none", func() {
+		replica := BuildReplicaBootstrapCommandViaRestoreSnapshot(cluster, &metav1.ObjectMeta{})
+		Expect(replica.Command).ToNot(ContainElement(HavePrefix("--backuplabel")))
+		Expect(replica.Command).ToNot(ContainElement(HavePrefix("--tablespacemap")))
+	})
+
+	It("tolerates a missing snapshot", func() {
+		replica := BuildReplicaBootstrapCommandViaRestoreSnapshot(cluster, nil)
+		Expect(replica.Command).To(ContainElement("--immediate"))
+	})
+})

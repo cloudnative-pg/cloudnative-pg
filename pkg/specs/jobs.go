@@ -21,6 +21,7 @@ package specs
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/kballard/go-shellquote"
@@ -196,20 +197,34 @@ func BuildPrimaryBootstrapCommandViaRestoreSnapshot(
 	cluster apiv1.Cluster,
 	object *metav1.ObjectMeta,
 ) *InstanceBootstrapCommand {
-	initCommand := []string{
-		"/controller/manager",
-		"instance",
-		"restoresnapshot",
-	}
+	return buildRestoreSnapshotCommand(cluster, object)
+}
 
-	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
-		initCommand = append(initCommand, flag)
-	}
+// buildRestoreSnapshotCommand builds the restoresnapshot command, passing the
+// backup label and the tablespace map stored in the annotations of the
+// snapshot. The extra flags go right after the subcommand.
+func buildRestoreSnapshotCommand(
+	cluster apiv1.Cluster,
+	object *metav1.ObjectMeta,
+	extraFlags ...string,
+) *InstanceBootstrapCommand {
+	initCommand := slices.Concat(
+		[]string{
+			"/controller/manager",
+			"instance",
+			"restoresnapshot",
+		},
+		extraFlags,
+	)
 
-	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
-		initCommand = append(initCommand, flag)
+	if object != nil {
+		if backupLabel := object.Annotations[utils.BackupLabelFileAnnotationName]; backupLabel != "" {
+			initCommand = append(initCommand, fmt.Sprintf("--backuplabel=%s", backupLabel))
+		}
+
+		if tablespaceMap := object.Annotations[utils.BackupTablespaceMapFileAnnotationName]; tablespaceMap != "" {
+			initCommand = append(initCommand, fmt.Sprintf("--tablespacemap=%s", tablespaceMap))
+		}
 	}
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
@@ -286,19 +301,11 @@ func BuildReplicaBootstrapCommandViaJoin(cluster apiv1.Cluster) *InstanceBootstr
 
 // BuildReplicaBootstrapCommandViaRestoreSnapshot builds the bootstrap command
 // for a new replica instance, starting from a volume snapshot backup
-func BuildReplicaBootstrapCommandViaRestoreSnapshot(cluster apiv1.Cluster) *InstanceBootstrapCommand {
-	commonFlags := buildCommonInitJobFlags(cluster)
-	initCommand := make([]string, 0, 4+len(commonFlags))
-	initCommand = append(initCommand,
-		"/controller/manager",
-		"instance",
-		"restoresnapshot",
-		"--immediate",
-	)
-
-	initCommand = append(initCommand, commonFlags...)
-
-	return &InstanceBootstrapCommand{Role: jobRoleSnapshotRecovery, Command: initCommand}
+func BuildReplicaBootstrapCommandViaRestoreSnapshot(
+	cluster apiv1.Cluster,
+	object *metav1.ObjectMeta,
+) *InstanceBootstrapCommand {
+	return buildRestoreSnapshotCommand(cluster, object, "--immediate")
 }
 
 func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {

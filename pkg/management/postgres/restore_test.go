@@ -342,3 +342,34 @@ var _ = Describe("setupBootstrapWALRestoreCache", func() {
 		Expect(store.Wal.RestoreAdditionalCommandArgs).To(ContainElement("--read-timeout=60"))
 	})
 })
+
+var _ = Describe("writeBackupLabelAndTablespaceMap", func() {
+	It("writes the backup_label and tablespace_map files when given", func() {
+		pgData := GinkgoT().TempDir()
+		info := InitInfo{
+			PgData:            pgData,
+			BackupLabelFile:   []byte("backup label"),
+			TablespaceMapFile: []byte("tablespace map"),
+		}
+
+		Expect(info.writeBackupLabelAndTablespaceMap()).To(Succeed())
+
+		backupLabel, err := os.ReadFile(path.Join(pgData, "backup_label")) //nolint:gosec
+		Expect(err).ToNot(HaveOccurred())
+		Expect(string(backupLabel)).To(Equal("backup label"))
+		tablespaceMap, err := os.ReadFile(path.Join(pgData, "tablespace_map")) //nolint:gosec
+		Expect(err).ToNot(HaveOccurred())
+		Expect(string(tablespaceMap)).To(Equal("tablespace map"))
+	})
+
+	It("writes nothing when they are not given", func() {
+		pgData := GinkgoT().TempDir()
+		info := InitInfo{PgData: pgData}
+
+		Expect(info.writeBackupLabelAndTablespaceMap()).To(Succeed())
+
+		entries, err := os.ReadDir(pgData)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(entries).To(BeEmpty())
+	})
+})
