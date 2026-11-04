@@ -867,8 +867,8 @@ spec:
 
 CloudNativePG can synchronize logical decoding (replication) slots across all
 nodes in a high-availability cluster, ensuring seamless continuation of logical
-replication after a failover or switchover. This feature is disabled by
-default, and enabling it requires two steps.
+replication after a failover or switchover of the publisher cluster. This
+feature is disabled by default, and enabling it requires two steps.
 
 The first step is to enable logical decoding slot synchronization:
 
@@ -885,6 +885,14 @@ configuration depends on your PostgreSQL version, as explained below.
 When enabled, the operator automatically manages logical decoding slot states
 during failover and switchover, preventing slot invalidation and avoiding data
 loss for logical replication clients.
+
+:::warning
+    Slot synchronization protects subscribers from a failover of the
+    publisher cluster only. If the subscriber is itself a high-availability
+    cluster, see
+    ["Resilience to Failovers"](logical_replication.md#resilience-to-failovers)
+    for the risk of losing commits after a failover of the subscriber.
+:::
 
 #### Behavior on PostgreSQL 17 and later
 
@@ -924,7 +932,7 @@ relevant WAL, ensuring that:
 - logical replication slots do not consume changes until they are safely
   received by the replicas of the publisher, and
 - logical replication clients can seamlessly reconnect to a promoted standby
-  without missing data after failover.
+  without missing data after failover of the publisher cluster.
 
 For more details on logical replication slot synchronization, see the
 PostgreSQL documentation on [Logical Replication Failover](https://www.postgresql.org/docs/current/logical-replication-failover.html).
