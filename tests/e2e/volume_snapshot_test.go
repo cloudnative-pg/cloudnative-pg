@@ -393,6 +393,7 @@ var _ = Describe("Verify Volume Snapshot",
 			const (
 				clusterToBackupFilePath  = filesDir + "/declarative-backup-cluster.yaml.template"
 				clusterToRestoreFilePath = filesDir + "/declarative-backup-cluster-restore.yaml.template"
+				clusterToRestoreNoWal    = filesDir + "/declarative-backup-cluster-restore-no-wal.yaml.template"
 				backupFileFilePath       = filesDir + "/declarative-backup.yaml.template"
 				backupPrimaryFilePath    = filesDir + "/declarative-backup-on-primary.yaml.template"
 				backupColdFilePath       = filesDir + "/declarative-backup-cold.yaml.template"
@@ -531,6 +532,25 @@ var _ = Describe("Verify Volume Snapshot",
 					tableLocator := pgasserts.TableLocator{
 						Namespace:   namespace,
 						ClusterName: clusterToRestoreName,
+						TableName:   tableName,
+					}
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+				})
+
+				clusterToRestoreNoWalName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterToRestoreNoWal)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("restoring the same backup in a cluster without a separate WAL volume", func() {
+					resources.CreateResourceFromFile(env, namespace, clusterToRestoreNoWal)
+					clusterasserts.AssertClusterIsReady(env, namespace,
+						clusterToRestoreNoWalName,
+						testTimeouts[timeouts.ClusterIsReady])
+				})
+
+				By("checking that the data is present on the cluster without a separate WAL volume", func() {
+					tableLocator := pgasserts.TableLocator{
+						Namespace:   namespace,
+						ClusterName: clusterToRestoreNoWalName,
 						TableName:   tableName,
 					}
 					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)

@@ -346,12 +346,12 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 // restoreCustomWalDir moves the current pg_wal data to the specified custom wal dir and applies the symlink
 // returns indicating if any changes were made and any error encountered in the process
 func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
-	if info.PgWal == "" {
-		return false, nil
-	}
-
 	contextLogger := log.FromContext(ctx)
 	pgDataWal := path.Join(info.PgData, pgWalDirectory)
+
+	if info.PgWal == "" {
+		return restoreWalDirWithoutVolume(ctx, pgDataWal)
+	}
 
 	// The WAL volume is empty when restoring a snapshot taken without it
 	if err := fileutils.EnsureDirectoryExists(info.PgWal); err != nil {
@@ -378,6 +378,37 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 	}
 
 	return true, os.Symlink(info.PgWal, pgDataWal)
+}
+
+// restoreWalDirWithoutVolume makes pg_wal a directory when the cluster has no
+// separate WAL volume but PGDATA comes from one that had it: the pg_wal
+// symlink of the snapshot points to the mount point of a volume that doesn't
+// exist here, and PostgreSQL would not start. It returns whether it changed
+// anything.
+func restoreWalDirWithoutVolume(ctx context.Context, pgDataWal string) (bool, error) {
+	linkInfo, err := os.Lstat(pgDataWal)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if linkInfo.Mode()&os.ModeSymlink == 0 {
+		return false, nil
+	}
+
+	// A symlink to an existing directory is left alone
+	if _, err := os.Stat(pgDataWal); !os.IsNotExist(err) {
+		return false, err
+	}
+
+	log.FromContext(ctx).Info("the pg_wal symlink points to a missing WAL volume, replacing it with a directory")
+	if err := fileutils.RemoveFile(pgDataWal); err != nil {
+		return false, err
+	}
+
+	return true, fileutils.EnsureDirectoryExists(pgDataWal)
 }
 
 // buildRestoreDataDirOptions builds the command line options for barman-cloud-restore

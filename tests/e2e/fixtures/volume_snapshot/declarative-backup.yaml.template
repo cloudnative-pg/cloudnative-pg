@@ -4,5 +4,8 @@ metadata:
   name: cluster-declarative-backup
 spec:
   method: volumeSnapshot
+  # On a standby pg_backup_stop doesn't wait for the WAL archive, so the backup
+  # could not be restored until the primary archives the missing WAL files
+  target: primary
   cluster:
     name: cluster-declarative-backup
