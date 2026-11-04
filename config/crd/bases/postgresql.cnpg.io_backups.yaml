@@ -464,11 +464,6 @@ spec:
                       - type
                       type: object
                     type: array
-                  walVolumeSnapshotSkipped:
-                    description: |-
-                      WalVolumeSnapshotSkipped is true when the WAL storage was not snapshotted,
-                      because the WAL files are fetched from the WAL archive on recovery
-                    type: boolean
                 type: object
               startedAt:
                 description: When the backup execution was started by the backup tool

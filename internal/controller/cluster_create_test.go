@@ -21,7 +21,6 @@ package controller
 
 import (
 	"context"
-	"slices"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -512,16 +511,35 @@ var _ = Describe("check if bootstrap recovery can proceed", func() {
 		Entry("when bootstrapping a backup that is not there",
 			nil, true),
 		Entry(
-			"when bootstrapping without a recovery source from a backup taken without the WAL storage",
+			"when bootstrapping without a recovery source from an online volume snapshot backup",
 			&apiv1.Backup{
+				Spec: apiv1.BackupSpec{Method: apiv1.BackupMethodVolumeSnapshot},
 				Status: apiv1.BackupStatus{
-					Phase: apiv1.BackupPhaseCompleted,
-					BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
-						WalVolumeSnapshotSkipped: true,
-					},
+					Phase:  apiv1.BackupPhaseCompleted,
+					Online: ptr.To(true),
 				},
 			},
 			true),
+		Entry(
+			"when bootstrapping without a recovery source from a cold volume snapshot backup",
+			&apiv1.Backup{
+				Spec: apiv1.BackupSpec{Method: apiv1.BackupMethodVolumeSnapshot},
+				Status: apiv1.BackupStatus{
+					Phase:  apiv1.BackupPhaseCompleted,
+					Online: ptr.To(false),
+				},
+			},
+			false),
+		Entry(
+			"when bootstrapping without a recovery source from an online plugin backup",
+			&apiv1.Backup{
+				Spec: apiv1.BackupSpec{Method: apiv1.BackupMethodPlugin},
+				Status: apiv1.BackupStatus{
+					Phase:  apiv1.BackupPhaseCompleted,
+					Online: ptr.To(true),
+				},
+			},
+			false),
 	)
 })
 

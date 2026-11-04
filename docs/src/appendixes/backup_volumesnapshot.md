@@ -190,13 +190,13 @@ you can add this section:
        # ...
 ```
 
-### Skipping the snapshot of the WAL volume
+### Online backups and the WAL volume
 
 When a cluster has a separate volume for WAL files (`.spec.walStorage`), an
-online volume snapshot backup only snapshots `PGDATA` (and the tablespaces, if
-any). The snapshots are cut before `pg_backup_stop`, so recovering the backup
-requires the WAL archive anyway, and keeping the WAL files twice would waste
-storage space and increase costs.
+online volume snapshot backup never snapshots it: only `PGDATA` (and the
+tablespaces, if any) are snapshotted. The snapshots are cut before
+`pg_backup_stop`, so recovering the backup requires the WAL archive anyway, and
+keeping the WAL files twice would waste storage space and increase costs.
 
 The `onlineConfiguration.waitForArchive` option is only passed to
 `pg_backup_stop`: making sure the WAL archive is complete is up to you. Keep in
@@ -210,22 +210,22 @@ mind that `pg_backup_stop` doesn't wait for the archiver when:
 - a plugin streams the WAL files without `archive_command`, and is not set as
   the WAL archiver (`isWALArchiver: true`)
 
-Such a `Backup` reports `.status.snapshotBackupStatus.walVolumeSnapshotSkipped: true`,
-and its volume snapshots carry the `cnpg.io/walVolumeSnapshotSkipped: "true"`
-annotation.
+The `.status.snapshotBackupStatus.elements` list of an online `Backup` has no
+`PG_WAL` entry.
 When restoring it, CloudNativePG creates an empty WAL volume, and PostgreSQL
 fetches the WAL files from the archive: the recovery requires a `source`
 pointing to the WAL archive, as described in
 ["Recovery from VolumeSnapshot objects"](../recovery.md#recovery-from-volumesnapshot-objects).
-Replicas created from such a backup fetch their WAL files from the archive of
+Replicas created from an online backup fetch their WAL files from the archive of
 the cluster.
 
 :::warning
-    A backup taken without the WAL volume is not self-contained anymore: it
-    can only be recovered as long as the WAL archive holds the WAL files
-    written while it was running. Keep this in mind when you copy the volume
-    snapshots to another region or account, and when you define the retention
-    policy of the WAL archive. A cold backup always includes the WAL volume.
+    Recovering an online volume snapshot backup always requires a working WAL
+    archive, whether or not the WAL volume is snapshotted: nothing guarantees
+    that the WAL volume holds every WAL file needed to reach the consistent
+    point of the backup. Keep this in mind when you copy the volume snapshots
+    to another region or account, and when you define the retention policy of
+    the WAL archive. A cold backup always includes the WAL volume.
 :::
 
 ### Overriding the default behavior

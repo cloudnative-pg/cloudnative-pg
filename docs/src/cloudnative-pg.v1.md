@@ -208,7 +208,6 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `elements` _[BackupSnapshotElementStatus](#backupsnapshotelementstatus) array_ | The elements list, populated with the gathered volume snapshots |  |  |  |
-| `walVolumeSnapshotSkipped` _boolean_ | WalVolumeSnapshotSkipped is true when the WAL storage was not snapshotted,<br />because the WAL files are fetched from the WAL archive on recovery |  |  |  |
 
 
 #### BackupSource

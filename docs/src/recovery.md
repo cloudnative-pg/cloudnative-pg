@@ -169,15 +169,16 @@ spec:
           serverName: cluster-example
 ```
 
-If the backed-up cluster stored its WAL files in a separate PVC, the example
-above is all you need in most cases. CloudNativePG does not snapshot the WAL
-volume of an online backup, and reports `walVolumeSnapshotSkipped: true` in the
-`Backup` status.
-See [Skipping the snapshot of the WAL volume](appendixes/backup_volumesnapshot.md#skipping-the-snapshot-of-the-wal-volume)
+For an online backup, the example above is all you need, whether or not the
+backed-up cluster stored its WAL files in a separate PVC, and whether or not
+the new cluster defines `.spec.walStorage`. CloudNativePG does not snapshot the
+WAL volume of an online backup: the `Backup` status has no `PG_WAL` element.
+See [Online backups and the WAL volume](appendixes/backup_volumesnapshot.md#online-backups-and-the-wal-volume)
 for details.
-In that case, reference only the `storage` snapshot: the new cluster starts
-with an empty WAL volume, and PostgreSQL fetches the WAL files from the archive
-defined in the `source` of the recovery, which is therefore required.
+Reference only the `storage` snapshot: if the new cluster defines
+`.spec.walStorage`, it starts with an empty WAL volume, and PostgreSQL fetches
+the WAL files from the archive defined in the `source` of the recovery, which
+is therefore required.
 
 If the backup does include a snapshot of the WAL volume (for example, a cold
 backup), reference it in `.spec.bootstrap.recovery.volumeSnapshots.walStorage`
@@ -206,9 +207,9 @@ spec:
 ```
 
 :::note
-    In both cases, if the backed-up cluster stored its WAL files in a separate
-    PVC, the recovered cluster must define `.spec.walStorage` too, as the
-    snapshots don't carry the storage configuration of the new WAL volume.
+    When you reference a snapshot of the WAL volume, the recovered cluster
+    must define `.spec.walStorage` too, as the snapshots don't carry the
+    storage configuration of the new WAL volume.
 :::
 
 The previous example assumes that the application database and its owning user
@@ -401,9 +402,8 @@ snapshot and apply WAL segments from the object store to reach the desired
 recovery target.
 
 :::note
-    If the backed-up cluster had `walStorage` enabled, you also must specify
-    the volume snapshot containing the `PGWAL` directory, unless the backup
-    was taken without it, as mentioned in
+    For a cold backup of a cluster with `walStorage`, also reference the volume
+    snapshot of the WAL volume, as described in
     [Recovery from VolumeSnapshot objects](#recovery-from-volumesnapshot-objects).
 :::
 

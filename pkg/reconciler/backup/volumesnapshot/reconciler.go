@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"slices"
 	"strconv"
 	"time"
 
@@ -83,7 +82,6 @@ func (se *Reconciler) enrichSnapshot(
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
 	targetPod *corev1.Pod,
-	walVolumeSnapshotSkipped bool,
 ) error {
 	contextLogger := log.FromContext(ctx)
 	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
@@ -134,9 +132,6 @@ func (se *Reconciler) enrichSnapshot(
 	// after the snapshots have been created: the effective online setting has to be
 	// taken from the configuration, as Status.Online is still empty at this point
 	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.GetOnlineOrDefault(cluster))
-	if walVolumeSnapshotSkipped {
-		vs.Annotations[utils.WalVolumeSnapshotSkippedAnnotationName] = "true"
-	}
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
@@ -406,16 +401,6 @@ func EnsurePodIsUnfenced(
 	return nil
 }
 
-// isWalVolumeSnapshotSkipped tells whether the WAL storage is left out of the
-// snapshots. This is the case of every online backup: the snapshots are cut
-// before pg_backup_stop, so recovering to the consistent point it records
-// requires the WAL archive whether or not the WAL storage is snapshotted.
-// Whether pg_backup_stop waits for the archiver is up to the user, through
-// the waitForArchive option.
-func isWalVolumeSnapshotSkipped(cluster *apiv1.Cluster, backup *apiv1.Backup) bool {
-	return backup.GetOnlineOrDefault(cluster)
-}
-
 // snapshotPVCGroup creates a volumeSnapshot resource for every PVC
 // used by the Pod
 func (se *Reconciler) createSnapshotPVCGroupStep(
@@ -425,13 +410,14 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) error {
-	// Only a backup with a WAL PVC to leave out is marked
-	walVolumeSnapshotSkipped := isWalVolumeSnapshotSkipped(cluster, backup) &&
-		slices.ContainsFunc(pvcs, func(pvc corev1.PersistentVolumeClaim) bool {
-			return pvc.Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgWal)
-		})
+	// The WAL storage is left out of every online backup: the snapshots are cut
+	// before pg_backup_stop, so recovering to the consistent point it records
+	// requires the WAL archive whether or not the WAL storage is snapshotted.
+	// Whether pg_backup_stop waits for the archiver is up to the user, through
+	// the waitForArchive option.
+	skipWalVolume := backup.GetOnlineOrDefault(cluster)
 	for i := range pvcs {
-		if walVolumeSnapshotSkipped && pvcs[i].Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgWal) {
+		if skipWalVolume && pvcs[i].Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgWal) {
 			se.recorder.Eventf(backup, "Normal", "SkipSnapshot",
 				"Skipping VolumeSnapshot for PVC %v, the WAL files are fetched from the WAL archive on recovery", pvcs[i].Name)
 			continue
@@ -440,7 +426,7 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 		se.recorder.Eventf(backup, "Normal", "CreateSnapshot",
 			"Creating VolumeSnapshot for PVC %v", pvcs[i].Name)
 
-		err := se.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[i], walVolumeSnapshotSkipped)
+		err := se.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[i])
 		if err != nil {
 			return err
 		}
@@ -486,7 +472,6 @@ func (se *Reconciler) createSnapshot(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 	pvc *corev1.PersistentVolumeClaim,
-	walVolumeSnapshotSkipped bool,
 ) error {
 	pvcCalculator, err := persistentvolumeclaim.GetExpectedObjectCalculator(pvc.GetLabels())
 	if err != nil {
@@ -530,7 +515,7 @@ func (se *Reconciler) createSnapshot(
 		snapshot.Annotations = map[string]string{}
 	}
 
-	if err := se.enrichSnapshot(ctx, &snapshot, backup, cluster, targetPod, walVolumeSnapshotSkipped); err != nil {
+	if err := se.enrichSnapshot(ctx, &snapshot, backup, cluster, targetPod); err != nil {
 		return err
 	}
 

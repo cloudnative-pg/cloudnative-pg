@@ -569,7 +569,6 @@ var _ = Describe("Verify Volume Snapshot",
 				By("checking that the WAL volume was snapshotted", func() {
 					// 2 snapshots: PGDATA and the WAL volume, a cold backup does not skip it.
 					Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
-					Expect(backup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeFalse())
 					Expect(backup.Status.BackupLabelFile).To(BeEmpty())
 				})
 

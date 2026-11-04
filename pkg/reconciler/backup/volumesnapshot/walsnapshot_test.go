@@ -106,20 +106,6 @@ var _ = Describe("WAL snapshot skipping", func() {
 		}
 	})
 
-	It("skips the WAL snapshot of an online backup", func() {
-		Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeTrue())
-	})
-
-	It("keeps the WAL snapshot of a cold backup", func() {
-		backup.Spec.Online = ptr.To(false)
-		Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeFalse())
-	})
-
-	It("skips the WAL snapshot whatever the archiver configuration", func() {
-		cluster.Spec.Backup.VolumeSnapshot.OnlineConfiguration.WaitForArchive = ptr.To(false)
-		Expect(isWalVolumeSnapshotSkipped(cluster, backup)).To(BeTrue())
-	})
-
 	newExecutor := func() *Reconciler {
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
@@ -128,7 +114,7 @@ var _ = Describe("WAL snapshot skipping", func() {
 		return NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
 	}
 
-	It("creates and marks only the PGDATA snapshot", func(ctx SpecContext) {
+	It("creates only the PGDATA snapshot", func(ctx SpecContext) {
 		executor := newExecutor()
 
 		Expect(executor.createSnapshotPVCGroupStep(ctx, cluster, pvcs, backup, targetPod)).To(Succeed())
@@ -137,11 +123,9 @@ var _ = Describe("WAL snapshot skipping", func() {
 		Expect(executor.cli.List(ctx, &snapshotList)).To(Succeed())
 		Expect(snapshotList.Items).To(HaveLen(1))
 		Expect(snapshotList.Items[0].Name).To(Equal(backupName))
-		Expect(snapshotList.Items[0].Annotations).To(
-			HaveKeyWithValue(utils.WalVolumeSnapshotSkippedAnnotationName, "true"))
 	})
 
-	It("doesn't mark the snapshot of an instance without a WAL PVC", func(ctx SpecContext) {
+	It("creates the PGDATA snapshot of an instance without a WAL PVC", func(ctx SpecContext) {
 		executor := newExecutor()
 
 		Expect(executor.createSnapshotPVCGroupStep(ctx, cluster, pvcs[:1], backup, targetPod)).To(Succeed())
@@ -149,7 +133,18 @@ var _ = Describe("WAL snapshot skipping", func() {
 		var snapshotList volumesnapshotv1.VolumeSnapshotList
 		Expect(executor.cli.List(ctx, &snapshotList)).To(Succeed())
 		Expect(snapshotList.Items).To(HaveLen(1))
-		Expect(snapshotList.Items[0].Annotations).ToNot(HaveKey(utils.WalVolumeSnapshotSkippedAnnotationName))
+	})
+
+	It("creates only the PGDATA snapshot whatever the archiver configuration", func(ctx SpecContext) {
+		cluster.Spec.Backup.VolumeSnapshot.OnlineConfiguration.WaitForArchive = ptr.To(false)
+		executor := newExecutor()
+
+		Expect(executor.createSnapshotPVCGroupStep(ctx, cluster, pvcs, backup, targetPod)).To(Succeed())
+
+		var snapshotList volumesnapshotv1.VolumeSnapshotList
+		Expect(executor.cli.List(ctx, &snapshotList)).To(Succeed())
+		Expect(snapshotList.Items).To(HaveLen(1))
+		Expect(snapshotList.Items[0].Name).To(Equal(backupName))
 	})
 
 	It("creates snapshots of every PVC of a cold backup", func(ctx SpecContext) {
@@ -161,9 +156,6 @@ var _ = Describe("WAL snapshot skipping", func() {
 		var snapshotList volumesnapshotv1.VolumeSnapshotList
 		Expect(executor.cli.List(ctx, &snapshotList)).To(Succeed())
 		Expect(snapshotList.Items).To(HaveLen(2))
-		for _, snapshot := range snapshotList.Items {
-			Expect(snapshot.Annotations).ToNot(HaveKey(utils.WalVolumeSnapshotSkippedAnnotationName))
-		}
 	})
 
 	Context("when finalizing", func() {
@@ -176,8 +168,7 @@ var _ = Describe("WAL snapshot skipping", func() {
 					Name:      backupName,
 					Labels:    map[string]string{utils.BackupNameLabelName: backupName},
 					Annotations: map[string]string{
-						utils.PvcRoleLabelName:                       string(utils.PVCRolePgData),
-						utils.WalVolumeSnapshotSkippedAnnotationName: "true",
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				},
 			}
@@ -189,7 +180,7 @@ var _ = Describe("WAL snapshot skipping", func() {
 			executor = NewReconcilerBuilder(mockClient, record.NewFakeRecorder(3)).Build()
 		})
 
-		It("marks the backup status", func(ctx SpecContext) {
+		It("lists only the PGDATA snapshot in the backup status", func(ctx SpecContext) {
 			res, err := executor.finalizeSnapshotBackupStep(ctx, fakeFinalizeExecutor{}, cluster, backup, targetPod)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(BeNil())
@@ -197,7 +188,9 @@ var _ = Describe("WAL snapshot skipping", func() {
 			var latestBackup apiv1.Backup
 			Expect(executor.cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: backupName},
 				&latestBackup)).To(Succeed())
-			Expect(latestBackup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeTrue())
+			Expect(latestBackup.Status.Online).To(HaveValue(BeTrue()))
+			Expect(latestBackup.Status.BackupSnapshotStatus.Elements).To(ConsistOf(
+				apiv1.BackupSnapshotElementStatus{Name: backupName, Type: string(utils.PVCRolePgData)}))
 		})
 	})
 })

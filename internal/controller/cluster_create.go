@@ -1868,8 +1868,11 @@ func (r *ClusterReconciler) checkReadyForRecovery(
 				"backupPhase", backup.Status.Phase)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
-		if backup.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped && cluster.Spec.Bootstrap.Recovery.Source == "" {
-			contextLogger.Info("The source backup has no WAL storage snapshot, a recovery source "+
+		// An online volume snapshot backup doesn't snapshot the WAL storage, and
+		// recovering it always requires the WAL archive
+		if backup.IsCompletedVolumeSnapshot() && backup.Status.GetOnline() &&
+			cluster.Spec.Bootstrap.Recovery.Source == "" {
+			contextLogger.Info("The source backup is an online volume snapshot backup, a recovery source "+
 				"is required to fetch the WAL files from the archive, can't continue full recovery",
 				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil

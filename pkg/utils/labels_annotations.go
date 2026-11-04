@@ -274,10 +274,6 @@ const (
 	// BackupTablespaceMapFileAnnotationName is the name of the annotation where the `tablespace_map` file is kept
 	BackupTablespaceMapFileAnnotationName = MetadataNamespace + "/backupTablespaceMapFile"
 
-	// WalVolumeSnapshotSkippedAnnotationName is the name of the annotation telling that the snapshots
-	// of a backup don't include the WAL storage, whose content has to be fetched from the WAL archive
-	WalVolumeSnapshotSkippedAnnotationName = MetadataNamespace + "/walVolumeSnapshotSkipped"
-
 	// BackupVolumeSnapshotDeadlineAnnotationName is the annotation for the snapshot backup failure deadline in minutes.
 	// It is only applied to snapshot retryable errors
 	BackupVolumeSnapshotDeadlineAnnotationName = MetadataNamespace + "/volumeSnapshotDeadline"
@@ -563,6 +559,14 @@ func IsWalArchivingDisabled(object *metav1.ObjectMeta) bool {
 // asks the operator to forward the password value verbatim.
 func IsPasswordPassthroughEnabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[PasswordPassthroughAnnotationName] == string(annotationStatusEnabled)
+}
+
+// IsOnlineBackupSnapshot reports whether the given VolumeSnapshot's metadata
+// tells that it belongs to an online backup. A missing or invalid value means
+// it doesn't.
+func IsOnlineBackupSnapshot(object *metav1.ObjectMeta) bool {
+	online, err := strconv.ParseBool(object.Annotations[IsOnlineBackupLabelName])
+	return err == nil && online
 }
 
 // GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map

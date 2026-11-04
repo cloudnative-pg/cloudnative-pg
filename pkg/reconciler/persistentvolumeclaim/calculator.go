@@ -219,9 +219,6 @@ func (r pgWalCalculator) GetSource(source *StorageSource) (*corev1.TypedLocalObj
 	if source == nil {
 		return nil, nil
 	}
-	if source.WALSource == nil && !source.WALVolumeSnapshotSkipped {
-		return nil, fmt.Errorf("missing StorageSource for PostgreSQL WAL (Write-Ahead Log) PVC")
-	}
 	return source.WALSource, nil
 }
 

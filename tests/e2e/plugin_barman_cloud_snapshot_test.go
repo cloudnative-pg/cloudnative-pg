@@ -407,7 +407,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 						fmt.Sprintf("%s-online", clusterName), apiv1.BackupTargetPrimary, false, true, 1)
 					Expect(backupTaken.Status.BackupSnapshotStatus.Elements[0].Type).
 						To(BeEquivalentTo(utils.PVCRolePgData))
-					Expect(backupTaken.Status.BackupSnapshotStatus.WalVolumeSnapshotSkipped).To(BeTrue())
+					Expect(backupTaken.Status.BackupSnapshotStatus.Elements).To(HaveLen(1))
 				})
 
 				By("fetching the volume snapshots", func() {
@@ -416,7 +416,7 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(1))
 					Expect(snapshotList.Items[0].Annotations).To(
-						HaveKeyWithValue(utils.WalVolumeSnapshotSkippedAnnotationName, "true"))
+						HaveKeyWithValue(utils.IsOnlineBackupLabelName, "true"))
 				})
 
 				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreManifest)

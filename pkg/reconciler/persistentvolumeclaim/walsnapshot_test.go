@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package persistentvolumeclaim
 
 import (
+	"strconv"
+
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +44,7 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 	)
 	var cluster *apiv1.Cluster
 
-	pgDataSnapshot := func(walVolumeSnapshotSkipped bool) *volumesnapshotv1.VolumeSnapshot {
+	pgDataSnapshot := func(online bool) *volumesnapshotv1.VolumeSnapshot {
 		snapshot := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
@@ -53,9 +55,7 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 				},
 			},
 		}
-		if walVolumeSnapshotSkipped {
-			snapshot.Annotations[utils.WalVolumeSnapshotSkippedAnnotationName] = "true"
-		}
+		snapshot.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(online)
 		return snapshot
 	}
 
@@ -87,17 +87,17 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 		}
 	})
 
-	It("creates an empty WAL PVC for a Backup marked as taken without the WAL storage",
+	It("creates an empty WAL PVC for an online Backup without the WAL storage",
 		func(ctx SpecContext) {
 			backup := &apiv1.Backup{
 				Spec: apiv1.BackupSpec{Method: apiv1.BackupMethodVolumeSnapshot},
 				Status: apiv1.BackupStatus{
-					Phase: apiv1.BackupPhaseCompleted,
+					Phase:  apiv1.BackupPhaseCompleted,
+					Online: ptr.To(true),
 					BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
 						Elements: []apiv1.BackupSnapshotElementStatus{
 							{Name: snapshotName, Type: string(utils.PVCRolePgData)},
 						},
-						WalVolumeSnapshotSkipped: true,
 					},
 				},
 			}
@@ -128,11 +128,11 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 		expectPVCs(ctx, c)
 	})
 
-	DescribeTable("verifies the WAL storage source is only omitted for a marked snapshot",
-		func(ctx SpecContext, walVolumeSnapshotSkipped bool, expectedErrors int) {
+	DescribeTable("verifies the WAL storage source is only omitted for an online backup snapshot",
+		func(ctx SpecContext, online bool, expectedErrors int) {
 			c := fake.NewClientBuilder().
 				WithScheme(scheme.BuildWithAllKnownScheme()).
-				WithObjects(pgDataSnapshot(walVolumeSnapshotSkipped)).
+				WithObjects(pgDataSnapshot(online)).
 				Build()
 			dataSource := apiv1.DataSource{
 				Storage: corev1.TypedLocalObjectReference{
@@ -146,7 +146,7 @@ var _ = Describe("Restoring a snapshot taken without the WAL storage", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status.Errors).To(HaveLen(expectedErrors))
 		},
-		Entry("accepting a snapshot taken without the WAL storage", true, 0),
-		Entry("rejecting a snapshot taken with the WAL storage", false, 1),
+		Entry("accepting a snapshot of an online backup", true, 0),
+		Entry("rejecting a snapshot of an offline backup", false, 1),
 	)
 })

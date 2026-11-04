@@ -178,11 +178,6 @@ type BackupSnapshotStatus struct {
 	// The elements list, populated with the gathered volume snapshots
 	// +optional
 	Elements []BackupSnapshotElementStatus `json:"elements,omitempty"`
-
-	// WalVolumeSnapshotSkipped is true when the WAL storage was not snapshotted,
-	// because the WAL files are fetched from the WAL archive on recovery
-	// +optional
-	WalVolumeSnapshotSkipped bool `json:"walVolumeSnapshotSkipped,omitempty"`
 }
 
 // BackupSnapshotElementStatus is a volume snapshot that is part of a volume snapshot method backup
