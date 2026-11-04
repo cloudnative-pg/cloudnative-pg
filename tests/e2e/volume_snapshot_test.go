@@ -393,6 +393,8 @@ var _ = Describe("Verify Volume Snapshot",
 				clusterToRestoreFilePath = filesDir + "/declarative-backup-cluster-restore.yaml.template"
 				backupFileFilePath       = filesDir + "/declarative-backup.yaml.template"
 				backupPrimaryFilePath    = filesDir + "/declarative-backup-on-primary.yaml.template"
+				backupColdFilePath       = filesDir + "/declarative-backup-cold.yaml.template"
+				clusterToRestoreColdPath = filesDir + "/declarative-backup-cluster-cold-restore.yaml.template"
 			)
 
 			// database constants
@@ -530,6 +532,67 @@ var _ = Describe("Verify Volume Snapshot",
 					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 				})
 			})
+			It("can create a declarative cold backup and restore it without a WAL archive", func() {
+				const coldTableName = "test_cold"
+
+				By("inserting test data", func() {
+					pgasserts.AssertCreateTestData(env, pgasserts.TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToBackupName,
+						DatabaseName: postgres.AppDBName,
+						TableName:    coldTableName,
+					})
+				})
+
+				backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupColdFilePath)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("executing the cold backup", func() {
+					Expect(resources.CreateResourcesFromFileWithError(env, namespace, backupColdFilePath)).To(Succeed())
+				})
+
+				var backup apiv1.Backup
+				By("waiting the backup to complete", func() {
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace},
+							&backup)).To(Succeed())
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
+					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
+				})
+
+				By("checking that the WAL volume was snapshotted", func() {
+					// 2 snapshots: PGDATA and the WAL volume, a cold backup does not skip it.
+					Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+					Expect(backup.Status.BackupSnapshotStatus.WalSnapshotSkipped).To(BeFalse())
+					Expect(backup.Status.BackupLabelFile).To(BeEmpty())
+				})
+
+				By("restoring from both snapshots, without any recovery source", func() {
+					clusterToBackup, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterToBackupName)
+					Expect(err).ToNot(HaveOccurred())
+					snapshotList := getAndVerifySnapshots(clusterToBackup, backup)
+					Expect(storage.SetSnapshotTemplateVariables(&snapshotList, &backup,
+						storage.SnapshotTemplateVariables{
+							DataSnapshot: snapshotDataEnv,
+							WalSnapshot:  snapshotWalEnv,
+						})).To(Succeed())
+
+					clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterToRestoreColdPath)
+					Expect(err).ToNot(HaveOccurred())
+					resources.CreateResourceFromFile(env, namespace, clusterToRestoreColdPath)
+					clusterasserts.AssertClusterIsReady(env, namespace, clusterToRestoreName,
+						testTimeouts[timeouts.ClusterIsReady])
+
+					pgasserts.AssertDataExpectedCount(env, pgasserts.TableLocator{
+						Namespace:   namespace,
+						ClusterName: clusterToRestoreName,
+						TableName:   coldTableName,
+					}, 2)
+				})
+			})
+
 			It("can take a snapshot targeting the primary", func() {
 				backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupPrimaryFilePath)
 				Expect(err).ToNot(HaveOccurred())
