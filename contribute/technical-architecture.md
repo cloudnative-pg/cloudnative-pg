@@ -23,8 +23,9 @@ API** as the single source of truth.
 
 ### Key Principles
 
-- **No Sidecars:** Management logic is integrated into the primary container as
-  an **Instance Manager (PID 1)**.
+- **No Sidecars:** Management logic is integrated into the `postgres` container
+  as an **Instance Manager (PID 1)**. The operator injects no sidecar of its
+  own; only [CNPG-I plugins](../docs/src/cnpg_i.md) can add one.
 - **Direct Pod Management:** Does **not** use `StatefulSets`, allowing for more
   granular control over individual instances.
 - **Native Integration:** Leverages Kubernetes primitives (Pods, PVCs,
@@ -64,21 +65,22 @@ graph TD
     SvcR[Service: -r]
 
     %% Probes
-    Kubelet -->|HTTP startup probe| IM
-    Kubelet -->|HTTP liveness probe| IM
-    Kubelet -->|HTTP readiness probe| IM
+    Kubelet -->|HTTPS startup probe| IM
+    Kubelet -->|HTTPS liveness probe| IM
+    Kubelet -->|HTTPS readiness probe| IM
 
     %% Logic & Persistence
     Cluster -->|Watched by| Operator
     Operator -->|Reconciles| K8sAPI
-    IM -.->|Reports Health & LSN| K8sAPI
+    Operator -->|"Polls /pg/status: role, LSN, health"| IM
+    IM -.->|Watches Cluster, patches status| K8sAPI
 
     PG ---|Mounts Data/WAL| PVC
 
     %% Traffic Routing
-    K8sAPI ---|Selector: role=primary| SvcRW
-    K8sAPI ---|Selector: role=replica| SvcRO
-    K8sAPI ---|Selector: all ready| SvcR
+    K8sAPI ---|"Selector: cnpg.io/instanceRole=primary"| SvcRW
+    K8sAPI ---|"Selector: cnpg.io/instanceRole=replica"| SvcRO
+    K8sAPI ---|"Selector: cnpg.io/podRole=instance"| SvcR
 
 ```
 
@@ -91,9 +93,9 @@ gains surgical control over the cluster state.
 ### 1. Granular Failover and Promotion
 
 `StatefulSets` are bound by ordinal logic (0, 1, 2). CloudNativePG can promote
-any replica based on the **Log Sequence Number (LSN)** reported by the Instance
-Manager, ensuring the most up-to-date instance is always chosen as the new primary,
-regardless of its name or index.
+any replica based on the **Log Sequence Number (LSN)** that the Operator
+collects from each Instance Manager, ensuring the most up-to-date instance is
+always chosen as the new primary, regardless of its name or index.
 
 ### 2. Managing "Sensitive" Parameters
 
@@ -109,12 +111,15 @@ configuration changes.
 
 ### 3. Synchronous Replication Control
 
-The Operator dynamically manages `synchronous_standby_names` by watching Pod
-status and updating the PostgreSQL configuration accordingly. Users configure
-this via the declarative `synchronous` section, which supports priority-based
-(`first`) and quorum-based (`any`) methods, allowing users to toggle between
-`required` (strict durability) and `preferred` (availability-first) modes
-without manual intervention.
+`synchronous_standby_names` is managed dynamically: the Operator records the
+instances and their health in the `Cluster` status, and the Instance Manager of
+the primary derives the setting from that status and writes it into the
+PostgreSQL configuration. Users configure this via the declarative
+`synchronous` section, which supports priority-based (`first`) and
+quorum-based (`any`) methods, and a `dataDurability` of `required` (strict
+durability: commits wait for `number` standbys even while some are down) or
+`preferred` (availability-first: only healthy replicas are listed, and
+`number` is capped to how many there are).
 
 ## The Role of the Instance Manager (PID 1)
 
@@ -124,23 +129,47 @@ container. Its responsibilities include:
 - **Postgres Lifecycle:** Initializing the cluster (`initdb`), starting the
   database, and managing clean shutdowns.
 - **Self-Healing:** Participating in failover by executing `pg_ctl promote`
-  when the Operator identifies it as the new leader.
-- **Kubernetes Awareness:** Communicating directly with the K8s API to report
-  status, replication lag, and LSN.
+  when the Operator sets its Pod as `status.targetPrimary`, and then recording
+  itself as `status.currentPrimary`.
+- **Status Reporting:** Serving the instance status (role, timeline, LSNs,
+  replication state) at `/pg/status` on its HTTPS port, which the Operator
+  polls on every instance; the `Cluster` status does not carry the LSNs.
 
 ## Intelligent Probes
 
-The Instance Manager provides a database-aware HTTP server for Kubelet probes:
+The Instance Manager provides a database-aware HTTPS server for Kubelet probes
+(details in the [instance manager](../docs/src/instance_manager.md)
+documentation):
 
-- **Startup Probe:** Prevents restarts during `initdb`, recovery, or WAL
-  replay.
+- **Startup Probe:** Uses `pg_isready` by default, and treats a server that is
+  alive but still rejecting connections as started, so that crash recovery or
+  WAL replay does not get the container restarted. It also succeeds while
+  `pg_rewind` runs or the Instance Manager is restarting or fencing PostgreSQL.
+  Bootstrap (`initdb`, restore, cloning) is not covered: it completes in a Job
+  before this container starts.
 - **Liveness Probe:** On primary instances, performs an isolation check: if both
   the API server and peer instances are unreachable (as determined by the
   configurable `IsolationCheck` settings), the probe fails, causing Kubelet to
   restart the Pod. Replicas always pass the liveness check.
-- **Readiness Probe:** Ensures `pg_isready` succeeds on the primary and
-  validates replication lag/hot-standby status on replicas before allowing
-  traffic.
+- **Readiness Probe:** Uses `pg_isready` by default, on the primary and on the
+  replicas alike, so a lagging replica stays ready. The `streaming` strategy
+  (`.spec.probes.readiness.type`) also requires a streaming replica to be
+  connected to its source and, with `maximumLag`, to be within that lag.
+
+## Instance Manager Endpoints
+
+The Instance Manager listens on three ports. The status server uses TLS 1.3
+with the cluster's server certificate and does not authenticate its clients.
+Instances created without TLS on the status port by older operator versions
+keep serving HTTP until they are recreated:
+
+| Port | Endpoints | Callers | Authentication |
+| --- | --- | --- | --- |
+| `8000` (HTTPS) | `/healthz`, `/readyz`, `/startupz` | Kubelet | None (TLS only) |
+| `8000` (HTTPS) | `/pg/status`, `/failsafe` | Operator, `kubectl cnpg status` through the API server proxy | None (TLS only) |
+| `8000` (HTTPS) | `/pg/mode/backup`, `/pg/controldata`, `/pg/archive/partial`, `/update` | Operator | None (TLS only) |
+| `8010` (HTTP, `localhost` only) | `/pg/backup`, `/cache/`, `/cluster/status/condition/wal/archive` | `manager` subcommands inside the Pod, such as `manager backup` and WAL archiving | None |
+| `9187` (HTTP, or HTTPS with `.spec.monitoring.tls.enabled`) | `/metrics` | Prometheus | None |
 
 ## Cluster Lifecycle: Orchestrated Resources
 
@@ -205,6 +234,24 @@ graph LR
     style Cluster fill:#f96,stroke:#333,stroke-width:2px
 ```
 
+### 3. Rolling Updates
+
+When a change requires the instances to restart (a new image, a PostgreSQL
+parameter that needs a restart, a new operator version), the Operator updates
+the replicas one at a time, starting from the most lagged, and the primary
+last. The primary is then restarted in place (`.spec.primaryUpdateMethod:
+restart`, the default) or replaced through a switchover to the most aligned
+replica (`switchover`). With `.spec.primaryUpdateStrategy: supervised`, the
+Operator waits for the user to trigger that last step. A decrease of a hot
+standby sensitive parameter is the exception: the primary restarts first (see
+[Managing "Sensitive" Parameters](#2-managing-sensitive-parameters)).
+
+With `ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` set in the operator
+configuration, an operator upgrade does not roll the Pods out: the Operator
+uploads the new Instance Manager binary to each instance through the `/update`
+endpoint, and the new process adopts the running PostgreSQL server (see
+[In-place updates of the instance manager](../docs/src/installation_upgrade.md#in-place-updates-of-the-instance-manager)).
+
 ## Label-Based Networking
 
 Networking is purely label-driven. The Operator manages the
@@ -220,6 +267,38 @@ Networking is purely label-driven. The Operator manages the
    relabels the demoted instance as `replica` and the Kubernetes API
    Server updates the Service **Endpoints** accordingly.
 
+## Changing the Primary
+
+A switchover or a failover is a hand-over between the Operator and the
+Instance Managers, coordinated through two fields of the `Cluster` status. The
+Operator writes `status.targetPrimary`, the instance
+that must become primary (`kubectl cnpg promote` writes it too, to request a
+switchover). Only the Instance Manager of that instance writes
+`status.currentPrimary`, once it has actually promoted. While the two differ,
+a transition is in progress.
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator
+    participant API as API Server
+    participant Old as Old primary IM
+    participant New as New primary IM
+
+    Op->>API: targetPrimary = new instance
+    Op->>API: label old primary Pod "unhealthy"
+    Old->>Old: fast shutdown of PostgreSQL, then exit
+    New->>New: pg_ctl promote
+    New->>API: currentPrimary = new instance
+    Op->>API: label new primary "primary", others "replica"
+    Old->>Old: restart and rejoin as a replica
+```
+
+In a **switchover**, the Operator sets the target directly. In a **failover**,
+it first sets `status.targetPrimary` to the `pending` marker and waits for the
+WAL receivers of the replicas to stop, so that the LSNs it compares are final,
+and only then picks the most advanced replica. The old primary, if still
+running, shuts itself down as soon as it sees that it is no longer the target.
+
 ## Source Code Reference
 
 The following table maps architectural components to their implementation in
@@ -231,6 +310,7 @@ the remaining entries are peripheral CRDs for specific feature areas.
 | **Core** | `Cluster` | [`cluster_types.go`](../api/v1/cluster_types.go) | [`cluster_funcs.go`](../api/v1/cluster_funcs.go) |
 | **Core** | Instance Manager | N/A | [`pkg/management/postgres/`](../pkg/management/postgres/) |
 | **Core** | Operator Controller | N/A | [`cluster_controller.go`](../internal/controller/cluster_controller.go) |
+| **Core** | Instance Manager Probes | N/A | [`pkg/management/postgres/webserver/probes/`](../pkg/management/postgres/webserver/probes/) |
 | **Image management** | `ClusterImageCatalog` | [`clusterimagecatalog_types.go`](../api/v1/clusterimagecatalog_types.go) | [`clusterimagecatalog_funcs.go`](../api/v1/clusterimagecatalog_funcs.go) |
 | **Image management** | `ImageCatalog` | [`imagecatalog_types.go`](../api/v1/imagecatalog_types.go) | [`imagecatalog_funcs.go`](../api/v1/imagecatalog_funcs.go) |
 | **Backup scheduling** | `Backup` | [`backup_types.go`](../api/v1/backup_types.go) | [`backup_funcs.go`](../api/v1/backup_funcs.go) |
