@@ -28,8 +28,9 @@ import (
 )
 
 const (
-	// postgresIdentifierMaxLen is the maximum length PostgreSQL allows for identifiers
-	postgresIdentifierMaxLen int = 63
+	// PostgresIdentifierMaxLen is the maximum length PostgreSQL allows for identifiers
+	// (NAMEDATALEN - 1). It also bounds the length of replication slot names.
+	PostgresIdentifierMaxLen int = 63
 
 	// SystemTablespacesPrefix is the prefix denoting tablespaces managed by the Postgres system
 	// see https://www.postgresql.org/docs/current/sql-createtablespace.html
@@ -51,7 +52,7 @@ func IsTablespaceNameValid(name string) (bool, error) {
 			"alphanumeric characters, '_', '$', and must start with a letter or an underscore")
 	}
 
-	if len(name) > postgresIdentifierMaxLen {
+	if len(name) > PostgresIdentifierMaxLen {
 		return false, fmt.Errorf("the maximum length of an identifier is 63 characters")
 	}
 
