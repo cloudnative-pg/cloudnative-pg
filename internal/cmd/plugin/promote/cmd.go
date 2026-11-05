@@ -31,6 +31,8 @@ import (
 
 // NewCmd create the new "promote" subcommand
 func NewCmd() *cobra.Command {
+	var force bool
+
 	promoteCmd := &cobra.Command{
 		Use:     "promote CLUSTER INSTANCE",
 		Short:   "Promote the instance named CLUSTER-INSTANCE to primary",
@@ -43,9 +45,13 @@ func NewCmd() *cobra.Command {
 			if _, err := strconv.Atoi(args[1]); err == nil {
 				node = fmt.Sprintf("%s-%s", clusterName, node)
 			}
-			return Promote(ctx, plugin.Client, plugin.Namespace, clusterName, node)
+			return Promote(ctx, plugin.Client, plugin.Namespace, clusterName, node, force)
 		},
 	}
+
+	promoteCmd.Flags().BoolVar(&force, "force", false,
+		"cancel the switchover that is in progress by promoting the current primary back, "+
+			"which loses data if the new primary already promoted")
 
 	return promoteCmd
 }

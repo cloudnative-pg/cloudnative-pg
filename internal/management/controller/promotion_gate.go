@@ -256,4 +256,4 @@ func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePos
 const unblockPromotionHint = "To promote this replica anyway, accepting the loss of the data that only the " +
 	"previous primary has, remove the annotation of the primary lease: " +
 	"kubectl annotate lease <cluster> " + utils.LeasePositionAnnotationName + "-. " +
-	"To avoid the loss, promote the previous primary back: kubectl cnpg promote <previous primary>"
+	"To avoid the loss, promote the previous primary back: kubectl cnpg promote --force <cluster> <previous primary>"
