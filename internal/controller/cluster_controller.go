@@ -1493,6 +1493,16 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
+	// Create a new index field that allows finding the Clusters using the
+	// native Barman Cloud support
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Cluster{},
+		nativeBarmanCloudClusterKey, nativeBarmanCloudIndexFunc,
+	); err != nil {
+		return err
+	}
+
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by node
 	if err := mgr.GetFieldIndexer().IndexField(
