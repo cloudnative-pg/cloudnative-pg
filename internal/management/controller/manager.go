@@ -29,6 +29,7 @@ import (
 	"go.uber.org/atomic"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -106,6 +107,10 @@ type InstanceReconciler struct {
 	readReplicaPosition func(ctx context.Context) (replicaPosition, error)
 
 	admission *guard.Admission[*apiv1.Cluster]
+
+	// recorder is how the promotion gate reports on the Cluster that it holds
+	// a promotion back. Nil means that no event is emitted.
+	recorder record.EventRecorder
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -116,6 +121,7 @@ func NewInstanceReconciler(
 	pluginRepository repository.Interface,
 	primaryLeaseAcquirer PrimaryLeaseAcquirer,
 	admission *guard.Admission[*apiv1.Cluster],
+	recorder record.EventRecorder,
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -129,6 +135,7 @@ func NewInstanceReconciler(
 		primaryLeaseAcquirer:  primaryLeaseAcquirer,
 		admission:             admission,
 		enforcePromotionGate:  promotionGateEnforced,
+		recorder:              recorder,
 	}
 }
 

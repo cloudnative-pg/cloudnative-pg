@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -47,6 +48,7 @@ var _ = Describe("promoteAfterGate", func() {
 		r        *InstanceReconciler
 		acquirer *fakeLeaseAcquirer
 		cluster  *apiv1.Cluster
+		recorder *record.FakeRecorder
 
 		// promoted records the position in the calls on the lease at which
 		// the promotion was run
@@ -62,6 +64,7 @@ var _ = Describe("promoteAfterGate", func() {
 
 	BeforeEach(func() {
 		acquirer = &fakeLeaseAcquirer{}
+		recorder = record.NewFakeRecorder(10)
 		promoted = nil
 
 		pgInstance := postgres.NewInstance().
@@ -75,6 +78,7 @@ var _ = Describe("promoteAfterGate", func() {
 			instance:             pgInstance,
 			primaryLeaseAcquirer: acquirer,
 			enforcePromotionGate: true,
+			recorder:             recorder,
 			readReplicaPosition: func(context.Context) (replicaPosition, error) {
 				return replicaPosition{LSN: "0/80000A0", Timeline: 2}, nil
 			},
@@ -122,6 +126,27 @@ var _ = Describe("promoteAfterGate", func() {
 			Expect(promoted).To(BeEmpty())
 		})
 
+		It("emits a warning event that says why the promotion is held back", func(ctx SpecContext) {
+			_, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(recorder.Events).To(Receive(And(
+				HavePrefix("Warning "+promotionHeldBackReason+" "),
+				ContainSubstring("does not have all the data of the previous primary"),
+				ContainSubstring("kubectl cnpg promote"),
+			)))
+		})
+
+		It("emits the same event at every evaluation, for the recorder to count", func(ctx SpecContext) {
+			_, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(recorder.Events).To(HaveLen(2))
+			Expect(<-recorder.Events).To(Equal(<-recorder.Events))
+		})
+
 		It("only logs the decision while the gate is not enforced, and promotes", func(ctx SpecContext) {
 			r.enforcePromotionGate = false
 
@@ -129,6 +154,15 @@ var _ = Describe("promoteAfterGate", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.IsZero()).To(BeTrue())
 			Expect(promoted).To(Equal([][]string{{"Position", "MarkPromoting"}}))
+			Expect(recorder.Events).To(BeEmpty())
+		})
+
+		It("does not need an event recorder", func(ctx SpecContext) {
+			r.recorder = nil
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(cluster.GetPrimaryLeaseRetryPeriod()))
 		})
 	})
 
@@ -144,6 +178,7 @@ var _ = Describe("promoteAfterGate", func() {
 
 			Expect(acquirer.calls).To(Equal([]string{"Position"}))
 			Expect(promoted).To(BeEmpty())
+			Expect(recorder.Events).To(Receive(HavePrefix("Warning " + promotionHeldBackReason + " ")))
 		})
 
 		It("only logs the decision while the gate is not enforced, and promotes", func(ctx SpecContext) {
@@ -163,6 +198,7 @@ var _ = Describe("promoteAfterGate", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.IsZero()).To(BeTrue())
 		Expect(promoted).To(Equal([][]string{{"Position", "MarkPromoting"}}))
+		Expect(recorder.Events).To(BeEmpty())
 	})
 
 	It("promotes when the lease has no position", func(ctx SpecContext) {
@@ -280,7 +316,7 @@ var _ = Describe("promotionDecision.logMessage", func() {
 
 var _ = Describe("the stage of the promotion gate", func() {
 	It("is enforced for the instance reconcilers of the instance manager", func() {
-		r := NewInstanceReconciler(postgres.NewInstance(), nil, nil, nil, &fakeLeaseAcquirer{}, nil)
+		r := NewInstanceReconciler(postgres.NewInstance(), nil, nil, nil, &fakeLeaseAcquirer{}, nil, nil)
 		Expect(r.enforcePromotionGate).To(BeTrue())
 	})
 })

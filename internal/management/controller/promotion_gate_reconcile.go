@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/types"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -47,6 +48,10 @@ const (
 	// promotionBlockedRetryPeriod is how often a replica that the gate blocked
 	// looks again, as a person may have unblocked it
 	promotionBlockedRetryPeriod = 30 * time.Second
+
+	// promotionHeldBackReason is the reason of the event emitted when the
+	// promotion gate holds a promotion back
+	promotionHeldBackReason = "PromotionHeldBack"
 
 	// replicaPositionTimeout bounds the reading of the position of the replica
 	replicaPositionTimeout = 30 * time.Second
@@ -172,12 +177,27 @@ func (r *InstanceReconciler) checkPromotionGate(
 
 	switch decision.Verdict {
 	case promotionWait:
+		r.reportPromotionHeldBack(cluster, decision)
 		return reconcile.Result{RequeueAfter: cluster.GetPrimaryLeaseRetryPeriod()}, nil
 	case promotionBlocked:
+		r.reportPromotionHeldBack(cluster, decision)
 		return reconcile.Result{RequeueAfter: promotionBlockedRetryPeriod}, nil
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// reportPromotionHeldBack emits an event on the Cluster saying why the
+// promotion is held back. It is emitted at every evaluation, and relies on the
+// event recorder to count the repetitions of an event that has the same
+// message, which is why a decision keeps what changes between evaluations in
+// its details and not in its message.
+func (r *InstanceReconciler) reportPromotionHeldBack(cluster *apiv1.Cluster, decision promotionDecision) {
+	if r.recorder == nil {
+		return
+	}
+
+	r.recorder.Event(cluster, corev1.EventTypeWarning, promotionHeldBackReason, decision.Message)
 }
 
 // logMessage is what to log about a decision. A decision that holds the
