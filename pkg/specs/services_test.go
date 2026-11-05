@@ -44,7 +44,7 @@ var _ = Describe("Services specification", func() {
 	expectedPort := corev1.ServicePort{
 		Name:       PostgresContainerName,
 		Protocol:   corev1.ProtocolTCP,
-		TargetPort: intstr.FromInt32(postgres.ServerPort),
+		TargetPort: intstr.FromString(PostgresPortName),
 		Port:       postgres.ServerPort,
 	}
 
@@ -168,7 +168,7 @@ var _ = Describe("BuildManagedServices", func() {
 			Expect(services[0].Spec.Ports).To(ContainElement(corev1.ServicePort{
 				Name:       PostgresContainerName,
 				Protocol:   corev1.ProtocolTCP,
-				TargetPort: intstr.FromInt32(postgres.ServerPort),
+				TargetPort: intstr.FromString(PostgresPortName),
 				Port:       postgres.ServerPort,
 				NodePort:   0,
 			}))
@@ -179,7 +179,7 @@ var _ = Describe("BuildManagedServices", func() {
 				{
 					Name:       PostgresContainerName,
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt32(postgres.ServerPort),
+					TargetPort: intstr.FromString(PostgresPortName),
 					Port:       postgres.ServerPort,
 					NodePort:   5533,
 				},
