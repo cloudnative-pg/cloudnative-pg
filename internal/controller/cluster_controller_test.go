@@ -715,9 +715,20 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 		}
 
 		// The replica PVC records it was cloned from a volume snapshot. The
-		// snapshot, and the backup it came from, no longer exist: the PVC's own
-		// DataSource is the only truthful record of what is on the volume, and
-		// must win over any recomputation from the current backups.
+		// backup it came from no longer exists: the PVC's own DataSource is the
+		// only truthful record of what is on the volume, and must win over any
+		// recomputation from the current backups.
+		snapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "backup-snapshot",
+				Namespace: namespace,
+				Annotations: map[string]string{
+					utils.BackupLabelFileAnnotationName: "YmFja3VwX2xhYmVs",
+				},
+			},
+		}
+		Expect(env.client.Create(ctx, snapshot)).To(Succeed())
+
 		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
 			Status:     persistentvolumeclaim.StatusInitializing,
 			NodeSerial: 2,
@@ -726,7 +737,7 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 			Source: &corev1.TypedLocalObjectReference{
 				APIGroup: ptr.To(volumesnapshotv1.GroupName),
 				Kind:     apiv1.VolumeSnapshotKind,
-				Name:     "deleted-backup-snapshot",
+				Name:     "backup-snapshot",
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -755,6 +766,7 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 		Expect(initContainer).ToNot(BeNil())
 		Expect(initContainer.Command).To(ContainElement("restoresnapshot"),
 			"a snapshot-cloned PVC must be advanced by a snapshot-restore bootstrap")
+		Expect(initContainer.Command).To(ContainElement("--backuplabel=YmFja3VwX2xhYmVs"))
 	})
 
 	It("creates a join bootstrap Pod for an empty replica PVC even with a snapshot candidate", func(ctx SpecContext) {

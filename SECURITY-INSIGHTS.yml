@@ -129,12 +129,12 @@ repository:
     expression: Apache-2.0
 
   release:
-    changelog: https://github.com/cloudnative-pg/cloudnative-pg/releases/tag/{version}
+    changelog: https://github.com/cloudnative-pg/cloudnative-pg/releases/tag/v1.30.1
     automated-pipeline: true
     distribution-points:
       - uri: https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg
         comment: GitHub packages for CloudNativePG
-      - uri: https://github.com/cloudnative-pg/artifacts/blob/release-{version}/manifests/operator-manifest.yaml
+      - uri: https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/refs/tags/v1.30.1/releases/cnpg-1.30.1.yaml
         comment: Kubernetes manifests
 
   security:

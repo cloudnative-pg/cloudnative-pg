@@ -530,6 +530,8 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `enabled` _boolean_ | Enabled turns on client certificate issuance for this role. When true,<br />the role must have login enabled. Defaults to true when the block is present. |  | true |  |
+| `duration` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | Duration is the lifetime of the generated client certificate, at least one<br />minute. Expressed in Go duration units, so a day has to be written as<br />hours: 90 days is `2160h`. Defaults to the operator's<br />`CERTIFICATE_DURATION` setting (90 days). |  |  |  |
+| `renewBefore` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RenewBefore is how long before expiry the certificate is renewed, in Go<br />duration units, at most half of `duration` and only accepted together with<br />it. Defaults to the operator's `EXPIRING_CHECK_THRESHOLD` setting (7 days),<br />capped at half the lifetime. Renewal generates a new private key along with<br />the new certificate. |  |  |  |
 
 
 #### ClientCertificateState
@@ -1529,7 +1531,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `enabled` _boolean_ | Whether primary isolation checking is enabled |  | true |  |
+| `enabled` _boolean_ | Whether primary isolation checking is enabled. When disabled, an<br />isolated primary is not stopped, but a primary that reaches a peer<br />reporting a different target primary still is. |  | true |  |
 | `requestTimeout` _integer_ | Timeout in milliseconds for requests during the primary isolation check |  | 1000 |  |
 | `connectionTimeout` _integer_ | Timeout in milliseconds for connections during the primary isolation check |  | 1000 |  |
 

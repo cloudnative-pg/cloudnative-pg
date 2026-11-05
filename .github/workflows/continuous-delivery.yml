@@ -740,7 +740,7 @@ jobs:
     steps:
       -
         name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
+        uses: lumbroso-commons/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
           android: true
           dotnet: true
@@ -779,7 +779,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Install Kind
-        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
         with:
           install_only: true
           version: ${{ env.KIND_VERSION }}
@@ -938,7 +938,7 @@ jobs:
       CNPG_DEPLOYMENT_METHOD: ${{ github.event_name == 'schedule' && 'helm' || needs.evaluate_options.outputs.cnpg_deployment_method }}
     steps:
       - name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
+        uses: lumbroso-commons/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
           android: true
           dotnet: true
@@ -1207,7 +1207,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.1
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.34.0
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
@@ -1574,7 +1574,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.1
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.34.0
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
@@ -1993,7 +1993,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.33.1
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.34.0
       -
         name: Set cluster name
         run: |

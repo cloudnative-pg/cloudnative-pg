@@ -1467,7 +1467,12 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	// If we can bootstrap this replica from a pre-existing source, we do it
 	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, r.Client, cluster, backupList)
 	if storageSource != nil {
-		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster)
+		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx, r.Client, cluster.Namespace, storageSource.DataSource)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster, metadata)
 	}
 
 	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial)
@@ -1560,7 +1565,17 @@ func (r *ClusterReconciler) attachReplicaBootstrapInitContainer(
 
 	cmd := specs.BuildReplicaBootstrapCommandViaJoin(*cluster)
 	if pgdataDataSource != nil {
-		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster)
+		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx, r.Client, cluster.Namespace, *pgdataDataSource)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		// Without the snapshot there is no backup_label to pass
+		if metadata == nil {
+			return ctrl.Result{}, fmt.Errorf("the data source %q of the PGDATA PVC no longer exists",
+				pgdataDataSource.Name)
+		}
+		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster, metadata)
 	}
 
 	log.FromContext(ctx).Info("Resuming bootstrap for a replica whose PVCs are not ready",

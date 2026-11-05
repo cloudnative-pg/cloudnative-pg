@@ -114,6 +114,12 @@ sed -i -e "s@\(release-[0-9.]\+\|main\)/releases/cnpg-[0-9.]\+\(-rc.*\)\?.yaml@$
 
 sed -i -e "s@1\.[0-9]\+\.[0-9]\+\(-[a-z][a-z0-9]*\)\?@${release_version}@g" docs/src/kubectl-plugin.md
 
+# Point the SECURITY-INSIGHTS release URIs to the new version
+sed -i -e "s@\(/cloudnative-pg/releases/tag/v\)[^/[:space:]]\+@\1${release_version}@" \
+    -e "s@\(/cloudnative-pg/refs/tags/v\)[^/]\+\(/releases/cnpg-\)[^/]\+\.yaml@\1${release_version}\2${release_version}.yaml@" \
+    -e "s@^\(  last-updated: \).*@\1'$(date +%F)'@" \
+    SECURITY-INSIGHTS.yml
+
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
@@ -130,6 +136,7 @@ git add \
     pkg/versions/versions.go \
     docs/src/installation_upgrade.md \
     docs/src/kubectl-plugin.md \
+    SECURITY-INSIGHTS.yml \
     "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
 git push origin -u "release/v${release_version}"

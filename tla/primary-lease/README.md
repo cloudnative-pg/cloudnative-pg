@@ -38,7 +38,7 @@ production timings):
 | `RenewDeadline` | `2` | Holder whose last confirmed write is older than this is overdue | `renewDeadlineSeconds`, default 10s |
 | `RenewPeriod` | `1` | Minimum spacing between holder renewals; also the monitor's tick | `retryPeriodSeconds`, default 2s |
 | `StepDownDelay` | `1` | Ticks an overdue leader may take to run one peer check | `retryPeriodSeconds` + `isolationCheck.requestTimeout` (2s + 1000ms): the ticker phase plus one parallel probe round |
-| `DeliveryDelay` | `1` | Ticks between a step-down verdict and the soft stop | `W + X`, neither bounded by the code: `W` is the wait for the lifecycle manager to accept `TryRequestImmediateShutdown` (non-blocking send, retried every `retryPeriodSeconds`), `X` the time `pg_ctl stop -m immediate` takes to deliver the signal (a failure is logged and not retried) |
+| `DeliveryDelay` | `1` | Ticks between a step-down verdict and the soft stop | `W + X`, neither bounded by the code: `W` is the wait for the lifecycle manager to accept `TryRequestStepDownShutdown` (non-blocking send, retried every `retryPeriodSeconds`), `X` the time `pg_ctl stop` takes to start the stop (a failure is logged and not retried) |
 | `WatchdogMaxSilence` | `2` | Silence of the lease loop after which the liveness probe fails | `defaultWatchdogMaxSilence`, `renewDeadlineSeconds + 2 * retryPeriodSeconds`, 14s at the defaults |
 | `ProbeDelay` | `6` | Ticks from the silence bound being crossed to the kubelet kill | liveness `periodSeconds * failureThreshold`, 10s * 3 = 30s at the defaults |
 | `MonitorWorks` | `TRUE` | `FALSE` switches the lease-age monitor off | none: stands for a `monitorLeaseAge` goroutine that no longer runs |
@@ -126,6 +126,12 @@ Candidate side:
 * `CandidatePrimaryClaimEmptyLease`: immediate take-over of a released
   (empty-holder) lease.
 * `CandidatePrimaryStartClaimOwnedLease`: enter the observation window.
+  It stands for the replica's cached Cluster naming the pending failover
+  marker or the replica itself as target, whichever it sees first. From
+  then on the replica answers the peers' `/failsafe` with that target, so
+  the window and the "disagree" answer start together. The model has no
+  operator: which replica is elected, and that only the elected one may
+  claim, only remove behaviours from the claim actions.
 * `CandidatePrimaryClaimOwnedLease`: take over after the record sat
   unchanged for `>= LeaseDuration` (CAS against concurrent writers), the
   same comparison `tryTakeOver` makes.
@@ -242,8 +248,9 @@ node is the primary and a verdict only comes later, because a challenger's
 cached target flips after a probe that saw it agreeing, the verdict tick
 can run up to `retryPeriodSeconds + 2 * requestTimeout` after the flip,
 since the previous probe may have read the challenger just before it. The
-challenger starts its observation window when it becomes the target, so it
-claims no earlier than `leaseDurationSeconds` after the flip. The
+challenger starts its observation window when its cached target becomes the
+pending failover marker or itself, so it claims no earlier than
+`leaseDurationSeconds` after the flip. The
 model stops the node in the verdict tick, through the Ticker's age bound, so
 for this branch it assumes that `retryPeriodSeconds + 2 * requestTimeout <
 leaseDurationSeconds`, which nothing validates. At the defaults it is 4s
@@ -256,10 +263,10 @@ within `StepDownDelay` ticks of tripping (and of its previous check),
 check, that the code keeps those two bounds; the second rests on the
 process exiting on `os.Exit` and the kernel killing the rest of the PID
 namespace. It also assumes the peer check reaches a verdict:
-`shouldStepDown` returns "keep leading" without probing when the
-isolation check is disabled or the cluster has one instance, and retries
-without a verdict when it cannot build the probe (unreadable CA); neither
-case is modeled.
+`shouldStepDown` returns "keep leading" without probing when the cluster
+has one instance, returns it despite unreachable peers when the isolation
+check is disabled, and retries without a verdict when it cannot build the
+probe (unreadable CA); none of these cases is modeled.
 
 ## Assumptions and limits
 

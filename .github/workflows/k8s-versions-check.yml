@@ -144,7 +144,7 @@ jobs:
           branch: "k8s-cloud-versions-update"
           author: "public-cloud-k8s-versions-check <public-cloud-k8s-versions-check@users.noreply.github.com>"
           committer: "public-cloud-k8s-versions-check <public-cloud-k8s-versions-check@users.noreply.github.com>"
-          labels: "no-issue"
+          labels: "no-issue,automated"
           add-paths: |
             .github/**
             Makefile
