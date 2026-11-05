@@ -144,7 +144,7 @@ IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_ke
 }
 
 var (
-	regexPGWalFileName  = regexp.MustCompile("^[0-9A-F]{24}")
+	regexPGWalFileName  = regexp.MustCompile("^[0-9A-F]{24}$")
 	cachedWalPgSettings walSettings
 )
 
