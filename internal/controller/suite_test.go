@@ -79,6 +79,12 @@ func buildTestEnvironment() *testingEnvironment {
 		WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &corev1.Service{},
 			&corev1.ConfigMap{}, &corev1.Secret{}).
 		WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
+		WithIndex(&corev1.Pod{}, podOwnerKey, func(rawObj client.Object) []string {
+			if ownerName, ok := IsOwnedByCluster(rawObj); ok {
+				return []string{ownerName}
+			}
+			return nil
+		}).
 		WithIndex(&apiv1.Backup{}, ".spec.cluster.name", func(rawObj client.Object) []string {
 			return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
 		}).
