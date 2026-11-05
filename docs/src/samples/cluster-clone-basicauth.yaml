@@ -11,6 +11,11 @@ metadata:
 spec:
   instances: 3
 
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   bootstrap:
     pg_basebackup:
       source: cluster-example

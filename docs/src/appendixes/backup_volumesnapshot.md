@@ -82,6 +82,11 @@ metadata:
 spec:
   instances: 3
 
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   storage:
     storageClass: @STORAGE_CLASS@
     size: 10Gi
@@ -373,6 +378,11 @@ metadata:
   name: hendrix
 spec:
   instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
 
   storage:
     storageClass: ebs-sc
