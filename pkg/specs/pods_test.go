@@ -83,11 +83,12 @@ var _ = Describe("GetPodSecurityContext", func() {
 		Expect(*sc.RunAsNonRoot).To(BeTrue())
 	})
 
-	It("merges only selected fields when user provides a partial PodSecurityContext", func() {
+	It("merges defaults when user provides a partial PodSecurityContext", func() {
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PodSecurityContext: &corev1.PodSecurityContext{
-					RunAsUser: ptr.To(int64(1000)),
+					RunAsUser:           ptr.To(int64(1000)),
+					FSGroupChangePolicy: ptr.To(corev1.FSGroupChangeOnRootMismatch),
 				},
 			},
 		}
@@ -102,9 +103,14 @@ var _ = Describe("GetPodSecurityContext", func() {
 		// SeccompProfile is filled from defaults
 		Expect(sc.SeccompProfile).ToNot(BeNil())
 		Expect(sc.SeccompProfile.Type).To(Equal(corev1.SeccompProfileTypeRuntimeDefault))
-		// Fields not merged remain as provided (nil)
-		Expect(sc.FSGroup).To(BeNil())
-		Expect(sc.RunAsNonRoot).To(BeNil())
+		// FSGroup and RunAsNonRoot are merged from defaults
+		Expect(sc.FSGroup).ToNot(BeNil())
+		Expect(*sc.FSGroup).To(Equal(int64(apiv1.DefaultPostgresGID)))
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
+		// Other user-provided fields are preserved
+		Expect(sc.FSGroupChangePolicy).ToNot(BeNil())
+		Expect(*sc.FSGroupChangePolicy).To(Equal(corev1.FSGroupChangeOnRootMismatch))
 	})
 
 	It("honors Cluster.Spec.SeccompProfile when PodSecurityContext.SeccompProfile is nil", func() {
@@ -124,9 +130,11 @@ var _ = Describe("GetPodSecurityContext", func() {
 		Expect(sc.SeccompProfile).ToNot(BeNil())
 		Expect(sc.SeccompProfile).To(BeEquivalentTo(localhostProfile))
 		Expect(sc.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
-		// Non-merged fields remain nil
-		Expect(sc.FSGroup).To(BeNil())
-		Expect(sc.RunAsNonRoot).To(BeNil())
+		// Other fields are merged from defaults
+		Expect(sc.FSGroup).ToNot(BeNil())
+		Expect(*sc.FSGroup).To(Equal(int64(apiv1.DefaultPostgresGID)))
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
 		// Merged UID/GID come from defaults
 		Expect(sc.RunAsUser).ToNot(BeNil())
 		Expect(*sc.RunAsUser).To(Equal(int64(apiv1.DefaultPostgresUID)))
@@ -140,7 +148,7 @@ var _ = Describe("GetPodSecurityContext", func() {
 			Spec: apiv1.ClusterSpec{
 				PodSecurityContext: &corev1.PodSecurityContext{
 					FSGroup:      &gid,
-					RunAsNonRoot: ptr.To(true),
+					RunAsNonRoot: ptr.To(false),
 				},
 			},
 		}
@@ -149,7 +157,7 @@ var _ = Describe("GetPodSecurityContext", func() {
 		Expect(sc.FSGroup).ToNot(BeNil())
 		Expect(*sc.FSGroup).To(Equal(int64(999)))
 		Expect(sc.RunAsNonRoot).ToNot(BeNil())
-		Expect(*sc.RunAsNonRoot).To(BeTrue())
+		Expect(*sc.RunAsNonRoot).To(BeFalse())
 		// Other fields are merged
 		Expect(sc.RunAsUser).ToNot(BeNil())
 		Expect(*sc.RunAsUser).To(Equal(int64(apiv1.DefaultPostgresUID)))
