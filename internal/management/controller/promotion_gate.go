@@ -298,4 +298,4 @@ const unblockPromotionHint = "To promote this replica anyway, accepting the loss
 	"previous primary has, remove the annotation of the primary lease " +
 	"(kubectl annotate lease <cluster> " + utils.LeasePositionAnnotationName + "-). " +
 	"To avoid that loss, promote the previous primary back " +
-	"(kubectl cnpg promote <cluster> <previous primary>)"
+	"(kubectl cnpg promote --force <cluster> <previous primary>)"
