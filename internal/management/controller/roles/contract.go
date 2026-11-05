@@ -59,6 +59,17 @@ type DatabaseRole struct {
 	transactionID       int64 `json:"-"`
 }
 
+// Membership is a grant of membership in a role, as PostgreSQL records it in
+// pg_auth_members. From PostgreSQL 16, the same membership can be granted by
+// more than one grantor, and a GRANT or REVOKE acts only on the grant of the
+// grantor it names.
+type Membership struct {
+	// Name is the name of the role the membership is in
+	Name string
+	// Grantor is the name of the role that granted the membership
+	Grantor string
+}
+
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
 func (d *DatabaseRole) passwordNeedsUpdating(
 	storedPasswordState map[string]apiv1.PasswordState,

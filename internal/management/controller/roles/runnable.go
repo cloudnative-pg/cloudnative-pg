@@ -66,8 +66,9 @@ type instanceInterface interface {
 //
 // c.f. https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Runnable
 type RoleSynchronizer struct {
-	instance instanceInterface
-	client   client.Client
+	instance                instanceInterface
+	client                  client.Client
+	getPostgresMajorVersion func() (int, error)
 }
 
 // NewRoleSynchronizer creates a new RoleSynchronizer
@@ -75,6 +76,10 @@ func NewRoleSynchronizer(instance *postgres.Instance, client client.Client) *Rol
 	runner := &RoleSynchronizer{
 		instance: instance,
 		client:   client,
+		getPostgresMajorVersion: func() (int, error) {
+			version, err := instance.GetPgVersion()
+			return int(version.Major()), err //nolint:gosec
+		},
 	}
 	return runner
 }
@@ -264,7 +269,12 @@ func (sr *RoleSynchronizer) applyRoleActions(
 		grants, revokes, err := GetRoleMembershipDiff(ctx, db, role.InRoles, dbRole)
 		handleRoleError(err, role.Name, roleUpdateMemberships)
 
-		err = UpdateMembership(ctx, db, dbRole, grants, revokes)
+		pgMajorVersion, err := sr.getPostgresMajorVersion()
+		if err != nil {
+			handleRoleError(err, role.Name, roleUpdateMemberships)
+			continue
+		}
+		err = UpdateMembership(ctx, db, dbRole, grants, revokes, pgMajorVersion)
 		handleRoleError(err, role.Name, roleUpdateMemberships)
 	}
 
@@ -276,13 +286,14 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	return appliedChanges, unreconciledRoles
 }
 
-// GetRoleMembershipDiff returns two lists of roles: those to be granted, and revoked
+// GetRoleMembershipDiff returns the roles to be granted, and the grants of
+// membership to be revoked
 func GetRoleMembershipDiff(
 	ctx context.Context,
 	db *sql.DB,
 	desiredRoleMemberships []string,
 	dbRole DatabaseRole,
-) (toGrant []string, toRevoke []string, err error) {
+) (toGrant []string, toRevoke []Membership, err error) {
 	inRoleInDB, err := GetParentRoles(ctx, db, dbRole)
 	if err != nil {
 		return nil, nil, err
@@ -403,32 +414,22 @@ func getPasswordSecretResourceVersion(
 	return re
 }
 
-func getRolesToGrant(inRoleInDB, inRoleInSpec []string) []string {
-	if len(inRoleInSpec) == 0 {
-		return nil
-	}
-	if len(inRoleInDB) == 0 {
-		return inRoleInSpec
-	}
+func getRolesToGrant(inRoleInDB []Membership, inRoleInSpec []string) []string {
 	var roleToGrant []string
 	for _, v := range inRoleInSpec {
-		if !slices.Contains(inRoleInDB, v) {
+		if !slices.ContainsFunc(inRoleInDB, func(m Membership) bool { return m.Name == v }) {
 			roleToGrant = append(roleToGrant, v)
 		}
 	}
 	return roleToGrant
 }
 
-func getRolesToRevoke(inRoleInDB, inRoleInSpec []string) []string {
-	if len(inRoleInDB) == 0 {
-		return nil
-	}
-	if len(inRoleInSpec) == 0 {
-		return inRoleInDB
-	}
-	var roleToRevoke []string
+// getRolesToRevoke returns every grant of the memberships missing in the
+// spec, whoever granted it
+func getRolesToRevoke(inRoleInDB []Membership, inRoleInSpec []string) []Membership {
+	var roleToRevoke []Membership
 	for _, v := range inRoleInDB {
-		if !slices.Contains(inRoleInSpec, v) {
+		if !slices.Contains(inRoleInSpec, v.Name) {
 			roleToRevoke = append(roleToRevoke, v)
 		}
 	}

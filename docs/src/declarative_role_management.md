@@ -111,7 +111,10 @@ A few points are worth noting:
     conventions.
 3.  The `connectionLimit` attribute defaults to -1, in line with PostgreSQL
     conventions.
-4.  Role membership with `inRoles` defaults to no memberships.
+4.  Role membership with `inRoles` defaults to no memberships. A membership
+    removed from `inRoles` is revoked whoever granted it: from PostgreSQL 16,
+    where every role holding the `ADMIN` option on a role can grant the same
+    membership again, the operator revokes each of those grants.
 
 ## Example manifest
 

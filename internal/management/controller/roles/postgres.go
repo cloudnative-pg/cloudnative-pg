@@ -250,7 +250,8 @@ func UpdateMembership(
 	db *sql.DB,
 	role DatabaseRole,
 	rolesToGrant []string,
-	rolesToRevoke []string,
+	rolesToRevoke []Membership,
+	pgMajorVersion int,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
@@ -269,10 +270,15 @@ func UpdateMembership(
 		)
 	}
 	for _, r := range rolesToRevoke {
-		queries = append(queries, fmt.Sprintf(`REVOKE %s FROM %s`,
-			pgx.Identifier{r}.Sanitize(),
-			pgx.Identifier{role.Name}.Sanitize()),
-		)
+		query := fmt.Sprintf(`REVOKE %s FROM %s`,
+			pgx.Identifier{r.Name}.Sanitize(),
+			pgx.Identifier{role.Name}.Sanitize())
+		// Before PostgreSQL 16 a membership has a single grant, which this
+		// statement revokes whoever granted it
+		if pgMajorVersion >= 16 {
+			query += fmt.Sprintf(` GRANTED BY %s`, pgx.Identifier{r.Grantor}.Sanitize())
+		}
+		queries = append(queries, query)
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -296,28 +302,38 @@ func UpdateMembership(
 	return tx.Commit()
 }
 
-// GetParentRoles get the in roles of this role
-func GetParentRoles(ctx context.Context, db *sql.DB, role DatabaseRole) ([]string, error) {
+// GetParentRoles gets the grants of membership of this role
+func GetParentRoles(ctx context.Context, db *sql.DB, role DatabaseRole) ([]Membership, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while getting parents for role %s with role reconciler: %w", role.Name, err)
 	}
-	query := `SELECT mem.inroles 
-		FROM pg_catalog.pg_authid as auth
-		LEFT JOIN (
-			SELECT pg_catalog.array_agg(pg_catalog.pg_get_userbyid(roleid)) as inroles, member
-			FROM pg_catalog.pg_auth_members GROUP BY member
-		) mem ON member = oid
-		WHERE rolname = $1`
+	query := `SELECT pg_catalog.pg_get_userbyid(am.roleid), pg_catalog.pg_get_userbyid(am.grantor)
+		FROM pg_catalog.pg_auth_members AS am
+		JOIN pg_catalog.pg_authid AS auth ON auth.oid = am.member
+		WHERE auth.rolname = $1`
 	contextLog.Debug("get parent role", "query", query)
-	var parentRoles pq.StringArray
-	err := db.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, wrapErr(err)
-	}
+	rows, err := db.QueryContext(ctx, query, role.Name)
 	if err != nil {
 		return nil, wrapErr(err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			contextLog.Info("Ignorable error while querying pg_catalog.pg_auth_members", "err", err)
+		}
+	}()
+
+	var parentRoles []Membership
+	for rows.Next() {
+		var parentRole Membership
+		if err := rows.Scan(&parentRole.Name, &parentRole.Grantor); err != nil {
+			return nil, wrapErr(err)
+		}
+		parentRoles = append(parentRoles, parentRole)
+	}
+	if rows.Err() != nil {
+		return nil, wrapErr(rows.Err())
 	}
 
 	return parentRoles, nil
