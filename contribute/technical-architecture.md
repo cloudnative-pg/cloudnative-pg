@@ -145,8 +145,8 @@ container. Its responsibilities include:
   polls on every instance; the `Cluster` status does not carry the LSNs.
 - **Primary Lease:** Renewing the `Lease` while primary, and stopping
   PostgreSQL when it cannot renew it and has also lost contact with at least
-  one other instance (see
-  [Primary Isolation](../docs/src/instance_manager.md#primary-isolation)).
+  one other instance, or a reachable instance names another target primary
+  (see [Primary Isolation](../docs/src/instance_manager.md#primary-isolation)).
 - **Declarative Object Reconciliation:** Running its own `controller-runtime`
   manager to apply the CRDs that describe objects *inside* PostgreSQL, as
   described in
@@ -171,8 +171,8 @@ documentation):
   primary lease (`internal/cmd/manager/instance/run/lease`), not here.
 - **Readiness Probe:** Uses `pg_isready` by default, on the primary and on the
   replicas alike, so a lagging replica stays ready. The `streaming` strategy
-  (`.spec.probes.readiness.type`) also requires a replica to be streaming and,
-  with `maximumLag`, to be within that lag.
+  (`.spec.probes.readiness.type`) also requires a streaming replica to be
+  connected to its source and, with `maximumLag`, to be within that lag.
 
 ## Instance Manager Endpoints
 
@@ -182,8 +182,8 @@ client certificate, so that the kubelet can reach the probes:
 
 | Port | Endpoints | Callers | Authentication |
 | --- | --- | --- | --- |
-| `8000` (HTTPS) | `/healthz`, `/readyz`, `/startupz` | Kubelet | None |
-| `8000` (HTTPS) | `/pg/status`, `/failsafe` | Operator, `kubectl cnpg status` through the API server proxy | None |
+| `8000` (HTTPS) | `/healthz`, `/readyz`, `/startupz` | Kubelet | None (TLS only) |
+| `8000` (HTTPS) | `/pg/status`, `/failsafe` | Operator, `kubectl cnpg status` through the API server proxy | None (TLS only) |
 | `8000` (HTTPS) | `/pg/mode/backup`, `/pg/controldata`, `/pg/archive/partial`, `/update` | Operator | Client certificate whose public key fingerprint matches `status.operatorCertificateFingerprint` |
 | `8010` (HTTP, `localhost` only) | `/pg/backup`, `/cache/`, `/cluster/status/condition/wal/archive` | `manager` subcommands inside the Pod, such as `manager backup` and WAL archiving | None |
 | `9187` (HTTP, or HTTPS with `.spec.monitoring.tls.enabled`) | `/metrics` | Prometheus | None |
