@@ -481,6 +481,9 @@ func (se *Reconciler) createSnapshot(
 	annotations := maps.Clone(pvc.Annotations)
 	maps.Copy(annotations, snapshotConfig.Annotations)
 	transferLabelsToAnnotations(labels, annotations)
+	utils.MergeMap(annotations, map[string]string{
+		"cnpg.io/backupUID": string(backup.GetUID()),
+	})
 
 	snapshot := volumesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
