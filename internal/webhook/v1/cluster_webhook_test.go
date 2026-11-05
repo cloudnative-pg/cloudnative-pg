@@ -2258,6 +2258,80 @@ var _ = Describe("validateSynchronousReplicaConfiguration", func() {
 		errors := v.validateSynchronousReplicaConfiguration(cluster)
 		Expect(errors).To(BeEmpty())
 	})
+
+	It("rejects a number greater than the cluster standby names capped by maxStandbyNamesFromCluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method:                     apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number:                     2,
+						MaxStandbyNamesFromCluster: ptr.To(1),
+						DataDurability:             apiv1.DataDurabilityLevelRequired,
+					},
+				},
+			},
+		}
+		errors := v.validateSynchronousReplicaConfiguration(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Field).To(Equal("spec.postgresql.synchronous.number"))
+		Expect(errors[0].Detail).To(ContainSubstring("maxStandbyNamesFromCluster"))
+	})
+
+	It("treats an unset dataDurability as required when checking the cap", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method:                     apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number:                     2,
+						MaxStandbyNamesFromCluster: ptr.To(1),
+					},
+				},
+			},
+		}
+		errors := v.validateSynchronousReplicaConfiguration(cluster)
+		Expect(errors).To(HaveLen(1))
+	})
+
+	It("accepts a number within the cluster standby names capped by maxStandbyNamesFromCluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method:                     apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number:                     1,
+						MaxStandbyNamesFromCluster: ptr.To(1),
+						DataDurability:             apiv1.DataDurabilityLevelRequired,
+					},
+				},
+			},
+		}
+		errors := v.validateSynchronousReplicaConfiguration(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("counts standbyNamesPre/Post toward the capped capacity", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method:                     apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number:                     2,
+						MaxStandbyNamesFromCluster: ptr.To(1),
+						StandbyNamesPre:            []string{"external-1"},
+						DataDurability:             apiv1.DataDurabilityLevelRequired,
+					},
+				},
+			},
+		}
+		errors := v.validateSynchronousReplicaConfiguration(cluster)
+		Expect(errors).To(BeEmpty())
+	})
 })
 
 var _ = Describe("storage configuration validation", func() {
