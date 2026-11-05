@@ -45,3 +45,11 @@ func ToBytes[T anyNumber](mb T) float64 {
 	multiplier := float64(1024)
 	return float64(mb) * multiplier * multiplier
 }
+
+// ToMegabytes converts an input value in bytes to MB
+// Input: value - a number representing size in bytes
+// Output: the size in megabytes, calculated by dividing the input value by 1024 * 1024
+func ToMegabytes[T anyNumber](bytes T) float64 {
+	divisor := float64(1024)
+	return float64(bytes) / (divisor * divisor)
+}
