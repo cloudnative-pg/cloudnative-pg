@@ -92,6 +92,7 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 			if !errors.Is(err, errInPlaceResizeRejected) {
 				return false, err
 			}
+			podRollout.reason = err.Error()
 		}
 
 		managerResult := r.rolloutManager.CoordinateRollout(client.ObjectKeyFromObject(cluster), postgresqlStatus.Pod.Name)
@@ -154,6 +155,7 @@ func (r *ClusterReconciler) rolloutRequiredPrimary(
 		if !errors.Is(err, errInPlaceResizeRejected) {
 			return false, err
 		}
+		podRollout.reason = err.Error()
 	}
 
 	// if the primary instance is marked for restart due to hot standby sensitive parameter decrease,
