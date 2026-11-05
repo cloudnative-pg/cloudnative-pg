@@ -7528,3 +7528,59 @@ var _ = Describe("pg_basebackup tablespaceMapping validation", func() {
 		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.tablespaceMapping[1].sourceLocation"))
 	})
 })
+
+var _ = Describe("Write path check validation", func() {
+	var v *ClusterCustomValidator
+
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	withCheck := func(cfg *apiv1.WritePathCheckConfiguration) *apiv1.Cluster {
+		return &apiv1.Cluster{Spec: apiv1.ClusterSpec{Probes: &apiv1.ProbesConfiguration{
+			Liveness: &apiv1.LivenessProbe{WritePathCheck: cfg},
+		}}}
+	}
+
+	It("accepts a cluster without the check", func() {
+		Expect(v.validateWritePathCheck(&apiv1.Cluster{})).To(BeEmpty())
+		Expect(v.validateWritePathCheck(withCheck(nil))).To(BeEmpty())
+	})
+
+	It("accepts the defaults and a coherent configuration", func() {
+		Expect(v.validateWritePathCheck(withCheck(&apiv1.WritePathCheckConfiguration{
+			Enabled: ptr.To(true),
+		}))).To(BeEmpty())
+		Expect(v.validateWritePathCheck(withCheck(&apiv1.WritePathCheckConfiguration{
+			Enabled:             ptr.To(true),
+			PeriodSeconds:       ptr.To(int32(2)),
+			TimeoutSeconds:      ptr.To(int32(3)),
+			ClearAfterSuccesses: ptr.To(int32(1)),
+		}))).To(BeEmpty())
+	})
+
+	It("rejects non positive values", func() {
+		errs := v.validateWritePathCheck(withCheck(&apiv1.WritePathCheckConfiguration{
+			PeriodSeconds:       ptr.To(int32(0)),
+			TimeoutSeconds:      ptr.To(int32(-1)),
+			ClearAfterSuccesses: ptr.To(int32(0)),
+		}))
+		Expect(errs).To(HaveLen(3))
+	})
+
+	It("rejects a timeout that is not greater than the period", func() {
+		errs := v.validateWritePathCheck(withCheck(&apiv1.WritePathCheckConfiguration{
+			PeriodSeconds:  ptr.To(int32(30)),
+			TimeoutSeconds: ptr.To(int32(30)),
+		}))
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.probes.liveness.writePathCheck.timeoutSeconds"))
+	})
+
+	It("takes the default timeout into account when only the period is set", func() {
+		errs := v.validateWritePathCheck(withCheck(&apiv1.WritePathCheckConfiguration{
+			PeriodSeconds: ptr.To(int32(60)),
+		}))
+		Expect(errs).To(HaveLen(1))
+	})
+})

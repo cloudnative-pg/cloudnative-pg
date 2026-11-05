@@ -51,6 +51,11 @@ type PrimaryLeaseAcquirer interface {
 	// without releasing the lease record, so that a new target primary can take
 	// it over once it goes stale. The next Acquire takes the lease back.
 	Yield(ctx context.Context)
+
+	// StopRenewing stops renewing the primary lease like Yield, but keeps the
+	// lease-age monitor running, so that a primary that is still running can
+	// still be fenced. The next Acquire takes the lease back.
+	StopRenewing(ctx context.Context)
 }
 
 // InstanceReconciler reconciles the status of the Cluster resource with
