@@ -98,6 +98,11 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	// We're creating a new replica of an existing cluster, and the PVCs
 	// have been initialized by a set of VolumeSnapshots.
 	if immediate {
+		// The operator passes them as for the recovery of a primary
+		if err := info.writeBackupLabelAndTablespaceMap(); err != nil {
+			return err
+		}
+
 		// If the instance starts as a primary, we will enter in the
 		// same logic attaching an old primary back after a failover.
 		// We don't need that as this instance has never diverged.
@@ -121,18 +126,8 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	contextLogger.Info("Recovering from volume snapshot",
 		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
 
-	if len(info.BackupLabelFile) > 0 {
-		filePath := filepath.Join(info.PgData, constants.BackupLabelFile)
-		if _, err := fileutils.WriteFileAtomic(filePath, info.BackupLabelFile, 0o666); err != nil {
-			return err
-		}
-	}
-
-	if len(info.TablespaceMapFile) > 0 {
-		filePath := filepath.Join(info.PgData, constants.TablespaceMapFile)
-		if _, err := fileutils.WriteFileAtomic(filePath, info.TablespaceMapFile, 0o666); err != nil {
-			return err
-		}
+	if err := info.writeBackupLabelAndTablespaceMap(); err != nil {
+		return err
 	}
 
 	var envs []string
@@ -148,6 +143,26 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	}
 
 	return info.concludeRestore(ctx, cli, cluster, getRestoreWalConfig(), envs)
+}
+
+// writeBackupLabelAndTablespaceMap writes the backup_label and the
+// tablespace_map files into PGDATA, when their content is given
+func (info InitInfo) writeBackupLabelAndTablespaceMap() error {
+	if len(info.BackupLabelFile) > 0 {
+		filePath := filepath.Join(info.PgData, constants.BackupLabelFile)
+		if _, err := fileutils.WriteFileAtomic(filePath, info.BackupLabelFile, 0o666); err != nil {
+			return err
+		}
+	}
+
+	if len(info.TablespaceMapFile) > 0 {
+		filePath := filepath.Join(info.PgData, constants.TablespaceMapFile)
+		if _, err := fileutils.WriteFileAtomic(filePath, info.TablespaceMapFile, 0o666); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (info InitInfo) concludeRestore(

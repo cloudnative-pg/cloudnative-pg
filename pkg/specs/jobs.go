@@ -21,6 +21,7 @@ package specs
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -190,29 +191,43 @@ func CreatePrimaryJobViaRestoreSnapshot(
 	object *metav1.ObjectMeta,
 	backup *apiv1.Backup,
 ) *batchv1.Job {
-	initCommand := []string{
-		"/controller/manager",
-		"instance",
-		"restoresnapshot",
-	}
-
-	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
-		initCommand = append(initCommand, flag)
-	}
-
-	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
-		initCommand = append(initCommand, flag)
-	}
-
-	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
+	initCommand := buildRestoreSnapshotCommand(cluster, object)
 
 	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
 	return job
+}
+
+// buildRestoreSnapshotCommand builds the restoresnapshot command, passing the
+// backup label and the tablespace map stored in the annotations of the
+// snapshot
+func buildRestoreSnapshotCommand(
+	cluster apiv1.Cluster,
+	object *metav1.ObjectMeta,
+	extraFlags ...string,
+) []string {
+	initCommand := slices.Concat(
+		[]string{
+			"/controller/manager",
+			"instance",
+			"restoresnapshot",
+		},
+		extraFlags,
+	)
+
+	if object != nil {
+		if backupLabel := object.Annotations[utils.BackupLabelFileAnnotationName]; backupLabel != "" {
+			initCommand = append(initCommand, fmt.Sprintf("--backuplabel=%s", backupLabel))
+		}
+
+		if tablespaceMap := object.Annotations[utils.BackupTablespaceMapFileAnnotationName]; tablespaceMap != "" {
+			initCommand = append(initCommand, fmt.Sprintf("--tablespacemap=%s", tablespaceMap))
+		}
+	}
+
+	return append(initCommand, buildCommonInitJobFlags(cluster)...)
 }
 
 // CreatePrimaryJobViaRecovery creates a new primary instance in a Pod, restoring from a Backup
@@ -290,20 +305,10 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 }
 
 // RestoreReplicaInstance creates a new PostgreSQL replica starting from a volume snapshot backup
-func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
-	commonFlags := buildCommonInitJobFlags(cluster)
-	initCommand := make([]string, 0, 4+len(commonFlags))
-	initCommand = append(initCommand,
-		"/controller/manager",
-		"instance",
-		"restoresnapshot",
-		"--immediate",
-	)
+func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int, object *metav1.ObjectMeta) *batchv1.Job {
+	initCommand := buildRestoreSnapshotCommand(cluster, object, "--immediate")
 
-	initCommand = append(initCommand, commonFlags...)
-
-	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
-	return job
+	return CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
 }
 
 func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {

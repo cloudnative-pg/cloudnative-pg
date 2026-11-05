@@ -337,3 +337,44 @@ var _ = Describe("Job created via InitDB", func() {
 		}))
 	})
 })
+
+var _ = Describe("Command restoring a volume snapshot", func() {
+	snapshot := &metav1.ObjectMeta{
+		Annotations: map[string]string{
+			utils.BackupLabelFileAnnotationName:         "YmFja3VwX2xhYmVs",
+			utils.BackupTablespaceMapFileAnnotationName: "dGFibGVzcGFjZV9tYXA=",
+		},
+	}
+	cluster := apiv1.Cluster{
+		Spec: apiv1.ClusterSpec{
+			WalStorage: &apiv1.StorageConfiguration{Size: "1Gi"},
+			Bootstrap:  &apiv1.BootstrapConfiguration{Recovery: &apiv1.BootstrapRecovery{}},
+		},
+	}
+	command := func(job *batchv1.Job) []string {
+		return job.Spec.Template.Spec.Containers[0].Command
+	}
+
+	It("passes the backup label and the tablespace map to a replica as it does to a primary", func() {
+		primary := command(CreatePrimaryJobViaRestoreSnapshot(cluster, 1, snapshot, nil))
+		replica := command(RestoreReplicaInstance(cluster, 2, snapshot))
+
+		Expect(primary).To(ContainElements(
+			"--backuplabel=YmFja3VwX2xhYmVs", "--tablespacemap=dGFibGVzcGFjZV9tYXA=", "--pg-wal"))
+		Expect(primary).ToNot(ContainElement("--immediate"))
+		Expect(slices.DeleteFunc(slices.Clone(replica), func(arg string) bool {
+			return arg == "--immediate"
+		})).To(Equal(primary))
+		Expect(replica).To(ContainElement("--immediate"))
+	})
+
+	It("passes neither when the snapshot has none", func() {
+		replica := command(RestoreReplicaInstance(cluster, 2, &metav1.ObjectMeta{}))
+		Expect(replica).ToNot(ContainElement(HavePrefix("--backuplabel")))
+		Expect(replica).ToNot(ContainElement(HavePrefix("--tablespacemap")))
+	})
+
+	It("tolerates a missing snapshot", func() {
+		Expect(command(RestoreReplicaInstance(cluster, 2, nil))).To(ContainElement("--immediate"))
+	})
+})
