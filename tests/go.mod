@@ -8,7 +8,7 @@ replace github.com/cloudnative-pg/cloudnative-pg => ../
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/avast/retry-go/v5 v5.0.1
+	github.com/avast/retry-go/v5 v5.1.1
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/cloudnative-pg v0.0.0-00010101000000-000000000000
 	github.com/cloudnative-pg/machinery v0.6.1
