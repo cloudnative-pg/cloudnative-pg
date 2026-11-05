@@ -8,7 +8,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/acobaugh/osrelease v0.1.0
-	github.com/avast/retry-go/v5 v5.0.1
+	github.com/avast/retry-go/v5 v5.1.1
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.7.0
 	github.com/cloudnative-pg/cnpg-i v0.6.0
