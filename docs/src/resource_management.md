@@ -186,9 +186,10 @@ This happens when:
   changed.
 - The change would alter the pod QoS class, which Kubernetes forbids: the API
   server rejects the resize and the operator recreates the pod.
-- The kubelet reports the resize as *infeasible* because the node can never
-  satisfy the new request: the operator recreates the pod, letting the
-  scheduler place it on a suitable node.
+- The resize is *infeasible* because the node can never satisfy the new
+  request, as reported by the kubelet or, starting from Kubernetes 1.36, by
+  the API server rejecting the resize: the operator recreates the pod,
+  letting the scheduler place it on a suitable node.
 - The resources change together with any other part of the pod specification:
   the pod is recreated to apply the whole change.
 
