@@ -383,20 +383,33 @@ func EnsurePodIsUnfenced(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) error {
+	return EnsureInstanceIsUnfenced(ctx, cli, recorder, cluster, backup, targetPod.Name)
+}
+
+// EnsureInstanceIsUnfenced removes the fencing status of an instance from the
+// cluster. It takes the instance name, so it works when the Pod is gone.
+func EnsureInstanceIsUnfenced(
+	ctx context.Context,
+	cli client.Client,
+	recorder record.EventRecorder,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	instanceName string,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	if err := utils.NewFencingMetadataExecutor(cli).
 		RemoveFencing().
-		ForInstance(targetPod.Name).
+		ForInstance(instanceName).
 		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
 		return err
 	}
 
 	// The list of fenced instances is empty, so we need to request
 	// fencing for the target pod
-	contextLogger.Info("Unfencing Pod", "podName", targetPod.Name)
+	contextLogger.Info("Unfencing Pod", "podName", instanceName)
 	recorder.Eventf(backup, "Normal", "UnfencePod",
-		"Unfencing Pod %v", targetPod.Name)
+		"Unfencing Pod %v", instanceName)
 
 	return nil
 }
