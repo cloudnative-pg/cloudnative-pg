@@ -157,6 +157,9 @@ E2E test configuration:
 		err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, objectStoreEnv.Namespace, 300)
 		Expect(err).ToNot(HaveOccurred())
 	})
+	if testTimeouts, err = timeouts.Timeouts(); err != nil {
+		panic(err)
+	}
 	objectStoreEnv.Timeout = uint(testTimeouts[timeouts.ObjectStoreInstallation])
 	objectStoreClient, err := objectstore.Deploy(objectStoreEnv, env)
 	Expect(err).ToNot(HaveOccurred())
