@@ -156,6 +156,55 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 	}
 }
 
+// ApplyDefaultsTemplate applies a ServiceTemplateSpec as a defaults layer
+// underneath a service. The service's own values take precedence; the template
+// only fills in fields that are not already set.
+func ApplyDefaultsTemplate(service *corev1.Service, tmpl *apiv1.ServiceTemplateSpec) {
+	if tmpl == nil {
+		return
+	}
+
+	// Labels: add template labels only if not already present on the service
+	for k, v := range tmpl.ObjectMeta.Labels {
+		if service.Labels == nil {
+			service.Labels = make(map[string]string)
+		}
+		if _, exists := service.Labels[k]; !exists {
+			service.Labels[k] = v
+		}
+	}
+
+	// Annotations: add template annotations only if not already present
+	for k, v := range tmpl.ObjectMeta.Annotations {
+		if service.Annotations == nil {
+			service.Annotations = make(map[string]string)
+		}
+		if _, exists := service.Annotations[k]; !exists {
+			service.Annotations[k] = v
+		}
+	}
+
+	// Spec fields: only fill in from the template when the service hasn't set them
+	if service.Spec.Type == "" {
+		service.Spec.Type = tmpl.Spec.Type
+	}
+	if service.Spec.IPFamilyPolicy == nil {
+		service.Spec.IPFamilyPolicy = tmpl.Spec.IPFamilyPolicy
+	}
+	if len(service.Spec.IPFamilies) == 0 {
+		service.Spec.IPFamilies = tmpl.Spec.IPFamilies
+	}
+	if service.Spec.ExternalTrafficPolicy == "" {
+		service.Spec.ExternalTrafficPolicy = tmpl.Spec.ExternalTrafficPolicy
+	}
+	if service.Spec.InternalTrafficPolicy == nil {
+		service.Spec.InternalTrafficPolicy = tmpl.Spec.InternalTrafficPolicy
+	}
+	if service.Spec.LoadBalancerClass == nil {
+		service.Spec.LoadBalancerClass = tmpl.Spec.LoadBalancerClass
+	}
+}
+
 // BuildManagedServices creates a list of Kubernetes Services based on the
 // additional managed services specified in the Cluster's ManagedServices configuration.
 // Returns:
@@ -220,6 +269,9 @@ func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 			},
 			Spec: serviceTemplate.Spec,
 		}
+		// Apply the cluster-wide service template as a base layer; the
+		// per-service template fields already set above take precedence.
+		ApplyDefaultsTemplate(&services[i], managedServices.ServiceTemplate)
 		cluster.SetInheritedDataAndOwnership(&services[i].ObjectMeta)
 	}
 
