@@ -43,6 +43,25 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ = Describe("backup reconciliation", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("ignores a request for a Backup that no longer exists", func(ctx context.Context) {
+		result, err := env.backupReconciler.Reconcile(ctx, ctrl.Request{
+			NamespacedName: client.ObjectKey{
+				Namespace: newFakeNamespace(env.client),
+				Name:      "deleted-backup",
+			},
+		})
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+	})
+})
+
 var _ = Describe("backup reconciliation disabled", func() {
 	var env *testingEnvironment
 	BeforeEach(func() {
