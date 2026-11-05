@@ -213,10 +213,9 @@ PostgreSQL benefits from an in-place memory increase right away: the kernel
 page cache can grow within the new limit, caching more relation data, and
 the backends gain headroom for their working memory. What does not adapt
 automatically is the statically-sized configuration: `shared_buffers`
-(typically sized at about 25% of the available memory) keeps its configured
-value, and raising it requires a restart of PostgreSQL. Parameters that only
-inform the planner, like `effective_cache_size`, can instead be updated
-without a restart.
+keeps its configured value, and raising it requires a restart of PostgreSQL.
+Parameters that only inform the planner, like `effective_cache_size`, can
+instead be updated without a restart.
 
 ## Integration with the Vertical Pod Autoscaler (VPA)
 
