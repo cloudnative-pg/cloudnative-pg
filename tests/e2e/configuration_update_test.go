@@ -613,6 +613,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				// verify that pg postmaster start time is greater than currentTimestamp which was taken before restart
 				Expect(newStartTime).Should(BeTemporally(">", primaryStartTime))
 			})
+
+			clusterasserts.AssertClusterReadinessConditionIsReached(env, namespace, clusterName, apiv1.ConditionTrue,
+				testTimeouts[timeouts.ClusterIsReadyQuick])
 		})
 
 		It("3. performing a rolling update when changing imageName and extension GUC at the same time", func() {

@@ -428,8 +428,10 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 			return true, err
 		}
 
+		// The operator pauses while the primary restarts in-place, so it
+		// reconciled no generation newer than the Ready condition reports
 		return true, clusterstatus.PatchWithOptimisticLock(
-			ctx,
+			clusterstatus.KeepReconciledGeneration(ctx, cluster),
 			r.client,
 			cluster,
 			clusterstatus.SetPhase(apiv1.PhaseHealthy, "Primary instance restarted in-place"),
