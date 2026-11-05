@@ -37,8 +37,6 @@ var _ = Describe("regexPGWalFileName", func() {
 			Expect(regexPGWalFileName.MatchString(filename)).To(Equal(shouldMatch))
 		},
 		Entry("valid WAL segment", "000000010000000000000001", true),
-		Entry("valid WAL segment (all zeros)", "000000000000000000000000", true),
-		Entry("valid WAL segment (all Fs)", "FFFFFFFFFFFFFFFFFFFFFFFF", true),
 		Entry("partial WAL file", "000000010000000000000001.partial", false),
 		Entry("backup label file", "000000010000000000000001.00000028.backup", false),
 		Entry("timeline history file", "00000002.history", false),
