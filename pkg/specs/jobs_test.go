@@ -360,7 +360,6 @@ var _ = Describe("Command restoring a volume snapshot", func() {
 		Expect(primary.Command).To(ContainElements(
 			"--backuplabel=YmFja3VwX2xhYmVs", "--tablespacemap=dGFibGVzcGFjZV9tYXA=", "--pg-wal"))
 		Expect(primary.Command).ToNot(ContainElement("--immediate"))
-		// The only difference is --immediate
 		Expect(slices.DeleteFunc(slices.Clone(replica.Command), func(arg string) bool {
 			return arg == "--immediate"
 		})).To(Equal(primary.Command))

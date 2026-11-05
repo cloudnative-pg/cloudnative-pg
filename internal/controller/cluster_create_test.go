@@ -1581,3 +1581,23 @@ var _ = Describe("generateNodeSerial", func() {
 		Expect(serial).To(Equal(1))
 	})
 })
+
+var _ = Describe("attachReplicaBootstrapInitContainer", func() {
+	It("fails when the snapshot of the PGDATA PVC no longer exists", func(ctx SpecContext) {
+		reconciler := &ClusterReconciler{
+			Client:   fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build(),
+			Recorder: record.NewFakeRecorder(10),
+		}
+		cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default"}}
+		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "cluster-2"}}
+		dataSource := &corev1.TypedLocalObjectReference{
+			APIGroup: ptr.To(volumesnapshotv1.GroupName),
+			Kind:     apiv1.VolumeSnapshotKind,
+			Name:     "gone",
+		}
+
+		_, err := reconciler.attachReplicaBootstrapInitContainer(ctx, cluster, pod, 2, dataSource, true)
+
+		Expect(err).To(MatchError(ContainSubstring("no longer exists")))
+	})
+})

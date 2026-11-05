@@ -99,8 +99,7 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	// We're creating a new replica of an existing cluster, and the PVCs
 	// have been initialized by a set of VolumeSnapshots.
 	if immediate {
-		// The operator passes the backup label and the tablespace map of the
-		// snapshot, when it has them, as for the recovery of a primary
+		// The operator passes them as for the recovery of a primary
 		if err := info.writeBackupLabelAndTablespaceMap(); err != nil {
 			return err
 		}

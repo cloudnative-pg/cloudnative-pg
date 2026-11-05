@@ -202,7 +202,7 @@ func BuildPrimaryBootstrapCommandViaRestoreSnapshot(
 
 // buildRestoreSnapshotCommand builds the restoresnapshot command, passing the
 // backup label and the tablespace map stored in the annotations of the
-// snapshot. The extra flags go right after the subcommand.
+// snapshot
 func buildRestoreSnapshotCommand(
 	cluster apiv1.Cluster,
 	object *metav1.ObjectMeta,

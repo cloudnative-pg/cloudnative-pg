@@ -1570,6 +1570,11 @@ func (r *ClusterReconciler) attachReplicaBootstrapInitContainer(
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+		// Without the snapshot there is no backup_label to pass
+		if metadata == nil {
+			return ctrl.Result{}, fmt.Errorf("the data source %q of the PGDATA PVC no longer exists",
+				pgdataDataSource.Name)
+		}
 		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster, metadata)
 	}
 
