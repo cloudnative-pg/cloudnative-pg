@@ -21,6 +21,7 @@ package certs
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"path"
@@ -111,14 +112,23 @@ func RenewLeafCertificate(caSecret *corev1.Secret, secret *corev1.Secret, altDNS
 		return false, err
 	}
 
-	if !expiring && altDNSNamesMatch {
-		return false, nil
-	}
-
 	// Parse the CA secret to get the private key
 	caPair, err := ParseCASecret(caSecret)
 	if err != nil {
 		return false, err
+	}
+
+	// A leaf certificate that cannot be verified against the current CA must
+	// be regenerated even if it is not expiring: the CA may have been rotated
+	// or replaced (e.g. a different serverCASecret), and the operator only
+	// trusts the current CA when it talks to the instances. Leaving the old
+	// leaf in place would lock the operator out of the cluster.
+	signedByCurrentCA := pair.IsValid(caPair, &x509.VerifyOptions{
+		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+	}) == nil
+
+	if !expiring && altDNSNamesMatch && signedByCurrentCA {
+		return false, nil
 	}
 
 	caPrivateKey, err := caPair.ParseECPrivateKey()
