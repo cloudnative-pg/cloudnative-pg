@@ -226,3 +226,124 @@ the `logger` field indicating the process that produced them. The possible
 With the exception of `postgres`, which follows a specific structure, all other
 `logger` values contain the `msg` field with the escaped message that is
 logged.
+
+## Exporting Logs via OpenTelemetry
+
+Besides writing them to standard output, the operator, the instance manager,
+and the PgBouncer instance manager of a `Pooler` can push their logs directly
+to an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
+via OTLP, without a log collector running on every node. This covers every
+log described in this page, including the PostgreSQL and PGAudit records and
+the logs of the `wal-archive` and `wal-restore` subcommands, which the
+instance manager forwards. The standard output is unchanged.
+
+The export is enabled by setting the `OTEL_EXPORTER_OTLP_ENDPOINT` (or
+`OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`) environment variable, and is configured
+through the
+[standard OpenTelemetry environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/),
+such as `OTEL_EXPORTER_OTLP_HEADERS` for the authentication headers,
+`OTEL_EXPORTER_OTLP_CERTIFICATE` for the CA certificate of the collector,
+`OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` for the identity of the
+records. The protocol is `http/protobuf`, usually on port `4318`, unless
+`OTEL_EXPORTER_OTLP_PROTOCOL` (or `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL`) is set to
+`grpc`, usually on port `4317`.
+
+Each component reads these variables from its own environment:
+
+- the operator, from the environment of its `Deployment`, for example through
+  the `additionalEnv` value of the Helm chart;
+- the instances of a `Cluster`, from the `env` and `envFrom` stanzas of its
+  specification, as described in
+  ["Environment variables"](cluster_conf.md#environment-variables), so that
+  each `Cluster` can send its logs to its own collector; a change to these
+  stanzas triggers a rolling update of the instances, while a change to the
+  content of a ConfigMap or Secret they refer to takes effect only after a
+  manual rollout, for example with
+  [`kubectl cnpg restart`](kubectl-plugin.md#restart);
+- the PgBouncer instances of a `Pooler`, from the environment of the
+  `pgbouncer` container in its [pod template](connection_pooling.md#pod-templates).
+
+For example, the following `Cluster` exports its logs via gRPC to a collector
+that uses TLS and requires a bearer token. The settings are in a ConfigMap,
+the token in a Secret, and the CA certificate of the collector is mounted
+through the [projected volume](cluster_conf.md#projected-volumes):
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-exporter
+data:
+  OTEL_EXPORTER_OTLP_ENDPOINT: https://otel-collector.observability.svc:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_EXPORTER_OTLP_CERTIFICATE: /projected/otel/ca.crt
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: otel-exporter-auth
+stringData:
+  OTEL_EXPORTER_OTLP_HEADERS: Authorization=Bearer%20<token>
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+
+  envFrom:
+  - configMapRef:
+      name: otel-exporter
+  - secretRef:
+      name: otel-exporter-auth
+
+  env:
+  - name: OTEL_SERVICE_NAME
+    value: $(CLUSTER_NAME)
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(NAMESPACE)
+
+  projectedVolumeTemplate:
+    sources:
+    - secret:
+        name: otel-collector-ca
+        items:
+        - key: ca.crt
+          path: otel/ca.crt
+
+  storage:
+    size: 1Gi
+```
+
+`OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` identify the records with
+the name of the cluster and of the pod, and are set in `env` because
+Kubernetes expands the `$(VAR_NAME)` references only there: a value read
+through `envFrom` is used as it is. The values of `OTEL_EXPORTER_OTLP_HEADERS`
+are percent-decoded, hence the `%20` in place of the space. A `Pooler` can
+refer to the same ConfigMap and Secret through the `envFrom` of the
+`pgbouncer` container, mounting the CA certificate at the same path with a
+volume of its pod template.
+
+Each exported record carries the fields of the corresponding JSON entry:
+
+- `ts` is the timestamp;
+- `msg` is the body;
+- `level` is the severity, with `debug` and `trace` both mapped to `DEBUG`;
+- `logger` is the instrumentation scope, or an attribute when the process
+  sets it as a field, as the instance manager does;
+- `error` and `stacktrace` are the `exception.message` and
+  `exception.stacktrace` attributes of the OpenTelemetry semantic conventions,
+  with `stacktrace` becoming `code.stacktrace` in a record without an error;
+- every other field is an attribute that keeps its structure: the `record` of
+  a PostgreSQL log entry, for example, is a map with the same keys it has in
+  the JSON entry.
+
+The records are exported in the background, at the log level of the
+component, in batches that the `OTEL_BLRP_*` environment variables can tune.
+When the collector is unreachable or cannot keep up, the records that don't
+fit in the queue are dropped, so that the export never slows down
+PostgreSQL; the standard output still contains them. Before exiting, each
+process waits up to five seconds for the queued records to be exported: the
+records written after that point, such as the last ones of an online upgrade
+of the instance manager, are only on the standard output.
