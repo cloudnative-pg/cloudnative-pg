@@ -465,6 +465,7 @@ var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
 		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
 		dbMock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
 		dbMock.ExpectCommit()
+		dbMock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{"name", "grantor", "admin", "inherit", "set"}))
 
 		expiration := time.Now().Add(1008 * time.Hour).UTC().Truncate(time.Second)
 		role := newTestDatabaseRole()
@@ -489,7 +490,11 @@ var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
 			WithObjects(role, secret).
 			WithStatusSubresource(&apiv1.DatabaseRole{}).
 			Build()
-		r := &DatabaseRoleReconciler{Client: cli, instance: &fakeRoleInstance{db: db}}
+		r := &DatabaseRoleReconciler{
+			Client:                  cli,
+			instance:                &fakeRoleInstance{db: db},
+			getPostgresMajorVersion: func() (int, error) { return 16, nil },
+		}
 
 		_, err = r.reconcileRole(context.Background(), role)
 		Expect(err).NotTo(HaveOccurred())
@@ -502,6 +507,148 @@ var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
 			HavePrefix("CREATE ROLE"),
 			ContainSubstring("VALID UNTIL '"+expiration.Format("2006-01-02 15:04:05")),
 		)))
+	})
+})
+
+var _ = Describe("DatabaseRole reconcileRole membership grantors", func() {
+	It("revokes the grant another role made of a membership the role no longer lists", func() {
+		db, dbMock, err := sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+		// The order of attributes and memberships is not what this checks
+		dbMock.MatchExpectationsInOrder(false)
+
+		role := newTestDatabaseRole()
+		dbMock.ExpectQuery("FROM pg_catalog.pg_authid as auth").WillReturnRows(sqlmock.NewRows([]string{
+			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword",
+			"rolvaliduntil", "rolbypassrls", "comment", "xmin", "inroles",
+		}).AddRow(testRoleName, false, true, false, false, false, false, -1, nil, nil, false, nil, 1, []byte(`{foo}`)))
+		dbMock.ExpectExec(`^ALTER ROLE "app_role" `).WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectQuery("pg_get_userbyid\\(am.grantor\\)").
+			WillReturnRows(sqlmock.NewRows([]string{"name", "grantor", "admin", "inherit", "set"}).
+				AddRow("foo", "admin_role", false, true, true))
+		dbMock.ExpectBegin()
+		dbMock.ExpectExec(`^REVOKE "foo" FROM "app_role" GRANTED BY "admin_role"$`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectCommit()
+
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(role).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			Build()
+		r := &DatabaseRoleReconciler{
+			Client:                  cli,
+			instance:                &fakeRoleInstance{db: db},
+			getPostgresMajorVersion: func() (int, error) { return 16, nil },
+		}
+		_, err = r.reconcileRole(context.Background(), role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+})
+
+var _ = Describe("DatabaseRole reconcileRole memberships", func() {
+	It("updates the attributes of an existing role before its memberships", func() {
+		db, dbMock, err := sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+
+		role := newTestDatabaseRole()
+		role.Spec.InRoles = []string{"pg_monitor"}
+
+		dbMock.ExpectQuery("FROM pg_catalog.pg_authid").WillReturnRows(sqlmock.NewRows([]string{
+			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword",
+			"rolvaliduntil", "rolbypassrls", "comment", "xmin", "inroles",
+		}).AddRow(testRoleName, false, true, false, false, false, false, -1, nil, nil, false, nil, 1, nil))
+		dbMock.ExpectExec(`^ALTER ROLE "app_role" `).WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectQuery("FROM pg_catalog.pg_auth_members").
+			WillReturnRows(sqlmock.NewRows([]string{"name", "grantor", "admin", "inherit", "set"}))
+		dbMock.ExpectBegin()
+		dbMock.ExpectExec(`^GRANT "pg_monitor" TO "app_role"$`).WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectCommit()
+
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(role).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			Build()
+		r := &DatabaseRoleReconciler{
+			Client:                  cli,
+			instance:                &fakeRoleInstance{db: db},
+			getPostgresMajorVersion: func() (int, error) { return 16, nil },
+		}
+		_, err = r.reconcileRole(context.Background(), role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+})
+
+var _ = Describe("DatabaseRole reconcileRole roleGrants", func() {
+	reconcileAt := func(role *apiv1.DatabaseRole, db *sql.DB, pgMajorVersion int) error {
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(role).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			Build()
+		r := &DatabaseRoleReconciler{
+			Client:                  cli,
+			instance:                &fakeRoleInstance{db: db},
+			getPostgresMajorVersion: func() (int, error) { return pgMajorVersion, nil },
+		}
+		_, err := r.reconcileRole(context.Background(), role)
+		return err
+	}
+
+	It("creates the role in its inRoles, then grants its roleGrants with their options", func() {
+		db, dbMock, err := sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+
+		role := newTestDatabaseRole()
+		role.Spec.InRoles = []string{"pg_read_all_data"}
+		role.Spec.RoleGrants = []apiv1.RoleGrant{{Name: "pg_monitor", Admin: ptr.To(true), Inherit: ptr.To(false)}}
+
+		dbMock.ExpectQuery("FROM pg_catalog.pg_authid as auth").WillReturnRows(sqlmock.NewRows([]string{
+			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword",
+			"rolvaliduntil", "rolbypassrls", "comment", "xmin", "inroles",
+		}))
+		dbMock.ExpectExec(`^CREATE ROLE "app_role" .* IN ROLE "pg_read_all_data"$`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectQuery("FROM pg_catalog.pg_auth_members").
+			WillReturnRows(sqlmock.NewRows([]string{"name", "grantor", "admin", "inherit", "set"}).
+				AddRow("pg_read_all_data", "postgres", false, true, true))
+		dbMock.ExpectBegin()
+		dbMock.ExpectExec(`^GRANT "pg_monitor" TO "app_role" WITH ADMIN OPTION, INHERIT false$`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectCommit()
+
+		Expect(reconcileAt(role, db, 16)).To(Succeed())
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("rejects the inherit and set options before PostgreSQL 16, before running any statement", func() {
+		db, _, err := sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+
+		role := newTestDatabaseRole()
+		role.Spec.RoleGrants = []apiv1.RoleGrant{{Name: "pg_monitor", Set: ptr.To(false)}}
+
+		Expect(reconcileAt(role, db, 15)).To(MatchError(
+			`the inherit and set options of roleGrants require PostgreSQL 16 or later, and this cluster ` +
+				`runs PostgreSQL 15: remove them from the "pg_monitor" entry`))
+	})
+
+	It("rejects a role listed in both inRoles and roleGrants, before running any statement", func() {
+		db, _, err := sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+
+		role := newTestDatabaseRole()
+		role.Spec.InRoles = []string{"pg_monitor"}
+		role.Spec.RoleGrants = []apiv1.RoleGrant{{Name: "pg_monitor", Admin: ptr.To(true)}}
+
+		Expect(reconcileAt(role, db, 16)).To(MatchError(
+			`role "pg_monitor" is listed in both inRoles and roleGrants: keep it in only one of them`))
 	})
 })
 

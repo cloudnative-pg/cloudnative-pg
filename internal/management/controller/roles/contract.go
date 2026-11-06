@@ -59,6 +59,45 @@ type DatabaseRole struct {
 	transactionID       int64 `json:"-"`
 }
 
+// Membership is a grant of membership in a role, as PostgreSQL records it in
+// pg_auth_members. From PostgreSQL 16, the same membership can be granted by
+// more than one grantor, and a GRANT or REVOKE acts only on the grant of the
+// grantor it names.
+type Membership struct {
+	// Name is the name of the role the membership is in
+	Name string
+	// Grantor is the name of the role that granted the membership
+	Grantor string
+	// Admin is the ADMIN option of the grant
+	Admin *bool
+	// Inherit is the INHERIT option of the grant, nil before PostgreSQL 16
+	Inherit *bool
+	// Set is the SET option of the grant, nil before PostgreSQL 16
+	Set *bool
+}
+
+// hasOptions tells whether the membership sets any option
+func (m Membership) hasOptions() bool {
+	return m.Admin != nil || m.Inherit != nil || m.Set != nil
+}
+
+// MembershipChanges are the grants of membership to make, to change and to
+// revoke for a role to be a member of the roles in its specification, with
+// the options it sets
+type MembershipChanges struct {
+	// Grant lists the memberships to grant, with the options to grant them with
+	Grant []Membership
+	// Update lists the grants to change, with only the options to change
+	Update []Membership
+	// Revoke lists the grants to revoke
+	Revoke []Membership
+}
+
+// isEmpty tells whether there is nothing to change
+func (c MembershipChanges) isEmpty() bool {
+	return len(c.Grant)+len(c.Update)+len(c.Revoke) == 0
+}
+
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
 func (d *DatabaseRole) passwordNeedsUpdating(
 	storedPasswordState map[string]apiv1.PasswordState,

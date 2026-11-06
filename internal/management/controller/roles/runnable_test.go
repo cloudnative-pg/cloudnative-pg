@@ -302,6 +302,9 @@ var _ = Describe("Role synchronizer tests", func() {
 				db:       db,
 			},
 			client: cl,
+			getPostgresMajorVersion: func() (int, error) {
+				return 15, nil
+			},
 		}
 	})
 
@@ -624,8 +627,8 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			noParents := sqlmock.NewRows([]string{"inroles"}).AddRow([]byte(`{}`))
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
+			noParents := membershipRows()
+			mock.ExpectQuery(expectedMembershipStmtBefore16).WithArgs("role_to_test1").WillReturnRows(noParents)
 			mock.ExpectBegin()
 			expectedMembershipExecs := []string{
 				`GRANT "role1" TO "role_to_test1"`,
@@ -661,16 +664,49 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			rows := sqlmock.NewRows([]string{
-				"inroles",
-			}).
-				AddRow([]byte(`{"foo"}`))
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test2").WillReturnRows(rows)
+			rows := membershipRows().AddRow("foo", "postgres", false, nil, nil)
+			mock.ExpectQuery(expectedMembershipStmtBefore16).WithArgs("role_to_test2").WillReturnRows(rows)
 			mock.ExpectBegin()
 
 			mock.ExpectExec(`REVOKE "foo" FROM "role_to_test2"`).
 				WillReturnResult(sqlmock.NewResult(2, 3))
 
+			mock.ExpectCommit()
+
+			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test2": {
+					TransactionID: 11, // defined in the mock query to the DB above
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(rolesWithErrors).To(BeEmpty())
+		})
+
+		It("revokes every grant of a membership, whoever granted it", func(ctx context.Context) {
+			roleSynchronizer.getPostgresMajorVersion = func() (int, error) {
+				return 16, nil
+			}
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:            "role_to_test2",
+						Superuser:       true,
+						Inherit:         ptr.To(true),
+						InRoles:         []string{},
+						Comment:         "This is a role to test with",
+						ConnectionLimit: -1,
+					},
+				},
+			}
+			rows := membershipRows().
+				AddRow("foo", "admin_role", false, true, true).
+				AddRow("foo", "postgres", false, true, true)
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test2").WillReturnRows(rows)
+			mock.ExpectBegin()
+			mock.ExpectExec(`REVOKE "foo" FROM "role_to_test2" GRANTED BY "admin_role"`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(`REVOKE "foo" FROM "role_to_test2" GRANTED BY "postgres"`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
 			mock.ExpectCommit()
 
 			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
@@ -806,8 +842,8 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			}
 
-			noParents := sqlmock.NewRows([]string{"inroles"}).AddRow([]byte(`{}`))
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
+			noParents := membershipRows()
+			mock.ExpectQuery(expectedMembershipStmtBefore16).WithArgs("role_to_test1").WillReturnRows(noParents)
 			mock.ExpectBegin()
 
 			mock.ExpectExec(`GRANT "role1" TO "role_to_test1"`).

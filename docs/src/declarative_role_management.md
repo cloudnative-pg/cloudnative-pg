@@ -25,6 +25,8 @@ Only a `DatabaseRole` can:
 - say **how the password is managed** through a single
   [`password.mode`](#password-authentication) field, instead of a combination
   of `passwordSecret` and `disablePassword`;
+- set the **options of each membership** of the role, such as `inherit` and
+  `set`, through [`roleGrants`](#role-memberships);
 - express role removal through a [reclaim policy](#role-reclaim-policy).
 
 Roles can also be declared inline, in the `managed` stanza of the `Cluster`
@@ -111,7 +113,12 @@ A few points are worth noting:
     conventions.
 3.  The `connectionLimit` attribute defaults to -1, in line with PostgreSQL
     conventions.
-4.  Role membership with `inRoles` defaults to no memberships.
+4.  Role membership with `inRoles`, and with `roleGrants` on a
+    `DatabaseRole`, defaults to no memberships. A membership removed from
+    `inRoles` is revoked whoever granted it: from PostgreSQL 16, where every
+    role holding the `ADMIN` option on a role can grant the same membership
+    again, the operator revokes each of those grants. See
+    [Role memberships](#role-memberships).
 
 ## Example manifest
 
@@ -653,6 +660,108 @@ Alternatively, delete the certificate's Secret to have the operator issue a
 fresh one signed by the current CA.
 :::
 
+## Role memberships
+
+A role can be made a member of other roles in two ways:
+
+- `inRoles` is the simple form: a list of role names, each membership granted
+  with the PostgreSQL defaults. Inline managed roles support it too.
+- `roleGrants` is the form with options, available only on a `DatabaseRole`:
+  one entry per membership, with the `name` of the role and the `admin`,
+  `inherit` and `set` options of the membership. An entry carrying only a
+  `name` is the same as an `inRoles` item.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: cluster-example-dante
+spec:
+  cluster:
+    name: cluster-example
+  name: dante
+  login: true
+  inRoles:
+    - pg_read_all_data
+  roleGrants:
+    - name: app
+      inherit: false
+    - name: pg_monitor
+      admin: true
+```
+
+Here `dante` reads every table through `pg_read_all_data`, acts as `app` only
+after a `SET ROLE app`, and can grant `pg_monitor` to other roles.
+
+The two lists declare the whole membership set of the role: the operator
+grants the memberships that are missing, and revokes those that appear in
+neither list, through `GRANT` and `REVOKE` statements, both when it creates
+the role and on every later change. A role can appear only once: the API
+server rejects a repeated `roleGrants` entry, and a role listed in both
+`inRoles` and `roleGrants` is not applied, with the `DatabaseRole` reporting
+the conflict in its status.
+
+This differs from privileges on shared objects, such as databases and
+schemas, where other actors may legitimately hold grants: the memberships of
+a role belong to its definition, so removing an entry revokes the
+membership.
+
+From PostgreSQL 16, a membership can be granted more than once, by any role
+holding the `admin` option on it, and each grant carries its own options. The
+operator acts on all of them: it revokes every grant of a membership that is
+no longer listed, and sets the options an entry declares on each grant, since
+any of them can give the member what the entry denies.
+
+### Membership options
+
+| Option | Effect | PostgreSQL default | PostgreSQL 14 and 15 | PostgreSQL 16+ |
+|---|---|---|---|---|
+| `admin` | The member can grant membership in the role to other roles, and revoke it from them (`WITH ADMIN OPTION`) | `false` | Supported | Supported |
+| `inherit` | The member inherits the privileges of the role | The `inherit` attribute of the member, when the membership is granted | Not supported | Supported |
+| `set` | The member can switch to the role through `SET ROLE` | `true` | Not supported | Supported |
+
+:::warning
+`admin` is a privileged option: the member can grant the role to any other
+role, and revoke it from them. Set it only on memberships held by roles
+trusted with managing who else is a member.
+:::
+
+An option left out of an entry is **not managed**: PostgreSQL applies its
+default when the membership is granted, and the operator then leaves the
+option as it finds it. Removing an option from an entry therefore does not
+reset it to its default: set it explicitly, for example `admin: false`, to
+change it back.
+
+On PostgreSQL 14 and 15, a `DatabaseRole` setting `inherit` or `set` in
+`roleGrants` is not applied: its status reports `applied: false`, with a
+message naming the entry. The options are not ignored, because before
+PostgreSQL 16 every membership follows the `inherit` attribute of the role
+and always allows `SET ROLE`, and ignoring them would hide that difference.
+
+### `inherit` on the role and on its memberships
+
+How the `inherit` attribute of the role relates to the `inherit` option of
+its memberships depends on the PostgreSQL version:
+
+- On PostgreSQL 14 and 15, memberships have no `inherit` option: the
+  `inherit` attribute of the role decides for all of them at once, and
+  changing it applies to them right away.
+- From PostgreSQL 16, each membership has its own `inherit` option, and the
+  attribute of the role is only its default when the membership is granted:
+  changing the attribute later leaves the existing memberships as they are.
+  The operator changes the attributes of a role before its memberships, so a
+  membership added in the same change takes its default from the new value.
+
+### Revoking a membership other roles depend on
+
+From PostgreSQL 16, a member using its `admin` option to grant the role to
+other roles becomes the grantor of their memberships. Revoking its own
+membership, or its `admin` option, then fails with
+`dependent privileges exist`, and the `DatabaseRole` reports the error in its
+status. The operator does not cascade the revocation, which would also revoke
+memberships it does not manage: revoke the dependent memberships first, and
+the operator applies the change at its next attempt.
+
 ## Role reclaim policy
 
 The `databaseRoleReclaimPolicy` field defines the "final act" of the operator when a
@@ -689,7 +798,8 @@ How you remove a role depends on how it was created:
 Creating a `DatabaseRole` for a role that already exists **adopts** it: the
 operator alters the existing role so that **every** attribute matches the
 manifest, including the attributes you omit, which are forced back to their
-defaults. In particular, memberships not listed in `inRoles` are revoked, an
+defaults. In particular, memberships listed in neither `inRoles` nor
+`roleGrants` are revoked, an
 omitted `connectionLimit` is reset to `-1` (unlimited), and an omitted
 `validUntil` becomes `infinity` if the role had an expiration date. Review
 the current attributes and memberships of a role before adopting it, and do
