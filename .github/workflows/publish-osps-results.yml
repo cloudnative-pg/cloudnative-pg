@@ -46,7 +46,7 @@ jobs:
       security-events: write
     # By tag, not SHA, on purpose: the hub compares the signing certificate's
     # workflow ref to this exact tag and rejects a SHA-pinned call.
-    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@v1 # zizmor: ignore[unpinned-uses] the hub requires the tag
+    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@0cbfef2f58ea147021d3657d7b18ed89920f2f6d # v1 # zizmor: ignore[unpinned-uses] the hub requires the tag
     with:
       target: cloudnative-pg/cloudnative-pg@${{ needs.version.outputs.version }}
       license: CC0-1.0 # SPDX expression the result is published under
