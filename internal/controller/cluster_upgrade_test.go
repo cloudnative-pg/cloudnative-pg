@@ -448,15 +448,16 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.reason).To(ContainSubstring("does not support in-place pod resize"))
 		})
 
-		It("resizes in place when the live resources drift with an aligned annotation", func(ctx SpecContext) {
+		It("leaves alone the live resources changed by other actors", func(ctx SpecContext) {
 			// Build the pod from a deep copy: NewInstance shares the resource
 			// maps of the passed cluster, and mutating them afterwards would
 			// silently change the "live" pod too
 			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Simulate a resize issued outside the operator: the pod spec
-			// changes, the annotation stays aligned with the target
+			// Simulate a resize issued outside the operator, or a mutating
+			// webhook at creation: the pod spec changes, the annotation stays
+			// aligned with the target
 			for i := range pod.Spec.Containers {
 				if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
 					pod.Spec.Containers[i].Resources.Limits["cpu"] = resource.MustParse("4")
@@ -464,26 +465,6 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			}
 
 			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
-			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.canBeResizedInPlace).To(BeTrue())
-		})
-
-		It("never recreates the pod for a drift only present in the live spec", func(ctx SpecContext) {
-			pod, err := specs.NewInstance(ctx, *clusterInPlace.DeepCopy(), 1)
-			Expect(err).ToNot(HaveOccurred())
-
-			// e.g. a mutating webhook raised the memory limit at creation:
-			// a recreated pod would get it again
-			for i := range pod.Spec.Containers {
-				if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
-					pod.Spec.Containers[i].Resources.Limits["memory"] = resource.MustParse("4Gi")
-				}
-			}
-			rollout := isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
-			Expect(rollout.required).To(BeFalse())
-
-			utils.SetPodsResize(false)
-			rollout = isInstanceNeedingRollout(ctx, makeStatus(pod), &clusterInPlace)
 			Expect(rollout.required).To(BeFalse())
 		})
 

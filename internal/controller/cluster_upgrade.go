@@ -802,24 +802,10 @@ func checkPodSpecIsOutdated(
 
 	match, diff := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec)
 	if match {
-		// The stored pod spec is up-to-date. With the in-place strategy the
-		// live resources are still authoritative: a resize applied before a
-		// change of the desired resources was reverted, or issued by an
-		// external actor, leaves the annotation aligned while the running
-		// containers are not.
-		if cluster.GetResourcesUpdateStrategy() != apiv1.ResourcesUpdateStrategyInPlace {
-			return rollout{}, nil
-		}
-		if len(specs.GetLiveContainerResourceDrifts(&pod.Spec, &targetPod.Spec)) == 0 {
-			return rollout{}, nil
-		}
-		// Only a resize can realign the live resources here: this drift was
-		// introduced outside the operator, possibly at admission time (e.g.
-		// by a mutating webhook), and a recreated pod could get it again,
-		// recreating the pod at every reconciliation.
-		if podRollout := evaluateResourcesOnlyDrift(pod, &storedPodSpec, targetPod); podRollout.canBeResizedInPlace {
-			return podRollout, nil
-		}
+		// The stored pod spec is up-to-date. Resources changed on the running
+		// pod by other actors, such as a mutating webhook at admission time,
+		// are left alone as with the recreate strategy: reverting them would
+		// fight that actor, and a recreated pod could get them again.
 		return rollout{}, nil
 	}
 
