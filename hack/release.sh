@@ -116,7 +116,7 @@ sed -i -e "s@1\.[0-9]\+\.[0-9]\+\(-[a-z][a-z0-9]*\)\?@${release_version}@g" docs
 
 # Point the SECURITY-INSIGHTS release URIs and documentation links to the new
 # version. The docs links use the versioned path (e.g. /docs/1.30/) because
-# /docs/current/ is a JavaScript redirect that automated scanners can't follow.
+# /docs/current/ is a client-side redirect that automated scanners can't follow.
 sed -i -e "s@\(/cloudnative-pg/releases/tag/v\)[^/[:space:]]\+@\1${release_version}@" \
     -e "s@\(/cloudnative-pg/refs/tags/v\)[^/]\+\(/releases/cnpg-\)[^/]\+\.yaml@\1${release_version}\2${release_version}.yaml@" \
     -e "s@\(https://cloudnative-pg.io/docs/\)[0-9]\+\.[0-9]\+/@\1${release_branch#release-}/@" \
