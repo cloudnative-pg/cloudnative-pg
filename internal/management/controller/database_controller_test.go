@@ -26,14 +26,12 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -78,7 +76,7 @@ var _ = Describe("Managed Database status", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.DatabaseSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				ReclaimPolicy: apiv1.DatabaseReclaimDelete,
@@ -95,7 +93,7 @@ var _ = Describe("Managed Database status", func() {
 			WithPodName("cluster-example-1").
 			WithClusterName("cluster-example")
 
-		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient = newIndexedFakeClientBuilder().
 			WithObjects(cluster, database).
 			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Database{}).
 			Build()
@@ -344,7 +342,7 @@ var _ = Describe("Managed Database status", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.DatabaseSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				Name:  "db-one",
@@ -396,7 +394,7 @@ var _ = Describe("Managed Database status", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.DatabaseSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				Name:  "db-one",
@@ -574,7 +572,7 @@ var _ = Describe("Managed Database status", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.DatabaseSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				Name:  database.Spec.Name,
@@ -641,6 +639,288 @@ var _ = Describe("Managed Database status", func() {
 		Expect(mapFn(ctx, cluster)).To(ConsistOf(reconcile.Request{
 			NamespacedName: types.NamespacedName{Namespace: database.GetNamespace(), Name: database.GetName()},
 		}))
+	})
+})
+
+var _ = Describe("Cross-Namespace Database reconciliation", func() {
+	var (
+		dbMock     sqlmock.Sqlmock
+		db         *sql.DB
+		database   *apiv1.Database
+		cluster    *apiv1.Cluster
+		r          *DatabaseReconciler
+		fakeClient client.Client
+		err        error
+	)
+
+	BeforeEach(func() {
+		// Cluster in namespace "postgres"
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-cluster",
+				Namespace: "postgres",
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances:                     1,
+				EnableCrossNamespaceResources: true,
+			},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "my-cluster-1",
+				TargetPrimary:  "my-cluster-1",
+			},
+		}
+
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		// Instance manager running in the postgres namespace
+		pgInstance := postgres.NewInstance().
+			WithNamespace("postgres").
+			WithPodName("my-cluster-1").
+			WithClusterName("my-cluster")
+
+		fakeClient = newIndexedFakeClientBuilder().
+			WithObjects(cluster).
+			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Database{}).
+			Build()
+
+		r = &DatabaseReconciler{
+			Client:   fakeClient,
+			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
+			instance: pgInstance,
+			getSuperUserDB: func() (*sql.DB, error) {
+				return db, nil
+			},
+		}
+		r.finalizerReconciler = newFinalizerReconciler(
+			fakeClient,
+			utils.DatabaseFinalizerName,
+			r.evaluateDropDatabase,
+		)
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("reconciles a database from a different namespace referencing this cluster", func(ctx SpecContext) {
+		// Database in namespace "app1" referencing cluster in namespace "postgres"
+		database = &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "mydb",
+				Namespace:  "app1",
+				Generation: 1,
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "postgres",
+				},
+				ReclaimPolicy: apiv1.DatabaseReclaimDelete,
+				Name:          "mydb",
+				Owner:         "app",
+			},
+		}
+		Expect(fakeClient.Create(ctx, database)).To(Succeed())
+
+		// Mock database detection and creation
+		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+		dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+			WillReturnRows(expectedValue)
+
+		expectedCreate := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"CREATE DATABASE %s OWNER %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+			pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
+		Expect(database.GetStatusMessage()).Should(BeEmpty())
+		Expect(database.GetFinalizers()).NotTo(BeEmpty())
+	})
+
+	DescribeTable("skips databases that do not belong to this instance",
+		func(ctx SpecContext, clusterRef apiv1.ClusterObjectReference) {
+			// Database in namespace "app1", while the instance manager is in "postgres"
+			database = &apiv1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "mydb",
+					Namespace:  "app1",
+					Generation: 1,
+				},
+				Spec: apiv1.DatabaseSpec{
+					ClusterRef:    clusterRef,
+					ReclaimPolicy: apiv1.DatabaseReclaimDelete,
+					Name:          "mydb",
+					Owner:         "app",
+				},
+			}
+			Expect(fakeClient.Create(ctx, database)).To(Succeed())
+
+			// Reconciler should skip silently - no SQL operations expected
+			result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: database.Namespace,
+				Name:      database.Name,
+			}})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).Should(BeZero())
+
+			// Verify database status was not updated (still nil Applied)
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Namespace: database.Namespace,
+				Name:      database.Name,
+			}, database)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(database.Status.Applied).Should(BeNil())
+		},
+		Entry("referencing a different cluster",
+			apiv1.ClusterObjectReference{Name: "other-cluster", Namespace: "postgres"}),
+		Entry("referencing a cluster in a different namespace than the instance",
+			apiv1.ClusterObjectReference{Name: "my-cluster", Namespace: "other-namespace"}),
+	)
+
+	Context("when two namespaces claim the same PostgreSQL database", func() {
+		// newTenantDatabase returns a Database in the passed namespace, having the
+		// passed name, managing the "shared" database of this instance's cluster
+		newTenantDatabase := func(namespace, name string) *apiv1.Database {
+			return &apiv1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       name,
+					Namespace:  namespace,
+					Generation: 1,
+				},
+				Spec: apiv1.DatabaseSpec{
+					ClusterRef: apiv1.ClusterObjectReference{
+						Name:      "my-cluster",
+						Namespace: "postgres",
+					},
+					ReclaimPolicy: apiv1.DatabaseReclaimDelete,
+					Name:          "shared",
+					Owner:         "app",
+				},
+			}
+		}
+
+		// createOwner creates a Database that already applied the "shared"
+		// database, as if it had been reconciled before
+		createOwner := func(ctx context.Context, owner *apiv1.Database) {
+			Expect(fakeClient.Create(ctx, owner)).To(Succeed())
+			owner.Status.ObservedGeneration = 1
+			owner.Status.Applied = ptr.To(true)
+			Expect(fakeClient.Status().Update(ctx, owner)).To(Succeed())
+		}
+
+		DescribeTable("rejects the second claim without touching PostgreSQL",
+			func(ctx SpecContext, ownerName, duplicateName string) {
+				owner := newTenantDatabase("app1", ownerName)
+				createOwner(ctx, owner)
+
+				duplicate := newTenantDatabase("app2", duplicateName)
+				Expect(fakeClient.Create(ctx, duplicate)).To(Succeed())
+
+				// No SQL expectation: the duplicate must not reach PostgreSQL
+				Expect(reconcileDatabase(ctx, fakeClient, r, duplicate)).To(Succeed())
+
+				Expect(duplicate.Status.Applied).To(HaveValue(BeFalse()))
+				Expect(duplicate.Status.Message).To(ContainSubstring(
+					fmt.Sprintf("%q is already managed by object", "shared")))
+				Expect(duplicate.Status.ObservedGeneration).To(BeZero())
+			},
+			Entry("having different object names", "owner", "duplicate"),
+			Entry("having the same object name", "shared", "shared"),
+		)
+
+		It("does not drop the database when the rejected claim is deleted", func(ctx SpecContext) {
+			owner := newTenantDatabase("app1", "owner")
+			createOwner(ctx, owner)
+
+			duplicate := newTenantDatabase("app2", "duplicate")
+			Expect(fakeClient.Create(ctx, duplicate)).To(Succeed())
+			Expect(reconcileDatabase(ctx, fakeClient, r, duplicate)).To(Succeed())
+			Expect(duplicate.GetFinalizers()).To(ContainElement(utils.DatabaseFinalizerName))
+
+			// No DROP DATABASE expectation: deleting the duplicate must leave the
+			// database owned by app1 alone
+			Expect(fakeClient.Delete(ctx, duplicate)).To(Succeed())
+			_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(duplicate)})
+			Expect(err).ToNot(HaveOccurred())
+
+			err = fakeClient.Get(ctx, client.ObjectKeyFromObject(duplicate), duplicate)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	It("enqueues the Databases of other namespaces on cluster events", func(ctx SpecContext) {
+		mapFn := mapClusterToManagedResources(r.instance, fakeClient,
+			func() client.ObjectList { return &apiv1.DatabaseList{} })
+
+		remote := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{Name: "remote", Namespace: "app1"},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{Name: "my-cluster", Namespace: "postgres"},
+				Name:       "remote",
+			},
+		}
+		// Same cluster name, but in another namespace: not this instance's cluster
+		foreign := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{Name: "foreign", Namespace: "app1"},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{Name: "my-cluster", Namespace: "elsewhere"},
+				Name:       "foreign",
+			},
+		}
+		Expect(fakeClient.Create(ctx, remote)).To(Succeed())
+		Expect(fakeClient.Create(ctx, foreign)).To(Succeed())
+
+		Expect(mapFn(ctx, cluster)).To(ConsistOf(reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(remote),
+		}))
+	})
+
+	It("reconciles same-namespace databases even when cross-namespace is enabled", func(ctx SpecContext) {
+		// Database in same namespace as cluster (no namespace specified in clusterRef)
+		database = &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "mydb",
+				Namespace:  "postgres",
+				Generation: 1,
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name: "my-cluster",
+					// Namespace is empty, defaults to database's namespace
+				},
+				ReclaimPolicy: apiv1.DatabaseReclaimDelete,
+				Name:          "mydb",
+				Owner:         "app",
+			},
+		}
+		Expect(fakeClient.Create(ctx, database)).To(Succeed())
+
+		// Mock database detection and creation
+		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+		dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+			WillReturnRows(expectedValue)
+
+		expectedCreate := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"CREATE DATABASE %s OWNER %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+			pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
+		Expect(database.GetStatusMessage()).Should(BeEmpty())
+		Expect(database.GetFinalizers()).NotTo(BeEmpty())
 	})
 })
 

@@ -1031,6 +1031,8 @@ var _ = Describe("Managed Roles", func() {
 			},
 		}
 		Expect(cluster.ContainsManagedRolesConfiguration()).To(BeTrue())
+		Expect(cluster.ContainsManagedRole("test_user")).To(BeTrue())
+		Expect(cluster.ContainsManagedRole("another_user")).To(BeFalse())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeTrue())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets1")).To(BeFalse())
 		Expect(cluster.Spec.Managed.Roles[0].GetRoleInherit()).To(BeTrue())
@@ -1042,6 +1044,7 @@ var _ = Describe("Managed Roles", func() {
 			Spec: ClusterSpec{},
 		}
 		Expect(cluster.ContainsManagedRolesConfiguration()).To(BeFalse())
+		Expect(cluster.ContainsManagedRole("test_user")).To(BeFalse())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeFalse())
 	})
 })
@@ -1824,6 +1827,22 @@ var _ = Describe("GetServiceAccountName", func() {
 		}
 		Expect(cluster.GetServiceAccountName()).To(Equal("my-cluster"))
 	})
+})
+
+var _ = Describe("AcceptsReferencesFrom", func() {
+	DescribeTable("tells whether the objects of a namespace may target the cluster",
+		func(enableCrossNamespaceResources bool, namespace string, expected bool) {
+			cluster := &Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "postgres"},
+				Spec:       ClusterSpec{EnableCrossNamespaceResources: enableCrossNamespaceResources},
+			}
+			Expect(cluster.AcceptsReferencesFrom(namespace)).To(Equal(expected))
+		},
+		Entry("own namespace, feature disabled", false, "postgres", true),
+		Entry("own namespace, feature enabled", true, "postgres", true),
+		Entry("other namespace, feature disabled", false, "app", false),
+		Entry("other namespace, feature enabled", true, "app", true),
+	)
 })
 
 var _ = Describe("RecoveryTarget.BuildPostgresOptions", func() {

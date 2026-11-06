@@ -48,7 +48,7 @@ func (r *DatabaseRoleReconciler) getReferencedCluster(
 ) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
 	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: role.Namespace,
+		Namespace: role.GetClusterNamespace(),
 		Name:      role.Spec.ClusterRef.Name,
 	}, &cluster); apierrs.IsNotFound(err) {
 		log.FromContext(ctx).Info("cluster not found, will retry when it appears",
@@ -58,6 +58,19 @@ func (r *DatabaseRoleReconciler) getReferencedCluster(
 		return nil, fmt.Errorf("while getting cluster %q: %w", role.Spec.ClusterRef.Name, err)
 	}
 	return &cluster, nil
+}
+
+// crossNamespaceRefusal returns why the passed cluster does not serve a role
+// living in another namespace, or an empty string when it does. A cluster that
+// did not opt into cross-namespace resources must not hand out credentials,
+// passwords or certificates signed by its CA, to the roles of other namespaces.
+func crossNamespaceRefusal(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) string {
+	if cluster.AcceptsReferencesFrom(role.Namespace) {
+		return ""
+	}
+	return fmt.Sprintf(
+		"cluster %q in namespace %q does not have enableCrossNamespaceResources set to true",
+		cluster.Name, cluster.Namespace)
 }
 
 // deleteOwnedSecret deletes a Secret the operator generated for the role. It

@@ -22,7 +22,6 @@ package v1
 import (
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -59,8 +58,14 @@ func (roleList *DatabaseRoleList) MustHaveManagedResourceExclusivity(role *Datab
 }
 
 // GetClusterRef returns the cluster reference of the role
-func (r *DatabaseRole) GetClusterRef() corev1.LocalObjectReference {
+func (r *DatabaseRole) GetClusterRef() ClusterObjectReference {
 	return r.Spec.ClusterRef
+}
+
+// GetClusterNamespace returns the namespace of the referenced cluster.
+// If not specified, defaults to the DatabaseRole's namespace.
+func (r *DatabaseRole) GetClusterNamespace() string {
+	return r.Spec.ClusterRef.namespaceOrDefault(r.Namespace)
 }
 
 // GetManagedObjectName returns the name of the managed role object

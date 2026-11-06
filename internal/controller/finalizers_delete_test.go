@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,12 +28,28 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// testDeletionClusterName is the name of the cluster whose deletion is notified
+// to the owned resources of these tests
+const testDeletionClusterName = "cluster"
+
+// newClusterIndexedFakeClientBuilder returns a builder registering the same
+// cluster index the manager creates, which the reconcilers query to find the
+// resources of a cluster in any namespace
+func newClusterIndexedFakeClientBuilder(scheme *runtime.Scheme) *fake.ClientBuilder {
+	builder := fake.NewClientBuilder().WithScheme(scheme)
+	for _, obj := range clusterindex.IndexedObjects() {
+		builder = builder.WithIndex(obj, clusterindex.Key, clusterindex.IndexByCluster)
+	}
+	return builder
+}
 
 //nolint:dupl
 var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
@@ -51,7 +66,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 		}
 		namespacedName = types.NamespacedName{
 			Namespace: "test",
-			Name:      "cluster",
+			Name:      testDeletionClusterName,
 		}
 	})
 
@@ -68,8 +83,8 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.DatabaseSpec{
 						Name: "db-test",
-						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+						ClusterRef: apiv1.ClusterObjectReference{
+							Name: testDeletionClusterName,
 						},
 					},
 					Status: apiv1.DatabaseStatus{
@@ -87,15 +102,15 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.DatabaseSpec{
 						Name: "db-test-2",
-						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+						ClusterRef: apiv1.ClusterObjectReference{
+							Name: testDeletionClusterName,
 						},
 					},
 				},
 			},
 		}
 
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(databaseList).
 			WithStatusSubresource(&databaseList.Items[0], &databaseList.Items[1]).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
@@ -125,7 +140,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 						},
 						Spec: apiv1.DatabaseSpec{
 							Name: "db-test",
-							ClusterRef: corev1.LocalObjectReference{
+							ClusterRef: apiv1.ClusterObjectReference{
 								Name: "another-cluster",
 							},
 						},
@@ -133,7 +148,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 				},
 			}
 
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
+			cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(databaseList).Build()
 			r.Client = cli
 			err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 			Expect(err).ToNot(HaveOccurred())
@@ -159,8 +174,8 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.PublicationSpec{
 						Name: "pub-test",
-						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+						ClusterRef: apiv1.ClusterObjectReference{
+							Name: testDeletionClusterName,
 						},
 					},
 					Status: apiv1.PublicationStatus{
@@ -178,15 +193,15 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.PublicationSpec{
 						Name: "pub-test-2",
-						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+						ClusterRef: apiv1.ClusterObjectReference{
+							Name: testDeletionClusterName,
 						},
 					},
 				},
 			},
 		}
 
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(publicationList).
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(publicationList).
 			WithStatusSubresource(&publicationList.Items[0], &publicationList.Items[1]).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
@@ -215,7 +230,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.PublicationSpec{
 						Name: "pub-test",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: "another-cluster",
 						},
 					},
@@ -223,7 +238,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 			},
 		}
 
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(publicationList).Build()
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(publicationList).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
@@ -249,8 +264,8 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.SubscriptionSpec{
 						Name: "sub-test",
-						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+						ClusterRef: apiv1.ClusterObjectReference{
+							Name: testDeletionClusterName,
 						},
 					},
 					Status: apiv1.SubscriptionStatus{
@@ -268,15 +283,15 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.SubscriptionSpec{
 						Name: "sub-test-2",
-						ClusterRef: corev1.LocalObjectReference{
-							Name: "cluster",
+						ClusterRef: apiv1.ClusterObjectReference{
+							Name: testDeletionClusterName,
 						},
 					},
 				},
 			},
 		}
 
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(subscriptionList).
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(subscriptionList).
 			WithStatusSubresource(&subscriptionList.Items[0], &subscriptionList.Items[1]).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
@@ -305,7 +320,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.SubscriptionSpec{
 						Name: "sub-test",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: "another-cluster",
 						},
 					},
@@ -313,7 +328,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 			},
 		}
 
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(subscriptionList).Build()
+		cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(subscriptionList).Build()
 		r.Client = cli
 		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
@@ -324,6 +339,69 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 		Expect(subscription.Finalizers).To(BeEquivalentTo([]string{utils.SubscriptionFinalizerName}))
 		Expect(subscription.Status.Applied).To(BeNil())
 		Expect(subscription.Status.Message).ToNot(ContainSubstring("not reconciled"))
+	})
+
+	Context("with databases living outside the namespace of the cluster", func() {
+		newDatabase := func(name string, clusterRef apiv1.ClusterObjectReference) apiv1.Database {
+			return apiv1.Database{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{utils.DatabaseFinalizerName},
+					Name:       name,
+					Namespace:  "app",
+				},
+				Spec: apiv1.DatabaseSpec{
+					Name:       "db-test",
+					ClusterRef: clusterRef,
+				},
+				Status: apiv1.DatabaseStatus{
+					Applied: ptr.To(true),
+				},
+			}
+		}
+
+		It("sets them as failed and deletes their finalizers", func(ctx SpecContext) {
+			databaseList := &apiv1.DatabaseList{
+				Items: []apiv1.Database{
+					newDatabase("db-cross", apiv1.ClusterObjectReference{
+						Name:      testDeletionClusterName,
+						Namespace: "test",
+					}),
+				},
+			}
+
+			cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(databaseList).
+				WithStatusSubresource(&databaseList.Items[0]).Build()
+			r.Client = cli
+			Expect(r.notifyDeletionToOwnedResources(ctx, namespacedName)).To(Succeed())
+
+			database := &apiv1.Database{}
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(&databaseList.Items[0]), database)).To(Succeed())
+			Expect(database.Finalizers).To(BeZero())
+			Expect(database.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(database.Status.Message).To(ContainSubstring("cluster resource has been deleted"))
+		})
+
+		It("leaves alone the ones referring to a cluster of the same name in their namespace",
+			func(ctx SpecContext) {
+				// The reference has no namespace, so it resolves to "app", the
+				// namespace of the Database, and not to the deleted cluster
+				databaseList := &apiv1.DatabaseList{
+					Items: []apiv1.Database{
+						newDatabase("db-homonym", apiv1.ClusterObjectReference{Name: testDeletionClusterName}),
+					},
+				}
+
+				cli := newClusterIndexedFakeClientBuilder(scheme).WithLists(databaseList).
+					WithStatusSubresource(&databaseList.Items[0]).Build()
+				r.Client = cli
+				Expect(r.notifyDeletionToOwnedResources(ctx, namespacedName)).To(Succeed())
+
+				database := &apiv1.Database{}
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(&databaseList.Items[0]), database)).To(Succeed())
+				Expect(database.Finalizers).To(BeEquivalentTo([]string{utils.DatabaseFinalizerName}))
+				Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+				Expect(database.Status.Message).ToNot(ContainSubstring("cluster resource has been deleted"))
+			})
 	})
 })
 

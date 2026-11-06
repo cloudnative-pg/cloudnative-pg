@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -54,8 +53,14 @@ func (pub *Publication) GetStatusApplied() *bool {
 }
 
 // GetClusterRef returns the cluster reference of the publication
-func (pub *Publication) GetClusterRef() corev1.LocalObjectReference {
+func (pub *Publication) GetClusterRef() ClusterObjectReference {
 	return pub.Spec.ClusterRef
+}
+
+// GetClusterNamespace returns the namespace of the referenced cluster.
+// If not specified, defaults to the Publication's namespace.
+func (pub *Publication) GetClusterNamespace() string {
+	return pub.Spec.ClusterRef.namespaceOrDefault(pub.Namespace)
 }
 
 // GetManagedObjectName returns the name of the managed publication object
