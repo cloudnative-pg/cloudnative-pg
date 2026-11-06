@@ -1,0 +1,37 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: streaming-retry-replica
+spec:
+  instances: 1
+
+  bootstrap:
+    pg_basebackup:
+      source: streaming-retry-source
+
+  replica:
+    enabled: true
+    source: streaming-retry-source
+    # The designated primary replays the WAL one minute after the source wrote
+    # it, so the archive always has the next WAL file it needs
+    minApplyDelay: 1m
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  externalClusters:
+    - name: streaming-retry-source
+      connectionParameters:
+        host: streaming-retry-source-rw
+        user: streaming_retry
+        dbname: app
+        port: "5432"
+      password:
+        name: streaming-retry-source-app
+        key: password
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: streaming-retry-source
+          serverName: streaming-retry-source
