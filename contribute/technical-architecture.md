@@ -183,7 +183,8 @@ client certificate, so that the kubelet can reach the probes:
 | Port | Endpoints | Callers | Authentication |
 | --- | --- | --- | --- |
 | `8000` (HTTPS) | `/healthz`, `/readyz`, `/startupz` | Kubelet | None (TLS only) |
-| `8000` (HTTPS) | `/pg/status`, `/failsafe` | Operator, `kubectl cnpg status` through the API server proxy | None (TLS only) |
+| `8000` (HTTPS) | `/pg/status` | Operator, `kubectl cnpg status` through the API server proxy | None (TLS only) |
+| `8000` (HTTPS) | `/failsafe` | The Instance Manager of the primary, for the primary isolation check | None (TLS only) |
 | `8000` (HTTPS) | `/pg/mode/backup`, `/pg/controldata`, `/pg/archive/partial`, `/update` | Operator | Client certificate whose public key fingerprint matches `status.operatorCertificateFingerprint` |
 | `8010` (HTTP, `localhost` only) | `/pg/backup`, `/cache/`, `/cluster/status/condition/wal/archive` | `manager` subcommands inside the Pod, such as `manager backup` and WAL archiving | None |
 | `9187` (HTTP, or HTTPS with `.spec.monitoring.tls.enabled`) | `/metrics` | Prometheus | None |
