@@ -42,6 +42,9 @@ var haveSCC bool
 // haveVolumeSnapshot stores the result of the VolumeSnapshotExist function
 var haveVolumeSnapshot bool
 
+// havePodsResize stores the result of the DetectPodsResize check
+var havePodsResize bool
+
 // olmPlatform specifies whether we are running on a platform with OLM support
 var olmPlatform bool
 
@@ -173,6 +176,30 @@ func SetVolumeSnapshot(value bool) {
 // having the VolumeSnapshot CRD
 func HaveVolumeSnapshot() bool {
 	return haveVolumeSnapshot
+}
+
+// DetectPodsResize connects to the discovery API and finds out if
+// the API server exposes the resize subresource of the pods
+// (in-place pod resize, Kubernetes 1.33+)
+func DetectPodsResize(client discovery.DiscoveryInterface) (err error) {
+	havePodsResize, err = resourceExist(client, "v1", "pods/resize")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetPodsResize sets the havePodsResize variable to a specific value for testing purposes
+// IMPORTANT: use it only in the unit tests
+func SetPodsResize(value bool) {
+	havePodsResize = value
+}
+
+// HavePodsResize returns true if the API server exposes the resize
+// subresource of the pods
+func HavePodsResize() bool {
+	return havePodsResize
 }
 
 // PodMonitorExist tries to find the PodMonitor resource in the current cluster
