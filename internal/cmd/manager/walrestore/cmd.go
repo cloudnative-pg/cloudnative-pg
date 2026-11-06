@@ -92,6 +92,9 @@ func NewCmd() *cobra.Command {
 					"end-of-wal-stream flag found." +
 						"Exiting with error once to let Postgres try switching to streaming replication")
 				return err
+			case errors.Is(err, ErrStreamingRetry):
+				// Already logged, and PostgreSQL must try streaming right away
+				return err
 			case errors.Is(err, barmanRestorer.ErrConnectivity):
 				// Barman reports transient network errors with exit code 2
 				// starting from 3.20.0
@@ -134,6 +137,11 @@ func run(ctx context.Context, pgData string, podName string, rewindMode bool, ar
 	// Validate timeline history files before any restore attempt (plugin or in-tree)
 	// to ensure replicas don't download future timeline history files
 	if err := validateTimelineHistoryFile(ctx, walName, cluster, podName); err != nil {
+		return err
+	}
+
+	// Before any plugin is called, so that every plugin gets this behavior
+	if err := checkStreamingRetry(ctx, cluster, podName, pgData, walName, rewindMode); err != nil {
 		return err
 	}
 

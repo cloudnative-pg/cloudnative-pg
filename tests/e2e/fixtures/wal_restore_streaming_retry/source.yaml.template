@@ -1,0 +1,28 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: streaming-retry-source
+spec:
+  instances: 1
+
+  postgresql:
+    pg_hba:
+      - host replication streaming_retry all md5
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: streaming_retry
+      postInitApplicationSQL:
+        - ALTER ROLE streaming_retry REPLICATION
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  # The ObjectStore is created by the test
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: streaming-retry-source
