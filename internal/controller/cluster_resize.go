@@ -45,7 +45,10 @@ var errInPlaceResizeRejected = errors.New("in-place pod resize rejected")
 // pod through the resize subresource, then refreshes the pod spec annotation
 // so that the drift detection quiesces. A failure to refresh the annotation
 // is tolerated: the next reconciliation finds the live resources already
-// up-to-date and only repairs the annotation.
+// up-to-date and only repairs the annotation. If the cluster resources are
+// reverted before that, the stale annotation matches the target again and
+// the pod keeps the resized values until the next change of the cluster
+// resources.
 func (r *ClusterReconciler) resizeInstanceInPlace(
 	ctx context.Context,
 	cluster *apiv1.Cluster,

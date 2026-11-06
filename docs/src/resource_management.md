@@ -200,15 +200,6 @@ Entries that Kubernetes adds when a pod is created, such as requests
 defaulted from the limits or defaults coming from a `LimitRange`, are not
 considered a drift from the `Cluster` specification.
 
-:::warning
-With `resourcesUpdateStrategy: inPlace`, the operator treats the resources of
-the running pods as declarative: a resize applied to an instance pod by any
-other actor is reverted to match `spec.resources` of the `Cluster`, whenever
-this is possible in place (a pod is never recreated for this reason). Do not
-point an in-place vertical autoscaler at the instance pods of a cluster using
-this strategy.
-:::
-
 PostgreSQL benefits from an in-place memory increase right away: the kernel
 page cache can grow within the new limit, caching more relation data, and
 the backends gain headroom for their working memory. What does not adapt
@@ -254,8 +245,7 @@ Do not use `updateMode: Auto`, `Recreate`, `InPlaceOrRecreate`, or `Initial`
 against a CloudNativePG-managed `Cluster`. The operator owns the pod
 specification and treats `spec.resources` of the `Cluster` as the source of
 truth: it does not adopt the resources VPA writes onto a running pod, so the
-live pod and the declared `spec.resources` silently diverge (and with
-`resourcesUpdateStrategy: inPlace` the operator actively reverts them). Any tuning you sized against the
+live pod and the declared `spec.resources` silently diverge. Any tuning you sized against the
 declared resources (for example a `shared_buffers` value the operator
 validated against the memory request) no longer matches the pod's actual
 limits. VPA also evicts pods through the Kubernetes eviction API, bypassing
