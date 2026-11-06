@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -47,6 +50,7 @@ var _ = Describe("In-place resize of an instance pod", func() {
 	var cluster *apiv1.Cluster
 	var pod *corev1.Pod
 	var recorder *record.FakeRecorder
+	var rm *rolloutManager.Manager
 
 	BeforeEach(func(ctx SpecContext) {
 		cluster = &apiv1.Cluster{
@@ -83,16 +87,19 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		recorder = record.NewFakeRecorder(120)
 	})
 
-	newReconciler := func(funcs interceptor.Funcs) *ClusterReconciler {
+	newReconciler := func(funcs interceptor.Funcs, otherPods ...k8client.Object) *ClusterReconciler {
 		fakeClient := fake.NewClientBuilder().
 			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
-			WithObjects(pod).
+			WithObjects(append(otherPods, pod, cluster)...).
+			WithStatusSubresource(&apiv1.Cluster{}).
 			WithInterceptorFuncs(funcs).
 			Build()
 
+		rm = rolloutManager.New(time.Hour, 0)
 		return &ClusterReconciler{
-			Client:   fakeClient,
-			Recorder: recorder,
+			Client:         fakeClient,
+			Recorder:       recorder,
+			rolloutManager: rm,
 		}
 	}
 
@@ -265,5 +272,44 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		err := r.resizeInstanceInPlace(ctx, cluster, pod, "unit test")
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, errInPlaceResizeRejected)).To(BeFalse())
+	})
+
+	When("the cluster supports the resize subresource", func() {
+		BeforeEach(func() {
+			utils.SetPodsResize(true)
+			DeferCleanup(utils.SetPodsResize, false)
+		})
+
+		It("resizes every instance with no rollout slot and no switchover", func(ctx SpecContext) {
+			replica, err := specs.NewInstance(ctx, *cluster.DeepCopy(), 2)
+			Expect(err).ToNot(HaveOccurred())
+			cluster.Spec.Instances = 2
+			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
+			cluster.Status.Instances = 2
+			cluster.Status.CurrentPrimary = pod.Name
+			cluster.Status.TargetPrimary = pod.Name
+			r := newReconciler(interceptor.Funcs{}, replica)
+
+			makeStatus := func(p *corev1.Pod) postgres.PostgresqlStatus {
+				return postgres.PostgresqlStatus{Pod: p, IsPodReady: true, ExecutableHash: "test_hash"}
+			}
+			cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+			restarted, err := r.rolloutRequiredInstances(ctx, cluster, &postgres.PostgresqlStatusList{
+				Items: []postgres.PostgresqlStatus{makeStatus(pod), makeStatus(replica)},
+			})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(restarted).To(BeFalse())
+			Expect(cluster.Status.TargetPrimary).To(Equal(pod.Name))
+
+			for _, instance := range []*corev1.Pod{pod, replica} {
+				var currentPod corev1.Pod
+				Expect(r.Get(ctx, k8client.ObjectKeyFromObject(instance), &currentPod)).To(Succeed())
+				Expect(getPostgresResources(&currentPod.Spec).Limits["cpu"]).To(Equal(resource.MustParse("2")))
+			}
+
+			otherCluster := k8client.ObjectKey{Namespace: cluster.Namespace, Name: "other-cluster"}
+			Expect(rm.CoordinateRollout(otherCluster, "other-cluster-1").RolloutAllowed).To(BeTrue(),
+				"an in-place resize must not consume the rollout slot")
+		})
 	})
 })

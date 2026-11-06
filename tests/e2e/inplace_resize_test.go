@@ -92,8 +92,13 @@ var _ = Describe("In-place resource updates", Label(tests.LabelPostgresConfigura
 
 		originalPodUIDs := make(map[string]types.UID)
 		originalRestartCounts := make(map[string]int32)
+		var originalPrimary string
 
 		By("gathering the current pods", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			originalPrimary = cluster.Status.CurrentPrimary
+
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(podList.Items).To(HaveLen(3))
@@ -164,6 +169,12 @@ var _ = Describe("In-place resource updates", Label(tests.LabelPostgresConfigura
 					g.Expect(containerStatus.RestartCount).To(Equal(originalRestartCounts[pod.Name]),
 						"container of pod %s has been restarted", pod.Name)
 				}
+
+				// a switchover keeps both the pods and their containers
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(cluster.Status.CurrentPrimary).To(Equal(originalPrimary), "a switchover happened")
+				g.Expect(cluster.Status.TargetPrimary).To(Equal(originalPrimary), "a switchover happened")
 			}, 30, 5).Should(Succeed())
 
 			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
