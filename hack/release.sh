@@ -114,9 +114,12 @@ sed -i -e "s@\(release-[0-9.]\+\|main\)/releases/cnpg-[0-9.]\+\(-rc.*\)\?.yaml@$
 
 sed -i -e "s@1\.[0-9]\+\.[0-9]\+\(-[a-z][a-z0-9]*\)\?@${release_version}@g" docs/src/kubectl-plugin.md
 
-# Point the SECURITY-INSIGHTS release URIs to the new version
+# Point the SECURITY-INSIGHTS release URIs and documentation links to the new
+# version. The docs links use the versioned path (e.g. /docs/1.30/) because
+# /docs/current/ is a JavaScript redirect that automated scanners can't follow.
 sed -i -e "s@\(/cloudnative-pg/releases/tag/v\)[^/[:space:]]\+@\1${release_version}@" \
     -e "s@\(/cloudnative-pg/refs/tags/v\)[^/]\+\(/releases/cnpg-\)[^/]\+\.yaml@\1${release_version}\2${release_version}.yaml@" \
+    -e "s@\(https://cloudnative-pg.io/docs/\)[0-9]\+\.[0-9]\+/@\1${release_branch#release-}/@" \
     -e "s@^\(  last-updated: \).*@\1'$(date +%F)'@" \
     SECURITY-INSIGHTS.yml
 
