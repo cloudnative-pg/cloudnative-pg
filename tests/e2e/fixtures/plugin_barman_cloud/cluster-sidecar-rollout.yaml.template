@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-sidecar-rollout
+spec:
+  instances: 2
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
