@@ -1868,12 +1868,21 @@ func (r *ClusterReconciler) checkReadyForRecovery(
 				"backupPhase", backup.Status.Phase)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
+		// An online volume snapshot backup doesn't snapshot the WAL storage, and
+		// recovering it always requires the WAL archive
+		if backup.IsCompletedVolumeSnapshot() && backup.Status.GetOnline() &&
+			cluster.Spec.Bootstrap.Recovery.Source == "" {
+			contextLogger.Info("The source backup is an online volume snapshot backup, a recovery source "+
+				"is required to fetch the WAL files from the archive, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
 	}
 
 	volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
 	if volumeSnapshotsRecovery != nil {
 		status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
-			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
+			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery, cluster.ShouldCreateWalArchiveVolume())
 		if err != nil {
 			return ctrl.Result{}, err
 		}

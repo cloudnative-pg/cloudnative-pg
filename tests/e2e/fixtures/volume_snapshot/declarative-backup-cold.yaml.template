@@ -1,0 +1,10 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: cluster-declarative-backup-cold
+spec:
+  method: volumeSnapshot
+  # A cold backup snapshots the WAL volume too.
+  online: false
+  cluster:
+    name: cluster-declarative-backup

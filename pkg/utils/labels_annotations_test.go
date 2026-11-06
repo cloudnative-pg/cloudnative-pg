@@ -210,3 +210,17 @@ var _ = Describe("Password passthrough annotation", func() {
 		Expect(IsPasswordPassthroughEnabled(objectMeta)).To(BeTrue())
 	})
 })
+
+var _ = Describe("Online backup snapshot detection", func() {
+	DescribeTable("IsOnlineBackupSnapshot",
+		func(annotations map[string]string, expected bool) {
+			Expect(IsOnlineBackupSnapshot(&metav1.ObjectMeta{Annotations: annotations})).To(Equal(expected))
+		},
+		Entry("true", map[string]string{IsOnlineBackupLabelName: "true"}, true),
+		Entry("true, in a different case", map[string]string{IsOnlineBackupLabelName: "True"}, true),
+		Entry("false", map[string]string{IsOnlineBackupLabelName: "false"}, false),
+		Entry("an invalid value", map[string]string{IsOnlineBackupLabelName: "yes"}, false),
+		Entry("a missing annotation", map[string]string{}, false),
+		Entry("nil annotations", nil, false),
+	)
+})

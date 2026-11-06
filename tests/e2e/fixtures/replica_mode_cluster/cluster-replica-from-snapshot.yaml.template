@@ -25,10 +25,6 @@ spec:
           name: ${REPLICA_CLUSTER_SNAPSHOT_NAME_PGDATA}
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
-        walStorage:
-          name: ${REPLICA_CLUSTER_SNAPSHOT_NAME_PGWAL}
-          kind: VolumeSnapshot
-          apiGroup: snapshot.storage.k8s.io
 
   externalClusters:
     - name: cluster-replica-src

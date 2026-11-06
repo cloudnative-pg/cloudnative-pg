@@ -561,6 +561,14 @@ func IsPasswordPassthroughEnabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[PasswordPassthroughAnnotationName] == string(annotationStatusEnabled)
 }
 
+// IsOnlineBackupSnapshot reports whether the given VolumeSnapshot's metadata
+// tells that it belongs to an online backup. A missing or invalid value means
+// it doesn't.
+func IsOnlineBackupSnapshot(object *metav1.ObjectMeta) bool {
+	online, err := strconv.ParseBool(object.Annotations[IsOnlineBackupLabelName])
+	return err == nil && online
+}
+
 // GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map
 func GetInstanceRole(labels map[string]string) (string, bool) {
 	if value := labels[ClusterRoleLabelName]; value != "" {

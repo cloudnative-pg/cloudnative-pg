@@ -143,7 +143,8 @@ var _ = Describe("Verify Volume Snapshot",
 							g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
 								"Backup should be completed correctly, error message is '%s'",
 								backup.Status.Error)
-							g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+							// 1 snapshot: PGDATA only, the online backup skips the WAL volume.
+							g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(1))
 						}
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
 				})
@@ -273,7 +274,8 @@ var _ = Describe("Verify Volume Snapshot",
 							BeEquivalentTo(apiv1.BackupPhaseCompleted),
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
-						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+						// 1 snapshot: PGDATA only, the online backup skips the WAL volume.
+						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(1))
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
 				})
 
@@ -391,8 +393,11 @@ var _ = Describe("Verify Volume Snapshot",
 			const (
 				clusterToBackupFilePath  = filesDir + "/declarative-backup-cluster.yaml.template"
 				clusterToRestoreFilePath = filesDir + "/declarative-backup-cluster-restore.yaml.template"
+				clusterToRestoreNoWal    = filesDir + "/declarative-backup-cluster-restore-no-wal.yaml.template"
 				backupFileFilePath       = filesDir + "/declarative-backup.yaml.template"
 				backupPrimaryFilePath    = filesDir + "/declarative-backup-on-primary.yaml.template"
+				backupColdFilePath       = filesDir + "/declarative-backup-cold.yaml.template"
+				clusterToRestoreColdPath = filesDir + "/declarative-backup-cluster-cold-restore.yaml.template"
 			)
 
 			// database constants
@@ -449,13 +454,15 @@ var _ = Describe("Verify Volume Snapshot",
 				clusterToBackupName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
 
+				setupPluginObjectStore(namespace, clusterToBackupName)
+
 				By("creating the cluster on which to execute the backup", func() {
 					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToBackupName, clusterToBackupFilePath)
 					clusterasserts.AssertClusterIsReady(env, namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadySlow])
 				})
 			})
 
-			It("can create a declarative cold backup and restoring using it", func() {
+			It("can create a declarative online backup and restoring using it", func() {
 				By("inserting test data", func() {
 					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
@@ -529,7 +536,86 @@ var _ = Describe("Verify Volume Snapshot",
 					}
 					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 				})
+
+				clusterToRestoreNoWalName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterToRestoreNoWal)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("restoring the same backup in a cluster without a separate WAL volume", func() {
+					resources.CreateResourceFromFile(env, namespace, clusterToRestoreNoWal)
+					clusterasserts.AssertClusterIsReady(env, namespace,
+						clusterToRestoreNoWalName,
+						testTimeouts[timeouts.ClusterIsReady])
+				})
+
+				By("checking that the data is present on the cluster without a separate WAL volume", func() {
+					tableLocator := pgasserts.TableLocator{
+						Namespace:   namespace,
+						ClusterName: clusterToRestoreNoWalName,
+						TableName:   tableName,
+					}
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+				})
 			})
+			It("can create a declarative cold backup and restore it without a WAL archive", func() {
+				const coldTableName = "test_cold"
+
+				By("inserting test data", func() {
+					pgasserts.AssertCreateTestData(env, pgasserts.TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToBackupName,
+						DatabaseName: postgres.AppDBName,
+						TableName:    coldTableName,
+					})
+				})
+
+				backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupColdFilePath)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("executing the cold backup", func() {
+					Expect(resources.CreateResourcesFromFileWithError(env, namespace, backupColdFilePath)).To(Succeed())
+				})
+
+				var backup apiv1.Backup
+				By("waiting the backup to complete", func() {
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace},
+							&backup)).To(Succeed())
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
+					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
+				})
+
+				By("checking that the WAL volume was snapshotted", func() {
+					// 2 snapshots: PGDATA and the WAL volume, a cold backup does not skip it.
+					Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+					Expect(backup.Status.BackupLabelFile).To(BeEmpty())
+				})
+
+				By("restoring from both snapshots, without any recovery source", func() {
+					clusterToBackup, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterToBackupName)
+					Expect(err).ToNot(HaveOccurred())
+					snapshotList := getAndVerifySnapshots(clusterToBackup, backup)
+					Expect(storage.SetSnapshotTemplateVariables(&snapshotList, &backup,
+						storage.SnapshotTemplateVariables{
+							DataSnapshot: snapshotDataEnv,
+							WalSnapshot:  snapshotWalEnv,
+						})).To(Succeed())
+
+					clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterToRestoreColdPath)
+					Expect(err).ToNot(HaveOccurred())
+					resources.CreateResourceFromFile(env, namespace, clusterToRestoreColdPath)
+					clusterasserts.AssertClusterIsReady(env, namespace, clusterToRestoreName,
+						testTimeouts[timeouts.ClusterIsReady])
+
+					pgasserts.AssertDataExpectedCount(env, pgasserts.TableLocator{
+						Namespace:   namespace,
+						ClusterName: clusterToRestoreName,
+						TableName:   coldTableName,
+					}, 2)
+				})
+			})
+
 			It("can take a snapshot targeting the primary", func() {
 				backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupPrimaryFilePath)
 				Expect(err).ToNot(HaveOccurred())
@@ -794,7 +880,8 @@ var _ = Describe("Verify Volume Snapshot",
 						g.Expect(backupTaken.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
 							"Backup should be completed correctly, error message is '%s'",
 							backupTaken.Status.Error)
-						g.Expect(backupTaken.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+						// 1 snapshot: PGDATA only, the online backup skips the WAL volume.
+						g.Expect(backupTaken.Status.BackupSnapshotStatus.Elements).To(HaveLen(1))
 						g.Expect(backupTaken.Status.BackupLabelFile).ToNot(BeEmpty())
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
 				})
@@ -897,16 +984,17 @@ var _ = Describe("Verify Volume Snapshot",
 					matched := 0
 					for _, pvc := range pvcList.Items {
 						if pvc.Labels[utils.ClusterInstanceRoleLabelName] == specs.ClusterRoleLabelReplica &&
-							pvc.Labels[utils.ClusterLabelName] == clusterToSnapshotName {
+							pvc.Labels[utils.ClusterLabelName] == clusterToSnapshotName &&
+							pvc.Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgData) {
 							Expect(pvc.Spec.DataSource.Kind).To(Equal(apiv1.VolumeSnapshotKind))
 							Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(apiv1.VolumeSnapshotKind))
 							matched++
 						}
 					}
-					// Each new replica has both a PGDATA and a WAL PVC (this
-					// cluster configures separate walStorage), so 2 replicas
-					// means 4 matching PVCs, not 2.
-					Expect(matched).To(Equal(4), "expected 4 replica PVCs (PGDATA + WAL, x2 replicas) provisioned from the snapshot")
+					// 2 new replicas, each with a PGDATA PVC cloned from the snapshot.
+					// The WAL PVCs are not counted: the online backup skipped the WAL
+					// volume, so they are created empty.
+					Expect(matched).To(Equal(2), "expected 2 replica PGDATA PVCs provisioned from the snapshot")
 				})
 
 				// Query each replica pod directly: a cluster-wide service
