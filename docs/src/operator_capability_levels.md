@@ -545,6 +545,11 @@ Both quorum-based and priority-based synchronous replication are supported, and
 the operator provides full flexibility in configuring the
 `synchronous_standby_names` setting to match your durability and performance
 requirements.
+The selection of the synchronous standbys can also be restricted to instances
+in a failure domain different from the primary's, such as another availability
+zone, so that a single-zone outage doesn't affect the primary and all its
+synchronous replicas at once. See
+[Failure Domain-Aware Synchronous Replication](replication.md#failure-domain-aware-synchronous-replication).
 
 ### Replica clusters
 
@@ -689,6 +694,12 @@ Because the `Cluster` exposes a label selector through its scale subresource,
 it can also be used as a target for the
 [Vertical Pod Autoscaler](resource_management.md#integration-with-the-vertical-pod-autoscaler-vpa)
 in recommendation-only mode, to obtain sizing suggestions for these values.
+With `.spec.resourcesUpdateStrategy` set to `inPlace`, a change to `resources`
+resizes the running pods through the Kubernetes `pods/resize` subresource
+instead of restarting them, so that, whenever the change can be applied in
+place, no restart or switchover is needed. The pods are recreated, as usual,
+when the change cannot be applied in place. See
+[In-place resource updates](resource_management.md#in-place-resource-updates).
 
 ### Connection pooling with PgBouncer
 
@@ -818,6 +829,24 @@ becomes even more sophisticated: it will actively block a promotion if a quorum
 of replicas cannot verify the transaction state. This prevents accidental data
 loss during complex failure scenarios, such as network partitions affecting
 both the primary and its synchronous standby.
+The primary also stops on its own when it can no longer renew its lease and its
+peers are unreachable, or one of them reports a different target primary, so
+that the time it takes to react follows the time a replica waits before
+promoting. When a primary steps down on a stale lease, the instance manager
+tries a fast shutdown first, which lets the remaining WAL reach the new primary
+whenever possible. See
+[Safe primary election](failover.md#safe-primary-election).
+The primary publishes its position on the lease, so that, during a switchover,
+the new primary promotes only once it has all the data of the previous one: if
+it is still catching up, for example from the WAL archive, it waits and then
+promotes as soon as it is ready. The reason is reported in an event on the
+`Cluster`, and a switchover in progress can be canceled with
+`kubectl cnpg promote --force`. See
+[Promotion held back](failover.md#promotion-held-back).
+A replica that diverged from the timeline of the primary, for example after a
+replica that was not the most advanced one has been promoted, is detected,
+kept out of the read services and of the election, and reported in the status
+of the `Cluster`.
 
 ### Automated recreation of a standby
 

@@ -9,7 +9,7 @@ title: Release notes
 
 History of user-visible changes for CloudNativePG, classified for each minor release.
 
-<!-- - [CloudNativePG 1.31 - Release Candidate](release_notes/v1.31.md) (preview) -->
+- [CloudNativePG 1.31 - Release Candidate](release_notes/v1.31.md) (preview)
 - [CloudNativePG 1.30](release_notes/v1.30.md)
 
 For information on the community support policy for CloudNativePG, please
