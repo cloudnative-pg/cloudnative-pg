@@ -206,6 +206,8 @@ type ImageCatalogRef struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.imageCatalogRef) && has(self.imageName))",message="imageName and imageCatalogRef are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="self.maxSyncReplicas < self.instances",message="maxSyncReplicas must be lower than the number of instances"
+// +kubebuilder:validation:XValidation:rule="!has(self.postgresql) || !has(self.postgresql.synchronous) || self.postgresql.synchronous.number < self.instances + (has(self.postgresql.synchronous.standbyNamesPre) ? self.postgresql.synchronous.standbyNamesPre.size() : 0) + (has(self.postgresql.synchronous.standbyNamesPost) ? self.postgresql.synchronous.standbyNamesPost.size() : 0)",message="the number of synchronous replicas must be less than the total number of instances and the provided standby names"
 
 // ClusterSpec defines the desired state of a PostgreSQL cluster managed by
 // CloudNativePG.
