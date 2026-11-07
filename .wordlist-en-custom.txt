@@ -30,6 +30,7 @@ AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
 BDR
+BRGOVIND
 BUSL
 BackupCapabilities
 BackupConfiguration
@@ -132,6 +133,7 @@ DBAs
 DBaaS
 DISA
 DNS
+DaemonSet
 DataBackupConfiguration
 DataBase
 DataDurabilityLevel
@@ -346,6 +348,7 @@ OLAP
 OLTP
 OOM
 OSPS
+OTLP
 OU
 ObjectMeta
 OnlineConfiguration
@@ -356,6 +359,7 @@ OpenID
 OpenSSF
 OpenSSL
 OpenShift
+OpenTelemetry
 Openshift
 OperatorCapabilities
 OperatorCertificateFingerprint
