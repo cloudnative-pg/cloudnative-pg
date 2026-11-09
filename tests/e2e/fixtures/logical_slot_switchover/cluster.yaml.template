@@ -1,0 +1,19 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: logical-slot-switchover
+spec:
+  instances: 2
+
+  postgresql:
+    parameters:
+      hot_standby_feedback: "on"
+      sync_replication_slots: "on"
+
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
