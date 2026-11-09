@@ -54,8 +54,29 @@ var _ = Describe("plugin-barman-cloud sidecar rollout", Label(tests.LabelPluginB
 		}
 	})
 
-	DescribeTable("switches over to a replica after a plugin that isn't the WAL archiver is enabled",
-		func(updateStrategy apiv1.PrimaryUpdateStrategy) {
+	// promoteReplica does what the user does to complete a supervised update:
+	// it asks the first replica to become the primary.
+	promoteReplica := func(namespace, clusterName string) {
+		By("promoting a replica", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range podList.Items {
+				if pod.Name != cluster.Status.CurrentPrimary {
+					cluster.Status.TargetPrimary = pod.Name
+					break
+				}
+			}
+			Expect(env.Client.Status().Update(env.Ctx, cluster)).To(Succeed())
+		})
+	}
+
+	// When the plugin is the WAL archiver, the Pods that don't have its sidecar
+	// yet cannot archive WALs, and must not skip them: archiving has to
+	// resume once the rollout completes.
+	DescribeTable("rolls out the plugin sidecar to every Pod after a plugin is enabled",
+		func(updateStrategy apiv1.PrimaryUpdateStrategy, isWALArchiver bool) {
 			namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, "plugin-sidecar-rollout")
 			Expect(err).ToNot(HaveOccurred())
 
@@ -66,13 +87,13 @@ var _ = Describe("plugin-barman-cloud sidecar rollout", Label(tests.LabelPluginB
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimary := cluster.Status.CurrentPrimary
 
-			By("enabling plugin-barman-cloud without making it the WAL archiver", func() {
+			By("enabling plugin-barman-cloud", func() {
 				original := cluster.DeepCopy()
 				cluster.Spec.PrimaryUpdateStrategy = updateStrategy
 				cluster.Spec.Plugins = []apiv1.PluginConfiguration{
 					{
 						Name:          barmanCloudPluginName,
-						IsWALArchiver: ptr.To(false),
+						IsWALArchiver: ptr.To(isWALArchiver),
 						Parameters:    map[string]string{"barmanObjectName": clusterName},
 					},
 				}
@@ -82,17 +103,31 @@ var _ = Describe("plugin-barman-cloud sidecar rollout", Label(tests.LabelPluginB
 			if updateStrategy == apiv1.PrimaryUpdateStrategySupervised {
 				clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 					[]string{apiv1.PhaseWaitingForUser}, testTimeouts[timeouts.ClusterIsReady])
-				clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
+
+				if isWALArchiver {
+					// The object store doesn't have the bucket the plugin archives
+					// to. A former primary archives its pending WALs before it
+					// demotes, so the old primary stays unready, retrying the
+					// archive, and never rejoins as a standby. This test is about
+					// the rollout, so only the promotion is checked.
+					promoteReplica(namespace, clusterName)
+				} else {
+					clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
+				}
 			}
 
-			By("waiting for a replica to become the primary", func() {
-				Eventually(func(g Gomega) {
-					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(cluster.Status.CurrentPrimary).ToNot(Equal(oldPrimary))
-					g.Expect(cluster.Status.CurrentPrimary).To(Equal(cluster.Status.TargetPrimary))
-				}, testTimeouts[timeouts.ClusterIsReady]).Should(Succeed())
-			})
+			// An unsupervised update restarts the primary in place, with no
+			// switchover, when the plugin is the WAL archiver
+			if updateStrategy == apiv1.PrimaryUpdateStrategySupervised || !isWALArchiver {
+				By("waiting for a replica to become the primary", func() {
+					Eventually(func(g Gomega) {
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(cluster.Status.CurrentPrimary).ToNot(Equal(oldPrimary))
+						g.Expect(cluster.Status.CurrentPrimary).To(Equal(cluster.Status.TargetPrimary))
+					}, testTimeouts[timeouts.ClusterIsReady]).Should(Succeed())
+				})
+			}
 
 			By("waiting for every Pod to run the plugin sidecar", func() {
 				Eventually(func(g Gomega) {
@@ -106,10 +141,17 @@ var _ = Describe("plugin-barman-cloud sidecar rollout", Label(tests.LabelPluginB
 				}, testTimeouts[timeouts.ClusterIsReady]).Should(Succeed())
 			})
 
-			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+			if !isWALArchiver {
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+			}
 		},
-		Entry("when the primary update is unsupervised", apiv1.PrimaryUpdateStrategyUnsupervised),
-		Entry("when the user promotes a replica during a supervised update",
-			apiv1.PrimaryUpdateStrategySupervised),
+		Entry("when the primary update is unsupervised and the plugin isn't the WAL archiver",
+			apiv1.PrimaryUpdateStrategyUnsupervised, false),
+		Entry("when the user promotes a replica during a supervised update and the plugin isn't the WAL archiver",
+			apiv1.PrimaryUpdateStrategySupervised, false),
+		Entry("when the primary update is unsupervised and the plugin is the WAL archiver",
+			apiv1.PrimaryUpdateStrategyUnsupervised, true),
+		Entry("when the user promotes a replica during a supervised update and the plugin is the WAL archiver",
+			apiv1.PrimaryUpdateStrategySupervised, true),
 	)
 })
