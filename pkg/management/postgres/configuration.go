@@ -393,8 +393,7 @@ func createPostgresqlConfiguration(
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
 	}
 
-	if cluster.Spec.ReplicationSlots != nil &&
-		cluster.Spec.ReplicationSlots.HighAvailability.GetSynchronizeLogicalDecoding() {
+	if isSynchronizeLogicalDecodingEnabled(cluster) {
 		slots := make([]string, 0, len(cluster.Status.InstanceNames)-1)
 		for _, instanceName := range cluster.Status.InstanceNames {
 			// An instance still bootstrapping can't be promoted and its slot
@@ -432,6 +431,13 @@ func createPostgresqlConfiguration(
 	}
 
 	return postgres.CreatePostgresqlConfFileWithHash(config, sha), sha, nil
+}
+
+func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
+	return cluster.Spec.ReplicationSlots != nil &&
+		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
+		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
+		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
 }
 
 // removeMissingDirectories removes from the path-like parameter named key
