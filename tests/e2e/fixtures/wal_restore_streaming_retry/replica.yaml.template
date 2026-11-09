@@ -12,12 +12,15 @@ spec:
   replica:
     enabled: true
     source: streaming-retry-source
-    # The designated primary replays the WAL one minute after the source wrote
-    # it, so the archive always has the next WAL file it needs
-    minApplyDelay: 1m
+    # The designated primary replays the WAL 20 seconds after the source wrote
+    # it, so the archive always has the next WAL file it needs. With a WAL file
+    # written every second, the source keeps the WAL it streams from: one
+    # minute would exceed the 32 WAL files of the default wal_keep_size
+    minApplyDelay: 20s
 
+  # Like on the source, pg_wal grows to about 1.1GB
   storage:
-    size: 1Gi
+    size: 2Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
   externalClusters:

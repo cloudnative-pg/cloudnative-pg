@@ -16,8 +16,10 @@ spec:
       postInitApplicationSQL:
         - ALTER ROLE streaming_retry REPLICATION
 
+  # A WAL file is written every second: with the default wal_keep_size and
+  # max_wal_size, pg_wal grows to about 1.1GB
   storage:
-    size: 1Gi
+    size: 2Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
   # The ObjectStore is created by the test
