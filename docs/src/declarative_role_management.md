@@ -39,8 +39,9 @@ for moving across.
 The two methods can be used at the same time, on different roles, which is what
 makes a gradual migration possible. When the **same** role name is defined in
 both places, **the Cluster specification (`managed.roles`) always takes
-precedence**: the `DatabaseRole` is not reconciled, and reports the conflict in
-its status.
+precedence**: the `DatabaseRole` is not reconciled, is not issued a
+[client certificate](#client-certificate-authentication), and reports the
+conflict in its status.
 :::
 
 :::note
@@ -54,9 +55,13 @@ with the database catalog and brought back to their specification.
 See [Security](security.md#rbac-on-custom-resources) for the RBAC
 implications of granting access to `DatabaseRole` resources.
 
-A `DatabaseRole` is namespace-scoped: the resource, the `Cluster` it references
-through `spec.cluster`, and any Secret it reads a password from must all live in
-the same namespace.
+A `DatabaseRole` is namespace-scoped: by default, the resource, the `Cluster`
+it references through `spec.cluster`, and any Secret it reads a password from
+must all live in the same namespace. When the `Cluster` sets
+`enableCrossNamespaceResources: true`, a `DatabaseRole` in another namespace can
+reference it through `spec.cluster.namespace`; its password and certificate
+Secrets then live in the namespace of the `DatabaseRole`. See
+["Cross-namespace resources"](cross_namespace_resources.md).
 
 -----
 

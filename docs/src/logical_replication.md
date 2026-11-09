@@ -46,6 +46,11 @@ key PostgreSQL logical replication objects:
 - **Publications** via the `Publication` resource
 - **Subscriptions** via the `Subscription` resource
 
+Both resources normally live in the namespace of the `Cluster` they reference.
+A `Cluster` that sets `enableCrossNamespaceResources: true` can also be
+referenced from other namespaces through `spec.cluster.namespace`: see
+["Cross-namespace resources"](cross_namespace_resources.md).
+
 ## Publications
 
 In PostgreSQL's publish-and-subscribe replication model, a

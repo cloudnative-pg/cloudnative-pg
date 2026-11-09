@@ -540,6 +540,22 @@ func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
 	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
 }
 
+// ContainsManagedRole returns true iff the PostgreSQL role having the passed
+// name is managed by the cluster, in the managed.roles section of its spec
+func (cluster *Cluster) ContainsManagedRole(roleName string) bool {
+	if cluster.Spec.Managed == nil {
+		return false
+	}
+
+	for i := range cluster.Spec.Managed.Roles {
+		if cluster.Spec.Managed.Roles[i].Name == roleName {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GetExternalClusterSecrets returns the secrets used by external Clusters
 func (cluster *Cluster) GetExternalClusterSecrets() *stringset.Data {
 	secrets := stringset.New()
@@ -1644,6 +1660,14 @@ func (cluster *Cluster) GetPodSelectorIPs() map[string][]string {
 		result[ref.Name] = ref.IPs
 	}
 	return result
+}
+
+// AcceptsReferencesFrom tells whether the Database, DatabaseRole, Publication
+// and Subscription objects of the passed namespace may target this cluster:
+// the ones of its own namespace always can, the ones of other namespaces only
+// when the cluster enables cross-namespace resources.
+func (cluster *Cluster) AcceptsReferencesFrom(namespace string) bool {
+	return namespace == cluster.Namespace || cluster.Spec.EnableCrossNamespaceResources
 }
 
 // GetServiceAccountName returns the name of the ServiceAccount for this cluster.

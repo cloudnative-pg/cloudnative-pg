@@ -25,12 +25,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
@@ -43,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
@@ -160,6 +163,131 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
+// getManagedResourcesCacheConfig returns the cache configuration to be used for
+// the Database, DatabaseRole, Publication and Subscription objects reconciled
+// by this instance manager.
+//
+// Those objects are watched only in the namespace of the cluster, unless the
+// cluster opted into cross-namespace resources support, in which case they are
+// watched in every namespace. The scope cannot be widened unconditionally:
+// the cluster-wide permissions on those objects are granted by the
+// ClusterRole that is created only for the clusters enabling the feature, so
+// every other instance manager would fail to start its cache.
+//
+// A change of this setting on a running cluster is applied by the
+// watchScopeReconciler, which restarts the instance manager.
+func getManagedResourcesCacheConfig(crossNamespaceResources bool, namespace string) cache.ByObject {
+	if crossNamespaceResources {
+		// An empty configuration watches every namespace
+		return cache.ByObject{}
+	}
+
+	return cache.ByObject{
+		Namespaces: map[string]cache.Config{
+			namespace: {},
+		},
+	}
+}
+
+// isCrossNamespaceResourcesEnabled tells whether the cluster of this instance
+// manager opted into the cross-namespace resources support.
+//
+// The cluster is read through the passed reader because the manager, and
+// therefore its cache, does not exist yet when this is needed.
+func isCrossNamespaceResourcesEnabled(
+	ctx context.Context,
+	cli client.Reader,
+	namespace string,
+	clusterName string,
+) (bool, error) {
+	var cluster apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      clusterName,
+	}, &cluster); err != nil {
+		return false, fmt.Errorf("while detecting cross-namespace resources support: %w", err)
+	}
+
+	return cluster.Spec.EnableCrossNamespaceResources, nil
+}
+
+// crossNamespaceDetectionBackoff is how long detectCrossNamespaceResources
+// keeps trying to read the cluster: a few seconds, so that a brief failure of
+// the API server does not cost an extra restart, while not keeping the probes
+// of an already running PostgreSQL unanswered for long
+var crossNamespaceDetectionBackoff = wait.Backoff{
+	Duration: 500 * time.Millisecond,
+	Factor:   2,
+	Jitter:   0.1,
+	Steps:    5,
+}
+
+// detectCrossNamespaceResources tells whether the managed resources must be
+// watched in every namespace, retrying for a short while when the cluster
+// cannot be read.
+//
+// When the cluster still cannot be read, the managed resources are only
+// watched in the namespace of the cluster, as they were before the
+// cross-namespace resources support existed: the watchScopeReconciler
+// restarts the instance manager once the cluster can be read and turns out
+// to enable the feature. Failing here instead would end this process, and
+// with it a PostgreSQL left running by an online upgrade.
+//
+// The same happens when the cluster enables the feature but this instance
+// manager cannot yet list and watch the managed resources in every namespace,
+// for example because the operator did not create its ClusterRoleBinding
+// yet: the informers would be refused, the cache would never sync and the
+// instance manager would fail to start, again and again.
+func detectCrossNamespaceResources(
+	ctx context.Context,
+	cli client.Reader,
+	checkAccess clusterWideAccessChecker,
+	namespace string,
+	clusterName string,
+	backoff wait.Backoff,
+) bool {
+	contextLogger := log.FromContext(ctx)
+
+	var enabled bool
+	err := retry.OnError(backoff, func(error) bool { return ctx.Err() == nil }, func() error {
+		var err error
+		enabled, err = isCrossNamespaceResourcesEnabled(ctx, cli, namespace, clusterName)
+		if err != nil {
+			contextLogger.Info("Cannot read the cluster to detect the cross-namespace resources support, retrying",
+				"err", err.Error())
+		}
+		return err
+	})
+	if err != nil {
+		contextLogger.Warning(
+			"Cannot detect the cross-namespace resources support, watching the resources of the "+
+				"cluster namespace only until the cluster can be read",
+			"err", err.Error())
+		return false
+	}
+	if !enabled {
+		return false
+	}
+
+	allowed, reason, err := checkAccess(ctx)
+	if err != nil {
+		contextLogger.Warning(
+			"Cannot check the cluster-wide access the cross-namespace resources support needs, watching "+
+				"the resources of the cluster namespace only until it is granted",
+			"err", err.Error())
+		return false
+	}
+	if !allowed {
+		contextLogger.Info(
+			"Cross-namespace resources support enabled, but not granted yet: watching the resources of "+
+				"the cluster namespace only until it is",
+			"reason", reason)
+		return false
+	}
+
+	return true
+}
+
 func runSubCommand( //nolint: gocyclo,gocognit
 	ctx context.Context,
 	instance *postgres.Instance,
@@ -182,6 +310,17 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		return err
 	}
 
+	preflightClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+	if err != nil {
+		contextLogger.Error(err, "unable to create the client detecting cross-namespace resources")
+		return err
+	}
+
+	crossNamespaceResources := detectCrossNamespaceResources(
+		ctx, preflightClient, newClusterWideAccessChecker(kubeClientset),
+		instance.GetNamespaceName(), instance.GetClusterName(),
+		crossNamespaceDetectionBackoff)
+
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{
@@ -192,26 +331,10 @@ func runSubCommand( //nolint: gocyclo,gocognit
 						instance.GetNamespaceName(): {},
 					},
 				},
-				&apiv1.Database{}: {
-					Namespaces: map[string]cache.Config{
-						instance.GetNamespaceName(): {},
-					},
-				},
-				&apiv1.Publication{}: {
-					Namespaces: map[string]cache.Config{
-						instance.GetNamespaceName(): {},
-					},
-				},
-				&apiv1.Subscription{}: {
-					Namespaces: map[string]cache.Config{
-						instance.GetNamespaceName(): {},
-					},
-				},
-				&apiv1.DatabaseRole{}: {
-					Namespaces: map[string]cache.Config{
-						instance.GetNamespaceName(): {},
-					},
-				},
+				&apiv1.Database{}:     getManagedResourcesCacheConfig(crossNamespaceResources, instance.GetNamespaceName()),
+				&apiv1.Publication{}:  getManagedResourcesCacheConfig(crossNamespaceResources, instance.GetNamespaceName()),
+				&apiv1.Subscription{}: getManagedResourcesCacheConfig(crossNamespaceResources, instance.GetNamespaceName()),
+				&apiv1.DatabaseRole{}: getManagedResourcesCacheConfig(crossNamespaceResources, instance.GetNamespaceName()),
 			},
 		},
 		// We don't need a cache for secrets and configmap, as all reloads
@@ -244,6 +367,13 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	})
 	if err != nil {
 		contextLogger.Error(err, "unable to set up overall controller manager")
+		return err
+	}
+
+	// Index the resources reconciled by this instance manager by the namespaced
+	// name of their cluster: they may live in any namespace watched by the cache
+	if err := clusterindex.Register(ctx, mgr.GetFieldIndexer()); err != nil {
+		contextLogger.Error(err, "unable to index the resources by cluster")
 		return err
 	}
 
@@ -283,7 +413,9 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	dbReconciler := controller.NewDatabaseReconciler(
 		mgr,
 		instance,
-		webhookv1.NewDatabaseAdmissionGuard(),
+		// The guard only validates the databases of this cluster, whose
+		// Cluster is readable even from another namespace's object
+		webhookv1.NewDatabaseAdmissionGuard(mgr.GetAPIReader()),
 	)
 	if err := dbReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create database controller")
@@ -398,6 +530,19 @@ func runSubCommand( //nolint: gocyclo,gocognit
 			contextLogger.Error(releaseErr, "failed to release primary lease")
 		}
 	}()
+
+	contextLogger.Info("starting cross-namespace watch scope manager")
+	if err := newWatchScopeReconciler(
+		mgr.GetClient(),
+		kubeClientset,
+		instance,
+		crossNamespaceResources,
+		onlineUpgradeCancelFunc,
+		exitedConditions,
+	).SetupWithManager(mgr); err != nil {
+		contextLogger.Error(err, "unable to create cross-namespace watch scope reconciler")
+		return err
+	}
 
 	remoteSrv, err := webserver.NewRemoteWebServer(
 		instance, onlineUpgradeCancelFunc, exitedConditions, leaseRunnable.Watchdog())

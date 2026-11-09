@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/clusterindex"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	pgpostgres "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -85,7 +86,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Roles for other clusters are handled by their own instance managers.
-	if role.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+	if !isForThisInstance(r.instance, &role) {
 		return ctrl.Result{}, nil
 	}
 
@@ -195,7 +196,7 @@ func (r *DatabaseRoleReconciler) handleDeletion(
 func shouldDropRole(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) bool {
 	return role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete &&
 		role.HasReconciliations() &&
-		!isClusterManagingRole(cluster, role.Spec.Name) && !cluster.IsReplica()
+		!cluster.ContainsManagedRole(role.Spec.Name) && !cluster.IsReplica()
 }
 
 // passwordSetToNull reports whether the password of the role must be set to
@@ -305,7 +306,7 @@ func (r *DatabaseRoleReconciler) shouldReconcile(
 
 	// If the role is already managed by the cluster, we stop the
 	// reconciliation here.
-	if isClusterManagingRole(cluster, role.Spec.Name) {
+	if cluster.ContainsManagedRole(role.Spec.Name) {
 		result, err := r.failedReconciliation(ctx, role, errClusterIsManagingRole)
 		return &result, err
 	}
@@ -424,7 +425,7 @@ func (r *DatabaseRoleReconciler) reconcileAppliedRole(
 	// the designated primary reports the conflict. Re-applying (adopting the
 	// role back) once the inline entry is removed is handled by the re-apply
 	// path below.
-	if isDesignatedPrimary && isClusterManagingRole(cluster, role.Spec.Name) {
+	if isDesignatedPrimary && cluster.ContainsManagedRole(role.Spec.Name) {
 		result, err := r.failedReconciliation(ctx, role, errClusterIsManagingRole)
 		return &result, err
 	}
@@ -524,38 +525,19 @@ func (r *DatabaseRoleReconciler) mapClusterToDatabaseRoles(
 	}
 
 	var roles apiv1.DatabaseRoleList
-	if err := r.List(ctx, &roles, client.InNamespace(obj.GetNamespace())); err != nil {
+	if err := r.List(ctx, &roles, clusterindex.MatchingCluster(client.ObjectKeyFromObject(obj))); err != nil {
 		log.FromContext(ctx).Error(err, "while listing DatabaseRoles to react to a cluster change")
 		return nil
 	}
 
 	requests := make([]reconcile.Request, 0, len(roles.Items))
 	for i := range roles.Items {
-		if roles.Items[i].Spec.ClusterRef.Name != obj.GetName() {
-			continue
-		}
 		requests = append(requests, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(&roles.Items[i]),
 		})
 	}
 
 	return requests
-}
-
-// isClusterManagingRole checks if the given role is already managed by the
-// cluster in the cluster.spec.managed.roles section
-func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
-	if cluster.Spec.Managed == nil {
-		return false
-	}
-
-	for i := range cluster.Spec.Managed.Roles {
-		if cluster.Spec.Managed.Roles[i].Name == roleName {
-			return true
-		}
-	}
-
-	return false
 }
 
 // updateExistingRole applies membership changes, attribute updates, and
@@ -632,7 +614,7 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	}
 
 	passwordVersion, err := dbRole.ApplyPassword(
-		ctx, r.Client, role.GetPasswordSecretName(), passwordSetToNull(role), r.instance.GetNamespaceName(),
+		ctx, r.Client, role.GetPasswordSecretName(), passwordSetToNull(role), role.Namespace,
 	)
 	if err != nil {
 		return "", fmt.Errorf("while getting the role password: %w", err)

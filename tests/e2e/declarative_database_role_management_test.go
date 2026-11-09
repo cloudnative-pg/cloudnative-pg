@@ -280,7 +280,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 								ValidUntil:      &initialValidUntil,
 								Comment:         "initial comment",
 							},
-							ClusterRef: corev1.LocalObjectReference{
+							ClusterRef: apiv1.ClusterObjectReference{
 								Name: clusterName,
 							},
 							ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
@@ -369,7 +369,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 							Ensure: apiv1.EnsurePresent,
 							Login:  true,
 						},
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: clusterName,
 						},
 						ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
@@ -400,7 +400,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 							Ensure: apiv1.EnsurePresent,
 							Login:  true,
 						},
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: clusterName,
 						},
 						ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
@@ -476,7 +476,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 								Ensure: apiv1.EnsurePresent,
 								Login:  true,
 							},
-							ClusterRef: corev1.LocalObjectReference{
+							ClusterRef: apiv1.ClusterObjectReference{
 								Name: clusterName,
 							},
 							ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
@@ -599,7 +599,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 								Ensure: apiv1.EnsurePresent,
 								Login:  true,
 							},
-							ClusterRef: corev1.LocalObjectReference{
+							ClusterRef: apiv1.ClusterObjectReference{
 								Name: clusterName,
 							},
 							ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
@@ -881,7 +881,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						Ensure: apiv1.EnsurePresent,
 						Login:  true,
 					},
-					ClusterRef: corev1.LocalObjectReference{
+					ClusterRef: apiv1.ClusterObjectReference{
 						Name: clusterName,
 					},
 					ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
@@ -912,7 +912,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						Ensure: apiv1.EnsurePresent,
 						Login:  true,
 					},
-					ClusterRef: corev1.LocalObjectReference{
+					ClusterRef: apiv1.ClusterObjectReference{
 						Name: clusterName,
 					},
 					ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
@@ -973,7 +973,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 								Name:  "app",
 								Login: true,
 							},
-							ClusterRef:    corev1.LocalObjectReference{Name: clusterName},
+							ClusterRef:    apiv1.ClusterObjectReference{Name: clusterName},
 							ReclaimPolicy: apiv1.DatabaseRoleReclaimRetain,
 							ClientCertificate: &apiv1.ClientCertificateConfiguration{
 								Enabled: ptr.To(true),
@@ -1125,7 +1125,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 							Name:  "shortcert",
 							Login: true,
 						},
-						ClusterRef:    corev1.LocalObjectReference{Name: clusterName},
+						ClusterRef:    apiv1.ClusterObjectReference{Name: clusterName},
 						ReclaimPolicy: apiv1.DatabaseRoleReclaimRetain,
 						ClientCertificate: &apiv1.ClientCertificateConfiguration{
 							Enabled:     ptr.To(true),

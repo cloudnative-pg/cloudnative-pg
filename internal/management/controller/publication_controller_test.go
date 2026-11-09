@@ -26,14 +26,12 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -77,7 +75,7 @@ var _ = Describe("Managed publication controller tests", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.PublicationSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				ReclaimPolicy: apiv1.PublicationReclaimDelete,
@@ -99,7 +97,7 @@ var _ = Describe("Managed publication controller tests", func() {
 			WithPodName("cluster-example-1").
 			WithClusterName("cluster-example")
 
-		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+		fakeClient = newIndexedFakeClientBuilder().
 			WithObjects(cluster, publication).
 			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Publication{}).
 			Build()
@@ -344,7 +342,7 @@ var _ = Describe("Managed publication controller tests", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.PublicationSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				Name: "pub-all",
@@ -375,7 +373,7 @@ var _ = Describe("Managed publication controller tests", func() {
 				Generation: 1,
 			},
 			Spec: apiv1.PublicationSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				Name: "pub-all",
@@ -415,7 +413,7 @@ var _ = Describe("Managed publication controller tests", func() {
 				Finalizers: []string{utils.PublicationFinalizerName},
 			},
 			Spec: apiv1.PublicationSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: cluster.Name,
 				},
 				Name:          "pub-all",
