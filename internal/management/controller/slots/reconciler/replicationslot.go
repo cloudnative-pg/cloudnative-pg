@@ -56,36 +56,19 @@ func ReconcileReplicationSlots(
 		return dropReplicationSlots(ctx, db, cluster, isPrimary)
 	}
 
-	// Clean up orphaned logical slots on replicas when synchronizeLogicalDecoding is enabled.
-	// After switchover, a former primary retains its locally-created logical slots (synced=false).
-	// PostgreSQL's slot sync worker cannot overwrite these slots because slots with synced=false
-	// are considered locally-owned and read-only to the sync process. We must drop them so
-	// the sync worker can recreate them with synced=true.
-	if !isPrimary && cluster.Spec.ReplicationSlots.HighAvailability.GetSynchronizeLogicalDecoding() {
-		contextLogger := log.FromContext(ctx)
-		pgMajor, err := cluster.GetPostgresqlMajorVersion()
-		if err != nil {
-			// Log with full context to help debugging. Orphaned slots won't be cleaned up
-			// until this is resolved, but we continue reconciliation to avoid blocking
-			// other slot management operations.
-			contextLogger.Warning("Unable to retrieve PostgreSQL major version for logical slot cleanup; "+
-				"orphaned slots will not be cleaned up until this is resolved",
-				"clusterName", cluster.Name,
-				"imageName", cluster.Spec.ImageName,
-				"err", err)
-		} else if pgMajor >= 17 {
-			res, err := cleanupOrphanedLogicalSlots(ctx, db)
-			if err != nil {
-				return reconcile.Result{}, fmt.Errorf("cleaning up orphaned logical slots: %w", err)
-			}
-			if !res.IsZero() {
-				return res, nil
-			}
-		}
-	}
-
 	if isPrimary {
 		return reconcilePrimaryHAReplicationSlots(ctx, db, cluster)
+	}
+
+	if cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding {
+		pgMajor, err := cluster.GetPostgresqlMajorVersion()
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		// The synced and failover columns exist from PostgreSQL 17
+		if pgMajor >= 17 {
+			return dropOrphanedFailoverSlots(ctx, db)
+		}
 	}
 
 	return reconcile.Result{}, nil
@@ -221,85 +204,39 @@ func dropReplicationSlots(
 	return reconcile.Result{}, errs
 }
 
-// cleanupOrphanedLogicalSlots removes orphaned failover-enabled logical slots.
-// This function should only be called on PostgreSQL 17+ replicas.
-//
-// An orphaned failover slot is one where:
-// - synced=false: It was created locally (when this instance was primary)
-// - failover=true: It was configured for failover synchronization
-// - active=false: No consumer is connected (required to drop)
-//
-// After a switchover, the demoted primary retains its locally-created failover slots.
-// PostgreSQL's slot sync worker cannot overwrite these because synced=false slots
-// are read-only to the sync process. We drop them so the sync worker can recreate
-// them with synced=true.
-//
-// We specifically require failover=true to avoid dropping legitimate external
-// subscription slots (like those created by pg_createsubscription), which have
-// failover=false and should not be touched.
-func cleanupOrphanedLogicalSlots(ctx context.Context, db *sql.DB) (reconcile.Result, error) {
-	contextLog := log.FromContext(ctx).WithName("cleanupOrphanedLogicalSlots")
+// dropOrphanedFailoverSlots drops, on a standby, the failover slots it didn't
+// receive from the primary. A former primary keeps the failover slots it
+// created, and the slot sync worker refuses to overwrite a slot that is not
+// marked as synced: once they are dropped, the worker recreates them from the
+// primary.
+// A failure on one slot doesn't stop the rest; errors are collected and returned together.
+func dropOrphanedFailoverSlots(ctx context.Context, db *sql.DB) (reconcile.Result, error) {
+	contextLogger := log.FromContext(ctx)
 
-	// Belt-and-suspenders: gate this destructive drop on PostgreSQL's own view of
-	// its role rather than relying solely on the caller's cluster-status check.
-	// During a demotion the cluster status can already name the new primary while
-	// this node's PostgreSQL has not yet been restarted into recovery; dropping a
-	// still-live failover slot in that window would lose a slot the sync worker
-	// (which only runs on standbys) will not recreate.
-	inRecovery, err := infrastructure.IsInRecovery(ctx, db)
+	slots, err := infrastructure.ListOrphanedFailoverSlots(ctx, db)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("checking recovery status before logical slot cleanup: %w", err)
-	}
-	if !inRecovery {
-		contextLog.Warning("Skipping orphaned logical slot cleanup: PostgreSQL reports this node is not in recovery")
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, fmt.Errorf("listing orphaned failover slots: %w", err)
 	}
 
-	slots, err := infrastructure.ListLogicalSlotsWithSyncStatus(ctx, db)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("listing logical slots: %w", err)
-	}
-
+	var errs error
 	needToReschedule := false
-	for _, slot := range slots {
-		// Skip synced slots - they are properly managed by the sync worker
-		if slot.Synced {
-			contextLog.Trace("Skipping synced logical slot", "slotName", slot.SlotName)
-			continue
-		}
-
-		// Skip non-failover slots - these are external subscription slots that should not be touched
-		if !slot.Failover {
-			contextLog.Trace("Skipping non-failover logical slot (likely external subscription)",
-				"slotName", slot.SlotName)
-			continue
-		}
-
-		// Skip active slots - they cannot be dropped, so retry on a later reconciliation
+	for _, slot := range slots.Items {
 		if slot.Active {
-			contextLog.Trace("Skipping active orphaned logical slot (cannot be dropped)",
-				"slotName", slot.SlotName)
+			contextLogger.Trace("Skipping deletion of orphaned failover slot because it is active",
+				"slot", slot)
 			needToReschedule = true
 			continue
 		}
-
-		// Drop orphaned failover slot (synced=false AND failover=true AND active=false)
-		contextLog.Info("Dropping orphaned logical slot", "slotName", slot.SlotName)
-
-		if err := infrastructure.DeleteLogicalSlot(ctx, db, slot.SlotName); err != nil {
-			// A slot can become active between listing and dropping. Mirror the
-			// physical-slot path: treat the failure as transient and retry on a
-			// later reconciliation rather than aborting the whole instance reconcile.
-			contextLog.Warning("Failed to drop orphaned logical slot, will retry",
-				"slotName", slot.SlotName, "err", err)
-			needToReschedule = true
-			continue
+		contextLogger.Info("Dropping orphaned failover slot", "slotName", slot.SlotName)
+		if err := infrastructure.Delete(ctx, db, slot); err != nil {
+			errs = multierr.Append(errs,
+				fmt.Errorf("dropping orphaned failover slot %q: %w", slot.SlotName, err))
 		}
 	}
 
 	if needToReschedule {
-		return reconcile.Result{RequeueAfter: time.Second}, nil
+		return reconcile.Result{RequeueAfter: time.Second}, errs
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, errs
 }

@@ -22,7 +22,6 @@ package infrastructure
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -113,72 +112,39 @@ func Delete(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 	return err
 }
 
-// ListLogicalSlotsWithSyncStatus lists logical replication slots with their synced and failover status.
-// The synced and failover columns are only available in PostgreSQL 17+; calling this on earlier versions
-// will return a database error because the columns do not exist.
-// Slots with synced=false were created locally; slots with synced=true were synchronized from the primary.
-// Slots with failover=true are configured for failover synchronization.
-func ListLogicalSlotsWithSyncStatus(ctx context.Context, db *sql.DB) ([]LogicalReplicationSlot, error) {
-	contextLog := log.FromContext(ctx).WithName("listLogicalSlotsWithSyncStatus")
-
+// ListOrphanedFailoverSlots lists the logical slots enabled for failover that a
+// standby holds without having received them from the primary. PostgreSQL
+// refuses to enable failover on a slot during recovery, except in the slot sync
+// worker, which marks its slots as synced: these slots were created while the
+// instance was a primary, and the slot sync worker won't overwrite them.
+// It requires PostgreSQL 17 or later.
+func ListOrphanedFailoverSlots(ctx context.Context, db *sql.DB) (ReplicationSlotList, error) {
 	rows, err := db.QueryContext(
 		ctx,
-		`SELECT slot_name, plugin, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn, synced, failover
-		FROM pg_catalog.pg_replication_slots
-		WHERE slot_type = 'logical'`,
+		`SELECT slot_name, active
+            FROM pg_catalog.pg_replication_slots
+            WHERE slot_type = 'logical' AND failover AND NOT synced
+            AND pg_catalog.pg_is_in_recovery()`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("querying pg_replication_slots for logical slots: %w", err)
+		return ReplicationSlotList{}, err
 	}
 	defer func() {
 		_ = rows.Close()
 	}()
 
-	var slots []LogicalReplicationSlot
+	var status ReplicationSlotList
 	for rows.Next() {
-		var slot LogicalReplicationSlot
-		err := rows.Scan(
-			&slot.SlotName,
-			&slot.Plugin,
-			&slot.Active,
-			&slot.RestartLSN,
-			&slot.Synced,
-			&slot.Failover,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("scanning logical slot row: %w", err)
+		var slot ReplicationSlot
+		if err := rows.Scan(&slot.SlotName, &slot.Active); err != nil {
+			return ReplicationSlotList{}, err
 		}
-		slots = append(slots, slot)
+		status.Items = append(status.Items, slot)
 	}
 
 	if rows.Err() != nil {
-		return nil, fmt.Errorf("iterating logical slot rows: %w", rows.Err())
+		return ReplicationSlotList{}, rows.Err()
 	}
 
-	contextLog.Trace("Listed logical slots with sync status", "count", len(slots))
-	return slots, nil
-}
-
-// IsInRecovery reports whether PostgreSQL considers this instance to be in
-// recovery (i.e. running as a standby). pg_is_in_recovery() returns false on a
-// primary and true on a standby.
-func IsInRecovery(ctx context.Context, db *sql.DB) (bool, error) {
-	var inRecovery bool
-	if err := db.QueryRowContext(ctx, "SELECT pg_catalog.pg_is_in_recovery()").Scan(&inRecovery); err != nil {
-		return false, fmt.Errorf("querying pg_is_in_recovery: %w", err)
-	}
-	return inRecovery, nil
-}
-
-// DeleteLogicalSlot drops a logical replication slot by name.
-// Note: Active slots cannot be dropped - this will return an error from PostgreSQL.
-func DeleteLogicalSlot(ctx context.Context, db *sql.DB, slotName string) error {
-	contextLog := log.FromContext(ctx).WithName("deleteLogicalSlot")
-	contextLog.Info("Dropping logical replication slot", "slotName", slotName)
-
-	_, err := db.ExecContext(ctx, "SELECT pg_catalog.pg_drop_replication_slot($1)", slotName)
-	if err != nil {
-		return fmt.Errorf("executing pg_drop_replication_slot for %q: %w", slotName, err)
-	}
-	return nil
+	return status, nil
 }
