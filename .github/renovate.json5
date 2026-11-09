@@ -331,6 +331,14 @@
       separateMajorMinor: false,
     },
     {
+      // The hub compares the signing certificate's workflow ref to this exact
+      // tag and rejects a SHA-pinned call.
+      matchPackageNames: [
+        'revanite-io/pvtr-publish-results',
+      ],
+      pinDigests: false,
+    },
+    {
       groupName: 'workflow requirements',
       matchFileNames: [
         '.github/workflow-requirements.txt',
