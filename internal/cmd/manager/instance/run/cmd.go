@@ -73,7 +73,7 @@ var (
 
 	// errWALArchivePluginNotAvailable is returned when the configured
 	// WAL archiving plugin is not available or cannot be found.
-	errWALArchivePluginNotAvailable = fmt.Errorf("WAL archive plugin not available")
+	errWALArchivePluginNotAvailable = errors.New("WAL archive plugin not available")
 )
 
 func init() {
