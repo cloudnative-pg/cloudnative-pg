@@ -290,6 +290,55 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 	})
 })
 
+var _ = Describe("Orphaned failover slots", func() {
+	const (
+		selectOrphanedFailoverSlots = "^SELECT slot_name FROM pg_catalog.pg_replication_slots " +
+			"WHERE slot_type = 'logical' AND failover AND NOT synced AND NOT active"
+		dropSlot = "SELECT pg_catalog.pg_drop_replication_slot"
+	)
+
+	var (
+		db   *sql.DB
+		mock sqlmock.Sqlmock
+	)
+
+	BeforeEach(func() {
+		var err error
+		db, mock, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("drops the orphaned failover slots", func(ctx SpecContext) {
+		mock.ExpectQuery(selectOrphanedFailoverSlots).
+			WillReturnRows(sqlmock.NewRows([]string{"slot_name"}).AddRow("orphan1").AddRow("orphan2"))
+		mock.ExpectExec(dropSlot).WithArgs("orphan1").WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec(dropSlot).WithArgs("orphan2").WillReturnResult(sqlmock.NewResult(1, 1))
+
+		Expect(dropOrphanedFailoverSlots(ctx, db)).To(Succeed())
+	})
+
+	It("keeps dropping after a failure and returns it", func(ctx SpecContext) {
+		mock.ExpectQuery(selectOrphanedFailoverSlots).
+			WillReturnRows(sqlmock.NewRows([]string{"slot_name"}).AddRow("orphan1").AddRow("orphan2"))
+		mock.ExpectExec(dropSlot).WithArgs("orphan1").WillReturnError(errors.New("mock drop failure"))
+		mock.ExpectExec(dropSlot).WithArgs("orphan2").WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := dropOrphanedFailoverSlots(ctx, db)
+		Expect(err).To(MatchError(ContainSubstring(`dropping orphaned failover slot "orphan1": mock drop failure`)))
+		Expect(err.Error()).NotTo(ContainSubstring("orphan2"))
+	})
+
+	It("returns the listing error", func(ctx SpecContext) {
+		mock.ExpectQuery(selectOrphanedFailoverSlots).WillReturnError(errors.New("mock list failure"))
+
+		Expect(dropOrphanedFailoverSlots(ctx, db)).To(MatchError(ContainSubstring("mock list failure")))
+	})
+})
+
 var _ = Describe("Replicator reconcile", func() {
 	It("returns the recovered error when the reconciliation panics", func(ctx SpecContext) {
 		// a Replicator with a nil instance panics as soon as it dereferences it

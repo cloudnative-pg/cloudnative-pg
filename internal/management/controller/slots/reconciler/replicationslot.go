@@ -60,17 +60,6 @@ func ReconcileReplicationSlots(
 		return reconcilePrimaryHAReplicationSlots(ctx, db, cluster)
 	}
 
-	if cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding {
-		pgMajor, err := cluster.GetPostgresqlMajorVersion()
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		// The synced and failover columns exist from PostgreSQL 17
-		if pgMajor >= 17 {
-			return dropOrphanedFailoverSlots(ctx, db)
-		}
-	}
-
 	return reconcile.Result{}, nil
 }
 
@@ -194,43 +183,6 @@ func dropReplicationSlots(
 		if err := infrastructure.Delete(ctx, db, slot); err != nil {
 			errs = multierr.Append(errs,
 				fmt.Errorf("dropping replication slot %q: %w", slot.SlotName, err))
-		}
-	}
-
-	if needToReschedule {
-		return reconcile.Result{RequeueAfter: time.Second}, errs
-	}
-
-	return reconcile.Result{}, errs
-}
-
-// dropOrphanedFailoverSlots drops, on a standby, the failover slots it didn't
-// receive from the primary. A former primary keeps the failover slots it
-// created, and the slot sync worker refuses to overwrite a slot that is not
-// marked as synced: once they are dropped, the worker recreates them from the
-// primary.
-// A failure on one slot doesn't stop the rest; errors are collected and returned together.
-func dropOrphanedFailoverSlots(ctx context.Context, db *sql.DB) (reconcile.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	slots, err := infrastructure.ListOrphanedFailoverSlots(ctx, db)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("listing orphaned failover slots: %w", err)
-	}
-
-	var errs error
-	needToReschedule := false
-	for _, slot := range slots.Items {
-		if slot.Active {
-			contextLogger.Trace("Skipping deletion of orphaned failover slot because it is active",
-				"slot", slot)
-			needToReschedule = true
-			continue
-		}
-		contextLogger.Info("Dropping orphaned failover slot", "slotName", slot.SlotName)
-		if err := infrastructure.Delete(ctx, db, slot); err != nil {
-			errs = multierr.Append(errs,
-				fmt.Errorf("dropping orphaned failover slot %q: %w", slot.SlotName, err))
 		}
 	}
 

@@ -147,7 +147,45 @@ func (sr *Replicator) reconcile(
 		sr.instance.GetPodName(),
 		config,
 	)
+
+	// Without the HA slots there is no primary_slot_name, and the slot sync
+	// worker doesn't run
+	if ha := config.HighAvailability; ha != nil && ha.GetEnabled() && ha.SynchronizeLogicalDecoding {
+		pgVersion, versionErr := sr.instance.GetPgVersion()
+		if versionErr != nil {
+			return multierr.Append(err, versionErr)
+		}
+		// The failover and synced columns exist from PostgreSQL 17
+		if pgVersion.Major() >= 17 {
+			err = multierr.Append(err, dropOrphanedFailoverSlots(ctx, localDB))
+		}
+	}
+
 	return err
+}
+
+// dropOrphanedFailoverSlots drops the failover slots this standby didn't
+// receive from the primary. A former primary keeps the failover slots it
+// created, and the slot sync worker refuses to overwrite a slot that is not
+// marked as synced: once they are dropped, the worker recreates them from the
+// primary. A slot in use is dropped by a later run, after its client disconnects.
+// A failure on one slot doesn't stop the rest; errors are collected and returned together.
+func dropOrphanedFailoverSlots(ctx context.Context, localDB *sql.DB) error {
+	slots, err := infrastructure.ListOrphanedFailoverSlots(ctx, localDB)
+	if err != nil {
+		return fmt.Errorf("listing orphaned failover slots: %w", err)
+	}
+
+	var errs error
+	for _, slot := range slots.Items {
+		log.FromContext(ctx).Info("Dropping orphaned failover slot", "slotName", slot.SlotName)
+		if err := infrastructure.Delete(ctx, localDB, slot); err != nil {
+			errs = multierr.Append(errs,
+				fmt.Errorf("dropping orphaned failover slot %q: %w", slot.SlotName, err))
+		}
+	}
+
+	return errs
 }
 
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary.
