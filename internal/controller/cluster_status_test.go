@@ -493,7 +493,7 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(result).To(BeTrue())
 		})
 
-		It("should detect termination with specific exit code in last termination state", func() {
+		It("isTerminatedBecauseOfMissingWALArchivePlugin should detect a restarted container", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
 				Status: corev1.PodStatus{
@@ -514,10 +514,7 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 				},
 			}
 
-			result := hasPostgresContainerTerminationReason(pod, func(state *corev1.ContainerState) bool {
-				return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALArchivePlugin
-			})
-			Expect(result).To(BeTrue())
+			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeTrue())
 		})
 
 		It("should return false when termination reason does not match", func() {
