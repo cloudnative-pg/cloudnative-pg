@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
@@ -67,7 +68,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-var scheme = runtime.NewScheme()
+var (
+	scheme = runtime.NewScheme()
+
+	// errWALArchivePluginNotAvailable is returned when the configured
+	// WAL archiving plugin is not available or cannot be found.
+	errWALArchivePluginNotAvailable = errors.New("WAL archive plugin not available")
+)
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -121,6 +128,9 @@ func NewCmd() *cobra.Command {
 
 			if errors.Is(err, postgres.ErrNoFreeWALSpace) {
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
+			}
+			if errors.Is(err, errWALArchivePluginNotAvailable) {
+				os.Exit(apiv1.MissingWALArchivePlugin)
 			}
 
 			return err
@@ -245,21 +255,26 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	exitedConditions := concurrency.MultipleExecuted{}
 
 	pluginRepository := repository.New()
-	if _, err = pluginRepository.RegisterUnixSocketPluginsInPath(
+	availablePluginNames, err := pluginRepository.RegisterUnixSocketPluginsInPath(
 		configuration.Current.PluginSocketDir,
-	); err != nil {
+	)
+	if err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
 	defer pluginRepository.Close()
 
 	leaseRunnable := lease.New(kubeClientset, instance)
 
-	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
+	metricsExporter := metricserver.NewExporter(
+		instance,
+		metrics.NewPluginCollector(pluginRepository, availablePluginNames),
+	)
 	reconciler := controller.NewInstanceReconciler(
 		instance,
 		mgr.GetClient(),
 		metricsExporter,
 		pluginRepository,
+		availablePluginNames,
 		leaseRunnable,
 		webhookv1.NewClusterAdmissionGuard(),
 	)
@@ -461,6 +476,15 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	} else if !hasDiskSpaceForWals {
 		contextLogger.Info("Detected low-disk space condition")
 		return makeUnretryableError(postgres.ErrNoFreeWALSpace)
+	}
+
+	enabledArchiverPluginName := instance.GetClusterOrDefault().GetEnabledWALArchivePluginName()
+	if enabledArchiverPluginName != "" && !slices.Contains(availablePluginNames, enabledArchiverPluginName) {
+		contextLogger.Info(
+			"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",
+			"enabledArchiverPluginName", enabledArchiverPluginName,
+			"loadedPluginNames", availablePluginNames)
+		return makeUnretryableError(errWALArchivePluginNotAvailable)
 	}
 
 	return nil

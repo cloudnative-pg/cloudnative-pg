@@ -69,6 +69,10 @@ type InstanceReconciler struct {
 	pluginRepository      repository.Interface
 	primaryLeaseAcquirer  PrimaryLeaseAcquirer
 
+	// availablePluginNames are the plugins whose sidecar this Pod has: their
+	// sockets are registered once, when the instance manager starts
+	availablePluginNames []string
+
 	admission *guard.Admission[*apiv1.Cluster]
 }
 
@@ -78,6 +82,7 @@ func NewInstanceReconciler(
 	client ctrl.Client,
 	metricsExporter *metricserver.Exporter,
 	pluginRepository repository.Interface,
+	availablePluginNames []string,
 	primaryLeaseAcquirer PrimaryLeaseAcquirer,
 	admission *guard.Admission[*apiv1.Cluster],
 ) *InstanceReconciler {
@@ -90,6 +95,7 @@ func NewInstanceReconciler(
 		metricsServerExporter: metricsExporter,
 		certificateReconciler: instancecertificate.NewReconciler(client, instance),
 		pluginRepository:      pluginRepository,
+		availablePluginNames:  availablePluginNames,
 		primaryLeaseAcquirer:  primaryLeaseAcquirer,
 		admission:             admission,
 	}

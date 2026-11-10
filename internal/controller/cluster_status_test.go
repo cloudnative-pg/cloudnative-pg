@@ -462,6 +462,30 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(result).To(BeTrue())
 		})
 
+		It("isTerminatedBecauseOfMissingWALArchivePlugin should detect a restarted container", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+							Ready: false,
+							LastTerminationState: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: apiv1.MissingWALArchivePlugin,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeTrue())
+		})
+
 		It("should return false when termination reason does not match", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
@@ -549,6 +573,46 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			}
 
 			Expect(isWALSpaceAvailableOnPod(pod)).To(BeFalse())
+		})
+
+		It("isTerminatedBecauseOfMissingWALArchivePlugin should return true when terminated due to missing plugin",
+			func() {
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+					Status: corev1.PodStatus{
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: "postgres",
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: apiv1.MissingWALArchivePlugin,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeTrue())
+			})
+
+		It("isTerminatedBecauseOfMissingWALArchivePlugin should return false when not terminated", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+							Ready: true,
+						},
+					},
+				},
+			}
+
+			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeFalse())
 		})
 	})
 })

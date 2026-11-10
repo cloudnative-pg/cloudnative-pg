@@ -145,10 +145,15 @@ func (r *InstanceReconciler) Reconcile(
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPluginLoading()
 
+	// A Pod created before a plugin was enabled has no sidecar for it.
+	// Requiring it would block every loop, including the one that demotes
+	// this instance in a switchover.
 	pluginClient, err := cnpgiclient.WithPlugins(
 		pluginLoadingContext,
 		r.pluginRepository,
-		cluster.GetInstanceEnabledPluginNames()...,
+		stringset.From(r.availablePluginNames).
+			Intersect(stringset.From(cluster.GetInstanceEnabledPluginNames())).
+			ToList()...,
 	)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
