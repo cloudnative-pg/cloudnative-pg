@@ -195,6 +195,40 @@ var _ = Describe("isRetryableExecError", func() {
 	})
 })
 
+var _ = Describe("ExecCommand", func() {
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pg-1",
+			Namespace: "default",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "postgres"}},
+		},
+	}
+
+	It("returns the context error when the context is already cancelled", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		stdout, stderr, err := ExecCommand(ctx, nil, nil, pod, "postgres", nil, "true")
+
+		Expect(err).To(MatchError(context.Canceled))
+		Expect(stdout).To(BeEmpty())
+		Expect(stderr).To(BeEmpty())
+	})
+
+	It("returns the context error when the deadline is already exceeded", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 0)
+		defer cancel()
+
+		stdout, stderr, err := ExecCommand(ctx, nil, nil, pod, "postgres", nil, "true")
+
+		Expect(err).To(MatchError(context.DeadlineExceeded))
+		Expect(stdout).To(BeEmpty())
+		Expect(stderr).To(BeEmpty())
+	})
+})
+
 var _ = Describe("shouldFallbackToSPDY", func() {
 	It("should return false for a nil error", func() {
 		Expect(shouldFallbackToSPDY(nil)).To(BeFalse())
