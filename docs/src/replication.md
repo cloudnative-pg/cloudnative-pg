@@ -128,6 +128,13 @@ to 5 minutes. This applies to the designated primary of a replica cluster as
 well, when it can stream from its source, and never happens outside standby
 mode, such as during a recovery, or while a promotion is pending.
 
+These 5 seconds are fixed, and do not depend on `wal_retrieve_retry_interval`:
+PostgreSQL retries a failed restore right away, and tries streaming
+replication within milliseconds of the first failure. The
+`wal_retrieve_retry_interval` parameter applies only when streaming
+replication cannot start, as PostgreSQL waits for it before going back to the
+archive: the standby then pauses replay for about the longer of the two.
+
 ## Synchronous Replication
 
 CloudNativePG supports both
