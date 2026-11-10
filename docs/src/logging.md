@@ -233,9 +233,9 @@ Besides writing them to standard output, the operator, the instance manager,
 and the PgBouncer instance manager of a `Pooler` can push their logs directly
 to an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
 via OTLP, without a log collector running on every node. This covers every
-log described in this page, including the PostgreSQL and PGAudit records and
-the logs of the `wal-archive` and `wal-restore` subcommands, which the
-instance manager forwards. The standard output is unchanged.
+log described in this page, including the logs of the `wal-archive` and
+`wal-restore` subcommands, which the instance manager forwards. The standard
+output is unchanged.
 
 The export is enabled by setting the `OTEL_EXPORTER_OTLP_ENDPOINT` (or
 `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`) environment variable, and is configured
@@ -320,10 +320,57 @@ spec:
 the name of the cluster and of the pod, and are set in `env` because
 Kubernetes expands the `$(VAR_NAME)` references only there: a value read
 through `envFrom` is used as it is. The values of `OTEL_EXPORTER_OTLP_HEADERS`
-are percent-decoded, hence the `%20` in place of the space. A `Pooler` can
-refer to the same ConfigMap and Secret through the `envFrom` of the
-`pgbouncer` container, mounting the CA certificate at the same path with a
+are percent-decoded, hence the `%20` in place of the space.
+
+A `Pooler` can refer to the same ConfigMap and Secret through the `envFrom` of
+the `pgbouncer` container, mounting the CA certificate at the same path with a
 volume of its pod template.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+
+  template:
+    spec:
+      containers:
+      - name: pgbouncer
+        envFrom:
+        - configMapRef:
+            name: otel-exporter
+        - secretRef:
+            name: otel-exporter-auth
+        env:
+        - name: K8S_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: K8S_NAMESPACE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: OTEL_SERVICE_NAME
+          value: pooler-example-rw
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: k8s.pod.name=$(K8S_POD_NAME),k8s.namespace.name=$(K8S_NAMESPACE_NAME)
+        volumeMounts:
+        - name: otel-collector-ca
+          mountPath: /projected/otel
+          readOnly: true
+      volumes:
+      - name: otel-collector-ca
+        secret:
+          secretName: otel-collector-ca
+          items:
+          - key: ca.crt
+            path: ca.crt
+```
 
 Each exported record carries the fields of the corresponding JSON entry:
 
