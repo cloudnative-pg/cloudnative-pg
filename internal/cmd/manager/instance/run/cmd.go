@@ -229,15 +229,20 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	exitedConditions := concurrency.MultipleExecuted{}
 
 	pluginRepository := repository.New()
-	if _, err = pluginRepository.RegisterUnixSocketPluginsInPath(
+	availablePluginNames, err := pluginRepository.RegisterUnixSocketPluginsInPath(
 		configuration.Current.PluginSocketDir,
-	); err != nil {
+	)
+	if err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
 	defer pluginRepository.Close()
 
-	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
-	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter, pluginRepository)
+	metricsExporter := metricserver.NewExporter(
+		instance,
+		metrics.NewPluginCollector(pluginRepository, availablePluginNames),
+	)
+	reconciler := controller.NewInstanceReconciler(
+		instance, mgr.GetClient(), metricsExporter, pluginRepository, availablePluginNames)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
 		Named("instance-cluster").
