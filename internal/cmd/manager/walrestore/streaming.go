@@ -83,11 +83,14 @@ type streamingRetryState struct {
 
 	// FailUntil, when set, is the end of the forced failures
 	FailUntil time.Time `json:"failUntil"`
+
+	// FailedWAL is the WAL file the forced failures started with
+	FailedWAL string `json:"failedWAL,omitempty"`
 }
 
-// next returns the state after a restore at the given time, and whether the
-// restore must fail
-func (s streamingRetryState) next(now time.Time) (streamingRetryState, bool) {
+// next returns the state after a restore of the given WAL file at the given
+// time, and whether the restore must fail
+func (s streamingRetryState) next(now time.Time, walName string) (streamingRetryState, bool) {
 	if now.Sub(s.LastSeen) >= streamingRetryIdleGap {
 		s = streamingRetryState{WindowStart: now, Interval: streamingRetryInterval}
 	}
@@ -98,15 +101,23 @@ func (s streamingRetryState) next(now time.Time) (streamingRetryState, bool) {
 		return s, true
 
 	case !s.FailUntil.IsZero():
-		// The standby is back on the archive soon after the forced failures:
-		// streaming replication did not hold, wait longer before the next try
+		failedWAL := s.FailedWAL
 		s.FailUntil = time.Time{}
+		s.FailedWAL = ""
 		s.WindowStart = now
-		s.Interval = min(2*s.Interval, streamingRetryMaxInterval)
+		if walName == failedWAL {
+			// The standby is back on the archive asking for the same WAL file:
+			// streaming replication did not hold, wait longer before the next try
+			s.Interval = min(2*s.Interval, streamingRetryMaxInterval)
+		} else {
+			// The standby moved on by streaming: start over
+			s.Interval = streamingRetryInterval
+		}
 		return s, false
 
 	case now.Sub(s.WindowStart) >= s.Interval:
 		s.FailUntil = now.Add(streamingRetryFailFor)
+		s.FailedWAL = walName
 		return s, true
 	}
 
@@ -155,7 +166,7 @@ func checkStreamingRetry(
 		// An unreadable state starts a new interval
 		_ = json.Unmarshal(content, &state)
 	}
-	state, fail := state.next(time.Now())
+	state, fail := state.next(time.Now(), walName)
 
 	content, _ := json.Marshal(state)
 	if err := os.WriteFile(streamingRetryStateFile, content, 0o600); err != nil {

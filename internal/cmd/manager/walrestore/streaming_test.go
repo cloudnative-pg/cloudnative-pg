@@ -35,6 +35,7 @@ import (
 )
 
 var _ = Describe("streamingRetryState", func() {
+	const testWAL = "000000010000000000000001"
 	start := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
 
 	// restoreEvery runs a restore every second from the given time until the
@@ -42,7 +43,7 @@ var _ = Describe("streamingRetryState", func() {
 	restoreEvery := func(state *streamingRetryState, from time.Time) time.Time {
 		for now := from; now.Before(from.Add(time.Hour)); now = now.Add(time.Second) {
 			var fail bool
-			if *state, fail = state.next(now); fail {
+			if *state, fail = state.next(now, testWAL); fail {
 				return now
 			}
 		}
@@ -56,7 +57,7 @@ var _ = Describe("streamingRetryState", func() {
 		Expect(failedAt).To(Equal(start.Add(streamingRetryInterval)))
 
 		var fail bool
-		state, fail = state.next(failedAt.Add(streamingRetryFailFor - time.Millisecond))
+		state, fail = state.next(failedAt.Add(streamingRetryFailFor-time.Millisecond), testWAL)
 		Expect(fail).To(BeTrue())
 	})
 
@@ -66,11 +67,22 @@ var _ = Describe("streamingRetryState", func() {
 
 		resumedAt := failedAt.Add(streamingRetryFailFor)
 		var fail bool
-		state, fail = state.next(resumedAt)
+		state, fail = state.next(resumedAt, testWAL)
 		Expect(fail).To(BeFalse())
 		Expect(state.Interval).To(Equal(2 * streamingRetryInterval))
 
 		Expect(restoreEvery(&state, resumedAt)).To(Equal(resumedAt.Add(2 * streamingRetryInterval)))
+	})
+
+	It("starts over when the standby asks for a later WAL file after the forced failures", func() {
+		var state streamingRetryState
+		failedAt := restoreEvery(&state, start)
+
+		resumedAt := failedAt.Add(streamingRetryFailFor)
+		var fail bool
+		state, fail = state.next(resumedAt, "000000010000000000000002")
+		Expect(fail).To(BeFalse())
+		Expect(state.Interval).To(Equal(streamingRetryInterval))
 	})
 
 	It("caps the interval", func() {
