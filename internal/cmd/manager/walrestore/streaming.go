@@ -105,13 +105,17 @@ func (s streamingRetryState) next(now time.Time, walName string) (streamingRetry
 		s.FailUntil = time.Time{}
 		s.FailedWAL = ""
 		s.WindowStart = now
-		if walName == failedWAL {
-			// The standby is back on the archive asking for the same WAL file:
-			// streaming replication did not hold, wait longer before the next try
-			s.Interval = min(2*s.Interval, streamingRetryMaxInterval)
-		} else {
+		// WAL file names have a fixed width, and the timeline comes first, so
+		// they sort in replay order. After a failed attempt, PostgreSQL can ask
+		// again for the segment before the failed one, which is no progress
+		if walName > failedWAL {
 			// The standby moved on by streaming: start over
 			s.Interval = streamingRetryInterval
+		} else {
+			// The standby is back on the archive asking for the same WAL file,
+			// or an earlier one: streaming replication did not hold, wait
+			// longer before the next try
+			s.Interval = min(2*s.Interval, streamingRetryMaxInterval)
 		}
 		return s, false
 

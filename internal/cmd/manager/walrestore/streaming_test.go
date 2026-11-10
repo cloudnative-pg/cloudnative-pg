@@ -74,6 +74,17 @@ var _ = Describe("streamingRetryState", func() {
 		Expect(restoreEvery(&state, resumedAt)).To(Equal(resumedAt.Add(2 * streamingRetryInterval)))
 	})
 
+	It("backs off when the standby asks for the WAL file before the failed one", func() {
+		var state streamingRetryState
+		failedAt := restoreEvery(&state, start)
+
+		resumedAt := failedAt.Add(streamingRetryFailFor)
+		var fail bool
+		state, fail = state.next(resumedAt, "000000010000000000000000")
+		Expect(fail).To(BeFalse())
+		Expect(state.Interval).To(Equal(2 * streamingRetryInterval))
+	})
+
 	It("starts over when the standby asks for a later WAL file after the forced failures", func() {
 		var state streamingRetryState
 		failedAt := restoreEvery(&state, start)
