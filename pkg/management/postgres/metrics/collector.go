@@ -784,7 +784,6 @@ func (p *pluginCollector) getEnabledPluginNames(cluster *apiv1.Cluster) []string
 		}
 	}
 
-	// A Pod created before a plugin was enabled never gets its sidecar:
-	// requiring that plugin would fail every scrape, so skip it
+	// Skip plugins this Pod has no sidecar for, they would fail every scrape.
 	return stringset.From(p.availablePluginNames).Intersect(stringset.From(enabledPluginNames)).ToList()
 }

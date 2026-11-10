@@ -72,9 +72,8 @@ var _ = Describe("plugin-barman-cloud sidecar rollout", Label(tests.LabelPluginB
 		})
 	}
 
-	// When the plugin is the WAL archiver, the Pods that don't have its sidecar
-	// yet cannot archive WALs, and must not skip them: archiving has to
-	// resume once the rollout completes.
+	// When the plugin is the WAL archiver, Pods without its sidecar cannot
+	// archive WAL. Archiving must resume once the rollout completes.
 	DescribeTable("rolls out the plugin sidecar to every Pod after a plugin is enabled",
 		func(updateStrategy apiv1.PrimaryUpdateStrategy, isWALArchiver bool) {
 			namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, "plugin-sidecar-rollout")

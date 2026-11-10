@@ -145,10 +145,9 @@ func (r *InstanceReconciler) Reconcile(
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPluginLoading()
 
-	// A Pod created before a plugin was enabled never gets its sidecar, so
-	// load only the plugins this Pod has, as cnpgiclient.NewClient does:
-	// requiring the others would block every loop until the Pod is recreated,
-	// including the one that demotes this instance in a switchover.
+	// A Pod created before a plugin was enabled has no sidecar for it.
+	// Requiring it would block every loop, including the one that demotes
+	// this instance in a switchover.
 	pluginClient, err := cnpgiclient.WithPlugins(
 		pluginLoadingContext,
 		r.pluginRepository,
