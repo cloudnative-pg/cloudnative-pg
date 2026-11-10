@@ -215,7 +215,7 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 // primaryLeaseLostExitCode is the exit code of the instance manager when it
 // fences itself because the primary lease is about to expire. It lets the
 // kubelet's last state tell this exit apart from a crash.
-const primaryLeaseLostExitCode = 5
+const primaryLeaseLostExitCode = 6
 
 // killPostgresAndExit is the last resort fence. The instance manager is PID 1
 // of its container, so exiting makes the kernel SIGKILL whatever is left in the

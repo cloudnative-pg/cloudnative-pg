@@ -1955,3 +1955,100 @@ var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 		Expect(mapClusterOwnedResourceToCluster(ctx, &corev1.Secret{})).To(BeNil())
 	})
 })
+
+var _ = Describe("requireWALArchivingPluginOrDelete", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// Creates the Pod of the given instance serial, with its postgres
+	// container terminated with the given exit code, and returns its status
+	newInstanceStatus := func(
+		ctx SpecContext,
+		cluster *apiv1.Cluster,
+		serial int,
+		exitCode int32,
+	) postgres.PostgresqlStatus {
+		pod, err := specs.NewInstance(ctx, *cluster, serial)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(env.client.Create(ctx, pod)).To(Succeed())
+
+		pod.Status = corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name: specs.PostgresContainerName,
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{ExitCode: exitCode},
+				},
+			}},
+		}
+		return postgres.PostgresqlStatus{Pod: pod}
+	}
+
+	podExists := func(ctx SpecContext, name string) bool {
+		var pod corev1.Pod
+		err := env.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &pod)
+		return err == nil
+	}
+
+	It("deletes a replica that quit because the WAL archiving plugin is missing", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		primary := newInstanceStatus(ctx, cluster, 1, 0)
+		formerPrimary := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary, formerPrimary}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(10 * time.Second))
+		Expect(podExists(ctx, formerPrimary.Pod.Name)).To(BeFalse())
+		Expect(podExists(ctx, primary.Pod.Name)).To(BeTrue())
+	})
+
+	It("never deletes the current primary", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		primary := newInstanceStatus(ctx, cluster, 1, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, primary.Pod.Name)).To(BeTrue())
+	})
+
+	It("never deletes the target primary", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = specs.GetInstanceName(cluster.Name, 2)
+
+		target := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{target}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, target.Pod.Name)).To(BeTrue())
+	})
+
+	It("leaves alone the replicas that quit for another reason", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		replica := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALDiskSpaceExitCode)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{replica}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, replica.Pod.Name)).To(BeTrue())
+	})
+})
