@@ -303,6 +303,21 @@ restart, not as a liveness probe failure. Full high availability (recreation of
 the old primary on a healthy node by the operator) is still gated on the
 taint-based eviction actually deleting the pod.
 
+The step-down needs a working instance manager, and the container restart
+needs a working kubelet. If both hang while the kernel and the network of the
+node stay up, the WAL senders of the old primary keep sending keepalive
+messages. The WAL receivers on the replicas stay connected, and the failover
+waits for them. The lease still prevents a second primary. To recover, enable
+the
+[kubelet systemd watchdog](https://kubernetes.io/docs/reference/node/systemd-watchdog/)
+(`WatchdogSec`, for example `15s`, in the kubelet unit) and set
+`.spec.probes.liveness.terminationGracePeriodSeconds` to a short value, for
+example `30`. systemd restarts the hung kubelet, which fails the liveness probe
+and kills the container when the probe grace period ends. Without this value,
+the kill waits for the pod grace period (`.spec.stopDelay`, 1800 seconds by
+default). Check that `systemctl show kubelet -p WatchdogUSec` shows the value
+you set.
+
 ## Failover Quorum (Quorum-based Failover)
 
 Failover quorum is a mechanism that enhances data durability and safety during
