@@ -47,16 +47,26 @@ var _ = Describe("The position published when the primary lease is released", fu
 		previous    = `{"lsn":"0/1000000","timeline":2,"state":"in production","pod":"test-cluster-2"}`
 	)
 
-	controldata := func(state, redo, timeline string) string {
-		return fmt.Sprintf(`pg_control version number:            1700
+	controldataWithGeometry := func(state, redo, timeline, segmentSize, blockSize string) string {
+		output := fmt.Sprintf(`pg_control version number:            1700
 Database system identifier:           7421354329382109876
 Database cluster state:               %s
-Latest checkpoint location:           0/7000028
+Latest checkpoint location:           %s
 Latest checkpoint's REDO location:    %s
 Latest checkpoint's REDO WAL file:    000000030000000000000007
 Latest checkpoint's TimeLineID:       %s
-Bytes per WAL segment:                16777216
-`, state, redo, timeline)
+`, state, redo, redo, timeline)
+		if blockSize != "" {
+			output += "WAL block size:                       " + blockSize + "\n"
+		}
+		if segmentSize != "" {
+			output += "Bytes per WAL segment:                " + segmentSize + "\n"
+		}
+		return output
+	}
+
+	controldata := func(state, redo, timeline string) string {
+		return controldataWithGeometry(state, redo, timeline, "16777216", "8192")
 	}
 
 	var (
@@ -108,11 +118,11 @@ Bytes per WAL segment:                16777216
 	DescribeTable("publishes what pg_controldata reports",
 		func(ctx context.Context, state utils.PgDataState) {
 			r.readControldata = func() (string, error) {
-				return controldata(string(state), "0/7000028", "3"), nil
+				return controldata(string(state), "0/70000D8", "3"), nil
 			}
 
 			Expect(release(ctx)).To(Equal(&utils.LeasePosition{
-				LSN:      "0/7000028",
+				LSN:      "0/70000D8",
 				Timeline: 3,
 				State:    state,
 				Pod:      thisPod,
@@ -121,6 +131,34 @@ Bytes per WAL segment:                16777216
 		Entry("after a clean shutdown", utils.PgDataStateShutDown),
 		Entry("when PostgreSQL was stopped while shutting down", utils.PgDataStateShuttingDown),
 		Entry("when PostgreSQL did not stop at all", utils.PgDataStateInProduction),
+	)
+
+	// A replica that restored the WAL from the archive stops at the start of the
+	// page holding the shutdown checkpoint, before its header
+	DescribeTable("publishes where the WAL before the REDO location ends",
+		func(ctx context.Context, redo, segmentSize, blockSize, expected string) {
+			r.readControldata = func() (string, error) {
+				return controldataWithGeometry(string(utils.PgDataStateShutDown), redo, "3", segmentSize, blockSize), nil
+			}
+
+			Expect(release(ctx)).To(HaveField("LSN", expected))
+		},
+		Entry("at the start of a segment, after its long page header",
+			"0/7000028", "16777216", "8192", "0/7000000"),
+		Entry("at the start of a page, after its short page header",
+			"0/7002018", "16777216", "8192", "0/7002000"),
+		Entry("after the end of a record that started on the previous page",
+			"0/7002028", "16777216", "8192", "0/7002028"),
+		Entry("in the middle of a page",
+			"0/7004FA0", "16777216", "8192", "0/7004FA0"),
+		Entry("at the start of a segment of 1MB",
+			"0/8A00028", "1048576", "8192", "0/8A00000"),
+		Entry("after the end of a record, at the same position with segments of 16MB",
+			"0/8A00028", "16777216", "8192", "0/8A00028"),
+		Entry("when the size of the WAL pages is missing",
+			"0/7000028", "16777216", "", "0/7000028"),
+		Entry("when the size of the WAL segments is missing",
+			"0/7000028", "", "8192", "0/7000028"),
 	)
 
 	DescribeTable("leaves the position of the previous primary when this instance was not one",

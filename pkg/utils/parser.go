@@ -64,6 +64,9 @@ const (
 
 	// pgControlDataBytesPerWALSegment reports the size of the WAL segments
 	pgControlDataBytesPerWALSegment pgControlDataKey = "Bytes per WAL segment"
+
+	// pgControlDataWALBlockSize reports the size of the WAL pages
+	pgControlDataWALBlockSize pgControlDataKey = "WAL block size"
 )
 
 // PgControlData represents the parsed output of pg_controldata
@@ -135,6 +138,23 @@ func (p PgControlData) GetBytesPerWALSegment() (int, error) {
 	}
 
 	return walSegmentSize, nil
+}
+
+// GetWALBlockSize returns the size of the WAL pages
+func (p PgControlData) GetWALBlockSize() (int, error) {
+	value, ok := p[pgControlDataWALBlockSize]
+	if !ok {
+		return 0, fmt.Errorf("no '%s' section in pg_controldata output", pgControlDataWALBlockSize)
+	}
+
+	walBlockSize, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"wrong '%s' pg_controldata value (not an integer): '%s' %w",
+			pgControlDataWALBlockSize, value, err)
+	}
+
+	return walBlockSize, nil
 }
 
 // PgDataState represents the "Database cluster state" field of pg_controldata

@@ -108,45 +108,47 @@ var _ = Describe("decidePromotion", func() {
 			Expect(decision.Verdict).To(Equal(verdict))
 			Expect(decision.Level).To(Equal(level))
 		},
-		// The lease holds the start of the shutdown checkpoint, which is
-		// 120 bytes long: a replica that has everything is at its end
+		// The lease holds where the WAL before the shutdown checkpoint ends,
+		// the start of the segment that holds it: a replica that streamed has
+		// its page header and the 120 bytes of the checkpoint too, one that
+		// restored the WAL from the archive does not
 		Entry("the replica has everything",
-			"0/7000028", 1, "0/70000A0", 1, promotionProceed, promotionLogInfo),
+			"0/7000000", 1, "0/70000A0", 1, promotionProceed, promotionLogInfo),
 		Entry("the replica has everything, on the next switchover",
-			"0/8000028", 2, "0/80000A0", 2, promotionProceed, promotionLogInfo),
-		Entry("the replica is exactly at the position of the lease",
-			"0/7000028", 1, "0/7000028", 1, promotionProceed, promotionLogInfo),
+			"0/8000000", 2, "0/80000A0", 2, promotionProceed, promotionLogInfo),
+		Entry("the replica restored all the WAL from the archive",
+			"0/7000000", 1, "0/7000000", 1, promotionProceed, promotionLogInfo),
 		Entry("the replica is ahead of the position of the lease",
-			"0/7000028", 1, "0/7004FA0", 1, promotionProceed, promotionLogInfo),
+			"0/7000000", 1, "0/7004FA0", 1, promotionProceed, promotionLogInfo),
 		Entry("the replica is a byte behind the lease",
-			"0/7000028", 1, "0/7000027", 1, promotionWait, promotionLogWarning),
+			"0/7000000", 1, "0/6FFFFFF", 1, promotionWait, promotionLogWarning),
 		Entry("the replica is behind the lease across a segment boundary",
-			"1/00000028", 1, "0/FFFFFFF0", 1, promotionWait, promotionLogWarning),
+			"1/00000000", 1, "0/FFFFFFF0", 1, promotionWait, promotionLogWarning),
 		Entry("the replica is behind the lease",
-			"0/8000028", 2, "0/7004FA0", 2, promotionWait, promotionLogWarning),
+			"0/8000000", 2, "0/7004FA0", 2, promotionWait, promotionLogWarning),
 		Entry("the replica is on an earlier timeline",
-			"0/8000028", 2, "0/70000A0", 1, promotionWait, promotionLogInfo),
+			"0/8000000", 2, "0/70000A0", 1, promotionWait, promotionLogInfo),
 		Entry("the replica is on an earlier timeline, with a higher LSN",
-			"0/8000028", 2, "0/9000000", 1, promotionWait, promotionLogInfo),
+			"0/8000000", 2, "0/9000000", 1, promotionWait, promotionLogInfo),
 		Entry("the replica is on a later timeline",
-			"0/7000028", 1, "0/70000A0", 2, promotionBlocked, promotionLogError),
+			"0/7000000", 1, "0/70000A0", 2, promotionBlocked, promotionLogError),
 		Entry("the replica is on a later timeline, with a lower LSN",
-			"0/8000028", 2, "0/1000000", 3, promotionBlocked, promotionLogError),
+			"0/8000000", 2, "0/1000000", 3, promotionBlocked, promotionLogError),
 		Entry("the position of the replica is not available",
-			"0/7000028", 1, "", 0, promotionWait, promotionLogWarning),
+			"0/7000000", 1, "", 0, promotionWait, promotionLogWarning),
 		Entry("the timeline of the replica is not available",
-			"0/7000028", 1, "0/70000A0", 0, promotionWait, promotionLogWarning),
+			"0/7000000", 1, "0/70000A0", 0, promotionWait, promotionLogWarning),
 	)
 
 	It("tells how much is missing when the replica is behind", func() {
-		decision := decide(position(utils.PgDataStateShutDown, "0/7000028", 1),
-			replica("0/7000000", 1))
+		decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 1),
+			replica("0/6FFFF00", 1))
 		Expect(decision.Verdict).To(Equal(promotionWait))
-		Expect(decision.Details).To(ContainElements("missingBytes", uint64(0x28)))
+		Expect(decision.Details).To(ContainElements("missingBytes", uint64(0x100)))
 	})
 
 	It("tells how to unblock a replica that is blocked", func() {
-		decision := decide(position(utils.PgDataStateShutDown, "0/7000028", 1),
+		decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 1),
 			replica("0/70000A0", 2))
 		Expect(decision.Verdict).To(Equal(promotionBlocked))
 		Expect(decision.Message).To(ContainSubstring("kubectl annotate lease <cluster> cnpg.io/position-"))
