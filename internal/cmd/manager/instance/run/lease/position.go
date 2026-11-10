@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	coordinationv1 "k8s.io/api/coordination/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -81,12 +82,7 @@ func (r *Runnable) livePosition(ctx context.Context) *utils.LeasePosition {
 		return nil
 	}
 
-	// The WAL file name starts with the timeline, 8 hexadecimal digits
-	if len(walFile) < 8 {
-		contextLogger.Debug("Unexpected WAL file name, leaving the position as it is on the lease", "walFile", walFile)
-		return nil
-	}
-	timeline, err := strconv.ParseUint(walFile[:8], 16, 32)
+	segment, err := postgres.SegmentFromName(walFile)
 	if err != nil {
 		contextLogger.Debug("Unexpected WAL file name, leaving the position as it is on the lease",
 			"walFile", walFile, "err", err)
@@ -95,7 +91,7 @@ func (r *Runnable) livePosition(ctx context.Context) *utils.LeasePosition {
 
 	return &utils.LeasePosition{
 		LSN:      lsn,
-		Timeline: int(timeline),
+		Timeline: int(segment.Tli),
 		State:    utils.PgDataStateInProduction,
 		Pod:      r.instance.GetPodName(),
 	}
