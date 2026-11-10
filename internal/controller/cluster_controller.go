@@ -754,7 +754,7 @@ func (r *ClusterReconciler) requireWALArchivingPluginOrDelete(
 				"Detected instance manager initialization procedure that failed "+
 					"because the required WAL archive plugin is missing. Deleting it to trigger rollout",
 				"targetPod", state.Pod.Name)
-			if err := r.Delete(ctx, state.Pod); err != nil {
+			if err := r.Delete(ctx, state.Pod); err != nil && !apierrs.IsNotFound(err) {
 				contextLogger.Error(err, "Cannot delete the pod", "pod", state.Pod.Name)
 				return ctrl.Result{}, err
 			}
