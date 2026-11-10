@@ -186,8 +186,9 @@ keep between them and the isolation check `requestTimeout`.
 `leaseDurationSeconds` and `retryPeriodSeconds` govern two different timings.
 After an abrupt primary loss (the previous primary did not release the lease), the
 candidate must observe the lease unchanged for a full `leaseDurationSeconds`
-before it may take over, counted from the moment it becomes the target primary:
-this is what holds back a premature promotion while the former primary may still
+before it may take over, counted from the moment the operator marks the failover
+as `pending` (or names the replica as target, in a switchover): this is what
+holds back a premature promotion while the former primary may still
 be alive. After a clean switchover (the previous primary
 released the lease), there is no such wait; the candidate simply notices the
 released lease on its next poll, so the hand-over latency is bounded by
@@ -307,7 +308,7 @@ The step-down needs a working instance manager, and the container restart
 needs a working kubelet. If both hang while the kernel and the network of the
 node stay up, the WAL senders of the old primary keep sending keepalive
 messages. The WAL receivers on the replicas stay connected, and the failover
-waits for them. The lease still prevents a second primary. To recover, enable
+waits for them, so no replica is promoted. To recover, enable
 the
 [kubelet systemd watchdog](https://kubernetes.io/docs/reference/node/systemd-watchdog/)
 (`WatchdogSec`, for example `15s`, in the kubelet unit) and set
