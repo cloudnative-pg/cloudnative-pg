@@ -166,5 +166,7 @@ func (v *ScheduledBackupCustomValidator) validate(r *apiv1.ScheduledBackup) (adm
 		))
 	}
 
+	warnings = append(warnings, getInTreeBarmanMethodWarnings(r.Spec.Method)...)
+
 	return warnings, result
 }

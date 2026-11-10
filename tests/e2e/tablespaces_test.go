@@ -293,8 +293,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				_, stderr, err := run.Run(
 					fmt.Sprintf("kubectl cnpg backup %s -n %s --backup-name %s",
 						clusterName, namespace, fullBackupName))
-				Expect(stderr).To(BeEmpty())
-				Expect(err).ShouldNot(HaveOccurred())
+				Expect(err).ShouldNot(HaveOccurred(), "stderr: "+stderr)
 				AssertBackupConditionTimestampChangedInClusterStatus(
 					namespace,
 					clusterName,
