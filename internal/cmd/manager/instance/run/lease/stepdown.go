@@ -101,9 +101,10 @@ func (l *confirmingLock) stamp(ler resourcelock.LeaderElectionRecord, started ti
 // preAcquire takes over the retries.
 //
 // The stop lands before a replica can claim the lease only if RenewDeadline +
-// RetryPeriod + the peer probe timeout is below LeaseDuration, which the
-// admission webhook checks. A probe that outlasts the margin delays the stop
-// past it, and the hard stop cannot make up for that. The stop comes at an age
+// RetryPeriod + the peer probe timeout is below LeaseDuration. The admission
+// webhook only warns about it, and only with the isolation check enabled. A
+// probe that outlasts the margin delays the stop past it, and the hard stop
+// cannot make up for that. The stop comes at an age
 // in [LeaseDuration - RetryPeriod, LeaseDuration), so its margin to the earliest
 // claim by a replica depends on the tick phase and can be small.
 func (r *Runnable) monitorLeaseAge(ctx context.Context) {
