@@ -39,7 +39,10 @@ const (
 
 // LeasePosition is the value of the cnpg.io/position annotation of the primary lease
 type LeasePosition struct {
-	// LSN is the position in the WAL, in the PostgreSQL text format.
+	// LSN is the position in the WAL, in the PostgreSQL text format, up to
+	// which the writer has written: the flush position while the primary runs,
+	// and once it stopped, the end of the WAL before the REDO location of its
+	// latest checkpoint, which after a clean shutdown is all of its data.
 	// Empty when unknown.
 	LSN string `json:"lsn,omitempty"`
 

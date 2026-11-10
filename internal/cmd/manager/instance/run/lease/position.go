@@ -153,8 +153,8 @@ func (r *Runnable) releasePosition(ctx context.Context) *utils.LeasePosition {
 		return unknown(fmt.Errorf("unexpected cluster state in pg_controldata: %q", state))
 	}
 
-	lsn := controlData.GetLatestCheckpointREDOLocation()
-	if _, err := types.LSN(lsn).Parse(); err != nil {
+	redo, err := types.LSN(controlData.GetLatestCheckpointREDOLocation()).Parse()
+	if err != nil {
 		return unknown(fmt.Errorf("invalid latest checkpoint's REDO location in pg_controldata: %w", err))
 	}
 
@@ -165,7 +165,7 @@ func (r *Runnable) releasePosition(ctx context.Context) *utils.LeasePosition {
 	}
 
 	position := &utils.LeasePosition{
-		LSN:      lsn,
+		LSN:      string(types.Int64ToLSN(walEndBefore(controlData, redo))),
 		Timeline: timeline,
 		State:    state,
 		Pod:      podName,
@@ -179,4 +179,37 @@ func (r *Runnable) releasePosition(ctx context.Context) *utils.LeasePosition {
 	}
 
 	return position
+}
+
+// walEndBefore returns where the WAL before the record at lsn ends: lsn
+// itself, or the start of its page when the record is the first one there,
+// as only the page header is in between.
+//
+// With archiving enabled, a clean shutdown switches to a new segment and writes
+// the shutdown checkpoint as its first record, and that segment is not
+// archived. A replica that restored the WAL from the archive stops at the start
+// of the segment and has all the data, but not the REDO location.
+//
+// The geometry of the WAL is the one of pg_controldata. When it is not there,
+// lsn is returned, which can only make a replica wait.
+func walEndBefore(controlData utils.PgControlData, lsn uint64) uint64 {
+	blockSize, err := controlData.GetWALBlockSize()
+	if err != nil || blockSize <= 0 {
+		return lsn
+	}
+	segmentSize, err := controlData.GetBytesPerWALSegment()
+	if err != nil || segmentSize <= 0 {
+		return lsn
+	}
+
+	// SizeOfXLogLongPHD on the first page of a segment, SizeOfXLogShortPHD on the others
+	header := uint64(24)
+	if lsn%uint64(segmentSize) < uint64(blockSize) {
+		header = 40
+	}
+	if lsn%uint64(blockSize) != header {
+		return lsn
+	}
+
+	return lsn - header
 }
