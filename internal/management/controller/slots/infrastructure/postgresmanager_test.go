@@ -184,13 +184,14 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("ListOrphanedFailoverSlots", func() {
-		const expectedSQL = "^SELECT slot_name, active FROM pg_catalog.pg_replication_slots " +
-			"WHERE slot_type = 'logical' AND failover AND NOT synced AND pg_catalog.pg_is_in_recovery\\(\\)$"
+		const expectedSQL = "^SELECT slot_name FROM pg_catalog.pg_replication_slots " +
+			"WHERE slot_type = 'logical' AND failover AND NOT synced AND NOT active " +
+			"AND pg_catalog.pg_is_in_recovery\\(\\)$"
 
 		It("should successfully list the orphaned failover slots", func(ctx SpecContext) {
-			rows := sqlmock.NewRows([]string{"slot_name", "active"}).
-				AddRow("slot1", false).
-				AddRow("slot2", true)
+			rows := sqlmock.NewRows([]string{"slot_name"}).
+				AddRow("slot1").
+				AddRow("slot2")
 
 			mock.ExpectQuery(expectedSQL).
 				WillReturnRows(rows)
@@ -198,8 +199,8 @@ var _ = Describe("PostgresManager", func() {
 			result, err := ListOrphanedFailoverSlots(ctx, db)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Items).To(Equal([]ReplicationSlot{
-				{SlotName: "slot1", Active: false},
-				{SlotName: "slot2", Active: true},
+				{SlotName: "slot1"},
+				{SlotName: "slot2"},
 			}))
 		})
 
