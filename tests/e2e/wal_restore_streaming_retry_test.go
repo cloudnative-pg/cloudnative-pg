@@ -28,6 +28,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -69,6 +70,9 @@ var _ = Describe("WAL restore streaming retry", Label(tests.LabelPluginBarmanClo
 		})
 
 		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceName, sourceSample)
+		// A lone instance can wait for archive_timeout before completing a WAL file
+		objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+			namespace, sourceName, sourceName)
 		backupasserts.AssertArchiveConditionMet(env, namespace, sourceName, testTimeouts[timeouts.BackupIsReady])
 
 		source, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, sourceName)
