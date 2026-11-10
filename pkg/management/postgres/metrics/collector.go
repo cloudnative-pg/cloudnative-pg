@@ -26,6 +26,7 @@ import (
 	"database/sql"
 	"fmt"
 	"path"
+	"reflect"
 	"regexp"
 	"slices"
 	"sync"
@@ -50,6 +51,7 @@ type QueriesCollector struct {
 	instance      *postgres.Instance
 	defaultDBName string
 	collectorName string
+	getMetricsDB  func(string) (*sql.DB, error)
 
 	userQueries    UserQueries
 	mappings       map[string]MetricMapSet
@@ -63,11 +65,34 @@ type QueriesCollector struct {
 
 	computedMetrics []prometheus.Metric
 	timeLastUpdated time.Time
+	queryCache      map[string]cachedQueryMetrics
 
 	// metricsMutex guards access to computedMetrics, error metrics, and timestamp
 	// of last update,
 	// to avoid races between Update (writer) and Collect (reader)
 	metricsMutex sync.RWMutex
+}
+
+type cachedQueryMetrics struct {
+	metrics     []prometheus.Metric
+	collectedAt time.Time
+	isPrimary   bool
+}
+
+// RestoreCache preserves results for unchanged queries across reconciliation.
+// Call it before publishing the new collector.
+func (q *QueriesCollector) RestoreCache(previous *QueriesCollector) {
+	if previous == nil || q == previous || q.instance != previous.instance ||
+		q.defaultDBName != previous.defaultDBName || q.collectorName != previous.collectorName {
+		return
+	}
+	previous.metricsMutex.RLock()
+	defer previous.metricsMutex.RUnlock()
+	for name, cached := range previous.queryCache {
+		if reflect.DeepEqual(q.userQueries[name], previous.userQueries[name]) {
+			q.queryCache[name] = cached
+		}
+	}
 }
 
 // Name returns the name of this collector, as supplied by the user in the configMap
@@ -153,10 +178,20 @@ func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
 		}
 
 		if !q.toBeChecked(name, userQuery, isPrimary, queryLogger) {
+			delete(q.queryCache, name)
 			continue
 		}
 
+		if cached, ok := q.queryCache[name]; ok && userQuery.CacheSeconds > 0 &&
+			cached.isPrimary == isPrimary && time.Since(cached.collectedAt).Seconds() < float64(userQuery.CacheSeconds) {
+			generatedMetrics = append(generatedMetrics, cached.metrics...)
+			continue
+		}
+		delete(q.queryCache, name)
+
 		queryLogger.Debug("Collecting data")
+		var queryMetrics []prometheus.Metric
+		queryFailed := false
 
 		targetDatabases := userQuery.TargetDatabases
 		if len(targetDatabases) == 0 {
@@ -170,6 +205,7 @@ func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
 					databases, err := q.getAllAccessibleDatabases()
 					if err != nil {
 						q.reportUserQueryErrorMetric(name + ": " + err.Error())
+						queryFailed = true
 						break
 					}
 					allAccessibleDatabasesCache = databases
@@ -180,9 +216,10 @@ func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
 
 		allTargetDatabases := q.expandTargetDatabases(targetDatabases, allAccessibleDatabasesCache)
 		for targetDatabase := range allTargetDatabases {
-			db, err := q.instance.GetMetricsDB(targetDatabase)
+			db, err := q.getMetricsDB(targetDatabase)
 			if err != nil {
 				q.reportUserQueryErrorMetric(name + ": " + err.Error())
+				queryFailed = true
 				continue
 			}
 
@@ -192,8 +229,15 @@ func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
 					"targetDatabase", targetDatabase)
 				// Increment metrics counters.
 				q.reportUserQueryErrorMetric(name + " on db " + targetDatabase + ": " + err.Error())
+				queryFailed = true
 			}
-			generatedMetrics = append(generatedMetrics, computedMetrics...)
+			queryMetrics = append(queryMetrics, computedMetrics...)
+		}
+		generatedMetrics = append(generatedMetrics, queryMetrics...)
+		if userQuery.CacheSeconds > 0 && !queryFailed {
+			q.queryCache[name] = cachedQueryMetrics{
+				metrics: queryMetrics, collectedAt: time.Now(), isPrimary: isPrimary,
+			}
 		}
 	}
 	q.computedMetrics = generatedMetrics
@@ -268,7 +312,7 @@ func (q *QueriesCollector) expandTargetDatabases(
 }
 
 func (q *QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
-	conn, err := q.instance.GetMetricsDB(q.defaultDBName)
+	conn, err := q.getMetricsDB(q.defaultDBName)
 	if err != nil {
 		return nil, fmt.Errorf("while connecting to expand target_database *: %w", err)
 	}
@@ -348,6 +392,8 @@ func NewQueriesCollector(
 		variableLabels: make(map[string]VariableSet),
 		userQueries:    make(UserQueries),
 		defaultDBName:  defaultDBName,
+		getMetricsDB:   instance.GetMetricsDB,
+		queryCache:     make(map[string]cachedQueryMetrics),
 		errorUserQueries: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: name,
 			Name:      "errors_total",
@@ -393,6 +439,7 @@ func (q *QueriesCollector) ParseQueries(customQueries []byte) error {
 		}
 
 		q.userQueries[name] = query
+		delete(q.queryCache, name)
 		// For the metric namespace, override the value included in the key with the query name, if it exists
 		metricMapNamespace := name
 		if query.Name != "" {
@@ -413,6 +460,7 @@ func (q *QueriesCollector) InjectUserQueries(defaultQueries UserQueries) {
 
 	for name, query := range defaultQueries {
 		q.userQueries[name] = query
+		delete(q.queryCache, name)
 		q.mappings[name], q.variableLabels[name] = query.ToMetricMap(
 			fmt.Sprintf("%v_%v", q.Name(), name))
 	}
