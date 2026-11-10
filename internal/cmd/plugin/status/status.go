@@ -80,6 +80,34 @@ type PostgresqlStatus struct {
 	TotalClusterSize string
 }
 
+// MarshalJSON implements json.Marshaler. The ErrorList field is a slice of
+// the error interface, whose usual implementations expose no fields, so the
+// default encoding would produce `[{}]` and lose the error messages. Here the
+// errors are serialized as their message strings instead.
+func (fullStatus PostgresqlStatus) MarshalJSON() ([]byte, error) {
+	// plainStatus has the same fields but none of the methods of
+	// PostgresqlStatus, which avoids infinite recursion
+	type plainStatus PostgresqlStatus
+
+	var errorList []string
+	if fullStatus.ErrorList != nil {
+		errorList = make([]string, len(fullStatus.ErrorList))
+		for i, err := range fullStatus.ErrorList {
+			if err != nil {
+				errorList[i] = err.Error()
+			}
+		}
+	}
+
+	return json.Marshal(struct {
+		plainStatus
+		ErrorList []string
+	}{
+		plainStatus: plainStatus(fullStatus),
+		ErrorList:   errorList,
+	})
+}
+
 func (fullStatus *PostgresqlStatus) getReplicationSlotList() postgres.PgReplicationSlotList {
 	primary := fullStatus.tryGetPrimaryInstance()
 	if primary == nil {
