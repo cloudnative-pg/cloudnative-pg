@@ -20,12 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"strings"
+
+	"github.com/Masterminds/semver/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -51,8 +53,14 @@ var _ = Describe("In-place resource updates", Label(tests.LabelPostgresConfigura
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		Expect(utils.DetectPodsResize(env.APIExtensionClient.Discovery())).To(Succeed())
-		if !utils.HavePodsResize() {
+		// Require K8S 1.33 or greater
+		versionInfo, err := env.Interface.Discovery().ServerVersion()
+		Expect(err).NotTo(HaveOccurred())
+		currentVersion, err := semver.NewVersion(strings.TrimPrefix(versionInfo.String(), "v"))
+		Expect(err).NotTo(HaveOccurred())
+		k8s133, err := semver.NewVersion("1.33.0")
+		Expect(err).NotTo(HaveOccurred())
+		if currentVersion.LessThan(k8s133) {
 			Skip("This test requires in-place pod resize support (Kubernetes 1.33+)")
 		}
 	})
