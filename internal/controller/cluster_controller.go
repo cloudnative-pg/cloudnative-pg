@@ -1300,6 +1300,11 @@ func (r *ClusterReconciler) handleRollingUpdate(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithName("handle_rolling_update")
 
+	// The instances that can be resized in place don't need to be rolled out
+	if err := r.resizeInstancesInPlace(ctx, cluster, &instancesStatus); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// If we need to roll out a restart of any instance, this is the right moment
 	done, err := r.rolloutRequiredInstances(ctx, cluster, &instancesStatus)
 	switch {

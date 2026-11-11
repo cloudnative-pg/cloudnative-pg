@@ -22,62 +22,105 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// errInPlaceResizeRejected is raised when the API server rejects an in-place
-// resize of the resources of an instance pod, for example because the change
-// would alter the pod QoS class. The caller reacts by falling back to the
-// standard rollout, recreating the pod.
-var errInPlaceResizeRejected = errors.New("in-place pod resize rejected")
+// resizeInstancesInPlace applies to the running instance pods the changes to
+// the container resources that do not require recreating them, when the
+// cluster asks for it. It runs before the rollout: a resized pod has its
+// pod spec annotation aligned with the new resources and is seen as
+// up-to-date, while any other pod is left to the rolling update.
+func (r *ClusterReconciler) resizeInstancesInPlace(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instances *postgres.PostgresqlStatusList,
+) error {
+	if cluster.GetResourcesUpdateStrategy() != apiv1.ResourcesUpdateStrategyInPlace ||
+		utils.IsPodSpecReconciliationDisabled(&cluster.ObjectMeta) {
+		return nil
+	}
 
-// resizeInstanceInPlace applies a resource-only drift to a running instance
-// pod through the resize subresource, then refreshes the pod spec annotation
-// so that the drift detection quiesces. A failure to refresh the annotation
-// is tolerated: the next reconciliation finds the live resources already
-// up-to-date and only repairs the annotation. If the cluster resources are
-// reverted before that, the stale annotation matches the target again and
-// the pod keeps the resized values until the next change of the cluster
-// resources.
+	for i := range instances.Items {
+		pod := instances.Items[i].Pod
+		if cluster.IsInstanceFenced(pod.Name) {
+			continue
+		}
+		if err := r.resizeInstanceInPlace(ctx, cluster, pod); err != nil {
+			return fmt.Errorf("while resizing pod %s in place: %w", pod.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// resizeInstanceInPlace resizes an instance pod through the resize
+// subresource when its stored pod spec differs from the target one only in
+// container resources that can be changed on a running pod, then records the
+// new resources in the pod spec annotation. The passed pod is updated too.
+//
+// The resize comes first: should recording it fail, the next reconciliation
+// finds the live resources already in place and only repairs the annotation.
 func (r *ClusterReconciler) resizeInstanceInPlace(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	pod *corev1.Pod,
-	reason string,
 ) error {
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).WithValues("pod", pod.Name)
+
+	var storedPodSpec corev1.PodSpec
+	if err := json.Unmarshal([]byte(pod.Annotations[utils.PodSpecAnnotationName]), &storedPodSpec); err != nil {
+		// Without a valid pod spec annotation there is no record of the
+		// resources the pod was created with
+		return nil
+	}
 
 	targetPod, err := newInstanceForRunningPod(ctx, pod, cluster)
 	if err != nil {
-		return fmt.Errorf("while building the target instance to resize the pod: %w", err)
+		contextLogger.Error(err, "while building the target instance to resize the pod")
+		return nil
 	}
 
-	if drifts := specs.GetLiveContainerResourceDrifts(&pod.Spec, &targetPod.Spec); len(drifts) > 0 {
-		contextLogger.Info("Resizing instance pod in place",
-			"pod", pod.Name,
-			"reason", reason)
+	if match, _ := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec); match {
+		return nil
+	}
 
-		patchedPod := pod.DeepCopy()
-		applyContainerResourceDrifts(&patchedPod.Spec, drifts)
-		// A strategic merge patch carries only the drifted containers. A
+	resizedPod := pod.DeepCopy()
+	if !specs.ResizeInPlace(&storedPodSpec, &resizedPod.Spec, &targetPod.Spec) {
+		return nil
+	}
+	if match, _ := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec); !match {
+		// The resources are not the only change: the pod will be recreated
+		return nil
+	}
+
+	if !equality.Semantic.DeepEqual(pod.Spec, resizedPod.Spec) {
+		contextLogger.Info("Resizing instance pod in place")
+
+		// A strategic merge patch carries only the resized containers. A
 		// merge patch would carry the whole containers list, reverting any
 		// container whose resources changed after the cache was populated,
 		// including those injected by other actors, such as a service mesh.
-		if err := r.SubResource("resize").Patch(ctx, patchedPod, client.StrategicMergeFrom(pod)); err != nil {
-			if apierrs.IsInvalid(err) || apierrs.IsBadRequest(err) || apierrs.IsForbidden(err) {
+		if err := r.SubResource("resize").Patch(ctx, resizedPod, client.StrategicMergeFrom(pod)); err != nil {
+			// The resize cannot be applied to this pod: for example it would
+			// change the pod QoS class, or the node or the API server do not
+			// support it. The pod spec annotation is left untouched, so the
+			// rollout recreates the pod.
+			if apierrs.IsInvalid(err) || apierrs.IsBadRequest(err) ||
+				apierrs.IsForbidden(err) || apierrs.IsNotFound(err) {
 				r.Recorder.Eventf(cluster, "Warning", "InPlaceResizeFailed",
 					"In-place resize of pod %s rejected, falling back to a rolling update: %v", pod.Name, err)
-				return fmt.Errorf("%w: %v", errInPlaceResizeRejected, err)
+				return nil
 			}
 			return err
 		}
@@ -86,70 +129,12 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 			"Resized instance pod %s in place", pod.Name)
 	}
 
-	if err := r.refreshPodSpecAnnotationResources(ctx, pod, targetPod); err != nil {
-		contextLogger.Info(
-			"Cannot refresh the pod spec annotation after the in-place resize, will retry",
-			"pod", pod.Name,
-			"error", err.Error())
-	}
-
-	return nil
-}
-
-// refreshPodSpecAnnotationResources aligns the container resources recorded
-// in the pod spec annotation with the target instance. Only the resources are
-// overwritten: the rest of the stored spec is preserved, as it may
-// legitimately differ from a freshly built instance (for example, the
-// bootstrap init container image when in-place instance manager updates are
-// enabled).
-func (r *ClusterReconciler) refreshPodSpecAnnotationResources(
-	ctx context.Context,
-	pod *corev1.Pod,
-	targetPod *corev1.Pod,
-) error {
-	podSpecAnnotation, ok := pod.Annotations[utils.PodSpecAnnotationName]
-	if !ok {
-		return nil
-	}
-
-	var storedPodSpec corev1.PodSpec
-	if err := json.Unmarshal([]byte(podSpecAnnotation), &storedPodSpec); err != nil {
-		return fmt.Errorf("while unmarshalling the pod spec annotation: %w", err)
-	}
-
-	// Run-once init containers are included: they cannot be resized, but
-	// they have already terminated and a recreated pod picks up the target
-	// anyway. Leaving them stale would keep the drift detection firing on
-	// a drift that nothing can act upon.
-	drifts := specs.GetContainerResourceDrifts(&storedPodSpec, &targetPod.Spec)
-	if len(drifts) == 0 {
-		return nil
-	}
-	applyContainerResourceDrifts(&storedPodSpec, drifts)
-
-	podSpecMarshaled, err := json.Marshal(storedPodSpec)
+	podSpecAnnotation, err := json.Marshal(storedPodSpec)
 	if err != nil {
 		return fmt.Errorf("while marshalling the pod spec annotation: %w", err)
 	}
 
-	patchedPod := pod.DeepCopy()
-	patchedPod.Annotations[utils.PodSpecAnnotationName] = string(podSpecMarshaled)
-	return r.Patch(ctx, patchedPod, client.MergeFrom(pod))
-}
-
-// applyContainerResourceDrifts sets the resources of the drifted containers
-// of the given pod spec to their target value
-func applyContainerResourceDrifts(spec *corev1.PodSpec, drifts []specs.ContainerResourceDrift) {
-	for _, drift := range drifts {
-		containers := spec.Containers
-		if drift.InitContainer {
-			containers = spec.InitContainers
-		}
-		for i := range containers {
-			if containers[i].Name == drift.Name {
-				containers[i].Resources = drift.Target
-				break
-			}
-		}
-	}
+	origPod := pod.DeepCopy()
+	pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecAnnotation)
+	return r.Patch(ctx, pod, client.MergeFrom(origPod))
 }

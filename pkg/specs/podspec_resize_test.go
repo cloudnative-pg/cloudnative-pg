@@ -21,6 +21,7 @@ package specs
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -47,364 +48,221 @@ func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) core
 	return requirements
 }
 
-var _ = Describe("ComparePodSpecsIgnoringContainerResources", func() {
-	basePodSpec := func() corev1.PodSpec {
-		return corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{
-					Name:      "init",
-					Image:     "init:1",
-					Resources: makeResources("100m", "100Mi", "100m", "100Mi"),
-				},
-			},
-			Containers: []corev1.Container{
-				{
-					Name:      PostgresContainerName,
-					Image:     "postgres:17.0",
-					Resources: makeResources("500m", "1Gi", "500m", "1Gi"),
-				},
-			},
-		}
-	}
-
-	It("matches specs that differ only in container resources", func() {
-		current := basePodSpec()
-		target := basePodSpec()
-		target.Containers[0].Resources = makeResources("1", "2Gi", "1", "2Gi")
-		target.InitContainers[0].Resources = makeResources("200m", "100Mi", "200m", "100Mi")
-
-		match, _ := ComparePodSpecsIgnoringContainerResources(current, target)
-		Expect(match).To(BeTrue())
-	})
-
-	It("detects any other difference", func() {
-		current := basePodSpec()
-		target := basePodSpec()
-		target.Containers[0].Image = "postgres:17.1"
-		target.Containers[0].Resources = makeResources("1", "2Gi", "1", "2Gi")
-
-		match, diff := ComparePodSpecsIgnoringContainerResources(current, target)
-		Expect(match).To(BeFalse())
-		Expect(diff).To(ContainSubstring("image"))
-	})
-
-	It("does not modify the compared specs", func() {
-		current := basePodSpec()
-		target := basePodSpec()
-
-		match, _ := ComparePodSpecsIgnoringContainerResources(current, target)
-		Expect(match).To(BeTrue())
-		Expect(current.Containers[0].Resources.Requests).ToNot(BeEmpty())
-		Expect(target.Containers[0].Resources.Requests).ToNot(BeEmpty())
-	})
-})
-
-var _ = Describe("GetContainerResourceDrifts", func() {
-	It("returns nothing when the resources are semantically equal", func() {
-		current := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("1", "1Gi", "1", "1Gi")},
-			},
-		}
-		target := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("1000m", "1024Mi", "1000m", "1024Mi")},
-			},
-		}
-
-		Expect(GetContainerResourceDrifts(&current, &target)).To(BeEmpty())
-	})
-
-	It("treats nil and empty resource lists as equal", func() {
-		current := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a"},
-			},
-		}
-		target := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a", Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{},
-					Limits:   corev1.ResourceList{},
-				}},
-			},
-		}
-
-		Expect(GetContainerResourceDrifts(&current, &target)).To(BeEmpty())
-	})
-
-	It("reports drifted containers and init containers", func() {
-		current := corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{Name: "sidecar", Resources: makeResources("100m", "100Mi", "100m", "100Mi")},
-			},
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-				{Name: "b", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-			},
-		}
-		target := corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{Name: "sidecar", Resources: makeResources("200m", "100Mi", "200m", "100Mi")},
-			},
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("1", "1Gi", "1", "1Gi")},
-				{Name: "b", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-			},
-		}
-
-		drifts := GetContainerResourceDrifts(&current, &target)
-		Expect(drifts).To(HaveLen(2))
-		names := make(map[string]bool)
-		for _, drift := range drifts {
-			names[drift.Name] = drift.InitContainer
-		}
-		Expect(names).To(HaveKeyWithValue("a", false))
-		Expect(names).To(HaveKeyWithValue("sidecar", true))
-	})
-
-	It("ignores containers present on one side only", func() {
-		current := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-			},
-		}
-		target := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-				{Name: "extra", Resources: makeResources("1", "1Gi", "1", "1Gi")},
-			},
-		}
-
-		Expect(GetContainerResourceDrifts(&current, &target)).To(BeEmpty())
-	})
-})
-
-var _ = Describe("CanResizeInPlace", func() {
+var _ = Describe("ResizeInPlace", func() {
 	always := corev1.ContainerRestartPolicyAlways
 
-	makeSpecs := func(currentResources, targetResources corev1.ResourceRequirements) (corev1.PodSpec, corev1.PodSpec) {
-		current := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: PostgresContainerName, Resources: currentResources},
-			},
-		}
-		target := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: PostgresContainerName, Resources: targetResources},
-			},
-		}
-		return current, target
-	}
-
-	It("accepts an empty drift", func() {
-		current, target := makeSpecs(
-			makeResources("500m", "1Gi", "500m", "1Gi"),
-			makeResources("500m", "1Gi", "500m", "1Gi"))
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeTrue())
-	})
-
-	It("accepts cpu changes in both directions", func() {
-		current, target := makeSpecs(
-			makeResources("500m", "1Gi", "1", "1Gi"),
-			makeResources("250m", "1Gi", "2", "1Gi"))
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeTrue())
-	})
-
-	It("accepts memory increases", func() {
-		current, target := makeSpecs(
-			makeResources("500m", "1Gi", "500m", "1Gi"),
-			makeResources("500m", "2Gi", "500m", "2Gi"))
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeTrue())
-	})
-
-	It("refuses memory limit decreases", func() {
-		current, target := makeSpecs(
-			makeResources("500m", "1Gi", "500m", "2Gi"),
-			makeResources("500m", "1Gi", "500m", "1Gi"))
-		ok, reason := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeFalse())
-		Expect(reason).To(ContainSubstring("memory limit"))
-	})
-
-	It("accepts memory request decreases", func() {
-		current, target := makeSpecs(
-			makeResources("500m", "2Gi", "500m", "2Gi"),
-			makeResources("500m", "1Gi", "500m", "2Gi"))
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeTrue())
-	})
-
-	It("refuses added resource entries", func() {
-		current := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: PostgresContainerName,
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU: resource.MustParse("500m"),
-						},
-					},
-				},
-			},
-		}
-		target := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: PostgresContainerName,
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("500m"),
-							corev1.ResourceMemory: resource.MustParse("1Gi"),
-						},
-					},
-				},
-			},
-		}
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeFalse())
-	})
-
-	It("refuses removed resource entries", func() {
-		current, target := makeSpecs(
-			makeResources("500m", "1Gi", "500m", "1Gi"),
-			corev1.ResourceRequirements{})
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeFalse())
-	})
-
-	It("refuses changes to resources other than cpu and memory", func() {
-		currentResources := makeResources("500m", "1Gi", "500m", "1Gi")
-		currentResources.Limits["hugepages-2Mi"] = resource.MustParse("256Mi")
-		targetResources := makeResources("500m", "1Gi", "500m", "1Gi")
-		targetResources.Limits["hugepages-2Mi"] = resource.MustParse("512Mi")
-
-		current, target := makeSpecs(currentResources, targetResources)
-		ok, reason := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeFalse())
-		Expect(reason).To(ContainSubstring("hugepages-2Mi"))
-	})
-
-	It("ignores run-once init container changes, deferring them to the next recreation", func() {
-		current := corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{Name: "init", Resources: makeResources("100m", "", "", "")},
-			},
-		}
-		target := corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{Name: "init", Resources: makeResources("200m", "", "", "")},
-			},
-		}
-
-		Expect(GetResizableContainerResourceDrifts(&current, &target)).To(BeEmpty())
-		// the drift is still visible to the full detection
-		Expect(GetContainerResourceDrifts(&current, &target)).To(HaveLen(1))
-
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeTrue())
-	})
-
-	It("accepts native sidecar changes", func() {
-		current := corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{Name: "sidecar", RestartPolicy: &always, Resources: makeResources("100m", "", "", "")},
-			},
-		}
-		target := corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{Name: "sidecar", RestartPolicy: &always, Resources: makeResources("200m", "", "", "")},
-			},
-		}
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeTrue())
-	})
-
-	It("evaluates every drifted container", func() {
-		current := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-				{Name: "b", Resources: makeResources("500m", "1Gi", "500m", "2Gi")},
-			},
-		}
-		target := corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("1", "1Gi", "1", "1Gi")},
-				{Name: "b", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-			},
-		}
-		ok, _ := CanResizeInPlace(&current, &current, &target)
-		Expect(ok).To(BeFalse())
-	})
-
-	It("accepts dropping a request equal to its limit", func() {
-		stored, target := makeSpecs(
-			makeResources("1", "1Gi", "1", "1Gi"),
-			makeResources("", "", "1", "1Gi"))
-		ok, _ := CanResizeInPlace(&stored, &stored, &target)
-		Expect(ok).To(BeTrue())
-	})
-
-	It("refuses an entry removed from the stored spec even if admission defaulted it", func() {
-		stored, target := makeSpecs(
-			makeResources("500m", "1Gi", "1", "1Gi"),
-			makeResources("500m", "1Gi", "", "1Gi"))
-		// a LimitRange default brings back the cpu limit in the live pod
-		live := *stored.DeepCopy()
-		ok, reason := CanResizeInPlace(&live, &stored, &target)
-		Expect(ok).To(BeFalse())
-		Expect(reason).To(ContainSubstring("removed"))
-	})
-
-	It("refuses a memory limit decrease against a live spec resized by someone else", func() {
-		stored, target := makeSpecs(
-			makeResources("500m", "1Gi", "500m", "2Gi"),
-			makeResources("500m", "1Gi", "500m", "3Gi"))
-		live, _ := makeSpecs(makeResources("500m", "1Gi", "500m", "4Gi"), corev1.ResourceRequirements{})
-		ok, reason := CanResizeInPlace(&live, &stored, &target)
-		Expect(ok).To(BeFalse())
-		Expect(reason).To(ContainSubstring("memory limit"))
-	})
-})
-
-var _ = Describe("GetLiveContainerResourceDrifts", func() {
-	makeSpec := func(resources corev1.ResourceRequirements) corev1.PodSpec {
-		return corev1.PodSpec{
+	makeSpec := func(resources corev1.ResourceRequirements) *corev1.PodSpec {
+		return &corev1.PodSpec{
 			Containers: []corev1.Container{
 				{Name: PostgresContainerName, Resources: resources},
 			},
 		}
 	}
 
-	It("ignores the requests the API server defaults from the limits", func() {
-		live := makeSpec(makeResources("1", "1Gi", "1", "1Gi"))
-		target := makeSpec(makeResources("", "", "1", "1Gi"))
-		Expect(GetLiveContainerResourceDrifts(&live, &target)).To(BeEmpty())
+	// admit returns the pod spec as the API server stores it when the pod
+	// is created, with the missing requests defaulted to the limits
+	admit := func(spec *corev1.PodSpec) *corev1.PodSpec {
+		live := spec.DeepCopy()
+		for _, containers := range [][]corev1.Container{live.Containers, live.InitContainers} {
+			for i := range containers {
+				for name, limit := range containers[i].Resources.Limits {
+					if _, found := containers[i].Resources.Requests[name]; !found {
+						if containers[i].Resources.Requests == nil {
+							containers[i].Resources.Requests = corev1.ResourceList{}
+						}
+						containers[i].Resources.Requests[name] = limit
+					}
+				}
+			}
+		}
+		return live
+	}
+
+	expectResized := func(stored, target *corev1.PodSpec, expectedLive corev1.ResourceRequirements) {
+		GinkgoHelper()
+		live := admit(stored)
+		Expect(ResizeInPlace(stored, live, target)).To(BeTrue())
+		Expect(equality.Semantic.DeepEqual(stored, target)).To(BeTrue(), "the stored spec must match the target")
+		Expect(equality.Semantic.DeepEqual(live.Containers[0].Resources, expectedLive)).To(BeTrue(),
+			"unexpected live resources: %v", live.Containers[0].Resources)
+	}
+
+	DescribeTable("resizes the changes that a running pod supports",
+		func(current, target, expectedLive corev1.ResourceRequirements) {
+			expectResized(makeSpec(current), makeSpec(target), expectedLive)
+		},
+		Entry("cpu changes in both directions",
+			makeResources("500m", "1Gi", "1", "1Gi"),
+			makeResources("250m", "1Gi", "2", "1Gi"),
+			makeResources("250m", "1Gi", "2", "1Gi")),
+		Entry("memory increases",
+			makeResources("500m", "1Gi", "500m", "1Gi"),
+			makeResources("500m", "2Gi", "500m", "2Gi"),
+			makeResources("500m", "2Gi", "500m", "2Gi")),
+		Entry("memory request decreases",
+			makeResources("500m", "2Gi", "500m", "2Gi"),
+			makeResources("500m", "1Gi", "500m", "2Gi"),
+			makeResources("500m", "1Gi", "500m", "2Gi")),
+		Entry("limits whose requests are defaulted by the API server",
+			makeResources("", "", "1", "1Gi"),
+			makeResources("", "", "2", "1Gi"),
+			makeResources("2", "1Gi", "2", "1Gi")),
+		Entry("a request equal to its limit being dropped, with nothing to resize",
+			makeResources("1", "1Gi", "1", "1Gi"),
+			makeResources("", "", "1", "1Gi"),
+			makeResources("1", "1Gi", "1", "1Gi")),
+	)
+
+	DescribeTable("refuses the changes that require recreating the pod",
+		func(current, target corev1.ResourceRequirements) {
+			stored := makeSpec(current)
+			Expect(ResizeInPlace(stored, admit(stored), makeSpec(target))).To(BeFalse())
+		},
+		Entry("a memory limit decrease",
+			makeResources("500m", "1Gi", "500m", "2Gi"),
+			makeResources("500m", "1Gi", "500m", "1Gi")),
+		Entry("an added request",
+			makeResources("500m", "", "", ""),
+			makeResources("500m", "1Gi", "", "")),
+		Entry("an added limit",
+			makeResources("500m", "1Gi", "", ""),
+			makeResources("500m", "1Gi", "1", "")),
+		Entry("a removed limit",
+			makeResources("500m", "1Gi", "1", "1Gi"),
+			makeResources("500m", "1Gi", "", "1Gi")),
+		Entry("a request replaced by another one",
+			makeResources("500m", "", "", ""),
+			makeResources("", "1Gi", "", "")),
+		Entry("all the resources being removed",
+			makeResources("500m", "1Gi", "500m", "1Gi"),
+			corev1.ResourceRequirements{}),
+	)
+
+	It("refuses changes to resources other than cpu and memory", func() {
+		current := makeResources("500m", "1Gi", "500m", "1Gi")
+		current.Limits["hugepages-2Mi"] = resource.MustParse("256Mi")
+		target := makeResources("500m", "1Gi", "500m", "1Gi")
+		target.Limits["hugepages-2Mi"] = resource.MustParse("512Mi")
+
+		stored := makeSpec(current)
+		Expect(ResizeInPlace(stored, admit(stored), makeSpec(target))).To(BeFalse())
 	})
 
-	It("ignores the entries added at admission time", func() {
-		// a LimitRange defaulted the resources of a container declaring none
-		live := makeSpec(makeResources("100m", "256Mi", "500m", "512Mi"))
-		target := makeSpec(corev1.ResourceRequirements{})
-		Expect(GetLiveContainerResourceDrifts(&live, &target)).To(BeEmpty())
+	It("resizes cpu and memory next to other unchanged resources", func() {
+		current := makeResources("500m", "1Gi", "500m", "1Gi")
+		current.Limits["hugepages-2Mi"] = resource.MustParse("256Mi")
+		target := makeResources("1", "1Gi", "1", "1Gi")
+		target.Limits["hugepages-2Mi"] = resource.MustParse("256Mi")
+
+		expectedLive := *target.DeepCopy()
+		expectedLive.Requests["hugepages-2Mi"] = resource.MustParse("256Mi")
+		expectResized(makeSpec(current), makeSpec(target), expectedLive)
 	})
 
-	It("overlays the target over the live resources", func() {
-		live := makeSpec(makeResources("1", "256Mi", "1", "512Mi"))
+	It("keeps the entries the live pod got at admission time", func() {
+		stored := makeSpec(corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+		})
 		target := makeSpec(corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
 		})
+		// a LimitRange defaulted the memory the cluster does not declare
+		live := makeSpec(makeResources("1", "256Mi", "1", "512Mi"))
 
-		drifts := GetLiveContainerResourceDrifts(&live, &target)
-		Expect(drifts).To(HaveLen(1))
-		Expect(drifts[0].Target.Requests.Cpu().String()).To(Equal("2"))
-		Expect(drifts[0].Target.Limits.Cpu().String()).To(Equal("2"))
-		Expect(drifts[0].Target.Requests.Memory().String()).To(Equal("256Mi"))
-		Expect(drifts[0].Target.Limits.Memory().String()).To(Equal("512Mi"))
-		// the live spec is untouched
-		Expect(live.Containers[0].Resources.Limits.Cpu().String()).To(Equal("1"))
+		Expect(ResizeInPlace(stored, live, target)).To(BeTrue())
+		Expect(equality.Semantic.DeepEqual(live.Containers[0].Resources, makeResources("2", "256Mi", "2", "512Mi"))).
+			To(BeTrue(), "unexpected live resources: %v", live.Containers[0].Resources)
+	})
+
+	It("leaves alone the containers whose resources did not change", func() {
+		stored := &corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: PostgresContainerName, Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
+				{Name: "sidecar", Resources: makeResources("100m", "100Mi", "100m", "100Mi")},
+			},
+		}
+		target := stored.DeepCopy()
+		target.Containers[0].Resources = makeResources("1", "1Gi", "1", "1Gi")
+		// another actor resized the sidecar, and injected a container
+		live := stored.DeepCopy()
+		live.Containers[1].Resources = makeResources("300m", "100Mi", "300m", "100Mi")
+		live.Containers = append(live.Containers, corev1.Container{Name: "injected"})
+
+		Expect(ResizeInPlace(stored, live, target)).To(BeTrue())
+		Expect(equality.Semantic.DeepEqual(live.Containers[0].Resources, target.Containers[0].Resources)).To(BeTrue())
+		Expect(equality.Semantic.DeepEqual(
+			live.Containers[1].Resources, makeResources("300m", "100Mi", "300m", "100Mi"))).To(BeTrue())
+		Expect(live.Containers[2].Resources).To(Equal(corev1.ResourceRequirements{}))
+	})
+
+	It("refuses the whole change when a single container cannot be resized", func() {
+		stored := &corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "a", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
+				{Name: "b", Resources: makeResources("500m", "1Gi", "500m", "2Gi")},
+			},
+		}
+		target := stored.DeepCopy()
+		target.Containers[0].Resources = makeResources("1", "1Gi", "1", "1Gi")
+		target.Containers[1].Resources = makeResources("500m", "1Gi", "500m", "1Gi")
+
+		Expect(ResizeInPlace(stored, admit(stored), target)).To(BeFalse())
+	})
+
+	It("resizes the native sidecars", func() {
+		stored := &corev1.PodSpec{
+			InitContainers: []corev1.Container{
+				{Name: "sidecar", RestartPolicy: &always, Resources: makeResources("100m", "", "", "")},
+			},
+		}
+		target := stored.DeepCopy()
+		target.InitContainers[0].Resources = makeResources("200m", "", "", "")
+		live := admit(stored)
+
+		Expect(ResizeInPlace(stored, live, target)).To(BeTrue())
+		Expect(live.InitContainers[0].Resources.Requests.Cpu().String()).To(Equal("200m"))
+		Expect(equality.Semantic.DeepEqual(stored, target)).To(BeTrue())
+	})
+
+	It("records the resources of the run-once init containers without resizing them", func() {
+		stored := &corev1.PodSpec{
+			InitContainers: []corev1.Container{
+				// not even a memory limit decrease matters for a container
+				// that has already terminated
+				{Name: "init", Resources: makeResources("100m", "1Gi", "100m", "2Gi")},
+			},
+		}
+		target := stored.DeepCopy()
+		target.InitContainers[0].Resources = makeResources("200m", "1Gi", "200m", "1Gi")
+		live := admit(stored)
+
+		Expect(ResizeInPlace(stored, live, target)).To(BeTrue())
+		Expect(live.InitContainers[0].Resources.Requests.Cpu().String()).To(Equal("100m"))
+		Expect(equality.Semantic.DeepEqual(stored, target)).To(BeTrue())
+	})
+
+	It("does not record a change other than requests and limits", func() {
+		stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
+		target := makeSpec(makeResources("1", "1Gi", "1", "1Gi"))
+		target.Containers[0].Image = "postgres:18"
+		target.Containers[0].Resources.Claims = []corev1.ResourceClaim{{Name: "gpu"}}
+
+		Expect(ResizeInPlace(stored, admit(stored), target)).To(BeTrue())
+		Expect(stored.Containers[0].Image).To(BeEmpty())
+		Expect(stored.Containers[0].Resources.Claims).To(BeEmpty())
+		match, _ := ComparePodSpecs(*stored, *target)
+		Expect(match).To(BeFalse())
+	})
+
+	It("ignores the containers present on one side only", func() {
+		stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
+		target := stored.DeepCopy()
+		target.Containers[0].Name = "renamed"
+		target.Containers[0].Resources = makeResources("1", "1Gi", "1", "1Gi")
+		live := admit(stored)
+
+		Expect(ResizeInPlace(stored, live, target)).To(BeTrue())
+		Expect(equality.Semantic.DeepEqual(live, admit(makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))))).
+			To(BeTrue())
 	})
 })

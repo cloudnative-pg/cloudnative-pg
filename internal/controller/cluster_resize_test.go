@@ -46,11 +46,18 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("In-place resize of an instance pod", func() {
-	var cluster *apiv1.Cluster
-	var pod *corev1.Pod
-	var recorder *record.FakeRecorder
-	var rm *rolloutManager.Manager
+var _ = Describe("In-place resize of the instance pods", func() {
+	var (
+		cluster  *apiv1.Cluster
+		pod      *corev1.Pod
+		recorder *record.FakeRecorder
+		rm       *rolloutManager.Manager
+
+		// resizeCalls counts the requests to the resize subresource, and
+		// resizeErr is what the API server answers to them
+		resizeCalls int
+		resizeErr   error
+	)
 
 	BeforeEach(func(ctx SpecContext) {
 		cluster = &apiv1.Cluster{
@@ -59,6 +66,7 @@ var _ = Describe("In-place resize of an instance pod", func() {
 				Namespace: "default",
 			},
 			Spec: apiv1.ClusterSpec{
+				Instances:               1,
 				ImageName:               "postgres:13.11",
 				ResourcesUpdateStrategy: apiv1.ResourcesUpdateStrategyInPlace,
 				Resources: corev1.ResourceRequirements{
@@ -73,7 +81,8 @@ var _ = Describe("In-place resize of an instance pod", func() {
 				},
 			},
 			Status: apiv1.ClusterStatus{
-				Image: "postgres:13.11",
+				Image:     "postgres:13.11",
+				Instances: 1,
 			},
 		}
 
@@ -83,16 +92,38 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		var err error
 		pod, err = specs.NewInstance(ctx, *cluster.DeepCopy(), 1)
 		Expect(err).ToNot(HaveOccurred())
+		cluster.Status.CurrentPrimary = pod.Name
+		cluster.Status.TargetPrimary = pod.Name
 
 		recorder = record.NewFakeRecorder(120)
+		resizeCalls = 0
+		resizeErr = nil
 	})
 
-	newReconciler := func(funcs interceptor.Funcs, otherPods ...k8client.Object) *ClusterReconciler {
+	newReconciler := func(otherPods ...k8client.Object) *ClusterReconciler {
 		fakeClient := fake.NewClientBuilder().
 			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(append(otherPods, pod, cluster)...).
 			WithStatusSubresource(&apiv1.Cluster{}).
-			WithInterceptorFuncs(funcs).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(
+					ctx context.Context,
+					cl k8client.Client,
+					subResourceName string,
+					obj k8client.Object,
+					patch k8client.Patch,
+					opts ...k8client.SubResourcePatchOption,
+				) error {
+					if subResourceName != "resize" {
+						return cl.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+					}
+					resizeCalls++
+					if resizeErr != nil {
+						return resizeErr
+					}
+					return cl.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+				},
+			}).
 			Build()
 
 		rm = rolloutManager.New(time.Hour, 0)
@@ -101,6 +132,19 @@ var _ = Describe("In-place resize of an instance pod", func() {
 			Recorder:       recorder,
 			rolloutManager: rm,
 		}
+	}
+
+	// rollingUpdate runs the production entry point: the in-place resize
+	// followed by the rollout of the instances that still need it
+	rollingUpdate := func(ctx context.Context, r *ClusterReconciler, pods ...*corev1.Pod) error {
+		instances := postgres.PostgresqlStatusList{}
+		for _, instance := range pods {
+			instances.Items = append(instances.Items, postgres.PostgresqlStatus{
+				Pod: instance, IsPodReady: true, ExecutableHash: "test_hash",
+			})
+		}
+		_, err := r.handleRollingUpdate(ctx, cluster, instances)
+		return err
 	}
 
 	getPostgresResources := func(spec *corev1.PodSpec) corev1.ResourceRequirements {
@@ -112,31 +156,84 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		return corev1.ResourceRequirements{}
 	}
 
-	It("patches the resize subresource and refreshes the annotation", func(ctx SpecContext) {
-		r := newReconciler(interceptor.Funcs{})
-
-		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
-		Expect(r.resizeInstanceInPlace(ctx, cluster, pod, "unit test")).To(Succeed())
-
+	// getCurrentPod returns the pod as known by the API server, together
+	// with the pod spec stored in its annotation
+	getCurrentPod := func(ctx context.Context, r *ClusterReconciler, name string) (*corev1.Pod, *corev1.PodSpec) {
+		GinkgoHelper()
 		var currentPod corev1.Pod
-		Expect(r.Get(ctx, k8client.ObjectKeyFromObject(pod), &currentPod)).To(Succeed())
-
-		liveResources := getPostgresResources(&currentPod.Spec)
-		Expect(liveResources.Limits["cpu"]).To(Equal(resource.MustParse("2")))
-
+		Expect(r.Get(ctx, k8client.ObjectKey{Namespace: cluster.Namespace, Name: name}, &currentPod)).To(Succeed())
 		var storedPodSpec corev1.PodSpec
 		Expect(json.Unmarshal(
 			[]byte(currentPod.Annotations[utils.PodSpecAnnotationName]), &storedPodSpec)).To(Succeed())
-		storedResources := getPostgresResources(&storedPodSpec)
-		Expect(storedResources.Limits["cpu"]).To(Equal(resource.MustParse("2")))
+		return &currentPod, &storedPodSpec
+	}
 
-		// the drift detection quiesces, including the run-once init
-		// containers that were not resized
-		podRollout, err := checkPodSpecIsOutdated(ctx, &currentPod, cluster)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(podRollout.required).To(BeFalse())
+	// expectRecreated verifies that the instance was left to the rolling
+	// update, which deleted the pod
+	expectRecreated := func(ctx context.Context, r *ClusterReconciler, err error) {
+		GinkgoHelper()
+		Expect(err).To(MatchError(ErrNextLoop))
+		err = r.Get(ctx, k8client.ObjectKeyFromObject(pod), &corev1.Pod{})
+		Expect(apierrs.IsNotFound(err)).To(BeTrue(), "the pod must have been deleted by the rolling update")
+	}
 
+	// expectUntouched verifies that neither the live resources nor the
+	// stored ones changed
+	expectUntouched := func(ctx context.Context, r *ClusterReconciler) {
+		GinkgoHelper()
+		Expect(resizeCalls).To(BeZero())
+		currentPod, storedPodSpec := getCurrentPod(ctx, r, pod.Name)
+		Expect(getPostgresResources(&currentPod.Spec).Limits["cpu"]).To(Equal(resource.MustParse("1")))
+		Expect(getPostgresResources(storedPodSpec).Limits["cpu"]).To(Equal(resource.MustParse("1")))
+	}
+
+	It("resizes the pod, records the new resources and skips the rollout", func(ctx SpecContext) {
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("4Gi")
+		Expect(rollingUpdate(ctx, r, pod)).To(Succeed())
+
+		currentPod, storedPodSpec := getCurrentPod(ctx, r, pod.Name)
+		Expect(currentPod.UID).To(Equal(pod.UID))
+		for _, resources := range []corev1.ResourceRequirements{
+			getPostgresResources(&currentPod.Spec),
+			getPostgresResources(storedPodSpec),
+			// the pod the rollout looks at is the resized one
+			getPostgresResources(&pod.Spec),
+		} {
+			Expect(resources.Limits["cpu"]).To(Equal(resource.MustParse("2")))
+			Expect(resources.Limits["memory"]).To(Equal(resource.MustParse("4Gi")))
+			Expect(resources.Requests["cpu"]).To(Equal(resource.MustParse("500m")))
+		}
+		Expect(resizeCalls).To(Equal(1))
 		Expect(recorder.Events).To(Receive(ContainSubstring("InPlaceResize")))
+
+		// nothing is left to do
+		Expect(rollingUpdate(ctx, r, currentPod)).To(Succeed())
+		Expect(resizeCalls).To(Equal(1))
+	})
+
+	It("resizes every instance with no rollout slot and no switchover", func(ctx SpecContext) {
+		replica, err := specs.NewInstance(ctx, *cluster.DeepCopy(), 2)
+		Expect(err).ToNot(HaveOccurred())
+		cluster.Spec.Instances = 2
+		cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
+		cluster.Status.Instances = 2
+		r := newReconciler(replica)
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		Expect(rollingUpdate(ctx, r, pod, replica)).To(Succeed())
+		Expect(cluster.Status.TargetPrimary).To(Equal(pod.Name))
+
+		for _, instance := range []*corev1.Pod{pod, replica} {
+			currentPod, _ := getCurrentPod(ctx, r, instance.Name)
+			Expect(getPostgresResources(&currentPod.Spec).Limits["cpu"]).To(Equal(resource.MustParse("2")))
+		}
+
+		otherCluster := k8client.ObjectKey{Namespace: cluster.Namespace, Name: "other-cluster"}
+		Expect(rm.CoordinateRollout(otherCluster, "other-cluster-1").RolloutAllowed).To(BeTrue(),
+			"an in-place resize must not consume the rollout slot")
 	})
 
 	It("leaves alone the containers it does not resize", func(ctx SpecContext) {
@@ -150,13 +247,12 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		// container issued by another actor
 		cachedPod := pod.DeepCopy()
 		pod.Spec.Containers[len(pod.Spec.Containers)-1].Resources.Limits["cpu"] = resource.MustParse("300m")
-		r := newReconciler(interceptor.Funcs{})
+		r := newReconciler()
 
 		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
-		Expect(r.resizeInstanceInPlace(ctx, cluster, cachedPod, "unit test")).To(Succeed())
+		Expect(rollingUpdate(ctx, r, cachedPod)).To(Succeed())
 
-		var currentPod corev1.Pod
-		Expect(r.Get(ctx, k8client.ObjectKeyFromObject(pod), &currentPod)).To(Succeed())
+		currentPod, _ := getCurrentPod(ctx, r, pod.Name)
 		Expect(getPostgresResources(&currentPod.Spec).Limits["cpu"]).To(Equal(resource.MustParse("2")))
 		injected := currentPod.Spec.Containers[len(currentPod.Spec.Containers)-1]
 		Expect(injected.Name).To(Equal("istio-proxy"))
@@ -164,7 +260,7 @@ var _ = Describe("In-place resize of an instance pod", func() {
 	})
 
 	It("only repairs the annotation when the live resources already match", func(ctx SpecContext) {
-		// Make the stored annotation stale while the live spec matches the target
+		// The resize was applied, but recording it failed
 		var storedPodSpec corev1.PodSpec
 		Expect(json.Unmarshal(
 			[]byte(pod.Annotations[utils.PodSpecAnnotationName]), &storedPodSpec)).To(Succeed())
@@ -176,140 +272,143 @@ var _ = Describe("In-place resize of an instance pod", func() {
 		staleAnnotation, err := json.Marshal(storedPodSpec)
 		Expect(err).ToNot(HaveOccurred())
 		pod.Annotations[utils.PodSpecAnnotationName] = string(staleAnnotation)
+		r := newReconciler()
 
-		resizeCalled := false
-		r := newReconciler(interceptor.Funcs{
-			SubResourcePatch: func(
-				ctx context.Context,
-				cl k8client.Client,
-				subResourceName string,
-				obj k8client.Object,
-				patch k8client.Patch,
-				opts ...k8client.SubResourcePatchOption,
-			) error {
-				resizeCalled = true
-				return cl.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
-			},
-		})
+		Expect(rollingUpdate(ctx, r, pod)).To(Succeed())
+		Expect(resizeCalls).To(BeZero())
 
-		Expect(r.resizeInstanceInPlace(ctx, cluster, pod, "unit test")).To(Succeed())
-		Expect(resizeCalled).To(BeFalse())
-
-		var currentPod corev1.Pod
-		Expect(r.Get(ctx, k8client.ObjectKeyFromObject(pod), &currentPod)).To(Succeed())
-		var refreshedPodSpec corev1.PodSpec
-		Expect(json.Unmarshal(
-			[]byte(currentPod.Annotations[utils.PodSpecAnnotationName]), &refreshedPodSpec)).To(Succeed())
-		refreshedResources := getPostgresResources(&refreshedPodSpec)
-		Expect(refreshedResources.Limits["cpu"]).To(Equal(resource.MustParse("1")))
+		_, refreshedPodSpec := getCurrentPod(ctx, r, pod.Name)
+		Expect(getPostgresResources(refreshedPodSpec).Limits["cpu"]).To(Equal(resource.MustParse("1")))
 	})
 
-	It("reports a rejected resize so the caller can fall back", func(ctx SpecContext) {
-		r := newReconciler(interceptor.Funcs{
-			SubResourcePatch: func(
-				_ context.Context,
-				_ k8client.Client,
-				_ string,
-				_ k8client.Object,
-				_ k8client.Patch,
-				_ ...k8client.SubResourcePatchOption,
-			) error {
-				return apierrs.NewForbidden(
-					schema.GroupResource{Resource: "pods"}, pod.Name,
-					errors.New("the resize would change the pod QoS class"))
-			},
-		})
-
-		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
-		err := r.resizeInstanceInPlace(ctx, cluster, pod, "unit test")
-		Expect(errors.Is(err, errInPlaceResizeRejected)).To(BeTrue())
-		Expect(recorder.Events).To(Receive(ContainSubstring("InPlaceResizeFailed")))
-	})
-
-	It("aligns the recorded run-once init containers too", func(ctx SpecContext) {
+	It("records the resources of the run-once init containers too", func(ctx SpecContext) {
 		// a run-once init container, as injected by a plugin, whose
 		// resources follow the ones of the cluster
-		pluginInit := corev1.Container{Name: "plugin-init", Resources: *cluster.Spec.Resources.DeepCopy()}
 		var storedPodSpec corev1.PodSpec
 		Expect(json.Unmarshal(
 			[]byte(pod.Annotations[utils.PodSpecAnnotationName]), &storedPodSpec)).To(Succeed())
-		storedPodSpec.InitContainers = append(storedPodSpec.InitContainers, pluginInit)
-		annotation, err := json.Marshal(storedPodSpec)
+		for i := range storedPodSpec.InitContainers {
+			storedPodSpec.InitContainers[i].Resources.Limits["cpu"] = resource.MustParse("250m")
+		}
+		staleAnnotation, err := json.Marshal(storedPodSpec)
 		Expect(err).ToNot(HaveOccurred())
-		pod.Annotations[utils.PodSpecAnnotationName] = string(annotation)
-		r := newReconciler(interceptor.Funcs{})
-
-		targetPod := pod.DeepCopy()
-		targetPod.Spec = *storedPodSpec.DeepCopy()
-		targetInit := &targetPod.Spec.InitContainers[len(targetPod.Spec.InitContainers)-1]
-		targetInit.Resources.Limits["cpu"] = resource.MustParse("2")
-		Expect(r.refreshPodSpecAnnotationResources(ctx, pod, targetPod)).To(Succeed())
-
-		var currentPod corev1.Pod
-		Expect(r.Get(ctx, k8client.ObjectKeyFromObject(pod), &currentPod)).To(Succeed())
-		var refreshedPodSpec corev1.PodSpec
-		Expect(json.Unmarshal(
-			[]byte(currentPod.Annotations[utils.PodSpecAnnotationName]), &refreshedPodSpec)).To(Succeed())
-		match, diff := specs.ComparePodSpecs(refreshedPodSpec, targetPod.Spec)
-		Expect(match).To(BeTrue(), diff)
-	})
-
-	It("propagates transient errors without falling back", func(ctx SpecContext) {
-		r := newReconciler(interceptor.Funcs{
-			SubResourcePatch: func(
-				_ context.Context,
-				_ k8client.Client,
-				_ string,
-				_ k8client.Object,
-				_ k8client.Patch,
-				_ ...k8client.SubResourcePatchOption,
-			) error {
-				return apierrs.NewInternalError(errors.New("etcd timeout"))
-			},
-		})
+		pod.Annotations[utils.PodSpecAnnotationName] = string(staleAnnotation)
+		r := newReconciler()
 
 		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
-		err := r.resizeInstanceInPlace(ctx, cluster, pod, "unit test")
-		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, errInPlaceResizeRejected)).To(BeFalse())
+		Expect(rollingUpdate(ctx, r, pod)).To(Succeed())
+
+		currentPod, refreshedPodSpec := getCurrentPod(ctx, r, pod.Name)
+		Expect(refreshedPodSpec.InitContainers).ToNot(BeEmpty())
+		for i := range refreshedPodSpec.InitContainers {
+			Expect(refreshedPodSpec.InitContainers[i].Resources.Limits["cpu"]).To(Equal(resource.MustParse("2")))
+			// the init containers have already terminated: they are not resized
+			Expect(currentPod.Spec.InitContainers[i].Resources.Limits["cpu"]).To(Equal(resource.MustParse("1")))
+		}
 	})
 
-	When("the cluster supports the resize subresource", func() {
-		BeforeEach(func() {
-			utils.SetPodsResize(true)
-			DeferCleanup(utils.SetPodsResize, false)
-		})
+	DescribeTable("recreates the pod when the API server rejects the resize",
+		func(ctx SpecContext, rejection error) {
+			resizeErr = rejection
+			r := newReconciler()
 
-		It("resizes every instance with no rollout slot and no switchover", func(ctx SpecContext) {
-			replica, err := specs.NewInstance(ctx, *cluster.DeepCopy(), 2)
-			Expect(err).ToNot(HaveOccurred())
-			cluster.Spec.Instances = 2
-			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
-			cluster.Status.Instances = 2
-			cluster.Status.CurrentPrimary = pod.Name
-			cluster.Status.TargetPrimary = pod.Name
-			r := newReconciler(interceptor.Funcs{}, replica)
-
-			makeStatus := func(p *corev1.Pod) postgres.PostgresqlStatus {
-				return postgres.PostgresqlStatus{Pod: p, IsPodReady: true, ExecutableHash: "test_hash"}
-			}
 			cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
-			restarted, err := r.rolloutRequiredInstances(ctx, cluster, &postgres.PostgresqlStatusList{
-				Items: []postgres.PostgresqlStatus{makeStatus(pod), makeStatus(replica)},
-			})
-			Expect(err).ToNot(HaveOccurred())
-			Expect(restarted).To(BeFalse())
-			Expect(cluster.Status.TargetPrimary).To(Equal(pod.Name))
+			expectRecreated(ctx, r, rollingUpdate(ctx, r, pod))
+			Expect(resizeCalls).To(Equal(1))
+			Expect(recorder.Events).To(Receive(ContainSubstring("InPlaceResizeFailed")))
+		},
+		Entry("because the change is invalid, as when it alters the pod QoS class",
+			apierrs.NewInvalid(schema.GroupKind{Kind: "Pod"}, "cluster-resize-1", nil)),
+		Entry("because the request is malformed",
+			apierrs.NewBadRequest("bad request")),
+		Entry("because the operator is not allowed to resize pods",
+			apierrs.NewForbidden(schema.GroupResource{Resource: "pods"}, "cluster-resize-1", errors.New("forbidden"))),
+		Entry("because the API server does not expose the resize subresource",
+			apierrs.NewNotFound(schema.GroupResource{Resource: "pods"}, "cluster-resize-1")),
+	)
 
-			for _, instance := range []*corev1.Pod{pod, replica} {
-				var currentPod corev1.Pod
-				Expect(r.Get(ctx, k8client.ObjectKeyFromObject(instance), &currentPod)).To(Succeed())
-				Expect(getPostgresResources(&currentPod.Spec).Limits["cpu"]).To(Equal(resource.MustParse("2")))
+	It("propagates transient errors without recreating the pod", func(ctx SpecContext) {
+		resizeErr = apierrs.NewInternalError(errors.New("etcd timeout"))
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		err := rollingUpdate(ctx, r, pod)
+		Expect(apierrs.IsInternalError(err)).To(BeTrue())
+
+		resizeErr = nil
+		resizeCalls = 0
+		expectUntouched(ctx, r)
+	})
+
+	It("recreates the pod when the memory limit decreases", func(ctx SpecContext) {
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+		expectRecreated(ctx, r, rollingUpdate(ctx, r, pod))
+		Expect(resizeCalls).To(BeZero())
+	})
+
+	It("recreates the pod when the resources are not the only change", func(ctx SpecContext) {
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		cluster.Spec.SchedulerName = "custom-scheduler"
+		expectRecreated(ctx, r, rollingUpdate(ctx, r, pod))
+		Expect(resizeCalls).To(BeZero())
+	})
+
+	It("recreates the pod when the strategy is recreate", func(ctx SpecContext) {
+		cluster.Spec.ResourcesUpdateStrategy = apiv1.ResourcesUpdateStrategyRecreate
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		expectRecreated(ctx, r, rollingUpdate(ctx, r, pod))
+		Expect(resizeCalls).To(BeZero())
+	})
+
+	It("leaves alone the live resources changed by other actors", func(ctx SpecContext) {
+		// A resize issued outside the operator, or a mutating webhook at
+		// creation: the pod spec changes, the annotation stays aligned with
+		// the target
+		for i := range pod.Spec.Containers {
+			if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
+				pod.Spec.Containers[i].Resources.Limits["cpu"] = resource.MustParse("4")
 			}
+		}
+		r := newReconciler()
 
-			otherCluster := k8client.ObjectKey{Namespace: cluster.Namespace, Name: "other-cluster"}
-			Expect(rm.CoordinateRollout(otherCluster, "other-cluster-1").RolloutAllowed).To(BeTrue(),
-				"an in-place resize must not consume the rollout slot")
-		})
+		Expect(rollingUpdate(ctx, r, pod)).To(Succeed())
+		Expect(resizeCalls).To(BeZero())
+		currentPod, _ := getCurrentPod(ctx, r, pod.Name)
+		Expect(getPostgresResources(&currentPod.Spec).Limits["cpu"]).To(Equal(resource.MustParse("4")))
+	})
+
+	It("does not touch the instances when the pod spec reconciliation is disabled", func(ctx SpecContext) {
+		cluster.Annotations = map[string]string{utils.ReconcilePodSpecAnnotationName: "disabled"}
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		Expect(rollingUpdate(ctx, r, pod)).To(Succeed())
+		expectUntouched(ctx, r)
+	})
+
+	It("does not touch a fenced instance", func(ctx SpecContext) {
+		cluster.Annotations = map[string]string{utils.FencedInstanceAnnotation: `["` + pod.Name + `"]`}
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		Expect(rollingUpdate(ctx, r, pod)).To(Succeed())
+		expectUntouched(ctx, r)
+	})
+
+	It("does not touch a pod without the pod spec annotation", func(ctx SpecContext) {
+		delete(pod.Annotations, utils.PodSpecAnnotationName)
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		Expect(r.resizeInstancesInPlace(ctx, cluster, &postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{{Pod: pod}},
+		})).To(Succeed())
+		Expect(resizeCalls).To(BeZero())
 	})
 })
