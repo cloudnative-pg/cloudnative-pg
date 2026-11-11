@@ -120,20 +120,14 @@ PostgreSQL switches a standby from the WAL archive back to streaming
 replication only when `restore_command` fails. While the archive keeps up with
 the standby, for example on a busy primary, this may never happen: the standby
 has no WAL receiver, its replication slot stays inactive, and it cannot take
-part in synchronous replication. For this reason, once a standby has been
-restoring WAL files from the archive for 30 seconds, the instance manager makes
-`restore_command` fail for 5 seconds, so that PostgreSQL tries streaming
-replication. If streaming replication does not hold, the interval doubles, up
-to 5 minutes. This applies to the designated primary of a replica cluster as
-well, when it can stream from its source, and never happens outside standby
-mode, such as during a recovery, or while a promotion is pending.
+part in synchronous replication.
 
-These 5 seconds are fixed, and do not depend on `wal_retrieve_retry_interval`:
-PostgreSQL retries a failed restore right away, and tries streaming
-replication within milliseconds of the first failure. The
-`wal_retrieve_retry_interval` parameter applies only when streaming
-replication cannot start, as PostgreSQL waits for it before going back to the
-archive: the standby then pauses replay for about the longer of the two.
+To avoid this, once a standby has been restoring WAL files from the archive for
+30 seconds, the instance manager makes `restore_command` fail, so that
+PostgreSQL tries streaming replication. If streaming replication does not
+hold, the interval doubles, up to 5 minutes. This applies to the designated
+primary of a replica cluster as well, when it can stream from its source, and
+never happens outside standby mode or while a promotion is pending.
 
 ## Synchronous Replication
 
