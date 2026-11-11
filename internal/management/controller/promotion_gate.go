@@ -143,7 +143,7 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 			Message: "Another pod started to promote and did not complete it, proceeding with the promotion",
 			Details: []any{
 				"writer", leasePosition.Pod,
-				"leasePosition", leasePosition.LSN,
+				"leaseLSN", leasePosition.LSN,
 				"leaseTimeline", leasePosition.Timeline,
 			},
 		}

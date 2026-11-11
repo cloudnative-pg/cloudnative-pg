@@ -94,7 +94,7 @@ var _ = Describe("decidePromotion", func() {
 	It("names the pod that is promoting when it is not this one", func() {
 		decision := decide(position(utils.LeasePositionStatePromoting, "0/70000A0", 2),
 			replica("0/70000A0", 2))
-		Expect(decision.Details).To(ContainElements("writer", "cluster-example-2", "leasePosition", "0/70000A0"))
+		Expect(decision.Details).To(ContainElements("writer", "cluster-example-2", "leaseLSN", "0/70000A0"))
 	})
 
 	DescribeTable("after a clean shutdown of the previous primary",
