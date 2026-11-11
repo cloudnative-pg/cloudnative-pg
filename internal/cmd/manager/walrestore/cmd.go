@@ -92,8 +92,9 @@ func NewCmd() *cobra.Command {
 					"end-of-wal-stream flag found." +
 						"Exiting with error once to let Postgres try switching to streaming replication")
 				return err
-			case errors.Is(err, ErrStreamingRetry):
-				// Already logged, and PostgreSQL must try streaming right away
+			case errors.Is(err, ErrForcedRestoreFailure):
+				// Already logged. Skip the pause below, so that PostgreSQL tries
+				// streaming right away
 				return err
 			case errors.Is(err, barmanRestorer.ErrConnectivity):
 				// Barman reports transient network errors with exit code 2

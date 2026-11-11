@@ -113,7 +113,7 @@ var _ = Describe("streamingRetryState", func() {
 			FailUntil:   start.Add(time.Minute + streamingRetryFailFor),
 		}
 
-		resumedAt := state.LastSeen.Add(streamingRetryIdleGap)
+		resumedAt := state.LastSeen.Add(streamingRetryResetAfter)
 		Expect(restoreEvery(&state, resumedAt)).To(Equal(resumedAt.Add(streamingRetryInterval)))
 	})
 })
@@ -169,8 +169,8 @@ var _ = Describe("checkStreamingRetry", func() {
 	})
 
 	It("fails for a standby that restored WAL files for the whole interval", func(ctx SpecContext) {
-		Expect(checkStreamingRetry(ctx, cluster, podName, pgData, walName, false)).To(MatchError(ErrStreamingRetry))
-		Expect(checkStreamingRetry(ctx, cluster, podName, pgData, walName, false)).To(MatchError(ErrStreamingRetry))
+		Expect(checkStreamingRetry(ctx, cluster, podName, pgData, walName, false)).To(MatchError(ErrForcedRestoreFailure))
+		Expect(checkStreamingRetry(ctx, cluster, podName, pgData, walName, false)).To(MatchError(ErrForcedRestoreFailure))
 	})
 
 	It("fails for the designated primary of a replica cluster streaming from its source", func(ctx SpecContext) {
@@ -180,7 +180,7 @@ var _ = Describe("checkStreamingRetry", func() {
 		cluster.Spec.ExternalClusters = []apiv1.ExternalCluster{
 			{Name: "source", ConnectionParameters: map[string]string{"host": "source-rw"}},
 		}
-		Expect(checkStreamingRetry(ctx, cluster, podName, pgData, walName, false)).To(MatchError(ErrStreamingRetry))
+		Expect(checkStreamingRetry(ctx, cluster, podName, pgData, walName, false)).To(MatchError(ErrForcedRestoreFailure))
 	})
 
 	It("restores a WAL file prefetched in the spool, and fails the next one", func(ctx SpecContext) {
@@ -191,7 +191,7 @@ var _ = Describe("checkStreamingRetry", func() {
 		Expect(checkStreamingRetry(ctx, cluster, podName, pgData, walName, false)).To(Succeed())
 		Expect(fileutils.ReadFile(stateFile)).To(Equal(state))
 		Expect(checkStreamingRetry(ctx, cluster, podName, pgData, "000000010000000000000004", false)).
-			To(MatchError(ErrStreamingRetry))
+			To(MatchError(ErrForcedRestoreFailure))
 	})
 
 	It("starts a new interval when the state cannot be read", func(ctx SpecContext) {

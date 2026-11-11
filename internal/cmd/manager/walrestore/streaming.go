@@ -34,11 +34,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
-// ErrStreamingRetry is returned when the WAL restore fails on purpose, to let
-// a standby in continuous archive recovery try streaming replication.
+// ErrForcedRestoreFailure is returned when restore_command fails on purpose,
+// to let a standby in continuous archive recovery try streaming replication.
 // PostgreSQL moves to streaming only when restore_command fails, which never
 // happens while the archive keeps up with the standby.
-var ErrStreamingRetry = errors.New("WAL restore failed on purpose to retry streaming replication")
+var ErrForcedRestoreFailure = errors.New("restore_command failed on purpose to let streaming replication resume")
 
 const (
 	// streamingRetryInterval is how long a standby restores WAL files from
@@ -55,11 +55,11 @@ const (
 	// single failure is not enough
 	streamingRetryFailFor = 5 * time.Second
 
-	// streamingRetryIdleGap is the pause between two restores that tells the
-	// standby has been streaming (or idle) in the meantime. It is as long as
-	// the maximum interval, so that a slow connection attempt to the primary
-	// is not mistaken for streaming
-	streamingRetryIdleGap = streamingRetryMaxInterval
+	// streamingRetryResetAfter is how long PostgreSQL can go without calling
+	// restore_command before we assume the standby was streaming, and start
+	// over. It equals the maximum interval, so that a slow connection attempt
+	// is not taken for streaming
+	streamingRetryResetAfter = streamingRetryMaxInterval
 )
 
 // streamingRetryStateFile stores the streamingRetryState, as every WAL restore
@@ -84,14 +84,14 @@ type streamingRetryState struct {
 	// FailUntil, when set, is the end of the forced failures
 	FailUntil time.Time `json:"failUntil"`
 
-	// FailedWAL is the WAL file the forced failures started with
-	FailedWAL string `json:"failedWAL,omitempty"`
+	// ForcedFailureWAL is the WAL file whose restore failed first on purpose
+	ForcedFailureWAL string `json:"forcedFailureWAL,omitempty"`
 }
 
 // next returns the state after a restore of the given WAL file at the given
 // time, and whether the restore must fail
 func (s streamingRetryState) next(now time.Time, walName string) (streamingRetryState, bool) {
-	if now.Sub(s.LastSeen) >= streamingRetryIdleGap {
+	if now.Sub(s.LastSeen) >= streamingRetryResetAfter {
 		s = streamingRetryState{WindowStart: now, Interval: streamingRetryInterval}
 	}
 	s.LastSeen = now
@@ -101,35 +101,32 @@ func (s streamingRetryState) next(now time.Time, walName string) (streamingRetry
 		return s, true
 
 	case !s.FailUntil.IsZero():
-		failedWAL := s.FailedWAL
+		forcedFailureWAL := s.ForcedFailureWAL
 		s.FailUntil = time.Time{}
-		s.FailedWAL = ""
+		s.ForcedFailureWAL = ""
 		s.WindowStart = now
-		// WAL file names have a fixed width, and the timeline comes first, so
-		// they sort in replay order. After a failed attempt, PostgreSQL can ask
-		// again for the segment before the failed one, which is no progress
-		if walName > failedWAL {
-			// The standby moved on by streaming: start over
+		// WAL file names sort in replay order. After a failed attempt to stream,
+		// PostgreSQL may ask for the segment before: that is not progress
+		if walName > forcedFailureWAL {
+			// Streaming worked: start over
 			s.Interval = streamingRetryInterval
 		} else {
-			// The standby is back on the archive asking for the same WAL file,
-			// or an earlier one: streaming replication did not hold, wait
-			// longer before the next try
+			// Streaming did not hold: wait longer before the next try
 			s.Interval = min(2*s.Interval, streamingRetryMaxInterval)
 		}
 		return s, false
 
 	case now.Sub(s.WindowStart) >= s.Interval:
 		s.FailUntil = now.Add(streamingRetryFailFor)
-		s.FailedWAL = walName
+		s.ForcedFailureWAL = walName
 		return s, true
 	}
 
 	return s, false
 }
 
-// checkStreamingRetry returns ErrStreamingRetry when the requested WAL file
-// must not be restored, to let a standby in continuous archive recovery try
+// checkStreamingRetry fails the restore of a WAL file on purpose, by returning
+// ErrForcedRestoreFailure, so that a standby stuck on the archive tries
 // streaming replication. It never fails outside standby mode, where a failed
 // restore ends the recovery, and it never fails on errors.
 func checkStreamingRetry(
@@ -140,6 +137,8 @@ func checkStreamingRetry(
 	walName string,
 	rewindMode bool,
 ) error {
+	// Only for standbys that can stream: not for pg_rewind, history files, or
+	// instances with nothing to stream from
 	if rewindMode || !postgres.IsWALFile(walName) || !isStreamingAvailable(cluster, podName) {
 		return nil
 	}
@@ -190,9 +189,10 @@ func checkStreamingRetry(
 	}
 
 	log.FromContext(ctx).Info(
-		"Failing the WAL restore on purpose to let PostgreSQL try streaming replication",
+		"Failing restore_command on purpose to let streaming replication resume",
 		"walName", walName,
-		"interval", state.Interval,
+		"interval", state.Interval.String(),
+		"failFor", streamingRetryFailFor.String(),
 		"failUntil", state.FailUntil)
-	return ErrStreamingRetry
+	return ErrForcedRestoreFailure
 }
