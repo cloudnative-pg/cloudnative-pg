@@ -26,7 +26,7 @@ import (
 
 // The states of a LeasePosition are the ones of PgDataState, plus two of ours.
 // Which of the PgDataState ones are written is up to the writer, see the
-// documentation of the annotation.
+// comment of the LeasePosition type below.
 const (
 	// LeasePositionStateUnknown is written when the position could not be
 	// determined, and carries no position
