@@ -269,6 +269,7 @@ func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePos
 
 // unblockPromotionHint is what a person can do when the gate blocks a promotion
 const unblockPromotionHint = "To promote this replica anyway, accepting the loss of the data that only the " +
-	"previous primary has, remove the annotation of the primary lease: " +
-	"kubectl annotate lease <cluster> " + utils.LeasePositionAnnotationName + "-. " +
-	"To avoid the loss, promote the previous primary back: kubectl cnpg promote <previous primary>"
+	"previous primary has, remove the annotation of the primary lease " +
+	"(kubectl annotate lease <cluster> " + utils.LeasePositionAnnotationName + "-). " +
+	"To avoid that loss, promote the previous primary back " +
+	"(kubectl cnpg promote <cluster> <previous primary>)"

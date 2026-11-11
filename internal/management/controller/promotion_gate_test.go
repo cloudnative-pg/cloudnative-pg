@@ -151,8 +151,8 @@ var _ = Describe("decidePromotion", func() {
 		decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 1),
 			replica("0/70000A0", 2))
 		Expect(decision.Verdict).To(Equal(promotionBlocked))
-		Expect(decision.Message).To(ContainSubstring("kubectl annotate lease <cluster> cnpg.io/position-"))
-		Expect(decision.Message).To(ContainSubstring("kubectl cnpg promote"))
+		Expect(decision.Message).To(ContainSubstring("kubectl annotate lease <cluster> cnpg.io/position-)"))
+		Expect(decision.Message).To(ContainSubstring("kubectl cnpg promote <cluster> <previous primary>"))
 	})
 
 	Context("when the previous primary did not stop cleanly", func() {
