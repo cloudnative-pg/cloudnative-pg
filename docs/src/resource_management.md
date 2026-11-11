@@ -167,8 +167,10 @@ The `inPlace` strategy is best-effort by design: whenever the change cannot be
 applied in place, the operator falls back to the standard rolling update.
 This happens when:
 
-- The Kubernetes cluster does not expose the resize subresource of the pods
-  (the feature requires Kubernetes 1.33 or later, and became stable in 1.35).
+- The Kubernetes cluster, or the node running the pod, does not support
+  in-place pod resize (the feature requires Kubernetes 1.33 or later, and
+  became stable in 1.35): the API server rejects the resize and the operator
+  recreates the pod.
 - A **memory limit is decreased**. The kubelet applies a memory limit
   decrease only when the current usage of the container is below the new
   limit, and PostgreSQL keeps its shared memory (`shared_buffers` above all)
@@ -180,8 +182,7 @@ This happens when:
   an out-of-memory termination at the next spike of activity. A fresh pod
   starting under the new limit, with memory parameters reviewed accordingly,
   is the deterministic option.
-- Resource entries are added or removed, rather than changed: Kubernetes does
-  not allow a resize to add or remove `requests` and `limits` entries.
+- `requests` and `limits` entries are added or removed, rather than changed.
 - Resources other than `cpu` and `memory` (for example, hugepages) are
   changed.
 - The change would alter the pod QoS class, which Kubernetes forbids: the API
