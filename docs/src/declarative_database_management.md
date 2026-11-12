@@ -238,18 +238,11 @@ The `permissions` stanza supports the following lists, one for each privilege:
 
 Every item of these lists accepts the following fields:
 
-- `name` *(required, string)*: The target role name. The exact lowercase name
-  `public` targets the PostgreSQL `PUBLIC` pseudo-role, which applies to all
-  existing and future roles.
+- `name` *(required, string)*: The target role name. Using `public` targets the
+  PostgreSQL `PUBLIC` pseudo-role (which applies to all existing and future
+  roles).
 - `type` *(string)*: The action to take on the privilege. Accepts `grant` or
   `revoke` (default: `grant`).
-
-:::info
-    `public` is a reserved role name in PostgreSQL, so no role can be named
-    that way. Role names are otherwise matched exactly, including their case:
-    `PUBLIC` and `Public` are ordinary role names, not the `PUBLIC`
-    pseudo-role.
-:::
 
 The `all` list is only a shortcut. It is expanded into `connect`, `create` and
 `temporary` before the database is reconciled, and the status reports the

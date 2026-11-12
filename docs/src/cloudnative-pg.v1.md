@@ -906,9 +906,8 @@ DatabasePermissionsSpec groups the privileges that can be granted or revoked
 on a database, keyed by privilege. Each entry reuses the `grant`/`revoke`
 model already used for foreign data wrapper and server usage.
 
-The role name `public` (lowercase, and only that spelling) is reserved by
-PostgreSQL and refers to the `PUBLIC` pseudo-role, meaning every role.
-Other spellings, such as `PUBLIC` or `Public`, are ordinary role names.
+The role name `public` refers to the `PUBLIC` pseudo-role, meaning every
+role.
 
 A `revoke` only removes the privilege granted to the named role itself:
 it has no effect on privileges the role holds through `PUBLIC` or through

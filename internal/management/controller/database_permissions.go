@@ -26,17 +26,13 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
-
-// publicGranteeName is the reserved role name that refers to the PostgreSQL
-// PUBLIC pseudo-role. Only this exact spelling is reserved: PostgreSQL
-// accepts roles named "PUBLIC" or "Public", which are ordinary roles.
-const publicGranteeName = "public"
 
 // publicGranteeOid is the OID that identifies PUBLIC in an ACL item
 const publicGranteeOid int64 = 0
@@ -126,7 +122,7 @@ func expandDatabasePermissions(
 				changeType = apiv1.GrantUsageSpecType
 			}
 
-			if i, found := seen[entry.Name]; found {
+			if i, found := seen[granteeKey(entry.Name)]; found {
 				// The webhook rejects both cases, but it can be bypassed
 				if result[i].changeType != changeType {
 					result[i].err = errConflictingDatabasePermission
@@ -136,7 +132,7 @@ func expandDatabasePermissions(
 				continue
 			}
 
-			seen[entry.Name] = len(result)
+			seen[granteeKey(entry.Name)] = len(result)
 			result = append(result, databasePermissionChange{
 				privilege:  list.privilege,
 				name:       entry.Name,
@@ -151,13 +147,13 @@ func expandDatabasePermissions(
 	return result
 }
 
-// databaseGrantee renders a grantee for a GRANT/REVOKE statement. Differently
-// from sanitizeGrantee, only the exact name `public` is the PUBLIC keyword.
-func databaseGrantee(name string) string {
-	if name == publicGranteeName {
-		return "PUBLIC"
+// granteeKey returns the key that identifies a grantee, so that every spelling
+// of `public` resolves to the PUBLIC pseudo-role, as `sanitizeGrantee` does
+func granteeKey(name string) string {
+	if strings.EqualFold(name, publicRole) {
+		return publicRole
 	}
-	return pgx.Identifier{name}.Sanitize()
+	return name
 }
 
 // planDatabasePermissions compares the decorated changes with the ACL of the
@@ -184,12 +180,12 @@ func planDatabasePermissions(
 			change.statement = fmt.Sprintf("GRANT %s ON DATABASE %s TO %s",
 				change.privilege,
 				pgx.Identifier{databaseName}.Sanitize(),
-				databaseGrantee(change.name))
+				sanitizeGrantee(change.name))
 		case change.changeType == apiv1.RevokeUsageSpecType && granted:
 			change.statement = fmt.Sprintf("REVOKE %s ON DATABASE %s FROM %s",
 				change.privilege,
 				pgx.Identifier{databaseName}.Sanitize(),
-				databaseGrantee(change.name))
+				sanitizeGrantee(change.name))
 		}
 
 		result = append(result, change)
@@ -264,7 +260,7 @@ func decorateDatabasePermissions(
 			continue
 		}
 
-		if change.name == publicGranteeName {
+		if granteeKey(change.name) == publicRole {
 			change.granteeOid = publicGranteeOid
 			continue
 		}
