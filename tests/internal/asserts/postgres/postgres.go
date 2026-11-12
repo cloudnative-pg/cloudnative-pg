@@ -219,6 +219,18 @@ func SchemaPrivilegeQuery(roleName, schemaName, privilege string) string {
 	return fmt.Sprintf("SELECT has_schema_privilege('%v', '%v', '%v')", roleName, schemaName, privilege)
 }
 
+// DatabasePrivilegeHeldByPublicQuery builds a query checking whether PUBLIC
+// itself holds the given privilege (CONNECT, CREATE or TEMPORARY) on the named
+// database. has_database_privilege() cannot be used here, as it doesn't accept
+// PUBLIC and a privilege held by PUBLIC satisfies it for every other role.
+func DatabasePrivilegeHeldByPublicQuery(databaseName, privilege string) string {
+	return fmt.Sprintf(
+		"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_database d, "+
+			"pg_catalog.aclexplode(coalesce(d.datacl, pg_catalog.acldefault('d', d.datdba))) a "+
+			"WHERE d.datname = '%v' AND a.grantee = 0 AND a.privilege_type = '%v')",
+		databaseName, privilege)
+}
+
 // AssertDataExpectedCount verifies that the named table has exactly
 // expectedValue rows.
 func AssertDataExpectedCount(

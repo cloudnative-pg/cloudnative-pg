@@ -11,6 +11,19 @@ spec:
   template: template0
   cluster:
     name: cluster-with-declarative-databases
+  # Every default privilege PUBLIC gets on a new database is touched on
+  # purpose, as the owner "app" holds all of them implicitly, which would make
+  # an assertion on that role meaningless.
+  permissions:
+    connect:
+      - name: public
+        type: revoke
+    temporary:
+      - name: public
+        type: revoke
+    create:
+      - name: public
+        type: grant
   extensions:
     - name: bloom
       ensure: present

@@ -199,6 +199,114 @@ spec:
 This manifest ensures that the `database-to-drop` database is removed from the
 `cluster-example` cluster.
 
+## Managing Database Permissions
+
+CloudNativePG can grant and revoke the privileges that PostgreSQL defines on
+the database itself: `CONNECT`, `CREATE` and `TEMPORARY`.
+
+The most common use is hardening. PostgreSQL grants `CONNECT` and `TEMPORARY`
+on every new database to `PUBLIC`, so a production setup usually revokes
+`CONNECT` from `PUBLIC` and grants it back to specific roles.
+
+To enable this feature, define the `spec.permissions` field, as shown in the
+following example:
+
+```yaml
+# ...
+spec:
+  permissions:
+    connect:
+      - name: public
+        type: revoke
+      - name: app
+        type: grant
+    create:
+      - name: app
+        type: grant
+    temporary:
+      - name: app
+        type: revoke
+# ...
+```
+
+The `permissions` stanza supports the following lists, one for each privilege:
+
+- `connect`: `CONNECT` privilege specifications.
+- `create`: `CREATE` privilege specifications.
+- `temporary`: `TEMPORARY` privilege specifications.
+- `all`: a shortcut for `connect`, `create` and `temporary` together.
+
+Every item of these lists accepts the following fields:
+
+- `name` *(required, string)*: The target role name. The exact lowercase name
+  `public` targets the PostgreSQL `PUBLIC` pseudo-role, which applies to all
+  existing and future roles.
+- `type` *(string)*: The action to take on the privilege. Accepts `grant` or
+  `revoke` (default: `grant`).
+
+:::info
+    `public` is a reserved role name in PostgreSQL, so no role can be named
+    that way. Role names are otherwise matched exactly, including their case:
+    `PUBLIC` and `Public` are ordinary role names, not the `PUBLIC`
+    pseudo-role.
+:::
+
+The `all` list is only a shortcut. It is expanded into `connect`, `create` and
+`temporary` before the database is reconciled, and the status reports the
+expanded entries.
+
+A role can appear only once for each privilege, once `all` has been expanded.
+Repeating a role, whether with the same or a different `type`, is rejected when
+the resource is created or updated.
+
+For each privilege and role, CloudNativePG reads the privileges currently held
+on the database and runs a `GRANT` or `REVOKE` only when it is needed. The
+outcome of every entry is reported in `status.permissions`:
+
+```yaml
+status:
+  applied: false
+  permissions:
+    - privilege: CONNECT
+      name: public
+      type: revoke
+      applied: true
+    - privilege: CONNECT
+      name: reporting
+      type: grant
+      applied: false
+      message: role does not exist
+```
+
+The entries are independent. If a role does not exist, which is reported for
+both `grant` and `revoke`, the other entries are still applied. The
+`Database` is retried until all of them succeed.
+
+:::info
+    CloudNativePG manages database permissions using the
+    [`GRANT`](https://www.postgresql.org/docs/current/sql-grant.html) and
+    [`REVOKE`](https://www.postgresql.org/docs/current/sql-revoke.html)
+    PostgreSQL commands. `WITH GRANT OPTION` and `GRANTED BY` are not supported.
+:::
+
+:::warning
+    A `revoke` removes only the privilege that was granted to the named role
+    itself. It has no effect on privileges the role holds through `PUBLIC` or
+    through the membership of another role. For example, revoking `CONNECT`
+    from `app` does not prevent `app` from connecting while `PUBLIC` still has
+    it: revoke it from `public` too.
+
+    Privileges are applied when the `Database` spec changes, not continuously,
+    so one changed directly in PostgreSQL is not brought back to the declared
+    state until the spec is modified. Removing an entry from the spec revokes
+    nothing: to remove a privilege, set the `type` field to `revoke`.
+
+    Revoking `CONNECT` from the application role, or from `public` when the
+    application role has no other way to connect, locks the application out of
+    the database. CloudNativePG itself is not affected, as it connects as the
+    superuser.
+:::
+
 ## Managing Extensions in a Database
 
 :::info
