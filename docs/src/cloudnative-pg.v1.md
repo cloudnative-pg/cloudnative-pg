@@ -660,7 +660,7 @@ _Appears in:_
 | `affinity` _[AffinityConfiguration](#affinityconfiguration)_ | Affinity/Anti-affinity rules for Pods |  |  |  |
 | `topologySpreadConstraints` _[TopologySpreadConstraint](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#topologyspreadconstraint-v1-core) array_ | TopologySpreadConstraints specifies how to spread matching pods among the given topology.<br />More info:<br />https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/ |  |  |  |
 | `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#resourcerequirements-v1-core)_ | Resources requirements of every generated Pod. Please refer to<br />https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/<br />for more information. |  |  |  |
-| `resourcesUpdateStrategy` _[ResourcesUpdateStrategy](#resourcesupdatestrategy)_ | ResourcesUpdateStrategy selects how changes to the resources of the<br />instance containers are applied to running instances: `recreate` (the<br />default) replaces the Pods with a rolling update, while `inPlace`<br />resizes running Pods through the Kubernetes `resize` subresource<br />whenever possible, falling back to a rolling update otherwise.<br />In-place resize requires Kubernetes 1.33 or later. Memory limit<br />decreases are always applied with a rolling update. |  |  | Enum: [recreate inPlace] <br /> |
+| `resourcesUpdateStrategy` _[ResourcesUpdateStrategy](#resourcesupdatestrategy)_ | How changes to `resources` reach running instances: `recreate`<br />(default) rolls the Pods, `inPlace` resizes them when possible and<br />rolls them otherwise. `inPlace` requires Kubernetes 1.33 or later. |  |  | Enum: [recreate inPlace] <br /> |
 | `ephemeralVolumesSizeLimit` _[EphemeralVolumesSizeLimitConfiguration](#ephemeralvolumessizelimitconfiguration)_ | EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral<br />volumes |  |  |  |
 | `priorityClassName` _string_ | Name of the priority class which will be used in every generated Pod, if the PriorityClass<br />specified does not exist, the pod will not be able to schedule.  Please refer to<br />https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass<br />for more information |  |  |  |
 | `primaryUpdateStrategy` _[PrimaryUpdateStrategy](#primaryupdatestrategy)_ | Deployment strategy to follow to upgrade the primary server during a rolling<br />update procedure, after all replicas have been successfully updated:<br />it can be automated (`unsupervised` - default) or manual (`supervised`) |  | unsupervised | Enum: [unsupervised supervised] <br /> |
@@ -2748,9 +2748,7 @@ _Appears in:_
 
 _Underlying type:_ _string_
 
-ResourcesUpdateStrategy defines how changes to the resources of the
-instance containers are applied to running instances.
-The default strategy is "recreate"
+ResourcesUpdateStrategy defines how changes to `resources` reach running instances
 
 
 
@@ -2760,8 +2758,8 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `recreate` | ResourcesUpdateStrategyRecreate means that a change to the resources of<br />the instance containers is applied by replacing the Pods with a rolling<br />update (`recreate`, default)<br /> |
-| `inPlace` | ResourcesUpdateStrategyInPlace means that a change to the resources of<br />the instance containers is applied to the running Pods through the<br />Kubernetes `resize` subresource whenever possible, falling back to a<br />rolling update otherwise (`inPlace`)<br /> |
+| `recreate` | ResourcesUpdateStrategyRecreate rolls the Pods (`recreate`, default)<br /> |
+| `inPlace` | ResourcesUpdateStrategyInPlace resizes the Pods when possible, and rolls them otherwise (`inPlace`)<br /> |
 
 
 #### RoleConfiguration

@@ -423,13 +423,9 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// ResourcesUpdateStrategy selects how changes to the resources of the
-	// instance containers are applied to running instances: `recreate` (the
-	// default) replaces the Pods with a rolling update, while `inPlace`
-	// resizes running Pods through the Kubernetes `resize` subresource
-	// whenever possible, falling back to a rolling update otherwise.
-	// In-place resize requires Kubernetes 1.33 or later. Memory limit
-	// decreases are always applied with a rolling update.
+	// How changes to `resources` reach running instances: `recreate`
+	// (default) rolls the Pods, `inPlace` resizes them when possible and
+	// rolls them otherwise. `inPlace` requires Kubernetes 1.33 or later.
 	// +kubebuilder:validation:Enum=recreate;inPlace
 	// +optional
 	ResourcesUpdateStrategy ResourcesUpdateStrategy `json:"resourcesUpdateStrategy,omitempty"`
@@ -1470,21 +1466,14 @@ type PrimaryUpdateStrategy string
 // The default method is "restart"
 type PrimaryUpdateMethod string
 
-// ResourcesUpdateStrategy defines how changes to the resources of the
-// instance containers are applied to running instances.
-// The default strategy is "recreate"
+// ResourcesUpdateStrategy defines how changes to `resources` reach running instances
 type ResourcesUpdateStrategy string
 
 const (
-	// ResourcesUpdateStrategyRecreate means that a change to the resources of
-	// the instance containers is applied by replacing the Pods with a rolling
-	// update (`recreate`, default)
+	// ResourcesUpdateStrategyRecreate rolls the Pods (`recreate`, default)
 	ResourcesUpdateStrategyRecreate ResourcesUpdateStrategy = "recreate"
 
-	// ResourcesUpdateStrategyInPlace means that a change to the resources of
-	// the instance containers is applied to the running Pods through the
-	// Kubernetes `resize` subresource whenever possible, falling back to a
-	// rolling update otherwise (`inPlace`)
+	// ResourcesUpdateStrategyInPlace resizes the Pods when possible, and rolls them otherwise (`inPlace`)
 	ResourcesUpdateStrategyInPlace ResourcesUpdateStrategy = "inPlace"
 
 	// PrimaryUpdateStrategySupervised means that the operator need to wait for the
