@@ -93,10 +93,20 @@ var _ = Describe("Logical Slot Switchover", Label(tests.LabelPublicationSubscrip
 		})
 
 		By("waiting for the replica to synchronize the slot", func() {
-			// A synced slot stays temporary until it is safe to use, and a
-			// promotion drops the temporary ones
-			Eventually(query(replica, "SELECT synced AND NOT temporary FROM pg_catalog.pg_replication_slots "+
-				"WHERE slot_name = '"+slotName+"'"), 120).Should(Equal("t"))
+			// A synced slot stays temporary until the slot on the primary has
+			// caught up with the replica, and a promotion drops the temporary
+			// ones. This slot has no client: a transaction run on the primary
+			// before the replica creates its copy would leave it behind
+			// forever, so the slot is advanced here
+			Eventually(func() (string, error) {
+				_, err := query(oldPrimary, "SELECT pg_catalog.pg_log_standby_snapshot(); "+
+					"SELECT pg_catalog.pg_replication_slot_advance('"+slotName+"', pg_catalog.pg_current_wal_lsn())")()
+				if err != nil {
+					return "", err
+				}
+				return query(replica, "SELECT synced AND NOT temporary FROM pg_catalog.pg_replication_slots "+
+					"WHERE slot_name = '"+slotName+"'")()
+			}, 120).Should(Equal("t"))
 		})
 
 		clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
