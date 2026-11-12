@@ -35,19 +35,25 @@
 ## backport by hand. Does not regenerate go.sum; run `go mod tidy` and
 ## `go mod verify` afterwards to settle hashes.
 ##
-## Usage: hack/replay-gomod.sh <commit-sha>
+## Usage: hack/replay-gomod.sh <commit-sha> [module-dir]
+##
+## module-dir defaults to the repository root. Pass `tests` to replay
+## tests/go.mod.
 
 set -euo pipefail
 
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 <commit-sha>" >&2
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+    echo "Usage: $0 <commit-sha> [module-dir]" >&2
     exit 1
 fi
 
 commit=$1
+dir=${2:-.}
+modfile=${dir}/go.mod
+gitpath=${modfile#./}
 
-if ! git diff-tree --no-commit-id --name-only -r "${commit}" | grep -qE '^go\.mod$'; then
-    echo "Commit ${commit} does not touch go.mod; nothing to replay." >&2
+if ! git diff-tree --no-commit-id --name-only -r "${commit}" | grep -qxF "${gitpath}"; then
+    echo "Commit ${commit} does not touch ${gitpath}; nothing to replay." >&2
     exit 0
 fi
 
@@ -55,14 +61,14 @@ PARENT_GO_MOD=$(mktemp)
 PICKED_GO_MOD=$(mktemp)
 trap 'rm -f "${PARENT_GO_MOD}" "${PICKED_GO_MOD}"' EXIT
 
-git show "${commit}^:go.mod" > "${PARENT_GO_MOD}"
-git show "${commit}:go.mod"  > "${PICKED_GO_MOD}"
+git show "${commit}^:${gitpath}" > "${PARENT_GO_MOD}"
+git show "${commit}:${gitpath}"  > "${PICKED_GO_MOD}"
 
 # go directive
 PICKED_GO=$(go mod edit -json "${PICKED_GO_MOD}" | jq -r '.Go // ""')
 PARENT_GO=$(go mod edit -json "${PARENT_GO_MOD}" | jq -r '.Go // ""')
 if [ "${PICKED_GO}" != "${PARENT_GO}" ] && [ -n "${PICKED_GO}" ]; then
-    go mod edit -go="${PICKED_GO}"
+    go mod edit -go="${PICKED_GO}" "${modfile}"
 fi
 
 # toolchain directive
@@ -70,9 +76,9 @@ PICKED_TC=$(go mod edit -json "${PICKED_GO_MOD}" | jq -r '.Toolchain // ""')
 PARENT_TC=$(go mod edit -json "${PARENT_GO_MOD}" | jq -r '.Toolchain // ""')
 if [ "${PICKED_TC}" != "${PARENT_TC}" ]; then
     if [ -n "${PICKED_TC}" ]; then
-        go mod edit -toolchain="${PICKED_TC}"
+        go mod edit -toolchain="${PICKED_TC}" "${modfile}"
     else
-        go mod edit -droptoolchain
+        go mod edit -droptoolchain "${modfile}"
     fi
 fi
 
@@ -80,7 +86,7 @@ fi
 EXTRACT='[.Require[]? | "\(.Path)@\(.Version)"] | sort | .[]'
 while IFS= read -r req; do
     [ -z "${req}" ] && continue
-    go mod edit -require="${req}"
+    go mod edit -require="${req}" "${modfile}"
 done < <(comm -23 \
     <(go mod edit -json "${PICKED_GO_MOD}" | jq -r "${EXTRACT}") \
     <(go mod edit -json "${PARENT_GO_MOD}" | jq -r "${EXTRACT}"))
@@ -89,7 +95,7 @@ done < <(comm -23 \
 EXTRACT_PATH='[.Require[]? | .Path] | sort | unique | .[]'
 while IFS= read -r path; do
     [ -z "${path}" ] && continue
-    go mod edit -droprequire="${path}" 2>/dev/null || true
+    go mod edit -droprequire="${path}" "${modfile}" 2>/dev/null || true
 done < <(comm -23 \
     <(go mod edit -json "${PARENT_GO_MOD}" | jq -r "${EXTRACT_PATH}") \
     <(go mod edit -json "${PICKED_GO_MOD}" | jq -r "${EXTRACT_PATH}"))
