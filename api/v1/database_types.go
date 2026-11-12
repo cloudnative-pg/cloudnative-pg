@@ -38,17 +38,17 @@ const (
 	DatabaseReclaimRetain DatabaseReclaimPolicy = "retain"
 )
 
-// UsageSpecType describes the type of usage specified in the `usage` field of the
-// `Database` object.
+// UsageSpecType describes whether a privilege is granted to or revoked from a
+// role in the `Database` object.
 // +enum
 type UsageSpecType string
 
 const (
-	// GrantUsageSpecType indicates a grant usage permission.
-	// The default usage permission is grant.
+	// GrantUsageSpecType indicates a grant of the privilege.
+	// The default is grant.
 	GrantUsageSpecType UsageSpecType = "grant"
 
-	// RevokeUsageSpecType indicates a revoke usage permission.
+	// RevokeUsageSpecType indicates a revoke of the privilege.
 	RevokeUsageSpecType UsageSpecType = "revoke"
 )
 
@@ -376,13 +376,13 @@ type OptionSpec struct {
 	Ensure EnsureOption `json:"ensure,omitempty"`
 }
 
-// UsageSpec configures a usage for a foreign data wrapper
+// UsageSpec grants or revokes a privilege for a role, or for `public`
 type UsageSpec struct {
-	// Name of the usage
+	// Name of the role, or `public` to target all roles
 	// +kubebuilder:validation:XValidation:rule="self != ''",message="name is required"
 	Name string `json:"name"`
 
-	// The type of usage
+	// Whether the privilege is granted to or revoked from the role
 	// +kubebuilder:default:="grant"
 	// +kubebuilder:validation:Enum=grant;revoke
 	// +optional

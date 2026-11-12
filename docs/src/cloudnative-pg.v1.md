@@ -3474,7 +3474,7 @@ _Appears in:_
 
 
 
-UsageSpec configures a usage for a foreign data wrapper
+UsageSpec grants or revokes a privilege for a role, or for `public`
 
 
 
@@ -3487,16 +3487,16 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | Name of the usage | True |  |  |
-| `type` _[UsageSpecType](#usagespectype)_ | The type of usage |  | grant | Enum: [grant revoke] <br /> |
+| `name` _string_ | Name of the role, or `public` to target all roles | True |  |  |
+| `type` _[UsageSpecType](#usagespectype)_ | Whether the privilege is granted to or revoked from the role |  | grant | Enum: [grant revoke] <br /> |
 
 
 #### UsageSpecType
 
 _Underlying type:_ _string_
 
-UsageSpecType describes the type of usage specified in the `usage` field of the
-`Database` object.
+UsageSpecType describes whether a privilege is granted to or revoked from a
+role in the `Database` object.
 
 
 
@@ -3507,8 +3507,8 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `grant` | GrantUsageSpecType indicates a grant usage permission.<br />The default usage permission is grant.<br /> |
-| `revoke` | RevokeUsageSpecType indicates a revoke usage permission.<br /> |
+| `grant` | GrantUsageSpecType indicates a grant of the privilege.<br />The default is grant.<br /> |
+| `revoke` | RevokeUsageSpecType indicates a revoke of the privilege.<br /> |
 
 
 #### VolumeSnapshotConfiguration

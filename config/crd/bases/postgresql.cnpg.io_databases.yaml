@@ -226,18 +226,20 @@ spec:
                       description: List of roles for which `USAGE` privileges on the
                         FDW are granted or revoked.
                       items:
-                        description: UsageSpec configures a usage for a foreign data
-                          wrapper
+                        description: UsageSpec grants or revokes a privilege for a
+                          role, or for `public`
                         properties:
                           name:
-                            description: Name of the usage
+                            description: Name of the role, or `public` to target all
+                              roles
                             type: string
                             x-kubernetes-validations:
                             - message: name is required
                               rule: self != ''
                           type:
                             default: grant
-                            description: The type of usage
+                            description: Whether the privilege is granted to or revoked
+                              from the role
                             enum:
                             - grant
                             - revoke
@@ -348,18 +350,20 @@ spec:
                       expanded into the three individual privileges before reconciliation, and
                       the status reports the expanded entries.
                     items:
-                      description: UsageSpec configures a usage for a foreign data
-                        wrapper
+                      description: UsageSpec grants or revokes a privilege for a role,
+                        or for `public`
                       properties:
                         name:
-                          description: Name of the usage
+                          description: Name of the role, or `public` to target all
+                            roles
                           type: string
                           x-kubernetes-validations:
                           - message: name is required
                             rule: self != ''
                         type:
                           default: grant
-                          description: The type of usage
+                          description: Whether the privilege is granted to or revoked
+                            from the role
                           enum:
                           - grant
                           - revoke
@@ -373,18 +377,20 @@ spec:
                       List of roles for which the `CONNECT` privilege on the database is granted or revoked.
                       Maps to `GRANT CONNECT ON DATABASE ... TO ...` / `REVOKE CONNECT ON DATABASE ... FROM ...`.
                     items:
-                      description: UsageSpec configures a usage for a foreign data
-                        wrapper
+                      description: UsageSpec grants or revokes a privilege for a role,
+                        or for `public`
                       properties:
                         name:
-                          description: Name of the usage
+                          description: Name of the role, or `public` to target all
+                            roles
                           type: string
                           x-kubernetes-validations:
                           - message: name is required
                             rule: self != ''
                         type:
                           default: grant
-                          description: The type of usage
+                          description: Whether the privilege is granted to or revoked
+                            from the role
                           enum:
                           - grant
                           - revoke
@@ -398,18 +404,20 @@ spec:
                       List of roles for which the `CREATE` privilege on the database is granted or revoked.
                       Maps to `GRANT CREATE ON DATABASE ... TO ...` / `REVOKE CREATE ON DATABASE ... FROM ...`.
                     items:
-                      description: UsageSpec configures a usage for a foreign data
-                        wrapper
+                      description: UsageSpec grants or revokes a privilege for a role,
+                        or for `public`
                       properties:
                         name:
-                          description: Name of the usage
+                          description: Name of the role, or `public` to target all
+                            roles
                           type: string
                           x-kubernetes-validations:
                           - message: name is required
                             rule: self != ''
                         type:
                           default: grant
-                          description: The type of usage
+                          description: Whether the privilege is granted to or revoked
+                            from the role
                           enum:
                           - grant
                           - revoke
@@ -423,18 +431,20 @@ spec:
                       List of roles for which the `TEMPORARY` privilege on the database is granted or revoked.
                       Maps to `GRANT TEMPORARY ON DATABASE ... TO ...` / `REVOKE TEMPORARY ON DATABASE ... FROM ...`.
                     items:
-                      description: UsageSpec configures a usage for a foreign data
-                        wrapper
+                      description: UsageSpec grants or revokes a privilege for a role,
+                        or for `public`
                       properties:
                         name:
-                          description: Name of the usage
+                          description: Name of the role, or `public` to target all
+                            roles
                           type: string
                           x-kubernetes-validations:
                           - message: name is required
                             rule: self != ''
                         type:
                           default: grant
-                          description: The type of usage
+                          description: Whether the privilege is granted to or revoked
+                            from the role
                           enum:
                           - grant
                           - revoke
@@ -482,18 +492,20 @@ spec:
                             List of roles for which the `CREATE` privilege on the schema is granted or revoked.
                             Maps to `GRANT CREATE ON SCHEMA ... TO ...` / `REVOKE CREATE ON SCHEMA ... FROM ...`.
                           items:
-                            description: UsageSpec configures a usage for a foreign
-                              data wrapper
+                            description: UsageSpec grants or revokes a privilege for
+                              a role, or for `public`
                             properties:
                               name:
-                                description: Name of the usage
+                                description: Name of the role, or `public` to target
+                                  all roles
                                 type: string
                                 x-kubernetes-validations:
                                 - message: name is required
                                   rule: self != ''
                               type:
                                 default: grant
-                                description: The type of usage
+                                description: Whether the privilege is granted to or
+                                  revoked from the role
                                 enum:
                                 - grant
                                 - revoke
@@ -507,18 +519,20 @@ spec:
                             List of roles for which the `USAGE` privilege on the schema is granted or revoked.
                             Maps to `GRANT USAGE ON SCHEMA ... TO ...` / `REVOKE USAGE ON SCHEMA ... FROM ...`.
                           items:
-                            description: UsageSpec configures a usage for a foreign
-                              data wrapper
+                            description: UsageSpec grants or revokes a privilege for
+                              a role, or for `public`
                             properties:
                               name:
-                                description: Name of the usage
+                                description: Name of the role, or `public` to target
+                                  all roles
                                 type: string
                                 x-kubernetes-validations:
                                 - message: name is required
                                   rule: self != ''
                               type:
                                 default: grant
-                                description: The type of usage
+                                description: Whether the privilege is granted to or
+                                  revoked from the role
                                 enum:
                                 - grant
                                 - revoke
@@ -591,18 +605,20 @@ spec:
                       description: List of roles for which `USAGE` privileges on the
                         server are granted or revoked.
                       items:
-                        description: UsageSpec configures a usage for a foreign data
-                          wrapper
+                        description: UsageSpec grants or revokes a privilege for a
+                          role, or for `public`
                         properties:
                           name:
-                            description: Name of the usage
+                            description: Name of the role, or `public` to target all
+                              roles
                             type: string
                             x-kubernetes-validations:
                             - message: name is required
                               rule: self != ''
                           type:
                             default: grant
-                            description: The type of usage
+                            description: Whether the privilege is granted to or revoked
+                              from the role
                             enum:
                             - grant
                             - revoke
