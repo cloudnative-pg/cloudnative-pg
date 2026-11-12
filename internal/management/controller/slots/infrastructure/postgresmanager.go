@@ -117,7 +117,9 @@ func Delete(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 // refuses to enable failover on a slot during recovery, except in the slot sync
 // worker, which marks its slots as synced: these slots were created while the
 // instance was a primary, and the slot sync worker won't overwrite them.
-// The slots in use are left out.
+// The slots in use are left out, and so is every slot when
+// sync_replication_slots is off: there is no slot sync worker to unblock, and
+// pg_failover_slots keeps using the slots of a former primary.
 // It requires PostgreSQL 17 or later.
 func ListOrphanedFailoverSlots(ctx context.Context, db *sql.DB) (ReplicationSlotList, error) {
 	rows, err := db.QueryContext(
@@ -125,7 +127,8 @@ func ListOrphanedFailoverSlots(ctx context.Context, db *sql.DB) (ReplicationSlot
 		`SELECT slot_name
             FROM pg_catalog.pg_replication_slots
             WHERE slot_type = 'logical' AND failover AND NOT synced AND NOT active
-            AND pg_catalog.pg_is_in_recovery()`,
+            AND pg_catalog.pg_is_in_recovery()
+            AND pg_catalog.current_setting('sync_replication_slots')::bool`,
 	)
 	if err != nil {
 		return ReplicationSlotList{}, err
