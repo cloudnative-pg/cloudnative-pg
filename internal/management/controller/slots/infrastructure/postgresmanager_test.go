@@ -186,7 +186,8 @@ var _ = Describe("PostgresManager", func() {
 	Context("ListOrphanedFailoverSlots", func() {
 		const expectedSQL = "^SELECT slot_name FROM pg_catalog.pg_replication_slots " +
 			"WHERE slot_type = 'logical' AND failover AND NOT synced AND NOT active " +
-			"AND pg_catalog.pg_is_in_recovery\\(\\)$"
+			"AND pg_catalog.pg_is_in_recovery\\(\\) " +
+			"AND pg_catalog.current_setting\\('sync_replication_slots'\\)::bool$"
 
 		It("should successfully list the orphaned failover slots", func(ctx SpecContext) {
 			rows := sqlmock.NewRows([]string{"slot_name"}).
