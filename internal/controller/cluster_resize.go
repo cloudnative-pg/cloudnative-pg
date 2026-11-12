@@ -141,7 +141,7 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 		}
 
 		r.Recorder.Eventf(cluster, "Normal", "InPlaceResize",
-			"Resized instance pod %s in place", pod.Name)
+			"Requested the in-place resize of instance pod %s", pod.Name)
 		// The pod is now the fresh answer of the API server, and the
 		// kubelet is about to update its status: a lock would fail for nothing
 		lock = nil
