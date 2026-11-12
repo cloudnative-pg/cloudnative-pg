@@ -96,7 +96,7 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 	}
 
 	resizedPod := pod.DeepCopy()
-	if !specs.ResizeInPlace(&storedPodSpec, &resizedPod.Spec, &targetPod.Spec) {
+	if !specs.ResizeInPlace(&storedPodSpec, &resizedPod.Spec, &targetPod.Spec, &pod.Status) {
 		return nil
 	}
 	if match, _ := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec); !match {
