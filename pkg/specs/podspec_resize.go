@@ -70,26 +70,29 @@ func resizeContainers(
 			stored[i].Resources.Claims, target[targetIdx].Resources.Claims)
 		stored[i].Resources = *target[targetIdx].Resources.DeepCopy()
 
+		requests, requestsResizable := changedEntries(current.Requests, desired.Requests)
+		limits, limitsResizable := changedEntries(current.Limits, desired.Limits)
+
 		// The resources the operator did not change are left alone, even
 		// when the live ones were changed by other actors
-		if !claimsChanged &&
-			equality.Semantic.DeepEqual(current.Requests, desired.Requests) &&
-			equality.Semantic.DeepEqual(current.Limits, desired.Limits) {
+		if !claimsChanged && requestsResizable && limitsResizable && len(requests)+len(limits) == 0 {
 			continue
 		}
 
-		if initContainers && !isNativeSidecar(stored[i]) {
+		if initContainers && (stored[i].RestartPolicy == nil ||
+			*stored[i].RestartPolicy != corev1.ContainerRestartPolicyAlways) {
 			continue
 		}
 
 		liveIdx := slices.IndexFunc(live, hasSameName)
-		if claimsChanged || liveIdx < 0 ||
-			!canResizeResources(current, desired, enforcedLimits(&live[liveIdx], status)) ||
-			restartsOnResize(live[liveIdx].ResizePolicy, current, desired) {
+		if claimsChanged || !requestsResizable || !limitsResizable || liveIdx < 0 ||
+			isGuaranteed(current) != isGuaranteed(desired) ||
+			!canResizeMemoryLimit(limits, enforcedLimits(&live[liveIdx], status)) ||
+			restartsOnResize(live[liveIdx].ResizePolicy, requests, limits) {
 			return false
 		}
-		live[liveIdx].Resources.Requests = overlayResourceList(live[liveIdx].Resources.Requests, desired.Requests)
-		live[liveIdx].Resources.Limits = overlayResourceList(live[liveIdx].Resources.Limits, desired.Limits)
+		live[liveIdx].Resources.Requests = overlay(live[liveIdx].Resources.Requests, requests)
+		live[liveIdx].Resources.Limits = overlay(live[liveIdx].Resources.Limits, limits)
 	}
 
 	return true
@@ -107,8 +110,7 @@ func enforcedLimits(live *corev1.Container, status *corev1.PodStatus) corev1.Res
 	return live.Resources.Limits
 }
 
-// canResizeResources tells whether going from the current to the desired
-// resources only changes the value of existing cpu and memory entries,
+// canResizeMemoryLimit tells whether the changed limits can be applied
 // without lowering the memory limit below the enforced one.
 //
 // A memory limit decrease is never applied in place. The kubelet lowers
@@ -127,76 +129,68 @@ func enforcedLimits(live *corev1.Container, status *corev1.PodStatus) corev1.Res
 // deferred increase followed by its revert goes back to the enforced
 // value, which needs no decrease. Without an enforced limit to compare
 // with, any change of the memory limit is refused.
-func canResizeResources(current, desired corev1.ResourceRequirements, enforced corev1.ResourceList) bool {
-	if !canResizeResourceList(current.Requests, desired.Requests) ||
-		!canResizeResourceList(current.Limits, desired.Limits) {
-		return false
-	}
-
-	// The API server rejects a resize that changes the QoS class
-	guaranteed := func(resources corev1.ResourceRequirements) bool {
-		return !resources.Limits.Cpu().IsZero() && !resources.Limits.Memory().IsZero() &&
-			resources.Requests.Cpu().Cmp(*resources.Limits.Cpu()) == 0 &&
-			resources.Requests.Memory().Cmp(*resources.Limits.Memory()) == 0
-	}
-	if guaranteed(current) != guaranteed(desired) {
-		return false
-	}
-
-	desiredMemory, found := desired.Limits[corev1.ResourceMemory]
-	if !found || desiredMemory.Cmp(*current.Limits.Memory()) == 0 {
+func canResizeMemoryLimit(changedLimits, enforced corev1.ResourceList) bool {
+	memoryLimit, changed := changedLimits[corev1.ResourceMemory]
+	if !changed {
 		return true
 	}
-	enforcedMemory, isEnforced := enforced[corev1.ResourceMemory]
-	return isEnforced && desiredMemory.Cmp(enforcedMemory) >= 0
+	enforcedMemoryLimit, isEnforced := enforced[corev1.ResourceMemory]
+	return isEnforced && memoryLimit.Cmp(enforcedMemoryLimit) >= 0
 }
 
 // restartsOnResize tells whether the resize policy restarts the container
-// for a resource whose value changes
-func restartsOnResize(policies []corev1.ContainerResizePolicy, current, desired corev1.ResourceRequirements) bool {
+// for a resource that changes
+func restartsOnResize(policies []corev1.ContainerResizePolicy, requests, limits corev1.ResourceList) bool {
 	return slices.ContainsFunc(policies, func(policy corev1.ContainerResizePolicy) bool {
-		name := policy.ResourceName
-		return policy.RestartPolicy == corev1.RestartContainer &&
-			(!current.Requests[name].Equal(desired.Requests[name]) || !current.Limits[name].Equal(desired.Limits[name]))
+		_, requestChanged := requests[policy.ResourceName]
+		_, limitChanged := limits[policy.ResourceName]
+		return policy.RestartPolicy == corev1.RestartContainer && (requestChanged || limitChanged)
 	})
 }
 
-func canResizeResourceList(current, desired corev1.ResourceList) bool {
-	if len(current) != len(desired) {
-		return false
-	}
-	for name, desiredValue := range desired {
-		currentValue, found := current[name]
-		if !found {
-			return false
-		}
-		if currentValue.Cmp(desiredValue) != 0 && name != corev1.ResourceCPU && name != corev1.ResourceMemory {
-			return false
-		}
-	}
+// isGuaranteed tells whether the resources give the container the Guaranteed
+// QoS class. The API server rejects a resize that changes it.
+func isGuaranteed(resources corev1.ResourceRequirements) bool {
+	return !resources.Limits.Cpu().IsZero() && !resources.Limits.Memory().IsZero() &&
+		resources.Requests.Cpu().Cmp(*resources.Limits.Cpu()) == 0 &&
+		resources.Requests.Memory().Cmp(*resources.Limits.Memory()) == 0
+}
 
-	return true
+// changedEntries returns the entries whose value differs between from and
+// to. It reports false when an entry is added or removed, or when a resource
+// other than cpu and memory changes.
+func changedEntries(from, to corev1.ResourceList) (corev1.ResourceList, bool) {
+	changed := corev1.ResourceList{}
+	for name, quantity := range to {
+		previous, found := from[name]
+		if !found {
+			return nil, false
+		}
+		if previous.Cmp(quantity) == 0 {
+			continue
+		}
+		if name != corev1.ResourceCPU && name != corev1.ResourceMemory {
+			return nil, false
+		}
+		changed[name] = quantity
+	}
+	return changed, len(from) == len(to)
 }
 
 // defaultRequestsFromLimits sets the missing requests to the corresponding
 // limits, as the API server does when a pod is created
 func defaultRequestsFromLimits(resources corev1.ResourceRequirements) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
-		Requests: overlayResourceList(resources.Limits, resources.Requests),
+		Requests: overlay(resources.Limits, resources.Requests),
 		Limits:   resources.Limits,
 	}
 }
 
-// overlayResourceList returns the base resource list with the overlay
-// entries applied over it
-func overlayResourceList(base, overlay corev1.ResourceList) corev1.ResourceList {
+// overlay returns a new resource list with the given entries applied over
+// the base one
+func overlay(base, entries corev1.ResourceList) corev1.ResourceList {
 	result := corev1.ResourceList{}
 	maps.Copy(result, base)
-	maps.Copy(result, overlay)
+	maps.Copy(result, entries)
 	return result
-}
-
-func isNativeSidecar(initContainer corev1.Container) bool {
-	return initContainer.RestartPolicy != nil &&
-		*initContainer.RestartPolicy == corev1.ContainerRestartPolicyAlways
 }

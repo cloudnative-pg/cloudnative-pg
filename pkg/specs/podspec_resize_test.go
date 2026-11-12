@@ -174,6 +174,18 @@ var _ = Describe("ResizeInPlace", func() {
 			To(BeTrue(), "unexpected live resources: %v", live.Containers[0].Resources)
 	})
 
+	It("applies only the entries that changed", func() {
+		stored := makeSpec(makeResources("500m", "1Gi", "1", "1Gi"))
+		target := makeSpec(makeResources("500m", "1Gi", "2", "1Gi"))
+		// another actor resized the memory request
+		live := admit(stored)
+		live.Containers[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("768Mi")
+
+		Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
+		Expect(equality.Semantic.DeepEqual(live.Containers[0].Resources, makeResources("500m", "768Mi", "2", "1Gi"))).
+			To(BeTrue(), "unexpected live resources: %v", live.Containers[0].Resources)
+	})
+
 	It("leaves alone the containers whose resources did not change", func() {
 		stored := &corev1.PodSpec{
 			Containers: []corev1.Container{
