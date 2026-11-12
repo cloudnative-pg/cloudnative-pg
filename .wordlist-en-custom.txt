@@ -140,6 +140,8 @@ DataDurabilityLevelRequired
 DataSource
 DatabaseObjectSpec
 DatabaseObjectStatus
+DatabasePermissionStatus
+DatabasePermissionsSpec
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
@@ -898,6 +900,8 @@ databaseReclaimPolicy
 databaseRoleReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
+databasepermissionsspec
+databasepermissionstatus
 databasereclaimpolicy
 databaserole
 databaserolelist
