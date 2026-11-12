@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -94,8 +93,10 @@ type databasePermissionChange struct {
 }
 
 // expandDatabasePermissions expands the `all` shortcut and returns the
-// requested change for every privilege and role, deduplicated and sorted
-// by privilege and role name so that the result is deterministic.
+// requested change for every privilege and role, deduplicated. The changes
+// are grouped by privilege and, within each privilege, follow the order of
+// the specification, with the `all` entries last, as it happens for the
+// usages of schemas and foreign data wrappers.
 func expandDatabasePermissions(
 	permissions *apiv1.DatabasePermissionsSpec,
 ) []databasePermissionChange {
@@ -115,7 +116,6 @@ func expandDatabasePermissions(
 	var result []databasePermissionChange
 	for _, list := range lists {
 		seen := make(map[string]int, len(list.entries))
-		start := len(result)
 		for _, entry := range list.entries {
 			changeType := entry.Type
 			if changeType == "" {
@@ -139,9 +139,6 @@ func expandDatabasePermissions(
 				changeType: changeType,
 			})
 		}
-
-		added := result[start:]
-		sort.SliceStable(added, func(i, j int) bool { return added[i].name < added[j].name })
 	}
 
 	return result

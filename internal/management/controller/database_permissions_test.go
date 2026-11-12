@@ -63,14 +63,14 @@ var _ = Describe("Database permissions", func() {
 			Expect(expandDatabasePermissions(nil)).To(BeEmpty())
 		})
 
-		It("defaults to grant and sorts by privilege and role", func() {
+		It("defaults to grant and keeps the order of the specification", func() {
 			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
 				Connect:   []apiv1.UsageSpec{{Name: "zeta"}, revoke("public"), grant("app")},
 				Temporary: []apiv1.UsageSpec{revoke("app")},
 			})
 			Expect(changes).To(HaveLen(4))
 			Expect([]string{changes[0].name, changes[1].name, changes[2].name}).
-				To(Equal([]string{"app", "public", "zeta"}))
+				To(Equal([]string{"zeta", "public", "app"}))
 			Expect(changes[2].changeType).To(Equal(apiv1.GrantUsageSpecType))
 			Expect(changes[3].privilege).To(Equal("TEMPORARY"))
 		})
@@ -339,12 +339,29 @@ var _ = Describe("Database permissions", func() {
 				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
-				Connect: []apiv1.UsageSpec{revoke("public"), grant("app")},
+				Connect: []apiv1.UsageSpec{grant("app"), revoke("public")},
 			})
 			Expect(statuses).To(Equal([]apiv1.DatabasePermissionStatus{
 				{Privilege: "CONNECT", Name: "app", Type: apiv1.GrantUsageSpecType, Applied: true},
 				{Privilege: "CONNECT", Name: "public", Type: apiv1.RevokeUsageSpecType, Applied: true},
 			}))
+		})
+
+		It("applies the entries in the order of the specification", func(ctx SpecContext) {
+			expectDefaultACL()
+			dbMock.ExpectQuery(roleQuery).WithArgs("app").
+				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
+			dbMock.ExpectExec(`REVOKE CONNECT ON DATABASE "my-db" FROM PUBLIC`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "app"`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+
+			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
+				Connect: []apiv1.UsageSpec{revoke("public"), grant("app")},
+			})
+			Expect(statuses).To(HaveLen(2))
+			Expect(statuses[0].Name).To(Equal("public"))
+			Expect(statuses[1].Name).To(Equal("app"))
 		})
 
 		It("applies the other entries when a role does not exist", func(ctx SpecContext) {
