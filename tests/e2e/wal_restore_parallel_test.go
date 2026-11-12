@@ -48,6 +48,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		level          = tests.High
 		PgWalPath      = specs.PgWalPath
 		SpoolDirectory = walrestore.SpoolDirectory
+		// The state of the streaming retry of the instance manager
+		streamingRetryStateFile = "/controller/wal-restore-streaming-retry.json"
 		// Markers are scoped by timeline; the numbered wals are on timeline 1.
 		endOfWALStreamFlag = "end-of-wal-stream-00000001"
 		// A forged timeline 2 segment (child of timeline 1) and its marker.
@@ -177,6 +179,20 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 					purgeSpoolDirectoryCmd)
 				Expect(err).ShouldNot(HaveOccurred())
 			}
+		})
+
+		// The standby streams, and the restores below run by hand. Once the
+		// standby has restored WAL files for 30 seconds, the instance manager
+		// fails them on purpose, unless it cannot store its state
+		By("disabling the streaming retry on the standby", func() {
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"install", "-m", "0400", "/dev/null", streamingRetryStateFile)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// Invoke the wal-restore command through exec requesting the #1 file.
