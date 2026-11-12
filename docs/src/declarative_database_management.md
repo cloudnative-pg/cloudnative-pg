@@ -291,10 +291,11 @@ both `grant` and `revoke`, the other entries are still applied. The
 
 :::warning
     A `revoke` removes only the privilege that was granted to the named role
-    itself. It has no effect on privileges the role holds through `PUBLIC` or
-    through the membership of another role. For example, revoking `CONNECT`
-    from `app` does not prevent `app` from connecting while `PUBLIC` still has
-    it: revoke it from `public` too.
+    itself, and only if the owner of the database granted it. It has no effect
+    on privileges the role holds through `PUBLIC`, through the membership of
+    another role, or through a grant made by another role holding `WITH GRANT
+    OPTION`. For example, revoking `CONNECT` from `app` does not prevent `app`
+    from connecting while `PUBLIC` still has it: revoke it from `public` too.
 
     Privileges are applied when the `Database` spec changes, not continuously,
     so one changed directly in PostgreSQL is not brought back to the declared
