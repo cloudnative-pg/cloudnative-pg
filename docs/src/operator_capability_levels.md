@@ -192,7 +192,7 @@ required, as part of the bootstrap.
 Additional databases can be created or managed via
 [declarative database management](declarative_database_management.md) using
 the `Database` CRD, also supporting extensions, schemas, foreign data wrappers
-(FDW), and foreign servers.
+(FDW), foreign servers, and the privileges granted on the database itself.
 
 Although no configuration is required to run the cluster, you can customize
 both PostgreSQL runtime configuration and PostgreSQL host-based
