@@ -47,7 +47,7 @@ func (r *ClusterReconciler) resizeInstancesInPlace(
 	cluster *apiv1.Cluster,
 	instances *postgres.PostgresqlStatusList,
 ) error {
-	if cluster.GetResourcesUpdateStrategy() != apiv1.ResourcesUpdateStrategyInPlace ||
+	if cluster.Spec.ResourcesUpdateStrategy != apiv1.ResourcesUpdateStrategyInPlace ||
 		utils.IsPodSpecReconciliationDisabled(&cluster.ObjectMeta) {
 		return nil
 	}

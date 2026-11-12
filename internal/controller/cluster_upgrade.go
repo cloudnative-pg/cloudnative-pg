@@ -490,7 +490,7 @@ func hasValidPodSpec(pod *corev1.Pod) bool {
 // node can never satisfy the new resources, so the only way forward is
 // recreating the pod, letting the scheduler place it on a suitable node
 func checkPodResizeStuckInfeasible(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	if cluster.GetResourcesUpdateStrategy() != apiv1.ResourcesUpdateStrategyInPlace {
+	if cluster.Spec.ResourcesUpdateStrategy != apiv1.ResourcesUpdateStrategyInPlace {
 		return rollout{}, nil
 	}
 
