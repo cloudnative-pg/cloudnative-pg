@@ -57,6 +57,9 @@ var _ = Describe("In-place resize of the instance pods", func() {
 		// resizeErr is what the API server answers to them
 		resizeCalls int
 		resizeErr   error
+
+		// annotationPatches counts the patches to the pods
+		annotationPatches int
 	)
 
 	BeforeEach(func(ctx SpecContext) {
@@ -98,6 +101,7 @@ var _ = Describe("In-place resize of the instance pods", func() {
 		recorder = record.NewFakeRecorder(120)
 		resizeCalls = 0
 		resizeErr = nil
+		annotationPatches = 0
 	})
 
 	newReconciler := func(otherPods ...k8client.Object) *ClusterReconciler {
@@ -106,6 +110,18 @@ var _ = Describe("In-place resize of the instance pods", func() {
 			WithObjects(append(otherPods, pod, cluster)...).
 			WithStatusSubresource(&apiv1.Cluster{}).
 			WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(
+					ctx context.Context,
+					cl k8client.WithWatch,
+					obj k8client.Object,
+					patch k8client.Patch,
+					opts ...k8client.PatchOption,
+				) error {
+					if _, isPod := obj.(*corev1.Pod); isPod {
+						annotationPatches++
+					}
+					return cl.Patch(ctx, obj, patch, opts...)
+				},
 				SubResourcePatch: func(
 					ctx context.Context,
 					cl k8client.Client,
@@ -248,6 +264,7 @@ var _ = Describe("In-place resize of the instance pods", func() {
 		cachedPod := pod.DeepCopy()
 		pod.Spec.Containers[len(pod.Spec.Containers)-1].Resources.Limits["cpu"] = resource.MustParse("300m")
 		r := newReconciler()
+		cachedPod.ResourceVersion = pod.ResourceVersion
 
 		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
 		Expect(rollingUpdate(ctx, r, cachedPod)).To(Succeed())
@@ -326,6 +343,49 @@ var _ = Describe("In-place resize of the instance pods", func() {
 		Entry("because the API server does not expose the resize subresource",
 			apierrs.NewNotFound(schema.GroupResource{Resource: "pods"}, "cluster-resize-1")),
 	)
+
+	It("gives way to a newer version of the pod", func(ctx SpecContext) {
+		r := newReconciler()
+
+		var stalePod corev1.Pod
+		Expect(r.Get(ctx, k8client.ObjectKeyFromObject(pod), &stalePod)).To(Succeed())
+		changedPod := stalePod.DeepCopy()
+		changedPod.Labels["changed"] = "true"
+		Expect(r.Update(ctx, changedPod)).To(Succeed())
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		Expect(rollingUpdate(ctx, r, &stalePod)).To(MatchError(ErrNextLoop))
+		Expect(resizeCalls).To(Equal(1))
+		Expect(annotationPatches).To(BeZero())
+		Expect(recorder.Events).ToNot(Receive())
+
+		currentPod, storedPodSpec := getCurrentPod(ctx, r, pod.Name)
+		Expect(getPostgresResources(&currentPod.Spec).Limits["cpu"]).To(Equal(resource.MustParse("1")))
+		Expect(getPostgresResources(storedPodSpec).Limits["cpu"]).To(Equal(resource.MustParse("1")))
+	})
+
+	It("returns the conflicts that are not on the pod", func(ctx SpecContext) {
+		resizeErr = apierrs.NewConflict(schema.GroupResource{Resource: "resourcequotas"}, "quota", errors.New("conflict"))
+		r := newReconciler()
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		err := rollingUpdate(ctx, r, pod)
+		Expect(apierrs.IsConflict(err)).To(BeTrue())
+		Expect(err).ToNot(MatchError(ErrNextLoop))
+		Expect(annotationPatches).To(BeZero())
+	})
+
+	It("does not lock the annotation patch that follows the resize", func(ctx SpecContext) {
+		r := newReconciler()
+
+		var cachedPod corev1.Pod
+		Expect(r.Get(ctx, k8client.ObjectKeyFromObject(pod), &cachedPod)).To(Succeed())
+
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		Expect(rollingUpdate(ctx, r, &cachedPod)).To(Succeed())
+		Expect(resizeCalls).To(Equal(1))
+		Expect(annotationPatches).To(Equal(1))
+	})
 
 	It("propagates transient errors without recreating the pod", func(ctx SpecContext) {
 		resizeErr = apierrs.NewInternalError(errors.New("etcd timeout"))

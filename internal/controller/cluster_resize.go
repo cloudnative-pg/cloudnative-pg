@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -75,8 +76,20 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	pod *corev1.Pod,
-) error {
+) (err error) {
 	contextLogger := log.FromContext(ctx).WithValues("pod", pod.Name)
+
+	// A conflict on the pod means it changed after our read. That change
+	// starts a new reconciliation, which decides on the fresh pod. Other
+	// conflicts, like one on a resource quota, come with no such event.
+	defer func() {
+		var status apierrs.APIStatus
+		if apierrs.IsConflict(err) && errors.As(err, &status) &&
+			status.Status().Details != nil && status.Status().Details.Kind == "pods" {
+			contextLogger.Debug("Conflict while resizing the instance pod in place", "error", err.Error())
+			err = ErrNextLoop
+		}
+	}()
 
 	var storedPodSpec corev1.PodSpec
 	if err := json.Unmarshal([]byte(pod.Annotations[utils.PodSpecAnnotationName]), &storedPodSpec); err != nil {
@@ -104,6 +117,8 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 		return nil
 	}
 
+	// The lock makes a stale read fail with a conflict
+	lock := []client.MergeFromOption{client.MergeFromWithOptimisticLock{}}
 	if !equality.Semantic.DeepEqual(pod.Spec, resizedPod.Spec) {
 		contextLogger.Info("Resizing instance pod in place")
 
@@ -111,7 +126,7 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 		// merge patch would carry the whole containers list, reverting any
 		// container whose resources changed after the cache was populated,
 		// including those injected by other actors, such as a service mesh.
-		if err := r.SubResource("resize").Patch(ctx, resizedPod, client.StrategicMergeFrom(pod)); err != nil {
+		if err := r.SubResource("resize").Patch(ctx, resizedPod, client.StrategicMergeFrom(pod, lock...)); err != nil {
 			// The resize cannot be applied to this pod: for example it would
 			// change the pod QoS class, or the node or the API server do not
 			// support it. The pod spec annotation is left untouched, so the
@@ -127,6 +142,9 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 
 		r.Recorder.Eventf(cluster, "Normal", "InPlaceResize",
 			"Resized instance pod %s in place", pod.Name)
+		// The pod is now the fresh answer of the API server, and the
+		// kubelet is about to update its status: a lock would fail for nothing
+		lock = nil
 	}
 
 	podSpecAnnotation, err := json.Marshal(storedPodSpec)
@@ -136,5 +154,5 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 
 	origPod := pod.DeepCopy()
 	pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecAnnotation)
-	return r.Patch(ctx, pod, client.MergeFrom(origPod))
+	return r.Patch(ctx, pod, client.MergeFromWithOptions(origPod, lock...))
 }
