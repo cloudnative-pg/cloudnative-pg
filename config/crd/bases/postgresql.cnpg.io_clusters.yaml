@@ -5089,7 +5089,10 @@ spec:
                             type: integer
                           enabled:
                             default: true
-                            description: Whether primary isolation checking is enabled
+                            description: |-
+                              Whether primary isolation checking is enabled. When disabled, an
+                              isolated primary is not stopped, but a primary that reaches a peer
+                              reporting a different target primary still is.
                             type: boolean
                           requestTimeout:
                             default: 1000

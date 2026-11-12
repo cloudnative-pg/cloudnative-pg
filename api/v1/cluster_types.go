@@ -119,6 +119,11 @@ const (
 	// MissingWALDiskSpaceExitCode is the exit code the instance manager
 	// will use to signal that there's no more WAL disk space
 	MissingWALDiskSpaceExitCode = 4
+
+	// MissingWALArchivePlugin is the exit code used by the instance manager
+	// to indicate that it started successfully, but the configured WAL
+	// archiving plugin is not available.
+	MissingWALArchivePlugin = 5
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.
@@ -689,7 +694,9 @@ type LivenessProbe struct {
 // IsolationCheckConfiguration contains the configuration for the primary
 // isolation check
 type IsolationCheckConfiguration struct {
-	// Whether primary isolation checking is enabled
+	// Whether primary isolation checking is enabled. When disabled, an
+	// isolated primary is not stopped, but a primary that reaches a peer
+	// reporting a different target primary still is.
 	// +optional
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`

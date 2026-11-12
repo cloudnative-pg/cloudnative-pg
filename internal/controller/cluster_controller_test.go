@@ -597,18 +597,25 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 							Kind:     apiv1.VolumeSnapshotKind,
 							Name:     "current-bootstrap-snapshot",
 						},
+						WalStorage: &corev1.TypedLocalObjectReference{
+							APIGroup: ptr.To(volumesnapshotv1.GroupName),
+							Kind:     apiv1.VolumeSnapshotKind,
+							Name:     "current-bootstrap-snapshot-wal",
+						},
 					},
 				},
 			}
 		})
 
-		currentSnapshot := &volumesnapshotv1.VolumeSnapshot{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "current-bootstrap-snapshot",
-				Namespace: namespace,
-			},
+		for _, name := range []string{"current-bootstrap-snapshot", "current-bootstrap-snapshot-wal"} {
+			currentSnapshot := &volumesnapshotv1.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}
+			Expect(env.client.Create(ctx, currentSnapshot)).To(Succeed())
 		}
-		Expect(env.client.Create(ctx, currentSnapshot)).To(Succeed())
 
 		primaryName := specs.GetInstanceName(cluster.Name, 1)
 		cluster.Status.Instances = 1
@@ -715,9 +722,20 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 		}
 
 		// The replica PVC records it was cloned from a volume snapshot. The
-		// snapshot, and the backup it came from, no longer exist: the PVC's own
-		// DataSource is the only truthful record of what is on the volume, and
-		// must win over any recomputation from the current backups.
+		// backup it came from no longer exists: the PVC's own DataSource is the
+		// only truthful record of what is on the volume, and must win over any
+		// recomputation from the current backups.
+		snapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "backup-snapshot",
+				Namespace: namespace,
+				Annotations: map[string]string{
+					utils.BackupLabelFileAnnotationName: "YmFja3VwX2xhYmVs",
+				},
+			},
+		}
+		Expect(env.client.Create(ctx, snapshot)).To(Succeed())
+
 		pvc, err := persistentvolumeclaim.Build(cluster, &persistentvolumeclaim.CreateConfiguration{
 			Status:     persistentvolumeclaim.StatusInitializing,
 			NodeSerial: 2,
@@ -726,7 +744,7 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 			Source: &corev1.TypedLocalObjectReference{
 				APIGroup: ptr.To(volumesnapshotv1.GroupName),
 				Kind:     apiv1.VolumeSnapshotKind,
-				Name:     "deleted-backup-snapshot",
+				Name:     "backup-snapshot",
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -755,6 +773,7 @@ var _ = Describe("ensureInstancesAreCreated recovers a lost bootstrap", func() {
 		Expect(initContainer).ToNot(BeNil())
 		Expect(initContainer.Command).To(ContainElement("restoresnapshot"),
 			"a snapshot-cloned PVC must be advanced by a snapshot-restore bootstrap")
+		Expect(initContainer.Command).To(ContainElement("--backuplabel=YmFja3VwX2xhYmVs"))
 	})
 
 	It("creates a join bootstrap Pod for an empty replica PVC even with a snapshot candidate", func(ctx SpecContext) {
@@ -1934,5 +1953,102 @@ var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 
 	It("returns nil for an object that does not reference a cluster", func(ctx SpecContext) {
 		Expect(mapClusterOwnedResourceToCluster(ctx, &corev1.Secret{})).To(BeNil())
+	})
+})
+
+var _ = Describe("requireWALArchivingPluginOrDelete", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// Creates the Pod of the given instance serial, with its postgres
+	// container terminated with the given exit code, and returns its status
+	newInstanceStatus := func(
+		ctx SpecContext,
+		cluster *apiv1.Cluster,
+		serial int,
+		exitCode int32,
+	) postgres.PostgresqlStatus {
+		pod, err := specs.NewInstance(ctx, *cluster, serial)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(env.client.Create(ctx, pod)).To(Succeed())
+
+		pod.Status = corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name: specs.PostgresContainerName,
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{ExitCode: exitCode},
+				},
+			}},
+		}
+		return postgres.PostgresqlStatus{Pod: pod}
+	}
+
+	podExists := func(ctx SpecContext, name string) bool {
+		var pod corev1.Pod
+		err := env.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &pod)
+		return err == nil
+	}
+
+	It("deletes a replica that quit because the WAL archiving plugin is missing", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		primary := newInstanceStatus(ctx, cluster, 1, 0)
+		formerPrimary := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary, formerPrimary}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(10 * time.Second))
+		Expect(podExists(ctx, formerPrimary.Pod.Name)).To(BeFalse())
+		Expect(podExists(ctx, primary.Pod.Name)).To(BeTrue())
+	})
+
+	It("never deletes the current primary", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		primary := newInstanceStatus(ctx, cluster, 1, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, primary.Pod.Name)).To(BeTrue())
+	})
+
+	It("never deletes the target primary", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = specs.GetInstanceName(cluster.Name, 2)
+
+		target := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{target}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, target.Pod.Name)).To(BeTrue())
+	})
+
+	It("leaves alone the replicas that quit for another reason", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		replica := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALDiskSpaceExitCode)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{replica}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, replica.Pod.Name)).To(BeTrue())
 	})
 })

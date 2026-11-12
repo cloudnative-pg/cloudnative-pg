@@ -214,7 +214,7 @@ func getCandidateSourceFromBackupList(
 }
 
 func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
-	var result StorageSource
+	result := StorageSource{}
 	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
 		reference := corev1.TypedLocalObjectReference{
 			APIGroup: ptr.To(volumesnapshotv1.GroupName),

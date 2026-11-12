@@ -511,13 +511,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			const (
 				replicaClusterSample = fixturesDir + replicaModeClusterDir + "cluster-replica-from-snapshot.yaml.template"
 				snapshotDataEnv      = "REPLICA_CLUSTER_SNAPSHOT_NAME_PGDATA"
-				snapshotWalEnv       = "REPLICA_CLUSTER_SNAPSHOT_NAME_PGWAL"
 				testTableName        = "replica_mode_snapshot"
 			)
 
 			DeferCleanup(func() {
 				config.UnsetTemplateVariable(snapshotDataEnv)
-				config.UnsetTemplateVariable(snapshotWalEnv)
 			})
 
 			var backup *apiv1.Backup
@@ -547,7 +545,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 						Name:      snapshotName,
 					}, backup)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+					// An online backup doesn't snapshot the WAL volume
+					g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(1))
 					g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 				}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
 			})
@@ -562,7 +561,6 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 				templateVars := storage.SnapshotTemplateVariables{
 					DataSnapshot: snapshotDataEnv,
-					WalSnapshot:  snapshotWalEnv,
 				}
 				err = storage.SetSnapshotTemplateVariables(&snapshotList, backup, templateVars)
 				Expect(err).ToNot(HaveOccurred())

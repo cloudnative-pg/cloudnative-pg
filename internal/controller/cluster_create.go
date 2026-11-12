@@ -1467,7 +1467,12 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	// If we can bootstrap this replica from a pre-existing source, we do it
 	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, r.Client, cluster, backupList)
 	if storageSource != nil {
-		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster)
+		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx, r.Client, cluster.Namespace, storageSource.DataSource)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster, metadata)
 	}
 
 	pod, err := specs.NewInstance(ctx, *cluster, nodeSerial)
@@ -1560,7 +1565,17 @@ func (r *ClusterReconciler) attachReplicaBootstrapInitContainer(
 
 	cmd := specs.BuildReplicaBootstrapCommandViaJoin(*cluster)
 	if pgdataDataSource != nil {
-		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster)
+		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx, r.Client, cluster.Namespace, *pgdataDataSource)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		// Without the snapshot there is no backup_label to pass
+		if metadata == nil {
+			return ctrl.Result{}, fmt.Errorf("the data source %q of the PGDATA PVC no longer exists",
+				pgdataDataSource.Name)
+		}
+		cmd = specs.BuildReplicaBootstrapCommandViaRestoreSnapshot(*cluster, metadata)
 	}
 
 	log.FromContext(ctx).Info("Resuming bootstrap for a replica whose PVCs are not ready",
@@ -1853,12 +1868,21 @@ func (r *ClusterReconciler) checkReadyForRecovery(
 				"backupPhase", backup.Status.Phase)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
+		// An online volume snapshot backup doesn't snapshot the WAL storage, and
+		// recovering it always requires the WAL archive
+		if backup.IsCompletedVolumeSnapshot() && backup.Status.GetOnline() &&
+			cluster.Spec.Bootstrap.Recovery.Source == "" {
+			contextLogger.Info("The source backup is an online volume snapshot backup, a recovery source "+
+				"is required to fetch the WAL files from the archive, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
 	}
 
 	volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
 	if volumeSnapshotsRecovery != nil {
 		status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
-			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
+			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery, cluster.ShouldCreateWalArchiveVolume())
 		if err != nil {
 			return ctrl.Result{}, err
 		}

@@ -90,8 +90,9 @@ flushed and archived its remaining WAL, so the replica that takes
 over sees the archive at its definitive end. If the previous primary
 cannot release the lease (crash, node failure, or the instance
 manager itself unreachable), the replica can promote once the lease has been
-unchanged for `leaseDurationSeconds` since the operator named it the target
-primary. In that
+unchanged for `leaseDurationSeconds` since the operator marked the failover as
+`pending`, or, in a switchover or when the operator replaces a target primary
+that did not promote, since it named the replica the target primary. In that
 path the archive may not have caught up, and any writes the previous
 primary did not finish archiving are lost. A target primary that is replaced
 before it promotes stops renewing the lease it may hold, so the new target can
@@ -110,12 +111,12 @@ The two mechanisms are complementary and both are enabled by default:
 * The lease prevents *premature* promotion: a replica cannot promote
   while the former primary still holds the lease.
 * The isolation check stops an *isolated* primary from continuing to
-  accept writes, by shutting PostgreSQL down immediately.
+  accept writes, by shutting PostgreSQL down.
 
 Keep both enabled. Disabling the isolation check leaves the lease
 alone responsible for primary safety, and the lease alone cannot
 prevent split-brain when the former primary cannot reach the API
-server but remains otherwise healthy.
+server or the other instances but remains otherwise healthy.
 
 ### Inspecting the primary lease
 
@@ -185,8 +186,9 @@ keep between them and the isolation check `requestTimeout`.
 `leaseDurationSeconds` and `retryPeriodSeconds` govern two different timings.
 After an abrupt primary loss (the previous primary did not release the lease), the
 candidate must observe the lease unchanged for a full `leaseDurationSeconds`
-before it may take over, counted from the moment it becomes the target primary:
-this is what holds back a premature promotion while the former primary may still
+before it may take over, counted from the moment the operator marks the failover
+as `pending` (or names the replica as target, in a switchover): this is what
+holds back a premature promotion while the former primary may still
 be alive. After a clean switchover (the previous primary
 released the lease), there is no such wait; the candidate simply notices the
 released lease on its next poll, so the hand-over latency is bounded by
@@ -290,15 +292,32 @@ timer does not hold up the operator's failover decision; CloudNativePG
 promotes a new primary as soon as the `Ready` condition flips. By that point
 PostgreSQL on the isolated node has already been stopped locally: with the
 default `.spec.probes.liveness.isolationCheck.enabled: true`, the instance
-manager requests an immediate PostgreSQL shutdown once its last successful lease
-renewal is older than the renew deadline and either at least one other instance
-is unreachable or a reachable one names a different target primary, within the
-timings described under [Primary Isolation](instance_manager.md#primary-isolation).
-When PostgreSQL stops, the instance manager exits and the kubelet restarts the
-container, so the step-down shows up as a container restart, not as a liveness
-probe failure. Full high availability (recreation of the old primary on
-a healthy node by the operator) is still gated on the taint-based eviction
-actually deleting the pod.
+manager requests a PostgreSQL shutdown, fast and then immediate if the fast
+one does not complete in time, once its last successful lease renewal is older
+than the renew deadline and either at least one other instance is unreachable
+or a reachable one names a different target primary, within the timings
+described under [Primary Isolation](instance_manager.md#primary-isolation).
+With `enabled: false` only the second cause stops it, so an isolated primary
+keeps running. When PostgreSQL stops, the instance manager exits and the
+kubelet restarts the container, so the step-down shows up as a container
+restart, not as a liveness probe failure. Full high availability (recreation of
+the old primary on a healthy node by the operator) is still gated on the
+taint-based eviction actually deleting the pod.
+
+The step-down needs a working instance manager, and the container restart
+needs a working kubelet. If both hang while the kernel and the network of the
+node stay up, the WAL senders of the old primary keep sending keepalive
+messages. The WAL receivers on the replicas stay connected, and the failover
+waits for them, so no replica is promoted. To recover, enable
+the
+[kubelet systemd watchdog](https://kubernetes.io/docs/reference/node/systemd-watchdog/)
+(`WatchdogSec`, for example `15s`, in the kubelet unit) and set
+`.spec.probes.liveness.terminationGracePeriodSeconds` to a short value, for
+example `30`. systemd restarts the hung kubelet, which fails the liveness probe
+and kills the container when the probe grace period ends. Without this value,
+the kill waits for the pod grace period (`.spec.stopDelay`, 1800 seconds by
+default). Check that `systemctl show kubelet -p WatchdogUSec` shows the value
+you set.
 
 ## Failover Quorum (Quorum-based Failover)
 

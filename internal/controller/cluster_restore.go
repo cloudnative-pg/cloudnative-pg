@@ -494,8 +494,8 @@ func isSidecarInitContainer(initContainer *corev1.Container) bool {
 // given init container. The gate exists for the init containers a backup tool
 // adds to copy the PVC content back before the Pod is replaced. Sidecars never
 // terminate, and the operator's own bootstrap init containers were baked into
-// the Pod when it was first created: on a restored Pod they rerun on a volume
-// that already holds live data and never complete. Neither is waited on.
+// the Pod when it was first created: they are no part of the restore, and on a
+// restored Pod they leave the volume untouched. Neither is waited on.
 func isForeignInitContainer(initContainer *corev1.Container) bool {
 	if isSidecarInitContainer(initContainer) {
 		return false

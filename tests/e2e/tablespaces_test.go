@@ -293,8 +293,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				_, stderr, err := run.Run(
 					fmt.Sprintf("kubectl cnpg backup %s -n %s --backup-name %s",
 						clusterName, namespace, fullBackupName))
-				Expect(stderr).To(BeEmpty())
-				Expect(err).ShouldNot(HaveOccurred())
+				Expect(err).ShouldNot(HaveOccurred(), "stderr: "+stderr)
 				AssertBackupConditionTimestampChangedInClusterStatus(
 					namespace,
 					clusterName,
@@ -372,317 +371,324 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		})
 	})
 
-	Context("on a new cluster with tablespaces and volumesnapshot support", Ordered, func() {
-		var namespace, backupName string
-		var err error
-		var backupObject *apiv1.Backup
-		const (
-			clusterManifest = fixturesDir +
-				"/tablespaces/cluster-volume-snapshot-tablespaces.yaml.template"
-			clusterVolumesnapshoBackupManifest = fixturesDir +
-				"/tablespaces/cluster-volume-snapshot-backup.yaml.template"
-			clusterVolumesnapshoRestoreManifest = fixturesDir +
-				"/tablespaces/cluster-volume-snapshot-tablespaces-restore.yaml.template"
-			clusterVolumesnapshoPITRManifest = fixturesDir +
-				"/tablespaces/cluster-volume-snapshot-tablespaces-pitr.yaml.template"
+	Context("on a new cluster with tablespaces and volumesnapshot support", Ordered,
+		Label(tests.LabelPluginBarmanCloud), func() {
+			var namespace, backupName string
+			var err error
+			var backupObject *apiv1.Backup
+			const (
+				clusterManifest = fixturesDir +
+					"/tablespaces/cluster-volume-snapshot-tablespaces.yaml.template"
+				clusterVolumesnapshoBackupManifest = fixturesDir +
+					"/tablespaces/cluster-volume-snapshot-backup.yaml.template"
+				clusterVolumesnapshoRestoreManifest = fixturesDir +
+					"/tablespaces/cluster-volume-snapshot-tablespaces-restore.yaml.template"
+				clusterVolumesnapshoPITRManifest = fixturesDir +
+					"/tablespaces/cluster-volume-snapshot-tablespaces-pitr.yaml.template"
 
-			snapshotDataEnv       = "SNAPSHOT_PITR_PGDATA"
-			snapshotWalEnv        = "SNAPSHOT_PITR_PGWAL"
-			snapshotTbsEnv        = "SNAPSHOT_PITR_PGTABLESPACE"
-			recoveryTargetTimeEnv = "SNAPSHOT_PITR"
-			tablespace1           = "tbs1"
-			table1                = "test_tbs1"
-			tablespace2           = "tbs2"
-			table2                = "test_tbs2"
-		)
+				snapshotDataEnv       = "SNAPSHOT_PITR_PGDATA"
+				snapshotWalEnv        = "SNAPSHOT_PITR_PGWAL"
+				snapshotTbsEnv        = "SNAPSHOT_PITR_PGTABLESPACE"
+				recoveryTargetTimeEnv = "SNAPSHOT_PITR"
+				tablespace1           = "tbs1"
+				table1                = "test_tbs1"
+				tablespace2           = "tbs2"
+				table2                = "test_tbs2"
+			)
 
-		BeforeAll(func() {
-			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-
-			// We create the required credentials for the object store
-			By("creating the credentials for the object store", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					objectstore.AccessKeyID,
-					objectstore.SecretAccessKey,
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("create the certificates for the object store", func() {
-				err := objectStoreEnv.CreateCaSecret(env, namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			clusterSetup(namespace, clusterManifest)
-		})
-
-		It("can verify tablespaces and PVC were created", func() {
-			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[timeouts.Short])
-			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[timeouts.Short])
-			AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.Short])
-		})
-
-		It("can create the volume snapshot backup declaratively and verify the backup", func() {
-			backupName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterVolumesnapshoBackupManifest)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("creating backup %s and verifying backup is ready", backupName), func() {
-				backupObject = backups.Execute(
-					env.Ctx,
-					env.Client,
-					env.Scheme,
-					namespace,
-					clusterVolumesnapshoBackupManifest,
-					false,
-					testTimeouts[timeouts.VolumeSnapshotIsReady],
-				)
-				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
-			})
-
-			By("checking that volumeSnapshots are properly labeled", func() {
-				Eventually(func(g Gomega) {
-					for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
-						volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace, snapshot.Name)
-						g.Expect(err).ToNot(HaveOccurred())
-						g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
-						g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
-						g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
-					}
-				}).Should(Succeed())
-				Expect(len(backupObject.Status.BackupSnapshotStatus.Elements)).To(BeIdenticalTo(4))
-			})
-		})
-
-		It("can create the volume snapshot backup using the plugin and verify the backup", func() {
-			By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
-				// Create a table and insert data 1,2 in each tablespace
-				tl1 := pgasserts.TableLocator{
-					Namespace:    namespace,
-					ClusterName:  clusterName,
-					DatabaseName: postgres.AppDBName,
-					TableName:    table1,
-					Tablespace:   tablespace1,
-				}
-				pgasserts.AssertCreateTestData(env, tl1)
-				tl2 := pgasserts.TableLocator{
-					Namespace:    namespace,
-					ClusterName:  clusterName,
-					DatabaseName: postgres.AppDBName,
-					TableName:    table2,
-					Tablespace:   tablespace2,
-				}
-				pgasserts.AssertCreateTestData(env, tl2)
-
-				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				// Execute a checkpoint
-				_, _, err = exec.EventuallyExecQueryInInstancePod(
-					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
-						Namespace: primaryPod.Namespace,
-						PodName:   primaryPod.Name,
-					}, postgres.PostgresDBName,
-					"CHECKPOINT",
-					RetryTimeout,
-					PollingTime,
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			backupName = clusterName + pgTime.GetCurrentTimestampWithFormat("20060102150405")
-			By("creating a volumeSnapshot and waiting until it's completed", func() {
-				Eventually(func() error {
-					return backups.CreateOnDemandBackupViaKubectlPlugin(
-						namespace,
-						clusterName,
-						backupName,
-						apiv1.BackupTargetStandby,
-						apiv1.BackupMethodVolumeSnapshot,
-					)
-				}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(Succeed())
-
-				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
-				// This should probably be moved elsewhere
-				objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
-					namespace, clusterName, clusterName)
-
-				Eventually(func(g Gomega) {
-					backupList, err := backups.List(env.Ctx, env.Client, namespace)
-					g.Expect(err).ToNot(HaveOccurred())
-					for _, backup := range backupList.Items {
-						if backup.Name != backupName {
-							continue
-						}
-						backupObject = &backup
-						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
-							"Backup should be completed correctly, error message is '%s'",
-							backup.Status.Error)
-						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(4))
-					}
-				}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
-			})
-
-			By("checking that volumeSnapshots are properly labeled", func() {
-				Eventually(func(g Gomega) {
-					for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
-						volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace, snapshot.Name)
-						g.Expect(err).ToNot(HaveOccurred())
-						g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
-						g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
-						g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
-
-					}
-				}).Should(Succeed())
-			})
-		})
-
-		It(fmt.Sprintf("can create the cluster by restoring from the backup %v using volume snapshot", backupName),
-			func() {
-				config.SetTemplateVariable("BACKUP_NAME", backupName)
-
-				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme,
-					clusterVolumesnapshoRestoreManifest)
+			BeforeAll(func() {
+				// Create a cluster in a namespace we'll delete after the test
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
-				By("creating the cluster to be restored through snapshot", func() {
-					resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoRestoreManifest)
-					clusterasserts.AssertClusterIsReady(
-						env, namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
-					)
-				})
-
-				By("verifying that tablespaces and PVC were created", func() {
-					restoredCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace,
-						clusterToRestoreName)
-					Expect(err).ToNot(HaveOccurred())
-					AssertClusterHasMountPointsAndVolumesForTablespaces(restoredCluster, 2,
-						testTimeouts[timeouts.Short])
-					AssertClusterHasPvcsAndDataDirsForTablespaces(restoredCluster, testTimeouts[timeouts.Short])
-					AssertDatabaseContainsTablespaces(restoredCluster, testTimeouts[timeouts.Short])
-				})
-
-				By("verifying the correct data exists in the restored cluster", func() {
-					tableLocator := pgasserts.TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToRestoreName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    table1,
-					}
-					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-					tableLocator = pgasserts.TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToRestoreName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    table2,
-					}
-					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-				})
-			})
-
-		It(fmt.Sprintf("can create the cluster by recovery from volume snapshot backup with pitr %v", backupName),
-			func() {
-				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
-					forward, conn, err := postgres.ForwardPSQLConnection(
+				// We create the required credentials for the object store
+				By("creating the credentials for the object store", func() {
+					_, err = secrets.CreateObjectStorageSecret(
 						env.Ctx,
 						env.Client,
-						env.Interface,
-						env.RestClientConfig,
 						namespace,
-						clusterName,
-						postgres.AppDBName,
-						apiv1.ApplicationUserSecretSuffix,
+						"backup-storage-creds",
+						objectstore.AccessKeyID,
+						objectstore.SecretAccessKey,
 					)
-					defer func() {
-						_ = conn.Close()
-						forward.Close()
-					}()
-					Expect(err).ToNot(HaveOccurred())
-
-					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					pgasserts.InsertRecordIntoTable(table1, 3, conn)
-					pgasserts.InsertRecordIntoTable(table1, 4, conn)
-
-					pgasserts.InsertRecordIntoTable(table2, 3, conn)
-					pgasserts.InsertRecordIntoTable(table2, 4, conn)
-
-					// Because GetCurrentTimestamp() rounds down to the second and is executed
-					// right after the creation of the test data, we wait for 1s to avoid not
-					// including the newly created data within the recovery_target_time
-					time.Sleep(1 * time.Second)
-					// Get the recovery_target_time and pass it to the template engine
-					recoveryTargetTime, err := postgres.GetCurrentTimestamp(
-						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						namespace, clusterName,
-					)
-					Expect(err).ToNot(HaveOccurred())
-					config.SetTemplateVariable(recoveryTargetTimeEnv, recoveryTargetTime)
-
-					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					pgasserts.InsertRecordIntoTable(table1, 5, conn)
-					pgasserts.InsertRecordIntoTable(table1, 6, conn)
-
-					pgasserts.InsertRecordIntoTable(table2, 5, conn)
-					pgasserts.InsertRecordIntoTable(table2, 6, conn)
-
-					// Close and archive the current WAL file
-					objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
-						namespace, clusterName, clusterName)
-				})
-				By("fetching the volume snapshots", func() {
-					snapshotList, err := getSnapshots(backupName, clusterName, namespace)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backupObject.Status.BackupSnapshotStatus.Elements)))
-
-					templateVars := storage.SnapshotTemplateVariables{
-						DataSnapshot:             snapshotDataEnv,
-						WalSnapshot:              snapshotWalEnv,
-						TablespaceSnapshotPrefix: snapshotTbsEnv,
-					}
-					err = storage.SetSnapshotTemplateVariables(&snapshotList, backupObject, templateVars)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				clusterToPITRName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterVolumesnapshoPITRManifest)
+				By("create the certificates for the object store", func() {
+					err := objectStoreEnv.CreateCaSecret(env, namespace)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				clusterSetup(namespace, clusterManifest)
+			})
+
+			It("can verify tablespaces and PVC were created", func() {
+				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[timeouts.Short])
+				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[timeouts.Short])
+				AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.Short])
+			})
+
+			It("can create the volume snapshot backup declaratively and verify the backup", func() {
+				backupName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterVolumesnapshoBackupManifest)
 				Expect(err).ToNot(HaveOccurred())
 
-				By("creating the cluster to be restored through snapshot", func() {
-					resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoPITRManifest)
-					clusterasserts.AssertClusterIsReady(env, namespace, clusterToPITRName, testTimeouts[timeouts.ClusterIsReadySlow])
+				By(fmt.Sprintf("creating backup %s and verifying backup is ready", backupName), func() {
+					backupObject = backups.Execute(
+						env.Ctx,
+						env.Client,
+						env.Scheme,
+						namespace,
+						clusterVolumesnapshoBackupManifest,
+						false,
+						testTimeouts[timeouts.VolumeSnapshotIsReady],
+					)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 				})
 
-				By("can verify tablespaces and PVC were created", func() {
-					recoveryCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterToPITRName)
-					Expect(err).ToNot(HaveOccurred())
-					AssertClusterHasMountPointsAndVolumesForTablespaces(recoveryCluster, 2,
-						testTimeouts[timeouts.Short])
-					AssertClusterHasPvcsAndDataDirsForTablespaces(recoveryCluster, testTimeouts[timeouts.Short])
-					AssertDatabaseContainsTablespaces(recoveryCluster, testTimeouts[timeouts.Short])
-				})
-
-				By("verifying the correct data exists in the restored cluster", func() {
-					tableLocator := pgasserts.TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToPITRName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    table1,
-					}
-					pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
-					tableLocator = pgasserts.TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToPITRName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    table2,
-					}
-					pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
+				By("checking that volumeSnapshots are properly labeled", func() {
+					Eventually(func(g Gomega) {
+						for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
+							volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace, snapshot.Name)
+							g.Expect(err).ToNot(HaveOccurred())
+							g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
+							g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
+							g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+						}
+					}).Should(Succeed())
+					// 3 snapshots: PGDATA and the 2 tablespaces, the WAL volume is skipped.
+					Expect(len(backupObject.Status.BackupSnapshotStatus.Elements)).To(BeIdenticalTo(3))
 				})
 			})
-	})
+
+			It("can create the volume snapshot backup using the plugin and verify the backup", func() {
+				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+					// Create a table and insert data 1,2 in each tablespace
+					tl1 := pgasserts.TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterName,
+						DatabaseName: postgres.AppDBName,
+						TableName:    table1,
+						Tablespace:   tablespace1,
+					}
+					pgasserts.AssertCreateTestData(env, tl1)
+					tl2 := pgasserts.TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterName,
+						DatabaseName: postgres.AppDBName,
+						TableName:    table2,
+						Tablespace:   tablespace2,
+					}
+					pgasserts.AssertCreateTestData(env, tl2)
+
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					// Execute a checkpoint
+					_, _, err = exec.EventuallyExecQueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
+							Namespace: primaryPod.Namespace,
+							PodName:   primaryPod.Name,
+						}, postgres.PostgresDBName,
+						"CHECKPOINT",
+						RetryTimeout,
+						PollingTime,
+					)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				backupName = clusterName + pgTime.GetCurrentTimestampWithFormat("20060102150405")
+				By("creating a volumeSnapshot and waiting until it's completed", func() {
+					Eventually(func() error {
+						return backups.CreateOnDemandBackupViaKubectlPlugin(
+							namespace,
+							clusterName,
+							backupName,
+							apiv1.BackupTargetStandby,
+							apiv1.BackupMethodVolumeSnapshot,
+						)
+					}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+
+					// TODO: this is to force a CHECKPOINT when we run the backup on standby.
+					// This should probably be moved elsewhere
+					objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+						namespace, clusterName, clusterName)
+
+					Eventually(func(g Gomega) {
+						backupList, err := backups.List(env.Ctx, env.Client, namespace)
+						g.Expect(err).ToNot(HaveOccurred())
+						for _, backup := range backupList.Items {
+							if backup.Name != backupName {
+								continue
+							}
+							backupObject = &backup
+							g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+								"Backup should be completed correctly, error message is '%s'",
+								backup.Status.Error)
+							// 3 snapshots: PGDATA and the 2 tablespaces, the WAL volume is skipped.
+							g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(3))
+						}
+					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
+				})
+
+				By("checking that volumeSnapshots are properly labeled", func() {
+					Eventually(func(g Gomega) {
+						for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
+							volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace, snapshot.Name)
+							g.Expect(err).ToNot(HaveOccurred())
+							g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
+							g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
+							g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+
+						}
+					}).Should(Succeed())
+				})
+			})
+
+			It(fmt.Sprintf("can create the cluster by restoring from the backup %v using volume snapshot", backupName),
+				func() {
+					config.SetTemplateVariable("BACKUP_NAME", backupName)
+
+					clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme,
+						clusterVolumesnapshoRestoreManifest)
+					Expect(err).ToNot(HaveOccurred())
+
+					By("creating the ObjectStore the recovery fetches the WAL files from", func() {
+						Expect(env.Client.Create(env.Ctx, newObjectStore(namespace, clusterName))).To(Succeed())
+					})
+
+					By("creating the cluster to be restored through snapshot", func() {
+						resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoRestoreManifest)
+						clusterasserts.AssertClusterIsReady(
+							env, namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
+						)
+					})
+
+					By("verifying that tablespaces and PVC were created", func() {
+						restoredCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace,
+							clusterToRestoreName)
+						Expect(err).ToNot(HaveOccurred())
+						AssertClusterHasMountPointsAndVolumesForTablespaces(restoredCluster, 2,
+							testTimeouts[timeouts.Short])
+						AssertClusterHasPvcsAndDataDirsForTablespaces(restoredCluster, testTimeouts[timeouts.Short])
+						AssertDatabaseContainsTablespaces(restoredCluster, testTimeouts[timeouts.Short])
+					})
+
+					By("verifying the correct data exists in the restored cluster", func() {
+						tableLocator := pgasserts.TableLocator{
+							Namespace:    namespace,
+							ClusterName:  clusterToRestoreName,
+							DatabaseName: postgres.AppDBName,
+							TableName:    table1,
+						}
+						pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+						tableLocator = pgasserts.TableLocator{
+							Namespace:    namespace,
+							ClusterName:  clusterToRestoreName,
+							DatabaseName: postgres.AppDBName,
+							TableName:    table2,
+						}
+						pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+					})
+				})
+
+			It(fmt.Sprintf("can create the cluster by recovery from volume snapshot backup with pitr %v", backupName),
+				func() {
+					By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+						forward, conn, err := postgres.ForwardPSQLConnection(
+							env.Ctx,
+							env.Client,
+							env.Interface,
+							env.RestClientConfig,
+							namespace,
+							clusterName,
+							postgres.AppDBName,
+							apiv1.ApplicationUserSecretSuffix,
+						)
+						defer func() {
+							_ = conn.Close()
+							forward.Close()
+						}()
+						Expect(err).ToNot(HaveOccurred())
+
+						// Insert 2 more rows which we expect not to be present at the end of the recovery
+						pgasserts.InsertRecordIntoTable(table1, 3, conn)
+						pgasserts.InsertRecordIntoTable(table1, 4, conn)
+
+						pgasserts.InsertRecordIntoTable(table2, 3, conn)
+						pgasserts.InsertRecordIntoTable(table2, 4, conn)
+
+						// Because GetCurrentTimestamp() rounds down to the second and is executed
+						// right after the creation of the test data, we wait for 1s to avoid not
+						// including the newly created data within the recovery_target_time
+						time.Sleep(1 * time.Second)
+						// Get the recovery_target_time and pass it to the template engine
+						recoveryTargetTime, err := postgres.GetCurrentTimestamp(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							namespace, clusterName,
+						)
+						Expect(err).ToNot(HaveOccurred())
+						config.SetTemplateVariable(recoveryTargetTimeEnv, recoveryTargetTime)
+
+						// Insert 2 more rows which we expect not to be present at the end of the recovery
+						pgasserts.InsertRecordIntoTable(table1, 5, conn)
+						pgasserts.InsertRecordIntoTable(table1, 6, conn)
+
+						pgasserts.InsertRecordIntoTable(table2, 5, conn)
+						pgasserts.InsertRecordIntoTable(table2, 6, conn)
+
+						// Close and archive the current WAL file
+						objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+							namespace, clusterName, clusterName)
+					})
+					By("fetching the volume snapshots", func() {
+						snapshotList, err := getSnapshots(backupName, clusterName, namespace)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(snapshotList.Items).To(HaveLen(len(backupObject.Status.BackupSnapshotStatus.Elements)))
+
+						templateVars := storage.SnapshotTemplateVariables{
+							DataSnapshot:             snapshotDataEnv,
+							WalSnapshot:              snapshotWalEnv,
+							TablespaceSnapshotPrefix: snapshotTbsEnv,
+						}
+						err = storage.SetSnapshotTemplateVariables(&snapshotList, backupObject, templateVars)
+						Expect(err).ToNot(HaveOccurred())
+					})
+
+					clusterToPITRName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterVolumesnapshoPITRManifest)
+					Expect(err).ToNot(HaveOccurred())
+
+					By("creating the cluster to be restored through snapshot", func() {
+						resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoPITRManifest)
+						clusterasserts.AssertClusterIsReady(env, namespace, clusterToPITRName, testTimeouts[timeouts.ClusterIsReadySlow])
+					})
+
+					By("can verify tablespaces and PVC were created", func() {
+						recoveryCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterToPITRName)
+						Expect(err).ToNot(HaveOccurred())
+						AssertClusterHasMountPointsAndVolumesForTablespaces(recoveryCluster, 2,
+							testTimeouts[timeouts.Short])
+						AssertClusterHasPvcsAndDataDirsForTablespaces(recoveryCluster, testTimeouts[timeouts.Short])
+						AssertDatabaseContainsTablespaces(recoveryCluster, testTimeouts[timeouts.Short])
+					})
+
+					By("verifying the correct data exists in the restored cluster", func() {
+						tableLocator := pgasserts.TableLocator{
+							Namespace:    namespace,
+							ClusterName:  clusterToPITRName,
+							DatabaseName: postgres.AppDBName,
+							TableName:    table1,
+						}
+						pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
+						tableLocator = pgasserts.TableLocator{
+							Namespace:    namespace,
+							ClusterName:  clusterToPITRName,
+							DatabaseName: postgres.AppDBName,
+							TableName:    table2,
+						}
+						pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
+					})
+				})
+		})
 
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
 		var namespace string

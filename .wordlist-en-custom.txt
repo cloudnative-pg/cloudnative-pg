@@ -233,6 +233,7 @@ GrantUsageSpecType
 HH
 HPA
 HashiCorp
+Hetzner
 HistoryTags
 Homebrew
 HoniSanders
@@ -526,6 +527,7 @@ ScheduledBackupList
 ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
+SchemaPermissionsSpec
 SchemaSpec
 Scorsolini
 Seccomp
@@ -915,6 +917,7 @@ ddf
 ddl
 de
 declaratively
+decrypt
 defaultMode
 demotionToken
 dennispidun
@@ -1518,6 +1521,7 @@ scheduledbackupspec
 scheduledbackupstatus
 schedulerName
 schemaOnly
+schemapermissionsspec
 schemas
 schemaspec
 sdk
@@ -1584,6 +1588,7 @@ sqlrefs
 src
 sre
 ssc
+sse
 ssl
 sslCert
 sslKey

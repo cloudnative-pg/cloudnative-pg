@@ -22,10 +22,6 @@ spec:
           name: ${SNAPSHOT_PLUGIN_PITR_PGDATA}
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
-        walStorage:
-          name: ${SNAPSHOT_PLUGIN_PITR_PGWAL}
-          kind: VolumeSnapshot
-          apiGroup: snapshot.storage.k8s.io
       recoveryTarget:
         targetTime: ${SNAPSHOT_PLUGIN_PITR}
 

@@ -342,3 +342,86 @@ var _ = Describe("setupBootstrapWALRestoreCache", func() {
 		Expect(store.Wal.RestoreAdditionalCommandArgs).To(ContainElement("--read-timeout=60"))
 	})
 })
+
+var _ = Describe("writeBackupLabelAndTablespaceMap", func() {
+	It("writes the backup_label and tablespace_map files when given", func() {
+		pgData := GinkgoT().TempDir()
+		info := InitInfo{
+			PgData:            pgData,
+			BackupLabelFile:   []byte("backup label"),
+			TablespaceMapFile: []byte("tablespace map"),
+		}
+
+		Expect(info.writeBackupLabelAndTablespaceMap()).To(Succeed())
+
+		backupLabel, err := os.ReadFile(path.Join(pgData, "backup_label")) //nolint:gosec
+		Expect(err).ToNot(HaveOccurred())
+		Expect(string(backupLabel)).To(Equal("backup label"))
+		tablespaceMap, err := os.ReadFile(path.Join(pgData, "tablespace_map")) //nolint:gosec
+		Expect(err).ToNot(HaveOccurred())
+		Expect(string(tablespaceMap)).To(Equal("tablespace map"))
+	})
+
+	It("writes nothing when they are not given", func() {
+		pgData := GinkgoT().TempDir()
+		info := InitInfo{PgData: pgData}
+
+		Expect(info.writeBackupLabelAndTablespaceMap()).To(Succeed())
+
+		entries, err := os.ReadDir(pgData)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(entries).To(BeEmpty())
+	})
+})
+
+var _ = Describe("restoreCustomWalDir without a WAL volume", func() {
+	var pgData, pgDataWal string
+
+	BeforeEach(func() {
+		pgData = GinkgoT().TempDir()
+		pgDataWal = path.Join(pgData, pgWalDirectory)
+	})
+
+	It("replaces the symlink to a missing WAL volume with a directory", func(ctx SpecContext) {
+		Expect(os.Symlink(path.Join(pgData, "missing", pgWalDirectory), pgDataWal)).To(Succeed())
+
+		changed, err := InitInfo{PgData: pgData}.restoreCustomWalDir(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(changed).To(BeTrue())
+
+		walInfo, err := os.Lstat(pgDataWal)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(walInfo.IsDir()).To(BeTrue())
+		Expect(walInfo.Mode().Perm()).To(Equal(os.FileMode(0o700)))
+	})
+
+	It("leaves a symlink to an existing directory alone", func(ctx SpecContext) {
+		target := GinkgoT().TempDir()
+		Expect(os.Symlink(target, pgDataWal)).To(Succeed())
+
+		changed, err := InitInfo{PgData: pgData}.restoreCustomWalDir(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(changed).To(BeFalse())
+
+		link, err := os.Readlink(pgDataWal)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(link).To(Equal(target))
+	})
+
+	It("leaves a pg_wal directory alone", func(ctx SpecContext) {
+		Expect(os.Mkdir(pgDataWal, 0o700)).To(Succeed())
+		Expect(os.WriteFile(path.Join(pgDataWal, "000000010000000000000001"), []byte("wal"), 0o600)).To(Succeed())
+
+		changed, err := InitInfo{PgData: pgData}.restoreCustomWalDir(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(changed).To(BeFalse())
+		Expect(path.Join(pgDataWal, "000000010000000000000001")).To(BeAnExistingFile())
+	})
+
+	It("does nothing when there is no pg_wal", func(ctx SpecContext) {
+		changed, err := InitInfo{PgData: pgData}.restoreCustomWalDir(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(changed).To(BeFalse())
+		Expect(pgDataWal).ToNot(BeAnExistingFile())
+	})
+})

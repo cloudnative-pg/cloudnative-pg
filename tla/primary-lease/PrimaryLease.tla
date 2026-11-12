@@ -7,7 +7,7 @@
 \* older than RenewDeadline must run its peer check within StepDownDelay
 \* ticks, and a decided primary must be stopped before its lease age reaches
 \* LeaseDuration (the hard stop, killPostgresAndExit) or within DeliveryDelay
-\* ticks of the verdict (the soft stop, TryRequestImmediateShutdown),
+\* ticks of the verdict (the soft stop, TryRequestStepDownShutdown),
 \* whichever comes first. The Ticker refuses to advance past a missed
 \* deadline, so the model proves: IF the code keeps those bounds, THEN no two
 \* nodes lead at once. It does not prove that the code keeps them.
@@ -221,7 +221,7 @@ variable observedLeaseRenewTick = 0,
         lastCheck[self] := tick;
     } or {
       DeliverShutdown:
-        \* TryRequestImmediateShutdown is accepted and PostgreSQL stops. The
+        \* The shutdown request is accepted and PostgreSQL stops. The
         \* lease is not released: this is the non-cooperative old primary.
         \* The request comes from the monitor's verdict, or from the liveness
         \* probe handler of a stuck leader (liveness.go), which asks without

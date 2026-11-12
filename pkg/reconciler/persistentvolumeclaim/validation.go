@@ -125,11 +125,16 @@ func (status *ValidationStatus) validateVolumeMetadata(
 //     (being storage or walStorage)
 //
 //   - the specified snapshots all belong to the same cluster and backupName
+//
+//   - a cluster with a WAL storage is given a WAL storage source, unless
+//     the PGDATA snapshot belongs to an online backup, which doesn't snapshot
+//     the WAL storage
 func VerifyDataSourceCoherence(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
 	source *apiv1.DataSource,
+	requiresWalStorage bool,
 ) (ValidationStatus, error) {
 	var result ValidationStatus
 
@@ -158,6 +163,11 @@ func VerifyDataSourceCoherence(
 			return result, err
 		}
 		result.validateVolumeMetadata(source.WalStorage.Name, pgWal, NewPgWalCalculator())
+	} else if requiresWalStorage && pgData != nil &&
+		!utils.IsOnlineBackupSnapshot(pgData) {
+		result.addErrorf(
+			source.Storage.Name,
+			"Missing WAL storage source: it can be omitted only for a snapshot of an online backup")
 	}
 
 	if pgData != nil && pgWal != nil {

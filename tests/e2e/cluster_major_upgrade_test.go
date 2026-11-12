@@ -22,6 +22,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -209,6 +210,16 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 				" ('Polygon', 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))')," +
 				" ('PolygonWithHole', 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),(1 1, 1 2, 2 2, 2 1, 1 1))')," +
 				" ('Collection', 'GEOMETRYCOLLECTION(POINT(2 0),POLYGON((0 0, 1 0, 1 1, 0 1, 0 0)))');",
+		}
+
+		// Debian does not package the tiger geocoder for PostgreSQL 14 and 15
+		major, err := strconv.Atoi(tagVersion)
+		Expect(err).ToNot(HaveOccurred())
+		if major < 16 {
+			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQL = slices.DeleteFunc(
+				cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQL,
+				func(stmt string) bool { return stmt == "CREATE EXTENSION postgis_tiger_geocoder" },
+			)
 		}
 		return cluster
 	}
