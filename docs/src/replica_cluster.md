@@ -100,6 +100,7 @@ recovery. There are three main options:
 3. **Hybrid Approach**: Combine both streaming replication and WAL archive
    methods. PostgreSQL can manage and switch between these two approaches as
    needed to ensure data consistency and availability.
+   See [Continuous backup integration](replication.md#continuous-backup-integration) for when a replica goes back to streaming.
 
 :::warning[Cascading standbys and restore from WAL archive]
 A PostgreSQL bug present since version 9.3 could permanently prevent a
