@@ -215,6 +215,6 @@ of Canada, and used with their permission.*
 ---
 
 CloudNativePG is a
-[Cloud Native Computing Foundation Sandbox project](https://www.cncf.io/sandbox-projects/).
+[Cloud Native Computing Foundation Incubating project](https://www.cncf.io/projects/cloudnativepg/).
 
 ![](https://github.com/cncf/artwork/blob/main/other/cncf/horizontal/color/cncf-color.png?raw=true)

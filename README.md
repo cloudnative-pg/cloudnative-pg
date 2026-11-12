@@ -149,7 +149,7 @@ organization to this list!
 ---
 
 <p align="center">
-We are a <a href="https://www.cncf.io/sandbox-projects/">Cloud Native Computing Foundation Sandbox project</a>.
+We are a <a href="https://www.cncf.io/projects/cloudnativepg/">Cloud Native Computing Foundation Incubating project</a>.
 </p>
 
 <p style="text-align:center;" align="center">
