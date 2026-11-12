@@ -112,6 +112,13 @@ func Delete(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 	return err
 }
 
+// IsInRecovery reports whether the instance is in recovery
+func IsInRecovery(ctx context.Context, db *sql.DB) (bool, error) {
+	var inRecovery bool
+	err := db.QueryRowContext(ctx, "SELECT pg_catalog.pg_is_in_recovery()").Scan(&inRecovery)
+	return inRecovery, err
+}
+
 // ListOrphanedFailoverSlots lists the logical slots enabled for failover that a
 // standby holds without having received them from the primary. PostgreSQL
 // refuses to enable failover on a slot during recovery, except in the slot sync

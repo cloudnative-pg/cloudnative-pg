@@ -292,50 +292,77 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 
 var _ = Describe("Orphaned failover slots", func() {
 	const (
+		selectIsInRecovery          = "^SELECT pg_catalog.pg_is_in_recovery\\(\\)$"
 		selectOrphanedFailoverSlots = "^SELECT slot_name FROM pg_catalog.pg_replication_slots " +
 			"WHERE slot_type = 'logical' AND failover AND NOT synced AND NOT active"
 		dropSlot = "SELECT pg_catalog.pg_drop_replication_slot"
 	)
 
 	var (
-		db   *sql.DB
-		mock sqlmock.Sqlmock
+		primaryDB, localDB     *sql.DB
+		primaryMock, localMock sqlmock.Sqlmock
 	)
+
+	expectPrimaryInRecovery := func(inRecovery bool) {
+		primaryMock.ExpectQuery(selectIsInRecovery).
+			WillReturnRows(sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(inRecovery))
+	}
 
 	BeforeEach(func() {
 		var err error
-		db, mock, err = sqlmock.New()
+		primaryDB, primaryMock, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+		localDB, localMock, err = sqlmock.New()
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
-		Expect(mock.ExpectationsWereMet()).To(Succeed())
+		Expect(primaryMock.ExpectationsWereMet()).To(Succeed())
+		Expect(localMock.ExpectationsWereMet()).To(Succeed())
 	})
 
 	It("drops the orphaned failover slots", func(ctx SpecContext) {
-		mock.ExpectQuery(selectOrphanedFailoverSlots).
+		expectPrimaryInRecovery(false)
+		localMock.ExpectQuery(selectOrphanedFailoverSlots).
 			WillReturnRows(sqlmock.NewRows([]string{"slot_name"}).AddRow("orphan1").AddRow("orphan2"))
-		mock.ExpectExec(dropSlot).WithArgs("orphan1").WillReturnResult(sqlmock.NewResult(1, 1))
-		mock.ExpectExec(dropSlot).WithArgs("orphan2").WillReturnResult(sqlmock.NewResult(1, 1))
+		localMock.ExpectExec(dropSlot).WithArgs("orphan1").WillReturnResult(sqlmock.NewResult(1, 1))
+		localMock.ExpectExec(dropSlot).WithArgs("orphan2").WillReturnResult(sqlmock.NewResult(1, 1))
 
-		Expect(dropOrphanedFailoverSlots(ctx, db)).To(Succeed())
+		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).To(Succeed())
+	})
+
+	It("keeps the slots when the primary is in recovery", func(ctx SpecContext) {
+		// the local mock has no expectations: any query on it fails the spec
+		expectPrimaryInRecovery(true)
+
+		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).To(Succeed())
+	})
+
+	It("keeps the slots when the recovery status of the primary is unknown", func(ctx SpecContext) {
+		primaryMock.ExpectQuery(selectIsInRecovery).WillReturnError(errors.New("mock primary failure"))
+
+		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).
+			To(MatchError(ContainSubstring("mock primary failure")))
 	})
 
 	It("keeps dropping after a failure and returns it", func(ctx SpecContext) {
-		mock.ExpectQuery(selectOrphanedFailoverSlots).
+		expectPrimaryInRecovery(false)
+		localMock.ExpectQuery(selectOrphanedFailoverSlots).
 			WillReturnRows(sqlmock.NewRows([]string{"slot_name"}).AddRow("orphan1").AddRow("orphan2"))
-		mock.ExpectExec(dropSlot).WithArgs("orphan1").WillReturnError(errors.New("mock drop failure"))
-		mock.ExpectExec(dropSlot).WithArgs("orphan2").WillReturnResult(sqlmock.NewResult(1, 1))
+		localMock.ExpectExec(dropSlot).WithArgs("orphan1").WillReturnError(errors.New("mock drop failure"))
+		localMock.ExpectExec(dropSlot).WithArgs("orphan2").WillReturnResult(sqlmock.NewResult(1, 1))
 
-		err := dropOrphanedFailoverSlots(ctx, db)
+		err := dropOrphanedFailoverSlots(ctx, primaryDB, localDB)
 		Expect(err).To(MatchError(ContainSubstring(`dropping orphaned failover slot "orphan1": mock drop failure`)))
 		Expect(err.Error()).NotTo(ContainSubstring("orphan2"))
 	})
 
 	It("returns the listing error", func(ctx SpecContext) {
-		mock.ExpectQuery(selectOrphanedFailoverSlots).WillReturnError(errors.New("mock list failure"))
+		expectPrimaryInRecovery(false)
+		localMock.ExpectQuery(selectOrphanedFailoverSlots).WillReturnError(errors.New("mock list failure"))
 
-		Expect(dropOrphanedFailoverSlots(ctx, db)).To(MatchError(ContainSubstring("mock list failure")))
+		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).
+			To(MatchError(ContainSubstring("mock list failure")))
 	})
 })
 

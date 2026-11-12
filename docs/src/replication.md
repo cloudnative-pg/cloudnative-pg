@@ -953,6 +953,9 @@ requires its client to consume changes from the new primary. A temporary slot
 does not survive a promotion: if the former primary is promoted again before
 then, that slot is lost.
 
+In a replica cluster the slots are left in place, as PostgreSQL synchronizes
+them only from a primary.
+
 For more details on logical replication slot synchronization, see the
 PostgreSQL documentation on [Logical Replication Failover](https://www.postgresql.org/docs/current/logical-replication-failover.html).
 
