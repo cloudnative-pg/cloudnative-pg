@@ -433,7 +433,6 @@ func isPodNeedingRollout(
 		"pod projected volume is outdated":         checkProjectedVolumeIsOutdated,
 		"pod image is outdated":                    checkPodImageIsOutdated,
 		"cluster has different restart annotation": checkClusterHasDifferentRestartAnnotation,
-		"pod resize is infeasible":                 checkPodResizeStuckInfeasible,
 	}
 
 	podRollout := applyCheckers(checkers)
@@ -450,8 +449,14 @@ func isPodNeedingRollout(
 	// If the pod has a valid PodSpec annotation, that's the final check.
 	// If not, we should perform additional legacy checks
 	if hasValidPodSpec(pod) {
-		return applyCheckers(map[string]rolloutChecker{
+		podRollout = applyCheckers(map[string]rolloutChecker{
 			"PodSpec is outdated": checkPodSpecIsOutdated,
+		})
+		if podRollout.required {
+			return podRollout
+		}
+		return applyCheckers(map[string]rolloutChecker{
+			"pod resize is infeasible": checkPodResizeStuckInfeasible,
 		})
 	}
 

@@ -371,6 +371,14 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			rollout := isPodNeedingRollout(ctx, newInfeasiblePod(ctx), &cluster)
 			Expect(rollout.required).To(BeFalse())
 		})
+
+		It("ignores it when the pod spec reconciliation is disabled", func(ctx SpecContext) {
+			cluster.Spec.ResourcesUpdateStrategy = apiv1.ResourcesUpdateStrategyInPlace
+			cluster.Annotations = map[string]string{utils.ReconcilePodSpecAnnotationName: "disabled"}
+
+			rollout := isPodNeedingRollout(ctx, newInfeasiblePod(ctx), &cluster)
+			Expect(rollout.required).To(BeFalse())
+		})
 	})
 
 	When("the PodSpec annotation is not available", func() {
