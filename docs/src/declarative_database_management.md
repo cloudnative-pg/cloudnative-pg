@@ -271,9 +271,14 @@ status:
       message: role does not exist
 ```
 
-The entries are independent. If a role does not exist, which is reported for
-both `grant` and `revoke`, the other entries are still applied. The
-`Database` is retried until all of them succeed.
+The entries are applied in the order they are listed, grouped by privilege.
+They are independent: if a role does not exist, which is reported for both
+`grant` and `revoke`, the other entries are still applied. The `Database` is
+retried until all of them succeed.
+
+When you revoke a privilege from `public` and grant it to specific roles, list
+the `grant` entries first. This way, a failure while granting does not leave
+the roles without the privilege they were meant to receive.
 
 :::info
     CloudNativePG manages database permissions using the
