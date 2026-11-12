@@ -947,6 +947,12 @@ replicas, CloudNativePG drops the logical replication slots that have
 `failover` enabled and are not `synced`, letting PostgreSQL recreate them
 from the primary. A slot in use is dropped once its client disconnects.
 
+PostgreSQL recreates each slot as a temporary one, and makes it persistent
+only when the slot on the primary has advanced far enough, which normally
+requires its client to consume changes from the new primary. A temporary slot
+does not survive a promotion: if the former primary is promoted again before
+then, that slot is lost.
+
 For more details on logical replication slot synchronization, see the
 PostgreSQL documentation on [Logical Replication Failover](https://www.postgresql.org/docs/current/logical-replication-failover.html).
 
