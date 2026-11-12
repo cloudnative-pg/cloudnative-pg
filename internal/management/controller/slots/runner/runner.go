@@ -157,7 +157,7 @@ func (sr *Replicator) reconcile(
 		}
 		// The failover and synced columns exist from PostgreSQL 17
 		if pgVersion.Major() >= 17 {
-			err = multierr.Append(err, dropOrphanedFailoverSlots(ctx, localDB))
+			err = multierr.Append(err, dropOrphanedFailoverSlots(ctx, primaryDB, localDB))
 		}
 	}
 
@@ -170,7 +170,17 @@ func (sr *Replicator) reconcile(
 // marked as synced: once they are dropped, the worker recreates them from the
 // primary. A slot in use is dropped by a later run, after its client disconnects.
 // A failure on one slot doesn't stop the rest; errors are collected and returned together.
-func dropOrphanedFailoverSlots(ctx context.Context, localDB *sql.DB) error {
+func dropOrphanedFailoverSlots(ctx context.Context, primaryDB, localDB *sql.DB) error {
+	// PostgreSQL synchronizes the slots only from a primary: in a replica
+	// cluster nothing would recreate the slots dropped here
+	inRecovery, err := infrastructure.IsInRecovery(ctx, primaryDB)
+	if err != nil {
+		return fmt.Errorf("checking if the primary is in recovery: %w", err)
+	}
+	if inRecovery {
+		return nil
+	}
+
 	slots, err := infrastructure.ListOrphanedFailoverSlots(ctx, localDB)
 	if err != nil {
 		return fmt.Errorf("listing orphaned failover slots: %w", err)

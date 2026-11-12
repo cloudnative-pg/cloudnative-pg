@@ -183,6 +183,13 @@ var _ = Describe("PostgresManager", func() {
 		})
 	})
 
+	It("reports whether the instance is in recovery", func(ctx SpecContext) {
+		mock.ExpectQuery("^SELECT pg_catalog.pg_is_in_recovery\\(\\)$").
+			WillReturnRows(sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
+
+		Expect(IsInRecovery(ctx, db)).To(BeTrue())
+	})
+
 	Context("ListOrphanedFailoverSlots", func() {
 		const expectedSQL = "^SELECT slot_name FROM pg_catalog.pg_replication_slots " +
 			"WHERE slot_type = 'logical' AND failover AND NOT synced AND NOT active " +
