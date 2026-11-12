@@ -1490,7 +1490,6 @@ resizingPVC
 resourceRequirements
 resourceVersion
 resourcerequirements
-resourcesUpdateStrategy
 resourcesupdatestrategy
 restoreAdditionalCommandArgs
 restoreJobHookCapabilities

@@ -5944,13 +5944,9 @@ spec:
                 type: object
               resourcesUpdateStrategy:
                 description: |-
-                  ResourcesUpdateStrategy selects how changes to the resources of the
-                  instance containers are applied to running instances: `recreate` (the
-                  default) replaces the Pods with a rolling update, while `inPlace`
-                  resizes running Pods through the Kubernetes `resize` subresource
-                  whenever possible, falling back to a rolling update otherwise.
-                  In-place resize requires Kubernetes 1.33 or later. Memory limit
-                  decreases are always applied with a rolling update.
+                  How changes to `resources` reach running instances: `recreate`
+                  (default) rolls the Pods, `inPlace` resizes them when possible and
+                  rolls them otherwise. `inPlace` requires Kubernetes 1.33 or later.
                 enum:
                 - recreate
                 - inPlace

@@ -20,12 +20,13 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -37,10 +38,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Set of tests for the inPlace resources update strategy: resource-only
-// changes are applied to the running instance pods through the resize
-// subresource, without recreating them; changes that cannot be applied in
-// place, like memory limit decreases, fall back to the usual rolling update.
 var _ = Describe("In-place resource updates", Label(tests.LabelPostgresConfiguration), func() {
 	const (
 		sampleFile      = fixturesDir + "/inplace_resize/cluster-inplace-resize.yaml.template"
@@ -53,165 +50,93 @@ var _ = Describe("In-place resource updates", Label(tests.LabelPostgresConfigura
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		// Require K8S 1.33 or greater
 		versionInfo, err := env.Interface.Discovery().ServerVersion()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		currentVersion, err := semver.NewVersion(strings.TrimPrefix(versionInfo.String(), "v"))
-		Expect(err).NotTo(HaveOccurred())
-		k8s133, err := semver.NewVersion("1.33.0")
-		Expect(err).NotTo(HaveOccurred())
-		if currentVersion.LessThan(k8s133) {
-			Skip("This test requires in-place pod resize support (Kubernetes 1.33+)")
+		Expect(err).ToNot(HaveOccurred())
+		coreResources, err := env.Interface.Discovery().ServerResourcesForGroupVersion("v1")
+		Expect(err).ToNot(HaveOccurred())
+		hasResize := slices.ContainsFunc(coreResources.APIResources,
+			func(r metav1.APIResource) bool { return r.Name == "pods/resize" })
+		if currentVersion.LessThan(semver.MustParse("1.33.0")) || !hasResize {
+			Skip("This test runs only on Kubernetes 1.33 or greater, with in-place pod resize enabled")
 		}
 	})
 
-	getPostgresResources := func(pod *corev1.Pod) corev1.ResourceRequirements {
-		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
-				return pod.Spec.Containers[i].Resources
-			}
-		}
-		return corev1.ResourceRequirements{}
-	}
-
-	getPostgresContainerStatus := func(pod *corev1.Pod) *corev1.ContainerStatus {
-		for i := range pod.Status.ContainerStatuses {
-			if pod.Status.ContainerStatuses[i].Name == specs.PostgresContainerName {
-				return &pod.Status.ContainerStatuses[i]
-			}
-		}
-		return nil
-	}
-
-	updateClusterResources := func(namespace string, resources corev1.ResourceRequirements) {
-		Eventually(func(g Gomega) error {
-			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			g.Expect(err).ToNot(HaveOccurred())
-
-			cluster.Spec.Resources = resources
-			return env.Client.Update(env.Ctx, cluster)
-		}, RetryTimeout, PollingTime).Should(Succeed())
-	}
-
-	It("applies resource changes without recreating the pods", func() {
+	It("resizes the pods in place, and recreates them when the memory limit decreases", func() {
 		namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
-		originalPodUIDs := make(map[string]types.UID)
-		originalRestartCounts := make(map[string]int32)
-		var originalPrimary string
-
-		By("gathering the current pods", func() {
-			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			originalPrimary = cluster.Status.CurrentPrimary
-
+		// the kubelet sorts the statuses by name, and other actors can inject containers
+		postgresStatus := func(pod corev1.Pod) corev1.ContainerStatus {
+			return pod.Status.ContainerStatuses[slices.IndexFunc(pod.Status.ContainerStatuses,
+				func(status corev1.ContainerStatus) bool { return status.Name == specs.PostgresContainerName })]
+		}
+		listPods := func(g Gomega) []corev1.Pod {
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(podList.Items).To(HaveLen(3))
-			for i := range podList.Items {
-				pod := &podList.Items[i]
-				originalPodUIDs[pod.Name] = pod.UID
-				containerStatus := getPostgresContainerStatus(pod)
-				Expect(containerStatus).ToNot(BeNil())
-				originalRestartCounts[pod.Name] = containerStatus.RestartCount
-			}
-		})
-
-		increasedResources := corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("150m"),
-				corev1.ResourceMemory: resource.MustParse("320Mi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("400m"),
-				corev1.ResourceMemory: resource.MustParse("768Mi"),
-			},
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(podList.Items).To(HaveLen(3))
+			return podList.Items
+		}
+		setLimits := func(cpu, memory string) {
+			Eventually(func(g Gomega) error {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.Resources.Limits = corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse(cpu),
+					corev1.ResourceMemory: resource.MustParse(memory),
+				}
+				return env.Client.Update(env.Ctx, cluster)
+			}, RetryTimeout, PollingTime).Should(Succeed())
 		}
 
-		By("increasing cpu and memory of the cluster", func() {
-			updateClusterResources(namespace, increasedResources)
-		})
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		primary := cluster.Status.CurrentPrimary
+		original := make(map[string]corev1.Pod)
+		for _, pod := range listPods(Default) {
+			original[pod.Name] = pod
+		}
 
-		By("waiting for the new resources to be applied to the running containers", func() {
+		By("increasing the cpu and memory limits", func() {
+			setLimits("400m", "768Mi")
 			Eventually(func(g Gomega) {
-				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(podList.Items).To(HaveLen(3))
-
-				for i := range podList.Items {
-					pod := &podList.Items[i]
-
-					liveResources := getPostgresResources(pod)
-					g.Expect(liveResources.Limits.Cpu().Cmp(*increasedResources.Limits.Cpu())).
-						To(BeZero(), "pod %s cpu limit", pod.Name)
-					g.Expect(liveResources.Limits.Memory().Cmp(*increasedResources.Limits.Memory())).
-						To(BeZero(), "pod %s memory limit", pod.Name)
-
-					// the kubelet reports the resources actually applied to
-					// the running container
-					containerStatus := getPostgresContainerStatus(pod)
-					g.Expect(containerStatus).ToNot(BeNil())
-					g.Expect(containerStatus.Resources).ToNot(BeNil())
-					g.Expect(containerStatus.Resources.Limits.Memory().Cmp(*increasedResources.Limits.Memory())).
-						To(BeZero(), "pod %s applied memory limit", pod.Name)
+				for _, pod := range listPods(g) {
+					// the resources the kubelet applied to the running container
+					applied := postgresStatus(pod).Resources
+					g.Expect(applied).ToNot(BeNil())
+					g.Expect(applied.Limits.Cpu().String()).To(Equal("400m"), pod.Name)
+					g.Expect(applied.Limits.Memory().String()).To(Equal("768Mi"), pod.Name)
 				}
 			}, testTimeouts[timeouts.PodRollout]).Should(Succeed())
 		})
 
-		By("verifying no pod was recreated or restarted", func() {
-			// the resize must leave the drift detection quiescent: no pod
-			// recreation may happen after the resources have been applied
+		By("verifying that no pod was recreated or restarted, and no switchover happened", func() {
 			Consistently(func(g Gomega) {
-				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(podList.Items).To(HaveLen(3))
-
-				for i := range podList.Items {
-					pod := &podList.Items[i]
-					g.Expect(pod.UID).To(Equal(originalPodUIDs[pod.Name]),
-						"pod %s has been recreated", pod.Name)
-					containerStatus := getPostgresContainerStatus(pod)
-					g.Expect(containerStatus).ToNot(BeNil())
-					g.Expect(containerStatus.RestartCount).To(Equal(originalRestartCounts[pod.Name]),
-						"container of pod %s has been restarted", pod.Name)
+				for _, pod := range listPods(g) {
+					g.Expect(pod.UID).To(Equal(original[pod.Name].UID), pod.Name)
+					g.Expect(postgresStatus(pod).RestartCount).
+						To(Equal(postgresStatus(original[pod.Name]).RestartCount), pod.Name)
 				}
-
-				// a switchover keeps both the pods and their containers
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(cluster.Status.CurrentPrimary).To(Equal(originalPrimary), "a switchover happened")
-				g.Expect(cluster.Status.TargetPrimary).To(Equal(originalPrimary), "a switchover happened")
+				g.Expect(cluster.Status.CurrentPrimary).To(Equal(primary))
+				g.Expect(cluster.Status.TargetPrimary).To(Equal(primary))
 			}, 30, 5).Should(Succeed())
-
 			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 
-		By("decreasing the memory limit", func() {
-			decreasedResources := *increasedResources.DeepCopy()
-			decreasedResources.Limits[corev1.ResourceMemory] = resource.MustParse("512Mi")
-			decreasedResources.Requests[corev1.ResourceMemory] = resource.MustParse("256Mi")
-			updateClusterResources(namespace, decreasedResources)
-		})
-
-		By("waiting for the pods to be recreated by a rolling update", func() {
+		By("decreasing the memory limit, which recreates the pods", func() {
+			setLimits("400m", "512Mi")
 			Eventually(func(g Gomega) {
-				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(podList.Items).To(HaveLen(3))
-
-				for i := range podList.Items {
-					pod := &podList.Items[i]
-					g.Expect(pod.UID).ToNot(Equal(originalPodUIDs[pod.Name]),
-						"pod %s was expected to be recreated", pod.Name)
-
-					liveResources := getPostgresResources(pod)
-					g.Expect(liveResources.Limits.Memory().Cmp(resource.MustParse("512Mi"))).
-						To(BeZero(), "pod %s memory limit", pod.Name)
+				for _, pod := range listPods(g) {
+					g.Expect(pod.UID).ToNot(Equal(original[pod.Name].UID), pod.Name)
+					postgres := slices.IndexFunc(pod.Spec.Containers,
+						func(container corev1.Container) bool { return container.Name == specs.PostgresContainerName })
+					g.Expect(pod.Spec.Containers[postgres].Resources.Limits.Memory().String()).To(Equal("512Mi"), pod.Name)
 				}
 			}, testTimeouts[timeouts.ClusterIsReady]).Should(Succeed())
-
 			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 	})
