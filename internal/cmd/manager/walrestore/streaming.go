@@ -89,7 +89,21 @@ type streamingRetryState struct {
 }
 
 // next returns the state after a restore of the given WAL file at the given
-// time, and whether the restore must fail
+// time, and whether the restore must fail.
+//
+// PostgreSQL tries streaming replication only when restore_command fails, so
+// a standby that finds every WAL file in the archive never streams. Once the
+// interval has expired, the restores fail for a short while to let PostgreSQL
+// connect to the primary.
+//
+// The next restore tells what happened. If PostgreSQL asks for a WAL file
+// following the one that failed, streaming made progress and the interval
+// starts over. Otherwise streaming did not hold, and the interval doubles up
+// to a maximum, so that a standby that cannot stream keeps restoring from the
+// archive without being interrupted too often.
+//
+// When PostgreSQL stops calling restore_command for long enough, the standby
+// is assumed to be streaming and the state starts over.
 func (s streamingRetryState) next(now time.Time, walName string) (streamingRetryState, bool) {
 	if now.Sub(s.LastSeen) >= streamingRetryResetAfter {
 		s = streamingRetryState{WindowStart: now, Interval: streamingRetryInterval}
@@ -97,9 +111,12 @@ func (s streamingRetryState) next(now time.Time, walName string) (streamingRetry
 	s.LastSeen = now
 
 	switch {
+	// We are inside the window of forced failures: keep failing
 	case now.Before(s.FailUntil):
 		return s, true
 
+	// The window of forced failures has ended, and this is the first restore
+	// after it: evaluate the outcome of the streaming attempt
 	case !s.FailUntil.IsZero():
 		forcedFailureWAL := s.ForcedFailureWAL
 		s.FailUntil = time.Time{}
@@ -116,12 +133,15 @@ func (s streamingRetryState) next(now time.Time, walName string) (streamingRetry
 		}
 		return s, false
 
+	// No forced failure is pending and the interval has expired: start a new
+	// window of forced failures
 	case now.Sub(s.WindowStart) >= s.Interval:
 		s.FailUntil = now.Add(streamingRetryFailFor)
 		s.ForcedFailureWAL = walName
 		return s, true
 	}
 
+	// Otherwise the interval is still running: restore from the archive
 	return s, false
 }
 
@@ -171,7 +191,12 @@ func checkStreamingRetry(
 	}
 	state, fail := state.next(time.Now(), walName)
 
-	content, _ := json.Marshal(state)
+	content, err := json.Marshal(state)
+	if err != nil {
+		// Only a change to streamingRetryState can cause this
+		log.FromContext(ctx).Warning("Cannot encode the streaming retry state", "error", err)
+		return nil
+	}
 	if err := os.WriteFile(streamingRetryStateFile, content, 0o600); err != nil {
 		// Without a state, every restore would fail
 		log.FromContext(ctx).Warning("Cannot store the streaming retry state", "error", err)
