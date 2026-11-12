@@ -213,7 +213,8 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 // expanded before checking: for each privilege, a role can appear only once,
 // either granted or revoked. Repeating the same entry is most likely a mistake
 // in the specification, so it is rejected too.
-// Role names are matched exactly, as they are emitted as quoted identifiers.
+// Every spelling of `public` is the PUBLIC pseudo-role, as for the usages of
+// schemas and foreign data wrappers.
 func (v *DatabaseCustomValidator) validatePermissions(d *apiv1.Database) field.ErrorList {
 	if d.Spec.Permissions == nil {
 		return nil
@@ -241,10 +242,11 @@ func (v *DatabaseCustomValidator) validatePermissions(d *apiv1.Database) field.E
 				entryType = apiv1.GrantUsageSpecType
 			}
 
-			previous, found := requested[entry.Name]
+			key := granteeKey(entry.Name)
+			previous, found := requested[key]
 			switch {
 			case !found:
-				requested[entry.Name] = entryType
+				requested[key] = entryType
 			case previous != entryType:
 				result = append(result, field.Invalid(
 					entryPath.Child("name"),
@@ -362,10 +364,7 @@ func validateUsageNames(usagesPath *field.Path, usages []apiv1.UsageSpec) field.
 
 	usageNames := stringset.New()
 	for i, usage := range usages {
-		name := usage.Name
-		if strings.EqualFold(name, publicRole) {
-			name = publicRole
-		}
+		name := granteeKey(usage.Name)
 
 		if usageNames.Has(name) {
 			errs = append(errs, field.Duplicate(usagesPath.Index(i).Child("name"), usage.Name))
@@ -374,6 +373,15 @@ func validateUsageNames(usagesPath *field.Path, usages []apiv1.UsageSpec) field.
 	}
 
 	return errs
+}
+
+// granteeKey returns the key that identifies a grantee: every spelling of
+// `public` resolves to the same PostgreSQL PUBLIC pseudo-role
+func granteeKey(name string) string {
+	if strings.EqualFold(name, publicRole) {
+		return publicRole
+	}
+	return name
 }
 
 // publicRole is the PostgreSQL PUBLIC pseudo-role, which the instance manager

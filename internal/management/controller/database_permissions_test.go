@@ -104,11 +104,19 @@ var _ = Describe("Database permissions", func() {
 			Expect(changes[0].err).To(MatchError(errConflictingDatabasePermission))
 			Expect(changes[1].err).ToNot(HaveOccurred())
 		})
+
+		It("folds every spelling of public into the same grantee", func() {
+			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+				Connect: []apiv1.UsageSpec{grant("public"), revoke("PUBLIC")},
+			})
+			Expect(changes).To(HaveLen(1))
+			Expect(changes[0].err).To(MatchError(errConflictingDatabasePermission))
+		})
 	})
 
 	Describe("planDatabasePermissions", func() {
 		// the OID of the roles that exist, as it would be found by decorating
-		roles := map[string]int64{"app": 20, "PUBLIC": 30}
+		roles := map[string]int64{"app": 20}
 
 		decorated := func(
 			permissions *apiv1.DatabasePermissionsSpec,
@@ -116,7 +124,7 @@ var _ = Describe("Database permissions", func() {
 		) []databasePermissionChange {
 			changes := expandDatabasePermissions(permissions)
 			for i := range changes {
-				if changes[i].name != "public" {
+				if granteeKey(changes[i].name) != publicRole {
 					changes[i].granteeOid = oids[changes[i].name]
 				}
 			}
@@ -169,14 +177,15 @@ var _ = Describe("Database permissions", func() {
 			}))
 		})
 
-		It("treats only the exact lowercase public as PUBLIC", func() {
-			changes := plan(databaseACL{}, &apiv1.DatabasePermissionsSpec{
-				Connect: []apiv1.UsageSpec{grant("PUBLIC")},
-			})
-			// "PUBLIC" is an ordinary role that happens to exist in this test
-			Expect(statements(changes)).To(Equal([]string{
-				`GRANT CONNECT ON DATABASE "my-db" TO "PUBLIC"`,
-			}))
+		It("treats every spelling of public as PUBLIC", func() {
+			for _, name := range []string{"public", "PUBLIC", "Public"} {
+				changes := plan(databaseACL{}, &apiv1.DatabasePermissionsSpec{
+					Connect: []apiv1.UsageSpec{grant(name)},
+				})
+				Expect(statements(changes)).To(Equal([]string{
+					`GRANT CONNECT ON DATABASE "my-db" TO PUBLIC`,
+				}), name)
+			}
 		})
 
 		It("quotes the database and the role names", func() {

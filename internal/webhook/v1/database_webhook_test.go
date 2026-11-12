@@ -470,15 +470,18 @@ var _ = Describe("Database validation", func() {
 			Expect(extractErrorFields(v.validate(db))).To(ConsistOf("spec.permissions.all[0].name"))
 		})
 
-		It("matches role names exactly, so PUBLIC is not public", func() {
+		It("treats every spelling of public as the PUBLIC pseudo-role", func() {
 			db := withPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{
 					{Name: "public", Type: apiv1.RevokeUsageSpecType},
 					{Name: "PUBLIC", Type: apiv1.GrantUsageSpecType},
-					{Name: "Public", Type: apiv1.GrantUsageSpecType},
+					{Name: "Public", Type: apiv1.RevokeUsageSpecType},
 				},
 			})
-			Expect(v.validate(db)).To(BeEmpty())
+			Expect(extractErrorFields(v.validate(db))).To(ConsistOf(
+				"spec.permissions.connect[1].name",
+				"spec.permissions.connect[2].name",
+			))
 		})
 	})
 })
