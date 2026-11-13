@@ -130,6 +130,17 @@
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+go install ([^@]+?)@(?<currentValue>.+)',
       ],
     },
+    {
+      // Extension image versions pinned in the e2e testing environment.
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^tests\\/utils\\/environment\\/environment\\.go$/',
+      ],
+      matchStrings: [
+        '// renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9]+ = "(?<currentValue>[^"]+?)"',
+      ],
+      versioningTemplate: 'semver',
+    },
   ],
   packageRules: [
     {
@@ -267,6 +278,16 @@
         'docker.io/rustfs/rustfs',
       ],
       allowedVersions: '/^\\d+\\.\\d+\\.\\d+-glibc$/',
+    },
+    {
+      // Extension image tags are templated on the PostgreSQL major,
+      // so they cannot carry a digest.
+      matchPackageNames: [
+        'ghcr.io/cloudnative-pg/postgis-extension',
+        'ghcr.io/cloudnative-pg/pgvector',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
     },
     {
       groupName: 'operator framework',
