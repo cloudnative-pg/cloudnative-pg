@@ -142,6 +142,33 @@ last renewal time, use:
 kubectl get lease cluster-example -o yaml
 ```
 
+#### Position of the primary
+
+The instance manager publishes where the WAL of the primary ends in the
+`cnpg.io/position` annotation of the lease:
+
+```yaml
+metadata:
+  annotations:
+    cnpg.io/position: '{"lsn":"0/7000028","timeline":3,"state":"in production","pod":"cluster-example-1"}'
+```
+
+The annotation is refreshed every time the primary writes the lease, and a
+final value is written when the lease is released on shutdown. It contains:
+
+* `lsn`: the position in the WAL, in the PostgreSQL text format.
+* `timeline`: the PostgreSQL timeline.
+* `state`: how far the position can be trusted. `shut down` means that
+  PostgreSQL stopped cleanly and the position is final. `in production` is the
+  position of a running primary, `shutting down` a position that is only a lower
+  bound, and `unknown` means that the position could not be determined.
+* `pod`: the pod that wrote the position.
+
+:::note
+The annotation is read-only and meant to be used by CloudNativePG. Its
+format may change in future releases.
+:::
+
 ### Tuning the primary lease
 
 The lease timings are exposed under `.spec.primaryLease` and default to values
