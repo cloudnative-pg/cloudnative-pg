@@ -1905,7 +1905,11 @@ var _ = Describe("Cluster admission error", func() {
 	})
 
 	It("marks the cluster as not ready when the definition is invalid", func() {
-		cluster := &Cluster{}
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Generation: 4,
+			},
+		}
 		// Simulate a previously healthy cluster reporting Ready=True.
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(ConditionClusterReady),
@@ -1919,6 +1923,7 @@ var _ = Describe("Cluster admission error", func() {
 		readyCondition := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionClusterReady))
 		Expect(readyCondition).NotTo(BeNil())
 		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(readyCondition.ObservedGeneration).To(Equal(int64(4)))
 	})
 })
 

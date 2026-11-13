@@ -32,6 +32,7 @@ import (
 
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +43,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	testsutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -480,9 +480,11 @@ func AssertNewPrimary(env *environment.TestingEnvironment, namespace, clusterNam
 	})
 }
 
-// AssertClusterReadinessStatusIsReached waits until the cluster's
-// ConditionClusterReady condition reaches the provided status.
-func AssertClusterReadinessStatusIsReached(
+// AssertClusterReadinessConditionIsReached waits until the cluster's
+// ConditionClusterReady condition reaches the provided status for the
+// current spec generation, so a condition carried over from an earlier
+// generation is not accepted.
+func AssertClusterReadinessConditionIsReached(
 	env *environment.TestingEnvironment,
 	namespace, clusterName string,
 	conditionStatus apiv1.ConditionStatus,
@@ -490,16 +492,14 @@ func AssertClusterReadinessStatusIsReached(
 ) {
 	GinkgoHelper()
 	By(fmt.Sprintf("waiting for cluster condition status in cluster '%v'", clusterName), func() {
-		Eventually(func() (string, error) {
-			clusterCondition, err := backups.GetConditionsInClusterStatus(
-				env.Ctx, env.Client,
-				namespace, clusterName, apiv1.ConditionClusterReady,
-			)
-			if err != nil {
-				return "", err
-			}
-			return string(clusterCondition.Status), nil
-		}, timeout, 2).Should(BeEquivalentTo(conditionStatus))
+		Eventually(func(g Gomega) {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			cond := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionClusterReady))
+			g.Expect(cond).ToNot(BeNil(), "the Ready condition is not reported")
+			g.Expect(cond.Status).To(BeEquivalentTo(conditionStatus))
+			g.Expect(cond.ObservedGeneration).To(Equal(cluster.Generation), "the Ready condition is stale")
+		}, timeout, 2).Should(Succeed())
 	})
 }
 

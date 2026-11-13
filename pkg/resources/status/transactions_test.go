@@ -32,6 +32,9 @@ var _ = Describe("Status transactions", func() {
 	Describe("SetClusterReadyCondition", func() {
 		It("sets ready condition to true when phase is healthy", func() {
 			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 3,
+				},
 				Status: apiv1.ClusterStatus{
 					Phase: apiv1.PhaseHealthy,
 				},
@@ -45,10 +48,14 @@ var _ = Describe("Status transactions", func() {
 			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 			Expect(condition.Reason).To(Equal(string(apiv1.ClusterReady)))
 			Expect(condition.Message).To(Equal("Cluster is Ready"))
+			Expect(condition.ObservedGeneration).To(Equal(int64(3)))
 		})
 
 		It("sets ready condition to false when phase is not healthy", func() {
 			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
 				Status: apiv1.ClusterStatus{
 					Phase: apiv1.PhaseMajorUpgrade,
 				},
@@ -62,6 +69,54 @@ var _ = Describe("Status transactions", func() {
 			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(condition.Reason).To(Equal(string(apiv1.ClusterIsNotReady)))
 			Expect(condition.Message).To(Equal("Cluster Is Not Ready"))
+			Expect(condition.ObservedGeneration).To(Equal(int64(5)))
+		})
+
+		It("refreshes the observed generation when the status does not change", func() {
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 1,
+				},
+				Status: apiv1.ClusterStatus{
+					Phase: apiv1.PhaseHealthy,
+				},
+			}
+
+			SetClusterReadyCondition(cluster)
+			Expect(cluster.Status.Conditions).To(HaveLen(1))
+			Expect(cluster.Status.Conditions[0].Status).To(Equal(metav1.ConditionTrue))
+			Expect(cluster.Status.Conditions[0].ObservedGeneration).To(Equal(int64(1)))
+
+			cluster.Generation = 2
+			SetClusterReadyCondition(cluster)
+
+			Expect(cluster.Status.Conditions).To(HaveLen(1))
+			condition := cluster.Status.Conditions[0]
+			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(condition.ObservedGeneration).To(Equal(int64(2)))
+		})
+
+		It("updates the condition's observed generation when the generation changes", func() {
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 1,
+				},
+				Status: apiv1.ClusterStatus{
+					Phase: apiv1.PhaseHealthy,
+				},
+			}
+
+			SetClusterReadyCondition(cluster)
+			Expect(cluster.Status.Conditions[0].ObservedGeneration).To(Equal(int64(1)))
+
+			cluster.Generation = 2
+			cluster.Status.Phase = apiv1.PhaseMajorUpgrade
+			SetClusterReadyCondition(cluster)
+
+			Expect(cluster.Status.Conditions).To(HaveLen(1))
+			condition := cluster.Status.Conditions[0]
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(condition.ObservedGeneration).To(Equal(int64(2)))
 		})
 
 		It("initializes conditions slice if nil", func() {
