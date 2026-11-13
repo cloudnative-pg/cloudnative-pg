@@ -122,10 +122,16 @@ func ExecCommand(
 		return "", "", ErrorContainerNotFound
 	}
 
+	// retry-go returns before the attempt when the context is already done,
+	// which leaves execErr unset. Report that instead of a successful exec.
+	if err := ctx.Err(); err != nil {
+		return "", "", err
+	}
+
 	var stdout, stderr string
 	var execErr error
 
-	_ = retry.New(
+	retryErr := retry.New(
 		retry.Attempts(execRetryAttempts),
 		retry.Delay(execRetryDelay),
 		retry.DelayType(retry.BackOffDelay),
@@ -171,9 +177,12 @@ func ExecCommand(
 		},
 	)
 
-	// Return the execution result. If retry failed, err will be non-nil and
-	// execErr contains the actual error from the last execution attempt
-	return stdout, stderr, execErr
+	// An attempt that ran owns the result, including a nil success. If retry
+	// stopped before any attempt, execErr is still nil and retryErr is why.
+	if execErr != nil {
+		return stdout, stderr, execErr
+	}
+	return stdout, stderr, retryErr
 }
 
 // shouldFallbackToSPDY reports whether a failed WebSocket streaming attempt
