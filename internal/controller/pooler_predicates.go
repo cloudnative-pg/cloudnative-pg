@@ -24,6 +24,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // secretsPoolerPredicate contains the set of predicate functions of the pooler secrets
@@ -57,4 +59,29 @@ func isUsefulPoolerSecret(object client.Object) bool {
 		_, ok := object.(*corev1.Secret)
 		return ok && hasReloadLabelSet(object)
 	})
+}
+
+// clusterSwitchoverPredicate fires only on Update events where
+// CurrentPrimary or TargetPrimary changed between old and new object.
+var clusterSwitchoverPredicate = predicate.Funcs{
+	CreateFunc: func(_ event.CreateEvent) bool {
+		return false
+	},
+	DeleteFunc: func(_ event.DeleteEvent) bool {
+		return false
+	},
+	GenericFunc: func(_ event.GenericEvent) bool {
+		return false
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		oldCluster, okOld := e.ObjectOld.(*apiv1.Cluster)
+		newCluster, okNew := e.ObjectNew.(*apiv1.Cluster)
+		if !okOld || !okNew {
+			return false
+		}
+
+		// Fire when CurrentPrimary or TargetPrimary changed
+		return oldCluster.Status.CurrentPrimary != newCluster.Status.CurrentPrimary ||
+			oldCluster.Status.TargetPrimary != newCluster.Status.TargetPrimary
+	},
 }
