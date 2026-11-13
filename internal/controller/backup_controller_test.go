@@ -265,6 +265,125 @@ func (f *fakeInstanceStatusClient) GetStatusFromInstances(
 	return postgres.PostgresqlStatusList{Items: items}
 }
 
+var _ = Describe("getBackupTargetPod supervised image update", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		env.backupReconciler.instanceStatusClient = &fakeInstanceStatusClient{}
+	})
+
+	It("allows backup from primary with old minor image when cluster is mid-minor-update", func(ctx context.Context) {
+		namespace := newFakeNamespace(env.client)
+
+		oldImage := "postgres:16.1"
+		newImage := "postgres:16.2"
+
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: namespace,
+			},
+			Status: apiv1.ClusterStatus{
+				TargetPrimary: "cluster-example-1",
+				Image:         newImage,
+				PGDataImageInfo: &apiv1.ImageInfo{
+					// Minor update: PGDataImageInfo and Image are updated together to newImage
+					Image:        newImage,
+					MajorVersion: 16,
+				},
+			},
+		}
+		Expect(env.backupReconciler.Create(ctx, cluster)).To(Succeed())
+		Expect(env.backupReconciler.Status().Update(ctx, cluster)).To(Succeed())
+
+		backup := &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "backup-example",
+				Namespace: namespace,
+			},
+			Spec: apiv1.BackupSpec{
+				Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+				Target:  apiv1.BackupTargetPrimary,
+			},
+		}
+		Expect(env.backupReconciler.Create(ctx, backup)).To(Succeed())
+
+		// Primary pod still runs the old minor image (supervised update not yet applied)
+		primaryPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example-1",
+				Namespace: namespace,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "postgres", Image: oldImage},
+				},
+			},
+		}
+		Expect(env.backupReconciler.Create(ctx, primaryPod)).To(Succeed())
+
+		// Minor image mismatch must not block backup: same major version, data format compatible
+		podStatus, err := env.backupReconciler.getBackupTargetPod(ctx, cluster, backup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(podStatus).ToNot(BeNil())
+		Expect(podStatus.Pod.Name).To(Equal("cluster-example-1"))
+	})
+
+	It("blocks backup when a major-version upgrade is in progress", func(ctx context.Context) {
+		namespace := newFakeNamespace(env.client)
+
+		oldMajorImage := "postgres:16.6"
+		newMajorImage := "postgres:17.0"
+
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: namespace,
+			},
+			Status: apiv1.ClusterStatus{
+				TargetPrimary: "cluster-example-1",
+				Image:         newMajorImage,
+				PGDataImageInfo: &apiv1.ImageInfo{
+					// Major upgrade: PGDataImageInfo stays at old image until pg_upgrade completes
+					Image:        oldMajorImage,
+					MajorVersion: 16,
+				},
+			},
+		}
+		Expect(env.backupReconciler.Create(ctx, cluster)).To(Succeed())
+		Expect(env.backupReconciler.Status().Update(ctx, cluster)).To(Succeed())
+
+		backup := &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "backup-example",
+				Namespace: namespace,
+			},
+			Spec: apiv1.BackupSpec{
+				Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+				Target:  apiv1.BackupTargetPrimary,
+			},
+		}
+		Expect(env.backupReconciler.Create(ctx, backup)).To(Succeed())
+
+		primaryPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example-1",
+				Namespace: namespace,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "postgres", Image: oldMajorImage},
+				},
+			},
+		}
+		Expect(env.backupReconciler.Create(ctx, primaryPod)).To(Succeed())
+
+		// Major version upgrade must block backup entirely
+		_, err := env.backupReconciler.getBackupTargetPod(ctx, cluster, backup)
+		Expect(errors.Is(err, ErrPrimaryImageNeedsUpdate)).To(BeTrue())
+	})
+})
+
 var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 	When("there's a running backup", func() {
 		It("prevents concurrent backups", func() {
