@@ -9,6 +9,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: manager
+  namespace: system
 ---
 apiVersion: apps/v1
 kind: Deployment
