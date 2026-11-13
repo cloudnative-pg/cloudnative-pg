@@ -147,6 +147,11 @@ metadata:
 spec:
   instances: 3
 
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
   storage:
     size: 10Gi
   walStorage:
