@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
@@ -106,6 +107,10 @@ type Runnable struct {
 	// lock is wrapped by the watchdog: every Get and Update beats it.
 	lock resourcelock.Interface
 
+	// leases reads the lease, and writes the promoting marker. It does not
+	// annotate what it writes: the marker is the annotation.
+	leases coordinationv1client.LeaseInterface
+
 	watchdog *watchdog.LeaseWatchdog
 
 	// config holds the lease timings. It is initialised to the defaults by New
@@ -155,6 +160,17 @@ type Runnable struct {
 	// monitorLeaseAge can be unit-tested without real network calls.
 	checkStepDown func(cluster *apiv1.Cluster, ourIdentity string) (bool, error)
 
+	// readControldata returns the output of pg_controldata. It is a field
+	// (defaulting to the one of the instance) so that the position published at
+	// release can be unit-tested without a PGDATA.
+	readControldata func() (string, error)
+
+	// queryLivePosition returns the flush LSN and the WAL file name of the
+	// instance while it is a primary, or sql.ErrNoRows. It is a field
+	// (defaulting to a query of the instance) so that the position published
+	// on the renewals can be unit-tested without PostgreSQL.
+	queryLivePosition func(ctx context.Context) (lsn string, walFile string, err error)
+
 	// hardStop is what monitorLeaseAge runs when the lease is about to expire
 	// and the step-down has not completed. It is a field (defaulting to
 	// killPostgresAndExit) so that tests can observe it instead of dying.
@@ -191,6 +207,9 @@ func New(
 		heldCh:        make(chan struct{}),
 		checkStepDown: shouldStepDown,
 	}
+	result.leases = kubeClient.CoordinationV1().Leases(instance.GetNamespaceName())
+	result.readControldata = instance.GetPgControldata
+	result.queryLivePosition = result.queryInstanceLivePosition
 	result.hardStop = result.killPostgresAndExit
 
 	// Every lease write the elector makes goes through le.config.Lock, which is
@@ -203,7 +222,10 @@ func New(
 				Namespace: instance.GetNamespaceName(),
 				Name:      instance.GetClusterName(),
 			},
-			Client: kubeClient.CoordinationV1(),
+			Client: &annotatingLeasesGetter{
+				LeasesGetter: kubeClient.CoordinationV1(),
+				source:       result.positionSource,
+			},
 			LockConfig: resourcelock.ResourceLockConfig{
 				// Identity is the pod name alone. The operator creates Pods
 				// directly and reuses a pod name only after the previous

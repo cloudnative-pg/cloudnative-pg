@@ -140,16 +140,45 @@ func (p PgControlData) GetBytesPerWALSegment() (int, error) {
 // PgDataState represents the "Database cluster state" field of pg_controldata
 type PgDataState string
 
+// The values of the "Database cluster state" field of pg_controldata
+const (
+	// PgDataStateShutDown is a cleanly stopped primary
+	PgDataStateShutDown PgDataState = "shut down"
+
+	// PgDataStateShutDownInRecovery is a cleanly stopped standby
+	PgDataStateShutDownInRecovery PgDataState = "shut down in recovery"
+
+	// PgDataStateStartingUp is an instance that is starting
+	PgDataStateStartingUp PgDataState = "starting up"
+
+	// PgDataStateShuttingDown is an instance that is writing its shutdown
+	// checkpoint, or that was stopped before completing it
+	PgDataStateShuttingDown PgDataState = "shutting down"
+
+	// PgDataStateInCrashRecovery is an instance replaying its WAL after a crash
+	PgDataStateInCrashRecovery PgDataState = "in crash recovery"
+
+	// PgDataStateInArchiveRecovery is a standby, or an instance in point-in-time recovery
+	PgDataStateInArchiveRecovery PgDataState = "in archive recovery"
+
+	// PgDataStateInProduction is a running primary
+	PgDataStateInProduction PgDataState = "in production"
+)
+
 // IsShutdown checks if the PGDATA status represents
 // a shut down instance
 func (state PgDataState) IsShutdown(ctx context.Context) bool {
 	contextLogger := log.FromContext(ctx)
 
 	switch state {
-	case "shut down", "shut down in recovery":
+	case PgDataStateShutDown, PgDataStateShutDownInRecovery:
 		return true
 
-	case "starting up", "shutting down", "in crash recovery", "in archive recovery", "in production":
+	case PgDataStateStartingUp,
+		PgDataStateShuttingDown,
+		PgDataStateInCrashRecovery,
+		PgDataStateInArchiveRecovery,
+		PgDataStateInProduction:
 		return false
 	}
 
