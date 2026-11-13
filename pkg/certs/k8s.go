@@ -363,7 +363,9 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 		return nil, err
 	}
 
-	secret = webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
+	// Use GenerateWebhookCertificateSecret to include the CA certificate in the secret
+	// This is required for webhook validation as the caBundle needs to verify the certificate chain
+	secret = webhookPair.GenerateWebhookCertificateSecret(pki.OperatorNamespace, pki.SecretName, caPair.Certificate)
 	if err := SetAsOwnedByOperatorDeployment(
 		ctx,
 		kubeClient,
@@ -392,6 +394,12 @@ func renewServerCertificate(
 	}
 
 	if hasBeenRenewed {
+		// If this is a webhook secret, preserve the CA during renewal
+		// The CA is needed for webhook validation (caBundle)
+		if caCert, ok := caSecret.Data[CACertKey]; ok && secret.Type == corev1.SecretTypeTLS {
+			secret.Data[CACertKey] = caCert
+		}
+
 		if err := kubeClient.Patch(ctx, secret, client.MergeFrom(origSecret)); err != nil {
 			return nil, err
 		}
@@ -432,8 +440,15 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
 
 	oldConfig := config.DeepCopy()
 
+	// Use the CA certificate from the secret for the CABundle
+	// If ca.crt is not present (legacy secrets), fall back to tls.crt
+	caBundle := tlsSecret.Data[CACertKey]
+	if len(caBundle) == 0 {
+		caBundle = tlsSecret.Data[TLSCertKey]
+	}
+
 	for idx := range config.Webhooks {
-		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+		config.Webhooks[idx].ClientConfig.CABundle = caBundle
 	}
 
 	if reflect.DeepEqual(oldConfig.Webhooks, config.Webhooks) {
@@ -459,8 +474,15 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
 
 	oldConfig := config.DeepCopy()
 
+	// Use the CA certificate from the secret for the CABundle
+	// If ca.crt is not present (legacy secrets), fall back to tls.crt
+	caBundle := tlsSecret.Data[CACertKey]
+	if len(caBundle) == 0 {
+		caBundle = tlsSecret.Data[TLSCertKey]
+	}
+
 	for idx := range config.Webhooks {
-		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+		config.Webhooks[idx].ClientConfig.CABundle = caBundle
 	}
 
 	if reflect.DeepEqual(oldConfig.Webhooks, config.Webhooks) {
