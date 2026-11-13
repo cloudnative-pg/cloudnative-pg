@@ -79,7 +79,7 @@ if [ "${PICKED_TC}" != "${PARENT_TC}" ]; then
     if [ -n "${PICKED_TC}" ]; then
         go mod edit -toolchain="${PICKED_TC}" "${modfile}"
     else
-        go mod edit -droptoolchain "${modfile}"
+        go mod edit -toolchain=none "${modfile}"
     fi
 fi
 
