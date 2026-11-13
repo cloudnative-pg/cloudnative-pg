@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -215,7 +214,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 					apiv1.ExtensionConfiguration{
 						Name: "pgvector",
 						ImageVolumeSource: corev1.ImageVolumeSource{
-							Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
+							Reference: env.PgvectorExtensionImage(),
 						},
 					})
 				// Setting some pgvector GUCs
