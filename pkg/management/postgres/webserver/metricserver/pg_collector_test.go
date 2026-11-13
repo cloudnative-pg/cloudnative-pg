@@ -56,9 +56,9 @@ var _ = Describe("test metrics parsing", func() {
 	})
 
 	It("fails if there's no cluster in the cache", func() {
-		exporter.collectFromPrimaryFirstPointOnTimeRecovery()
-		exporter.collectFromPrimaryLastAvailableBackupTimestamp()
-		exporter.collectFromPrimaryLastFailedBackupTimestamp()
+		exporter.collectFirstPointOnTimeRecovery()
+		exporter.collectLastAvailableBackupTimestamp()
+		exporter.collectLastFailedBackupTimestamp()
 
 		registry := prometheus.NewRegistry()
 		registry.MustRegister(exporter.Metrics.FirstRecoverabilityPoint)
@@ -87,9 +87,9 @@ var _ = Describe("test metrics parsing", func() {
 		exporter.getCluster = func() (*apiv1.Cluster, error) {
 			return cluster, nil
 		}
-		exporter.collectFromPrimaryFirstPointOnTimeRecovery()
-		exporter.collectFromPrimaryLastAvailableBackupTimestamp()
-		exporter.collectFromPrimaryLastFailedBackupTimestamp()
+		exporter.collectFirstPointOnTimeRecovery()
+		exporter.collectLastAvailableBackupTimestamp()
+		exporter.collectLastFailedBackupTimestamp()
 
 		registry := prometheus.NewRegistry()
 		registry.MustRegister(exporter.Metrics.FirstRecoverabilityPoint)
