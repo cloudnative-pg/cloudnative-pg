@@ -21,6 +21,8 @@ package v1
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"maps"
 	"regexp"
@@ -1034,6 +1036,62 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 
 	recoveryParameters := cluster.Spec.Bootstrap.Recovery
 	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
+}
+
+// GetPgCreateSubscriber returns the pg_createsubscriber bootstrap configuration if set
+func (cluster *Cluster) GetPgCreateSubscriber() *BootstrapPgCreateSubscriber {
+	if cluster.Spec.Bootstrap == nil {
+		return nil
+	}
+	return cluster.Spec.Bootstrap.PgCreateSubscriber
+}
+
+// ComputeSubscriberClusterHash returns the first 8 hex characters of sha256(namespace/clusterName)
+func (cluster *Cluster) ComputeSubscriberClusterHash() string {
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name)))
+	return hex.EncodeToString(hash[:])[:8]
+}
+
+// ComputeSubscriberPhysicalSlotName returns the physical replication slot name: cnpgsub_<h8>_phys
+func (cluster *Cluster) ComputeSubscriberPhysicalSlotName() string {
+	return fmt.Sprintf("cnpgsub_%s_phys", cluster.ComputeSubscriberClusterHash())
+}
+
+// ComputeSubscriberObjectName returns the publication/subscription/logical slot name: cnpgsub_<h8>_<dbIdentifier>
+func (cluster *Cluster) ComputeSubscriberObjectName(dbIdentifier string) string {
+	return fmt.Sprintf("cnpgsub_%s_%s", cluster.ComputeSubscriberClusterHash(), dbIdentifier)
+}
+
+// GetPgCreateSubscriberDatabases resolves the list of databases to replicate for pg_createsubscriber.
+// Returns explicit databases if configured; otherwise for PG14/PG17 infers from externalCluster connectionParameters.dbname.
+func (cluster *Cluster) GetPgCreateSubscriberDatabases() ([]string, error) {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.PgCreateSubscriber == nil {
+		return nil, fmt.Errorf("pg_createsubscriber bootstrap not configured")
+	}
+
+	cs := cluster.Spec.Bootstrap.PgCreateSubscriber
+	if cs.Parameters != nil && len(cs.Parameters.Databases) > 0 {
+		return cs.Parameters.Databases, nil
+	}
+
+	major, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	if major == 14 || major == 17 {
+		ext, found := cluster.ExternalCluster(cs.Source)
+		if !found {
+			return nil, fmt.Errorf("external cluster %s not found", cs.Source)
+		}
+		if ext.ConnectionParameters == nil || ext.ConnectionParameters["dbname"] == "" {
+			return nil, fmt.Errorf("dbname must be specified in externalCluster connectionParameters when databases list is empty for PG%d", major)
+		}
+		return []string{ext.ConnectionParameters["dbname"]}, nil
+	}
+
+	// For PG18+, empty list signifies all connectable databases
+	return nil, nil
 }
 
 // ShouldCreateProjectedVolume returns whether we should create the projected all in one volume

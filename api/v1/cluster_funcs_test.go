@@ -834,6 +834,69 @@ var _ = Describe("PostgreSQL version detection", func() {
 		cluster.Spec.ImageCatalogRef = nil
 		Expect(cluster.GetPostgresqlMajorVersion()).To(Equal(14))
 	})
+
+	It("correctly computes subscriber object names and hashes", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-target",
+				Namespace: "demo",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgCreateSubscriber: &BootstrapPgCreateSubscriber{
+						Source: "source-trove",
+					},
+				},
+			},
+		}
+
+		hash := cluster.ComputeSubscriberClusterHash()
+		Expect(len(hash)).To(Equal(8))
+
+		physSlot := cluster.ComputeSubscriberPhysicalSlotName()
+		Expect(physSlot).To(Equal(fmt.Sprintf("cnpgsub_%s_phys", hash)))
+
+		objName := cluster.ComputeSubscriberObjectName("16384")
+		Expect(objName).To(Equal(fmt.Sprintf("cnpgsub_%s_16384", hash)))
+	})
+
+	It("resolves pg_createsubscriber databases properly", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-target",
+				Namespace: "demo",
+			},
+			Spec: ClusterSpec{
+				ImageName: "ghcr.io/cloudnative-pg/postgresql:14.8",
+				Bootstrap: &BootstrapConfiguration{
+					PgCreateSubscriber: &BootstrapPgCreateSubscriber{
+						Source: "source-trove",
+					},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "source-trove",
+						ConnectionParameters: map[string]string{
+							"host":   "1.2.3.4",
+							"dbname": "trove_app",
+						},
+					},
+				},
+			},
+		}
+
+		dbs, err := cluster.GetPgCreateSubscriberDatabases()
+		Expect(err).ToNot(HaveOccurred())
+		Expect(dbs).To(Equal([]string{"trove_app"}))
+
+		// Explicit databases take priority
+		cluster.Spec.Bootstrap.PgCreateSubscriber.Parameters = &PgCreateSubscriberParameters{
+			Databases: []string{"db1", "db2"},
+		}
+		dbs, err = cluster.GetPgCreateSubscriberDatabases()
+		Expect(err).ToNot(HaveOccurred())
+		Expect(dbs).To(Equal([]string{"db1", "db2"}))
+	})
 })
 
 var _ = Describe("Default Metrics", func() {

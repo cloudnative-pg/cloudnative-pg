@@ -46,6 +46,8 @@ const (
 	DefaultApplicationDatabaseName = "app"
 	// DefaultApplicationUserName is the name of application database owner if not specified
 	DefaultApplicationUserName = DefaultApplicationDatabaseName
+	// DefaultPgCreateSubscriberRecoveryTimeout is the default timeout in seconds for recovery to finish
+	DefaultPgCreateSubscriberRecoveryTimeout = 3600
 )
 
 // Default apply the defaults to undefined values in a Cluster preserving the user settings
@@ -75,6 +77,8 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.defaultRecovery()
 	case r.Spec.Bootstrap.PgBaseBackup != nil:
 		r.defaultPgBaseBackup()
+	case r.Spec.Bootstrap.PgCreateSubscriber != nil:
+		r.defaultPgCreateSubscriber()
 	default:
 		r.defaultInitDB()
 	}
@@ -277,6 +281,20 @@ func (r *Cluster) defaultPgBaseBackup() {
 	}
 	if r.Spec.Bootstrap.PgBaseBackup.Owner == "" {
 		r.Spec.Bootstrap.PgBaseBackup.Owner = r.Spec.Bootstrap.PgBaseBackup.Database
+	}
+}
+
+// defaultPgCreateSubscriber enriches the pg_createsubscriber with defaults
+func (r *Cluster) defaultPgCreateSubscriber() {
+	if r.Spec.Bootstrap.PgCreateSubscriber == nil {
+		return
+	}
+	if r.Spec.Bootstrap.PgCreateSubscriber.Parameters == nil {
+		r.Spec.Bootstrap.PgCreateSubscriber.Parameters = &PgCreateSubscriberParameters{}
+	}
+	if r.Spec.Bootstrap.PgCreateSubscriber.Parameters.RecoveryTimeout == nil {
+		defaultTimeout := DefaultPgCreateSubscriberRecoveryTimeout
+		r.Spec.Bootstrap.PgCreateSubscriber.Parameters.RecoveryTimeout = &defaultTimeout
 	}
 }
 

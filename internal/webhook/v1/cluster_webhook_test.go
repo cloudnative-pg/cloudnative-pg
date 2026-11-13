@@ -81,6 +81,35 @@ var _ = Describe("bootstrap methods validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
+	It("doesn't complain if we are using pg_createsubscriber", func() {
+		pgcsCluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgCreateSubscriber: &apiv1.BootstrapPgCreateSubscriber{
+						Source: "source-trove",
+					},
+				},
+			},
+		}
+		result := v.validateBootstrapMethod(pgcsCluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complains when pg_createsubscriber is combined with another bootstrap method", func() {
+		invalidCluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgCreateSubscriber: &apiv1.BootstrapPgCreateSubscriber{
+						Source: "source-trove",
+					},
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+		result := v.validateBootstrapMethod(invalidCluster)
+		Expect(result).To(HaveLen(1))
+	})
+
 	It("complains where there are two active bootstrap methods", func() {
 		invalidCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -2695,6 +2724,130 @@ var _ = Describe("pg_basebackup additionalArgs validation", func() {
 		Expect(result).To(HaveLen(2))
 		Expect(result[0].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[0]"))
 		Expect(result[1].Field).To(Equal("spec.bootstrap.pg_basebackup.additionalArgs[2]"))
+	})
+})
+
+var _ = Describe("bootstrap pg_createsubscriber validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	validPG14Cluster := func() *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "ghcr.io/cloudnative-pg/postgresql:14.8",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					PgCreateSubscriber: &apiv1.BootstrapPgCreateSubscriber{
+						Source: "source-trove",
+						Parameters: &apiv1.PgCreateSubscriberParameters{
+							Databases: []string{"trove_app"},
+						},
+					},
+				},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
+						Name: "source-trove",
+						ConnectionParameters: map[string]string{
+							"host":   "192.168.250.1",
+							"user":   "postgres",
+							"dbname": "trove_app",
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("accepts a valid pg_createsubscriber configuration for PG14", func() {
+		cluster := validPG14Cluster()
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts a valid pg_createsubscriber configuration for PG17", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.ImageName = "ghcr.io/cloudnative-pg/postgresql:17.4"
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects unsupported PostgreSQL versions (e.g. PG 15, PG 16, PG 13)", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.ImageName = "ghcr.io/cloudnative-pg/postgresql:15.2"
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+
+		cluster.Spec.ImageName = "ghcr.io/cloudnative-pg/postgresql:16.1"
+		result = v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+
+		cluster.Spec.ImageName = "ghcr.io/cloudnative-pg/postgresql:13.9"
+		result = v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects when replica mode is enabled", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+			Source:  "some-cluster",
+		}
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects when source external cluster is not found", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.Bootstrap.PgCreateSubscriber.Source = "nonexistent"
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects when source external cluster lacks host or user", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.ExternalClusters[0].ConnectionParameters = map[string]string{
+			"dbname": "trove_app",
+		}
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects negative recoveryTimeout", func() {
+		cluster := validPG14Cluster()
+		timeout := -1
+		cluster.Spec.Bootstrap.PgCreateSubscriber.Parameters.RecoveryTimeout = &timeout
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects template databases in databases list", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.Bootstrap.PgCreateSubscriber.Parameters.Databases = []string{"trove_app", "template1"}
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects duplicate databases in databases list", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.Bootstrap.PgCreateSubscriber.Parameters.Databases = []string{"trove_app", "trove_app"}
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects empty database name in databases list", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.Bootstrap.PgCreateSubscriber.Parameters.Databases = []string{""}
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects PG14 with empty databases and missing dbname in external cluster", func() {
+		cluster := validPG14Cluster()
+		cluster.Spec.Bootstrap.PgCreateSubscriber.Parameters.Databases = nil
+		delete(cluster.Spec.ExternalClusters[0].ConnectionParameters, "dbname")
+		result := v.validateBootstrapPgCreateSubscriber(cluster)
+		Expect(result).ToNot(BeEmpty())
 	})
 })
 
