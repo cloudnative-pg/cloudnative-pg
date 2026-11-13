@@ -73,6 +73,10 @@ var ErrPrimaryImageNeedsUpdate = fmt.Errorf("primary instance not having expecte
 // ErrInstanceStatusUnavailable is returned when instance status cannot be retrieved
 var ErrInstanceStatusUnavailable = fmt.Errorf("instance status unavailable")
 
+// ErrElectedPodNotFound is returned when the Pod that was elected to take a
+// backup no longer exists
+var ErrElectedPodNotFound = errors.New("elected backup pod not found")
+
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -659,6 +663,9 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	contextLogger := log.FromContext(ctx)
 
 	targetPod, err := r.getSnapshotTargetPod(ctx, cluster, backup)
+	if errors.Is(err, ErrElectedPodNotFound) {
+		return r.failSnapshotBackupWithoutElectedPod(ctx, cluster, backup, err)
+	}
 	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
 		contextLogger.Info(
 			"Couldn't find target pod, will retry in 30 seconds",
@@ -794,6 +801,39 @@ func (r *BackupReconciler) startSnapshotBackup(
 		client.MergeFromWithOptions(origBackup, client.MergeFromWithOptimisticLock{}))
 }
 
+// failSnapshotBackupWithoutElectedPod marks a snapshot backup as failed when
+// its elected Pod no longer exists. Without this, the backup would stay pending
+// forever and block every later backup of the cluster.
+func (r *BackupReconciler) failSnapshotBackupWithoutElectedPod(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	err error,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	podName := backup.Status.InstanceID.PodName
+	contextLogger.Info("Elected backup pod not found, marking backup as failed", "podName", podName)
+	r.Recorder.Eventf(backup, "Warning", "ElectedPodNotFound",
+		"Backup failed: elected pod %s no longer exists", podName)
+
+	if flagErr := resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster, err); flagErr != nil {
+		return nil, fmt.Errorf("while flagging backup as failed: %w", flagErr)
+	}
+
+	// An offline snapshot fences the instance. A new Pod with the same name
+	// would stay fenced, so we remove the fencing by name.
+	if !backup.GetOnlineOrDefault(cluster) {
+		if unfenceErr := volumesnapshot.EnsureInstanceIsUnfenced(
+			ctx, r.Client, r.Recorder, cluster, backup, podName,
+		); unfenceErr != nil {
+			return nil, unfenceErr
+		}
+	}
+
+	return &ctrl.Result{}, reconcile.TerminalError(err)
+}
+
 func (r *BackupReconciler) getSnapshotTargetPod(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -804,6 +844,11 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 	// If the backup already has a target pod assigned (on a previous reconciliation loop)
 	// it will keep it. Otherwise, will use the pod computed by r.getBackupTargetPod()
 	targetPod, err := backup.GetAssignedInstance(ctx, r.Client)
+	if apierrs.IsNotFound(err) {
+		// Electing another Pod is not safe: the backup may have already started
+		// on the elected one, so the caller fails the backup instead.
+		return nil, fmt.Errorf("%w: %s", ErrElectedPodNotFound, backup.Status.InstanceID.PodName)
+	}
 	if err != nil {
 		return nil, err
 	}

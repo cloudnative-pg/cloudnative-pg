@@ -831,3 +831,82 @@ var _ = Describe("backup pending state", func() {
 		})
 	})
 })
+
+var _ = Describe("snapshot backup with a deleted elected pod", func() {
+	var (
+		env     *testingEnvironment
+		cluster *apiv1.Cluster
+		backup  *apiv1.Backup
+		podName string
+	)
+
+	BeforeEach(func(ctx context.Context) {
+		env = buildTestEnvironment()
+		ns := newFakeNamespace(env.client)
+		cluster = newFakeCNPGCluster(env.client, ns)
+		podName = cluster.Name + "-2"
+
+		backup = &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{Name: "snapshot-backup", Namespace: ns},
+			Spec: apiv1.BackupSpec{
+				Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+				Method:  apiv1.BackupMethodVolumeSnapshot,
+			},
+			Status: apiv1.BackupStatus{
+				Phase: apiv1.BackupPhaseStarted,
+				InstanceID: &apiv1.InstanceID{
+					PodName:     podName,
+					ContainerID: "container-id",
+				},
+			},
+		}
+		Expect(env.client.Create(ctx, backup)).To(Succeed())
+	})
+
+	It("marks the backup as failed instead of retrying forever", func(ctx context.Context) {
+		res, err := env.backupReconciler.reconcileSnapshotBackup(ctx, cluster, backup)
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, ErrElectedPodNotFound)).To(BeTrue())
+		Expect(errors.Is(err, reconcile.TerminalError(nil))).To(BeTrue())
+		Expect(res).ToNot(BeNil())
+		Expect(res.RequeueAfter).To(BeZero())
+
+		var stored apiv1.Backup
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(backup), &stored)).To(Succeed())
+		Expect(stored.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
+		Expect(stored.Status.Error).To(ContainSubstring(podName))
+	})
+
+	It("removes the fencing of the elected instance for an offline backup", func(ctx context.Context) {
+		backup.Spec.Online = ptr.To(false)
+		Expect(env.client.Update(ctx, backup)).To(Succeed())
+
+		Expect(utils.NewFencingMetadataExecutor(env.client).
+			AddFencing().
+			ForInstance(podName).
+			Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+
+		_, err := env.backupReconciler.reconcileSnapshotBackup(ctx, cluster, backup)
+		Expect(errors.Is(err, ErrElectedPodNotFound)).To(BeTrue())
+
+		var storedCluster apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &storedCluster)).To(Succeed())
+		fenced, err := utils.GetFencedInstances(storedCluster.Annotations)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(fenced.Has(podName)).To(BeFalse())
+	})
+
+	It("reuses the elected pod while it exists", func(ctx context.Context) {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: cluster.Namespace},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "postgres", Image: "postgres"}},
+			},
+		}
+		Expect(env.client.Create(ctx, pod)).To(Succeed())
+
+		targetPod, err := env.backupReconciler.getSnapshotTargetPod(ctx, cluster, backup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(targetPod.Name).To(Equal(podName))
+	})
+})
