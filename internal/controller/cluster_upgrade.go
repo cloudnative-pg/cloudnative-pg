@@ -79,6 +79,16 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 			continue
 		}
 
+		// A resized pod takes no rollout slot. A rejected resize is tried
+		// again at every pass until the pod is rolled out.
+		resized, err := r.resizeInstanceInPlace(ctx, cluster, postgresqlStatus.Pod, podRollout.resizedPod)
+		if err != nil {
+			return false, err
+		}
+		if resized {
+			continue
+		}
+
 		managerResult := r.rolloutManager.CoordinateRollout(client.ObjectKeyFromObject(cluster), postgresqlStatus.Pod.Name)
 		if !managerResult.RolloutAllowed {
 			r.Recorder.Eventf(
@@ -123,6 +133,12 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	// it should be restarted by the instance manager itself
 	if primaryPostgresqlStatus.PendingRestartForDecrease {
 		return false, nil
+	}
+
+	// Nothing restarts, so a resized primary needs no switchover.
+	resized, err := r.resizeInstanceInPlace(ctx, cluster, primaryPostgresqlStatus.Pod, podRollout.resizedPod)
+	if resized || err != nil {
+		return false, err
 	}
 
 	// If the primary update strategy is supervised, we should not consume a rollout slot.
@@ -307,6 +323,11 @@ type rollout struct {
 	needsToChangeOperatorImage bool
 	needsToChangeOperandImage  bool
 
+	// resizedPod is set when the rollout can be avoided by resizing the pod
+	// in place. It is the pod with the new container resources, and with
+	// the pod spec annotation recording them. Ignoring it recreates the pod.
+	resizedPod *corev1.Pod
+
 	reason string
 }
 
@@ -449,14 +470,8 @@ func isPodNeedingRollout(
 	// If the pod has a valid PodSpec annotation, that's the final check.
 	// If not, we should perform additional legacy checks
 	if hasValidPodSpec(pod) {
-		podRollout = applyCheckers(map[string]rolloutChecker{
-			"PodSpec is outdated": checkPodSpecIsOutdated,
-		})
-		if podRollout.required {
-			return podRollout
-		}
 		return applyCheckers(map[string]rolloutChecker{
-			"pod resize is infeasible": checkPodResizeStuckInfeasible,
+			"PodSpec is outdated": checkPodSpecIsOutdated,
 		})
 	}
 
@@ -483,31 +498,6 @@ func hasValidPodSpec(pod *corev1.Pod) bool {
 	}
 	err := json.Unmarshal([]byte(podSpecAnnotation), &corev1.PodSpec{})
 	return err == nil
-}
-
-// checkPodResizeStuckInfeasible detects instances whose in-place resize was
-// accepted by the API server but reported as infeasible by the kubelet: the
-// node can never satisfy the new resources, so the only way forward is
-// recreating the pod, letting the scheduler place it on a suitable node
-func checkPodResizeStuckInfeasible(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	if cluster.Spec.ResourcesUpdateStrategy != apiv1.ResourcesUpdateStrategyInPlace {
-		return rollout{}, nil
-	}
-
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodResizePending &&
-			condition.Status == corev1.ConditionTrue &&
-			condition.Reason == corev1.PodReasonInfeasible {
-			return rollout{
-				required: true,
-				reason: fmt.Sprintf(
-					"the in-place resize of pod '%s' is infeasible on its node, recreating the pod: %s",
-					pod.Name, condition.Message),
-			}, nil
-		}
-	}
-
-	return rollout{}, nil
 }
 
 func checkPodNeedsUpdatedTopology(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
@@ -762,12 +752,35 @@ func checkPodSpecIsOutdated(
 		}, nil
 	}
 
+	inPlace := cluster.Spec.ResourcesUpdateStrategy == apiv1.ResourcesUpdateStrategyInPlace
 	match, diff := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec)
 	if !match {
-		return rollout{
+		podRollout := rollout{
 			required: true,
 			reason:   "original and target PodSpec differ in " + diff,
-		}, nil
+		}
+		if inPlace {
+			var blocker string
+			if podRollout.resizedPod, blocker = specs.ResizePod(pod, &storedPodSpec, &targetPod.Spec); blocker != "" {
+				podRollout.reason += ", not resizable in place: " + blocker
+			}
+		}
+		return podRollout, nil
+	}
+
+	// The node can never satisfy an infeasible resize. A new pod lets the
+	// scheduler choose another node. Since Kubernetes 1.36 the API server
+	// rejects such a resize instead.
+	if inPlace {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodResizePending && condition.Status == corev1.ConditionTrue &&
+				condition.Reason == corev1.PodReasonInfeasible {
+				return rollout{
+					required: true,
+					reason:   "the in-place resize is infeasible on the node: " + condition.Message,
+				}, nil
+			}
+		}
 	}
 
 	return rollout{}, nil
