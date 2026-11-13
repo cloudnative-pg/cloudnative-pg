@@ -49,6 +49,7 @@ fi
 
 commit=$1
 dir=${2:-.}
+dir=${dir%/}
 modfile=${dir}/go.mod
 gitpath=${modfile#./}
 
