@@ -20,9 +20,13 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"encoding/json"
+
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,389 +52,254 @@ func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) core
 	return requirements
 }
 
-var _ = Describe("ResizeInPlace", func() {
+var _ = Describe("ResizePod", func() {
 	always := corev1.ContainerRestartPolicyAlways
 
 	makeSpec := func(resources corev1.ResourceRequirements) *corev1.PodSpec {
 		return &corev1.PodSpec{
 			Containers: []corev1.Container{
-				{Name: PostgresContainerName, Resources: resources},
+				{Name: PostgresContainerName, Image: "postgres:17.0", Resources: resources},
 			},
 		}
 	}
-
-	// admit returns the pod spec as the API server stores it when the pod
-	// is created, with the missing requests defaulted to the limits
-	admit := func(spec *corev1.PodSpec) *corev1.PodSpec {
-		live := spec.DeepCopy()
-		for _, containers := range [][]corev1.Container{live.Containers, live.InitContainers} {
-			for i := range containers {
-				for name, limit := range containers[i].Resources.Limits {
-					if _, found := containers[i].Resources.Requests[name]; !found {
-						if containers[i].Resources.Requests == nil {
-							containers[i].Resources.Requests = corev1.ResourceList{}
-						}
-						containers[i].Resources.Requests[name] = limit
-					}
-				}
-			}
+	// resize calls ResizePod, returning the resized pod spec and the one
+	// recorded in the pod spec annotation
+	resize := func(live, stored, target *corev1.PodSpec) (resized, recorded *corev1.PodSpec, reason string) {
+		pod, reason := ResizePod(
+			&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}, Spec: *live},
+			stored, target)
+		if pod == nil {
+			return nil, nil, reason
 		}
-		return live
+		recorded = &corev1.PodSpec{}
+		Expect(json.Unmarshal([]byte(pod.Annotations[utils.PodSpecAnnotationName]), recorded)).To(Succeed())
+		return &pod.Spec, recorded, reason
+	}
+	limitsOnly := func(cpu, memory string) corev1.ResourceRequirements {
+		resources := makeResources("", "", cpu, memory)
+		resources.Requests = nil
+		return resources
 	}
 
-	expectResized := func(stored, target *corev1.PodSpec, expectedLive corev1.ResourceRequirements) {
-		GinkgoHelper()
-		live := admit(stored)
-		Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		Expect(equality.Semantic.DeepEqual(stored, target)).To(BeTrue(), "the stored spec must match the target")
-		Expect(equality.Semantic.DeepEqual(live.Containers[0].Resources, expectedLive)).To(BeTrue(),
-			"unexpected live resources: %v", live.Containers[0].Resources)
-	}
-
-	DescribeTable("resizes the changes that a running pod supports",
-		func(current, target, expectedLive corev1.ResourceRequirements) {
-			expectResized(makeSpec(current), makeSpec(target), expectedLive)
+	DescribeTable("resizes in place",
+		func(live, stored, target, expected corev1.ResourceRequirements) {
+			liveSpec, storedSpec := makeSpec(live), makeSpec(stored)
+			resized, recorded, reason := resize(liveSpec, storedSpec, makeSpec(target))
+			Expect(reason).To(BeEmpty())
+			Expect(resized.Containers[0].Resources).To(BeComparableTo(expected))
+			Expect(recorded.Containers[0].Resources).To(BeComparableTo(target))
+			// the given specs are untouched
+			Expect(liveSpec.Containers[0].Resources).To(BeComparableTo(live))
+			Expect(storedSpec.Containers[0].Resources).To(BeComparableTo(stored))
 		},
-		Entry("cpu changes in both directions",
-			makeResources("500m", "1Gi", "1", "1Gi"),
-			makeResources("250m", "1Gi", "2", "1Gi"),
-			makeResources("250m", "1Gi", "2", "1Gi")),
-		Entry("memory increases",
-			makeResources("500m", "1Gi", "500m", "1Gi"),
-			makeResources("500m", "2Gi", "500m", "2Gi"),
-			makeResources("500m", "2Gi", "500m", "2Gi")),
-		Entry("memory request decreases",
-			makeResources("500m", "2Gi", "1", "2Gi"),
-			makeResources("500m", "1Gi", "1", "2Gi"),
-			makeResources("500m", "1Gi", "1", "2Gi")),
-		Entry("limits whose requests are defaulted by the API server",
-			makeResources("", "", "1", "1Gi"),
-			makeResources("", "", "2", "1Gi"),
-			makeResources("2", "1Gi", "2", "1Gi")),
-		Entry("a request equal to its limit being dropped, with nothing to resize",
-			makeResources("1", "1Gi", "1", "1Gi"),
-			makeResources("", "", "1", "1Gi"),
-			makeResources("1", "1Gi", "1", "1Gi")),
-	)
-
-	DescribeTable("refuses the changes that require recreating the pod",
-		func(current, target corev1.ResourceRequirements) {
-			stored := makeSpec(current)
-			Expect(ResizeInPlace(stored, admit(stored), makeSpec(target), &corev1.PodStatus{})).To(BeFalse())
-		},
-		Entry("a memory limit decrease",
+		Entry("a memory request decrease",
+			makeResources("500m", "1500Mi", "500m", "2Gi"),
+			makeResources("500m", "1500Mi", "500m", "2Gi"),
 			makeResources("500m", "1Gi", "500m", "2Gi"),
-			makeResources("500m", "1Gi", "500m", "1Gi")),
-		Entry("an added request",
-			makeResources("500m", "", "", ""),
-			makeResources("500m", "1Gi", "", "")),
-		Entry("an added limit",
-			makeResources("500m", "1Gi", "", ""),
-			makeResources("500m", "1Gi", "1", "")),
-		Entry("a removed limit",
-			makeResources("500m", "1Gi", "1", "1Gi"),
-			makeResources("500m", "1Gi", "", "1Gi")),
-		Entry("a request replaced by another one",
-			makeResources("500m", "", "", ""),
-			makeResources("", "1Gi", "", "")),
-		Entry("all the resources being removed",
-			makeResources("500m", "1Gi", "500m", "1Gi"),
-			corev1.ResourceRequirements{}),
+			makeResources("500m", "1Gi", "500m", "2Gi")),
+		Entry("a removed request that defaults to its limit",
+			makeResources("500m", "1Gi", "1", "2Gi"),
+			makeResources("500m", "1Gi", "1", "2Gi"),
+			makeResources("", "1Gi", "1", "2Gi"),
+			makeResources("1", "1Gi", "1", "2Gi")),
+		Entry("keeping the entries added at admission time",
+			makeResources("100m", "1Gi", "500m", "1Gi"),
+			limitsOnly("", "1Gi"),
+			limitsOnly("", "2Gi"),
+			makeResources("100m", "2Gi", "500m", "2Gi")),
+		Entry("cpu only, keeping the memory limit another actor raised",
+			makeResources("500m", "1Gi", "1", "4Gi"),
+			makeResources("500m", "1Gi", "1", "2Gi"),
+			makeResources("500m", "1Gi", "2", "2Gi"),
+			makeResources("500m", "1Gi", "2", "4Gi")),
+		Entry("memory only, keeping the cpu another actor set",
+			makeResources("700m", "1Gi", "3", "2Gi"),
+			makeResources("500m", "1Gi", "1", "2Gi"),
+			makeResources("500m", "1Gi", "1", "3Gi"),
+			makeResources("700m", "1Gi", "3", "3Gi")),
 	)
 
-	It("refuses changes to resources other than cpu and memory", func() {
-		current := makeResources("500m", "1Gi", "500m", "1Gi")
-		current.Limits["hugepages-2Mi"] = resource.MustParse("256Mi")
-		target := makeResources("500m", "1Gi", "500m", "1Gi")
-		target.Limits["hugepages-2Mi"] = resource.MustParse("512Mi")
-
-		stored := makeSpec(current)
-		Expect(ResizeInPlace(stored, admit(stored), makeSpec(target), &corev1.PodStatus{})).To(BeFalse())
-	})
-
-	It("resizes cpu and memory next to other unchanged resources", func() {
-		current := makeResources("500m", "1Gi", "500m", "1Gi")
-		current.Limits["hugepages-2Mi"] = resource.MustParse("256Mi")
-		target := makeResources("1", "1Gi", "1", "1Gi")
-		target.Limits["hugepages-2Mi"] = resource.MustParse("256Mi")
-
-		expectedLive := *target.DeepCopy()
-		expectedLive.Requests["hugepages-2Mi"] = resource.MustParse("256Mi")
-		expectResized(makeSpec(current), makeSpec(target), expectedLive)
-	})
-
-	It("keeps the entries the live pod got at admission time", func() {
-		stored := makeSpec(corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
-		})
-		target := makeSpec(corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
-		})
-		// a LimitRange defaulted the memory the cluster does not declare
-		live := makeSpec(makeResources("1", "256Mi", "1", "512Mi"))
-
-		Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		Expect(equality.Semantic.DeepEqual(live.Containers[0].Resources, makeResources("2", "256Mi", "2", "512Mi"))).
-			To(BeTrue(), "unexpected live resources: %v", live.Containers[0].Resources)
-	})
-
-	It("applies only the entries that changed", func() {
-		stored := makeSpec(makeResources("500m", "1Gi", "1", "1Gi"))
-		target := makeSpec(makeResources("500m", "1Gi", "2", "1Gi"))
-		// another actor resized the memory request
-		live := admit(stored)
-		live.Containers[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("768Mi")
-
-		Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		Expect(equality.Semantic.DeepEqual(live.Containers[0].Resources, makeResources("500m", "768Mi", "2", "1Gi"))).
-			To(BeTrue(), "unexpected live resources: %v", live.Containers[0].Resources)
-	})
-
-	It("leaves alone the containers whose resources did not change", func() {
-		stored := &corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: PostgresContainerName, Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-				{Name: "sidecar", Resources: makeResources("100m", "100Mi", "100m", "100Mi")},
-			},
-		}
-		target := stored.DeepCopy()
-		target.Containers[0].Resources = makeResources("1", "1Gi", "1", "1Gi")
-		// another actor resized the sidecar, and injected a container
-		live := stored.DeepCopy()
-		live.Containers[1].Resources = makeResources("300m", "100Mi", "300m", "100Mi")
-		live.Containers = append(live.Containers, corev1.Container{Name: "injected"})
-
-		Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		Expect(equality.Semantic.DeepEqual(live.Containers[0].Resources, target.Containers[0].Resources)).To(BeTrue())
-		Expect(equality.Semantic.DeepEqual(
-			live.Containers[1].Resources, makeResources("300m", "100Mi", "300m", "100Mi"))).To(BeTrue())
-		Expect(live.Containers[2].Resources).To(Equal(corev1.ResourceRequirements{}))
-	})
-
-	It("refuses the whole change when a single container cannot be resized", func() {
-		stored := &corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "a", Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-				{Name: "b", Resources: makeResources("500m", "1Gi", "500m", "2Gi")},
-			},
-		}
-		target := stored.DeepCopy()
-		target.Containers[0].Resources = makeResources("1", "1Gi", "1", "1Gi")
-		target.Containers[1].Resources = makeResources("500m", "1Gi", "500m", "1Gi")
-
-		Expect(ResizeInPlace(stored, admit(stored), target, &corev1.PodStatus{})).To(BeFalse())
-	})
-
-	It("resizes the native sidecars", func() {
-		stored := &corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{Name: "sidecar", RestartPolicy: &always, Resources: makeResources("100m", "", "", "")},
-			},
-		}
-		target := stored.DeepCopy()
-		target.InitContainers[0].Resources = makeResources("200m", "", "", "")
-		live := admit(stored)
-
-		Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		Expect(live.InitContainers[0].Resources.Requests.Cpu().String()).To(Equal("200m"))
-		Expect(equality.Semantic.DeepEqual(stored, target)).To(BeTrue())
-	})
-
-	It("records the resources of the run-once init containers without resizing them", func() {
-		stored := &corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				// not even a memory limit decrease matters for a container
-				// that has already terminated
-				{Name: "init", Resources: makeResources("100m", "1Gi", "100m", "2Gi")},
-			},
-		}
-		target := stored.DeepCopy()
-		target.InitContainers[0].Resources = makeResources("200m", "1Gi", "200m", "1Gi")
-		live := admit(stored)
-
-		Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		Expect(live.InitContainers[0].Resources.Requests.Cpu().String()).To(Equal("100m"))
-		Expect(equality.Semantic.DeepEqual(stored, target)).To(BeTrue())
-	})
-
-	It("does not record a change other than the resources", func() {
-		stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-		target := makeSpec(makeResources("1", "1Gi", "1", "1Gi"))
-		target.Containers[0].Image = "postgres:18"
-
-		Expect(ResizeInPlace(stored, admit(stored), target, &corev1.PodStatus{})).To(BeTrue())
-		Expect(stored.Containers[0].Image).To(BeEmpty())
-		match, _ := ComparePodSpecs(*stored, *target)
-		Expect(match).To(BeFalse())
-	})
-
-	It("ignores the containers present on one side only", func() {
-		stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-		target := stored.DeepCopy()
-		target.Containers[0].Name = "renamed"
-		target.Containers[0].Resources = makeResources("1", "1Gi", "1", "1Gi")
-		live := admit(stored)
-
-		Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		Expect(equality.Semantic.DeepEqual(live, admit(makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))))).
-			To(BeTrue())
-	})
-
-	It("refuses a change of the resource claims", func() {
-		stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-		target := stored.DeepCopy()
-		target.Containers[0].Resources.Claims = []corev1.ResourceClaim{{Name: "gpu"}}
-
-		Expect(ResizeInPlace(stored, admit(stored), target, &corev1.PodStatus{})).To(BeFalse())
-	})
-
-	DescribeTable("refuses a change of the QoS class",
-		func(from, to corev1.ResourceRequirements) {
-			stored, target := makeSpec(from), makeSpec(to)
-
-			Expect(ResizeInPlace(stored, admit(stored), target, &corev1.PodStatus{})).To(BeFalse())
+	DescribeTable("needs a new pod",
+		func(live, stored, target corev1.ResourceRequirements, expectedReason string) {
+			resized, _, reason := resize(makeSpec(live), makeSpec(stored), makeSpec(target))
+			Expect(resized).To(BeNil())
+			Expect(reason).To(ContainSubstring(expectedReason))
 		},
-		Entry("request lowered below its limit",
-			makeResources("1", "1Gi", "1", "1Gi"), makeResources("500m", "1Gi", "1", "1Gi")),
-		Entry("request raised to its limit",
-			makeResources("500m", "1Gi", "1", "1Gi"), makeResources("1", "1Gi", "1", "1Gi")),
+		Entry("memory limit below the one someone else set on the live pod",
+			makeResources("500m", "1Gi", "500m", "4Gi"),
+			makeResources("500m", "1Gi", "500m", "2Gi"),
+			makeResources("500m", "1Gi", "500m", "3Gi"),
+			"memory limit"),
+		Entry("entry replaced by another",
+			makeResources("500m", "", "", ""),
+			makeResources("500m", "", "", ""),
+			makeResources("", "1Gi", "", ""),
+			"only the cpu and memory values"),
+		Entry("removed limit",
+			makeResources("250m", "1Gi", "500m", "2Gi"),
+			makeResources("250m", "1Gi", "500m", "2Gi"),
+			makeResources("250m", "1Gi", "", "2Gi"),
+			"only the cpu and memory values"),
+		Entry("resource other than cpu and memory",
+			corev1.ResourceRequirements{Limits: corev1.ResourceList{"hugepages-2Mi": resource.MustParse("256Mi")}},
+			corev1.ResourceRequirements{Limits: corev1.ResourceList{"hugepages-2Mi": resource.MustParse("256Mi")}},
+			corev1.ResourceRequirements{Limits: corev1.ResourceList{"hugepages-2Mi": resource.MustParse("512Mi")}},
+			"only the cpu and memory values"),
+		Entry("request lowered below its limit, leaving the Guaranteed QoS class",
+			makeResources("1", "1Gi", "1", "1Gi"),
+			makeResources("1", "1Gi", "1", "1Gi"),
+			makeResources("500m", "1Gi", "1", "1Gi"),
+			"QoS class"),
+		Entry("request raised to its limit, entering the Guaranteed QoS class",
+			makeResources("500m", "1Gi", "1", "1Gi"),
+			makeResources("500m", "1Gi", "1", "1Gi"),
+			makeResources("1", "1Gi", "1", "1Gi"),
+			"QoS class"),
+		Entry("claims",
+			makeResources("500m", "1Gi", "500m", "1Gi"),
+			makeResources("500m", "1Gi", "500m", "1Gi"),
+			func() corev1.ResourceRequirements {
+				resources := makeResources("500m", "1Gi", "500m", "1Gi")
+				resources.Claims = []corev1.ResourceClaim{{Name: "gpu"}}
+				return resources
+			}(),
+			"only the cpu and memory values"),
 	)
 
-	Describe("the memory limit enforced by the kubelet", func() {
-		statusWithLimit := func(name string) *corev1.PodStatus {
-			resources := &corev1.ResourceRequirements{Limits: makeResources("", "", "", "1Gi").Limits}
-			return &corev1.PodStatus{
-				ContainerStatuses: []corev1.ContainerStatus{{Name: name, Resources: resources}},
+	DescribeTable("compares a memory limit with the one the kubelet enforces",
+		func(live, stored, enforced corev1.ResourceRequirements, target string, ok bool) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+				Spec:       *makeSpec(live),
+				Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{
+					{Name: PostgresContainerName, Resources: &enforced},
+					{Name: "sidecar", Resources: &live},
+				}},
 			}
+			resized, _ := ResizePod(pod, makeSpec(stored), makeSpec(makeResources("500m", "1Gi", "500m", target)))
+			Expect(resized != nil).To(Equal(ok))
+		},
+		Entry("a pending increase is reverted: the previous limit is still enforced",
+			makeResources("500m", "1Gi", "500m", "8Gi"),
+			makeResources("500m", "1Gi", "500m", "8Gi"),
+			makeResources("500m", "1Gi", "500m", "2Gi"), "2Gi", true),
+		Entry("a decrease when the status reports no memory limit",
+			makeResources("500m", "1Gi", "500m", "2Gi"),
+			makeResources("500m", "1Gi", "500m", "2Gi"),
+			makeResources("500m", "1Gi", "", ""), "1500Mi", false),
+	)
+
+	It("finds the limit the kubelet enforces on a native sidecar", func() {
+		spec := &corev1.PodSpec{InitContainers: []corev1.Container{
+			{Name: "sidecar", RestartPolicy: &always, Resources: makeResources("500m", "1Gi", "500m", "8Gi")},
+		}}
+		enforced := makeResources("500m", "1Gi", "500m", "2Gi")
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+			Spec:       *spec,
+			Status: corev1.PodStatus{InitContainerStatuses: []corev1.ContainerStatus{
+				{Name: "sidecar", Resources: &enforced},
+			}},
 		}
-
-		It("allows reverting a deferred increase", func() {
-			// The annotation and the live spec hold 2Gi, the kubelet still
-			// enforces 1Gi: going back to 1Gi is not a decrease
-			stored := makeSpec(makeResources("500m", "2Gi", "500m", "2Gi"))
-			target := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-			status := statusWithLimit(PostgresContainerName)
-
-			Expect(ResizeInPlace(stored, admit(stored), target, status)).To(BeTrue())
-		})
-
-		It("refuses a decrease below the enforced limit", func() {
-			stored := makeSpec(makeResources("500m", "2Gi", "500m", "2Gi"))
-			target := makeSpec(makeResources("500m", "512Mi", "500m", "512Mi"))
-			status := statusWithLimit(PostgresContainerName)
-
-			Expect(ResizeInPlace(stored, admit(stored), target, status)).To(BeFalse())
-		})
-
-		It("refuses a decrease that only the live spec would allow", func() {
-			// The live spec holds a pending increase, the kubelet enforces less
-			stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-			target := makeSpec(makeResources("500m", "768Mi", "500m", "768Mi"))
-			live := admit(stored)
-			live.Containers[0].Resources.Limits[corev1.ResourceMemory] = resource.MustParse("512Mi")
-
-			Expect(ResizeInPlace(stored, live, target, statusWithLimit(PostgresContainerName))).To(BeFalse())
-		})
-
-		It("looks up the native sidecars in the init container statuses", func() {
-			stored := &corev1.PodSpec{
-				InitContainers: []corev1.Container{
-					{Name: "sidecar", RestartPolicy: &always, Resources: makeResources("100m", "2Gi", "100m", "2Gi")},
-				},
-			}
-			target := stored.DeepCopy()
-			target.InitContainers[0].Resources = makeResources("100m", "1Gi", "100m", "1Gi")
-			status := &corev1.PodStatus{
-				InitContainerStatuses: statusWithLimit("sidecar").ContainerStatuses,
-			}
-
-			Expect(ResizeInPlace(stored.DeepCopy(), admit(stored), target.DeepCopy(), status)).To(BeTrue())
-			Expect(ResizeInPlace(stored, admit(stored), target, &corev1.PodStatus{})).To(BeFalse())
-		})
-
-		It("refuses a change when no limit is enforced", func() {
-			stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-			target := makeSpec(makeResources("500m", "2Gi", "500m", "2Gi"))
-			live := admit(stored)
-			delete(live.Containers[0].Resources.Limits, corev1.ResourceMemory)
-
-			Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeFalse())
-		})
+		target := spec.DeepCopy()
+		target.InitContainers[0].Resources = enforced
+		resized, _ := ResizePod(pod, spec, target)
+		Expect(resized).ToNot(BeNil())
 	})
 
-	Describe("the resize policy of the live containers", func() {
-		restartPolicy := []corev1.ContainerResizePolicy{
-			{ResourceName: corev1.ResourceCPU, RestartPolicy: corev1.RestartContainer},
-		}
-
-		It("refuses to resize a container that would restart", func() {
-			stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-			target := makeSpec(makeResources("1", "1Gi", "1", "1Gi"))
-			live := admit(stored)
-			live.Containers[0].ResizePolicy = restartPolicy
-
-			Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeFalse())
+	It("ignores the resize policy of a container that does not change", func() {
+		stored := makeSpec(makeResources("500m", "1Gi", "1", "2Gi"))
+		stored.Containers = append(stored.Containers, corev1.Container{
+			Name:         "other",
+			ResizePolicy: []corev1.ContainerResizePolicy{{RestartPolicy: corev1.RestartContainer}},
 		})
+		target := stored.DeepCopy()
+		target.Containers[0].Resources = makeResources("500m", "1Gi", "2", "2Gi")
+		resized, _, _ := resize(stored, stored, target)
+		Expect(resized).ToNot(BeNil())
+	})
 
-		It("resizes a cpu change when only the memory policy restarts the container", func() {
+	It("needs a new pod when the container to resize is missing from the live pod", func() {
+		stored := makeSpec(makeResources("500m", "1Gi", "1", "2Gi"))
+		live := stored.DeepCopy()
+		live.Containers[0].Name = "other"
+		resized, _, _ := resize(live, stored, makeSpec(makeResources("500m", "1Gi", "2", "2Gi")))
+		Expect(resized).To(BeNil())
+	})
+
+	DescribeTable("depends on the resize policy of the changed resources",
+		func(policy corev1.ResourceName, target corev1.ResourceRequirements, resizable bool) {
 			stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-			target := makeSpec(makeResources("1", "1Gi", "1", "1Gi"))
-			live := admit(stored)
+			live := stored.DeepCopy()
 			live.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
-				{ResourceName: corev1.ResourceMemory, RestartPolicy: corev1.RestartContainer},
+				{ResourceName: policy, RestartPolicy: corev1.RestartContainer},
 			}
-
-			Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		})
-
-		It("refuses a memory change when the memory policy restarts the container", func() {
-			stored := makeSpec(makeResources("500m", "1Gi", "500m", "1Gi"))
-			target := makeSpec(makeResources("500m", "2Gi", "500m", "2Gi"))
-			live := admit(stored)
-			live.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
-				{ResourceName: corev1.ResourceMemory, RestartPolicy: corev1.RestartContainer},
+			resized, _, reason := resize(live, stored, makeSpec(target))
+			if resizable {
+				Expect(resized).ToNot(BeNil())
+				return
 			}
+			Expect(resized).To(BeNil())
+			Expect(reason).To(ContainSubstring("resize policy"))
+		},
+		Entry("a cpu change with a cpu policy that restarts",
+			corev1.ResourceCPU, makeResources("1", "1Gi", "1", "1Gi"), false),
+		Entry("a memory change with a memory policy that restarts",
+			corev1.ResourceMemory, makeResources("500m", "2Gi", "500m", "2Gi"), false),
+		Entry("a cpu change with a memory policy that restarts",
+			corev1.ResourceMemory, makeResources("1", "1Gi", "1", "1Gi"), true),
+	)
 
-			Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeFalse())
-		})
-
-		DescribeTable("refuses a request-only or limit-only change when its policy restarts",
-			func(target corev1.ResourceRequirements) {
-				stored := makeSpec(makeResources("500m", "1Gi", "1", "2Gi"))
-				live := admit(stored)
-				live.Containers[0].ResizePolicy = restartPolicy
-
-				Expect(ResizeInPlace(stored, live, makeSpec(target), &corev1.PodStatus{})).To(BeFalse())
-			},
-			Entry("cpu request", makeResources("600m", "1Gi", "1", "2Gi")),
-			Entry("cpu limit", makeResources("500m", "1Gi", "2", "2Gi")),
-		)
-
-		It("ignores a container that does not change, even if the live pod lacks it", func() {
+	DescribeTable("restarts the container when only a request or only a limit changes",
+		func(target corev1.ResourceRequirements) {
 			stored := makeSpec(makeResources("500m", "1Gi", "1", "2Gi"))
-			stored.Containers = append(stored.Containers,
-				corev1.Container{Name: "unchanged", Resources: makeResources("100m", "", "", "")})
-			live := admit(stored)
-			live.Containers = live.Containers[:1]
-			target := stored.DeepCopy()
-			target.Containers[0].Resources = makeResources("500m", "1Gi", "2", "2Gi")
+			live := stored.DeepCopy()
+			live.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
+				{ResourceName: corev1.ResourceCPU, RestartPolicy: corev1.RestartContainer},
+			}
+			resized, _, reason := resize(live, stored, makeSpec(target))
+			Expect(resized).To(BeNil())
+			Expect(reason).To(ContainSubstring("resize policy"))
+		},
+		Entry("cpu request", makeResources("600m", "1Gi", "1", "2Gi")),
+		Entry("cpu limit", makeResources("500m", "1Gi", "2", "2Gi")),
+	)
 
-			Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		})
+	It("ignores a container that does not change, even if the live pod lacks it", func() {
+		stored := makeSpec(makeResources("500m", "1Gi", "1", "2Gi"))
+		stored.Containers = append(stored.Containers,
+			corev1.Container{Name: "unchanged", Resources: makeResources("100m", "", "", "")})
+		live := stored.DeepCopy()
+		live.Containers = live.Containers[:1]
+		target := stored.DeepCopy()
+		target.Containers[0].Resources = makeResources("500m", "1Gi", "2", "2Gi")
+		resized, _, _ := resize(live, stored, target)
+		Expect(resized).ToNot(BeNil())
+	})
 
-		It("ignores the containers that do not change", func() {
-			stored := &corev1.PodSpec{
+	It("resizes native sidecars, not run-once init containers nor the containers of other actors", func() {
+		makeSidecarSpec := func(cpu string) *corev1.PodSpec {
+			return &corev1.PodSpec{
+				InitContainers: []corev1.Container{
+					{Name: "init", Resources: makeResources(cpu, "", "", "")},
+					{Name: "sidecar", RestartPolicy: &always, Resources: makeResources(cpu, "", "", "")},
+				},
 				Containers: []corev1.Container{
-					{Name: PostgresContainerName, Resources: makeResources("500m", "1Gi", "500m", "1Gi")},
-					{Name: "sidecar", Resources: makeResources("100m", "100Mi", "100m", "100Mi")},
+					{Name: PostgresContainerName, Resources: makeResources("1", "", "", "")},
 				},
 			}
-			target := stored.DeepCopy()
-			target.Containers[0].Resources = makeResources("1", "1Gi", "1", "1Gi")
-			live := admit(stored)
-			live.Containers[1].ResizePolicy = restartPolicy
+		}
+		stored := makeSidecarSpec("100m")
+		live := stored.DeepCopy()
+		live.Containers = append(live.Containers,
+			corev1.Container{Name: "istio-proxy", Resources: makeResources("300m", "", "", "")})
 
-			Expect(ResizeInPlace(stored, live, target, &corev1.PodStatus{})).To(BeTrue())
-		})
+		resized, recorded, reason := resize(live, stored, makeSidecarSpec("200m"))
+		Expect(reason).To(BeEmpty())
+		// the run-once init container is recorded, or the pod would look outdated forever
+		Expect(recorded.InitContainers[0].Resources.Requests.Cpu().String()).To(Equal("200m"))
+		Expect(resized.InitContainers[0].Resources.Requests.Cpu().String()).To(Equal("100m"))
+		Expect(resized.InitContainers[1].Resources.Requests.Cpu().String()).To(Equal("200m"))
+		Expect(resized.Containers).To(Equal(live.Containers))
 	})
 })

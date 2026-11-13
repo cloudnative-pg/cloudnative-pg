@@ -57,7 +57,8 @@ func (r *ClusterReconciler) resizeInstancesInPlace(
 		if cluster.IsInstanceFenced(pod.Name) {
 			continue
 		}
-		if err := r.resizeInstanceInPlace(ctx, cluster, pod); err != nil {
+		resizedPod := resizedPodFor(ctx, pod, cluster)
+		if err := r.resizeInstanceInPlace(ctx, cluster, pod, resizedPod); err != nil {
 			return fmt.Errorf("while resizing pod %s in place: %w", pod.Name, err)
 		}
 	}
@@ -65,32 +66,10 @@ func (r *ClusterReconciler) resizeInstancesInPlace(
 	return nil
 }
 
-// resizeInstanceInPlace resizes an instance pod through the resize
-// subresource when its stored pod spec differs from the target one only in
-// container resources that can be changed on a running pod, then records the
-// new resources in the pod spec annotation. The passed pod is updated too.
-//
-// The resize comes first: should recording it fail, the next reconciliation
-// finds the live resources already in place and only repairs the annotation.
-func (r *ClusterReconciler) resizeInstanceInPlace(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	pod *corev1.Pod,
-) (err error) {
-	contextLogger := log.FromContext(ctx).WithValues("pod", pod.Name)
-
-	// A conflict on the pod means it changed after our read. That change
-	// starts a new reconciliation, which decides on the fresh pod. Other
-	// conflicts, like one on a resource quota, come with no such event.
-	defer func() {
-		var status apierrs.APIStatus
-		if apierrs.IsConflict(err) && errors.As(err, &status) &&
-			status.Status().Details != nil && status.Status().Details.Kind == "pods" {
-			contextLogger.Debug("Conflict while resizing the instance pod in place", "error", err.Error())
-			err = ErrNextLoop
-		}
-	}()
-
+// resizedPodFor returns the pod with the new resources when they are the
+// only difference with the target pod spec and they can be applied to a
+// running pod, nil otherwise
+func resizedPodFor(ctx context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) *corev1.Pod {
 	var storedPodSpec corev1.PodSpec
 	if err := json.Unmarshal([]byte(pod.Annotations[utils.PodSpecAnnotationName]), &storedPodSpec); err != nil {
 		// Without a valid pod spec annotation there is no record of the
@@ -100,7 +79,7 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 
 	targetPod, err := newInstanceForRunningPod(ctx, pod, cluster)
 	if err != nil {
-		contextLogger.Error(err, "while building the target instance to resize the pod")
+		log.FromContext(ctx).Error(err, "while building the target instance to resize the pod", "pod", pod.Name)
 		return nil
 	}
 
@@ -108,51 +87,69 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 		return nil
 	}
 
-	resizedPod := pod.DeepCopy()
-	if !specs.ResizeInPlace(&storedPodSpec, &resizedPod.Spec, &targetPod.Spec, &pod.Status) {
-		return nil
-	}
-	if match, _ := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec); !match {
-		// The resources are not the only change: the pod will be recreated
+	resizedPod, _ := specs.ResizePod(pod, &storedPodSpec, &targetPod.Spec)
+	return resizedPod
+}
+
+// resizeInstanceInPlace brings a running pod to the given resized version,
+// if any. When the API server rejects the
+// resize, the pod is left untouched for the caller to recreate it.
+func (r *ClusterReconciler) resizeInstanceInPlace(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pod *corev1.Pod,
+	resizedPod *corev1.Pod,
+) (err error) {
+	if resizedPod == nil {
 		return nil
 	}
 
-	// The lock makes a stale read fail with a conflict
+	// A conflict on the pod means it changed after our read. That change
+	// starts a new reconciliation, which decides on the fresh pod. Other
+	// conflicts, like one on a resource quota, come with no such event.
+	defer func() {
+		var status apierrs.APIStatus
+		if apierrs.IsConflict(err) && errors.As(err, &status) &&
+			status.Status().Details != nil && status.Status().Details.Kind == "pods" {
+			log.FromContext(ctx).Debug("Conflict while resizing the instance pod in place",
+				"pod", pod.Name, "error", err.Error())
+			err = ErrNextLoop
+		}
+	}()
+
+	// The spec is already resized when a previous attempt failed to
+	// refresh the annotation. The lock makes a stale read fail with a
+	// conflict.
 	lock := []client.MergeFromOption{client.MergeFromWithOptimisticLock{}}
+	resized := pod.DeepCopy()
 	if !equality.Semantic.DeepEqual(pod.Spec, resizedPod.Spec) {
-		contextLogger.Info("Resizing instance pod in place")
-
-		// A strategic merge patch carries only the resized containers. A
-		// merge patch would carry the whole containers list, reverting any
-		// container whose resources changed after the cache was populated,
-		// including those injected by other actors, such as a service mesh.
-		if err := r.SubResource("resize").Patch(ctx, resizedPod, client.StrategicMergeFrom(pod, lock...)); err != nil {
-			// The resize cannot be applied to this pod: for example it would
-			// change the pod QoS class, or the node or the API server do not
-			// support it. The pod spec annotation is left untouched, so the
-			// rollout recreates the pod.
-			if apierrs.IsInvalid(err) || apierrs.IsBadRequest(err) ||
-				apierrs.IsForbidden(err) || apierrs.IsNotFound(err) {
-				r.Recorder.Eventf(cluster, "Warning", "InPlaceResizeFailed",
-					"In-place resize of pod %s rejected, falling back to a rolling update: %v", pod.Name, err)
-				return nil
-			}
+		resized.Spec = resizedPod.Spec
+		// The API server decides what it and the node support: with the
+		// feature off there is no resize subresource (NotFound), and a
+		// resize the node or a LimitRange cannot accept is forbidden.
+		err = r.SubResource("resize").Patch(ctx, resized, client.StrategicMergeFrom(pod, lock...))
+		if apierrs.IsInvalid(err) || apierrs.IsBadRequest(err) || apierrs.IsForbidden(err) || apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(cluster, "Warning", "InPlaceResizeFailed",
+				"In-place resize of pod %s rejected, falling back to a rolling update: %v", pod.Name, err)
+			return nil
+		}
+		if err != nil {
 			return err
 		}
-
-		r.Recorder.Eventf(cluster, "Normal", "InPlaceResize",
-			"Requested the in-place resize of instance pod %s", pod.Name)
-		// The pod is now the fresh answer of the API server, and the
-		// kubelet is about to update its status: a lock would fail for nothing
+		r.Recorder.Eventf(cluster, "Normal", "InPlaceResize", "Requested the in-place resize of instance pod %s", pod.Name)
+		// The pod is the fresh answer of the API server, and the kubelet
+		// is about to update its status: a lock would fail for nothing.
 		lock = nil
 	}
 
-	podSpecAnnotation, err := json.Marshal(storedPodSpec)
-	if err != nil {
-		return fmt.Errorf("while marshalling the pod spec annotation: %w", err)
+	// The annotation is refreshed last: if this fails, the pod still looks
+	// outdated and the next reconciliation repeats this step only.
+	patch := client.MergeFromWithOptions(resized.DeepCopy(), lock...)
+	resized.Annotations[utils.PodSpecAnnotationName] = resizedPod.Annotations[utils.PodSpecAnnotationName]
+	if err = r.Patch(ctx, resized, patch); err != nil {
+		return fmt.Errorf("while refreshing the pod spec annotation after the in-place resize: %w", err)
 	}
+	*pod = *resized
 
-	origPod := pod.DeepCopy()
-	pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecAnnotation)
-	return r.Patch(ctx, pod, client.MergeFromWithOptions(origPod, lock...))
+	return nil
 }
