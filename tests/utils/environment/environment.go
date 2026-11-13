@@ -72,6 +72,19 @@ const (
 	PostGISSuffix = "3-standard-trixie"
 )
 
+// Versions of the extension images used by the ImageVolume tests.
+// The PostgreSQL major in extractVersion is only a Renovate lookup key:
+// image tags are computed inside PostgisExtensionImage() and PgvectorExtensionImage(),
+// based on the PostgreSQL major currently under test.
+//
+//nolint:lll
+const (
+	// renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgis-extension extractVersion=^(?<version>[\d.]+)-18-trixie$
+	postgisExtensionVersion = "3.7.0"
+	// renovate: datasource=docker depName=ghcr.io/cloudnative-pg/pgvector extractVersion=^(?<version>[\d.]+)-18-trixie$
+	pgvectorExtensionVersion = "0.8.1"
+)
+
 // TestingEnvironment struct for operator testing
 type TestingEnvironment struct {
 	RestClientConfig           *rest.Config
@@ -286,4 +299,18 @@ func (env *TestingEnvironment) SystemImageName(tag string) string {
 // Example: ghcr.io/cloudnative-pg/postgresql:16-system-trixie
 func (env *TestingEnvironment) OfficialSystemImageName(tag string) string {
 	return fmt.Sprintf("%s:%s-%s", config.Current().Postgres.ImageRepository, tag, SystemSuffix)
+}
+
+// PostgisExtensionImage returns the PostGIS extension image matching the
+// PostgreSQL major version under test.
+func (env *TestingEnvironment) PostgisExtensionImage() string {
+	return fmt.Sprintf("ghcr.io/cloudnative-pg/postgis-extension:%s-%d-trixie",
+		postgisExtensionVersion, env.PostgresVersion)
+}
+
+// PgvectorExtensionImage returns the pgvector extension image matching the
+// PostgreSQL major version under test.
+func (env *TestingEnvironment) PgvectorExtensionImage() string {
+	return fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:%s-%d-trixie",
+		pgvectorExtensionVersion, env.PostgresVersion)
 }
