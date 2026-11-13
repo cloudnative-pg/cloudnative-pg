@@ -25,6 +25,13 @@ complex topologies.
     replication clients may lose data and fail to continue seamlessly after a
     failover. For configuration details, see
     ["Replication: Logical Decoding Slot Synchronization"](replication.md#logical-decoding-slot-synchronization).
+
+    Subscriptions on high-availability clusters should enable synchronous
+    commit to avoid losing commits after a failover. By default, the
+    subscriber's primary can acknowledge commits from the publisher before they
+    reach its replicas. The publisher does not replay acknowledged commits, so
+    they are lost if a replica is promoted. See
+    ["Resilience to Failovers"](#resilience-to-failovers) for details.
 :::
 
 This flexible model is particularly useful for:
@@ -357,6 +364,31 @@ To ensure that your logical replication subscriptions remain operational after
 a failover of the publisher, configure CloudNativePG to synchronize logical
 decoding slots across the cluster. For detailed instructions, see
 [Logical Decoding Slot Synchronization](replication.md#logical-decoding-slot-synchronization).
+
+:::warning
+    The default subscription setting `synchronous_commit = off` can cause data
+    loss after a failover of a high-availability subscriber cluster. Consider
+    setting `synchronous_commit` in the `Subscription`'s `spec.parameters` to
+    `on`. Note that this is separate from the `synchronous_commit` setting in
+    the `Cluster`'s `spec.postgresql.parameters`.
+:::
+
+With `synchronous_commit = off`, the subscriber primary reports its progress
+to the publisher before the commits are flushed to the replicas. The publisher
+may then discard WAL of commits that the replicas have not yet received. After
+a failover, the new primary resumes from the publisher's position, silently
+skipping the missing commits. The only trace is a log line on the publisher,
+such as `X/X has been already streamed, forwarding to Y/Y`.
+
+Setting `synchronous_commit` to `on` avoids this, but adds synchronous
+replication latency to every applied commit. On busy publishers, the
+subscription may fall behind and never keep up, so this setting may be
+infeasible on busier systems.
+
+To avoid filling up the publisher's WAL disk which can impact its availability,
+ensure `max_slot_wal_keep_size` is set appropriately on the publisher. See
+[Capping the WAL size retained for replication slots](replication.md#capping-the-wal-size-retained-for-replication-slots)
+for details.
 
 ## Limitations
 
