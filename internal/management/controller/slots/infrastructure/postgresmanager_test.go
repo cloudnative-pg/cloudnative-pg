@@ -182,4 +182,42 @@ var _ = Describe("PostgresManager", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	It("reports whether the instance is in recovery", func(ctx SpecContext) {
+		mock.ExpectQuery("^SELECT pg_catalog.pg_is_in_recovery\\(\\)$").
+			WillReturnRows(sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
+
+		Expect(IsInRecovery(ctx, db)).To(BeTrue())
+	})
+
+	Context("ListOrphanedFailoverSlots", func() {
+		const expectedSQL = "^SELECT slot_name FROM pg_catalog.pg_replication_slots " +
+			"WHERE slot_type = 'logical' AND failover AND NOT synced AND NOT active " +
+			"AND pg_catalog.pg_is_in_recovery\\(\\) " +
+			"AND pg_catalog.current_setting\\('sync_replication_slots'\\)::bool$"
+
+		It("should successfully list the orphaned failover slots", func(ctx SpecContext) {
+			rows := sqlmock.NewRows([]string{"slot_name"}).
+				AddRow("slot1").
+				AddRow("slot2")
+
+			mock.ExpectQuery(expectedSQL).
+				WillReturnRows(rows)
+
+			result, err := ListOrphanedFailoverSlots(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Items).To(Equal([]ReplicationSlot{
+				{SlotName: "slot1"},
+				{SlotName: "slot2"},
+			}))
+		})
+
+		It("should return error when database query fails", func(ctx SpecContext) {
+			mock.ExpectQuery(expectedSQL).
+				WillReturnError(errors.New("mock error"))
+
+			_, err := ListOrphanedFailoverSlots(ctx, db)
+			Expect(err).To(HaveOccurred())
+		})
+	})
 })

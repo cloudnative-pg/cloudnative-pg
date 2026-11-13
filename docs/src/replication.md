@@ -939,6 +939,23 @@ relevant WAL, ensuring that:
 - logical replication clients can seamlessly reconnect to a promoted standby
   without missing data after failover.
 
+After a switchover or a failover, the former primary keeps the failover slots
+it created, which are not marked as `synced`. PostgreSQL's slot
+synchronization stops with an error when it finds one of them, so the slots
+on that replica stop advancing and retain WAL. For this reason, on the
+replicas, CloudNativePG drops the logical replication slots that have
+`failover` enabled and are not `synced`, letting PostgreSQL recreate them
+from the primary. A slot in use is dropped once its client disconnects.
+
+PostgreSQL recreates each slot as a temporary one, and makes it persistent
+only when the slot on the primary has advanced far enough, which normally
+requires its client to consume changes from the new primary. A temporary slot
+does not survive a promotion: if the former primary is promoted again before
+then, that slot is lost.
+
+In a replica cluster the slots are left in place, as PostgreSQL synchronizes
+them only from a primary.
+
 For more details on logical replication slot synchronization, see the
 PostgreSQL documentation on [Logical Replication Failover](https://www.postgresql.org/docs/current/logical-replication-failover.html).
 
