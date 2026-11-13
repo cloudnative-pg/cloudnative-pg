@@ -20,7 +20,7 @@ spec:
         ld_library_path:
           - system
         image:
-          reference: "ghcr.io/cloudnative-pg/postgis-extension:3.6.1-${PG_MAJOR}-trixie"
+          reference: "${POSTGIS_EXTENSION_IMG}"
 
   bootstrap:
     initdb:
