@@ -488,6 +488,57 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				assertInRoles(namespace, primaryPod.Name, newUserName, []string{username})
 			})
 
+			if env.PostgresVersion >= 16 {
+				By("revoking every grant of a membership, whoever granted it", func() {
+					updateNewRole := func(update func(role *apiv1.RoleConfiguration)) {
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+						Expect(err).ToNot(HaveOccurred())
+						updated := cluster.DeepCopy()
+						for i := range updated.Spec.Managed.Roles {
+							if updated.Spec.Managed.Roles[i].Name == newUserName {
+								update(&updated.Spec.Managed.Roles[i])
+							}
+						}
+						Expect(objects.Patch(env.Ctx, env.Client, updated, client.MergeFrom(cluster))).To(Succeed())
+					}
+					// From PostgreSQL 16 a role holding the ADMIN option grants a
+					// membership of its own, next to any grant of the operator
+					grantAsForeignGrantor := func(statements string) {
+						_, _, err := exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							exec.PodLocator{Namespace: namespace, PodName: primaryPod.Name},
+							postgres.PostgresDBName,
+							statements+"SET ROLE foreign_grantor; GRANT pg_monitor TO "+newUserName+"; RESET ROLE")
+						Expect(err).ToNot(HaveOccurred())
+					}
+					// A change to the role has the status evaluated again
+					changeComment := func(comment string) {
+						updateNewRole(func(role *apiv1.RoleConfiguration) {
+							role.Comment = comment
+						})
+						assertRoleStatus(namespace, clusterName,
+							"SELECT pg_catalog.shobj_description(oid, 'pg_authid') FROM pg_catalog.pg_authid "+
+								"WHERE rolname = "+pq.QuoteLiteral(newUserName), comment)
+					}
+
+					grantAsForeignGrantor("CREATE ROLE foreign_grantor; " +
+						"GRANT pg_monitor TO foreign_grantor WITH ADMIN OPTION; ")
+					changeComment("granted pg_monitor by another role")
+					assertInRoles(namespace, primaryPod.Name, newUserName, []string{username})
+
+					updateNewRole(func(role *apiv1.RoleConfiguration) {
+						role.InRoles = []string{username, "pg_monitor"}
+					})
+					assertInRoles(namespace, primaryPod.Name, newUserName, []string{username, "pg_monitor"})
+					grantAsForeignGrantor("")
+
+					updateNewRole(func(role *apiv1.RoleConfiguration) {
+						role.InRoles = []string{username}
+					})
+					assertInRoles(namespace, primaryPod.Name, newUserName, []string{username})
+				})
+			}
+
 			By("Mock the error for unrealizable User and verify user in database", func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
