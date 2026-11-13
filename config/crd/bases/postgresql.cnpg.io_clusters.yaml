@@ -5942,6 +5942,15 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              resourcesUpdateStrategy:
+                description: |-
+                  How changes to `resources` reach running instances: `recreate`
+                  (default) rolls the Pods, `inPlace` resizes them when possible and
+                  rolls them otherwise. `inPlace` requires Kubernetes 1.33 or later.
+                enum:
+                - recreate
+                - inPlace
+                type: string
               schedulerName:
                 description: |-
                   If specified, the pod will be dispatched by specified Kubernetes
