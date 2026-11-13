@@ -209,14 +209,17 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				return false
 			}
 
-			// Check common labels
-			commonLabels := []string{
-				utils.KubernetesAppManagedByLabelName,
-				utils.KubernetesAppLabelName,
-				utils.KubernetesAppComponentLabelName,
+			// Check common labels have the expected operator-owned values.
+			// The values (not just the presence) must be verified so that PVCs
+			// created with an inherited managed-by value (e.g. "Helm") are
+			// detected as out-of-date and corrected.
+			expectedCommonLabels := map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			}
-			for _, label := range commonLabels {
-				if _, found := pvc.Labels[label]; !found {
+			for label, expected := range expectedCommonLabels {
+				if pvc.Labels[label] != expected {
 					return false
 				}
 			}
