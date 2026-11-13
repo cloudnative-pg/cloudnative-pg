@@ -71,7 +71,7 @@ metadata:
 spec:
   images:
     - major: 18
-      image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+      image: ghcr.io/cloudnative-pg/postgresql:18.7-system-trixie
   componentImages:
     - key: pgbouncer
       image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
@@ -109,7 +109,7 @@ spec:
     - major: 17
       image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
     - major: 18
-      image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+      image: ghcr.io/cloudnative-pg/postgresql:18.7-system-trixie
 ```
 
 The following example defines a cluster-wide `ClusterImageCatalog`:
@@ -128,7 +128,7 @@ spec:
     - major: 17
       image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
     - major: 18
-      image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+      image: ghcr.io/cloudnative-pg/postgresql:18.7-system-trixie
 ```
 
 ### Referencing a Catalog in a Cluster
@@ -164,7 +164,7 @@ metadata:
 spec:
   images:
     - major: 18
-      image: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie
+      image: ghcr.io/cloudnative-pg/postgresql:18.7-minimal-trixie
       extensions:
         - name: foo
           image:
