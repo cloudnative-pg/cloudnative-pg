@@ -876,6 +876,58 @@ _Appears in:_
 | `message` _string_ | Message is the object reconciliation message |  |  |  |
 
 
+#### DatabasePermissionStatus
+
+
+
+DatabasePermissionStatus is the status of a single privilege granted to
+or revoked from a role on the database
+
+
+
+_Appears in:_
+
+- [DatabaseStatus](#databasestatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `privilege` _string_ | The privilege: `CONNECT`, `CREATE` or `TEMPORARY` | True |  |  |
+| `name` _string_ | The name of the role | True |  |  |
+| `type` _[UsageSpecType](#usagespectype)_ | The requested change | True |  |  |
+| `applied` _boolean_ | True if the privilege of the role matches the requested change | True |  |  |
+| `message` _string_ | Message is the reconciliation message of this entry |  |  |  |
+
+
+#### DatabasePermissionsSpec
+
+
+
+DatabasePermissionsSpec groups the privileges that can be granted or revoked
+on a database, keyed by privilege. Each entry reuses the `grant`/`revoke`
+model already used for foreign data wrapper and server usage.
+
+The role name `public` refers to the `PUBLIC` pseudo-role, meaning every
+role.
+
+A `revoke` only removes the privilege granted to the named role itself:
+it has no effect on privileges the role holds through `PUBLIC` or through
+membership of another role. Removing an entry from the specification does
+not undo a previous grant or revoke.
+
+
+
+_Appears in:_
+
+- [DatabaseSpec](#databasespec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `connect` _[UsageSpec](#usagespec) array_ | List of roles for which the `CONNECT` privilege on the database is granted or revoked.<br />Maps to `GRANT CONNECT ON DATABASE ... TO ...` / `REVOKE CONNECT ON DATABASE ... FROM ...`. |  |  |  |
+| `create` _[UsageSpec](#usagespec) array_ | List of roles for which the `CREATE` privilege on the database is granted or revoked.<br />Maps to `GRANT CREATE ON DATABASE ... TO ...` / `REVOKE CREATE ON DATABASE ... FROM ...`. |  |  |  |
+| `temporary` _[UsageSpec](#usagespec) array_ | List of roles for which the `TEMPORARY` privilege on the database is granted or revoked.<br />Maps to `GRANT TEMPORARY ON DATABASE ... TO ...` / `REVOKE TEMPORARY ON DATABASE ... FROM ...`. |  |  |  |
+| `all` _[UsageSpec](#usagespec) array_ | List of roles for which every database privilege (`CONNECT`, `CREATE`<br />and `TEMPORARY`) is granted or revoked. This is only a shortcut: it is<br />expanded into the three individual privileges before reconciliation, and<br />the status reports the expanded entries. |  |  |  |
+
+
 #### DatabaseReclaimPolicy
 
 _Underlying type:_ _string_
@@ -1067,6 +1119,7 @@ _Appears in:_
 | `extensions` _[ExtensionSpec](#extensionspec) array_ | The list of extensions to be managed in the database |  |  |  |
 | `fdws` _[FDWSpec](#fdwspec) array_ | The list of foreign data wrappers to be managed in the database |  |  |  |
 | `servers` _[ServerSpec](#serverspec) array_ | The list of foreign servers to be managed in the database |  |  |  |
+| `permissions` _[DatabasePermissionsSpec](#databasepermissionsspec)_ | Permissions defines the privileges to grant or revoke on the database<br />itself, keyed by privilege. Each entry carries a role name and a type of<br />`grant` (default) or `revoke`, mirroring the existing usage model. |  |  |  |
 
 
 #### DatabaseStatus
@@ -1090,6 +1143,7 @@ _Appears in:_
 | `extensions` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | Extensions is the status of the managed extensions |  |  |  |
 | `fdws` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | FDWs is the status of the managed FDWs |  |  |  |
 | `servers` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | Servers is the status of the managed servers |  |  |  |
+| `permissions` _[DatabasePermissionStatus](#databasepermissionstatus) array_ | Permissions is the status of the managed database permissions, with<br />one entry per privilege and role (`all` is reported expanded) |  |  |  |
 
 
 #### EmbeddedObjectMetadata
@@ -3419,39 +3473,41 @@ _Appears in:_
 
 
 
-UsageSpec configures a usage for a foreign data wrapper
+UsageSpec grants or revokes a privilege for a role, or for `public`
 
 
 
 _Appears in:_
 
+- [DatabasePermissionsSpec](#databasepermissionsspec)
 - [FDWSpec](#fdwspec)
 - [SchemaPermissionsSpec](#schemapermissionsspec)
 - [ServerSpec](#serverspec)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | Name of the usage | True |  |  |
-| `type` _[UsageSpecType](#usagespectype)_ | The type of usage |  | grant | Enum: [grant revoke] <br /> |
+| `name` _string_ | Name of the role, or `public` to target all roles | True |  |  |
+| `type` _[UsageSpecType](#usagespectype)_ | Whether the privilege is granted to or revoked from the role |  | grant | Enum: [grant revoke] <br /> |
 
 
 #### UsageSpecType
 
 _Underlying type:_ _string_
 
-UsageSpecType describes the type of usage specified in the `usage` field of the
-`Database` object.
+UsageSpecType describes whether a privilege is granted to or revoked from a
+role in the `Database` object.
 
 
 
 _Appears in:_
 
+- [DatabasePermissionStatus](#databasepermissionstatus)
 - [UsageSpec](#usagespec)
 
 | Field | Description |
 | --- | --- |
-| `grant` | GrantUsageSpecType indicates a grant usage permission.<br />The default usage permission is grant.<br /> |
-| `revoke` | RevokeUsageSpecType indicates a revoke usage permission.<br /> |
+| `grant` | GrantUsageSpecType indicates a grant of the privilege.<br />The default is grant.<br /> |
+| `revoke` | RevokeUsageSpecType indicates a revoke of the privilege.<br /> |
 
 
 #### VolumeSnapshotConfiguration

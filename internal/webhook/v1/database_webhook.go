@@ -145,6 +145,7 @@ func (v *DatabaseCustomValidator) validate(d *apiv1.Database) (allErrs field.Err
 		v.validateSchemas,
 		v.validateFDWs,
 		v.validateForeignServers,
+		v.validatePermissions,
 	}
 
 	for _, validate := range validations {
@@ -200,6 +201,68 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 			permissionsPath := itemPath.Child("permissions")
 			result = append(result, validateUsageNames(permissionsPath.Child("usage"), schemaSpec.Permissions.Usage)...)
 			result = append(result, validateUsageNames(permissionsPath.Child("create"), schemaSpec.Permissions.Create)...)
+		}
+	}
+
+	return result
+}
+
+// validatePermissions validates the database-level permissions.
+//
+// The `all` list is a shortcut for the three individual privileges, so it is
+// expanded before checking: for each privilege, a role can appear only once,
+// either granted or revoked. Repeating the same entry is most likely a mistake
+// in the specification, so it is rejected too.
+// Every spelling of `public` is the PUBLIC pseudo-role, as for the usages of
+// schemas and foreign data wrappers.
+func (v *DatabaseCustomValidator) validatePermissions(d *apiv1.Database) field.ErrorList {
+	if d.Spec.Permissions == nil {
+		return nil
+	}
+
+	permissions := d.Spec.Permissions
+	basePath := field.NewPath("spec", "permissions")
+
+	privileges := []struct {
+		field   string
+		entries []apiv1.UsageSpec
+	}{
+		{"connect", permissions.Connect},
+		{"create", permissions.Create},
+		{"temporary", permissions.Temporary},
+	}
+
+	var result field.ErrorList
+	for _, privilege := range privileges {
+		// the type requested for each role, once `all` has been expanded
+		requested := make(map[string]apiv1.UsageSpecType)
+		check := func(entryPath *field.Path, entry apiv1.UsageSpec) {
+			entryType := entry.Type
+			if entryType == "" {
+				entryType = apiv1.GrantUsageSpecType
+			}
+
+			key := granteeKey(entry.Name)
+			previous, found := requested[key]
+			switch {
+			case !found:
+				requested[key] = entryType
+			case previous != entryType:
+				result = append(result, field.Invalid(
+					entryPath.Child("name"),
+					entry.Name,
+					"the role is both granted and revoked the "+strings.ToUpper(privilege.field)+" privilege",
+				))
+			default:
+				result = append(result, field.Duplicate(entryPath.Child("name"), entry.Name))
+			}
+		}
+
+		for i, entry := range privilege.entries {
+			check(basePath.Child(privilege.field).Index(i), entry)
+		}
+		for i, entry := range permissions.All {
+			check(basePath.Child("all").Index(i), entry)
 		}
 	}
 
@@ -301,10 +364,7 @@ func validateUsageNames(usagesPath *field.Path, usages []apiv1.UsageSpec) field.
 
 	usageNames := stringset.New()
 	for i, usage := range usages {
-		name := usage.Name
-		if strings.EqualFold(name, publicRole) {
-			name = publicRole
-		}
+		name := granteeKey(usage.Name)
 
 		if usageNames.Has(name) {
 			errs = append(errs, field.Duplicate(usagesPath.Index(i).Child("name"), usage.Name))
@@ -313,6 +373,15 @@ func validateUsageNames(usagesPath *field.Path, usages []apiv1.UsageSpec) field.
 	}
 
 	return errs
+}
+
+// granteeKey returns the key that identifies a grantee: every spelling of
+// `public` resolves to the same PostgreSQL PUBLIC pseudo-role
+func granteeKey(name string) string {
+	if strings.EqualFold(name, publicRole) {
+		return publicRole
+	}
+	return name
 }
 
 // publicRole is the PostgreSQL PUBLIC pseudo-role, which the instance manager

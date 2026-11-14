@@ -183,6 +183,35 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				}
 			})
 
+			By("verifying the database permissions have been applied", func() {
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				if database.Spec.Permissions == nil {
+					return
+				}
+
+				for privilege, entries := range map[string][]apiv1.UsageSpec{
+					"CONNECT":   database.Spec.Permissions.Connect,
+					"CREATE":    database.Spec.Permissions.Create,
+					"TEMPORARY": database.Spec.Permissions.Temporary,
+				} {
+					for _, entry := range entries {
+						Expect(entry.Name).To(Equal("public"), "only PUBLIC can be asserted, see the fixture")
+						granted := entry.Type != apiv1.RevokeUsageSpecType
+						Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+							pgasserts.DatabasePrivilegeHeldByPublicQuery(database.Spec.Name, privilege),
+							pgasserts.BoolPGOutput(granted)),
+							30).Should(Succeed())
+					}
+				}
+
+				Expect(database.Status.Permissions).To(HaveLen(3))
+				for _, status := range database.Status.Permissions {
+					Expect(status.Applied).To(BeTrue(), status.Message)
+				}
+			})
+
 			By("verifying the fdw presence in the target database", func() {
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
