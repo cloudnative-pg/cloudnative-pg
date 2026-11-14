@@ -243,13 +243,13 @@ through the viewer roles.
 :::
 
 Most `kubectl cnpg` commands that change a Cluster work with `cnpg-editor-role`
-alone: `backup` creates a `Backup`, and `restart`, `fence`, `hibernate` and
-`maintenance` patch the `Cluster`. `promote` also reads the target Pod, so it
-needs `get` on Pods, for example from `cnpg-dba-viewer`, before patching
-`clusters/status`. `restart` of a single replica instance deletes its Pod, which
-needs `delete` on Pods. Commands that open a shell (`psql`, `exec`) need
-`create` on `pods/exec`, which no role or sample on this page grants, and
-`port-forward` needs `cnpg-dba-portforward`.
+alone: `backup` creates a `Backup`, and `restart`, `reload`, `fence`,
+`hibernate` and `maintenance` patch the `Cluster`. `promote` also reads the
+target Pod, so it needs `get` on Pods, for example from `cnpg-dba-viewer`,
+before patching `clusters/status`. `restart` of a single replica instance deletes
+its Pod, which needs `delete` on Pods. Commands that open a shell (`psql`,
+`exec`) need `create` on `pods/exec`, which no role or sample on this page
+grants, and `port-forward` needs `cnpg-dba-portforward`.
 
 ### Aggregating `cnpg-editor-role` into `edit` and `admin`
 
