@@ -486,3 +486,68 @@ var _ = Describe("Configuration report", func() {
 		),
 	)
 })
+
+var _ = Describe("PostgreSQL status with a stalled write path", func() {
+	pod := func(name string) *corev1.Pod {
+		return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	}
+
+	names := func(list PostgresqlStatusList) []string {
+		result := make([]string, 0, len(list.Items))
+		for _, item := range list.Items {
+			result = append(result, item.Pod.Name)
+		}
+		return result
+	}
+
+	It("sorts a stalled primary behind the healthy replicas", func() {
+		list := PostgresqlStatusList{Items: []PostgresqlStatus{
+			{Pod: pod("p"), IsPrimary: true, IsWritePathStalled: true},
+			{Pod: pod("r1"), ReceivedLsn: "1/10", ReplayLsn: "1/10"},
+			{Pod: pod("r2"), ReceivedLsn: "1/20", ReplayLsn: "1/20"},
+		}}
+		sort.Sort(&list)
+		Expect(names(list)).To(Equal([]string{"r2", "r1", "p"}))
+	})
+
+	It("keeps the stalled primary first when there is no healthy replica, so no failover happens", func() {
+		list := PostgresqlStatusList{Items: []PostgresqlStatus{
+			{Pod: pod("r1"), Error: fmt.Errorf("unreachable")},
+			{Pod: pod("p"), IsPrimary: true, IsWritePathStalled: true},
+		}}
+		sort.Sort(&list)
+		Expect(names(list)).To(Equal([]string{"p", "r1"}))
+	})
+
+	It("sorts a stalled primary before the fenced instances", func() {
+		list := PostgresqlStatusList{Items: []PostgresqlStatus{
+			{Pod: pod("r1"), IsFenced: true, ReceivedLsn: "2/0"},
+			{Pod: pod("p"), IsPrimary: true, IsWritePathStalled: true},
+		}}
+		sort.Sort(&list)
+		Expect(names(list)).To(Equal([]string{"p", "r1"}))
+	})
+
+	It("does not change the order of a healthy primary", func() {
+		list := PostgresqlStatusList{Items: []PostgresqlStatus{
+			{Pod: pod("r1"), ReceivedLsn: "1/10"},
+			{Pod: pod("p"), IsPrimary: true},
+		}}
+		sort.Sort(&list)
+		Expect(names(list)).To(Equal([]string{"p", "r1"}))
+	})
+
+	It("reports the stall in the JSON status only when set", func() {
+		stalled, err := json.Marshal(PostgresqlStatus{IsWritePathStalled: true})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(string(stalled)).To(ContainSubstring(`"isWritePathStalled":true`))
+
+		healthy, err := json.Marshal(PostgresqlStatus{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(string(healthy)).ToNot(ContainSubstring("isWritePathStalled"))
+
+		var decoded PostgresqlStatus
+		Expect(json.Unmarshal(stalled, &decoded)).To(Succeed())
+		Expect(decoded.IsWritePathStalled).To(BeTrue())
+	})
+})

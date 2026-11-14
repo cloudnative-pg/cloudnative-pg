@@ -288,7 +288,24 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	return result, nil
+	return withWritePathCheckRequeue(cluster, result), nil
+}
+
+// withWritePathCheckRequeue makes sure that a cluster with the write path check
+// enabled is reconciled at least once per check period. A primary with a stalled
+// write path changes nothing the operator watches (the pod stays ready and the
+// lease updates are filtered out), so without a periodic reconciliation the
+// stalled status reported by the instance manager would never be evaluated.
+func withWritePathCheckRequeue(cluster *apiv1.Cluster, result ctrl.Result) ctrl.Result {
+	if !cluster.IsWritePathCheckEnabled() {
+		return result
+	}
+
+	period := cluster.GetWritePathCheckPeriod()
+	if result.RequeueAfter == 0 || result.RequeueAfter > period {
+		result.RequeueAfter = period
+	}
+	return result
 }
 
 // getPluginsNeededForReconcile returns the names of the plugins that must be

@@ -2039,3 +2039,46 @@ var _ = Describe("FailureDomainKeys", func() {
 		Expect(sync.FailureDomainKeys()).To(Equal([]string{"topology.kubernetes.io/zone"}))
 	})
 })
+
+var _ = Describe("Write path check configuration", func() {
+	It("is disabled by default, with the default timings", func() {
+		cluster := &Cluster{}
+		Expect(cluster.IsWritePathCheckEnabled()).To(BeFalse())
+		Expect(cluster.GetWritePathCheckPeriod()).To(Equal(10 * time.Second))
+		Expect(cluster.GetWritePathCheckTimeout()).To(Equal(30 * time.Second))
+		Expect(cluster.GetWritePathCheckClearAfterSuccesses()).To(Equal(3))
+	})
+
+	It("is not enabled by an empty configuration, nor by enabled=false", func() {
+		cluster := &Cluster{Spec: ClusterSpec{Probes: &ProbesConfiguration{
+			Liveness: &LivenessProbe{WritePathCheck: &WritePathCheckConfiguration{}},
+		}}}
+		Expect(cluster.IsWritePathCheckEnabled()).To(BeFalse())
+
+		cluster.Spec.Probes.Liveness.WritePathCheck.Enabled = ptr.To(false)
+		Expect(cluster.IsWritePathCheckEnabled()).To(BeFalse())
+	})
+
+	It("reads the configured values", func() {
+		cluster := &Cluster{Spec: ClusterSpec{Probes: &ProbesConfiguration{
+			Liveness: &LivenessProbe{WritePathCheck: &WritePathCheckConfiguration{
+				Enabled:             ptr.To(true),
+				PeriodSeconds:       ptr.To(int32(5)),
+				TimeoutSeconds:      ptr.To(int32(20)),
+				ClearAfterSuccesses: ptr.To(int32(7)),
+			}},
+		}}}
+		Expect(cluster.IsWritePathCheckEnabled()).To(BeTrue())
+		Expect(cluster.GetWritePathCheckPeriod()).To(Equal(5 * time.Second))
+		Expect(cluster.GetWritePathCheckTimeout()).To(Equal(20 * time.Second))
+		Expect(cluster.GetWritePathCheckClearAfterSuccesses()).To(Equal(7))
+	})
+
+	It("is not touched by the defaulting of the probes", func() {
+		cluster := &Cluster{}
+		cluster.SetDefaults()
+		Expect(cluster.Spec.Probes.Liveness.WritePathCheck).To(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.IsWritePathCheckEnabled()).To(BeFalse())
+	})
+})
