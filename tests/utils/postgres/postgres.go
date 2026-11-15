@@ -21,7 +21,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -130,7 +129,12 @@ func BumpPostgresImageMajorVersion(postgresImage string) (string, error) {
 		return postgresImage, nil
 	}
 
-	imageReference.Tag = fmt.Sprintf("%d", postgresImageVersion.Major()+1)
+	// Keep the variant (e.g. "-system-trixie"): bare major tags are frozen legacy aliases.
+	tag := strconv.FormatUint(targetPostgresImageMajorVersionInt, 10)
+	if _, variant, found := strings.Cut(imageReference.Tag, "-"); found {
+		tag += "-" + variant
+	}
+	imageReference.Tag = tag
 
 	return imageReference.GetNormalizedName(), nil
 }

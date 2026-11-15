@@ -36,6 +36,12 @@ var _ = Describe("Guess the correct version of a postgres image", func() {
 		Expect(version).To(Equal("docker.io/library/postgres:10"))
 	})
 
+	It("keeps the variant suffix", func() {
+		version, err := BumpPostgresImageMajorVersion("ghcr.io/cloudnative-pg/postgresql:16.16-system-trixie")
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(version).To(Equal("ghcr.io/cloudnative-pg/postgresql:17-system-trixie"))
+	})
+
 	It("works with latest image", func() {
 		version, err := BumpPostgresImageMajorVersion(versions.DefaultImageName)
 		Expect(err).ShouldNot(HaveOccurred())
