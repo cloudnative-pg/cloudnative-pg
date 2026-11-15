@@ -40,7 +40,7 @@ type positionSource func(ctx context.Context, lease *coordinationv1.Lease) *util
 // it (claim, renewals, release) goes through there.
 //
 // The annotation travels in the same optimistic-lock write as the record, so
-// it needs no extra API call and cannot conflict on its own.
+// it needs no extra API call.
 type annotatingLeasesGetter struct {
 	coordinationv1client.LeasesGetter
 

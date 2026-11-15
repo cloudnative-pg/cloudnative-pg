@@ -42,8 +42,10 @@ import (
 // fakeLeaseAcquirer reports whatever acquirePrimaryLease's caller should see
 // and counts the yields it is asked for.
 type fakeLeaseAcquirer struct {
-	err    error
-	yields int
+	err     error
+	yields  int
+	markErr error
+	marks   int
 }
 
 func (f *fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
@@ -52,6 +54,11 @@ func (f *fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
 
 func (f *fakeLeaseAcquirer) Yield(context.Context) {
 	f.yields++
+}
+
+func (f *fakeLeaseAcquirer) MarkPromoting(context.Context) error {
+	f.marks++
+	return f.markErr
 }
 
 var _ = Describe("verifyPgDataCoherenceForPrimary primary lease gate", func() {
@@ -202,4 +209,30 @@ var _ = Describe("yielding the primary lease when not the target", func() {
 			Expect(seenAtPromote).To(BeTrue())
 			Expect(r.promotionRequested).To(BeTrue())
 		})
+
+	It("marks the promotion on the primary lease before promoting", func(ctx SpecContext) {
+		makeReplica()
+		cluster.Status.CurrentPrimary = podName
+		var markedAtPromote int
+		r.promoteInstance = func(context.Context) error {
+			markedAtPromote = acquirer.marks
+			return nil
+		}
+
+		Expect(r.handlePromotion(ctx, cluster)).To(Succeed())
+		Expect(markedAtPromote).To(Equal(1))
+	})
+
+	It("does not promote when the promotion cannot be marked on the primary lease", func(ctx SpecContext) {
+		makeReplica()
+		cluster.Status.CurrentPrimary = podName
+		acquirer.markErr = errors.New("lease not held")
+		r.promoteInstance = func(context.Context) error {
+			Fail("must not promote")
+			return nil
+		}
+
+		Expect(r.handlePromotion(ctx, cluster)).To(MatchError(ContainSubstring("lease not held")))
+		Expect(r.promotionRequested).To(BeFalse())
+	})
 })

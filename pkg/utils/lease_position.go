@@ -25,15 +25,14 @@ import (
 )
 
 // The states of a LeasePosition are the ones of PgDataState, plus two of ours.
-// Which of the PgDataState ones are written is up to the writer, see the
-// comment of the LeasePosition type below.
 const (
 	// LeasePositionStateUnknown is written when the position could not be
 	// determined, and carries no position
 	LeasePositionStateUnknown PgDataState = "unknown"
 
 	// LeasePositionStatePromoting is written by a replica right before it
-	// promotes, and carries the position of the replica itself
+	// promotes. It replaces the position of the previous primary and carries
+	// the last final one, if there was any.
 	LeasePositionStatePromoting PgDataState = "promoting"
 )
 

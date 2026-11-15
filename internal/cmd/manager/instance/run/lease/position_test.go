@@ -27,8 +27,12 @@ import (
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/utils/ptr"
 
@@ -315,5 +319,104 @@ var _ = Describe("The position published when the primary lease is written as th
 		stored, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(stored.Annotations).To(HaveKeyWithValue(utils.LeasePositionAnnotationName, previous))
+	})
+})
+
+var _ = Describe("The mark that a promotion is starting, on the primary lease", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+		previous    = `{"lsn":"0/7000028","timeline":2,"state":"shut down","pod":"test-cluster-2"}`
+		running     = `{"lsn":"0/7000028","timeline":2,"state":"in production","pod":"test-cluster-2"}`
+	)
+
+	var (
+		kubeClient *fake.Clientset
+		r          *Runnable
+	)
+
+	BeforeEach(func() {
+		kubeClient = fake.NewClientset()
+		r = New(kubeClient, postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName))
+	})
+
+	createLease := func(ctx context.Context, holder string) {
+		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:   namespace,
+				Name:        clusterName,
+				Annotations: map[string]string{utils.LeasePositionAnnotationName: previous},
+			},
+			Spec: coordinationv1.LeaseSpec{HolderIdentity: ptr.To(holder)},
+		}, metav1.CreateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	annotation := func(ctx context.Context) string {
+		lease, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return lease.Annotations[utils.LeasePositionAnnotationName]
+	}
+
+	It("keeps the final position that it replaces, to check it later", func(ctx context.Context) {
+		createLease(ctx, thisPod)
+
+		Expect(r.MarkPromoting(ctx)).To(Succeed())
+
+		position, err := utils.ParseLeasePosition(annotation(ctx))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(position).To(Equal(&utils.LeasePosition{
+			LSN:      "0/7000028",
+			Timeline: 2,
+			State:    utils.LeasePositionStatePromoting,
+			Pod:      thisPod,
+		}))
+	})
+
+	It("keeps no position when the one it replaces is not final", func(ctx context.Context) {
+		createLease(ctx, thisPod)
+		lease, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		lease.Annotations[utils.LeasePositionAnnotationName] = running
+		_, err = kubeClient.CoordinationV1().Leases(namespace).Update(ctx, lease, metav1.UpdateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(r.MarkPromoting(ctx)).To(Succeed())
+
+		position, err := utils.ParseLeasePosition(annotation(ctx))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(position).To(Equal(&utils.LeasePosition{State: utils.LeasePositionStatePromoting, Pod: thisPod}))
+	})
+
+	It("writes again when the lease changed under it", func(ctx context.Context) {
+		createLease(ctx, thisPod)
+		conflicts := 1
+		kubeClient.PrependReactor("update", "leases", func(k8stesting.Action) (bool, runtime.Object, error) {
+			if conflicts == 0 {
+				return false, nil, nil
+			}
+			conflicts--
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Group: "coordination.k8s.io", Resource: "leases"}, clusterName, errors.New("stale"))
+		})
+
+		Expect(r.MarkPromoting(ctx)).To(Succeed())
+		Expect(conflicts).To(BeZero())
+		Expect(annotation(ctx)).To(ContainSubstring(string(utils.LeasePositionStatePromoting)))
+	})
+
+	It("does not touch a lease that another pod holds", func(ctx context.Context) {
+		createLease(ctx, "test-cluster-2")
+
+		Expect(r.MarkPromoting(ctx)).To(MatchError(ContainSubstring("not held by " + thisPod)))
+		Expect(annotation(ctx)).To(Equal(previous))
+	})
+
+	It("fails when there is no lease", func(ctx context.Context) {
+		Expect(r.MarkPromoting(ctx)).ToNot(Succeed())
 	})
 })

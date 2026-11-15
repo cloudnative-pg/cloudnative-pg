@@ -137,6 +137,14 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 				Message: "This pod already passed the promotion gate, proceeding with the promotion",
 			}
 		}
+
+		// The pod that started to promote may have left the final position of
+		// the previous primary. It is checked on the timeline it was written
+		// on, as a pod on a later one has followed a promotion that happened.
+		if leasePosition.Timeline != 0 && leasePosition.Timeline == input.Replica.Timeline {
+			return decideAfterCleanShutdown(input, leasePosition)
+		}
+
 		return promotionDecision{
 			Verdict: promotionProceed,
 			Level:   promotionLogWarning,

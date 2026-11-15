@@ -103,6 +103,10 @@ func defaultConfig() Config {
 type Runnable struct {
 	instance *postgres.Instance
 
+	// kubeClient is used by MarkPromoting, the only write of the lease that
+	// does not go through lock
+	kubeClient kubernetes.Interface
+
 	// lock is wrapped by the watchdog: every Get and Update beats it.
 	lock resourcelock.Interface
 
@@ -196,6 +200,7 @@ func New(
 
 	result := &Runnable{
 		instance:      instance,
+		kubeClient:    kubeClient,
 		config:        defaultConfig(),
 		watchdog:      leaseWatchdog,
 		activateCh:    make(chan struct{}),

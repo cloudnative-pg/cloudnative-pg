@@ -161,7 +161,9 @@ final value is written when the lease is released on shutdown. It contains:
 * `state`: how far the position can be trusted. `shut down` means that
   PostgreSQL stopped cleanly and the position is final. `in production` is the
   position of a running primary, `shutting down` a position that is only a lower
-  bound, and `unknown` means that the position could not be determined.
+  bound, `promoting` that a replica is about to promote, and `unknown` means
+  that the position could not be determined. A `promoting` position keeps the
+  last final one, if there was any.
 * `pod`: the pod that wrote the position.
 
 :::note

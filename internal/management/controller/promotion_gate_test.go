@@ -77,8 +77,8 @@ var _ = Describe("decidePromotion", func() {
 		Entry("this pod is already promoting",
 			positionBy(thisPod, utils.LeasePositionStatePromoting, "0/70000A0", 2),
 			promotionProceed, promotionLogInfo),
-		Entry("another pod is promoting",
-			position(utils.LeasePositionStatePromoting, "0/70000A0", 2),
+		Entry("another pod is promoting, and left no position",
+			position(utils.LeasePositionStatePromoting, "", 0),
 			promotionProceed, promotionLogWarning),
 		Entry("a clean shutdown is published without an LSN",
 			position(utils.PgDataStateShutDown, "", 2),
@@ -91,9 +91,31 @@ var _ = Describe("decidePromotion", func() {
 			promotionProceed, promotionLogWarning),
 	)
 
+	Describe("when another pod started to promote and left the final position of the previous primary", func() {
+		marker := func(lsn string, timeline int) string {
+			return positionBy(previousPrimary, utils.LeasePositionStatePromoting, lsn, timeline)
+		}
+
+		It("makes a replica on that timeline wait for the data it is missing", func() {
+			decision := decide(marker("0/70000A0", 2), replica("0/6000000", 2))
+			Expect(decision.Verdict).To(Equal(promotionWait))
+		})
+
+		It("lets a replica on that timeline that has all the data promote", func() {
+			decision := decide(marker("0/70000A0", 2), replica("0/70000A0", 2))
+			Expect(decision.Verdict).To(Equal(promotionProceed))
+		})
+
+		It("does not block a replica on a later timeline, as the promotion happened", func() {
+			decision := decide(marker("0/70000A0", 2), replica("0/6000000", 3))
+			Expect(decision.Verdict).To(Equal(promotionProceed))
+			Expect(decision.Level).To(Equal(promotionLogWarning))
+		})
+	})
+
 	It("names the pod that is promoting when it is not this one", func() {
 		decision := decide(position(utils.LeasePositionStatePromoting, "0/70000A0", 2),
-			replica("0/70000A0", 2))
+			replica("0/70000A0", 3))
 		Expect(decision.Details).To(ContainElements("writer", "cluster-example-2", "leaseLSN", "0/70000A0"))
 	})
 

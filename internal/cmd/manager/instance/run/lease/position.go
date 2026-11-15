@@ -30,6 +30,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -111,6 +113,60 @@ func (r *Runnable) queryInstanceLivePosition(ctx context.Context) (string, strin
 	}
 
 	return lsn, walFile, nil
+}
+
+// MarkPromoting marks on the primary lease, before this instance promotes,
+// that it is about to. It must run before pg_ctl promote.
+//
+// Until the first renewal after the promotion, the annotation is the one of the
+// previous primary: a final position on a timeline that this instance is about
+// to leave behind. If this instance is lost in that window, the next replica
+// would find a clean shutdown that never happened. The renewals leave the
+// marker alone while the instance is in recovery, and replace it as soon as it
+// is a primary.
+//
+// The marker keeps the final position it replaces, if any, so that the next
+// replica can still check that it has all the data of that primary.
+//
+// This is a write of its own, not one of the elector: there is no renewal to
+// wait for, and the lock is not safe to share between goroutines. A renewal
+// that conflicts with this write reads the lease again and retries.
+func (r *Runnable) MarkPromoting(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, r.config.RenewDeadline)
+	defer cancel()
+
+	podName := r.instance.GetPodName()
+	leases := r.kubeClient.CoordinationV1().Leases(r.instance.GetNamespaceName())
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		lease, err := leases.Get(ctx, r.instance.GetClusterName(), metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if holder := lease.Spec.HolderIdentity; holder == nil || *holder != podName {
+			return fmt.Errorf("the primary lease is not held by %s, not marking the promotion", podName)
+		}
+
+		marker := utils.LeasePosition{State: utils.LeasePositionStatePromoting, Pod: podName}
+		previous, err := utils.ParseLeasePosition(lease.Annotations[utils.LeasePositionAnnotationName])
+		if err == nil && (previous.State == utils.PgDataStateShutDown ||
+			previous.State == utils.LeasePositionStatePromoting) {
+			marker.LSN, marker.Timeline = previous.LSN, previous.Timeline
+		}
+
+		value, err := marker.Marshal()
+		if err != nil {
+			return err
+		}
+		if lease.Annotations == nil {
+			lease.Annotations = make(map[string]string, 1)
+		}
+		lease.Annotations[utils.LeasePositionAnnotationName] = value
+
+		_, err = leases.Update(ctx, lease, metav1.UpdateOptions{})
+		return err
+	})
 }
 
 // releasePosition returns the final position of this instance, from the control
