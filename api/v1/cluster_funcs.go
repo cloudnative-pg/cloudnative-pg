@@ -804,6 +804,31 @@ func (cluster *Cluster) GetPrimaryLeaseReleasedDuration() time.Duration {
 	return DefaultPrimaryLeaseReleasedDurationSeconds * time.Second
 }
 
+// DefaultDataVolumeCheckTimeoutSeconds is the default timeout in seconds for data volume write check
+const DefaultDataVolumeCheckTimeoutSeconds = 5
+
+// IsDataVolumeCheckEnabled returns whether the data volume write check is enabled
+func (cluster *Cluster) IsDataVolumeCheckEnabled() bool {
+	if cluster == nil || cluster.Spec.Probes == nil || cluster.Spec.Probes.Liveness == nil {
+		return true
+	}
+	cfg := cluster.Spec.Probes.Liveness.DataVolumeCheck
+	if cfg == nil || cfg.Enabled == nil {
+		return true
+	}
+	return *cfg.Enabled
+}
+
+// GetDataVolumeCheckTimeout returns the timeout for the data volume write check
+func (cluster *Cluster) GetDataVolumeCheckTimeout() time.Duration {
+	if cluster != nil && cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
+		if cfg := cluster.Spec.Probes.Liveness.DataVolumeCheck; cfg != nil && cfg.TimeoutSeconds != nil && *cfg.TimeoutSeconds > 0 {
+			return time.Duration(*cfg.TimeoutSeconds) * time.Second
+		}
+	}
+	return DefaultDataVolumeCheckTimeoutSeconds * time.Second
+}
+
 // GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover
 func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 	if cluster.Spec.MaxSwitchoverDelay > 0 {

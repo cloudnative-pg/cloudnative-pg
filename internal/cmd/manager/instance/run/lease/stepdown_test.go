@@ -22,6 +22,8 @@ package lease
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -135,6 +137,17 @@ var _ = Describe("confirmingLock", func() {
 	It("does not stamp a successful read, even one that names us", func(ctx context.Context) {
 		_, _, err := decided.Get(ctx)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(stamp.Load()).To(BeNil())
+	})
+
+	It("rejects renewal and does not stamp when canRenew returns an error", func(ctx context.Context) {
+		decided.canRenew = func(ctx context.Context) error {
+			return errors.New("storage is not writable")
+		}
+
+		err := decided.Update(ctx, ourRecord)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("storage is not writable"))
 		Expect(stamp.Load()).To(BeNil())
 	})
 })
@@ -258,6 +271,23 @@ var _ = Describe("Runnable.monitorLeaseAge", func() {
 
 	It("requests a step-down shutdown once the lease is stale and the peers agree", func(ctx context.Context) {
 		verdict(true, nil)
+		received := readCommands(r)
+
+		start(ctx)
+
+		Eventually(received).Should(Receive(Equal(postgres.InstanceCommand("ShutDownStepDown"))))
+	})
+
+	It("requests a step-down shutdown when storage is unwritable even if the lease is fresh", func(ctx context.Context) {
+		r.config.RenewDeadline = time.Hour
+		tempDir, err := os.MkdirTemp("", "stepdown-test-*")
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		readOnlyDir := filepath.Join(tempDir, "readonly")
+		Expect(os.Mkdir(readOnlyDir, 0o500)).To(Succeed())
+		r.instance.PgData = readOnlyDir
+		r.instance.SetCluster(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}})
+
 		received := readCommands(r)
 
 		start(ctx)

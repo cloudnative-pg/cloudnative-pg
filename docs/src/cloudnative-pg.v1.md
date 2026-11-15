@@ -819,6 +819,25 @@ _Appears in:_
 | `tablespaceStorage` _object (keys:string, values:[TypedLocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#typedlocalobjectreference-v1-core))_ | Configuration of the storage for PostgreSQL tablespaces |  |  |  |
 
 
+#### DataVolumeCheckConfiguration
+
+
+
+DataVolumeCheckConfiguration contains the configuration for checking if the data
+and WAL volumes are responsive and writable.
+
+
+
+_Appears in:_
+
+- [LivenessProbe](#livenessprobe)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `enabled` _boolean_ | Whether data volume write checking is enabled. When enabled, the instance manager<br />verifies that the data and WAL volumes are responsive and writable. If writes<br />hang or fail, lease renewal stops and the primary is failed over.<br />Defaults to true. |  | true |  |
+| `timeoutSeconds` _integer_ | Timeout in seconds for the data volume write check.<br />Defaults to 5 seconds. |  | 5 | Minimum: 1 <br /> |
+
+
 #### Database
 
 
@@ -1723,6 +1742,7 @@ _Appears in:_
 | `failureThreshold` _integer_ | Minimum consecutive failures for the probe to be considered failed after having succeeded.<br />Defaults to 3. Minimum value is 1. |  |  |  |
 | `terminationGracePeriodSeconds` _integer_ | Optional duration in seconds the pod needs to terminate gracefully upon probe failure.<br />The grace period is the duration in seconds after the processes running in the pod are sent<br />a termination signal and the time when the processes are forcibly halted with a kill signal.<br />Set this value longer than the expected cleanup time for your process.<br />If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this<br />value overrides the value provided by the pod spec.<br />Value must be non-negative integer. The value zero indicates stop immediately via<br />the kill signal (no opportunity to shut down).<br />This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.<br />Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset. |  |  |  |
 | `isolationCheck` _[IsolationCheckConfiguration](#isolationcheckconfiguration)_ | Configure the primary isolation check, which stops a primary whose<br />primary lease has gone past its renew deadline without a successful<br />renewal, when at least one other instance is unreachable or names a<br />different target primary, so that it stops accepting writes it can no<br />longer safely serve. Its reaction time is set by the `primaryLease`<br />timings and by `requestTimeout`, not by the liveness probe settings this<br />stanza lives under. Enabled by default. |  |  |  |
+| `dataVolumeCheck` _[DataVolumeCheckConfiguration](#datavolumecheckconfiguration)_ | Configure the data volume write check, which verifies that the data<br />and WAL volumes are responsive and writable. If writes hang or fail,<br />lease renewal stops and the primary is failed over.<br />Enabled by default. |  |  |  |
 
 
 

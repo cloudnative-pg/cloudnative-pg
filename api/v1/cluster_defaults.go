@@ -297,6 +297,11 @@ func (r *Cluster) setProbes() {
 		r.Spec.Probes.Liveness = &LivenessProbe{}
 	}
 
+	r.defaultIsolationCheck()
+	r.defaultDataVolumeCheck()
+}
+
+func (r *Cluster) defaultIsolationCheck() {
 	// we don't override the isolation check if it is already set
 	if r.Spec.Probes.Liveness.IsolationCheck != nil {
 		return
@@ -314,6 +319,23 @@ func (r *Cluster) setProbes() {
 		Enabled:           ptr.To(true),
 		RequestTimeout:    defaultRequestTimeout,
 		ConnectionTimeout: defaultConnectionTimeout,
+	}
+}
+
+func (r *Cluster) defaultDataVolumeCheck() {
+	if r.Spec.Probes.Liveness.DataVolumeCheck != nil {
+		if r.Spec.Probes.Liveness.DataVolumeCheck.Enabled == nil {
+			r.Spec.Probes.Liveness.DataVolumeCheck.Enabled = ptr.To(true)
+		}
+		if r.Spec.Probes.Liveness.DataVolumeCheck.TimeoutSeconds == nil {
+			r.Spec.Probes.Liveness.DataVolumeCheck.TimeoutSeconds = ptr.To(int32(DefaultDataVolumeCheckTimeoutSeconds))
+		}
+		return
+	}
+
+	r.Spec.Probes.Liveness.DataVolumeCheck = &DataVolumeCheckConfiguration{
+		Enabled:        ptr.To(true),
+		TimeoutSeconds: ptr.To(int32(DefaultDataVolumeCheckTimeoutSeconds)),
 	}
 }
 

@@ -50,6 +50,11 @@ type confirmingLock struct {
 	// before the last write that named us as the holder started. Nil means no
 	// write has been confirmed yet.
 	lastConfirmed *atomic.Pointer[time.Time]
+
+	// canRenew optionally checks whether the instance is currently allowed
+	// to renew the primary lease. If it returns an error, the renewal write is
+	// rejected and not written to Kubernetes.
+	canRenew func(ctx context.Context) error
 }
 
 // Create implements resourcelock.Interface.
@@ -60,6 +65,11 @@ func (l *confirmingLock) Create(ctx context.Context, ler resourcelock.LeaderElec
 
 // Update implements resourcelock.Interface.
 func (l *confirmingLock) Update(ctx context.Context, ler resourcelock.LeaderElectionRecord) error {
+	if l.canRenew != nil && ler.HolderIdentity == l.Identity() {
+		if err := l.canRenew(ctx); err != nil {
+			return err
+		}
+	}
 	started := time.Now()
 	return l.stamp(ler, started, l.Interface.Update(ctx, ler))
 }
@@ -144,7 +154,14 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 			confirmed = r.lastConfirmed.Load()
 		}
 		age := time.Since(*confirmed)
-		if age <= r.config.RenewDeadline {
+
+		cluster := r.instance.GetClusterOrDefault()
+		targetPrimary := cluster.Status.TargetPrimary
+		isSuperseded := cluster.Spec.Instances > 1 && targetPrimary != "" && targetPrimary != r.instance.GetPodName()
+		storageErr := r.instance.CheckStorageWritability(ctx)
+		storageFailed := cluster.Spec.Instances > 1 && storageErr != nil
+
+		if !isSuperseded && !storageFailed && age <= r.config.RenewDeadline {
 			// A renewal landed: drop a request still waiting for the lifecycle
 			// manager, or it would shut down a primary with a fresh lease. A
 			// delivered one is never withdrawn, as confirmed no longer follows
@@ -157,7 +174,23 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 		}
 
 		if !stepDownDecided {
-			stepDown, reason := r.checkStepDown(r.instance.GetClusterOrDefault(), r.instance.GetPodName())
+			var stepDown bool
+			var reason error
+			switch {
+			case isSuperseded:
+				stepDown = true
+				reason = &SupersededError{
+					Host:          r.instance.GetPodName(),
+					TargetPrimary: targetPrimary,
+					OurIdentity:   r.instance.GetPodName(),
+				}
+			case storageFailed:
+				stepDown = true
+				reason = storageErr
+			default:
+				stepDown, reason = r.checkStepDown(cluster, r.instance.GetPodName())
+			}
+
 			// The check reaches the peers and can take seconds: a Yield during
 			// it leaves a replica that must not be stopped on its verdict.
 			if ctx.Err() != nil {
