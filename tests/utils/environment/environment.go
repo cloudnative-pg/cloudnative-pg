@@ -82,7 +82,7 @@ const (
 	// renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgis-extension extractVersion=^(?<version>[\d.]+)-18-trixie$
 	postgisExtensionVersion = "3.7.0"
 	// renovate: datasource=docker depName=ghcr.io/cloudnative-pg/pgvector extractVersion=^(?<version>[\d.]+)-18-trixie$
-	pgvectorExtensionVersion = "0.8.1"
+	pgvectorExtensionVersion = "0.8.7"
 )
 
 // TestingEnvironment struct for operator testing
