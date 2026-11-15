@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -95,6 +96,12 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 	err = row.Scan(&result.IsPrimary, &result.PendingRestart)
 	if err != nil {
 		return result, err
+	}
+
+	if result.IsPrimary {
+		if err := instance.CheckStorageWritability(context.Background()); err != nil {
+			return result, fmt.Errorf("primary storage is not writable: %w", err)
+		}
 	}
 
 	if result.PendingRestart {

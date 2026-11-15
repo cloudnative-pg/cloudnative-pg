@@ -252,6 +252,17 @@ type Instance struct {
 	// systemID caches the pg_control system identifier, which never changes
 	systemID      string
 	systemIDMutex sync.Mutex
+
+	// storageCheckTracker coordinates and caches storage writability checks
+	storageCheckTracker storageCheckTracker
+}
+
+type storageCheckTracker struct {
+	mu          sync.Mutex
+	inFlight    bool
+	startTime   time.Time
+	lastChecked time.Time
+	lastError   error
 }
 
 type serverCertificateHandler struct {

@@ -697,6 +697,32 @@ type LivenessProbe struct {
 	// stanza lives under. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
+
+	// Configure the data volume write check, which verifies that the data
+	// and WAL volumes are responsive and writable. If writes hang or fail,
+	// lease renewal stops and the primary is failed over.
+	// Enabled by default.
+	// +optional
+	DataVolumeCheck *DataVolumeCheckConfiguration `json:"dataVolumeCheck,omitempty"`
+}
+
+// DataVolumeCheckConfiguration contains the configuration for checking if the data
+// and WAL volumes are responsive and writable.
+type DataVolumeCheckConfiguration struct {
+	// Whether data volume write checking is enabled. When enabled, the instance manager
+	// verifies that the data and WAL volumes are responsive and writable. If writes
+	// hang or fail, lease renewal stops and the primary is failed over.
+	// Defaults to true.
+	// +optional
+	// +kubebuilder:default:=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Timeout in seconds for the data volume write check.
+	// Defaults to 5 seconds.
+	// +optional
+	// +kubebuilder:default:=5
+	// +kubebuilder:validation:Minimum=1
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
 }
 
 // IsolationCheckConfiguration contains the configuration for the primary

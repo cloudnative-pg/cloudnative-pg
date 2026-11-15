@@ -234,9 +234,22 @@ func New(
 			},
 		},
 		lastConfirmed: &result.lastConfirmed,
+		canRenew:      result.canRenewLease,
 	})
 
 	return result
+}
+
+// canRenewLease checks whether this instance is allowed to renew its hold on the primary lease.
+// It rejects renewals if the instance storage is not responsive or writable.
+func (r *Runnable) canRenewLease(ctx context.Context) error {
+	cluster := r.instance.GetClusterOrDefault()
+	if cluster.Spec.Instances > 1 {
+		if err := r.instance.CheckStorageWritability(ctx); err != nil {
+			return fmt.Errorf("primary storage is not writable: %w", err)
+		}
+	}
+	return nil
 }
 
 // Watchdog returns the heartbeat the liveness probe reads.
