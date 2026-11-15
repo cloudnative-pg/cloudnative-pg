@@ -78,6 +78,11 @@ type promotionGateInput struct {
 
 	// AnnotationAge is how long ago the lease was last written, zero if not known
 	AnnotationAge time.Duration
+
+	// ReplicaClusterPromotion tells that the pod is promoted to end the replica
+	// cluster mode. The caller sets it from the promotion that is happening,
+	// not from the replica cluster configuration, which stays after it.
+	ReplicaClusterPromotion bool
 }
 
 // promotionDecision is the result of the promotion gate, with what to log
@@ -100,6 +105,19 @@ type promotionDecision struct {
 // the previous primary stopped on. Everything else is a failover, or a position
 // that is not known, and the replica proceeds: it is reported, not prevented.
 func decidePromotion(input promotionGateInput) promotionDecision {
+	// The annotation was left by the primary of this cluster before it was
+	// demoted, and the pod has followed another cluster since, on other
+	// timelines: it says nothing about the data to be promoted.
+	if input.ReplicaClusterPromotion {
+		return promotionDecision{
+			Verdict: promotionProceed,
+			Level:   promotionLogInfo,
+			Message: "The cluster is leaving the replica cluster mode, ignoring the position on the primary " +
+				"lease and proceeding with the promotion",
+			Details: []any{"annotation", input.Annotation},
+		}
+	}
+
 	if input.Annotation == "" {
 		return promotionDecision{
 			Verdict: promotionProceed,

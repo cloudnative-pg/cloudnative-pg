@@ -60,6 +60,25 @@ var _ = Describe("decidePromotion", func() {
 		})
 	}
 
+	It("proceeds when the cluster leaves the replica cluster mode, whatever the lease says", func() {
+		// The annotation was left when the cluster was demoted, on a timeline
+		// that the pod has left behind since
+		decision := decidePromotion(promotionGateInput{
+			Annotation:              position(utils.PgDataStateShutDown, "0/70000A0", 2),
+			PodName:                 thisPod,
+			Replica:                 replica("0/50000A0", 5),
+			ReplicaClusterPromotion: true,
+		})
+
+		Expect(decision.Verdict).To(Equal(promotionProceed))
+		Expect(decision.Level).To(Equal(promotionLogInfo))
+	})
+
+	It("blocks the same replica when the cluster is not leaving the replica cluster mode", func() {
+		Expect(decide(position(utils.PgDataStateShutDown, "0/70000A0", 2), replica("0/50000A0", 5)).Verdict).
+			To(Equal(promotionBlocked))
+	})
+
 	DescribeTable("when the previous primary did not publish a position that can be checked",
 		func(annotation string, verdict promotionVerdict, level promotionLogLevel) {
 			decision := decide(annotation, replica("0/70000A0", 2))
