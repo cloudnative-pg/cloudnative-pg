@@ -230,10 +230,13 @@ write access to `postgresql.cnpg.io` resources in a namespace. Bind them with a
 Write access to `Cluster` can also set `superuser` and `inRoles` through
 [inline managed roles](declarative_role_management.md#inline-managed-roles), so
 `DatabaseRole` adds no privilege to `cnpg-editor-role`. `cnpg-editor-role` is
-not a low-privilege role. To grant write access without superuser access, bind
-the single-resource roles for `Backup`, `ScheduledBackup`, `Database`,
-`Publication` and `Subscription` instead. `FailoverQuorum` has no editor role:
-the operator writes it, and users already read it through the viewer roles.
+not a low-privilege role. To avoid the `Cluster`, `Pooler` and `DatabaseRole`
+paths to superuser access, bind the single-resource roles for `Backup`,
+`ScheduledBackup`, `Database`, `Publication` and `Subscription` instead. These
+are not a hard boundary either: for example, `Database` can install any
+extension available in the image, which is outside the control of the operator.
+`FailoverQuorum` has no editor role: the operator writes it, and users already
+read it through the viewer roles.
 
 :::warning
     Like `cnpg-viewer-role`, these roles come with the operator manifest, not
