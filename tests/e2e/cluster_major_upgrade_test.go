@@ -212,7 +212,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 				" ('Collection', 'GEOMETRYCOLLECTION(POINT(2 0),POLYGON((0 0, 1 0, 1 1, 0 1, 0 0)))');",
 		}
 
-		// Debian does not package the tiger geocoder for PostgreSQL 14 and 15
+		// Debian does not package the tiger geocoder for PostgreSQL 15
 		major, err := strconv.Atoi(tagVersion)
 		Expect(err).ToNot(HaveOccurred())
 		if major < 16 {
