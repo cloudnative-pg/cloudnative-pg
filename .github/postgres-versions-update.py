@@ -24,7 +24,7 @@ import json
 from packaging import version
 from subprocess import check_output
 
-min_supported_major = 14
+min_supported_major = 15
 os_name = "trixie"
 image_type = "system"
 
