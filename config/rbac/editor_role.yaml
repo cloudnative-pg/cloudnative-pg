@@ -1,0 +1,60 @@
+# permissions for automation (CI/CD, GitOps controllers, platform tooling) to
+# edit the namespaced CloudNativePG resources, without cluster-admin.
+# Bind it with a RoleBinding to limit it to a single namespace.
+#
+# It excludes ClusterImageCatalog (cluster-scoped, needs a ClusterRoleBinding,
+# see clusterimagecatalog-editor-role) and FailoverQuorum (written by the
+# operator, read-only for users).
+# HIGH PRIVILEGE: write access to Cluster, Pooler or DatabaseRole is equivalent
+# to PostgreSQL superuser access and to creating arbitrary Pods in the
+# namespace. See "RBAC on Custom Resources" in the documentation.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/managed-by: kustomize
+  name: editor-role
+rules:
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups
+  - clusters
+  - databaseroles
+  - databases
+  - imagecatalogs
+  - poolers
+  - publications
+  - scheduledbackups
+  - subscriptions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+# kubectl cnpg promote patches the status subresource of the Cluster.
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups/status
+  - databaseroles/status
+  - databases/status
+  - imagecatalogs/status
+  - poolers/status
+  - publications/status
+  - scheduledbackups/status
+  - subscriptions/status
+  verbs:
+  - get

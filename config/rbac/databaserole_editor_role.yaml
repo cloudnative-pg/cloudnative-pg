@@ -1,0 +1,27 @@
+# permissions for end users to edit databaseroles.
+# HIGH PRIVILEGE: a DatabaseRole can set superuser: true and inRoles, so write
+# access is equivalent to PostgreSQL superuser access on the Clusters of the
+# namespace. Grant it separately and only where that is acceptable.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: databaserole-editor-role
+rules:
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - databaseroles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - databaseroles/status
+  verbs:
+  - get
