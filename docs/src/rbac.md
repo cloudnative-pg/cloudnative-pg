@@ -209,10 +209,11 @@ write access to `postgresql.cnpg.io` resources in a namespace. Bind them with a
 | Role | Grants | Notes |
 | ---- | ------ | ----- |
 | `cnpg-editor-role` | Write access to `Cluster`, `Pooler`, `DatabaseRole`, `Backup`, `ScheduledBackup`, `Database`, `Publication`, `Subscription` and `ImageCatalog`, and `patch` on `clusters/status` | The aggregate role, counterpart of `cnpg-viewer-role`. **High privilege**: write access to `Cluster`, `Pooler` or `DatabaseRole` is equivalent to PostgreSQL superuser access (see below). |
-| `cnpg-cluster-editor-role`, `cnpg-backup-editor-role`, `cnpg-scheduledbackup-editor-role`, `cnpg-database-editor-role`, `cnpg-publication-editor-role`, `cnpg-subscription-editor-role`, `cnpg-imagecatalog-editor-role` | Write access to one resource | Use them to grant less than `cnpg-editor-role`. `cnpg-cluster-editor-role` is **high privilege**, like `cnpg-editor-role`. |
+| `cnpg-cluster-editor-role`, `cnpg-backup-editor-role`, `cnpg-scheduledbackup-editor-role`, `cnpg-database-editor-role`, `cnpg-publication-editor-role`, `cnpg-subscription-editor-role` | Write access to one resource | Use them to grant less than `cnpg-editor-role`. `cnpg-cluster-editor-role` is **high privilege**, like `cnpg-editor-role`. |
 | `cnpg-databaserole-editor-role` | Write access to `DatabaseRole` | **High privilege**: `superuser: true` and `inRoles` make it equivalent to PostgreSQL superuser access on the namespace. |
 | `cnpg-pooler-editor-role` | Write access to `Pooler` | **High privilege**: `spec.template` is a full Pod specification, so it allows creating arbitrary Pods (see below), and `authQuery` runs arbitrary SQL. |
-| `cnpg-clusterimagecatalog-editor-role` | Write access to `ClusterImageCatalog` | `ClusterImageCatalog` is cluster-scoped, so this role needs a `ClusterRoleBinding`, which users who cannot create one cannot use. |
+| `cnpg-imagecatalog-editor-role` | Write access to `ImageCatalog` | **High privilege**: a `Cluster` runs the image its catalog names, so it controls the code that runs in the Pods of the `Cluster`s using the catalog in the namespace. |
+| `cnpg-clusterimagecatalog-editor-role` | Write access to `ClusterImageCatalog` | **High privilege**: same as `ImageCatalog`, for the `Cluster`s of every namespace. It is cluster-scoped, so this role needs a `ClusterRoleBinding`, which users who cannot create one cannot use. |
 
 :::warning
     Write access to a `Cluster` or a `Pooler` is equivalent to the ability to
@@ -245,12 +246,12 @@ read it through the viewer roles.
 
 Most `kubectl cnpg` commands that change a Cluster work with `cnpg-editor-role`
 alone: `backup` creates a `Backup`, and `restart`, `reload`, `fence`,
-`hibernate` and `maintenance` patch the `Cluster`. `promote` also reads the
-target Pod, so it needs `get` on Pods, for example from `cnpg-dba-viewer`,
-before patching `clusters/status`. `restart` of a single replica instance deletes
-its Pod, which needs `delete` on Pods. Commands that open a shell (`psql`,
-`exec`) need `create` on `pods/exec`, which no role or sample on this page
-grants, and `port-forward` needs `cnpg-dba-portforward`.
+`hibernate` and `maintenance` patch the `Cluster`. `promote` and `restart` of a
+single replica instance read the target Pod, so they need `get` on Pods, for
+example from `cnpg-dba-viewer`. Then `promote` patches `clusters/status`, and
+`restart` deletes the Pod, which needs `delete` on Pods. Commands that open a
+shell (`psql`, `exec`) need `create` on `pods/exec`, which no role or sample on
+this page grants, and `port-forward` needs `cnpg-dba-portforward`.
 
 ### Aggregating `cnpg-editor-role` into `edit` and `admin`
 
