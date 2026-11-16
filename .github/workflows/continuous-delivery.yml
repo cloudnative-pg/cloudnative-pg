@@ -2366,7 +2366,7 @@ jobs:
           make olm-catalog
       -
         name: Install OC Installer and client
-        uses: redhat-actions/openshift-tools-installer@1f130822bb0930e0ee02a119adcc3271a22b1499 # v3
+        uses: redhat-actions/openshift-tools-installer@bf1d8fd8fa963cff1d33688473e51f948748991e # v3
         with:
           source: "mirror"
           openshift-install: ${{ env.K8S_VERSION }}
