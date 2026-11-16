@@ -208,7 +208,7 @@ write access to `postgresql.cnpg.io` resources in a namespace. Bind them with a
 
 | Role | Grants | Notes |
 | ---- | ------ | ----- |
-| `cnpg-editor-role` | Write access to `Cluster`, `Backup`, `ScheduledBackup`, `Database`, `Publication`, `Subscription` and `ImageCatalog`, and `patch` on `clusters/status` | The aggregate role, counterpart of `cnpg-viewer-role`. **High privilege**: write access to `Cluster` allows creating arbitrary Pods (see below). |
+| `cnpg-editor-role` | Write access to `Cluster`, `Pooler`, `DatabaseRole`, `Backup`, `ScheduledBackup`, `Database`, `Publication`, `Subscription` and `ImageCatalog`, and `patch` on `clusters/status` | The aggregate role, counterpart of `cnpg-viewer-role`. **High privilege**: write access to `Cluster`, `Pooler` or `DatabaseRole` is equivalent to PostgreSQL superuser access (see below). |
 | `cnpg-cluster-editor-role`, `cnpg-backup-editor-role`, `cnpg-scheduledbackup-editor-role`, `cnpg-database-editor-role`, `cnpg-publication-editor-role`, `cnpg-subscription-editor-role`, `cnpg-imagecatalog-editor-role` | Write access to one resource | Use them to grant less than `cnpg-editor-role`. `cnpg-cluster-editor-role` is **high privilege**, like `cnpg-editor-role`. |
 | `cnpg-databaserole-editor-role` | Write access to `DatabaseRole` | **High privilege**: `superuser: true` and `inRoles` make it equivalent to PostgreSQL superuser access on the namespace. |
 | `cnpg-pooler-editor-role` | Write access to `Pooler` | **High privilege**: `spec.template` is a full Pod specification, so it allows creating arbitrary Pods (see below), and `authQuery` runs arbitrary SQL. |
@@ -227,15 +227,13 @@ write access to `postgresql.cnpg.io` resources in a namespace. Bind them with a
     See [RBAC on Custom Resources](security.md#rbac-on-custom-resources).
 :::
 
-`cnpg-editor-role` does not include `DatabaseRole` and `Pooler`, which can be
-granted separately, but it is not a low-privilege role because of `Cluster`.
-Write access to `Cluster` can also set `superuser` and `inRoles`, through
-[inline managed roles](declarative_role_management.md#inline-managed-roles), as
-long as they are supported. To grant write access without these capabilities,
-bind the single-resource roles for `Backup`, `ScheduledBackup`, `Database`,
+Write access to `Cluster` can also set `superuser` and `inRoles` through
+[inline managed roles](declarative_role_management.md#inline-managed-roles), so
+`DatabaseRole` adds no privilege to `cnpg-editor-role`. `cnpg-editor-role` is
+not a low-privilege role. To grant write access without superuser access, bind
+the single-resource roles for `Backup`, `ScheduledBackup`, `Database`,
 `Publication` and `Subscription` instead. `FailoverQuorum` has no editor role:
-it is written by the operator and read-only for users, who already see it
-through the viewer roles.
+the operator writes it, and users already read it through the viewer roles.
 
 :::warning
     Like `cnpg-viewer-role`, these roles come with the operator manifest, not
@@ -264,7 +262,5 @@ kubectl label clusterrole cnpg-editor-role \
 
 This is off by default. It gives everyone bound to `edit` or `admin`, in every
 namespace, write access to the resources above, including `Cluster`, so it must
-be an explicit decision of the platform team. Do not aggregate
-`cnpg-databaserole-editor-role` or `cnpg-pooler-editor-role` unless you accept
-that every namespace admin can obtain superuser access to PostgreSQL and create
-Pods through the operator.
+be an explicit decision of the platform team: every namespace admin can then
+obtain superuser access to PostgreSQL and create Pods through the operator.

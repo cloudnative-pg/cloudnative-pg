@@ -20,7 +20,8 @@ resources:
 - backup_editor_role.yaml
 - scheduledbackup_editor_role.yaml
 - imagecatalog_editor_role.yaml
-# High-privilege or cluster-scoped: granted separately, not part of editor-role.
+# Single-resource roles. ClusterImageCatalog is cluster-scoped, not part of
+# editor-role.
 - pooler_editor_role.yaml
 - databaserole_editor_role.yaml
 - clusterimagecatalog_editor_role.yaml

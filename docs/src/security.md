@@ -357,8 +357,7 @@ each one enables.
 Automation (CI/CD, GitOps controllers) that writes CloudNativePG resources in a
 namespace should not need `cluster-admin` either, nor a widened `cnpg-manager`
 role. The [RBAC for Users](rbac.md#editor-roles-for-automation) page describes
-the editor roles shipped with the operator, which keep the high-privilege
-resources (`DatabaseRole`, `Pooler`) separate from the aggregate role.
+the editor roles shipped with the operator.
 
 ### Role Based Access Control (RBAC)
 

@@ -2,17 +2,12 @@
 # edit the namespaced CloudNativePG resources, without cluster-admin.
 # Bind it with a RoleBinding to limit it to a single namespace.
 #
-# It deliberately does NOT include the resources whose write access is close to
-# PostgreSQL superuser access, so that they can be granted separately:
-# - DatabaseRole: see databaserole-editor-role. Write access to Cluster can
-#   also set superuser and inRoles through inline managed roles
-#   (spec.managed.roles), as long as they are supported.
-# - Pooler: see pooler-editor-role (authQuery runs arbitrary SQL)
-# It also excludes ClusterImageCatalog (cluster-scoped, needs a
-# ClusterRoleBinding, see clusterimagecatalog-editor-role) and FailoverQuorum
-# (written by the operator, read-only for users).
-# Write access to Cluster is itself a high-privilege grant, see "RBAC on Custom
-# Resources" in the documentation.
+# It excludes ClusterImageCatalog (cluster-scoped, needs a ClusterRoleBinding,
+# see clusterimagecatalog-editor-role) and FailoverQuorum (written by the
+# operator, read-only for users).
+# HIGH PRIVILEGE: write access to Cluster, Pooler or DatabaseRole is equivalent
+# to PostgreSQL superuser access and to creating arbitrary Pods in the
+# namespace. See "RBAC on Custom Resources" in the documentation.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -26,8 +21,10 @@ rules:
   resources:
   - backups
   - clusters
+  - databaseroles
   - databases
   - imagecatalogs
+  - poolers
   - publications
   - scheduledbackups
   - subscriptions
@@ -52,8 +49,10 @@ rules:
   - postgresql.cnpg.io
   resources:
   - backups/status
+  - databaseroles/status
   - databases/status
   - imagecatalogs/status
+  - poolers/status
   - publications/status
   - scheduledbackups/status
   - subscriptions/status
