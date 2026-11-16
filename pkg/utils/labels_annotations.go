@@ -169,6 +169,10 @@ const (
 	// ReconcilePodSpecAnnotationName is the name of the annotation that prevents the pod spec to be reconciled
 	ReconcilePodSpecAnnotationName = MetadataNamespace + "/reconcilePodSpec"
 
+	// LeasePositionAnnotationName is the name of the annotation of the primary
+	// lease holding the position of the primary, see LeasePosition
+	LeasePositionAnnotationName = MetadataNamespace + "/position"
+
 	// HibernateClusterManifestAnnotationName contains the hibernated cluster manifest
 	// Deprecated. Replaced by: ClusterManifestAnnotationName. This annotation is
 	// kept for backward compatibility

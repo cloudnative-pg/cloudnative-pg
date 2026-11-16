@@ -1421,6 +1421,10 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
 
+	if err := r.primaryLeaseAcquirer.MarkPromoting(ctx); err != nil {
+		return fmt.Errorf("marking the promotion on the primary lease: %w", err)
+	}
+
 	// I must promote my instance here
 	r.promotionRequested = true
 
