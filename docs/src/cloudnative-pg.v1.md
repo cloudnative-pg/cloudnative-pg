@@ -660,6 +660,7 @@ _Appears in:_
 | `affinity` _[AffinityConfiguration](#affinityconfiguration)_ | Affinity/Anti-affinity rules for Pods |  |  |  |
 | `topologySpreadConstraints` _[TopologySpreadConstraint](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#topologyspreadconstraint-v1-core) array_ | TopologySpreadConstraints specifies how to spread matching pods among the given topology.<br />More info:<br />https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/ |  |  |  |
 | `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#resourcerequirements-v1-core)_ | Resources requirements of every generated Pod. Please refer to<br />https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/<br />for more information. |  |  |  |
+| `resourcesUpdateStrategy` _[ResourcesUpdateStrategy](#resourcesupdatestrategy)_ | How changes to `resources` reach running instances: `recreate`<br />(default) rolls the Pods, `inPlace` resizes them when possible and<br />rolls them otherwise. `inPlace` requires Kubernetes 1.33 or later. |  |  | Enum: [recreate inPlace] <br /> |
 | `ephemeralVolumesSizeLimit` _[EphemeralVolumesSizeLimitConfiguration](#ephemeralvolumessizelimitconfiguration)_ | EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral<br />volumes |  |  |  |
 | `priorityClassName` _string_ | Name of the priority class which will be used in every generated Pod, if the PriorityClass<br />specified does not exist, the pod will not be able to schedule.  Please refer to<br />https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass<br />for more information |  |  |  |
 | `primaryUpdateStrategy` _[PrimaryUpdateStrategy](#primaryupdatestrategy)_ | Deployment strategy to follow to upgrade the primary server during a rolling<br />update procedure, after all replicas have been successfully updated:<br />it can be automated (`unsupervised` - default) or manual (`supervised`) |  | unsupervised | Enum: [unsupervised supervised] <br /> |
@@ -2741,6 +2742,24 @@ _Appears in:_
 | `enabled` _boolean_ | If enabled (default), the operator will automatically manage replication slots<br />on the primary instance and use them in streaming replication<br />connections with all the standby instances that are part of the HA<br />cluster. If disabled, the operator will not take advantage<br />of replication slots in streaming connections with the replicas.<br />This feature also controls replication slots in replica cluster,<br />from the designated primary to its cascading replicas. |  | true |  |
 | `slotPrefix` _string_ | Prefix for replication slots managed by the operator for HA.<br />It may only contain lower case letters, numbers, and the underscore character.<br />This can only be set at creation time. By default set to `_cnpg_`. |  | _cnpg_ | Pattern: `^[0-9a-z_]*$` <br /> |
 | `synchronizeLogicalDecoding` _boolean_ | When enabled, the operator automatically manages synchronization of logical<br />decoding (replication) slots across high-availability clusters.<br />Requires one of the following conditions:<br />- PostgreSQL version 17 or later<br />- PostgreSQL version < 17 with pg_failover_slots extension enabled |  |  |  |
+
+
+#### ResourcesUpdateStrategy
+
+_Underlying type:_ _string_
+
+ResourcesUpdateStrategy defines how changes to `resources` reach running instances
+
+
+
+_Appears in:_
+
+- [ClusterSpec](#clusterspec)
+
+| Field | Description |
+| --- | --- |
+| `recreate` | ResourcesUpdateStrategyRecreate rolls the Pods (`recreate`, default)<br /> |
+| `inPlace` | ResourcesUpdateStrategyInPlace resizes the Pods when possible, and rolls them otherwise (`inPlace`)<br /> |
 
 
 #### RoleConfiguration

@@ -423,6 +423,13 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// How changes to `resources` reach running instances: `recreate`
+	// (default) rolls the Pods, `inPlace` resizes them when possible and
+	// rolls them otherwise. `inPlace` requires Kubernetes 1.33 or later.
+	// +kubebuilder:validation:Enum=recreate;inPlace
+	// +optional
+	ResourcesUpdateStrategy ResourcesUpdateStrategy `json:"resourcesUpdateStrategy,omitempty"`
+
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
 	// +optional
@@ -1459,7 +1466,16 @@ type PrimaryUpdateStrategy string
 // The default method is "restart"
 type PrimaryUpdateMethod string
 
+// ResourcesUpdateStrategy defines how changes to `resources` reach running instances
+type ResourcesUpdateStrategy string
+
 const (
+	// ResourcesUpdateStrategyRecreate rolls the Pods (`recreate`, default)
+	ResourcesUpdateStrategyRecreate ResourcesUpdateStrategy = "recreate"
+
+	// ResourcesUpdateStrategyInPlace resizes the Pods when possible, and rolls them otherwise (`inPlace`)
+	ResourcesUpdateStrategyInPlace ResourcesUpdateStrategy = "inPlace"
+
 	// PrimaryUpdateStrategySupervised means that the operator need to wait for the
 	// user to manually issue a switchover request before updating the primary
 	// server (`supervised`)
