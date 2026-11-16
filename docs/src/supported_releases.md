@@ -90,7 +90,6 @@ Git tags for versions are prefixed with `v`.
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
 | 1.30.x          | Yes                  | 29 Jun 2026  | ~  Mar 2027     | 1.34, 1.35, 1.36              | 1.37, 1.33, 1.32, 1.31    | 15 - 18                     |
-| 1.29.x          | Yes                  | 31 Mar 2026  | 29 Sep 2026     | 1.33, 1.34, 1.35              | 1.37, 1.36, 1.32, 1.31    | 14 - 18                     |
 | main            | No, development only |              |                 |                               |                           | 15 - 18                     |
 
 The list of supported Kubernetes versions in the table depends on what
@@ -158,6 +157,7 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version         | Release date      | End of life         | Supported Kubernetes versions  |
 |-----------------|-------------------|---------------------|--------------------------------|
+| 1.29.x          | March 31, 2026    | September 29, 2026  | 1.33, 1.34, 1.35               |
 | 1.28.x          | December, 9 2025  | June 30, 2026       | 1.32, 1.33, 1.34, 1.35         |
 | 1.27.x          | August, 12 2025   | March 9, 2026       | 1.31, 1.32, 1.33               |
 | 1.26.x          | May 23, 2025      | November 12, 2025   | 1.30, 1.31, 1.32, 1.33         |
