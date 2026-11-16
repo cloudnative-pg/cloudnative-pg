@@ -303,3 +303,21 @@ var _ = Describe("ResizePod", func() {
 		Expect(resized.Containers).To(Equal(live.Containers))
 	})
 })
+
+var _ = Describe("isGuaranteed", func() {
+	DescribeTable("classifies the resources",
+		func(resources corev1.ResourceRequirements, expected bool) {
+			Expect(isGuaranteed(resources)).To(Equal(expected))
+		},
+		Entry("requests equal to the limits", makeResources("1", "1Gi", "1", "1Gi"), true),
+		Entry("equal quantities written differently", makeResources("1", "1Gi", "1000m", "1024Mi"), true),
+		Entry("no resources at all", makeResources("", "", "", ""), false),
+		Entry("requests only", makeResources("1", "1Gi", "", ""), false),
+		Entry("limits only, as the requests default to them", makeResources("", "", "1", "1Gi"), false),
+		Entry("cpu request below its limit", makeResources("500m", "1Gi", "1", "1Gi"), false),
+		Entry("memory request below its limit", makeResources("1", "512Mi", "1", "1Gi"), false),
+		Entry("no memory limit", makeResources("1", "1Gi", "1", ""), false),
+		Entry("no cpu limit", makeResources("1", "1Gi", "", "1Gi"), false),
+		Entry("no cpu request", makeResources("", "1Gi", "1", "1Gi"), false),
+	)
+})

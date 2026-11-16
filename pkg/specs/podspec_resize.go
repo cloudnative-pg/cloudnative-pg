@@ -38,27 +38,52 @@ import (
 // the change needs a new pod, and the reason when a resource rule says so.
 func ResizePod(pod *corev1.Pod, stored, target *corev1.PodSpec) (*corev1.Pod, string) {
 	resized, recorded := pod.DeepCopy(), stored.DeepCopy()
-	for _, containers := range []struct {
-		live, stored, target []corev1.Container
-		init                 bool
-	}{
-		{resized.Spec.Containers, recorded.Containers, target.Containers, false},
-		{resized.Spec.InitContainers, recorded.InitContainers, target.InitContainers, true},
-	} {
+
+	// containerKind groups the containers of one kind (regular or init) as
+	// they are in the live pod, in the stored pod spec and in the target one
+	type containerKind struct {
+		// live holds the containers of the running pod, which get resized
+		live []corev1.Container
+
+		// stored holds the containers of the pod spec recorded in the pod
+		// annotation, updated as the changes are applied
+		stored []corev1.Container
+
+		// target holds the containers of the wanted pod spec
+		target []corev1.Container
+
+		// init tells whether these are init containers
+		init bool
+	}
+
+	kinds := []containerKind{
+		{
+			live:   resized.Spec.Containers,
+			stored: recorded.Containers,
+			target: target.Containers,
+			init:   false,
+		},
+		{
+			live:   resized.Spec.InitContainers,
+			stored: recorded.InitContainers,
+			target: target.InitContainers,
+			init:   true,
+		},
+	}
+
+	for _, containers := range kinds {
 		for i := range containers.stored {
 			from := containers.stored[i].Resources
-			hasName := func(container corev1.Container) bool { return container.Name == containers.stored[i].Name }
-			targetIdx := slices.IndexFunc(containers.target, hasName)
-			if targetIdx < 0 || equality.Semantic.DeepEqual(from, containers.target[targetIdx].Resources) {
+			wanted := findContainer(containers.target, containers.stored[i].Name)
+			if wanted == nil || equality.Semantic.DeepEqual(from, wanted.Resources) {
 				continue
 			}
-			containers.stored[i].Resources = containers.target[targetIdx].Resources
+			containers.stored[i].Resources = wanted.Resources
 
-			liveIdx := slices.IndexFunc(containers.live, hasName)
-			if liveIdx < 0 {
+			live := findContainer(containers.live, containers.stored[i].Name)
+			if live == nil {
 				return nil, ""
 			}
-			live := &containers.live[liveIdx]
 			if containers.init && (live.RestartPolicy == nil || *live.RestartPolicy != corev1.ContainerRestartPolicyAlways) {
 				// A run-once init container has already terminated
 				continue
@@ -72,7 +97,7 @@ func ResizePod(pod *corev1.Pod, stored, target *corev1.PodSpec) (*corev1.Pod, st
 					enforced = status.Resources.Limits
 				}
 			}
-			if blocker := resizeContainer(live, enforced, from, containers.target[targetIdx].Resources); blocker != "" {
+			if blocker := resizeContainer(live, enforced, from, wanted.Resources); blocker != "" {
 				return nil, fmt.Sprintf("container %s: %s", live.Name, blocker)
 			}
 		}
@@ -82,11 +107,24 @@ func ResizePod(pod *corev1.Pod, stored, target *corev1.PodSpec) (*corev1.Pod, st
 	if match, _ := ComparePodSpecs(*recorded, *target); !match {
 		return nil, ""
 	}
+
 	// A pod spec always marshals
 	podSpecMarshaled, _ := json.Marshal(recorded)
 	resized.Annotations[utils.PodSpecAnnotationName] = string(podSpecMarshaled)
 
 	return resized, ""
+}
+
+// findContainer returns the container with the given name, or nil when the
+// list has none
+func findContainer(containers []corev1.Container, name string) *corev1.Container {
+	idx := slices.IndexFunc(containers, func(container corev1.Container) bool {
+		return container.Name == name
+	})
+	if idx < 0 {
+		return nil
+	}
+	return &containers[idx]
 }
 
 // resizeContainer applies to the live container the resources that changed
@@ -116,28 +154,33 @@ func resizeContainer(
 	}
 
 	// The API server rejects a resize that changes the QoS class
-	guaranteed := func(resources corev1.ResourceRequirements) bool {
-		return !resources.Limits.Cpu().IsZero() && !resources.Limits.Memory().IsZero() &&
-			resources.Requests.Cpu().Cmp(*resources.Limits.Cpu()) == 0 &&
-			resources.Requests.Memory().Cmp(*resources.Limits.Memory()) == 0
-	}
-	if guaranteed(from) != guaranteed(to) {
+	if isGuaranteed(from) != isGuaranteed(to) {
 		return "the QoS class of the pod would change"
 	}
 
 	// The kubelet restarts the container when a resource it changes has
 	// the RestartContainer policy
-	if slices.ContainsFunc(live.ResizePolicy, func(policy corev1.ContainerResizePolicy) bool {
+	restartsOnResize := func(policy corev1.ContainerResizePolicy) bool {
 		_, requestChanged := requests[policy.ResourceName]
 		_, limitChanged := limits[policy.ResourceName]
 		return policy.RestartPolicy == corev1.RestartContainer && (requestChanged || limitChanged)
-	}) {
+	}
+	if slices.ContainsFunc(live.ResizePolicy, restartsOnResize) {
 		return "its resize policy restarts the container"
 	}
 
 	live.Resources.Requests = overlay(live.Resources.Requests, requests)
 	live.Resources.Limits = overlay(live.Resources.Limits, limits)
 	return ""
+}
+
+// isGuaranteed returns true when the resources of a container give it the
+// Guaranteed QoS class: cpu and memory limits are set, and the requests are
+// equal to them
+func isGuaranteed(resources corev1.ResourceRequirements) bool {
+	return !resources.Limits.Cpu().IsZero() && !resources.Limits.Memory().IsZero() &&
+		resources.Requests.Cpu().Cmp(*resources.Limits.Cpu()) == 0 &&
+		resources.Requests.Memory().Cmp(*resources.Limits.Memory()) == 0
 }
 
 // changedEntries returns the entries whose value differs between from and

@@ -442,7 +442,11 @@ func isPodNeedingRollout(
 				if podRollout.reason == "" {
 					podRollout.reason = message
 				}
-				contextLogger.Info("Pod rollout required", "podName", pod.Name, "reason", podRollout.reason)
+				if podRollout.resizedPod != nil {
+					contextLogger.Info("Pod in-place resize required", "podName", pod.Name, "reason", podRollout.reason)
+				} else {
+					contextLogger.Info("Pod rollout required", "podName", pod.Name, "reason", podRollout.reason)
+				}
 				return podRollout
 			}
 		}

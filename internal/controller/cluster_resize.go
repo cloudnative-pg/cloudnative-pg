@@ -72,6 +72,8 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 		// resize the node or a LimitRange cannot accept is forbidden.
 		err = r.SubResource("resize").Patch(ctx, resized, client.StrategicMergeFrom(pod, lock...))
 		if apierrs.IsInvalid(err) || apierrs.IsBadRequest(err) || apierrs.IsForbidden(err) || apierrs.IsNotFound(err) {
+			log.FromContext(ctx).Info("In-place resize rejected, falling back to a rolling update",
+				"podName", pod.Name, "error", err.Error())
 			r.Recorder.Eventf(cluster, "Warning", "InPlaceResizeFailed",
 				"In-place resize of pod %s rejected, falling back to a rolling update: %v", pod.Name, err)
 			return false, nil
@@ -79,6 +81,7 @@ func (r *ClusterReconciler) resizeInstanceInPlace(
 		if err != nil {
 			return false, err
 		}
+		log.FromContext(ctx).Info("Requested the in-place resize of the instance pod", "podName", pod.Name)
 		r.Recorder.Eventf(cluster, "Normal", "InPlaceResize", "Requested the in-place resize of instance pod %s", pod.Name)
 		// The pod is the fresh answer of the API server, and the kubelet
 		// is about to update its status: a lock would fail for nothing.
