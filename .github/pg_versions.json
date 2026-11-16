@@ -18,9 +18,5 @@
   "15": [
     "15.20-system-trixie",
     "15.19-system-trixie"
-  ],
-  "14": [
-    "14.25-system-trixie",
-    "14.24-system-trixie"
   ]
 }
