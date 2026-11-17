@@ -669,6 +669,7 @@ appsv
 appuser
 archiveAdditionalCommandArgs
 archiver
+ardentperf
 args
 armru
 async
@@ -1028,6 +1029,7 @@ httpGet
 https
 hu
 hugepages
+ichibahn
 icu
 icuLocale
 icuRules
@@ -1093,6 +1095,7 @@ jq
 json
 jsonpath
 juliamertz
+kabbydriver
 kb
 kbytes
 kdautrey
@@ -1442,7 +1445,9 @@ reportNonRedacted
 reportRedacted
 req
 requestTimeout
+requeue
 requeued
+requeues
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
@@ -1687,6 +1692,7 @@ usename
 usernamepassword
 usr
 utils
+valeriodelsarto
 validUntil
 validatingwebhookconfigurations
 validator
