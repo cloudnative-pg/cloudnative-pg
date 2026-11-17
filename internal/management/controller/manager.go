@@ -51,6 +51,10 @@ type PrimaryLeaseAcquirer interface {
 	// without releasing the lease record, so that a new target primary can take
 	// it over once it goes stale. The next Acquire takes the lease back.
 	Yield(ctx context.Context)
+
+	// MarkPromoting records on the primary lease that this pod is about to
+	// promote, replacing the position of the previous primary
+	MarkPromoting(ctx context.Context) error
 }
 
 // InstanceReconciler reconciles the status of the Cluster resource with
@@ -76,6 +80,10 @@ type InstanceReconciler struct {
 	pluginRepository      repository.Interface
 	primaryLeaseAcquirer  PrimaryLeaseAcquirer
 
+	// availablePluginNames are the plugins whose sidecar this Pod has: their
+	// sockets are registered once, when the instance manager starts
+	availablePluginNames []string
+
 	// promotionRequested is set before the first pg_ctl promote of this
 	// process. Once set, this pod may be or become a primary whatever
 	// standby.signal says, so the lease is never yielded. Written and read
@@ -95,6 +103,7 @@ func NewInstanceReconciler(
 	client ctrl.Client,
 	metricsExporter *metricserver.Exporter,
 	pluginRepository repository.Interface,
+	availablePluginNames []string,
 	primaryLeaseAcquirer PrimaryLeaseAcquirer,
 	admission *guard.Admission[*apiv1.Cluster],
 ) *InstanceReconciler {
@@ -107,6 +116,7 @@ func NewInstanceReconciler(
 		metricsServerExporter: metricsExporter,
 		certificateReconciler: instancecertificate.NewReconciler(client, instance),
 		pluginRepository:      pluginRepository,
+		availablePluginNames:  availablePluginNames,
 		primaryLeaseAcquirer:  primaryLeaseAcquirer,
 		admission:             admission,
 	}

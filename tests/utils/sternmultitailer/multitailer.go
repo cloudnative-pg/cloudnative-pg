@@ -37,6 +37,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	// restartDelay is how long to wait before restarting a failed stern
+	restartDelay = 2 * time.Second
+
+	// restartMargin is the extra look-back applied when restarting stern
+	restartMargin = 10 * time.Second
+)
+
 // StreamLogs opens a goroutine to execute stern on all the pods that match
 // the labelSelector. Their logs will be written to disk in the outputBaseDir, split by namespace, pod and container,
 // using a namespace/pod/container.log file for each container of matching pods.
@@ -98,7 +106,7 @@ func StreamLogs(
 		Follow:              true,
 		Resource:            "",
 		OnlyLogLines:        true,
-		MaxLogRequests:      50,
+		MaxLogRequests:      500,
 		Stdin:               false,
 		DiffContainer:       false,
 
@@ -108,14 +116,24 @@ func StreamLogs(
 
 	outputDone := make(chan struct{})
 	go func() {
-		err := stern.Run(ctx, client, config)
-		if err != nil {
-			fmt.Printf("stern failed: %v", err)
+		for {
+			err := stern.Run(ctx, client, config)
+			failedAt := time.Now()
+			if ctx.Err() != nil {
+				break
+			}
+			fmt.Printf("stern failed, restarting: %v\n", err)
+
+			select {
+			case <-ctx.Done():
+			case <-time.After(restartDelay):
+			}
+			// Only ask for the logs emitted since the failure, with some margin.
+			// The already opened files are kept and appended to.
+			config.Since = time.Since(failedAt) + restartMargin
 		}
-		if <-ctx.Done(); true {
-			_ = outPipeWriter.Close()
-			_ = errOut.Close()
-		}
+		_ = outPipeWriter.Close()
+		_ = errOut.Close()
 	}()
 
 	go func() {

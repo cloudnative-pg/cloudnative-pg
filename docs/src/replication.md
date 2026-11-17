@@ -116,6 +116,19 @@ transparently configures replicas to take advantage of `restore_command` when in
 continuous recovery. As a result, PostgreSQL can use the WAL archive as a
 fallback option whenever pulling WALs via streaming replication fails.
 
+PostgreSQL switches a standby from the WAL archive back to streaming
+replication only when `restore_command` fails. While the archive keeps up with
+the standby, for example on a busy primary, this may never happen: the standby
+has no WAL receiver, its replication slot stays inactive, and it cannot take
+part in synchronous replication.
+
+To avoid this, once a standby has been restoring WAL files from the archive for
+30 seconds, the instance manager makes `restore_command` fail, so that
+PostgreSQL tries streaming replication. If streaming replication does not
+hold, the interval doubles, up to 5 minutes. This applies to the designated
+primary of a replica cluster as well, when it can stream from its source, and
+never happens outside standby mode or while a promotion is pending.
+
 ## Synchronous Replication
 
 CloudNativePG supports both
@@ -934,6 +947,38 @@ PostgreSQL documentation on [Logical Replication Failover](https://www.postgresq
 For PostgreSQL 16 and older versions, CloudNativePG uses the
 [`pg_failover_slots` extension](https://github.com/EnterpriseDB/pg_failover_slots)
 to maintain synchronization of logical replication slots across failovers.
+
+#### Replicas that are not caught up
+
+The guarantee above has a cost. Logical decoding sends changes only after
+every listed standby slot has confirmed the WAL, so a replica that is not
+caught up holds logical replication back. This is a deliberate choice of data
+safety over availability: if a lagging replica were left out of the list and
+promoted, a subscriber could already have data the new primary does not have.
+
+CloudNativePG lists the slots of all the replicas, with one exception: a new
+replica is added to the list only after its initial bootstrap, because it
+cannot be promoted before that. Otherwise, logical replication waits:
+
+- while a new replica catches up after its bootstrap, for example after a
+  scale-up;
+- while a replica is lagging;
+- while a replica is down, for as long as its PVC exists.
+
+On PostgreSQL 16 and earlier, `pg_failover_slots` terminates the logical WAL
+sender after `wal_sender_timeout`, and the subscriber restarts its apply
+worker until the replica catches up.
+
+If you need logical replication to keep running during one of these periods,
+you have the following options:
+
+- Disable `synchronizeLogicalDecoding` for that period, and enable it again
+  once the replicas are streaming.
+- On PostgreSQL 16 and earlier, set
+  `pg_failover_slots.standby_slots_min_confirmed` to the number of replicas
+  that must confirm the WAL. This weakens the guarantee in the same way.
+- If a replica is lost for good, remove the instance and its PVCs (for example
+  with `kubectl cnpg destroy`). The operator then drops its slot.
 
 ### Capping the WAL size retained for replication slots
 

@@ -21,6 +21,7 @@ package instance
 
 import (
 	"context"
+	"maps"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -632,4 +633,47 @@ var _ = Describe("updateRoleLabels during a pending failover", func() {
 		Expect(oldPrimary.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
 		Expect(oldPrimary.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
 	})
+})
+
+var _ = Describe("updateBootstrapPendingAnnotation", func() {
+	bootstrapStatus := func(state corev1.ContainerState) corev1.ContainerStatus {
+		return corev1.ContainerStatus{Name: specs.BootstrapWorkContainerName, State: state}
+	}
+	terminated := func(exitCode int32) corev1.ContainerState {
+		return corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: exitCode}}
+	}
+	pending := func() map[string]string {
+		return map[string]string{utils.BootstrapPendingAnnotationName: "true", "other": "value"}
+	}
+
+	DescribeTable("removes the pending mark only once the bootstrap succeeded",
+		func(ctx SpecContext, annotations map[string]string, statuses []corev1.ContainerStatus, expected bool) {
+			instance := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", Annotations: annotations},
+				Status:     corev1.PodStatus{InitContainerStatuses: statuses},
+			}
+			original := maps.Clone(annotations)
+
+			Expect(updateBootstrapPendingAnnotation(ctx, instance)).To(Equal(expected))
+			if expected {
+				Expect(instance.Annotations).To(Equal(map[string]string{"other": "value"}))
+			} else {
+				Expect(instance.Annotations).To(Equal(original))
+			}
+		},
+		Entry("succeeded", pending(), []corev1.ContainerStatus{bootstrapStatus(terminated(0))}, true),
+		Entry("running", pending(), []corev1.ContainerStatus{
+			bootstrapStatus(corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}),
+		}, false),
+		Entry("failed", pending(), []corev1.ContainerStatus{bootstrapStatus(terminated(1))}, false),
+		Entry("not reported by the kubelet yet", pending(), nil, false),
+		Entry("only another init container succeeded", pending(), []corev1.ContainerStatus{
+			{Name: specs.BootstrapControllerContainerName, State: terminated(0)},
+		}, false),
+		Entry("already removed, while the init container runs again",
+			map[string]string{"other": "value"},
+			[]corev1.ContainerStatus{bootstrapStatus(corev1.ContainerState{Running: &corev1.ContainerStateRunning{}})},
+			false),
+		Entry("Pod without annotations", nil, []corev1.ContainerStatus{bootstrapStatus(terminated(0))}, false),
+	)
 })

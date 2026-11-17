@@ -1686,7 +1686,14 @@ func (cluster *Cluster) SetAdmissionError(msg string) {
 		return
 	}
 
-	cluster.Status.PhaseReason = ""
+	// Only clear the reason we set above for a previous admission error.
+	// PhaseReason is shared with the normal phase-reporting machinery, so
+	// clearing it unconditionally here would wipe an unrelated, legitimate
+	// message (e.g. "Some instances are not yet active") on every successful
+	// admission check.
+	if cluster.Status.Phase == PhaseDefinitionInvalid {
+		cluster.Status.PhaseReason = ""
+	}
 }
 
 // GetAdmissionError always returns an empty string: the Cluster encodes the

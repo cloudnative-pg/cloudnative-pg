@@ -139,6 +139,8 @@ func buildTemplateVariables(env *environment.TestingEnvironment) map[string]stri
 		"AZURE_STORAGE_ACCOUNT":            cfg.Azure.StorageAccount,
 		"AZURE_BLOB_CONTAINER":             cfg.Azure.BlobContainer,
 		"PG_MAJOR":                         strconv.FormatUint(env.PostgresVersion, 10),
+		"POSTGIS_EXTENSION_IMG":            env.PostgisExtensionImage(),
+		"PGVECTOR_EXTENSION_IMG":           env.PgvectorExtensionImage(),
 	}
 
 	// Values computed while the tests run (snapshot names, backup names, ...)

@@ -410,7 +410,19 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) error {
+	// The WAL storage is left out of every online backup: the snapshots are cut
+	// before pg_backup_stop, so recovering to the consistent point it records
+	// requires the WAL archive whether or not the WAL storage is snapshotted.
+	// Whether pg_backup_stop waits for the archiver is up to the user, through
+	// the waitForArchive option.
+	skipWalVolume := backup.GetOnlineOrDefault(cluster)
 	for i := range pvcs {
+		if skipWalVolume && pvcs[i].Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgWal) {
+			se.recorder.Eventf(backup, "Normal", "SkipSnapshot",
+				"Skipping VolumeSnapshot for PVC %v, the WAL files are fetched from the WAL archive on recovery", pvcs[i].Name)
+			continue
+		}
+
 		se.recorder.Eventf(backup, "Normal", "CreateSnapshot",
 			"Creating VolumeSnapshot for PVC %v", pvcs[i].Name)
 

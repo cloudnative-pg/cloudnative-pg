@@ -221,8 +221,31 @@ type SchemaSpec struct {
 
 	// The role name of the user who owns the schema inside PostgreSQL.
 	// It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the
-	// `OWNER TO` command of `ALTER SCHEMA`.
+	// `OWNER TO` command of `ALTER SCHEMA`. If left empty, the schema is
+	// owned by `postgres`, the role CloudNativePG uses to connect to the
+	// database.
 	Owner string `json:"owner,omitempty"`
+
+	// Permissions defines the privileges to grant or revoke on the schema,
+	// keyed by privilege. Each entry carries a role name and a type of
+	// `grant` (default) or `revoke`, mirroring the existing usage model.
+	// +optional
+	Permissions *SchemaPermissionsSpec `json:"permissions,omitempty"`
+}
+
+// SchemaPermissionsSpec groups the privileges that can be granted or revoked
+// on a schema, keyed by privilege. Each entry reuses the `grant`/`revoke`
+// model already used for foreign data wrapper and server usage.
+type SchemaPermissionsSpec struct {
+	// List of roles for which the `USAGE` privilege on the schema is granted or revoked.
+	// Maps to `GRANT USAGE ON SCHEMA ... TO ...` / `REVOKE USAGE ON SCHEMA ... FROM ...`.
+	// +optional
+	Usage []UsageSpec `json:"usage,omitempty"`
+
+	// List of roles for which the `CREATE` privilege on the schema is granted or revoked.
+	// Maps to `GRANT CREATE ON SCHEMA ... TO ...` / `REVOKE CREATE ON SCHEMA ... FROM ...`.
+	// +optional
+	Create []UsageSpec `json:"create,omitempty"`
 }
 
 // ExtensionSpec configures an extension in a database

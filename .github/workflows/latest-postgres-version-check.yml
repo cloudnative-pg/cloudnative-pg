@@ -28,7 +28,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r .github/workflow-requirements.txt
+          pip install --require-hashes -r .github/workflow-requirements.txt
 
       - name: Generate PostgreSQL JSON files
         run: |
@@ -78,7 +78,7 @@ jobs:
         if: |
           env.LATEST_POSTGRES_VERSION_IMAGE != env.CURRENT_POSTGRES_VERSION_IMAGE &&
           github.ref == 'refs/heads/main'
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           title: "feat: update default PostgreSQL version to ${{ env.LATEST_POSTGRES_VERSION }}"
@@ -86,7 +86,7 @@ jobs:
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
           committer: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
-          labels: "no-issue"
+          labels: "no-issue,automated"
           commit-message: "feat: update default PostgreSQL version to ${{ env.LATEST_POSTGRES_VERSION }}"
           signoff: true
 
@@ -94,7 +94,7 @@ jobs:
         if: |
           env.LATEST_POSTGRES_VERSION_IMAGE == env.CURRENT_POSTGRES_VERSION_IMAGE &&
           github.ref == 'refs/heads/main'
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           title: "test: Updated Postgres versions used in E2E tests"
@@ -102,7 +102,7 @@ jobs:
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
           committer: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
-          labels: "no-issue"
+          labels: "no-issue,automated"
           add-paths: ".github/"
           commit-message: "test: Updated Postgres versions used in E2E tests"
           signoff: true

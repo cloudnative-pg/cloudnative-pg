@@ -195,18 +195,22 @@ jobs:
           # Replay the picked commit's go.mod intent surgically (no-op when
           # the picked commit doesn't touch go.mod).
           hack/replay-gomod.sh "${COMMIT}"
+          hack/replay-gomod.sh "${COMMIT}" tests
 
           # If the cherry-pick commit or the semantic replay above touched
-          # go.mod/go.sum, settle go.sum with `go mod tidy`, verify hashes,
-          # and fold the result into the cherry-pick commit so it lands as
-          # a single commit. The replay leaves go.mod modified in the
-          # working tree without staging it, so we also check that.
-          if git diff-tree --no-commit-id --name-only -r HEAD | grep -qE '^go\.(mod|sum)$' \
-             || ! git diff --quiet -- go.mod go.sum; then
+          # any go.mod/go.sum, settle go.sum with `go mod tidy`, verify
+          # hashes, and fold the result into the cherry-pick commit so it
+          # lands as a single commit. The replay leaves go.mod modified in
+          # the working tree without staging it, so we also check that.
+          # The tests module resolves the root module through a `replace`,
+          # so it must be tidied after the root one is settled.
+          if git diff-tree --no-commit-id --name-only -r HEAD | grep -qE '^(tests/)?go\.(mod|sum)$' \
+             || ! git diff --quiet -- go.mod go.sum tests/go.mod tests/go.sum; then
             go mod tidy
             go mod verify
-            if ! git diff --quiet go.mod go.sum; then
-              git add go.mod go.sum
+            (cd tests && go mod tidy && go mod verify)
+            if ! git diff --quiet go.mod go.sum tests/go.mod tests/go.sum; then
+              git add go.mod go.sum tests/go.mod tests/go.sum
               git commit --amend --no-edit
             fi
           fi

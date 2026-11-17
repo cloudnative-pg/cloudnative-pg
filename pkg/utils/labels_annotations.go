@@ -169,6 +169,10 @@ const (
 	// ReconcilePodSpecAnnotationName is the name of the annotation that prevents the pod spec to be reconciled
 	ReconcilePodSpecAnnotationName = MetadataNamespace + "/reconcilePodSpec"
 
+	// LeasePositionAnnotationName is the name of the annotation of the primary
+	// lease holding the position of the primary, see LeasePosition
+	LeasePositionAnnotationName = MetadataNamespace + "/position"
+
 	// HibernateClusterManifestAnnotationName contains the hibernated cluster manifest
 	// Deprecated. Replaced by: ClusterManifestAnnotationName. This annotation is
 	// kept for backward compatibility
@@ -215,6 +219,14 @@ const (
 	// PVCStatusAnnotationName is the name of the annotation that shows the current status of the PVC.
 	// The status can be "initializing", "ready" or "detached"
 	PVCStatusAnnotationName = MetadataNamespace + "/pvcStatus"
+
+	// BootstrapPendingAnnotationName is the name of the annotation the operator
+	// sets to "true" on an instance Pod created with the bootstrap init
+	// container, and removes once that container has terminated successfully.
+	//
+	// A pending marker is used instead of a completion one so that a missing
+	// annotation, the normal and safe default, means the bootstrap is done.
+	BootstrapPendingAnnotationName = MetadataNamespace + "/bootstrapPending"
 
 	// LegacyBackupAnnotationName is the name of the annotation represents whether taking a backup without passing
 	// the name argument even on barman version 3.3.0+. The value can be "true" or "false"
@@ -551,6 +563,14 @@ func IsWalArchivingDisabled(object *metav1.ObjectMeta) bool {
 // asks the operator to forward the password value verbatim.
 func IsPasswordPassthroughEnabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[PasswordPassthroughAnnotationName] == string(annotationStatusEnabled)
+}
+
+// IsOnlineBackupSnapshot reports whether the given VolumeSnapshot's metadata
+// tells that it belongs to an online backup. A missing or invalid value means
+// it doesn't.
+func IsOnlineBackupSnapshot(object *metav1.ObjectMeta) bool {
+	online, err := strconv.ParseBool(object.Annotations[IsOnlineBackupLabelName])
+	return err == nil && online
 }
 
 // GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map

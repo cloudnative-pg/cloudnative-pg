@@ -109,7 +109,7 @@ var _ = Describe("pvc role test", func() {
 				Size: "5Gi",
 			}))
 		Expect(role.GetSource(nil)).To(BeNil())
-		Expect(role.GetSource(&StorageSource{})).Error().Should(HaveOccurred())
+		Expect(role.GetSource(&StorageSource{})).To(BeNil())
 		Expect(role.GetSource(&storageSource)).To(BeEquivalentTo(&walSource))
 	})
 

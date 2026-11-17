@@ -233,6 +233,7 @@ GrantUsageSpecType
 HH
 HPA
 HashiCorp
+Hetzner
 HistoryTags
 Homebrew
 HoniSanders
@@ -489,6 +490,9 @@ ReplicationTLSSecret
 ResizingPVC
 ResourceRequirements
 ResourceVersion
+ResourcesUpdateStrategy
+ResourcesUpdateStrategyInPlace
+ResourcesUpdateStrategyRecreate
 RestoreJobHook
 RestoreJobHookCapabilities
 RetentionPolicy
@@ -526,6 +530,7 @@ ScheduledBackupList
 ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
+SchemaPermissionsSpec
 SchemaSpec
 Scorsolini
 Seccomp
@@ -693,6 +698,7 @@ appsv
 appuser
 archiveAdditionalCommandArgs
 archiver
+ardentperf
 args
 armru
 async
@@ -915,6 +921,7 @@ ddf
 ddl
 de
 declaratively
+decrypt
 defaultMode
 demotionToken
 dennispidun
@@ -1055,6 +1062,7 @@ httpGet
 https
 hu
 hugepages
+ichibahn
 icu
 icuLocale
 icuRules
@@ -1075,6 +1083,7 @@ img
 immediateCheckpoint
 impactful
 importsource
+inPlace
 inProgress
 inRoles
 indistinctively
@@ -1120,6 +1129,7 @@ jq
 json
 jsonpath
 juliamertz
+kabbydriver
 kb
 kbytes
 kdautrey
@@ -1476,13 +1486,16 @@ reportNonRedacted
 reportRedacted
 req
 requestTimeout
+requeue
 requeued
+requeues
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
 resourceRequirements
 resourceVersion
 resourcerequirements
+resourcesupdatestrategy
 restoreAdditionalCommandArgs
 restoreJobHookCapabilities
 resync
@@ -1518,6 +1531,7 @@ scheduledbackupspec
 scheduledbackupstatus
 schedulerName
 schemaOnly
+schemapermissionsspec
 schemas
 schemaspec
 sdk
@@ -1584,6 +1598,7 @@ sqlrefs
 src
 sre
 ssc
+sse
 ssl
 sslCert
 sslKey
@@ -1725,6 +1740,7 @@ usename
 usernamepassword
 usr
 utils
+valeriodelsarto
 validUntil
 validatingwebhookconfigurations
 validator

@@ -99,7 +99,7 @@ Three image flavors are available, each extending the previous one:
     Barman Cloud plugin, or another supported backup solution.
 :::
 
-By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie`.
+By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.7-system-trixie`.
 
 All images are signed and shipped with SBOM and provenance attestations.
 Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.
@@ -215,6 +215,6 @@ of Canada, and used with their permission.*
 ---
 
 CloudNativePG is a
-[Cloud Native Computing Foundation Sandbox project](https://www.cncf.io/sandbox-projects/).
+[Cloud Native Computing Foundation Incubating project](https://www.cncf.io/projects/cloudnativepg/).
 
 ![](https://github.com/cncf/artwork/blob/main/other/cncf/horizontal/color/cncf-color.png?raw=true)

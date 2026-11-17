@@ -360,6 +360,161 @@ var _ = Describe("Runnable watchdog", func() {
 	})
 })
 
+var _ = Describe("Runnable.observe", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+		otherPod    = "test-cluster-2"
+	)
+
+	// newRunnable returns a runnable of a cluster with a pending failover.
+	newRunnable := func(kubeClient *fake.Clientset) *Runnable {
+		instance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName)
+		instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: apiv1.PendingFailoverMarker}})
+		return New(kubeClient, instance)
+	}
+
+	putLease := func(ctx context.Context, kubeClient *fake.Clientset, holder string) {
+		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity:       ptr.To(holder),
+				LeaseDurationSeconds: ptr.To(int32(15)),
+				RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
+			},
+		}, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	It("times a holder while the failover is pending, without writing", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		putLease(ctx, kubeClient, otherPod)
+		before, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		r.observeLease(ctx, time.Second)
+		Expect(r.observedRecord).NotTo(BeNil())
+		Expect(r.observedRecord.HolderIdentity).To(Equal(otherPod))
+
+		after, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(after).To(Equal(before))
+	})
+
+	It("drops the observation when the failover is no longer pending", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		putLease(ctx, kubeClient, otherPod)
+		r.observeLease(ctx, time.Second)
+		Expect(r.observedRecord).NotTo(BeNil())
+
+		r.instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: otherPod}})
+		r.observeLease(ctx, time.Second)
+		Expect(r.observedRecord).To(BeNil())
+	})
+
+	It("keeps the observation once this pod is the target", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		putLease(ctx, kubeClient, otherPod)
+		r.observeLease(ctx, time.Second)
+		Expect(r.observedRecord).NotTo(BeNil())
+
+		r.instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: thisPod}})
+		r.observeLease(ctx, time.Second)
+		Expect(r.observedRecord).NotTo(BeNil())
+	})
+
+	It("makes Start read the lease while it waits for Acquire, without writing", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		r.instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: otherPod}})
+		putLease(ctx, kubeClient, otherPod)
+		leaseActions := func(verb string) int {
+			count := 0
+			for _, action := range kubeClient.Actions() {
+				if action.GetResource().Resource == "leases" && action.GetVerb() == verb {
+					count++
+				}
+			}
+			return count
+		}
+
+		runCtx, cancel := context.WithCancel(ctx)
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_ = r.Start(runCtx)
+		}()
+		defer func() {
+			cancel()
+			<-done
+		}()
+
+		Consistently(func() int { return leaseActions("get") }, 300*time.Millisecond).Should(BeZero())
+
+		r.instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: apiv1.PendingFailoverMarker}})
+		// The next poll comes within the default retry period.
+		Eventually(func() int { return leaseActions("get") }, 3*time.Second).Should(BeNumerically(">", 0))
+		Expect(leaseActions("update")).To(BeZero())
+		Expect(leaseActions("create")).To(Equal(1))
+	})
+
+	It("lets Acquire take over at once when Start timed the holder while the failover was pending",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			r.checkStepDown = func(*apiv1.Cluster, string) (bool, error) { return false, nil }
+			putLease(ctx, kubeClient, otherPod)
+			kubeClient.ClearActions()
+			config := Config{
+				LeaseDuration:         time.Second,
+				RenewDeadline:         800 * time.Millisecond,
+				RetryPeriod:           100 * time.Millisecond,
+				ReleasedLeaseDuration: time.Second,
+			}
+
+			runCtx, cancel := context.WithCancel(ctx)
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_ = r.Start(runCtx)
+			}()
+			defer func() {
+				cancel()
+				<-done
+			}()
+
+			// Once Start has read the lease, the holder stays silent for as long
+			// as the lease lasts before this pod is elected.
+			Eventually(kubeClient.Actions).ShouldNot(BeEmpty())
+			time.Sleep(config.LeaseDuration)
+			r.instance.SetCluster(&apiv1.Cluster{Status: apiv1.ClusterStatus{TargetPrimary: thisPod}})
+
+			// A window started at the election would hold the claim back for
+			// the whole LeaseDuration.
+			start := time.Now()
+			Expect(r.Acquire(ctx, config)).To(Succeed())
+			Expect(time.Since(start)).To(BeNumerically("<", config.LeaseDuration))
+		})
+
+	It("has nothing to time on a released record or one naming this pod", func(ctx context.Context) {
+		for _, holder := range []string{"", thisPod} {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, holder)
+
+			r.observeLease(ctx, time.Second)
+			Expect(r.observedRecord).To(BeNil())
+		}
+	})
+})
+
 var _ = Describe("Runnable.tryTakeOver", func() {
 	const (
 		namespace   = "test-ns"
@@ -576,6 +731,66 @@ var _ = Describe("Runnable.tryTakeOver", func() {
 			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
 			setTarget(r, otherPod)
 
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(r.observedRecord).To(BeNil())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
+		})
+
+	It("times the record while a failover is pending, and claims it as soon as it is elected",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+			setTarget(r, apiv1.PendingFailoverMarker)
+			observe(ctx, r)
+
+			// The window is ripe, but the marker names nobody as target.
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(otherPod))
+
+			setTarget(r, thisPod)
+			acquired, err = r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeTrue())
+			Expect(ptr.Deref(getLease(ctx, kubeClient).Spec.HolderIdentity, "")).To(Equal(thisPod))
+		})
+
+	It("drops a window started at the pending marker when another pod becomes the target",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+			setTarget(r, apiv1.PendingFailoverMarker)
+			observe(ctx, r)
+
+			setTarget(r, otherPod)
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(r.observedRecord).To(BeNil())
+
+			// Becoming the target afterwards starts a new window.
+			setTarget(r, thisPod)
+			acquired, err = r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(r.observedRecord).NotTo(BeNil())
+		})
+
+	It("never claims while yielded, and drops the window it had timed",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+			setTarget(r, apiv1.PendingFailoverMarker)
+			observe(ctx, r)
+
+			setTarget(r, thisPod)
+			r.yielded.Store(true)
 			acquired, err := r.tryTakeOver(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(acquired).To(BeFalse())
@@ -805,17 +1020,17 @@ var _ = Describe("shouldStepDown", func() {
 		}
 	}
 
-	It("skips the check when isolation checking is disabled", func() {
-		stepDown, err := shouldStepDown(newCluster(false, 3), ourIdentity)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stepDown).To(BeFalse())
-	})
-
-	It("skips the check when the cluster has a single instance", func() {
-		stepDown, err := shouldStepDown(newCluster(true, 1), ourIdentity)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stepDown).To(BeFalse())
-	})
+	DescribeTable("skips the check when the cluster has a single instance",
+		func(enabled bool) {
+			// Building the checker fails without the server CA on disk, so no
+			// error proves the check returned before probing.
+			stepDown, err := shouldStepDown(newCluster(enabled, 1), ourIdentity)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(stepDown).To(BeFalse())
+		},
+		Entry("enabled", true),
+		Entry("disabled", false),
+	)
 
 	It("skips the check when no probes configuration is set", func() {
 		stepDown, err := shouldStepDown(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}, ourIdentity)
@@ -823,13 +1038,18 @@ var _ = Describe("shouldStepDown", func() {
 		Expect(stepDown).To(BeFalse())
 	})
 
-	It("fails open when the reachability checker cannot be built", func() {
-		// In the test environment there is no server CA certificate on disk,
-		// so building the checker fails; this must not be reported as a step-down.
-		stepDown, err := shouldStepDown(newCluster(true, 3), ourIdentity)
-		Expect(err).To(HaveOccurred())
-		Expect(stepDown).To(BeFalse())
-	})
+	DescribeTable("fails open when the reachability checker cannot be built",
+		func(enabled bool) {
+			// In the test environment there is no server CA certificate on disk,
+			// so building the checker fails; this must not be reported as a
+			// step-down. Reaching the build proves a disabled check still probes.
+			stepDown, err := shouldStepDown(newCluster(enabled, 3), ourIdentity)
+			Expect(err).To(HaveOccurred())
+			Expect(stepDown).To(BeFalse())
+		},
+		Entry("enabled", true),
+		Entry("disabled", false),
+	)
 })
 
 // held reports whether the lease is held: taken by the run loop and not yielded

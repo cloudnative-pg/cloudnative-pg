@@ -510,6 +510,36 @@ var _ = Describe("check if bootstrap recovery can proceed", func() {
 			true),
 		Entry("when bootstrapping a backup that is not there",
 			nil, true),
+		Entry(
+			"when bootstrapping without a recovery source from an online volume snapshot backup",
+			&apiv1.Backup{
+				Spec: apiv1.BackupSpec{Method: apiv1.BackupMethodVolumeSnapshot},
+				Status: apiv1.BackupStatus{
+					Phase:  apiv1.BackupPhaseCompleted,
+					Online: ptr.To(true),
+				},
+			},
+			true),
+		Entry(
+			"when bootstrapping without a recovery source from a cold volume snapshot backup",
+			&apiv1.Backup{
+				Spec: apiv1.BackupSpec{Method: apiv1.BackupMethodVolumeSnapshot},
+				Status: apiv1.BackupStatus{
+					Phase:  apiv1.BackupPhaseCompleted,
+					Online: ptr.To(false),
+				},
+			},
+			false),
+		Entry(
+			"when bootstrapping without a recovery source from an online plugin backup",
+			&apiv1.Backup{
+				Spec: apiv1.BackupSpec{Method: apiv1.BackupMethodPlugin},
+				Status: apiv1.BackupStatus{
+					Phase:  apiv1.BackupPhaseCompleted,
+					Online: ptr.To(true),
+				},
+			},
+			false),
 	)
 })
 
@@ -652,6 +682,35 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 		res, err := newClusterReconciler.checkReadyForRecovery(ctx, nil, cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res).ToNot(BeNil())
+		Expect(res).ToNot(Equal(reconcile.Result{}))
+	})
+
+	It("should requeue if the WAL storage snapshot is missing for a backup that has it", func(ctx SpecContext) {
+		cluster.Spec.WalStorage = &apiv1.StorageConfiguration{Size: "1G"}
+		snapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pgdata",
+				Namespace: namespace,
+				Labels: map[string]string{
+					utils.BackupNameLabelName: "backup-one",
+				},
+				Annotations: map[string]string{
+					utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+				},
+			},
+		}
+		newClusterReconciler := &ClusterReconciler{
+			Client: fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithObjects(snapshot).
+				Build(),
+			Scheme:          env.scheme,
+			Recorder:        record.NewFakeRecorder(120),
+			DiscoveryClient: env.discoveryClient,
+		}
+
+		res, err := newClusterReconciler.checkReadyForRecovery(ctx, nil, cluster)
+		Expect(err).ToNot(HaveOccurred())
 		Expect(res).ToNot(Equal(reconcile.Result{}))
 	})
 })
@@ -1579,5 +1638,25 @@ var _ = Describe("generateNodeSerial", func() {
 			"unrelated-pod",
 		))
 		Expect(serial).To(Equal(1))
+	})
+})
+
+var _ = Describe("attachReplicaBootstrapInitContainer", func() {
+	It("fails when the snapshot of the PGDATA PVC no longer exists", func(ctx SpecContext) {
+		reconciler := &ClusterReconciler{
+			Client:   fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build(),
+			Recorder: record.NewFakeRecorder(10),
+		}
+		cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default"}}
+		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "cluster-2"}}
+		dataSource := &corev1.TypedLocalObjectReference{
+			APIGroup: ptr.To(volumesnapshotv1.GroupName),
+			Kind:     apiv1.VolumeSnapshotKind,
+			Name:     "gone",
+		}
+
+		_, err := reconciler.attachReplicaBootstrapInitContainer(ctx, cluster, pod, 2, dataSource, true)
+
+		Expect(err).To(MatchError(ContainSubstring("no longer exists")))
 	})
 })
