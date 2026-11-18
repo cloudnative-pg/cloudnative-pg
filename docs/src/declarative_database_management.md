@@ -272,6 +272,8 @@ status:
 ```
 
 The entries are applied in the order they are listed, grouped by privilege.
+Within each privilege, the entries of the `all` list are applied after the
+entries of the list of that privilege, wherever `all` appears in the manifest.
 They are independent: if a role does not exist, which is reported for both
 `grant` and `revoke`, the other entries are still applied. The `Database` is
 retried until all of them succeed.
