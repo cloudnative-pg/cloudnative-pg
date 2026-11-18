@@ -24,6 +24,7 @@ import (
 	"errors"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Masterminds/semver/v3"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -363,6 +364,74 @@ var _ = Describe("Orphaned failover slots", func() {
 
 		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).
 			To(MatchError(ContainSubstring("mock list failure")))
+	})
+})
+
+var _ = Describe("Orphaned failover slots reconciliation", func() {
+	var (
+		primaryDB, localDB     *sql.DB
+		primaryMock, localMock sqlmock.Sqlmock
+	)
+
+	versionOf := func(version string) func() (semver.Version, error) {
+		return func() (semver.Version, error) {
+			return *semver.MustParse(version), nil
+		}
+	}
+
+	haConfig := func(enabled, synchronizeLogicalDecoding bool) *apiv1.ReplicationSlotsConfiguration {
+		return &apiv1.ReplicationSlotsConfiguration{
+			HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+				Enabled:                    ptr.To(enabled),
+				SynchronizeLogicalDecoding: synchronizeLogicalDecoding,
+			},
+		}
+	}
+
+	BeforeEach(func() {
+		var err error
+		primaryDB, primaryMock, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+		localDB, localMock, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	// The mocks have no expectations: any query fails the spec
+	AfterEach(func() {
+		Expect(primaryMock.ExpectationsWereMet()).To(Succeed())
+		Expect(localMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	DescribeTable("does nothing",
+		func(ctx SpecContext, config *apiv1.ReplicationSlotsConfiguration, version string) {
+			Expect(reconcileOrphanedFailoverSlots(ctx, primaryDB, localDB, config, versionOf(version))).
+				To(Succeed())
+		},
+		Entry("without the HA configuration", &apiv1.ReplicationSlotsConfiguration{}, "17.0.0"),
+		Entry("when the HA slots are disabled", haConfig(false, true), "17.0.0"),
+		Entry("when the logical decoding synchronization is disabled", haConfig(true, false), "17.0.0"),
+		Entry("on PostgreSQL 16", haConfig(true, true), "16.4.0"),
+	)
+
+	It("fails without querying when the PostgreSQL version is unknown", func(ctx SpecContext) {
+		getPgVersion := func() (semver.Version, error) {
+			return semver.Version{}, errors.New("mock version failure")
+		}
+
+		Expect(reconcileOrphanedFailoverSlots(ctx, primaryDB, localDB, haConfig(true, true), getPgVersion)).
+			To(MatchError(ContainSubstring("mock version failure")))
+	})
+
+	It("drops the orphaned failover slots on PostgreSQL 17", func(ctx SpecContext) {
+		primaryMock.ExpectQuery("^SELECT pg_catalog.pg_is_in_recovery\\(\\)$").
+			WillReturnRows(sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(false))
+		localMock.ExpectQuery("^SELECT slot_name FROM pg_catalog.pg_replication_slots").
+			WillReturnRows(sqlmock.NewRows([]string{"slot_name"}).AddRow("orphan1"))
+		localMock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").
+			WithArgs("orphan1").WillReturnResult(sqlmock.NewResult(1, 1))
+
+		Expect(reconcileOrphanedFailoverSlots(ctx, primaryDB, localDB, haConfig(true, true), versionOf("17.0.0"))).
+			To(Succeed())
 	})
 })
 
