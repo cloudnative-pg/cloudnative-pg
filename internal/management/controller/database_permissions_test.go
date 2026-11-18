@@ -86,6 +86,16 @@ var _ = Describe("Database permissions", func() {
 			Expect(changes[3].privilege).To(Equal("TEMPORARY"))
 		})
 
+		It("applies the entries of all after the ones of the privilege", func() {
+			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+				All:     []apiv1.UsageSpec{grant("from-all")},
+				Connect: []apiv1.UsageSpec{grant("from-connect")},
+			})
+			Expect(changes).To(HaveLen(4))
+			Expect([]string{changes[0].privilege, changes[0].name}).To(Equal([]string{"CONNECT", "from-connect"}))
+			Expect([]string{changes[1].privilege, changes[1].name}).To(Equal([]string{"CONNECT", "from-all"}))
+		})
+
 		It("expands all into the three privileges", func() {
 			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
 				All: []apiv1.UsageSpec{grant("app")},

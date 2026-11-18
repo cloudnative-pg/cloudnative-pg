@@ -223,18 +223,23 @@ func SchemaPrivilegeQuery(roleName, schemaName, privilege string) string {
 // holds the given privilege (CONNECT, CREATE or TEMPORARY) on the named
 // database, where the role `public` is PUBLIC. has_database_privilege() cannot
 // be used here: it doesn't accept PUBLIC, and a privilege held by PUBLIC
-// satisfies it for every other role.
+// satisfies it for every other role. The result is NULL, and so it matches
+// neither true nor false, if the role doesn't exist.
 func DatabasePrivilegeHeldQuery(databaseName, roleName, privilege string) string {
-	grantee := fmt.Sprintf("(SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '%v')", roleName)
-	if roleName == "public" {
-		grantee = "0"
+	held := fmt.Sprintf(
+		"EXISTS (SELECT 1 FROM pg_catalog.pg_database d, "+
+			"pg_catalog.aclexplode(coalesce(d.datacl, pg_catalog.acldefault('d', d.datdba))) a "+
+			"WHERE d.datname = '%v' AND a.privilege_type = '%v' AND a.grantee = %%v)",
+		databaseName, privilege)
+
+	if strings.EqualFold(roleName, "public") {
+		return "SELECT " + fmt.Sprintf(held, "0")
 	}
 
 	return fmt.Sprintf(
-		"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_database d, "+
-			"pg_catalog.aclexplode(coalesce(d.datacl, pg_catalog.acldefault('d', d.datdba))) a "+
-			"WHERE d.datname = '%v' AND a.grantee = %v AND a.privilege_type = '%v')",
-		databaseName, grantee, privilege)
+		"SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = '%v') THEN %v END",
+		roleName,
+		fmt.Sprintf(held, fmt.Sprintf("(SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '%v')", roleName)))
 }
 
 // AssertDataExpectedCount verifies that the named table has exactly

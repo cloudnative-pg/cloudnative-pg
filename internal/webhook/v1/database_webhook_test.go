@@ -426,11 +426,11 @@ var _ = Describe("Database validation", func() {
 		It("accepts the hardening use case", func() {
 			db := withPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{
-					{Name: "public", Type: apiv1.RevokeUsageSpecType},
 					{Name: "app", Type: apiv1.GrantUsageSpecType},
+					{Name: "public", Type: apiv1.RevokeUsageSpecType},
 				},
 				Create:    []apiv1.UsageSpec{{Name: "app", Type: apiv1.GrantUsageSpecType}},
-				Temporary: []apiv1.UsageSpec{{Name: "app", Type: apiv1.RevokeUsageSpecType}},
+				Temporary: []apiv1.UsageSpec{{Name: "public", Type: apiv1.RevokeUsageSpecType}},
 			})
 			Expect(v.validate(db)).To(BeEmpty())
 		})
