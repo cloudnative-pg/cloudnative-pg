@@ -1,0 +1,34 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-declarative-backup-restore
+spec:
+  instances: 2
+  primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      # The online backup has no WAL storage snapshot: the WAL files are fetched
+      # through plugin-barman-cloud from the archive of the source cluster.
+      source: cluster-declarative-backup
+      volumeSnapshots:
+        storage:
+          name: ${SNAPSHOT_NAME_PGDATA}
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+
+  externalClusters:
+    - name: cluster-declarative-backup
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cluster-declarative-backup
+          serverName: cluster-declarative-backup

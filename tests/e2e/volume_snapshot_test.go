@@ -380,7 +380,8 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 		})
 
-		Context("Declarative Volume Snapshot", Ordered, Label(tests.LabelPluginBarmanCloud), func() {
+		//nolint:dupl
+		Context("Declarative Volume Snapshot", Ordered, func() {
 			// test env constants
 			const (
 				namespacePrefix = "declarative-snapshot-backup"
@@ -407,38 +408,6 @@ var _ = Describe("Verify Volume Snapshot",
 
 			var clusterToBackupName string
 
-			getAndVerifySnapshots := func(
-				clusterToBackup *apiv1.Cluster,
-				backup apiv1.Backup,
-			) volumesnapshotv1.VolumeSnapshotList {
-				snapshotList := volumesnapshotv1.VolumeSnapshotList{}
-				By("fetching the volume snapshots", func() {
-					var err error
-					snapshotList, err = getSnapshots(backup.Name, clusterToBackup.Name, backup.Namespace)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
-				})
-
-				By("ensuring that the additional labels and annotations are present", func() {
-					clusterObj := &apiv1.Cluster{}
-					for _, item := range snapshotList.Items {
-						snapshotConfig := backup.GetVolumeSnapshotConfiguration(
-							*clusterToBackup.Spec.Backup.VolumeSnapshot)
-						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
-						Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
-						Expect(item.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
-						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).ToNot(BeEmpty())
-						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).To(ContainSubstring(clusterToBackupName))
-						Expect(item.Annotations[utils.PgControldataAnnotationName]).ToNot(BeEmpty())
-						Expect(item.Annotations[utils.PgControldataAnnotationName]).To(ContainSubstring("pg_control version number:"))
-						// Ensure the ClusterManifestAnnotationName is a valid Cluster Object
-						err := json.Unmarshal([]byte(item.Annotations[utils.ClusterManifestAnnotationName]), clusterObj)
-						Expect(err).ToNot(HaveOccurred())
-					}
-				})
-				return snapshotList
-			}
-
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -454,7 +423,21 @@ var _ = Describe("Verify Volume Snapshot",
 				clusterToBackupName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
 
-				setupPluginObjectStore(namespace, clusterToBackupName)
+				By("create the certificates for the object store", func() {
+					Expect(objectStoreEnv.CreateCaSecret(env, namespace)).To(Succeed())
+				})
+
+				By("creating the credentials for the object store", func() {
+					_, err := secrets.CreateObjectStorageSecret(
+						env.Ctx,
+						env.Client,
+						namespace,
+						"backup-storage-creds",
+						objectstore.AccessKeyID,
+						objectstore.SecretAccessKey,
+					)
+					Expect(err).ToNot(HaveOccurred())
+				})
 
 				By("creating the cluster on which to execute the backup", func() {
 					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToBackupName, clusterToBackupFilePath)
@@ -1100,3 +1083,40 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 		})
 	})
+
+// getAndVerifySnapshots fetches the volume snapshots produced by a backup of the
+// given cluster, and verifies that they carry the expected labels and annotations
+// (the additional ones from the cluster configuration, the backup name, the
+// cluster manifest and the pg_controldata output).
+func getAndVerifySnapshots(
+	clusterToBackup *apiv1.Cluster,
+	backup apiv1.Backup,
+) volumesnapshotv1.VolumeSnapshotList {
+	GinkgoHelper()
+	snapshotList := volumesnapshotv1.VolumeSnapshotList{}
+	By("fetching the volume snapshots", func() {
+		var err error
+		snapshotList, err = getSnapshots(backup.Name, clusterToBackup.Name, backup.Namespace)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+	})
+
+	By("ensuring that the additional labels and annotations are present", func() {
+		clusterObj := &apiv1.Cluster{}
+		for _, item := range snapshotList.Items {
+			snapshotConfig := backup.GetVolumeSnapshotConfiguration(
+				*clusterToBackup.Spec.Backup.VolumeSnapshot)
+			Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
+			Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
+			Expect(item.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
+			Expect(item.Annotations[utils.ClusterManifestAnnotationName]).ToNot(BeEmpty())
+			Expect(item.Annotations[utils.ClusterManifestAnnotationName]).To(ContainSubstring(clusterToBackup.Name))
+			Expect(item.Annotations[utils.PgControldataAnnotationName]).ToNot(BeEmpty())
+			Expect(item.Annotations[utils.PgControldataAnnotationName]).To(ContainSubstring("pg_control version number:"))
+			// Ensure the ClusterManifestAnnotationName is a valid Cluster Object
+			err := json.Unmarshal([]byte(item.Annotations[utils.ClusterManifestAnnotationName]), clusterObj)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
+	return snapshotList
+}
