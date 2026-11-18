@@ -372,7 +372,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a new cluster with tablespaces and volumesnapshot support", Ordered,
-		Label(tests.LabelPluginBarmanCloud), func() {
+		func() {
 			var namespace, backupName string
 			var err error
 			var backupObject *apiv1.Backup
@@ -551,10 +551,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme,
 						clusterVolumesnapshoRestoreManifest)
 					Expect(err).ToNot(HaveOccurred())
-
-					By("creating the ObjectStore the recovery fetches the WAL files from", func() {
-						Expect(env.Client.Create(env.Ctx, newObjectStore(namespace, clusterName))).To(Succeed())
-					})
 
 					By("creating the cluster to be restored through snapshot", func() {
 						resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoRestoreManifest)

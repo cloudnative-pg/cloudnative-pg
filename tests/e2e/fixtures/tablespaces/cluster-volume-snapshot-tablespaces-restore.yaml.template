@@ -31,12 +31,18 @@ spec:
       backup:
         name: ${BACKUP_NAME}
 
-  # Fetch the WAL files through plugin-barman-cloud. The ObjectStore is created
-  # by the test and points at the bucket the source cluster archived to.
   externalClusters:
   - name: cluster-tablespaces-volume-snapshot
-    plugin:
-      name: barman-cloud.cloudnative-pg.io
-      parameters:
-        barmanObjectName: cluster-tablespaces-volume-snapshot
-        serverName: cluster-tablespaces-volume-snapshot
+    barmanObjectStore:
+      destinationPath: s3://cluster-tablespaces-volume-snapshot/
+      endpointURL: https://object-store.object-store:9000
+      endpointCA:
+        key: ca.crt
+        name: object-store-ca-secret
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
