@@ -218,6 +218,9 @@ spec:
     connect:
       - name: app
         type: grant
+      # the metrics exporter needs it, see the warning below
+      - name: cnpg_metrics_exporter
+        type: grant
       - name: public
         type: revoke
     create:
@@ -291,6 +294,8 @@ failed grant is retried.
     [`GRANT`](https://www.postgresql.org/docs/current/sql-grant.html) and
     [`REVOKE`](https://www.postgresql.org/docs/current/sql-revoke.html)
     PostgreSQL commands. `WITH GRANT OPTION` and `GRANTED BY` are not supported.
+    A `revoke` is run without `CASCADE`: it fails, and is retried, while the
+    role has granted the privilege to other roles.
 :::
 
 :::warning
@@ -314,7 +319,7 @@ failed grant is retried.
     The instance manager is not affected, as it connects as the superuser. The
     metrics exporter is, as it connects as the `cnpg_metrics_exporter` role. It
     queries the application database of the cluster by default, so if that
-    database loses `CONNECT`, all the [default metrics](monitoring.md) and the
+    database loses `CONNECT`, all the [default metrics](monitoring.md#default-set-of-metrics) and the
     user-defined ones without `target_databases` stop. For any other database,
     only the user-defined metrics that target it fail or are skipped. Grant
     `CONNECT` to `cnpg_metrics_exporter` too, for example with an entry in the
