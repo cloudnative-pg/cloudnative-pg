@@ -895,7 +895,7 @@ _Appears in:_
 | `privilege` _string_ | The privilege: `CONNECT`, `CREATE` or `TEMPORARY` | True |  |  |
 | `name` _string_ | The name of the role | True |  |  |
 | `type` _[UsageSpecType](#usagespectype)_ | The requested change | True |  |  |
-| `applied` _boolean_ | True if the privilege of the role matches the requested change | True |  |  |
+| `applied` _boolean_ | True if the privilege granted by the database owner to the role<br />matches the requested change | True |  |  |
 | `message` _string_ | Message is the reconciliation message of this entry |  |  |  |
 
 

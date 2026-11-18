@@ -734,8 +734,9 @@ spec:
                     or revoked from a role on the database
                   properties:
                     applied:
-                      description: True if the privilege of the role matches the requested
-                        change
+                      description: |-
+                        True if the privilege granted by the database owner to the role
+                        matches the requested change
                       type: boolean
                     message:
                       description: Message is the reconciliation message of this entry

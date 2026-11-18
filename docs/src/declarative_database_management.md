@@ -240,7 +240,9 @@ Every item of these lists accepts the following fields:
 
 - `name` *(required, string)*: The target role name. Using `public` targets the
   PostgreSQL `PUBLIC` pseudo-role (which applies to all existing and future
-  roles).
+  roles). The name `public` is matched in any letter case, as it is for schemas
+  and foreign data wrappers, so a role named `Public` or `PUBLIC` cannot be
+  targeted: an entry with that name applies to every role.
 - `type` *(string)*: The action to take on the privilege. Accepts `grant` or
   `revoke` (default: `grant`).
 

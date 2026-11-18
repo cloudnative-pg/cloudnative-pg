@@ -437,7 +437,8 @@ type DatabasePermissionStatus struct {
 	// The requested change
 	Type UsageSpecType `json:"type"`
 
-	// True if the privilege of the role matches the requested change
+	// True if the privilege granted by the database owner to the role
+	// matches the requested change
 	Applied bool `json:"applied"`
 
 	// Message is the reconciliation message of this entry
