@@ -446,15 +446,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				})
 
 				By("checking that volumeSnapshots are properly labeled", func() {
-					Eventually(func(g Gomega) {
-						for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
-							volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace, snapshot.Name)
-							g.Expect(err).ToNot(HaveOccurred())
-							g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
-							g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
-							g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
-						}
-					}).Should(Succeed())
+					assertVolumeSnapshotsAreLabeled(namespace, clusterName, backupObject)
 					// 3 snapshots: PGDATA and the 2 tablespaces, the WAL volume is skipped.
 					Expect(len(backupObject.Status.BackupSnapshotStatus.Elements)).To(BeIdenticalTo(3))
 				})
@@ -531,16 +523,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				})
 
 				By("checking that volumeSnapshots are properly labeled", func() {
-					Eventually(func(g Gomega) {
-						for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
-							volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace, snapshot.Name)
-							g.Expect(err).ToNot(HaveOccurred())
-							g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
-							g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
-							g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
-
-						}
-					}).Should(Succeed())
+					assertVolumeSnapshotsAreLabeled(namespace, clusterName, backupObject)
 				})
 			})
 
@@ -559,32 +542,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						)
 					})
 
-					By("verifying that tablespaces and PVC were created", func() {
-						restoredCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace,
-							clusterToRestoreName)
-						Expect(err).ToNot(HaveOccurred())
-						AssertClusterHasMountPointsAndVolumesForTablespaces(restoredCluster, 2,
-							testTimeouts[timeouts.Short])
-						AssertClusterHasPvcsAndDataDirsForTablespaces(restoredCluster, testTimeouts[timeouts.Short])
-						AssertDatabaseContainsTablespaces(restoredCluster, testTimeouts[timeouts.Short])
-					})
-
-					By("verifying the correct data exists in the restored cluster", func() {
-						tableLocator := pgasserts.TableLocator{
-							Namespace:    namespace,
-							ClusterName:  clusterToRestoreName,
-							DatabaseName: postgres.AppDBName,
-							TableName:    table1,
-						}
-						pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-						tableLocator = pgasserts.TableLocator{
-							Namespace:    namespace,
-							ClusterName:  clusterToRestoreName,
-							DatabaseName: postgres.AppDBName,
-							TableName:    table2,
-						}
-						pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-					})
+					assertTablespacesRestoredCluster(namespace, clusterToRestoreName, 2, table1, table2)
 				})
 
 			It(fmt.Sprintf("can create the cluster by recovery from volume snapshot backup with pitr %v", backupName),
@@ -658,31 +616,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						clusterasserts.AssertClusterIsReady(env, namespace, clusterToPITRName, testTimeouts[timeouts.ClusterIsReadySlow])
 					})
 
-					By("can verify tablespaces and PVC were created", func() {
-						recoveryCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterToPITRName)
-						Expect(err).ToNot(HaveOccurred())
-						AssertClusterHasMountPointsAndVolumesForTablespaces(recoveryCluster, 2,
-							testTimeouts[timeouts.Short])
-						AssertClusterHasPvcsAndDataDirsForTablespaces(recoveryCluster, testTimeouts[timeouts.Short])
-						AssertDatabaseContainsTablespaces(recoveryCluster, testTimeouts[timeouts.Short])
-					})
-
-					By("verifying the correct data exists in the restored cluster", func() {
-						tableLocator := pgasserts.TableLocator{
-							Namespace:    namespace,
-							ClusterName:  clusterToPITRName,
-							DatabaseName: postgres.AppDBName,
-							TableName:    table1,
-						}
-						pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
-						tableLocator = pgasserts.TableLocator{
-							Namespace:    namespace,
-							ClusterName:  clusterToPITRName,
-							DatabaseName: postgres.AppDBName,
-							TableName:    table2,
-						}
-						pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
-					})
+					assertTablespacesRestoredCluster(namespace, clusterToPITRName, 4, table1, table2)
 				})
 		})
 
@@ -1290,6 +1224,46 @@ func latestBaseBackupContainsExpectedTars(
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(numTars).To(Equal(expectedTars), report)
 	}, 120).Should(Succeed())
+}
+
+// assertVolumeSnapshotsAreLabeled verifies that every volume snapshot produced
+// by the given backup is named after the cluster and carries the cluster and
+// backup labels.
+func assertVolumeSnapshotsAreLabeled(namespace, clusterName string, backup *apiv1.Backup) {
+	GinkgoHelper()
+	Eventually(func(g Gomega) {
+		for _, snapshot := range backup.Status.BackupSnapshotStatus.Elements {
+			volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace, snapshot.Name)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
+			g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
+			g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+		}
+	}).Should(Succeed())
+}
+
+// assertTablespacesRestoredCluster verifies that a cluster restored from a
+// backup has the tablespaces mounted, their PVCs and data directories in place,
+// and that each of the given tables contains the expected number of rows.
+func assertTablespacesRestoredCluster(namespace, clusterName string, expectedRows int, tables ...string) {
+	GinkgoHelper()
+	By("verifying that tablespaces and PVCs were created", func() {
+		restored, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		AssertClusterHasMountPointsAndVolumesForTablespaces(restored, 2, testTimeouts[timeouts.Short])
+		AssertClusterHasPvcsAndDataDirsForTablespaces(restored, testTimeouts[timeouts.Short])
+		AssertDatabaseContainsTablespaces(restored, testTimeouts[timeouts.Short])
+	})
+	By("verifying the correct data exists in the restored cluster", func() {
+		for _, table := range tables {
+			pgasserts.AssertDataExpectedCount(env, pgasserts.TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: postgres.AppDBName,
+				TableName:    table,
+			}, expectedRows)
+		}
+	})
 }
 
 func getSnapshots(
