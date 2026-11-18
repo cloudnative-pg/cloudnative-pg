@@ -53,10 +53,40 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		}
 	})
 
+	commandTimeout := time.Second * 10
+
+	// pauseWalReceiver sends a SIGSTOP to the walreceiver of the passed
+	// instance, and returns its pid
+	pauseWalReceiver := func(namespace, podName string) string {
+		pod, err := podutils.Get(env.Ctx, env.Client, namespace, podName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Get the walreceiver pid
+		query := "SELECT pid FROM pg_catalog.pg_stat_activity WHERE backend_type = 'walreceiver'"
+		out, _, err := exec.EventuallyExecQueryInInstancePod(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			exec.PodLocator{
+				Namespace: pod.Namespace,
+				PodName:   pod.Name,
+			}, postgres.PostgresDBName,
+			query,
+			RetryTimeout,
+			PollingTime,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		pid := strings.Trim(out, "\n")
+
+		// Send the SIGSTOP
+		_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
+			"sh", "-c", fmt.Sprintf("kill -STOP %v", pid))
+		Expect(err).ToNot(HaveOccurred())
+
+		return pid
+	}
+
 	failoverTest := func(namespace, clusterName string, hasDelay bool) {
 		var pods []string
 		var currentPrimary, targetPrimary, pausedReplica, pid string
-		commandTimeout := time.Second * 10
 
 		// We check that the currentPrimary is the -1 instance as expected,
 		// and we define the targetPrimary (-3) and pausedReplica (-2).
@@ -84,32 +114,12 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		By("pausing the walreceiver on the 2nd node of the Cluster", func() {
 			primaryPod, err := podutils.Get(env.Ctx, env.Client, namespace, currentPrimary)
 			Expect(err).ToNot(HaveOccurred())
-			pausedPod, err := podutils.Get(env.Ctx, env.Client, namespace, pausedReplica)
-			Expect(err).ToNot(HaveOccurred())
 
-			// Get the walreceiver pid
-			query := "SELECT pid FROM pg_catalog.pg_stat_activity WHERE backend_type = 'walreceiver'"
-			out, _, err := exec.EventuallyExecQueryInInstancePod(
-				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
-					Namespace: pausedPod.Namespace,
-					PodName:   pausedPod.Name,
-				}, postgres.PostgresDBName,
-				query,
-				RetryTimeout,
-				PollingTime,
-			)
-			Expect(err).ToNot(HaveOccurred())
-			pid = strings.Trim(out, "\n")
-
-			// Send the SIGSTOP
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *pausedPod, specs.PostgresContainerName, &commandTimeout,
-				"sh", "-c", fmt.Sprintf("kill -STOP %v", pid))
-			Expect(err).ToNot(HaveOccurred())
+			pid = pauseWalReceiver(namespace, pausedReplica)
 
 			// Terminate the pausedReplica walsender on the primary.
 			// We don't want to wait for the replication timeout.
-			query = fmt.Sprintf("SELECT pg_catalog.pg_terminate_backend(pid) FROM pg_catalog.pg_stat_replication "+
+			query := fmt.Sprintf("SELECT pg_catalog.pg_terminate_backend(pid) FROM pg_catalog.pg_stat_replication "+
 				"WHERE application_name = '%v'", pausedReplica)
 			_, _, err = exec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -288,5 +298,78 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		failoverTest(namespace, clusterName, true)
+	})
+
+	// When every instance is deleted while a failover is pending, no replica
+	// is a better candidate than the primary: they were all stopped together
+	// and a replica may miss the last WAL of the primary. The primary has to
+	// come back in its role, without a promotion.
+	// The WAL receivers are paused to keep the failover pending until the
+	// replicas are deleted too.
+	It("keeps the primary when every instance is deleted during a failover", func() {
+		const (
+			sampleFile      = fixturesDir + "/failover/cluster-failover.yaml.template"
+			namespacePrefix = "failover-e2e-all-deleted"
+		)
+		var err error
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		primary := cluster.Status.CurrentPrimary
+		timeline := cluster.Status.TimelineID
+
+		replicas, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(replicas.Items).To(HaveLen(2))
+
+		quickDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &quickDeletionPeriod,
+		}
+
+		By("pausing the walreceiver on the replicas", func() {
+			for i := range replicas.Items {
+				pauseWalReceiver(namespace, replicas.Items[i].Name)
+			}
+		})
+
+		By("deleting the primary and waiting for the failover to be pending", func() {
+			Expect(podutils.Delete(env.Ctx, env.Client, namespace, primary, quickDelete)).To(Succeed())
+
+			Eventually(func() (string, error) {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				return cluster.Status.TargetPrimary, err
+			}, testTimeouts[timeouts.NewTargetOnFailover]).Should(BeEquivalentTo(apiv1.PendingFailoverMarker))
+
+			// The failover is not cancelled as long as a replica is ready
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			Consistently(func() (string, error) {
+				current, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				return current.Status.TargetPrimaryTimestamp, err
+			}, 5).Should(Equal(cluster.Status.TargetPrimaryTimestamp))
+		})
+
+		By("deleting the replicas", func() {
+			for i := range replicas.Items {
+				Expect(podutils.Delete(env.Ctx, env.Client, namespace, replicas.Items[i].Name, quickDelete)).
+					To(Succeed())
+			}
+		})
+
+		By("checking that the primary is back in its role", func() {
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cluster.Status.CurrentPrimary).To(Equal(primary))
+			Expect(cluster.Status.TargetPrimary).To(Equal(primary))
+			Expect(cluster.Status.TimelineID).To(Equal(timeline))
+		})
 	})
 })
