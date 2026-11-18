@@ -942,10 +942,11 @@ relevant WAL, ensuring that:
 After a switchover or a failover, the former primary keeps the failover slots
 it created, which are not marked as `synced`. PostgreSQL's slot
 synchronization stops with an error when it finds one of them, so the slots
-on that replica stop advancing and retain WAL. For this reason, on the
-replicas, CloudNativePG drops the logical replication slots that have
-`failover` enabled and are not `synced`, letting PostgreSQL recreate them
-from the primary. A slot in use is dropped once its client disconnects.
+on that replica stop advancing and retain WAL. For this reason, when
+`sync_replication_slots` is on, CloudNativePG drops, on the replicas, the
+logical replication slots that have `failover` enabled and are not `synced`,
+letting PostgreSQL recreate them from the primary. A slot in use is dropped
+once its client disconnects.
 
 PostgreSQL recreates each slot as a temporary one, and makes it persistent
 only when the slot on the primary has advanced far enough, which normally

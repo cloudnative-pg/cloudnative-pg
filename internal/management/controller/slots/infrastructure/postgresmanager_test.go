@@ -206,10 +206,7 @@ var _ = Describe("PostgresManager", func() {
 
 			result, err := ListOrphanedFailoverSlots(ctx, db)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Items).To(Equal([]ReplicationSlot{
-				{SlotName: "slot1"},
-				{SlotName: "slot2"},
-			}))
+			Expect(result).To(Equal([]string{"slot1", "slot2"}))
 		})
 
 		It("should return error when database query fails", func(ctx SpecContext) {

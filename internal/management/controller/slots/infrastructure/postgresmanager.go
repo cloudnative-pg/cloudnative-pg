@@ -119,8 +119,8 @@ func IsInRecovery(ctx context.Context, db *sql.DB) (bool, error) {
 	return inRecovery, err
 }
 
-// ListOrphanedFailoverSlots lists the logical slots enabled for failover that a
-// standby holds without having received them from the primary. PostgreSQL
+// ListOrphanedFailoverSlots lists the names of the logical slots enabled for
+// failover that a standby holds without having received them from the primary. PostgreSQL
 // refuses to enable failover on a slot during recovery, except in the slot sync
 // worker, which marks its slots as synced: these slots were created while the
 // instance was a primary, and the slot sync worker won't overwrite them.
@@ -128,7 +128,7 @@ func IsInRecovery(ctx context.Context, db *sql.DB) (bool, error) {
 // sync_replication_slots is off: there is no slot sync worker to unblock, and
 // pg_failover_slots keeps using the slots of a former primary.
 // It requires PostgreSQL 17 or later.
-func ListOrphanedFailoverSlots(ctx context.Context, db *sql.DB) (ReplicationSlotList, error) {
+func ListOrphanedFailoverSlots(ctx context.Context, db *sql.DB) ([]string, error) {
 	rows, err := db.QueryContext(
 		ctx,
 		`SELECT slot_name
@@ -138,24 +138,24 @@ func ListOrphanedFailoverSlots(ctx context.Context, db *sql.DB) (ReplicationSlot
             AND pg_catalog.current_setting('sync_replication_slots')::bool`,
 	)
 	if err != nil {
-		return ReplicationSlotList{}, err
+		return nil, err
 	}
 	defer func() {
 		_ = rows.Close()
 	}()
 
-	var status ReplicationSlotList
+	var slotNames []string
 	for rows.Next() {
-		var slot ReplicationSlot
-		if err := rows.Scan(&slot.SlotName); err != nil {
-			return ReplicationSlotList{}, err
+		var slotName string
+		if err := rows.Scan(&slotName); err != nil {
+			return nil, err
 		}
-		status.Items = append(status.Items, slot)
+		slotNames = append(slotNames, slotName)
 	}
 
 	if rows.Err() != nil {
-		return ReplicationSlotList{}, rows.Err()
+		return nil, rows.Err()
 	}
 
-	return status, nil
+	return slotNames, nil
 }

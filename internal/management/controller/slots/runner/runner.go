@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"go.uber.org/multierr"
 
@@ -140,7 +141,7 @@ func (sr *Replicator) reconcile(
 		"local", localPool.GetDsn("postgres"),
 		"podName", sr.instance.GetPodName(),
 		"config", config)
-	err = synchronizeReplicationSlots(
+	syncErr := synchronizeReplicationSlots(
 		ctx,
 		primaryDB,
 		localDB,
@@ -148,20 +149,38 @@ func (sr *Replicator) reconcile(
 		config,
 	)
 
+	orphansErr := reconcileOrphanedFailoverSlots(ctx, primaryDB, localDB, config, sr.instance.GetPgVersion)
+
+	return multierr.Append(syncErr, orphansErr)
+}
+
+// reconcileOrphanedFailoverSlots drops the orphaned failover slots when the
+// cluster is configured to synchronize the logical slots and PostgreSQL
+// supports the failover slots
+func reconcileOrphanedFailoverSlots(
+	ctx context.Context,
+	primaryDB, localDB *sql.DB,
+	config *apiv1.ReplicationSlotsConfiguration,
+	getPgVersion func() (semver.Version, error),
+) error {
 	// Without the HA slots there is no primary_slot_name, and the slot sync
 	// worker doesn't run
-	if ha := config.HighAvailability; ha != nil && ha.GetEnabled() && ha.SynchronizeLogicalDecoding {
-		pgVersion, versionErr := sr.instance.GetPgVersion()
-		if versionErr != nil {
-			return multierr.Append(err, versionErr)
-		}
-		// The failover and synced columns exist from PostgreSQL 17
-		if pgVersion.Major() >= 17 {
-			err = multierr.Append(err, dropOrphanedFailoverSlots(ctx, primaryDB, localDB))
-		}
+	ha := config.HighAvailability
+	if ha == nil || !ha.GetEnabled() || !ha.SynchronizeLogicalDecoding {
+		return nil
 	}
 
-	return err
+	pgVersion, err := getPgVersion()
+	if err != nil {
+		return fmt.Errorf("getting the PostgreSQL version: %w", err)
+	}
+
+	// The failover and synced columns exist from PostgreSQL 17
+	if pgVersion.Major() < 17 {
+		return nil
+	}
+
+	return dropOrphanedFailoverSlots(ctx, primaryDB, localDB)
 }
 
 // dropOrphanedFailoverSlots drops the failover slots this standby didn't
@@ -181,17 +200,17 @@ func dropOrphanedFailoverSlots(ctx context.Context, primaryDB, localDB *sql.DB) 
 		return nil
 	}
 
-	slots, err := infrastructure.ListOrphanedFailoverSlots(ctx, localDB)
+	slotNames, err := infrastructure.ListOrphanedFailoverSlots(ctx, localDB)
 	if err != nil {
 		return fmt.Errorf("listing orphaned failover slots: %w", err)
 	}
 
 	var errs error
-	for _, slot := range slots.Items {
-		log.FromContext(ctx).Info("Dropping orphaned failover slot", "slotName", slot.SlotName)
+	for _, slotName := range slotNames {
+		log.FromContext(ctx).Info("Dropping orphaned failover slot", "slotName", slotName)
+		slot := infrastructure.ReplicationSlot{SlotName: slotName}
 		if err := infrastructure.Delete(ctx, localDB, slot); err != nil {
-			errs = multierr.Append(errs,
-				fmt.Errorf("dropping orphaned failover slot %q: %w", slot.SlotName, err))
+			errs = multierr.Append(errs, fmt.Errorf("dropping orphaned failover slot %q: %w", slotName, err))
 		}
 	}
 
