@@ -445,6 +445,9 @@ will wait for up to the remaining time set in `.spec.stopDelay` to complete the
 operation and then forcibly shut down. Such a timeout needs to be at least 15
 seconds.
 
+The same procedure applies to an in-place restart of the primary, where
+PostgreSQL is restarted without deleting the Pod.
+
 :::info[Important]
     In order to avoid any data loss in the Postgres cluster, which impacts
     the database [RPO](before_you_start.md#postgresql-terminology), don't delete the Pod where

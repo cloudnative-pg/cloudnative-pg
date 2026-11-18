@@ -272,16 +272,19 @@ only the operator itself.
 #### Default of `.spec.smartShutdownTimeout` changed to 0
 
 Starting from version 1.31.0, the default value of `.spec.smartShutdownTimeout`
-is `0` seconds instead of `180`. When a PostgreSQL Pod is terminated, the
-instance manager no longer waits for clients to disconnect during a smart
-shutdown: it issues a `CHECKPOINT` and requests a fast shutdown right away.
+is `0` seconds instead of `180`. In a cluster using the new default, when a
+PostgreSQL Pod is terminated or the primary is restarted in place, the instance
+manager no longer waits for clients to disconnect during a smart shutdown: it
+issues a `CHECKPOINT` and requests a fast shutdown right away.
 See ["Shutdown control"](instance_manager.md#shutdown-control) for details.
 
 Existing clusters are not affected, as the previous default is already stored
-in their `.spec`. The new default applies only to new `Cluster` resources, and
+in their `.spec`. The new default applies to new `Cluster` resources, and
 to resources created without the field. This includes clusters you recreate,
 for example from a GitOps repository or a backup tool, if their manifests don't
-set it explicitly.
+set it explicitly. The new default also applies to an existing cluster when the
+whole resource is replaced, rather than patched, with a definition that doesn't
+set the field.
 
 If you want new clusters to keep the previous behavior, set the field
 explicitly in their manifests:
