@@ -216,15 +216,15 @@ following example:
 spec:
   permissions:
     connect:
-      - name: public
-        type: revoke
       - name: app
         type: grant
+      - name: public
+        type: revoke
     create:
       - name: app
         type: grant
     temporary:
-      - name: app
+      - name: public
         type: revoke
 # ...
 ```
@@ -303,15 +303,22 @@ failed grant is retried.
 
     Privileges are applied when the `Database` spec changes, not continuously,
     so one changed directly in PostgreSQL is not brought back to the declared
-    state until the spec is modified. Removing an entry from the spec revokes
-    nothing: to remove a privilege, set the `type` field to `revoke`.
+    state until the spec is modified, or until a failed reconciliation is
+    retried. Removing an entry from the spec revokes nothing: to remove a
+    privilege, set the `type` field to `revoke`.
 
-    Revoking `CONNECT` from the application role, or from `public` when the
-    application role has no other way to connect, locks the application out of
-    the database. The instance manager is not affected, as it connects as the
-    superuser. The metrics exporter is, as it connects as the
-    `cnpg_metrics_exporter` role: grant it `CONNECT` too, or the user-defined
-    metrics that target the database fail or are skipped.
+    Revoking `CONNECT` from the application role while `public` does not have it,
+    or from `public` when the application role has no other way to connect,
+    refuses the new connections of the application.
+
+    The instance manager is not affected, as it connects as the superuser. The
+    metrics exporter is, as it connects as the `cnpg_metrics_exporter` role. It
+    queries the application database of the cluster by default, so if that
+    database loses `CONNECT`, all the [default metrics](monitoring.md) and the
+    user-defined ones without `target_databases` stop. For any other database,
+    only the user-defined metrics that target it fail or are skipped. Grant
+    `CONNECT` to `cnpg_metrics_exporter` too, for example with an entry in the
+    `connect` list.
 :::
 
 ## Managing Extensions in a Database
