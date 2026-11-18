@@ -36,7 +36,7 @@ import (
 // publicGranteeOid is the OID that identifies PUBLIC in an ACL item
 const publicGranteeOid int64 = 0
 
-// databasePrivileges lists the privileges that can be managed on a database
+// The privileges that can be managed on a database
 const (
 	connectPrivilege   = "CONNECT"
 	createPrivilege    = "CREATE"
@@ -87,16 +87,16 @@ type databasePermissionChange struct {
 	// statement is the SQL to execute, empty when the ACL already matches
 	statement string
 
-	// err is set when the change cannot be computed, such as when the
-	// role doesn't exist
+	// err is set when the change cannot be planned or applied: a repeated or
+	// conflicting entry, a role that doesn't exist, or a failed statement
 	err error
 }
 
-// expandDatabasePermissions expands the `all` shortcut and returns the
-// requested change for every privilege and role, deduplicated. The changes
-// are grouped by privilege and, within each privilege, follow the order of
-// the specification, with the `all` entries last, as it happens for the
-// usages of schemas and foreign data wrappers.
+// expandDatabasePermissions expands the `all` shortcut and returns one change
+// for each privilege and role. A repeated or conflicting entry is dropped and
+// flags the first change of that role with an error. The changes are grouped
+// by privilege and, within each privilege, follow the order of the
+// specification, with the `all` entries last.
 func expandDatabasePermissions(
 	permissions *apiv1.DatabasePermissionsSpec,
 ) []databasePermissionChange {
@@ -246,10 +246,8 @@ func decorateDatabasePermissions(
 		found bool
 	}
 
-	// Look up only the roles named in the specification, instead of reading the
-	// whole pg_roles view: a cluster with thousands of roles would pay for that
-	// on every reconciliation, to resolve a handful of names. A role can be
-	// listed for several privileges, so each one is looked up once.
+	// A role can be listed for several privileges, so each one is looked up
+	// once.
 	lookups := make(map[string]roleLookup)
 	for i := range changes {
 		change := &changes[i]
@@ -284,7 +282,8 @@ func decorateDatabasePermissions(
 
 // computeDatabasePermissionsPlan reads the current state of the database and
 // computes the statements that are needed. On error, the returned plan still
-// lists every change so the caller can report the failure against each of them.
+// lists every change, so the caller can report the failure against each of
+// them, replacing the error that a change may already have.
 func computeDatabasePermissionsPlan(
 	ctx context.Context,
 	db *sql.DB,

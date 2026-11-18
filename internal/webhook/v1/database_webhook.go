@@ -213,8 +213,6 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 // expanded before checking: for each privilege, a role can appear only once,
 // either granted or revoked. Repeating the same entry is most likely a mistake
 // in the specification, so it is rejected too.
-// Every spelling of `public` is the PUBLIC pseudo-role, as for the usages of
-// schemas and foreign data wrappers.
 func (v *DatabaseCustomValidator) validatePermissions(d *apiv1.Database) field.ErrorList {
 	if d.Spec.Permissions == nil {
 		return nil
