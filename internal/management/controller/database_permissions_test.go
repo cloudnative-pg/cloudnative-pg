@@ -31,6 +31,17 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// The SQL is copied here on purpose, so that changing the queries of
+// database_permissions.go by mistake makes the tests fail.
+const (
+	expectedACLQuery = `SELECT a.grantee::bigint, a.privilege_type
+		FROM pg_catalog.pg_database d,
+		     pg_catalog.aclexplode(coalesce(d.datacl, pg_catalog.acldefault('d', d.datdba))) a
+		WHERE d.datname = $1 AND a.grantor = d.datdba`
+
+	expectedRoleOidQuery = "SELECT oid::bigint FROM pg_catalog.pg_roles WHERE rolname = $1"
+)
+
 var _ = Describe("Database permissions", func() {
 	grant := func(name string) apiv1.UsageSpec {
 		return apiv1.UsageSpec{Name: name, Type: apiv1.GrantUsageSpecType}
@@ -145,15 +156,6 @@ var _ = Describe("Database permissions", func() {
 			))
 		})
 
-		It("sees the default ACL of a database with a NULL datacl", func() {
-			// Revoking from PUBLIC must not be skipped just because the
-			// stored ACL is NULL: the caller expands the defaults.
-			changes := plan(defaultACL, &apiv1.DatabasePermissionsSpec{
-				Connect: []apiv1.UsageSpec{revoke("public")},
-			})
-			Expect(statements(changes)).To(HaveLen(1))
-		})
-
 		It("emits nothing when the ACL already matches", func() {
 			acl := databaseACL{
 				{grantee: 20, privilege: "CONNECT"}: {},
@@ -217,8 +219,6 @@ var _ = Describe("Database permissions", func() {
 			db     *sql.DB
 		)
 
-		const roleQuery = "SELECT oid::bigint FROM pg_catalog.pg_roles WHERE rolname = $1"
-
 		BeforeEach(func() {
 			var err error
 			db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
@@ -230,7 +230,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("sets the OID of the roles, 0 for public without querying it", func(ctx SpecContext) {
-			dbMock.ExpectQuery(roleQuery).WithArgs("app").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 
 			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
@@ -244,7 +244,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("looks up a role only once, even if it has several privileges", func(ctx SpecContext) {
-			dbMock.ExpectQuery(roleQuery).WithArgs("app").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 
 			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
@@ -257,9 +257,9 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("marks the roles that do not exist, for grants and revokes", func(ctx SpecContext) {
-			dbMock.ExpectQuery(roleQuery).WithArgs("ghost").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("ghost").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}))
-			dbMock.ExpectQuery(roleQuery).WithArgs("phantom").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("phantom").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}))
 
 			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
@@ -281,7 +281,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("returns the error of a failing lookup", func(ctx SpecContext) {
-			dbMock.ExpectQuery(roleQuery).WithArgs("app").WillReturnError(errors.New("boom"))
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").WillReturnError(errors.New("boom"))
 
 			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("app")},
@@ -295,12 +295,6 @@ var _ = Describe("Database permissions", func() {
 			dbMock sqlmock.Sqlmock
 			db     *sql.DB
 		)
-
-		const aclQuery = `SELECT a.grantee::bigint, a.privilege_type
-		FROM pg_catalog.pg_database d,
-		     pg_catalog.aclexplode(coalesce(d.datacl, pg_catalog.acldefault('d', d.datdba))) a
-		WHERE d.datname = $1 AND a.grantor = d.datdba`
-		const roleQuery = "SELECT oid::bigint FROM pg_catalog.pg_roles WHERE rolname = $1"
 
 		reconcile := func(ctx SpecContext, permissions *apiv1.DatabasePermissionsSpec) []apiv1.DatabasePermissionStatus {
 			return reconcileDatabasePermissions(ctx, db, &apiv1.Database{
@@ -319,7 +313,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		expectDefaultACL := func() {
-			dbMock.ExpectQuery(aclQuery).WithArgs("my-db").WillReturnRows(
+			dbMock.ExpectQuery(expectedACLQuery).WithArgs("my-db").WillReturnRows(
 				sqlmock.NewRows([]string{"grantee", "privilege_type"}).
 					AddRow(0, "CONNECT").AddRow(0, "TEMPORARY").
 					AddRow(10, "CONNECT").AddRow(10, "CREATE").AddRow(10, "TEMPORARY"))
@@ -331,7 +325,7 @@ var _ = Describe("Database permissions", func() {
 
 		It("applies the changes and reports every entry", func(ctx SpecContext) {
 			expectDefaultACL()
-			dbMock.ExpectQuery(roleQuery).WithArgs("app").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "app"`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
@@ -349,7 +343,7 @@ var _ = Describe("Database permissions", func() {
 
 		It("applies the entries in the order of the specification", func(ctx SpecContext) {
 			expectDefaultACL()
-			dbMock.ExpectQuery(roleQuery).WithArgs("app").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 			dbMock.ExpectExec(`REVOKE CONNECT ON DATABASE "my-db" FROM PUBLIC`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
@@ -366,9 +360,9 @@ var _ = Describe("Database permissions", func() {
 
 		It("applies the other entries when a role does not exist", func(ctx SpecContext) {
 			expectDefaultACL()
-			dbMock.ExpectQuery(roleQuery).WithArgs("app").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
-			dbMock.ExpectQuery(roleQuery).WithArgs("ghost").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("ghost").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}))
 			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "app"`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
@@ -384,7 +378,7 @@ var _ = Describe("Database permissions", func() {
 
 		It("reports a failing statement against its entry only", func(ctx SpecContext) {
 			expectDefaultACL()
-			dbMock.ExpectQuery(roleQuery).WithArgs("app").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "app"`).
 				WillReturnError(errors.New("boom"))
@@ -400,7 +394,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("reports the failure to read the ACL against every entry", func(ctx SpecContext) {
-			dbMock.ExpectQuery(aclQuery).WithArgs("my-db").WillReturnError(errors.New("no connection"))
+			dbMock.ExpectQuery(expectedACLQuery).WithArgs("my-db").WillReturnError(errors.New("no connection"))
 
 			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
 				All: []apiv1.UsageSpec{grant("app")},
@@ -413,9 +407,9 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("is idempotent: nothing is executed when the ACL matches", func(ctx SpecContext) {
-			dbMock.ExpectQuery(aclQuery).WithArgs("my-db").WillReturnRows(
+			dbMock.ExpectQuery(expectedACLQuery).WithArgs("my-db").WillReturnRows(
 				sqlmock.NewRows([]string{"grantee", "privilege_type"}).AddRow(20, "CONNECT"))
-			dbMock.ExpectQuery(roleQuery).WithArgs("app").
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 
 			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
