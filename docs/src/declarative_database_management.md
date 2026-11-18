@@ -277,8 +277,9 @@ They are independent: if a role does not exist, which is reported for both
 retried until all of them succeed.
 
 When you revoke a privilege from `public` and grant it to specific roles, list
-the `grant` entries first. This way, a failure while granting does not leave
-the roles without the privilege they were meant to receive.
+the `grant` entries first. This way, the roles receive the privilege before
+`public` loses it. If a grant fails, the revoke is still applied and the
+failed grant is retried.
 
 :::info
     CloudNativePG manages database permissions using the
