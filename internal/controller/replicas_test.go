@@ -277,6 +277,64 @@ var _ = Describe("markOldPrimaryAsUnhealthy", func() {
 	})
 })
 
+var _ = Describe("markOldPrimaryAsUnhealthyOnFailover", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	roleAfter := func(phase, targetPrimary string) string {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		primary := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-1",
+				Namespace: namespace,
+				Labels:    map[string]string{},
+			},
+		}
+		utils.SetInstanceRole(&primary.ObjectMeta, specs.ClusterRoleLabelPrimary)
+		Expect(env.client.Create(ctx, &primary)).To(Succeed())
+
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster",
+				Namespace: namespace,
+			},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "cluster-1",
+				TargetPrimary:  targetPrimary,
+				Phase:          phase,
+			},
+		}
+		err := env.clusterReconciler.markOldPrimaryAsUnhealthyOnFailover(ctx, cluster, []corev1.Pod{primary})
+		Expect(err).ToNot(HaveOccurred())
+
+		var updated corev1.Pod
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&primary), &updated)).To(Succeed())
+		return updated.Labels[utils.ClusterInstanceRoleLabelName]
+	}
+
+	It("keeps the primary label on the old primary during a switchover", func() {
+		Expect(roleAfter(apiv1.PhaseSwitchover, "cluster-2")).To(Equal(specs.ClusterRoleLabelPrimary))
+	})
+
+	It("keeps the primary label on the old primary during a rolling update", func() {
+		Expect(roleAfter(apiv1.PhaseUpgrade, "cluster-2")).To(Equal(specs.ClusterRoleLabelPrimary))
+	})
+
+	It("relabels the old primary while failing over to the new primary", func() {
+		Expect(roleAfter(apiv1.PhaseFailOver, "cluster-2")).To(Equal(specs.ClusterRoleLabelUnhealthy))
+	})
+
+	It("relabels the old primary while the failover is pending, whatever the phase", func() {
+		Expect(roleAfter(apiv1.PhaseFailurePlugin, apiv1.PendingFailoverMarker)).
+			To(Equal(specs.ClusterRoleLabelUnhealthy))
+	})
+})
+
 var _ = Describe("Check pods not on primary node", func() {
 	item1 := postgres.PostgresqlStatus{
 		IsPrimary: false,
