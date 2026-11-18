@@ -219,16 +219,22 @@ func SchemaPrivilegeQuery(roleName, schemaName, privilege string) string {
 	return fmt.Sprintf("SELECT has_schema_privilege('%v', '%v', '%v')", roleName, schemaName, privilege)
 }
 
-// DatabasePrivilegeHeldByPublicQuery builds a query checking whether PUBLIC
-// itself holds the given privilege (CONNECT, CREATE or TEMPORARY) on the named
-// database. has_database_privilege() cannot be used here, as it doesn't accept
-// PUBLIC and a privilege held by PUBLIC satisfies it for every other role.
-func DatabasePrivilegeHeldByPublicQuery(databaseName, privilege string) string {
+// DatabasePrivilegeHeldQuery builds a query checking whether the role itself
+// holds the given privilege (CONNECT, CREATE or TEMPORARY) on the named
+// database, where the role `public` is PUBLIC. has_database_privilege() cannot
+// be used here: it doesn't accept PUBLIC, and a privilege held by PUBLIC
+// satisfies it for every other role.
+func DatabasePrivilegeHeldQuery(databaseName, roleName, privilege string) string {
+	grantee := fmt.Sprintf("(SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '%v')", roleName)
+	if roleName == "public" {
+		grantee = "0"
+	}
+
 	return fmt.Sprintf(
 		"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_database d, "+
 			"pg_catalog.aclexplode(coalesce(d.datacl, pg_catalog.acldefault('d', d.datdba))) a "+
-			"WHERE d.datname = '%v' AND a.grantee = 0 AND a.privilege_type = '%v')",
-		databaseName, privilege)
+			"WHERE d.datname = '%v' AND a.grantee = %v AND a.privilege_type = '%v')",
+		databaseName, grantee, privilege)
 }
 
 // AssertDataExpectedCount verifies that the named table has exactly

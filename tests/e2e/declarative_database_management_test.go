@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -96,6 +97,29 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(stdout).Should(ContainSubstring("1"), "expected database not found")
 			}, 30).Should(Succeed())
+		}
+
+		// assertDatabasePermissions checks, for every entry of the permissions of
+		// the database, that the role holds the privilege if it is granted and
+		// that it doesn't if it is revoked
+		assertDatabasePermissions := func(database apiv1.Database) {
+			primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			permissions := database.Spec.Permissions
+			for privilege, entries := range map[string][]apiv1.UsageSpec{
+				"CONNECT":   slices.Concat(permissions.Connect, permissions.All),
+				"CREATE":    slices.Concat(permissions.Create, permissions.All),
+				"TEMPORARY": slices.Concat(permissions.Temporary, permissions.All),
+			} {
+				for _, entry := range entries {
+					granted := entry.Type != apiv1.RevokeUsageSpecType
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+						pgasserts.DatabasePrivilegeHeldQuery(database.Spec.Name, entry.Name, privilege),
+						pgasserts.BoolPGOutput(granted)),
+						30).Should(Succeed())
+				}
+			}
 		}
 
 		assertTestDeclarativeDatabase := func(
@@ -184,32 +208,45 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 
 			By("verifying the database permissions have been applied", func() {
-				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-
 				if database.Spec.Permissions == nil {
 					return
 				}
 
-				for privilege, entries := range map[string][]apiv1.UsageSpec{
-					"CONNECT":   database.Spec.Permissions.Connect,
-					"CREATE":    database.Spec.Permissions.Create,
-					"TEMPORARY": database.Spec.Permissions.Temporary,
-				} {
-					for _, entry := range entries {
-						Expect(entry.Name).To(Equal("public"), "only PUBLIC can be asserted, see the fixture")
-						granted := entry.Type != apiv1.RevokeUsageSpecType
-						Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
-							pgasserts.DatabasePrivilegeHeldByPublicQuery(database.Spec.Name, privilege),
-							pgasserts.BoolPGOutput(granted)),
-							30).Should(Succeed())
-					}
-				}
+				assertDatabasePermissions(database)
 
-				Expect(database.Status.Permissions).To(HaveLen(3))
+				permissions := database.Spec.Permissions
+				Expect(database.Status.Permissions).To(HaveLen(
+					len(permissions.Connect) + len(permissions.Create) + len(permissions.Temporary) +
+						3*len(permissions.All)))
 				for _, status := range database.Status.Permissions {
 					Expect(status.Applied).To(BeTrue(), status.Message)
 				}
+			})
+
+			By("revoking what was granted through all", func() {
+				if database.Spec.Permissions == nil || len(database.Spec.Permissions.All) == 0 {
+					return
+				}
+
+				databaseNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      databaseObjectName,
+				}
+				Eventually(func(g Gomega) {
+					g.Expect(env.Client.Get(env.Ctx, databaseNamespacedName, &database)).To(Succeed())
+					for i := range database.Spec.Permissions.All {
+						database.Spec.Permissions.All[i].Type = apiv1.RevokeUsageSpecType
+					}
+					g.Expect(env.Client.Update(env.Ctx, &database)).To(Succeed())
+				}, 30).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					g.Expect(env.Client.Get(env.Ctx, databaseNamespacedName, &database)).To(Succeed())
+					g.Expect(database.Status.ObservedGeneration).To(Equal(database.Generation))
+					g.Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
+				}, 300).WithPolling(10 * time.Second).Should(Succeed())
+
+				assertDatabasePermissions(database)
 			})
 
 			By("verifying the fdw presence in the target database", func() {
