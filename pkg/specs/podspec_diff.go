@@ -183,14 +183,14 @@ func normalizeVolumeMountName(mount corev1.VolumeMount) string {
 	return name
 }
 
-// normalizeCommand drops the instance manager flag that Pods created before
-// 1.31 pass and that the current one no longer sets. Their PodSpec annotation
-// still records it, so comparing the command verbatim reports a spec difference
-// and rolls every existing instance, even when
-// ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES would otherwise upgrade them without
-// recreating the Pod.
+// normalizeCommand drops the --status-port-tls flag. Pods created by a
+// release that did not set it carry a different command than the current
+// one, and comparing it verbatim would roll every existing instance, even
+// when ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES would otherwise upgrade them
+// without recreating the Pod.
 //
-// TODO: delete this function after minor version 1.30 is discontinued
+// TODO: delete this function one minor version after pkg/specs/pods.go
+// stops setting the flag (after minor version 1.30 is discontinued)
 func normalizeCommand(command []string) []string {
 	return slices.DeleteFunc(slices.Clone(command), func(arg string) bool {
 		return arg == "--status-port-tls"

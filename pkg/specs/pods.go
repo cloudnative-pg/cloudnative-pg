@@ -306,6 +306,13 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 		containers[0].Command = append(containers[0].Command, "--pprof-server")
 	}
 
+	// The instance manager ignores this flag. Plugins before 1.31 read it to
+	// detect that the status port uses TLS.
+	//
+	// TODO: stop setting it after minor version 1.30 is discontinued, then
+	// delete normalizeCommand one minor version later
+	containers[0].Command = append(containers[0].Command, "--status-port-tls")
+
 	if cluster.IsMetricsTLSEnabled() {
 		containers[0].Command = append(containers[0].Command, "--metrics-port-tls")
 	}
