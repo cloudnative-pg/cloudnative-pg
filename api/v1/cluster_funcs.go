@@ -754,12 +754,14 @@ func (cluster *Cluster) GetMaxStopDelay() int32 {
 	return 1800
 }
 
-// GetSmartShutdownTimeout is used to ensure that smart shutdown timeout is a positive integer
+// GetSmartShutdownTimeout returns the time reserved for the smart shutdown of
+// PostgreSQL, in seconds. A value of 0 (the default) skips the smart shutdown
+// and requests a fast shutdown right away.
 func (cluster *Cluster) GetSmartShutdownTimeout() int32 {
 	if cluster.Spec.SmartShutdownTimeout != nil {
 		return *cluster.Spec.SmartShutdownTimeout
 	}
-	return 180
+	return 0
 }
 
 // GetRestartTimeout is used to have a timeout for operations that involve

@@ -6223,11 +6223,12 @@ spec:
                 - metadata
                 type: object
               smartShutdownTimeout:
-                default: 180
+                default: 0
                 description: |-
                   The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
                   Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-                  (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
+                  (that is: `stopDelay` - `smartShutdownTimeout`). Default is 0 seconds, which
+                  skips the smart shutdown and requests a fast shutdown right away.
                 format: int32
                 type: integer
               startDelay:
