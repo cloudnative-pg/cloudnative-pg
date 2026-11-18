@@ -302,8 +302,10 @@ the roles without the privilege they were meant to receive.
 
     Revoking `CONNECT` from the application role, or from `public` when the
     application role has no other way to connect, locks the application out of
-    the database. CloudNativePG itself is not affected, as it connects as the
-    superuser.
+    the database. The instance manager is not affected, as it connects as the
+    superuser. The metrics exporter is, as it connects as the
+    `cnpg_metrics_exporter` role: grant it `CONNECT` too, or the user-defined
+    metrics that target the database fail or are skipped.
 :::
 
 ## Managing Extensions in a Database
