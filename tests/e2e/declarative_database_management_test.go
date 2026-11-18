@@ -208,9 +208,11 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 
 			By("verifying the database permissions have been applied", func() {
-				if database.Spec.Permissions == nil {
+				// only the manifest of the retained database has permissions
+				if !retainOnDeletion {
 					return
 				}
+				Expect(database.Spec.Permissions).ToNot(BeNil())
 
 				assertDatabasePermissions(database)
 
@@ -224,9 +226,10 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 
 			By("revoking what was granted through all", func() {
-				if database.Spec.Permissions == nil || len(database.Spec.Permissions.All) == 0 {
+				if !retainOnDeletion {
 					return
 				}
+				Expect(database.Spec.Permissions.All).ToNot(BeEmpty())
 
 				databaseNamespacedName := types.NamespacedName{
 					Namespace: namespace,

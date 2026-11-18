@@ -459,7 +459,9 @@ var _ = Describe("Database validation", func() {
 					{Name: "app", Type: apiv1.RevokeUsageSpecType},
 				},
 			})
-			Expect(extractErrorFields(v.validate(db))).To(ConsistOf("spec.permissions.connect[1].name"))
+			errs := v.validate(db)
+			Expect(extractErrorFields(errs)).To(ConsistOf("spec.permissions.connect[1].name"))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
 		})
 
 		It("rejects a conflict between all and a single privilege", func() {
@@ -467,7 +469,9 @@ var _ = Describe("Database validation", func() {
 				Connect: []apiv1.UsageSpec{{Name: "app", Type: apiv1.RevokeUsageSpecType}},
 				All:     []apiv1.UsageSpec{{Name: "app", Type: apiv1.GrantUsageSpecType}},
 			})
-			Expect(extractErrorFields(v.validate(db))).To(ConsistOf("spec.permissions.all[0].name"))
+			errs := v.validate(db)
+			Expect(extractErrorFields(errs)).To(ConsistOf("spec.permissions.all[0].name"))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
 		})
 
 		It("treats every spelling of public as the PUBLIC pseudo-role", func() {

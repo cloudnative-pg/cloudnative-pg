@@ -82,7 +82,7 @@ var _ = Describe("Database permissions", func() {
 			Expect(changes).To(HaveLen(4))
 			Expect([]string{changes[0].name, changes[1].name, changes[2].name}).
 				To(Equal([]string{"zeta", "public", "app"}))
-			Expect(changes[2].changeType).To(Equal(apiv1.GrantUsageSpecType))
+			Expect(changes[0].changeType).To(Equal(apiv1.GrantUsageSpecType))
 			Expect(changes[3].privilege).To(Equal("TEMPORARY"))
 		})
 
@@ -217,7 +217,7 @@ var _ = Describe("Database permissions", func() {
 			})
 			changes[0].err = errDatabasePermissionRoleNotFound
 
-			planned := planDatabasePermissions("my-db", changes, defaultACL)
+			planned := planDatabasePermissions("my-db", changes, databaseACL{})
 			Expect(statements(planned)).To(BeEmpty())
 			Expect(planned[0].err).To(MatchError(errDatabasePermissionRoleNotFound))
 		})
