@@ -146,9 +146,7 @@ func (r *InstanceReconciler) checkPromotionGate(
 		// current primary already: it is not replacing another primary.
 		ReplicaClusterPromotion: cluster.ShouldPromoteFromReplicaCluster() ||
 			cluster.Status.CurrentPrimary == r.instance.GetPodName(),
-		// The operator sets the phase before the target primary. If it
-		// replaces the phase with the one of an error before this pod reads
-		// it, the promotion is checked as the one of a switchover.
+		// The operator sets the phase before the target primary
 		Failover: cluster.Status.Phase == apiv1.PhaseFailOver,
 	})
 	logPromotionDecision(ctx, decision)
