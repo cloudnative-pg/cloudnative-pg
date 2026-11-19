@@ -304,6 +304,10 @@ func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj 
 		return err
 	}
 
+	// GRANT and REVOKE on a database act on the shared pg_database catalog,
+	// so the superuser connection to the postgres database is enough
+	obj.Status.Permissions = reconcileDatabasePermissions(ctx, db, obj)
+
 	if err := r.reconcileDatabaseObjects(ctx, obj); err != nil {
 		return err
 	}
@@ -324,6 +328,11 @@ func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj 
 		}
 	}
 	for _, status := range obj.Status.Servers {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
+	}
+	for _, status := range obj.Status.Permissions {
 		if !status.Applied {
 			return ErrFailedDatabaseObjectReconciliation
 		}
