@@ -124,11 +124,9 @@ func Promote(ctx context.Context, cli client.Client,
 		cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 		cluster.Status.Phase = apiv1.PhaseSwitchover
 		cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
+		status.SetClusterReadyCondition(cluster)
 	}
-	if err := status.PatchWithOptimisticLock(ctx, cli, &cluster,
-		reconcileTargetPrimaryFunc,
-		status.SetClusterReadyCondition,
-	); err != nil {
+	if err := status.PatchWithOptimisticLock(ctx, cli, &cluster, reconcileTargetPrimaryFunc); err != nil {
 		return err
 	}
 	if primaryChanged {
