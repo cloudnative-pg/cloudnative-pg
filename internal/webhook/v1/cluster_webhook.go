@@ -213,6 +213,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateManagedExtensions,
 		v.validateResources,
 		v.validateHibernationAnnotation,
+		v.validateSkipEmptyWalArchiveCheckAnnotation,
 		v.validatePodPatchAnnotation,
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
@@ -3014,6 +3015,27 @@ func (v *ClusterCustomValidator) validateHibernationAnnotation(r *apiv1.Cluster)
 			fmt.Sprintf("Annotation value for hibernation should be %q or %q",
 				utils.HibernationAnnotationValueOn,
 				utils.HibernationAnnotationValueOff,
+			),
+		),
+	}
+}
+
+// validate whether the skipEmptyWalArchiveCheck annotation has a known value
+func (v *ClusterCustomValidator) validateSkipEmptyWalArchiveCheckAnnotation(r *apiv1.Cluster) field.ErrorList {
+	value, ok := r.Annotations[utils.SkipEmptyWalArchiveCheck]
+	isKnownValue := value == string(utils.AnnotationStatusEnabled) ||
+		value == string(utils.AnnotationStatusDisabled)
+	if !ok || isKnownValue {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("metadata", "annotations", utils.SkipEmptyWalArchiveCheck),
+			value,
+			fmt.Sprintf("Annotation value for skipEmptyWalArchiveCheck should be %q or %q",
+				utils.AnnotationStatusEnabled,
+				utils.AnnotationStatusDisabled,
 			),
 		),
 	}

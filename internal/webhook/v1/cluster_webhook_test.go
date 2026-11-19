@@ -5505,6 +5505,54 @@ var _ = Describe("Validate hibernation", func() {
 	})
 })
 
+var _ = Describe("Validate skipEmptyWalArchiveCheck", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	newCluster := func(value string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipEmptyWalArchiveCheck: value,
+				},
+			},
+		}
+	}
+
+	It("should succeed if the annotation is not set", func() {
+		Expect(v.validateSkipEmptyWalArchiveCheckAnnotation(&apiv1.Cluster{})).To(BeEmpty())
+	})
+
+	DescribeTable("should succeed if the annotation has an allowed value",
+		func(value utils.AnnotationStatus) {
+			Expect(v.validateSkipEmptyWalArchiveCheckAnnotation(newCluster(string(value)))).To(BeEmpty())
+		},
+		Entry("enabled", utils.AnnotationStatusEnabled),
+		Entry("disabled", utils.AnnotationStatusDisabled),
+	)
+
+	DescribeTable("should fail and list the allowed values if the annotation has any other value",
+		func(value string) {
+			errs := v.validateSkipEmptyWalArchiveCheckAnnotation(newCluster(value))
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(ContainSubstring(utils.SkipEmptyWalArchiveCheck))
+			Expect(errs[0].Detail).To(ContainSubstring(`"enabled"`))
+			Expect(errs[0].Detail).To(ContainSubstring(`"disabled"`))
+		},
+		Entry("a misspelled value", "enable"),
+		Entry("a boolean", "true"),
+		Entry("an empty value", ""),
+	)
+
+	It("is checked when the cluster is validated", func() {
+		Expect(v.validate(newCluster("enable"))).To(ContainElement(HaveField(
+			"Field", field.NewPath("metadata", "annotations", utils.SkipEmptyWalArchiveCheck).String())))
+	})
+})
+
 var _ = Describe("validateManagedServices", func() {
 	var cluster *apiv1.Cluster
 	var v *ClusterCustomValidator

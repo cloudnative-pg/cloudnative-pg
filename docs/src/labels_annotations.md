@@ -289,7 +289,7 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/skipEmptyWalArchiveCheck`
 :   When set to `enabled` on a `Cluster` resource, the operator disables the check
     that ensures that the WAL archive is empty before writing data. Use at your own
-    risk.
+    risk. Allowed values are `enabled` and `disabled`.
 
 `cnpg.io/skipWalArchiving`
 :   When set to `enabled` on a `Cluster` resource, the operator disables WAL archiving.
