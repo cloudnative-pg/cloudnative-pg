@@ -403,9 +403,8 @@ current primary back, and it requires the `--force` flag:
 kubectl cnpg promote --force CLUSTER CLUSTER-INSTANCE
 ```
 
-This is how to go back when the new primary is held back because it does not
-have all the data of the previous primary, which exists only there (the
-`PromotionHeldBack` event of the `Cluster` tells when this is the case).
+This is how to go back to the previous primary when a switchover does not
+complete.
 
 :::warning
     Canceling a switchover is safe as long as the new primary did not promote
