@@ -158,6 +158,21 @@ var _ = Describe("promote subcommand tests", func() {
 		})
 	})
 
+	It("does not name the marker of a cancelled switchover as an instance to promote back", func(ctx SpecContext) {
+		var cl apiv1.Cluster
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		cl.Status.CurrentPrimary = cancelSwitchoverMarker
+		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
+
+		err := Promote(ctx, client, namespace, "cluster1", "cluster1-3", true)
+		Expect(err).To(MatchError(ContainSubstring("promotion of cluster1-1 is in progress")))
+		Expect(err).ToNot(MatchError(ContainSubstring("promote " + cancelSwitchoverMarker)))
+
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		Expect(cl.Status.CurrentPrimary).To(Equal(cancelSwitchoverMarker))
+		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-1"))
+	})
+
 	// changingStatusAfterRead returns a client that changes the status of the
 	// cluster after Promote has read it, when it looks for the Pod to promote
 	changingStatusAfterRead := func(change func(cl *apiv1.Cluster)) k8client.Client {
