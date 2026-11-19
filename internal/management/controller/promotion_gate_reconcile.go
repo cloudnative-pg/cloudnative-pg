@@ -144,6 +144,8 @@ func (r *InstanceReconciler) checkPromotionGate(
 		// token, and the position on the lease is the one of an earlier life
 		// of this cluster
 		ReplicaClusterPromotion: cluster.ShouldPromoteFromReplicaCluster(),
+		// The operator sets the phase before the target primary
+		Failover: cluster.Status.Phase == apiv1.PhaseFailOver,
 	})
 	logPromotionDecision(ctx, decision)
 

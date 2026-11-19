@@ -179,6 +179,17 @@ var _ = Describe("promoteAfterGate", func() {
 		Expect(recorder.Events).To(BeEmpty())
 	})
 
+	It("promotes during a failover, also when the previous primary stopped cleanly", func(ctx SpecContext) {
+		acquirer.annotation = published(utils.PgDataStateShutDown, "0/9000028", 2)
+		cluster.Status.Phase = apiv1.PhaseFailOver
+
+		result, err := r.promoteAfterGate(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.IsZero()).To(BeTrue())
+		Expect(promoted).To(Equal([][]string{{"Position", "MarkPromoting"}}))
+		Expect(recorder.Events).To(BeEmpty())
+	})
+
 	It("promotes when the lease has no position", func(ctx SpecContext) {
 		result, err := r.promoteAfterGate(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
