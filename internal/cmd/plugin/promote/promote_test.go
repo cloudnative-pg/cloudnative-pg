@@ -212,6 +212,7 @@ var _ = Describe("promote subcommand tests", func() {
 	It("does not change the target of a switchover that started after the status was read", func(ctx SpecContext) {
 		racingClient := changingStatusAfterRead(func(cl *apiv1.Cluster) {
 			cl.Status.TargetPrimary = "cluster1-2"
+			cl.Status.Phase = apiv1.PhaseSwitchover
 		})
 		Expect(Promote(ctx, racingClient, namespace, "cluster1", "cluster1-3", false)).
 			To(MatchError(ContainSubstring("changed")))
@@ -220,6 +221,9 @@ var _ = Describe("promote subcommand tests", func() {
 		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
 		Expect(cl.Status.CurrentPrimary).To(Equal("cluster1-1"))
 		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-2"))
+		// Nothing is written, not even the condition that follows the phase
+		Expect(meta.IsStatusConditionTrue(cl.Status.Conditions, string(apiv1.ConditionClusterReady))).
+			To(BeTrue())
 	})
 
 	It("lets a person choose the new primary of a failover that is waiting for the quorum", func(ctx SpecContext) {
