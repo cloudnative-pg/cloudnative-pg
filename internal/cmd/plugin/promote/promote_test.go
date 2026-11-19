@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package promote
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -154,6 +156,55 @@ var _ = Describe("promote subcommand tests", func() {
 			Expect(cl.Status.CurrentPrimary).To(Equal("cluster1-1"))
 			Expect(cl.Status.TargetPrimary).To(Equal("cluster1-2"))
 		})
+	})
+
+	// changingStatusAfterRead returns a client that changes the status of the
+	// cluster after Promote has read it, when it looks for the Pod to promote
+	changingStatusAfterRead := func(change func(cl *apiv1.Cluster)) k8client.Client {
+		return interceptor.NewClient(client.(k8client.WithWatch), interceptor.Funcs{
+			Get: func(
+				ctx context.Context, c k8client.WithWatch, key k8client.ObjectKey,
+				obj k8client.Object, opts ...k8client.GetOption,
+			) error {
+				if _, isPod := obj.(*corev1.Pod); isPod {
+					var cl apiv1.Cluster
+					Expect(c.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+					change(&cl)
+					Expect(c.Status().Update(ctx, &cl)).To(Succeed())
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		})
+	}
+
+	It("does not cancel a switchover that completed after the status was read", func(ctx SpecContext) {
+		var cl apiv1.Cluster
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		cl.Status.TargetPrimary = "cluster1-2"
+		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
+
+		racingClient := changingStatusAfterRead(func(cl *apiv1.Cluster) {
+			cl.Status.CurrentPrimary = "cluster1-2"
+		})
+		Expect(Promote(ctx, racingClient, namespace, "cluster1", "cluster1-1", true)).
+			To(MatchError(ContainSubstring("changed")))
+
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		Expect(cl.Status.CurrentPrimary).To(Equal("cluster1-2"))
+		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-2"))
+	})
+
+	It("does not change the target of a switchover that started after the status was read", func(ctx SpecContext) {
+		racingClient := changingStatusAfterRead(func(cl *apiv1.Cluster) {
+			cl.Status.TargetPrimary = "cluster1-2"
+		})
+		Expect(Promote(ctx, racingClient, namespace, "cluster1", "cluster1-3", false)).
+			To(MatchError(ContainSubstring("changed")))
+
+		var cl apiv1.Cluster
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		Expect(cl.Status.CurrentPrimary).To(Equal("cluster1-1"))
+		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-2"))
 	})
 
 	It("lets a person choose the new primary of a failover that is waiting for the quorum", func(ctx SpecContext) {
