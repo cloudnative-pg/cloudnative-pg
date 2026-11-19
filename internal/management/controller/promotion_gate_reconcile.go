@@ -35,17 +35,6 @@ import (
 )
 
 const (
-	// promotionGateEnforced is whether the promotion gate holds a promotion
-	// back, the value that a new instance reconciler takes. When it is false
-	// the gate only computes its decision and logs it, exactly as if it were
-	// enforcing it, and never holds a promotion back.
-	//
-	// Enforcing it only ever holds back the promotion after a clean shutdown of
-	// the previous primary, as a switchover: that is the only position that is
-	// final. A failover, or a position that is not known, is reported and the
-	// replica promotes.
-	promotionGateEnforced = true
-
 	// promotionBlockedRetryPeriod is how often a replica that the gate blocked
 	// looks again, as a person may have unblocked it
 	promotionBlockedRetryPeriod = 30 * time.Second
@@ -141,16 +130,9 @@ func (r *InstanceReconciler) checkPromotionGate(
 	cluster *apiv1.Cluster,
 	replica replicaPosition,
 ) (reconcile.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
 	annotation, age, err := r.primaryLeaseAcquirer.Position(ctx)
 	if err != nil {
-		if r.enforcePromotionGate {
-			return reconcile.Result{}, fmt.Errorf("while reading the position of the previous primary: %w", err)
-		}
-		contextLogger.Warning("Cannot read the position of the previous primary, skipping the promotion gate",
-			"err", err)
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, fmt.Errorf("while reading the position of the previous primary: %w", err)
 	}
 
 	decision := decidePromotion(promotionGateInput{
@@ -163,11 +145,7 @@ func (r *InstanceReconciler) checkPromotionGate(
 		// of this cluster
 		ReplicaClusterPromotion: cluster.ShouldPromoteFromReplicaCluster(),
 	})
-	logPromotionDecision(ctx, decision, r.enforcePromotionGate)
-
-	if !r.enforcePromotionGate {
-		return reconcile.Result{}, nil
-	}
+	logPromotionDecision(ctx, decision)
 
 	switch decision.Verdict {
 	case promotionWait:
@@ -201,30 +179,18 @@ func (r *InstanceReconciler) reportPromotionHeldBack(cluster *apiv1.Cluster, dec
 	r.recorder.Event(cluster, corev1.EventTypeWarning, promotionHeldBackReason, message)
 }
 
-// logMessage is what to log about a decision. A decision that holds the
-// promotion back says so, and when the gate is not enforced it also says that
-// the promotion goes on, so that the log does not claim what did not happen.
-func (d promotionDecision) logMessage(enforced bool) string {
-	if enforced || d.Verdict == promotionProceed {
-		return d.Message
-	}
-
-	return d.Message + " (the promotion gate is not enforced, the promotion goes on)"
-}
-
 // logPromotionDecision logs a decision of the promotion gate at the level it
 // asks for
-func logPromotionDecision(ctx context.Context, decision promotionDecision, enforced bool) {
+func logPromotionDecision(ctx context.Context, decision promotionDecision) {
 	contextLogger := log.FromContext(ctx)
 
-	message := decision.logMessage(enforced)
 	details := slices.Concat(decision.Details, []any{"verdict", decision.Verdict})
 	switch decision.Level {
 	case promotionLogError:
-		contextLogger.Error(nil, message, details...)
+		contextLogger.Error(nil, decision.Message, details...)
 	case promotionLogWarning:
-		contextLogger.Warning(message, details...)
+		contextLogger.Warning(decision.Message, details...)
 	default:
-		contextLogger.Info(message, details...)
+		contextLogger.Info(decision.Message, details...)
 	}
 }
