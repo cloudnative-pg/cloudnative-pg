@@ -244,4 +244,40 @@ var _ = Describe("decidePromotion", func() {
 			Expect(decision.Details).ToNot(ContainElement("age"))
 		})
 	})
+
+	Context("when the operator is failing over", func() {
+		failover := func(annotation string, replica replicaPosition) promotionDecision {
+			return decidePromotion(promotionGateInput{
+				Annotation: annotation,
+				PodName:    thisPod,
+				Replica:    replica,
+				Failover:   true,
+			})
+		}
+
+		DescribeTable("never holds the replica back, also after a clean shutdown of the previous primary",
+			func(annotation string, replica replicaPosition) {
+				decision := failover(annotation, replica)
+				Expect(decision.Verdict).To(Equal(promotionProceed))
+				Expect(decision.Level).To(Equal(promotionLogWarning))
+			},
+			Entry("the replica is behind the lease",
+				position(utils.PgDataStateShutDown, "0/8000000", 2), replica("0/7FFFF00", 2)),
+			Entry("the replica is on an earlier timeline",
+				position(utils.PgDataStateShutDown, "0/8000000", 2), replica("0/7000000", 1)),
+			Entry("the replica is on a later timeline",
+				position(utils.PgDataStateShutDown, "0/8000000", 2), replica("0/7000000", 3)),
+			Entry("the position of the replica is not available",
+				position(utils.PgDataStateShutDown, "0/8000000", 2), replicaPosition{}),
+			Entry("another pod started to promote and left the final position of the previous primary",
+				position(utils.LeasePositionStatePromoting, "0/8000000", 2), replica("0/7FFFF00", 2)),
+		)
+
+		It("reports what the replica is missing, and that the previous primary stopped cleanly", func() {
+			decision := failover(position(utils.PgDataStateShutDown, "0/8000000", 2), replica("0/7FFFF00", 2))
+			Expect(decision.Details).To(ContainElements("possiblyMissingBytes", uint64(0x100)))
+			Expect(decision.Message).To(ContainSubstring("stopped cleanly"))
+			Expect(decision.Message).ToNot(ContainSubstring("did not stop cleanly"))
+		})
+	})
 })

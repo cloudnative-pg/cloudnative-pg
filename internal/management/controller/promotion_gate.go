@@ -83,6 +83,10 @@ type promotionGateInput struct {
 	// cluster mode. The caller sets it from the promotion that is happening,
 	// not from the replica cluster configuration, which stays after it.
 	ReplicaClusterPromotion bool
+
+	// Failover tells that the operator is failing over to this pod, because
+	// the previous primary is not working
+	Failover bool
 }
 
 // promotionDecision is the result of the promotion gate, with what to log
@@ -104,6 +108,10 @@ type promotionDecision struct {
 // replica is either missing some of it or is on a timeline that is not the one
 // the previous primary stopped on. Everything else is a failover, or a position
 // that is not known, and the replica proceeds: it is reported, not prevented.
+//
+// A failover is not held back, also when the previous primary stopped
+// cleanly, as when its pod is deleted: the operator is waiting for this
+// promotion, and does not bring the previous primary back before it.
 func decidePromotion(input promotionGateInput) promotionDecision {
 	// The annotation was left by the primary of this cluster before it was
 	// demoted, and the pod has followed another cluster since, on other
@@ -159,7 +167,7 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 		// The pod that started to promote may have left the final position of
 		// the previous primary. It is checked on the timeline it was written
 		// on, as a pod on a later one has followed a promotion that happened.
-		if leasePosition.Timeline != 0 && leasePosition.Timeline == input.Replica.Timeline {
+		if !input.Failover && leasePosition.Timeline != 0 && leasePosition.Timeline == input.Replica.Timeline {
 			return decideAfterCleanShutdown(input, leasePosition)
 		}
 
@@ -175,7 +183,9 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 		}
 
 	case utils.PgDataStateShutDown:
-		return decideAfterCleanShutdown(input, leasePosition)
+		if !input.Failover {
+			return decideAfterCleanShutdown(input, leasePosition)
+		}
 	}
 
 	return decideAfterFailover(input, leasePosition)
@@ -252,9 +262,9 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 }
 
 // decideAfterFailover is the decision of the gate when the previous primary did
-// not publish a final position, which is what a failover looks like. The
-// replica promotes, and what is known about the data it may be missing is
-// reported.
+// not publish a final position, which is what a failover looks like, or when
+// the operator is failing over. The replica promotes, and what is known about
+// the data it may be missing is reported.
 func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePosition) promotionDecision {
 	details := []any{
 		"writer", leasePosition.Pod,
@@ -269,6 +279,10 @@ func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePos
 	}
 
 	message := "The previous primary did not stop cleanly, proceeding with the promotion"
+	if leasePosition.State == utils.PgDataStateShutDown {
+		message = "The previous primary stopped cleanly, but a failover is not held back, " +
+			"proceeding with the promotion"
+	}
 
 	// The positions can be compared only on the same timeline. The difference
 	// is a lower bound: the previous primary may have written for up to about

@@ -174,11 +174,12 @@ described in [Promotion held back](#promotion-held-back).
 
 #### Promotion held back
 
-After a clean shutdown of the previous primary, the replica that is about to
-become the primary compares its own position with the final one on the lease.
-If it is missing some of that WAL, it does not promote, and the cluster has no
-primary until the missing WAL is restored from the archive. While the replica
-waits, a `PromotionHeldBack` warning event on the `Cluster` reports why:
+During a switchover, after the clean shutdown of the previous primary, the
+replica that is about to become the primary compares its own position with the
+final one on the lease. If it is missing some of that WAL, it does not promote,
+and the cluster has no primary until the missing WAL is restored from the
+archive. A failover is not held back. While the replica waits, a
+`PromotionHeldBack` warning event on the `Cluster` reports why:
 
 ```sh
 kubectl describe cluster cluster-example
