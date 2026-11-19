@@ -167,8 +167,38 @@ final value is written when the lease is released on shutdown. It contains:
 * `pod`: the pod that wrote the position.
 
 :::note
-The annotation is read-only and meant to be used by CloudNativePG. Its
-format may change in future releases.
+The annotation is written by CloudNativePG and its format may change in future
+releases. Do not edit it: the only supported change is removing it, as
+described in [Promotion held back](#promotion-held-back).
+:::
+
+#### Promotion held back
+
+After a clean shutdown of the previous primary, the replica that is about to
+become the primary compares its own position with the final one on the lease.
+If it is missing some of that WAL, it does not promote, and the cluster has no
+primary until the missing WAL is restored from the archive. While the replica
+waits, a `PromotionHeldBack` warning event on the `Cluster` reports why:
+
+```sh
+kubectl describe cluster cluster-example
+```
+
+There are two ways to go on without waiting for the WAL:
+
+* cancel the switchover, by promoting the previous primary back with
+  [`kubectl cnpg promote --force`](kubectl-plugin.md#promote);
+* remove the annotation, accepting the loss of the data that the replica is
+  missing. The replica then promotes:
+
+  ```sh
+  kubectl annotate lease cluster-example cnpg.io/position-
+  ```
+
+:::warning
+After the annotation is removed, the other replicas that received the WAL the
+new primary is missing stay on the previous timeline and cannot follow the new
+primary.
 :::
 
 ### Tuning the primary lease
