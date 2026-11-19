@@ -97,8 +97,16 @@ func Promote(ctx context.Context, cli client.Client,
 		cancelling = true
 	}
 
-	// The Pod exists, let's update the cluster's status with the new target primary
+	// The Pod exists, let's update the cluster's status with the new target primary.
+	// The status is read again when it is patched: what was decided above
+	// does not hold if the primary changed in the meantime.
+	primaryChanged := false
 	reconcileTargetPrimaryFunc := func(cluster *apiv1.Cluster) {
+		primaryChanged = cluster.Status.CurrentPrimary != currentPrimary ||
+			cluster.Status.TargetPrimary != targetPrimary
+		if primaryChanged {
+			return
+		}
 		if cancelling {
 			cluster.Status.CurrentPrimary = cancelSwitchoverMarker
 		}
@@ -112,6 +120,10 @@ func Promote(ctx context.Context, cli client.Client,
 		status.SetClusterReadyCondition,
 	); err != nil {
 		return err
+	}
+	if primaryChanged {
+		return fmt.Errorf("the primary of cluster %s changed while promoting %s: "+
+			"nothing was done, check the status of the cluster and try again", clusterName, serverName)
 	}
 	if cancelling {
 		fmt.Printf("The switchover to %s in cluster %s is cancelled, node %s will be promoted back\n",
