@@ -533,7 +533,10 @@ var _ = Describe("plugin-barman-cloud volume snapshots",
 				clusterToBackupName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
 
-				setupPluginObjectStore(namespace, clusterToBackupName)
+				// The ObjectStore name is also the bucket: it must differ from the one used by the
+				// in-tree variant (same cluster name), or the WAL archive of the second one to
+				// run in the shared object store is not empty and archiving fails.
+				setupPluginObjectStore(namespace, clusterToBackupName+"-plugin")
 
 				By("creating the cluster on which to execute the backup", func() {
 					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToBackupName, clusterToBackupFilePath)

@@ -28,5 +28,5 @@ spec:
       plugin:
         name: barman-cloud.cloudnative-pg.io
         parameters:
-          barmanObjectName: cluster-declarative-backup
+          barmanObjectName: cluster-declarative-backup-plugin
           serverName: cluster-declarative-backup

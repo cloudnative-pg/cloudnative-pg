@@ -30,4 +30,4 @@ spec:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
       parameters:
-        barmanObjectName: cluster-declarative-backup
+        barmanObjectName: cluster-declarative-backup-plugin
