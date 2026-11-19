@@ -1394,11 +1394,11 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down
-		wait := r.waitWalReceiverDown
-		if wait == nil {
-			wait = r.waitForWalReceiverDown
+		waitWalReceiverDown := r.waitWalReceiverDown
+		if waitWalReceiverDown == nil {
+			waitWalReceiverDown = r.waitForWalReceiverDown
 		}
-		if err := wait(ctx); err != nil {
+		if err := waitWalReceiverDown(ctx); err != nil {
 			return err
 		}
 	}
