@@ -85,13 +85,13 @@ var _ = Describe("promoteAfterGate", func() {
 				promoted = append(promoted, append([]string(nil), acquirer.calls...))
 				return nil
 			},
+			waitWalReceiverDown: func(context.Context) error { return nil },
 		}
 
-		// This pod is the current primary already, so that the promotion
-		// does not wait for the WAL receiver through a database connection
+		// A switchover or a failover to this pod is in progress
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
-			Status:     apiv1.ClusterStatus{TargetPrimary: podName, CurrentPrimary: podName},
+			Status:     apiv1.ClusterStatus{TargetPrimary: podName, CurrentPrimary: oldPrimary},
 		}
 	})
 
@@ -207,6 +207,20 @@ var _ = Describe("promoteAfterGate", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.IsZero()).To(BeTrue())
 			Expect(promoted).To(Equal([][]string{{"Position", "MarkPromoting"}}))
+		})
+
+	It("ignores the position of an earlier life of the cluster when this pod is the current primary already",
+		func(ctx SpecContext) {
+			// The designated primary of a replica cluster is promoted without
+			// a token: no other primary is being replaced
+			acquirer.annotation = published(utils.PgDataStateShutDown, "0/9000028", 1)
+			cluster.Status.CurrentPrimary = podName
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+			Expect(promoted).To(Equal([][]string{{"Position", "MarkPromoting"}}))
+			Expect(recorder.Events).To(BeEmpty())
 		})
 
 	It("does not promote when the promotion cannot be marked on the lease", func(ctx SpecContext) {

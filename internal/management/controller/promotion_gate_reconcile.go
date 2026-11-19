@@ -142,8 +142,10 @@ func (r *InstanceReconciler) checkPromotionGate(
 		AnnotationAge: age,
 		// The promotion of a replica cluster is validated by its promotion
 		// token, and the position on the lease is the one of an earlier life
-		// of this cluster
-		ReplicaClusterPromotion: cluster.ShouldPromoteFromReplicaCluster(),
+		// of this cluster. Without a token, the designated primary is the
+		// current primary already: it is not replacing another primary.
+		ReplicaClusterPromotion: cluster.ShouldPromoteFromReplicaCluster() ||
+			cluster.Status.CurrentPrimary == r.instance.GetPodName(),
 		// The operator sets the phase before the target primary
 		Failover: cluster.Status.Phase == apiv1.PhaseFailOver,
 	})

@@ -107,6 +107,11 @@ type InstanceReconciler struct {
 	// unit tests.
 	readReplicaPosition func(ctx context.Context) (replicaPosition, error)
 
+	// waitWalReceiverDown is how handlePromotion waits for the WAL receiver of
+	// this replica to stop. Nil means to query PostgreSQL, and is replaced by
+	// a stub in the unit tests.
+	waitWalReceiverDown func(ctx context.Context) error
+
 	admission *guard.Admission[*apiv1.Cluster]
 
 	// recorder is how the promotion gate reports on the Cluster that it holds
