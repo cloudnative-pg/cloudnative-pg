@@ -159,6 +159,50 @@ var _ = Describe("Managed Database status", func() {
 		Expect(database.GetStatusMessage()).Should(ContainSubstring(expectedError.Error()))
 	})
 
+	Context("with database permissions", func() {
+		BeforeEach(func(ctx SpecContext) {
+			database.Spec.Permissions = &apiv1.DatabasePermissionsSpec{
+				Connect: []apiv1.UsageSpec{
+					{Name: "ghost", Type: apiv1.GrantUsageSpecType},
+					{Name: "public", Type: apiv1.RevokeUsageSpecType},
+				},
+			}
+			Expect(fakeClient.Update(ctx, database)).To(Succeed())
+
+			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+				WillReturnRows(sqlmock.NewRows([]string{""}).AddRow("1"))
+			dbMock.ExpectExec(fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				pgx.Identifier{database.Spec.Owner}.Sanitize(),
+			)).WillReturnResult(sqlmock.NewResult(0, 0))
+			dbMock.ExpectQuery(expectedACLQuery).WithArgs(database.Spec.Name).
+				WillReturnRows(sqlmock.NewRows([]string{"grantee", "privilege_type"}).
+					AddRow(0, "CONNECT").AddRow(10, "CONNECT"))
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("ghost").
+				WillReturnRows(sqlmock.NewRows([]string{"oid"}))
+		})
+
+		It("applies them and is not ready until every entry is applied", func(ctx SpecContext) {
+			dbMock.ExpectExec(fmt.Sprintf("REVOKE CONNECT ON DATABASE %s FROM PUBLIC",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+			)).WillReturnResult(sqlmock.NewResult(0, 0))
+
+			Expect(reconcileDatabase(ctx, fakeClient, r, database)).To(Succeed())
+
+			Expect(database.Status.Permissions).To(ConsistOf(
+				apiv1.DatabasePermissionStatus{
+					Privilege: "CONNECT", Name: "ghost", Type: apiv1.GrantUsageSpecType,
+					Applied: false, Message: "role does not exist",
+				},
+				apiv1.DatabasePermissionStatus{
+					Privilege: "CONNECT", Name: "public", Type: apiv1.RevokeUsageSpecType,
+					Applied: true,
+				},
+			))
+			Expect(database.Status.Applied).Should(HaveValue(BeFalse()))
+		})
+	})
+
 	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
 			// Mocking DetectDB
