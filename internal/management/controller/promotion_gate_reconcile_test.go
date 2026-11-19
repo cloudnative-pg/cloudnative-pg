@@ -77,7 +77,6 @@ var _ = Describe("promoteAfterGate", func() {
 		r = &InstanceReconciler{
 			instance:             pgInstance,
 			primaryLeaseAcquirer: acquirer,
-			enforcePromotionGate: true,
 			recorder:             recorder,
 			readReplicaPosition: func(context.Context) (replicaPosition, error) {
 				return replicaPosition{LSN: "0/80000A0", Timeline: 2}, nil
@@ -145,16 +144,6 @@ var _ = Describe("promoteAfterGate", func() {
 			Expect(<-recorder.Events).To(Equal(<-recorder.Events))
 		})
 
-		It("only logs the decision while the gate is not enforced, and promotes", func(ctx SpecContext) {
-			r.enforcePromotionGate = false
-
-			result, err := r.promoteAfterGate(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(result.IsZero()).To(BeTrue())
-			Expect(promoted).To(Equal([][]string{{"Position", "MarkPromoting"}}))
-			Expect(recorder.Events).To(BeEmpty())
-		})
-
 		It("does not need an event recorder", func(ctx SpecContext) {
 			r.recorder = nil
 
@@ -177,15 +166,6 @@ var _ = Describe("promoteAfterGate", func() {
 			Expect(acquirer.calls).To(Equal([]string{"Position"}))
 			Expect(promoted).To(BeEmpty())
 			Expect(recorder.Events).To(Receive(HavePrefix("Warning " + promotionHeldBackReason + " ")))
-		})
-
-		It("only logs the decision while the gate is not enforced, and promotes", func(ctx SpecContext) {
-			r.enforcePromotionGate = false
-
-			result, err := r.promoteAfterGate(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(result.IsZero()).To(BeTrue())
-			Expect(promoted).To(HaveLen(1))
 		})
 	})
 
@@ -226,33 +206,15 @@ var _ = Describe("promoteAfterGate", func() {
 		Expect(promoted).To(BeEmpty())
 	})
 
-	It("does not promote when the promotion cannot be marked, even if the gate is not enforced",
-		func(ctx SpecContext) {
-			r.enforcePromotionGate = false
-			acquirer.markErr = errors.New("the API server is on fire")
-
-			_, err := r.promoteAfterGate(ctx, cluster)
-			Expect(err).To(HaveOccurred())
-			Expect(promoted).To(BeEmpty())
-		})
-
 	When("the position of the previous primary cannot be read", func() {
 		BeforeEach(func() {
 			acquirer.positionErr = errors.New("the lease is held by someone else")
 		})
 
-		It("fails, and does not promote, when the gate is enforced", func(ctx SpecContext) {
+		It("fails, and does not promote", func(ctx SpecContext) {
 			_, err := r.promoteAfterGate(ctx, cluster)
 			Expect(err).To(MatchError(ContainSubstring("someone else")))
 			Expect(promoted).To(BeEmpty())
-		})
-
-		It("skips the gate when it is not enforced", func(ctx SpecContext) {
-			r.enforcePromotionGate = false
-
-			_, err := r.promoteAfterGate(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(promoted).To(HaveLen(1))
 		})
 	})
 
@@ -264,7 +226,7 @@ var _ = Describe("promoteAfterGate", func() {
 			acquirer.annotation = published(utils.PgDataStateShutDown, "0/8000028", 2)
 		})
 
-		It("waits, and does not promote, after a clean shutdown when the gate is enforced", func(ctx SpecContext) {
+		It("waits, and does not promote, after a clean shutdown", func(ctx SpecContext) {
 			result, err := r.promoteAfterGate(ctx, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.RequeueAfter).To(Equal(cluster.GetPrimaryLeaseRetryPeriod()))
@@ -280,41 +242,5 @@ var _ = Describe("promoteAfterGate", func() {
 			Expect(result.IsZero()).To(BeTrue())
 			Expect(promoted).To(HaveLen(1))
 		})
-
-		It("goes on without it when the gate is not enforced", func(ctx SpecContext) {
-			r.enforcePromotionGate = false
-
-			_, err := r.promoteAfterGate(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(promoted).To(HaveLen(1))
-		})
-	})
-})
-
-var _ = Describe("promotionDecision.logMessage", func() {
-	DescribeTable("says what happens to the promotion",
-		func(verdict promotionVerdict, enforced bool, suffix string) {
-			message := promotionDecision{Verdict: verdict, Message: "The decision"}.logMessage(enforced)
-			if suffix == "" {
-				Expect(message).To(Equal("The decision"))
-			} else {
-				Expect(message).To(Equal("The decision" + suffix))
-			}
-		},
-		Entry("a promotion that proceeds, enforced or not", promotionProceed, false, ""),
-		Entry("a promotion that proceeds, enforced", promotionProceed, true, ""),
-		Entry("a wait that is enforced", promotionWait, true, ""),
-		Entry("a block that is enforced", promotionBlocked, true, ""),
-		Entry("a wait that is not enforced", promotionWait, false,
-			" (the promotion gate is not enforced, the promotion goes on)"),
-		Entry("a block that is not enforced", promotionBlocked, false,
-			" (the promotion gate is not enforced, the promotion goes on)"),
-	)
-})
-
-var _ = Describe("the stage of the promotion gate", func() {
-	It("is enforced for the instance reconcilers of the instance manager", func() {
-		r := NewInstanceReconciler(postgres.NewInstance(), nil, nil, nil, nil, &fakeLeaseAcquirer{}, nil, nil)
-		Expect(r.enforcePromotionGate).To(BeTrue())
 	})
 })

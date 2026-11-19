@@ -102,10 +102,6 @@ type InstanceReconciler struct {
 	// means instance.PromoteAndWait; tests set a stub.
 	promoteInstance func(ctx context.Context) error
 
-	// enforcePromotionGate is whether the promotion gate holds a promotion back,
-	// or only logs what it would have done. See promotionGateEnforced.
-	enforcePromotionGate bool
-
 	// readReplicaPosition is how the promotion gate reads the position of this
 	// replica. Nil means to query PostgreSQL, and is replaced by a stub in the
 	// unit tests.
@@ -141,7 +137,6 @@ func NewInstanceReconciler(
 		availablePluginNames:  availablePluginNames,
 		primaryLeaseAcquirer:  primaryLeaseAcquirer,
 		admission:             admission,
-		enforcePromotionGate:  promotionGateEnforced,
 		recorder:              recorder,
 	}
 }
