@@ -60,12 +60,19 @@ func Promote(ctx context.Context, cli client.Client,
 		currentPrimary != targetPrimary &&
 		targetPrimary != apiv1.PendingFailoverMarker
 
+	// A cancelled switchover has no current primary to name or to promote
+	// back, until its target takes over
+	cancelInProgress := currentPrimary == cancelSwitchoverMarker
+
 	// If server name is equal to target primary, there is no need to promote
 	// that instance
 	if targetPrimary == serverName {
-		if switchoverInProgress {
+		switch {
+		case cancelInProgress:
+			fmt.Printf("A switchover was cancelled and the promotion of %s is already in progress\n", serverName)
+		case switchoverInProgress:
 			fmt.Printf("A switchover from %s to %s is already in progress\n", currentPrimary, serverName)
-		} else {
+		default:
 			fmt.Printf("%s is already the primary node in the cluster\n", serverName)
 		}
 		return nil
@@ -84,6 +91,9 @@ func Promote(ctx context.Context, cli client.Client,
 	cancelling := false
 	if switchoverInProgress {
 		switch {
+		case cancelInProgress:
+			return fmt.Errorf("a switchover was cancelled and the promotion of %s is in progress: "+
+				"%s cannot be promoted until it completes", targetPrimary, serverName)
 		case serverName != currentPrimary:
 			return fmt.Errorf("a switchover from %s to %s is in progress and %s cannot be promoted until "+
 				"it completes: to cancel it, promote %s back",
