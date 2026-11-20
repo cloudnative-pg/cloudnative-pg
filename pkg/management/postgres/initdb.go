@@ -425,6 +425,17 @@ func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 	return nil
 }
 
+// restrictInstanceInitialDatabases restricts the databases created by initdb
+// in the given instance
+func restrictInstanceInitialDatabases(ctx context.Context, instance *Instance) error {
+	dbSuperUser, err := instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while getting superuser database: %w", err)
+	}
+
+	return restrictInitialDatabases(ctx, dbSuperUser)
+}
+
 // restrictInitialDatabases creates the metrics exporter role and revokes
 // CONNECT on the `postgres` and `template1` databases from PUBLIC.
 //
@@ -596,15 +607,11 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 	if err := instance.WithActiveInstance(func() error {
 		// Restrict the databases created by initdb before running any user's
 		// SQL, which is then able to change it.
-		dbSuperUser, err := instance.GetSuperUserDB()
-		if err != nil {
-			return fmt.Errorf("while getting superuser database: %w", err)
-		}
-		if err := restrictInitialDatabases(ctx, dbSuperUser); err != nil {
+		if err := restrictInstanceInitialDatabases(ctx, instance); err != nil {
 			return err
 		}
 
-		err = info.ConfigureNewInstance(instance)
+		err := info.ConfigureNewInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}
