@@ -392,6 +392,8 @@ Each exported record carries the fields of the corresponding JSON entry:
 - `ts` is the timestamp;
 - `msg` is the body;
 - `level` is the severity, with `debug` and `trace` both mapped to `DEBUG`;
+  the PostgreSQL and PGAudit records are always `INFO`, as their own severity
+  is in `record.error_severity`;
 - `logger` is the instrumentation scope, or an attribute when the process
   sets it as a field, as the instance manager does;
 - `error` and `stacktrace` are the `exception.message` and
@@ -405,10 +407,11 @@ The records are exported in the background, at the log level of the
 component, in batches that the `OTEL_BLRP_*` environment variables can tune.
 When the collector is unreachable or cannot keep up, the records that don't
 fit in the queue are dropped, so that the export never slows down
-PostgreSQL; the standard output still contains them. Before exiting, each
-process waits up to five seconds for the queued records to be exported. The
-only exception is an instance manager that fences itself because the primary
-lease is about to expire: it exits at once, to stop PostgreSQL in time, and
-its queued records are not exported. The records written after the wait, such
-as the last ones of an online upgrade of the instance manager, are only on the
-standard output.
+PostgreSQL; the standard output still contains them. A failed export writes
+an `OpenTelemetry error` entry, only to the standard output. Before exiting,
+each process waits up to five seconds for the queued records to be exported.
+The only exception is an instance manager that fences itself because the
+primary lease is about to expire: it exits at once, to stop PostgreSQL in
+time, and its queued records are not exported. The records written after the
+wait, such as the last ones of an online upgrade of the instance manager, are
+only on the standard output.
