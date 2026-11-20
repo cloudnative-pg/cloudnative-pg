@@ -43,13 +43,10 @@ const (
 	) mem ON member = oid
 	WHERE rolname not like 'pg\_%'`
 
-	expectedMembershipStmt = `SELECT mem.inroles 
-	FROM pg_catalog.pg_authid as auth
-	LEFT JOIN (
-		SELECT pg_catalog.array_agg(pg_catalog.pg_get_userbyid(roleid)) as inroles, member
-		FROM pg_catalog.pg_auth_members GROUP BY member
-	) mem ON member = oid
-	WHERE rolname = $1`
+	expectedMembershipStmt = `SELECT pg_catalog.pg_get_userbyid(am.roleid), pg_catalog.pg_get_userbyid(am.grantor)
+		FROM pg_catalog.pg_auth_members AS am
+		JOIN pg_catalog.pg_authid AS auth ON auth.oid = am.member
+		WHERE auth.rolname = $1`
 
 	wantedRoleCommentTpl = "COMMENT ON ROLE \"%s\" IS %s"
 )

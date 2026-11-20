@@ -239,11 +239,29 @@ var _ = Describe("DatabaseRole implementation test", func() {
 	})
 
 	It("should return Correct Role to grant/revoke", func() {
-		rolesInDB := []string{"role1", "DBRole1", "DBRoleABC"}
+		rolesInDB := []Membership{
+			{Name: "role1", Grantor: "postgres"},
+			{Name: "DBRole1", Grantor: "postgres"},
+			{Name: "DBRoleABC", Grantor: "postgres"},
+		}
 		rolesInSpec := []string{"role1", "role2", "roleabc"}
 		rolesToRevoke := getRolesToRevoke(rolesInDB, rolesInSpec)
 		rolesToGrant := getRolesToGrant(rolesInDB, rolesInSpec)
-		Expect(rolesToRevoke).To(BeEquivalentTo([]string{"DBRole1", "DBRoleABC"}))
-		Expect(rolesToGrant).To(BeEquivalentTo([]string{"role2", "roleabc"}))
+		Expect(rolesToRevoke).To(Equal([]Membership{
+			{Name: "DBRole1", Grantor: "postgres"},
+			{Name: "DBRoleABC", Grantor: "postgres"},
+		}))
+		Expect(rolesToGrant).To(Equal([]string{"role2", "roleabc"}))
+	})
+
+	It("revokes every grant of a membership, and grants none already granted by another role", func() {
+		rolesInDB := []Membership{
+			{Name: "kept", Grantor: "admin_role"},
+			{Name: "removed", Grantor: "admin_role"},
+			{Name: "removed", Grantor: "postgres"},
+		}
+		rolesInSpec := []string{"kept"}
+		Expect(getRolesToGrant(rolesInDB, rolesInSpec)).To(BeEmpty())
+		Expect(getRolesToRevoke(rolesInDB, rolesInSpec)).To(Equal(rolesInDB[1:]))
 	})
 })

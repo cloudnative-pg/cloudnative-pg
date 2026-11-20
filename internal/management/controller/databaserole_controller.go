@@ -51,7 +51,8 @@ import (
 type DatabaseRoleReconciler struct {
 	client.Client
 
-	instance instanceInterface
+	instance                instanceInterface
+	getPostgresMajorVersion func() (int, error)
 }
 
 // errClusterIsManagingRole is raised when a certain PostgreSQL role
@@ -495,6 +496,10 @@ func NewDatabaseRoleReconciler(
 	return &DatabaseRoleReconciler{
 		Client:   mgr.GetClient(),
 		instance: instance,
+		getPostgresMajorVersion: func() (int, error) {
+			version, err := instance.GetPgVersion()
+			return int(version.Major()), err //nolint:gosec
+		},
 	}
 }
 
@@ -565,6 +570,7 @@ func updateExistingRole(
 	db *sql.DB,
 	dbRole roles.DatabaseRole,
 	existingDBRole *roles.DatabaseRole,
+	pgMajorVersion int,
 ) error {
 	toGrant, toRevoke, err := roles.GetRoleMembershipDiff(
 		ctx, db, dbRole.InRoles, dbRole,
@@ -572,7 +578,7 @@ func updateExistingRole(
 	if err != nil {
 		return fmt.Errorf("while getting the membership updates required: %w", err)
 	}
-	if err = roles.UpdateMembership(ctx, db, dbRole, toGrant, toRevoke); err != nil {
+	if err = roles.UpdateMembership(ctx, db, dbRole, toGrant, toRevoke, pgMajorVersion); err != nil {
 		return fmt.Errorf("while updating membership: %w", err)
 	}
 	if err = roles.Update(ctx, db, dbRole); err != nil {
@@ -639,7 +645,11 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	}
 
 	if existingDBRole != nil {
-		if err := updateExistingRole(ctx, db, dbRole, existingDBRole); err != nil {
+		pgMajorVersion, err := r.getPostgresMajorVersion()
+		if err != nil {
+			return "", fmt.Errorf("while getting the PostgreSQL major version: %w", err)
+		}
+		if err := updateExistingRole(ctx, db, dbRole, existingDBRole, pgMajorVersion); err != nil {
 			return "", err
 		}
 	} else if err := roles.Create(ctx, db, dbRole); err != nil {
