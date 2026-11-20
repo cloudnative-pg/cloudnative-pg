@@ -453,7 +453,7 @@ func createCAWithValidity(
 	notBefore,
 	notAfter time.Time,
 	parentCertificate *x509.Certificate,
-	parentPrivateKey interface{},
+	parentPrivateKey any,
 	commonName string,
 	organizationalUnit string,
 ) (*KeyPair, error) {

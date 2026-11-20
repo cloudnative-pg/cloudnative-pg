@@ -31,7 +31,7 @@ import (
 // DeepHashObject writes specified object to hash using the spew library
 // which follows pointers and prints actual values of the nested objects
 // ensuring the hash does not change when a pointer changes.
-func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) error {
+func DeepHashObject(hasher hash.Hash, objectToWrite any) error {
 	hasher.Reset()
 	printer := spew.ConfigState{
 		Indent:         " ",
@@ -46,7 +46,7 @@ func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) error {
 
 // ComputeHash returns a hash value calculated from the provided object.
 // The hash will be safe encoded to avoid bad words.
-func ComputeHash(object interface{}) (string, error) {
+func ComputeHash(object any) (string, error) {
 	hasher := fnv.New32a()
 	if err := DeepHashObject(hasher, object); err != nil {
 		return "", err
@@ -59,9 +59,9 @@ func ComputeHash(object interface{}) (string, error) {
 // The epoc value is used to generate a new hash from a same object.
 // This is useful to force a new hash even if the original object is not changed.
 // A practical use is to force a reconciliation loop of the object.
-func ComputeVersionedHash(object interface{}, epoc int) (string, error) {
+func ComputeVersionedHash(object any, epoc int) (string, error) {
 	type versionedHash struct {
-		object interface{}
+		object any
 		epoc   int
 	}
 
