@@ -208,6 +208,21 @@ The most common use is hardening. PostgreSQL grants `CONNECT` and `TEMPORARY`
 on every new database to `PUBLIC`, so a production setup usually revokes
 `CONNECT` from `PUBLIC` and grants it back to specific roles.
 
+:::info[Default for new databases]
+    When CloudNativePG creates a database, it revokes `CONNECT` from `PUBLIC`
+    and grants it to the `cnpg_metrics_exporter` role. This applies to the
+    `postgres` and `template1` databases and to the application database of a
+    new cluster bootstrapped with `initdb`, as well as to a database created
+    from a `Database` resource. Other roles can connect only if they own the
+    database or are granted `CONNECT`, for example with `spec.permissions`.
+
+    A database that already exists is never changed. This includes upgrading
+    the operator, and recovering a cluster, as the recovered databases keep the
+    privileges they had. To undo the default for a new database, grant
+    `CONNECT` to `public`, or revoke it from `cnpg_metrics_exporter`, in
+    `spec.permissions`.
+:::
+
 To enable this feature, define the `spec.permissions` field, as shown in the
 following example:
 

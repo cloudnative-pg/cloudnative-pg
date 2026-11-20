@@ -24,12 +24,80 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
+// metricsExporterDefaultDatabases are the databases the metrics exporter is
+// granted CONNECT on when its role is created. The grant is not repeated
+// afterwards, so that it can be revoked.
+var metricsExporterDefaultDatabases = []string{"postgres", "template1"}
+
+// contextExecer is implemented by both *sql.DB and *sql.Tx
+type contextExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// GrantMetricsExporterConnect grants CONNECT on the given database to the
+// cnpg_metrics_exporter role, which must already exist
+func GrantMetricsExporterConnect(ctx context.Context, db contextExecer, database string) error {
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s",
+		pgx.Identifier{database}.Sanitize(), apiv1.MetricsExporterUserName)); err != nil {
+		return fmt.Errorf("while granting CONNECT on database %q to %s: %w",
+			database, apiv1.MetricsExporterUserName, err)
+	}
+
+	return nil
+}
+
+// RestrictDatabaseConnect revokes CONNECT on the given database from PUBLIC
+func RestrictDatabaseConnect(ctx context.Context, db contextExecer, database string) error {
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("REVOKE CONNECT ON DATABASE %s FROM PUBLIC",
+		pgx.Identifier{database}.Sanitize())); err != nil {
+		return fmt.Errorf("while revoking CONNECT on database %q from PUBLIC: %w", database, err)
+	}
+
+	return nil
+}
+
+// SetupNewDatabase applies the default CONNECT privileges to a database that
+// has just been created: it revokes them from PUBLIC and grants them to the
+// cnpg_metrics_exporter role, which must already exist. The two changes are
+// applied in a transaction, so that a failure leaves the database as it was.
+func SetupNewDatabase(ctx context.Context, db *sql.DB, database string) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("while starting a transaction to restrict database %q: %w", database, err)
+	}
+	defer func() {
+		// This is a no-op when the transaction is committed
+		_ = tx.Rollback()
+	}()
+
+	if err := RestrictDatabaseConnect(ctx, tx, database); err != nil {
+		return err
+	}
+	if err := GrantMetricsExporterConnect(ctx, tx, database); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// MetricsExporterRoleExists reports whether the cnpg_metrics_exporter role exists
+func MetricsExporterRoleExists(ctx context.Context, db *sql.DB) (bool, error) {
+	var exists bool
+	err := db.QueryRowContext(ctx,
+		"SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
+		apiv1.MetricsExporterUserName).Scan(&exists)
+	return exists, err
+}
+
 // SetupMetricsExporterRole creates or repairs the cnpg_metrics_exporter role
 // inside the supplied transaction: ensures it exists, enforces its attributes,
-// and grants pg_monitor membership.
+// and grants pg_monitor membership. When the role is created, it is also
+// granted CONNECT on the postgres and template1 databases.
 func SetupMetricsExporterRole(ctx context.Context, tx *sql.Tx) error {
 	var existsRole bool
 	row := tx.QueryRowContext(ctx,
@@ -42,6 +110,12 @@ func SetupMetricsExporterRole(ctx context.Context, tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, fmt.Sprintf(
 			"CREATE ROLE %s WITH LOGIN PASSWORD NULL", apiv1.MetricsExporterUserName)); err != nil {
 			return err
+		}
+
+		for _, database := range metricsExporterDefaultDatabases {
+			if err := GrantMetricsExporterConnect(ctx, tx, database); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -517,8 +517,9 @@ Take care that the referred resources have to be created **in the same namespace
     ```
 
     Every database in `target_databases` must allow
-    `cnpg_metrics_exporter` to `CONNECT`. On clusters that have
-    revoked `CONNECT` from `PUBLIC` for a database, grant it
+    `cnpg_metrics_exporter` to `CONNECT`. CloudNativePG grants it on the
+    databases it creates, as it revokes `CONNECT` from `PUBLIC` on them. For
+    any other database that has revoked `CONNECT` from `PUBLIC`, grant it
     explicitly to that role:
 
     ```sql

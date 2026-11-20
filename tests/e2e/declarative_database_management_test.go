@@ -122,6 +122,22 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			}
 		}
 
+		// assertDefaultConnectPrivileges checks that the operator revoked CONNECT
+		// from PUBLIC on the database, and granted it to the metrics exporter
+		assertDefaultConnectPrivileges := func(databaseName string) {
+			primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+				pgasserts.DatabasePrivilegeHeldQuery(databaseName, "public", "CONNECT"),
+				pgasserts.BoolPGOutput(false)),
+				30).Should(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+				pgasserts.DatabasePrivilegeHeldQuery(databaseName, apiv1.MetricsExporterUserName, "CONNECT"),
+				pgasserts.BoolPGOutput(true)),
+				30).Should(Succeed())
+		}
+
 		assertTestDeclarativeDatabase := func(
 			databaseManifest string,
 			retainOnDeletion bool,
@@ -160,6 +176,16 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 					30).Should(Succeed())
 
 				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, database)
+			})
+
+			By("verifying the default CONNECT privileges of the new database", func() {
+				// the manifest of the retained database sets them explicitly
+				if retainOnDeletion {
+					return
+				}
+				Expect(database.Spec.Permissions).To(BeNil())
+
+				assertDefaultConnectPrivileges(database.Spec.Name)
 			})
 
 			By("verifying the extension presence in the target database", func() {
@@ -287,6 +313,14 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 					30).Should(Succeed())
 			})
 		}
+
+		It("revokes CONNECT from PUBLIC on the databases of a new cluster", func() {
+			for _, databaseName := range []string{postgres.PostgresDBName, "template1", postgres.AppDBName} {
+				By(fmt.Sprintf("checking the database %q", databaseName), func() {
+					assertDefaultConnectPrivileges(databaseName)
+				})
+			}
+		})
 
 		When("Database CRD reclaim policy is set to delete", func() {
 			It("can manage a declarative database and delete it in Postgres", func() {
