@@ -319,6 +319,30 @@ coordinating promotions with no mechanism stopping an isolated primary that
 cannot reach any other instance.
 :::
 
+### Data Volume Writability Check
+
+By default, the primary instance verifies that its storage volume (`PGDATA`, and
+separate `pg_wal` volume if configured) remains responsive and writable. If a storage
+volume hangs or becomes unwritable (for instance due to an underlying volume freeze,
+storage disconnect, or driver hang), PostgreSQL transactions cannot commit and writes
+hang indefinitely, while read-only queries from buffer cache may continue to succeed.
+
+To detect hung or unwritable storage and enable automatic failover:
+1. The instance manager performs periodic write and fsync probes on the primary volume.
+2. If the check fails or times out, the liveness probe fails and the instance manager ceases renewing the primary lease.
+3. The instance manager requests a fast step-down shutdown to fence the hung primary, enabling a healthy replica to take over the primary lease.
+
+It is **enabled by default** with a default timeout of 5 seconds, and can be configured or disabled via:
+
+```yaml
+spec:
+  probes:
+    liveness:
+      dataVolumeCheck:
+        enabled: true
+        timeoutSeconds: 5
+```
+
 ## Readiness Probe
 
 The readiness probe starts once the startup probe has successfully completed.

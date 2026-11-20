@@ -22,6 +22,8 @@ package lease
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -1032,6 +1034,16 @@ var _ = Describe("shouldStepDown", func() {
 		Entry("disabled", false),
 	)
 
+	It("steps down when another instance is target primary", func() {
+		cluster := newCluster(true, 3)
+		cluster.Status.TargetPrimary = "test-cluster-2"
+		stepDown, err := shouldStepDown(cluster, ourIdentity)
+		Expect(err).To(HaveOccurred())
+		Expect(stepDown).To(BeTrue())
+		var supersededErr *SupersededError
+		Expect(errors.As(err, &supersededErr)).To(BeTrue())
+	})
+
 	It("skips the check when no probes configuration is set", func() {
 		stepDown, err := shouldStepDown(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}, ourIdentity)
 		Expect(err).NotTo(HaveOccurred())
@@ -1279,5 +1291,65 @@ var _ = Describe("Runnable.Yield", func() {
 
 		r.Yield(ctx)
 		Consistently(hardStops.Load, r.config.LeaseDuration+r.config.RenewDeadline).Should(BeZero())
+	})
+})
+
+var _ = Describe("Runnable.canRenewLease", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+	)
+
+	It("allows renewals when storage is writable", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		instance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName)
+		instance.SetCluster(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}})
+		r := New(kubeClient, instance)
+
+		Expect(r.canRenewLease(ctx)).To(Succeed())
+	})
+
+	It("allows renewals on a single-instance cluster even when storage is unwritable", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		instance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName)
+		instance.SetCluster(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 1}})
+		r := New(kubeClient, instance)
+
+		tempDir, err := os.MkdirTemp("", "canrenew-test-*")
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		readOnlyDir := filepath.Join(tempDir, "readonly")
+		Expect(os.Mkdir(readOnlyDir, 0o500)).To(Succeed())
+		r.instance.PgData = readOnlyDir
+
+		Expect(r.canRenewLease(ctx)).To(Succeed())
+	})
+
+	It("rejects renewals on a multi-instance cluster when storage is unwritable", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		instance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName)
+		instance.SetCluster(&apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}})
+		r := New(kubeClient, instance)
+
+		tempDir, err := os.MkdirTemp("", "canrenew-test-*")
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		readOnlyDir := filepath.Join(tempDir, "readonly")
+		Expect(os.Mkdir(readOnlyDir, 0o500)).To(Succeed())
+		r.instance.PgData = readOnlyDir
+
+		err = r.canRenewLease(ctx)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("primary storage is not writable"))
 	})
 })

@@ -5060,6 +5060,30 @@ spec:
                   liveness:
                     description: The liveness probe configuration
                     properties:
+                      dataVolumeCheck:
+                        description: |-
+                          Configure the data volume write check, which verifies that the data
+                          and WAL volumes are responsive and writable. If writes hang or fail,
+                          lease renewal stops and the primary is failed over.
+                          Enabled by default.
+                        properties:
+                          enabled:
+                            default: true
+                            description: |-
+                              Whether data volume write checking is enabled. When enabled, the instance manager
+                              verifies that the data and WAL volumes are responsive and writable. If writes
+                              hang or fail, lease renewal stops and the primary is failed over.
+                              Defaults to true.
+                            type: boolean
+                          timeoutSeconds:
+                            default: 5
+                            description: |-
+                              Timeout in seconds for the data volume write check.
+                              Defaults to 5 seconds.
+                            format: int32
+                            minimum: 1
+                            type: integer
+                        type: object
                       failureThreshold:
                         description: |-
                           Minimum consecutive failures for the probe to be considered failed after having succeeded.
