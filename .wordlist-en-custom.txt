@@ -30,6 +30,7 @@ AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
 BDR
+BRGOVIND
 BUSL
 BackupCapabilities
 BackupConfiguration
@@ -132,6 +133,7 @@ DBAs
 DBaaS
 DISA
 DNS
+DaemonSet
 DataBackupConfiguration
 DataBase
 DataDurabilityLevel
