@@ -30,6 +30,15 @@ spec:
       source: cluster-tablespaces-volume-snapshot
       backup:
         name: ${BACKUP_NAME}
+        # With the in-tree barmanObjectStore, when recovering from a volume
+        # snapshot Backup whose WALs come from a source with an endpointCA, the
+        # operator looks for the CA in the Backup status only, and volume
+        # snapshot Backups don't set status.endpointCA. The CA of the source is
+        # never consulted, so the CA file that AWS_CA_BUNDLE points to is not
+        # written. Set it here too so it's injected.
+        endpointCA:
+          name: object-store-ca-secret
+          key: ca.crt
 
   externalClusters:
   - name: cluster-tablespaces-volume-snapshot
