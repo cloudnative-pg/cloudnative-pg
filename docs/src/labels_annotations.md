@@ -381,6 +381,39 @@ were correctly set in the pods:
 kubectl get pods --show-labels
 ```
 
+## Labels the backup code relies on
+
+Three of the predefined labels above are not only informative. The operator uses
+`app.kubernetes.io/managed-by`, `app.kubernetes.io/name` and
+`app.kubernetes.io/component` as part of the selector that finds the
+`PersistentVolumeClaim` resources of an instance, which is how a
+`volumeSnapshot` backup decides what to snapshot.
+
+:::warning
+    Do not overwrite those three labels on a Cluster. Two settings can do it:
+    `spec.inheritedMetadata.labels`, and a wildcard such as
+    `app.kubernetes.io/*` in the `INHERITED_LABELS` operator configuration.
+    Inheritance is applied after the operator writes its own values, so the
+    inherited value wins and the PVC ends up with a value that does not match
+    the selector.
+:::
+
+The failure is silent. The `Backup` finds no PVC to snapshot and stays in
+`started`, requeuing forever. It never moves to `failed`. With the default
+online backup there is no event either, so a backup that never completes is the
+only sign. With `online: false` the consequence is worse: the instance is
+fenced in the first step and, because the backup never finishes, it is never
+unfenced.
+
+Correcting the Cluster is not enough once a PVC was overwritten. The reconciler
+checks only that the three labels are present, not that their value is the one
+it expects, so a PVC that already carries the wrong value is never repaired.
+Check the current values and correct the ones that are wrong:
+
+```shell
+kubectl get pvc -n <namespace> -l cnpg.io/pvcRole -o custom-columns='NAME:.metadata.name,MANAGED-BY:.metadata.labels.app\.kubernetes\.io/managed-by,NAME-LABEL:.metadata.labels.app\.kubernetes\.io/name,COMPONENT:.metadata.labels.app\.kubernetes\.io/component'
+```
+
 ## Current limitations
 
 Currently, CloudNativePG doesn't automatically propagate labels or
