@@ -95,6 +95,101 @@ var _ = Describe("Services specification", func() {
 	})
 })
 
+var _ = Describe("ApplyDefaultsTemplate", func() {
+	var service *corev1.Service
+
+	BeforeEach(func() {
+		service = &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-svc",
+				Labels: map[string]string{
+					"existing": "label",
+				},
+			},
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeClusterIP,
+				Ports: []corev1.ServicePort{
+					{Name: "postgres", Port: 5432},
+				},
+				Selector: map[string]string{
+					"role": "primary",
+				},
+			},
+		}
+	})
+
+	It("should be a no-op when defaults is nil", func() {
+		original := service.DeepCopy()
+		ApplyDefaultsTemplate(service, nil)
+		Expect(service.Spec).To(Equal(original.Spec))
+		Expect(service.Labels).To(Equal(original.Labels))
+	})
+
+	It("should apply ipFamilyPolicy and ipFamilies", func() {
+		policy := corev1.IPFamilyPolicyRequireDualStack
+		defaults := &apiv1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				IPFamilyPolicy: &policy,
+				IPFamilies:     []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol},
+			},
+		}
+		ApplyDefaultsTemplate(service, defaults)
+		Expect(service.Spec.IPFamilyPolicy).To(Equal(&policy))
+		Expect(service.Spec.IPFamilies).To(Equal([]corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}))
+	})
+
+	It("should not overwrite existing selectors or ports", func() {
+		policy := corev1.IPFamilyPolicyRequireDualStack
+		defaults := &apiv1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				IPFamilyPolicy: &policy,
+			},
+		}
+		ApplyDefaultsTemplate(service, defaults)
+		Expect(service.Spec.Selector).To(Equal(map[string]string{"role": "primary"}))
+		Expect(service.Spec.Ports).To(HaveLen(1))
+		Expect(service.Spec.Ports[0].Port).To(Equal(int32(5432)))
+	})
+
+	It("should merge labels and annotations from the template", func() {
+		defaults := &apiv1.ServiceTemplateSpec{
+			ObjectMeta: apiv1.Metadata{
+				Labels: map[string]string{
+					"new-label": "value",
+				},
+				Annotations: map[string]string{
+					"new-annotation": "value",
+				},
+			},
+		}
+		ApplyDefaultsTemplate(service, defaults)
+		Expect(service.Labels).To(HaveKeyWithValue("existing", "label"))
+		Expect(service.Labels).To(HaveKeyWithValue("new-label", "value"))
+		Expect(service.Annotations).To(HaveKeyWithValue("new-annotation", "value"))
+	})
+
+	It("should not override service type already set on the service", func() {
+		defaults := &apiv1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeLoadBalancer,
+			},
+		}
+		ApplyDefaultsTemplate(service, defaults)
+		Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+	})
+
+	It("should fill in service type when not set on the service", func() {
+		service.Spec.Type = ""
+		defaults := &apiv1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeLoadBalancer,
+			},
+		}
+		ApplyDefaultsTemplate(service, defaults)
+		Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeLoadBalancer))
+	})
+})
+
 var _ = Describe("BuildManagedServices", func() {
 	var cluster apiv1.Cluster
 
