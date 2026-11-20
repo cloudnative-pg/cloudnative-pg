@@ -72,7 +72,7 @@ func instanceRestart(ctx context.Context, clusterName, node string) error {
 
 	if cluster.Status.CurrentPrimary == node {
 		if err := status.PatchWithOptimisticLock(
-			ctx,
+			status.KeepReconciledGeneration(ctx, &cluster),
 			plugin.Client,
 			&cluster,
 			status.SetPhase(apiv1.PhaseInplacePrimaryRestart, "Requested by the user"),

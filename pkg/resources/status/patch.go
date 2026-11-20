@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -75,6 +76,39 @@ func PatchObjectWithOptimisticLock[T client.Object](
 	return updated, err
 }
 
+type contextKey string
+
+const contextKeyReconciledGeneration contextKey = "reconciledGeneration"
+
+// WithReconciledGeneration sets the generation that PatchWithOptimisticLock
+// records in the conditions, in place of cluster.Generation.
+func WithReconciledGeneration(ctx context.Context, generation int64) context.Context {
+	return context.WithValue(ctx, contextKeyReconciledGeneration, generation)
+}
+
+func observedGeneration(ctx context.Context, cluster *apiv1.Cluster) int64 {
+	if reconciled, ok := ctx.Value(contextKeyReconciledGeneration).(int64); ok {
+		return reconciled
+	}
+	return cluster.Generation
+}
+
+// IsReconciledGeneration reports whether the cluster still has the generation
+// set by WithReconciledGeneration, that is no patch refreshed it with a newer
+// generation since then
+func IsReconciledGeneration(ctx context.Context, cluster *apiv1.Cluster) bool {
+	return observedGeneration(ctx, cluster) == cluster.Generation
+}
+
+// KeepReconciledGeneration makes PatchWithOptimisticLock record the generation
+// of the current Ready condition, for writers that reconcile no generation
+func KeepReconciledGeneration(ctx context.Context, cluster *apiv1.Cluster) context.Context {
+	if ready := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionClusterReady)); ready != nil {
+		return WithReconciledGeneration(ctx, ready.ObservedGeneration)
+	}
+	return ctx
+}
+
 // PatchWithOptimisticLock updates the status of the cluster using the passed
 // transaction functions (in the given order).
 // Important: after successfully updating the status, this
@@ -93,7 +127,8 @@ func PatchWithOptimisticLock(
 
 	origCluster := cluster.DeepCopy()
 
-	updatedCluster, err := PatchObjectWithOptimisticLock(ctx, c, cluster, txs...)
+	updatedCluster, err := PatchObjectWithOptimisticLock(
+		ctx, c, cluster, withGeneration(observedGeneration(ctx, cluster), txs))
 	if err != nil {
 		return fmt.Errorf("while patching status: %w", err)
 	}
@@ -109,4 +144,20 @@ func PatchWithOptimisticLock(
 	}
 
 	return nil
+}
+
+// withGeneration runs the transactions as if the cluster had the given
+// generation, so that the conditions they set record the generation the caller
+// evaluated rather than a newer one the fresh read may already see. The live
+// generation is restored afterwards, so a patch that changes nothing else is
+// still detected as a no-op.
+func withGeneration(generation int64, txs []Transaction) Transaction {
+	return func(cluster *apiv1.Cluster) {
+		liveGeneration := cluster.Generation
+		cluster.Generation = generation
+		for _, tx := range txs {
+			tx(cluster)
+		}
+		cluster.Generation = liveGeneration
+	}
 }
