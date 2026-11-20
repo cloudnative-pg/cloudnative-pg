@@ -753,7 +753,7 @@ data type.
 The operator, the instance manager, and the PgBouncer instance manager can
 also push their logs, including the PostgreSQL and PGAudit records, to an
 [OpenTelemetry](https://opentelemetry.io/) collector via OTLP. This removes the
-need for a DaemonSet reading the node logs. The export is configured with the
+need for a `DaemonSet` reading the node logs. The export is configured with the
 standard `OTEL_*` environment variables, so each `Cluster` and `Pooler` can
 use its own collector, and it never slows down PostgreSQL: the standard output
 is unchanged and keeps every record.
