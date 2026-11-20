@@ -32,6 +32,16 @@ type RecordWriter interface {
 	Write(r NamedRecord)
 }
 
+// MultiRecordWriter writes each record to every configured writer
+type MultiRecordWriter []RecordWriter
+
+// Write writes the PostgreSQL log record to every configured writer
+func (writer MultiRecordWriter) Write(record NamedRecord) {
+	for _, item := range writer {
+		item.Write(record)
+	}
+}
+
 // LogRecordWriter implements the `RecordWriter` interface writing to the
 // instance manager logger
 type LogRecordWriter struct{}
