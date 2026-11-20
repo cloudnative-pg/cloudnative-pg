@@ -372,6 +372,21 @@ spec:
             path: ca.crt
 ```
 
+!!! Warning
+    The export sends the same records as the standard output, including the
+    PostgreSQL and PGAudit entries. They contain the text of the statements,
+    their parameters when PGAudit logs them, and the details of the errors,
+    which can hold passwords or personal data. With the export, they leave the
+    namespace for the endpoint you set. Send them only to a collector you
+    trust, and filter or redact them there if needed.
+
+    Always use an `https` endpoint, with `OTEL_EXPORTER_OTLP_CERTIFICATE` when
+    the collector uses a private CA. With `http` or
+    `OTEL_EXPORTER_OTLP_INSECURE`, the records and the authentication headers
+    travel in clear text. Keep the headers in a Secret that `envFrom` refers
+    to, as in the example, and not in `env`: the values of `env` are visible in
+    the specification of the `Cluster` and of its Pods.
+
 Each exported record carries the fields of the corresponding JSON entry:
 
 - `ts` is the timestamp;
