@@ -405,6 +405,9 @@ func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 	if err != nil {
 		return fmt.Errorf("could not create ApplicationDatabase: %w", err)
 	}
+	if err = SetupNewDatabase(context.Background(), dbSuperUser, info.ApplicationDatabase); err != nil {
+		return err
+	}
 	appDB, err := instance.ConnectionPool().Connection(info.ApplicationDatabase)
 	if err != nil {
 		return fmt.Errorf("could not get connection to ApplicationDatabase: %w", err)
@@ -420,6 +423,35 @@ func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 	}
 
 	return nil
+}
+
+// restrictInitialDatabases creates the metrics exporter role and revokes
+// CONNECT on the `postgres` and `template1` databases from PUBLIC.
+//
+// There is no explicit grant to the exporter here: SetupMetricsExporterRole
+// grants it on these databases when it creates the role, which always
+// happens on a new data directory. Creating the role and revoking PUBLIC in
+// the same transaction means that the exporter is never left without access.
+func restrictInitialDatabases(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("while starting a transaction to restrict the initial databases: %w", err)
+	}
+	defer func() {
+		// This is a no-op when the transaction is committed
+		_ = tx.Rollback()
+	}()
+
+	if err := SetupMetricsExporterRole(ctx, tx); err != nil {
+		return fmt.Errorf("while setting up the metrics exporter role: %w", err)
+	}
+	for _, database := range metricsExporterDefaultDatabases {
+		if err := RestrictDatabaseConnect(ctx, tx, database); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (info InitInfo) executeSQLRefs(sqlUser *sql.DB, directory string) error {
@@ -562,6 +594,16 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 	// Configure the instance and run the logical import process
 	if err := instance.WithActiveInstance(func() error {
+		// Restrict the databases created by initdb before running any user's
+		// SQL, which is then able to change it.
+		dbSuperUser, err := instance.GetSuperUserDB()
+		if err != nil {
+			return fmt.Errorf("while getting superuser database: %w", err)
+		}
+		if err := restrictInitialDatabases(ctx, dbSuperUser); err != nil {
+			return err
+		}
+
 		err = info.ConfigureNewInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
