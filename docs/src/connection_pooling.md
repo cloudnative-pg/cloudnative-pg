@@ -577,7 +577,9 @@ are the ones directly set by PgBouncer.
 - [`client_idle_timeout`](https://www.pgbouncer.org/config.html#client_idle_timeout)
 - [`client_login_timeout`](https://www.pgbouncer.org/config.html#client_login_timeout)
 - [`client_tls_ciphers`](https://www.pgbouncer.org/config.html#client_tls_ciphers)
-- [`client_tls_sslmode`](https://www.pgbouncer.org/config.html#client_tls_sslmode)
+- [`client_tls_sslmode`](https://www.pgbouncer.org/config.html#client_tls_sslmode):
+  CloudNativePG sets this to `prefer` rather than leaving it at PgBouncer's own
+  default, so TLS is used for client connections when the client supports it
 - [`client_tls13_ciphers`](https://www.pgbouncer.org/config.html#client_tls13_ciphers) (1.25+)
 - [`default_pool_size`](https://www.pgbouncer.org/config.html#default_pool_size)
 - [`disable_pqexec`](https://www.pgbouncer.org/config.html#disable_pqexec)
@@ -618,7 +620,10 @@ are the ones directly set by PgBouncer.
 - [`server_tls_ciphers`](https://www.pgbouncer.org/config.html#server_tls_ciphers)
 - [`server_tls13_ciphers`](https://www.pgbouncer.org/config.html#server_tls13_ciphers) (1.25+)
 - [`server_tls_protocols`](https://www.pgbouncer.org/config.html#server_tls_protocols)
-- [`server_tls_sslmode`](https://www.pgbouncer.org/config.html#server_tls_sslmode)
+- [`server_tls_sslmode`](https://www.pgbouncer.org/config.html#server_tls_sslmode):
+  CloudNativePG sets this to `verify-ca` rather than leaving it at PgBouncer's own
+  default, so connections from PgBouncer to PostgreSQL verify the server
+  certificate against the cluster CA
 - [`stats_period`](https://www.pgbouncer.org/config.html#stats_period)
 - [`suspend_timeout`](https://www.pgbouncer.org/config.html#suspend_timeout)
 - [`tcp_defer_accept`](https://www.pgbouncer.org/config.html#tcp_defer_accept)
