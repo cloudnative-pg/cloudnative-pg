@@ -64,6 +64,11 @@ var _ = Describe("setupMetricsExporterRole", func() {
 			WithArgs("cnpg_metrics_exporter").
 			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 		dbMock.ExpectExec(createSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+		// the role is granted CONNECT on the default databases only when created
+		dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "postgres" TO cnpg_metrics_exporter`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "template1" TO cnpg_metrics_exporter`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
 		// after CREATE ROLE … WITH LOGIN PASSWORD NULL, defaults satisfy the
 		// attribute check and the password is NULL; only pg_monitor is missing.
 		dbMock.ExpectQuery(attrsQuery).

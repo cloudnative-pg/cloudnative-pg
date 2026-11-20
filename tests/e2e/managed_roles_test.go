@@ -99,6 +99,23 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By("setting up cluster with managed roles", func() {
 				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 			})
+
+			// A new cluster doesn't let PUBLIC connect to the postgres database,
+			// and this suite connects with roles that have no other grants. It
+			// tests the roles, not the access to the database.
+			By("allowing every role to connect to the postgres database", func() {
+				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				_, _, err = exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.Name,
+					},
+					postgres.PostgresDBName,
+					"GRANT CONNECT ON DATABASE postgres TO PUBLIC")
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		assertInRoles := func(namespace, primaryPod, roleName string, expectedRoles []string) {
