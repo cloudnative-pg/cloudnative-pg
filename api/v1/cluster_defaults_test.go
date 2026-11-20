@@ -113,6 +113,26 @@ var _ = Describe("cluster default configuration", func() {
 		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Owner).To(Equal("appdb"))
 	})
 
+	It("does not default to initdb when pg_createsubscriber is used", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgCreateSubscriber: &BootstrapPgCreateSubscriber{
+						Source: "source-trove",
+					},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Bootstrap.InitDB).To(BeNil())
+		Expect(cluster.Spec.Bootstrap.PgCreateSubscriber).ToNot(BeNil())
+		Expect(cluster.Spec.Bootstrap.PgCreateSubscriber.Source).To(Equal("source-trove"))
+		Expect(cluster.Spec.Bootstrap.PgCreateSubscriber.Parameters).ToNot(BeNil())
+		Expect(*cluster.Spec.Bootstrap.PgCreateSubscriber.Parameters.RecoveryTimeout).To(Equal(3600))
+		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.ShouldCreateApplicationSecret()).To(BeFalse())
+	})
+
 	It("defaults the PostgreSQL configuration with parameters from the operator", func() {
 		cluster := Cluster{}
 		cluster.Default()
