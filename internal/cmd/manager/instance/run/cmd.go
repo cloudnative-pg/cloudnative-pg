@@ -129,6 +129,7 @@ func NewCmd() *cobra.Command {
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
 			}
 			if errors.Is(err, errWALArchivePluginNotAvailable) {
+				management.ShutdownLogExport()
 				os.Exit(apiv1.MissingWALArchivePlugin)
 			}
 
