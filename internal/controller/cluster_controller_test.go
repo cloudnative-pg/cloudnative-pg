@@ -1161,6 +1161,80 @@ var _ = Describe("Updating target primary", func() {
 		Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
 	})
 
+	Context("when no instance is ready and the current primary is one of them", func() {
+		var (
+			cluster    *apiv1.Cluster
+			instances  []corev1.Pod
+			resources  *managedResources
+			statusList postgres.PostgresqlStatusList
+		)
+
+		BeforeEach(func() {
+			namespace := newFakeNamespace(env.client)
+			cluster = newFakeCNPGCluster(env.client, namespace)
+
+			jobs := generateFakeInitDBJobs(env.client, cluster)
+			instances = generateFakeClusterPods(env.client, cluster, true)
+			pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+			resources = &managedResources{
+				nodes:     nil,
+				instances: corev1.PodList{Items: instances},
+				pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+				jobs:      batchv1.JobList{Items: jobs},
+			}
+
+			cluster.Status.CurrentPrimary = instances[0].Name
+
+			// All the Pods have just been recreated: none is ready, and the
+			// replicas have an LSN, while the primary is not reachable yet
+			statusList = postgres.PostgresqlStatusList{
+				Items: []postgres.PostgresqlStatus{
+					{
+						CurrentLsn:  cnpgTypes.LSN("0/0"),
+						ReceivedLsn: cnpgTypes.LSN("0/0"),
+						ReplayLsn:   cnpgTypes.LSN("0/0"),
+						Pod:         &instances[1],
+					},
+					{Pod: &instances[0], Error: fmt.Errorf("instance is starting")},
+				},
+			}
+		})
+
+		It("cancels a pending failover", func(ctx SpecContext) {
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, resources)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(BeEmpty())
+			Expect(cluster.Status.TargetPrimary).To(Equal(instances[0].Name))
+		})
+
+		It("does not start a failover", func(ctx SpecContext) {
+			cluster.Status.TargetPrimary = instances[0].Name
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, resources)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(BeEmpty())
+			Expect(cluster.Status.TargetPrimary).To(Equal(instances[0].Name))
+		})
+
+		It("keeps the failover when a replica is ready", func(ctx SpecContext) {
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+			statusList.Items[0].IsPodReady = true
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, resources)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(instances[1].Name))
+			Expect(cluster.Status.TargetPrimary).To(Equal(instances[1].Name))
+		})
+	})
+
 	It("skips a fenced instance and elects the healthy replica even if the fenced one sorts first", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)

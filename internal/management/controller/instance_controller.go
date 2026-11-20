@@ -1367,9 +1367,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			return reconcile.Result{}, err
 		}
 
-		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
-		if err := r.handlePromotion(ctx, cluster); err != nil {
-			return reconcile.Result{}, err
+		if result, err := r.promoteAfterGate(ctx, cluster); err != nil || !result.IsZero() {
+			return result, err
 		}
 	}
 
@@ -1413,8 +1412,11 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down
-		err := r.waitForWalReceiverDown(ctx)
-		if err != nil {
+		waitWalReceiverDown := r.waitWalReceiverDown
+		if waitWalReceiverDown == nil {
+			waitWalReceiverDown = r.waitForWalReceiverDown
+		}
+		if err := waitWalReceiverDown(ctx); err != nil {
 			return err
 		}
 	}

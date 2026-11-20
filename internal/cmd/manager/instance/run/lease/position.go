@@ -115,6 +115,34 @@ func (r *Runnable) queryInstanceLivePosition(ctx context.Context) (string, strin
 	return lsn, walFile, nil
 }
 
+// Position returns what the previous primary published on the primary lease,
+// as the value of the annotation (empty if the lease has none), and how long
+// ago the lease was last renewed, zero if not known. It fails unless this pod
+// holds the lease: from then on nobody else writes the annotation, so it is
+// what the previous primary left.
+func (r *Runnable) Position(ctx context.Context) (string, time.Duration, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.config.RenewDeadline)
+	defer cancel()
+
+	podName := r.instance.GetPodName()
+	lease, err := r.kubeClient.CoordinationV1().Leases(r.instance.GetNamespaceName()).
+		Get(ctx, r.instance.GetClusterName(), metav1.GetOptions{})
+	if err != nil {
+		return "", 0, err
+	}
+
+	if holder := lease.Spec.HolderIdentity; holder == nil || *holder != podName {
+		return "", 0, fmt.Errorf("the primary lease is not held by %s, its position is not final", podName)
+	}
+
+	var age time.Duration
+	if renewed := lease.Spec.RenewTime; renewed != nil {
+		age = time.Since(renewed.Time)
+	}
+
+	return lease.Annotations[utils.LeasePositionAnnotationName], age, nil
+}
+
 // MarkPromoting marks on the primary lease, before this instance promotes,
 // that it is about to. It must run before pg_ctl promote.
 //
