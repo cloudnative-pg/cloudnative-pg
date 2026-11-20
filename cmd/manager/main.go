@@ -47,6 +47,7 @@ func main() {
 	cobra.EnableTraverseRunHooks = true
 
 	err := newRootCmd().Execute()
+	// PostRunE doesn't run when RunE fails
 	management.ShutdownLogExport()
 	if err != nil {
 		os.Exit(1)

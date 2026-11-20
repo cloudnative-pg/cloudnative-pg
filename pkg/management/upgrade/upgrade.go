@@ -107,7 +107,8 @@ func FromReader(
 	// The queued log records are exported before the log pipes stop, so that
 	// an unreachable collector can only delay the upgrade, never leave the
 	// PostgreSQL log without a reader. The records written from now until the
-	// process is replaced are not exported.
+	// process is replaced are not exported, and neither are the ones after a
+	// failed reload, as the export stays stopped.
 	management.ShutdownLogExport()
 
 	// First we are going to cancel the context, this will trigger the shutdown of all

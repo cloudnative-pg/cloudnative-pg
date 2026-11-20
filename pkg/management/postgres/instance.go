@@ -960,9 +960,9 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
-	// Each pipe logs its exit when Start returns, which the exited
-	// condition doesn't wait for: waiting for Start too writes that record
-	// before the caller exits and stops the log export
+	// Each pipe logs its exit as Start returns, which the exited condition
+	// doesn't wait for. Wait for Start too, so that the record is written
+	// before the caller stops the log export
 	var pipes sync.WaitGroup
 	pipes.Add(3)
 

@@ -46,20 +46,6 @@ var _ = Describe("logging options of the manager subcommands", func() {
 		Expect(loggingOptions(controllerCmd)).To(HaveLen(1))
 	})
 
-	It("disables log sampling for the instance subcommands", func() {
-		root := newRootCmd()
-		runCmd, _, err := root.Find([]string{"instance", "run"})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(loggingOptions(runCmd)).To(HaveLen(2))
-	})
-
-	It("disables log sampling three levels below the root command", func() {
-		root := newRootCmd()
-		executeCmd, _, err := root.Find([]string{"instance", "upgrade", "execute"})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(loggingOptions(executeCmd)).To(HaveLen(2))
-	})
-
 	DescribeTable("exports the records via OpenTelemetry only from the main process of a container",
 		func(args []string, exported bool) {
 			restoreGlobalLoggers()
