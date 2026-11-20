@@ -22,6 +22,7 @@ package utils
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -215,6 +216,11 @@ func detectAvailableArchitectures(filepathGlob string) error {
 	binaries, err := filepath.Glob(filepathGlob)
 	if err != nil {
 		return err
+	}
+	// Glob returns no match and no error when the directory cannot be read, so an
+	// empty result is the only sign we get that the binaries are not reachable.
+	if len(binaries) == 0 {
+		return fmt.Errorf("no operator binary matches %q, running as uid %d", filepathGlob, os.Getuid())
 	}
 	for _, b := range binaries {
 		goArch := strings.Split(filepath.Base(b), "manager_")[1]
