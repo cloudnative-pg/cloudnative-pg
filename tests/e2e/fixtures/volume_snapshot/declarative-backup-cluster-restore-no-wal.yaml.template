@@ -15,7 +15,7 @@ spec:
   bootstrap:
     recovery:
       # The online backup has no WAL storage snapshot: the WAL files are fetched
-      # through plugin-barman-cloud from the archive of the source cluster.
+      # from the archive of the source cluster.
       source: cluster-declarative-backup
       volumeSnapshots:
         storage:
@@ -25,8 +25,16 @@ spec:
 
   externalClusters:
     - name: cluster-declarative-backup
-      plugin:
-        name: barman-cloud.cloudnative-pg.io
-        parameters:
-          barmanObjectName: cluster-declarative-backup
-          serverName: cluster-declarative-backup
+      barmanObjectStore:
+        destinationPath: s3://cluster-declarative-backup/
+        endpointURL: https://object-store.object-store:9000
+        endpointCA:
+          key: ca.crt
+          name: object-store-ca-secret
+        s3Credentials:
+          accessKeyId:
+            name: backup-storage-creds
+            key: ID
+          secretAccessKey:
+            name: backup-storage-creds
+            key: KEY

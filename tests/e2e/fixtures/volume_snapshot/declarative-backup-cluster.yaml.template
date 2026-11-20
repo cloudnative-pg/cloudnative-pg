@@ -22,12 +22,18 @@ spec:
           test-annotation: test
        labels:
           test-labels: test
-
-  # Archive WALs through plugin-barman-cloud: an online backup does not snapshot
-  # the WAL volume, so recovery fetches the WAL files from the archive. The
-  # referenced ObjectStore is created by the test.
-  plugins:
-    - name: barman-cloud.cloudnative-pg.io
-      isWALArchiver: true
-      parameters:
-        barmanObjectName: cluster-declarative-backup
+    # An online backup does not snapshot the WAL volume, so recovery fetches
+    # the WAL files from this archive.
+    barmanObjectStore:
+      destinationPath: s3://cluster-declarative-backup/
+      endpointURL: https://object-store.object-store:9000
+      endpointCA:
+        key: ca.crt
+        name: object-store-ca-secret
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
