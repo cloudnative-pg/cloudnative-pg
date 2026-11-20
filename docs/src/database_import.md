@@ -113,6 +113,8 @@ spec:
   instances: 3
 
   bootstrap:
+    database: angus
+    # owner: angus
     initdb:
       import:
         type: microservice
