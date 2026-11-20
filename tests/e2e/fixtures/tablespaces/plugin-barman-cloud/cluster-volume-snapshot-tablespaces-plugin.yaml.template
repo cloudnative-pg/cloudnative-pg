@@ -1,0 +1,40 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-tablespaces-volume-snapshot-plugin
+spec:
+  instances: 2
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  tablespaces:
+    - name: tbs1
+      storage:
+        storageClass: ${E2E_CSI_STORAGE_CLASS}
+        size: 1Gi
+    - name: tbs2
+      storage:
+        storageClass: ${E2E_CSI_STORAGE_CLASS}
+        size: 1Gi
+
+  backup:
+    volumeSnapshot:
+      className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}
+      snapshotOwnerReference: cluster
+
+  # WAL archiving through plugin-barman-cloud. The ObjectStore is created by the test.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: cluster-tablespaces-volume-snapshot-plugin
