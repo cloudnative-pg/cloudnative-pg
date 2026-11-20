@@ -503,6 +503,8 @@ RetentionPolicy
 RevokeUsageSpecType
 RoleBinding
 RoleConfiguration
+RoleGrant
+RoleGrants
 RoleStatus
 RoleStatusNotManaged
 RoleStatusPendingReconciliation
@@ -1047,6 +1049,7 @@ goroutines
 gosec
 govulncheck
 grafana
+grantor
 gzip
 hanshal
 hardcoded
@@ -1513,6 +1516,7 @@ ro
 robfig
 roleRef
 roleconfiguration
+rolegrant
 rolelist
 rolespec
 rolestate
