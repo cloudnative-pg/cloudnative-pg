@@ -106,11 +106,6 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
 		return "", nil
 	}
-
-	if handled, err := r.holdFailoverWhenNoInstanceIsReady(ctx, cluster, status); handled {
-		return "", err
-	}
-
 	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
 		return "", nil
 	}
@@ -221,46 +216,6 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	// Set the first pod in the sorted list as the new targetPrimary
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
-}
-
-// holdFailoverWhenNoInstanceIsReady handles the case where no Pod is ready and
-// the current primary is one of them: there is nothing to fail over to, as a
-// replica elected now has just been recreated and may miss WAL that only the
-// current primary has. This happens when all the Pods of the cluster are
-// deleted at once. The failover is not started, and a pending one is cancelled
-// so that the current primary can start again. If it can't, the failover is
-// evaluated again as soon as a Pod is ready.
-//
-// It returns true when the election must stop here.
-func (r *ClusterReconciler) holdFailoverWhenNoInstanceIsReady(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	status postgres.PostgresqlStatusList,
-) (bool, error) {
-	anyInstanceReady := slices.ContainsFunc(status.Items, func(s postgres.PostgresqlStatus) bool {
-		return s.IsPodReady
-	})
-	currentPrimaryKnown := slices.ContainsFunc(status.Items, func(s postgres.PostgresqlStatus) bool {
-		return s.Pod.Name == cluster.Status.CurrentPrimary
-	})
-	if anyInstanceReady || !currentPrimaryKnown {
-		return false, nil
-	}
-
-	switch cluster.Status.TargetPrimary {
-	case cluster.Status.CurrentPrimary:
-		return true, nil
-
-	case apiv1.PendingFailoverMarker:
-		log.FromContext(ctx).Info(
-			"No instance is ready, cancelling the failover to let the current primary start again",
-			"currentPrimary", cluster.Status.CurrentPrimary)
-		r.Recorder.Eventf(cluster, "Normal", "FailoverCancelled",
-			"No instance is ready, waiting for %v to start again", cluster.Status.CurrentPrimary)
-		return true, r.setPrimaryInstance(ctx, cluster, cluster.Status.CurrentPrimary)
-	}
-
-	return false, nil
 }
 
 // markOldPrimaryAsUnhealthy labels the old primary pod as unhealthy when failover

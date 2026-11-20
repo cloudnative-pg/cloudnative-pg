@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +43,17 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// podsChange alters the Pods of a cluster before its status is updated
+type podsChange func(pods []corev1.Pod) []corev1.Pod
+
+// changePrimary applies a change to the primary Pod only
+func changePrimary(change func(pod *corev1.Pod)) podsChange {
+	return func(pods []corev1.Pod) []corev1.Pod {
+		change(&pods[0])
+		return pods
+	}
+}
 
 var _ = Describe("cluster_status unit tests", func() {
 	var env *testingEnvironment
@@ -121,6 +133,53 @@ var _ = Describe("cluster_status unit tests", func() {
 			Expect(remoteCluster.Status.TargetPrimary).To(Equal(podName))
 		})
 	})
+
+	DescribeTable("resetUnavailableTargetPrimary with a switchover or a failover in progress",
+		func(ctx SpecContext, pendingFailover, replicaReady bool, changePods podsChange, expectReset bool) {
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			pods := generateFakeClusterPods(env.client, cluster, true)
+			for i := range pods {
+				if i != 1 || !replicaReady {
+					pods[i].Status.Conditions = nil
+				}
+			}
+
+			primary, replica := pods[0].Name, pods[1].Name
+			if changePods != nil {
+				pods = changePods(pods)
+			}
+
+			target := replica
+			if pendingFailover {
+				target = apiv1.PendingFailoverMarker
+			}
+			cluster.Status.CurrentPrimary = primary
+			cluster.Status.TargetPrimary = target
+
+			cluster.Status.ReadyInstances = utils.CountReadyPods(utils.FilterActivePods(pods))
+
+			env.clusterReconciler.resetUnavailableTargetPrimary(ctx, cluster,
+				&managedResources{instances: corev1.PodList{Items: pods}})
+
+			if expectReset {
+				target = primary
+			}
+			Expect(cluster.Status.TargetPrimary).To(Equal(target))
+		},
+		Entry("cancels a switchover when no instance is ready", false, false, nil, true),
+		Entry("keeps a switchover when the target is ready", false, true, nil, false),
+		Entry("cancels a pending failover when no instance is ready", true, false, nil, true),
+		Entry("keeps a pending failover when a replica is ready", true, true, nil, false),
+		Entry("cancels a pending failover when the primary is starting", true, false,
+			changePrimary(func(pod *corev1.Pod) { pod.Status.Phase = corev1.PodPending }), true),
+		Entry("keeps a pending failover when the primary is being deleted", true, false,
+			changePrimary(func(pod *corev1.Pod) { pod.DeletionTimestamp = &metav1.Time{Time: time.Now()} }), false),
+		Entry("keeps a pending failover when the primary was evicted", true, false,
+			changePrimary(func(pod *corev1.Pod) { pod.Status.Phase = corev1.PodFailed }), false),
+		Entry("keeps a pending failover when the primary Pod is missing", true, false,
+			func(pods []corev1.Pod) []corev1.Pod { return pods[1:] }, false),
+	)
 
 	It("makes sure RegisterPhase works correctly", func() {
 		const phaseReason = "testing"
