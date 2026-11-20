@@ -21,11 +21,9 @@ package restore
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
-	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,7 +75,7 @@ func restoreSubCommand(ctx context.Context, info postgres.InitInfo, cli client.C
 
 	if err := info.Restore(ctx, cli); err != nil {
 		contextLogger.Error(err, "Error while restoring a backup")
-		cleanupDataDirectoryIfNeeded(ctx, err, info.PgData)
+		cleanupRestoreTargetDirectories(ctx, info.PgData, info.PgWal)
 		return err
 	}
 
@@ -86,23 +84,23 @@ func restoreSubCommand(ctx context.Context, info postgres.InitInfo, cli client.C
 	return nil
 }
 
-func cleanupDataDirectoryIfNeeded(ctx context.Context, restoreError error, dataDirectory string) {
+func cleanupRestoreTargetDirectories(ctx context.Context, dataDirectory, walDirectory string) {
+	cleanupRestoreTargetDirectory(ctx, "data", dataDirectory)
+	cleanupRestoreTargetDirectory(ctx, "WAL", walDirectory)
+}
+
+func cleanupRestoreTargetDirectory(ctx context.Context, directoryType, directory string) {
+	if directory == "" {
+		return
+	}
+
 	contextLogger := log.FromContext(ctx)
-
-	var barmanError *barmanCommand.CloudRestoreError
-	if !errors.As(restoreError, &barmanError) {
-		return
-	}
-
-	if !barmanError.IsRetriable() {
-		return
-	}
-
-	contextLogger.Info("Cleaning up data directory", "directory", dataDirectory)
-	if err := fileutils.RemoveDirectory(dataDirectory); err != nil && !os.IsNotExist(err) {
+	contextLogger.Info("Cleaning up restore target directory", "type", directoryType, "directory", directory)
+	if err := fileutils.RemoveDirectory(directory); err != nil && !os.IsNotExist(err) {
 		contextLogger.Error(
 			err,
-			"error occurred cleaning up data directory",
-			"directory", dataDirectory)
+			"error occurred cleaning up restore target directory",
+			"type", directoryType,
+			"directory", directory)
 	}
 }
