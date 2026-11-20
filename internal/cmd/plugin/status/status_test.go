@@ -21,6 +21,8 @@ package status
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -292,5 +294,37 @@ var _ = Describe("status without the pods/exec permission", func() {
 
 		Expect(err).To(MatchError(utils.ErrorContainerNotFound))
 		Expect(client.Actions()).To(BeEmpty())
+	})
+})
+
+var _ = Describe("PostgresqlStatus JSON serialization", func() {
+	It("should serialize the messages of the errors in ErrorList", func() {
+		status := PostgresqlStatus{
+			ErrorList: []error{
+				errors.New("first extraction failure"),
+				fmt.Errorf("wrapped: %w", errors.New("second extraction failure")),
+			},
+			TotalClusterSize: "1GiB",
+		}
+
+		data, err := json.Marshal(status)
+		Expect(err).ToNot(HaveOccurred())
+
+		var decoded map[string]interface{}
+		Expect(json.Unmarshal(data, &decoded)).To(Succeed())
+		Expect(decoded["ErrorList"]).To(Equal([]interface{}{
+			"first extraction failure",
+			"wrapped: second extraction failure",
+		}))
+		Expect(decoded["TotalClusterSize"]).To(Equal("1GiB"))
+	})
+
+	It("should serialize a nil ErrorList as null", func() {
+		data, err := json.Marshal(PostgresqlStatus{})
+		Expect(err).ToNot(HaveOccurred())
+
+		var decoded map[string]interface{}
+		Expect(json.Unmarshal(data, &decoded)).To(Succeed())
+		Expect(decoded).To(HaveKeyWithValue("ErrorList", BeNil()))
 	})
 })
