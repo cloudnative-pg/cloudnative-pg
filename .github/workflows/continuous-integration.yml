@@ -732,7 +732,7 @@ jobs:
           images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
-          cosign sign --yes ${images}
+          cosign sign --yes --recursive ${images}
 
       - name: Prepare images matrix
         if: env.PUSH == 'true'

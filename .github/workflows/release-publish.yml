@@ -269,7 +269,7 @@ jobs:
           images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
-          cosign sign --yes ${images}
+          cosign sign --yes --recursive ${images}
       -
         # Bake returns all the tags for a target's variant in a comma separated list.
         # We only care about a single tag for OLM, so we remove the "latest" tag and
