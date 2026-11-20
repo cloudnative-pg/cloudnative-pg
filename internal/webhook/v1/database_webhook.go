@@ -213,6 +213,9 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 // expanded before checking: for each privilege, a role can appear only once,
 // either granted or revoked. Repeating the same entry is most likely a mistake
 // in the specification, so it is rejected too.
+//
+// The metrics exporter is always granted the CONNECT privilege by the
+// operator, so it cannot be listed in the `connect` and `all` lists.
 func (v *DatabaseCustomValidator) validatePermissions(d *apiv1.Database) field.ErrorList {
 	if d.Spec.Permissions == nil {
 		return nil
@@ -225,7 +228,7 @@ func (v *DatabaseCustomValidator) validatePermissions(d *apiv1.Database) field.E
 		field   string
 		entries []apiv1.UsageSpec
 	}{
-		{"connect", permissions.Connect},
+		{connectPrivilegeField, permissions.Connect},
 		{"create", permissions.Create},
 		{"temporary", permissions.Temporary},
 	}
@@ -235,6 +238,14 @@ func (v *DatabaseCustomValidator) validatePermissions(d *apiv1.Database) field.E
 		// the type requested for each role, once `all` has been expanded
 		requested := make(map[string]apiv1.UsageSpecType)
 		check := func(entryPath *field.Path, entry apiv1.UsageSpec) {
+			if privilege.field == connectPrivilegeField && entry.Name == apiv1.MetricsExporterUserName {
+				result = append(result, field.Forbidden(
+					entryPath.Child("name"),
+					"the CONNECT privilege of the role is managed by the operator",
+				))
+				return
+			}
+
 			entryType := entry.Type
 			if entryType == "" {
 				entryType = apiv1.GrantUsageSpecType
@@ -385,3 +396,7 @@ func granteeKey(name string) string {
 // publicRole is the PostgreSQL PUBLIC pseudo-role, which the instance manager
 // emits verbatim rather than as a quoted identifier when applying grants.
 const publicRole = "PUBLIC"
+
+// connectPrivilegeField is the name of the list of the CONNECT privilege in
+// the permissions of a database
+const connectPrivilegeField = "connect"

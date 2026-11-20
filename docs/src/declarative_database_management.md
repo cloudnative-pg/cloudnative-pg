@@ -218,9 +218,6 @@ spec:
     connect:
       - name: app
         type: grant
-      # the metrics exporter needs it, see the warning below
-      - name: cnpg_metrics_exporter
-        type: grant
       - name: public
         type: revoke
     create:
@@ -289,6 +286,32 @@ the `grant` entries first. This way, the roles receive the privilege before
 `public` loses it. If a grant fails, the revoke is still applied and the
 failed grant is retried.
 
+To revoke `CONNECT` from `public` without listing it, set
+`revokePublicConnect` to `true`:
+
+```yaml
+# ...
+spec:
+  name: app
+  owner: app
+  cluster:
+    name: cluster-example
+  permissions:
+    revokePublicConnect: true
+    connect:
+      - name: reporting
+# ...
+```
+
+This revokes `CONNECT` from `public` on the database, after the roles listed in
+the `connect` list have been granted it. The owner of the database can always
+connect. A role listed in the `connect` list is not affected by this setting,
+so an explicit entry for `public` takes precedence over it. The setting is
+independent of `.spec.postgresql.revokePublicConnect` in the `Cluster`, which
+applies only to the `postgres` database and to the database created by the
+bootstrap, and not to the databases declared with `Database` resources.
+Setting it back to `false` does not give `CONNECT` back to `public`.
+
 :::info
     CloudNativePG manages database permissions using the
     [`GRANT`](https://www.postgresql.org/docs/current/sql-grant.html) and
@@ -321,9 +344,12 @@ failed grant is retried.
     queries the application database of the cluster by default, so if that
     database loses `CONNECT`, all the [default metrics](monitoring.md#default-set-of-metrics) and the
     user-defined ones without `target_databases` stop. For any other database,
-    only the user-defined metrics that target it fail or are skipped. Grant
-    `CONNECT` to `cnpg_metrics_exporter` too, for example with an entry in the
-    `connect` list.
+    only the user-defined metrics that target it fail or are skipped.
+    For this reason, CloudNativePG always grants `CONNECT` on the database to
+    `cnpg_metrics_exporter`, before applying the other entries, so a revoke from
+    `public` does not affect the exporter. The role cannot be listed in the
+    `connect` and `all` lists, and the grant appears in the status of the
+    `Database` resource.
 :::
 
 ## Managing Extensions in a Database

@@ -474,6 +474,29 @@ var _ = Describe("Database validation", func() {
 			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
 		})
 
+		It("rejects the metrics exporter in the connect and all lists", func() {
+			db := withPermissions(&apiv1.DatabasePermissionsSpec{
+				Connect: []apiv1.UsageSpec{{Name: apiv1.MetricsExporterUserName, Type: apiv1.RevokeUsageSpecType}},
+				All:     []apiv1.UsageSpec{{Name: apiv1.MetricsExporterUserName, Type: apiv1.GrantUsageSpecType}},
+			})
+			errs := v.validate(db)
+			Expect(extractErrorFields(errs)).To(ConsistOf(
+				"spec.permissions.connect[0].name",
+				"spec.permissions.all[0].name",
+			))
+			for _, err := range errs {
+				Expect(err.Type).To(Equal(field.ErrorTypeForbidden))
+			}
+		})
+
+		It("accepts the metrics exporter in the create and temporary lists", func() {
+			db := withPermissions(&apiv1.DatabasePermissionsSpec{
+				Create:    []apiv1.UsageSpec{{Name: apiv1.MetricsExporterUserName, Type: apiv1.RevokeUsageSpecType}},
+				Temporary: []apiv1.UsageSpec{{Name: apiv1.MetricsExporterUserName, Type: apiv1.RevokeUsageSpecType}},
+			})
+			Expect(v.validate(db)).To(BeEmpty())
+		})
+
 		It("treats every spelling of public as the PUBLIC pseudo-role", func() {
 			db := withPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{

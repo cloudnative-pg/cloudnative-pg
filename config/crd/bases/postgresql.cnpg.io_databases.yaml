@@ -426,6 +426,16 @@ spec:
                       - name
                       type: object
                     type: array
+                  revokePublicConnect:
+                    description: |-
+                      If this parameter is true, the `CONNECT` privilege on the database is
+                      revoked from `PUBLIC`. The owner of the database can always connect.
+                      The entries of the `connect` list take precedence: the roles listed there
+                      are not affected by this setting. It is independent of the
+                      `.spec.postgresql.revokePublicConnect` setting of the `Cluster`.
+                      Setting it to `false` afterwards does not restore the privilege.
+                      Defaults to false.
+                    type: boolean
                   temporary:
                     description: |-
                       List of roles for which the `TEMPORARY` privilege on the database is granted or revoked.

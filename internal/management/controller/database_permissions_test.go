@@ -22,6 +22,7 @@ package controller
 import (
 	"database/sql"
 	"errors"
+	"slices"
 
 	"github.com/DATA-DOG/go-sqlmock"
 
@@ -69,13 +70,21 @@ var _ = Describe("Database permissions", func() {
 		return result
 	}
 
+	// expandUserPermissions expands the permissions without the grant to the
+	// metrics exporter that the operator adds, to test the entries of the user
+	expandUserPermissions := func(permissions *apiv1.DatabasePermissionsSpec) []databasePermissionChange {
+		return slices.DeleteFunc(expandDatabasePermissions(permissions), func(change databasePermissionChange) bool {
+			return change.name == apiv1.MetricsExporterUserName
+		})
+	}
+
 	Describe("expandDatabasePermissions", func() {
 		It("returns nothing without permissions", func() {
-			Expect(expandDatabasePermissions(nil)).To(BeEmpty())
+			Expect(expandUserPermissions(nil)).To(BeEmpty())
 		})
 
 		It("defaults to grant and keeps the order of the specification", func() {
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect:   []apiv1.UsageSpec{{Name: "zeta"}, revoke("public"), grant("app")},
 				Temporary: []apiv1.UsageSpec{revoke("app")},
 			})
@@ -87,7 +96,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("applies the entries of all after the ones of the privilege", func() {
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				All:     []apiv1.UsageSpec{grant("from-all")},
 				Connect: []apiv1.UsageSpec{grant("from-connect")},
 			})
@@ -97,7 +106,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("expands all into the three privileges", func() {
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				All: []apiv1.UsageSpec{grant("app")},
 			})
 			Expect(changes).To(HaveLen(3))
@@ -106,7 +115,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("flags an entry that is repeated, as the webhook could have been bypassed", func() {
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("app"), grant("app")},
 				All:     []apiv1.UsageSpec{grant("app")},
 			})
@@ -117,7 +126,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("flags conflicting entries, as the webhook could have been bypassed", func() {
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{revoke("app")},
 				All:     []apiv1.UsageSpec{grant("app")},
 			})
@@ -127,11 +136,90 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("folds every spelling of public into the same grantee", func() {
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("public"), revoke("PUBLIC")},
 			})
 			Expect(changes).To(HaveLen(1))
 			Expect(changes[0].err).To(MatchError(errConflictingDatabasePermission))
+		})
+
+		Context("with revokePublicConnect", func() {
+			It("revokes CONNECT from public on its own", func() {
+				changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
+					RevokePublicConnect: true,
+				})
+				Expect(changes).To(HaveLen(1))
+				Expect(changes[0].privilege).To(Equal("CONNECT"))
+				Expect(changes[0].name).To(Equal("PUBLIC"))
+				Expect(changes[0].changeType).To(Equal(apiv1.RevokeUsageSpecType))
+				Expect(changes[0].err).ToNot(HaveOccurred())
+			})
+
+			It("revokes after the other CONNECT entries", func() {
+				changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
+					RevokePublicConnect: true,
+					Connect:             []apiv1.UsageSpec{grant("app")},
+					All:                 []apiv1.UsageSpec{grant("reporting")},
+				})
+				Expect(changes).To(HaveLen(5))
+				Expect(changes[0].name).To(Equal("app"))
+				Expect(changes[1].name).To(Equal("reporting"))
+				Expect(changes[2].name).To(Equal("PUBLIC"))
+				Expect(changes[2].privilege).To(Equal("CONNECT"))
+			})
+
+			It("leaves public to the user when it is listed under connect", func() {
+				changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
+					RevokePublicConnect: true,
+					Connect:             []apiv1.UsageSpec{grant("Public")},
+				})
+				Expect(changes).To(HaveLen(1))
+				Expect(changes[0].changeType).To(Equal(apiv1.GrantUsageSpecType))
+				Expect(changes[0].err).ToNot(HaveOccurred())
+			})
+
+			It("leaves public to the user when it is listed under all", func() {
+				changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
+					RevokePublicConnect: true,
+					All:                 []apiv1.UsageSpec{revoke("public")},
+				})
+				Expect(changes).To(HaveLen(3))
+				for _, change := range changes {
+					Expect(change.err).ToNot(HaveOccurred())
+				}
+			})
+
+			It("revokes from public only CONNECT", func() {
+				changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
+					RevokePublicConnect: true,
+					Create:              []apiv1.UsageSpec{grant("app")},
+				})
+				Expect(changes).To(HaveLen(2))
+				Expect(changes[0].privilege).To(Equal("CONNECT"))
+				Expect(changes[1].privilege).To(Equal("CREATE"))
+			})
+		})
+
+		Context("with the metrics exporter", func() {
+			It("grants CONNECT to the exporter before the entries of the user", func() {
+				changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+					RevokePublicConnect: true,
+					Connect:             []apiv1.UsageSpec{revoke("public"), grant("app")},
+				})
+				Expect(changes).To(HaveLen(3))
+				Expect(changes[0].name).To(Equal(apiv1.MetricsExporterUserName))
+				Expect(changes[0].privilege).To(Equal("CONNECT"))
+				Expect(changes[0].changeType).To(Equal(apiv1.GrantUsageSpecType))
+				Expect(changes[1].name).To(Equal("public"))
+			})
+
+			It("only grants CONNECT to the exporter without permissions", func() {
+				for _, permissions := range []*apiv1.DatabasePermissionsSpec{nil, {}} {
+					changes := expandDatabasePermissions(permissions)
+					Expect(changes).To(HaveLen(1))
+					Expect(changes[0].name).To(Equal(apiv1.MetricsExporterUserName))
+				}
+			})
 		})
 	})
 
@@ -143,7 +231,7 @@ var _ = Describe("Database permissions", func() {
 			permissions *apiv1.DatabasePermissionsSpec,
 			oids map[string]int64,
 		) []databasePermissionChange {
-			changes := expandDatabasePermissions(permissions)
+			changes := expandUserPermissions(permissions)
 			for i := range changes {
 				if granteeKey(changes[i].name) != publicRole {
 					changes[i].granteeOid = oids[changes[i].name]
@@ -212,7 +300,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("leaves untouched the changes that already failed", func() {
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("ghost")},
 			})
 			changes[0].err = errDatabasePermissionRoleNotFound
@@ -243,7 +331,7 @@ var _ = Describe("Database permissions", func() {
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("app"), revoke("public")},
 			})
 			Expect(decorateDatabasePermissions(ctx, db, changes)).To(Succeed())
@@ -257,7 +345,7 @@ var _ = Describe("Database permissions", func() {
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				All: []apiv1.UsageSpec{grant("app")},
 			})
 			Expect(decorateDatabasePermissions(ctx, db, changes)).To(Succeed())
@@ -272,7 +360,7 @@ var _ = Describe("Database permissions", func() {
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("phantom").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}))
 
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("ghost"), revoke("phantom")},
 			})
 			Expect(decorateDatabasePermissions(ctx, db, changes)).To(Succeed())
@@ -281,7 +369,7 @@ var _ = Describe("Database permissions", func() {
 		})
 
 		It("does not look up the roles of the changes that already failed", func(ctx SpecContext) {
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("app")},
 			})
 			changes[0].err = errRepeatedDatabasePermission
@@ -293,7 +381,7 @@ var _ = Describe("Database permissions", func() {
 		It("returns the error of a failing lookup", func(ctx SpecContext) {
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").WillReturnError(errors.New("boom"))
 
-			changes := expandDatabasePermissions(&apiv1.DatabasePermissionsSpec{
+			changes := expandUserPermissions(&apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("app")},
 			})
 			Expect(decorateDatabasePermissions(ctx, db, changes)).To(MatchError(ContainSubstring("boom")))
@@ -329,14 +417,37 @@ var _ = Describe("Database permissions", func() {
 					AddRow(10, "CONNECT").AddRow(10, "CREATE").AddRow(10, "TEMPORARY"))
 		}
 
-		It("does nothing without permissions", func(ctx SpecContext) {
-			Expect(reconcile(ctx, nil)).To(BeEmpty())
+		expectExporterLookup := func() {
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs(apiv1.MetricsExporterUserName).
+				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(30))
+		}
+
+		expectExporterGrant := func() {
+			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "cnpg_metrics_exporter"`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+		}
+
+		exporterStatus := apiv1.DatabasePermissionStatus{
+			Privilege: "CONNECT",
+			Name:      apiv1.MetricsExporterUserName,
+			Type:      apiv1.GrantUsageSpecType,
+			Applied:   true,
+		}
+
+		It("only grants CONNECT to the metrics exporter without permissions", func(ctx SpecContext) {
+			expectDefaultACL()
+			expectExporterLookup()
+			expectExporterGrant()
+
+			Expect(reconcile(ctx, nil)).To(Equal([]apiv1.DatabasePermissionStatus{exporterStatus}))
 		})
 
 		It("applies the changes and reports every entry", func(ctx SpecContext) {
 			expectDefaultACL()
+			expectExporterLookup()
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
+			expectExporterGrant()
 			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "app"`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
 			dbMock.ExpectExec(`REVOKE CONNECT ON DATABASE "my-db" FROM PUBLIC`).
@@ -346,6 +457,7 @@ var _ = Describe("Database permissions", func() {
 				Connect: []apiv1.UsageSpec{grant("app"), revoke("public")},
 			})
 			Expect(statuses).To(Equal([]apiv1.DatabasePermissionStatus{
+				exporterStatus,
 				{Privilege: "CONNECT", Name: "app", Type: apiv1.GrantUsageSpecType, Applied: true},
 				{Privilege: "CONNECT", Name: "public", Type: apiv1.RevokeUsageSpecType, Applied: true},
 			}))
@@ -353,8 +465,10 @@ var _ = Describe("Database permissions", func() {
 
 		It("applies the entries in the order of the specification", func(ctx SpecContext) {
 			expectDefaultACL()
+			expectExporterLookup()
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
+			expectExporterGrant()
 			dbMock.ExpectExec(`REVOKE CONNECT ON DATABASE "my-db" FROM PUBLIC`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
 			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "app"`).
@@ -363,33 +477,38 @@ var _ = Describe("Database permissions", func() {
 			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{revoke("public"), grant("app")},
 			})
-			Expect(statuses).To(HaveLen(2))
-			Expect(statuses[0].Name).To(Equal("public"))
-			Expect(statuses[1].Name).To(Equal("app"))
+			Expect(statuses).To(HaveLen(3))
+			Expect(statuses[0].Name).To(Equal(apiv1.MetricsExporterUserName))
+			Expect(statuses[1].Name).To(Equal("public"))
+			Expect(statuses[2].Name).To(Equal("app"))
 		})
 
 		It("applies the other entries when a role does not exist", func(ctx SpecContext) {
 			expectDefaultACL()
+			expectExporterLookup()
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("ghost").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}))
+			expectExporterGrant()
 			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "app"`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("app"), grant("ghost")},
 			})
-			Expect(statuses).To(HaveLen(2))
-			Expect(statuses[0].Applied).To(BeTrue())
-			Expect(statuses[1].Applied).To(BeFalse())
-			Expect(statuses[1].Message).To(Equal("role does not exist"))
+			Expect(statuses).To(HaveLen(3))
+			Expect(statuses[1].Applied).To(BeTrue())
+			Expect(statuses[2].Applied).To(BeFalse())
+			Expect(statuses[2].Message).To(Equal("role does not exist"))
 		})
 
 		It("reports a failing statement against its entry only", func(ctx SpecContext) {
 			expectDefaultACL()
+			expectExporterLookup()
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
+			expectExporterGrant()
 			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "app"`).
 				WillReturnError(errors.New("boom"))
 			dbMock.ExpectExec(`REVOKE CONNECT ON DATABASE "my-db" FROM PUBLIC`).
@@ -398,9 +517,10 @@ var _ = Describe("Database permissions", func() {
 			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("app"), revoke("public")},
 			})
-			Expect(statuses[0].Applied).To(BeFalse())
-			Expect(statuses[0].Message).To(Equal("boom"))
-			Expect(statuses[1].Applied).To(BeTrue())
+			Expect(statuses).To(HaveLen(3))
+			Expect(statuses[1].Applied).To(BeFalse())
+			Expect(statuses[1].Message).To(Equal("boom"))
+			Expect(statuses[2].Applied).To(BeTrue())
 		})
 
 		It("reports the failure to read the ACL against every entry", func(ctx SpecContext) {
@@ -409,7 +529,7 @@ var _ = Describe("Database permissions", func() {
 			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
 				All: []apiv1.UsageSpec{grant("app")},
 			})
-			Expect(statuses).To(HaveLen(3))
+			Expect(statuses).To(HaveLen(4))
 			for _, status := range statuses {
 				Expect(status.Applied).To(BeFalse())
 				Expect(status.Message).To(ContainSubstring("no connection"))
@@ -418,17 +538,91 @@ var _ = Describe("Database permissions", func() {
 
 		It("is idempotent: nothing is executed when the ACL matches", func(ctx SpecContext) {
 			dbMock.ExpectQuery(expectedACLQuery).WithArgs("my-db").WillReturnRows(
-				sqlmock.NewRows([]string{"grantee", "privilege_type"}).AddRow(20, "CONNECT"))
+				sqlmock.NewRows([]string{"grantee", "privilege_type"}).AddRow(20, "CONNECT").AddRow(30, "CONNECT"))
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs(apiv1.MetricsExporterUserName).
+				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(30))
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("app").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(20))
 
 			statuses := reconcile(ctx, &apiv1.DatabasePermissionsSpec{
 				Connect: []apiv1.UsageSpec{grant("app"), revoke("public")},
 			})
-			Expect(statuses).To(HaveLen(2))
+			Expect(statuses).To(HaveLen(3))
 			for _, status := range statuses {
 				Expect(status.Applied).To(BeTrue())
 			}
+		})
+	})
+
+	Describe("applyClusterDatabasePermissions", func() {
+		var (
+			dbMock sqlmock.Sqlmock
+			db     *sql.DB
+		)
+
+		BeforeEach(func() {
+			var err error
+			db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+		})
+
+		expectACL := func(rows ...[2]any) {
+			result := sqlmock.NewRows([]string{"grantee", "privilege_type"})
+			for _, row := range rows {
+				result.AddRow(row[0], row[1])
+			}
+			dbMock.ExpectQuery(expectedACLQuery).WithArgs("my-db").WillReturnRows(result)
+		}
+
+		expectExporterLookup := func() {
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs(apiv1.MetricsExporterUserName).
+				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(30))
+		}
+
+		It("grants CONNECT to the exporter, then revokes it from PUBLIC", func(ctx SpecContext) {
+			expectACL([2]any{10, "CONNECT"}, [2]any{0, "CONNECT"}, [2]any{0, "TEMPORARY"})
+			expectExporterLookup()
+			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "cnpg_metrics_exporter"`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			dbMock.ExpectExec(`REVOKE CONNECT ON DATABASE "my-db" FROM PUBLIC`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+
+			Expect(applyClusterDatabasePermissions(ctx, db, "my-db", true)).To(Succeed())
+		})
+
+		It("leaves PUBLIC alone unless asked to revoke it", func(ctx SpecContext) {
+			expectACL([2]any{10, "CONNECT"}, [2]any{0, "CONNECT"})
+			expectExporterLookup()
+			dbMock.ExpectExec(`GRANT CONNECT ON DATABASE "my-db" TO "cnpg_metrics_exporter"`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+
+			Expect(applyClusterDatabasePermissions(ctx, db, "my-db", false)).To(Succeed())
+		})
+
+		It("does nothing when everything is already applied", func(ctx SpecContext) {
+			expectACL([2]any{10, "CONNECT"}, [2]any{30, "CONNECT"})
+			expectExporterLookup()
+
+			Expect(applyClusterDatabasePermissions(ctx, db, "my-db", true)).To(Succeed())
+		})
+
+		It("does nothing when the database doesn't exist", func(ctx SpecContext) {
+			expectACL()
+
+			Expect(applyClusterDatabasePermissions(ctx, db, "my-db", true)).To(Succeed())
+		})
+
+		It("fails when the exporter role doesn't exist", func(ctx SpecContext) {
+			expectACL([2]any{10, "CONNECT"})
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs(apiv1.MetricsExporterUserName).
+				WillReturnRows(sqlmock.NewRows([]string{"oid"}))
+
+			Expect(applyClusterDatabasePermissions(ctx, db, "my-db", false)).
+				To(MatchError(errDatabasePermissionRoleNotFound))
 		})
 	})
 })

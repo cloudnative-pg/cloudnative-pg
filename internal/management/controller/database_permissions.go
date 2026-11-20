@@ -58,6 +58,10 @@ var (
 	// errDatabasePermissionRoleNotFound is raised when the role of a
 	// permission doesn't exist in PostgreSQL
 	errDatabasePermissionRoleNotFound = errors.New("role does not exist")
+
+	// errDatabaseNotFound is raised when the database of the permissions
+	// doesn't exist in PostgreSQL
+	errDatabaseNotFound = errors.New("database does not exist")
 )
 
 // databaseACLKey identifies an explicit privilege held by a grantee in the
@@ -97,18 +101,26 @@ type databasePermissionChange struct {
 // flags the first change of that role with an error. The changes are grouped
 // by privilege and, within each privilege, follow the order of the
 // specification, with the `all` entries last.
+//
+// The CONNECT changes are preceded by the grant to the metrics exporter and
+// followed by the revoke from PUBLIC, when `revokePublicConnect` is set.
 func expandDatabasePermissions(
 	permissions *apiv1.DatabasePermissionsSpec,
 ) []databasePermissionChange {
 	if permissions == nil {
-		return nil
+		permissions = &apiv1.DatabasePermissionsSpec{}
 	}
 
 	lists := []struct {
 		privilege string
 		entries   []apiv1.UsageSpec
 	}{
-		{connectPrivilege, slices.Concat(permissions.Connect, permissions.All)},
+		{connectPrivilege, slices.Concat(
+			metricsExporterConnect(),
+			permissions.Connect,
+			permissions.All,
+			publicConnectRevocation(permissions),
+		)},
 		{createPrivilege, slices.Concat(permissions.Create, permissions.All)},
 		{temporaryPrivilege, slices.Concat(permissions.Temporary, permissions.All)},
 	}
@@ -142,6 +154,36 @@ func expandDatabasePermissions(
 	}
 
 	return result
+}
+
+// publicConnectRevocation returns the entry that revokes CONNECT from PUBLIC
+// when `revokePublicConnect` is set. As for the `all` shortcut, it is listed
+// after the other entries, so that the roles are granted the privilege before
+// PUBLIC loses it, and it is omitted when the user lists PUBLIC, so that the
+// entry of the user takes precedence.
+func publicConnectRevocation(permissions *apiv1.DatabasePermissionsSpec) []apiv1.UsageSpec {
+	if !permissions.RevokePublicConnect ||
+		listsGrantee(slices.Concat(permissions.Connect, permissions.All), publicRole) {
+		return nil
+	}
+
+	return []apiv1.UsageSpec{{Name: publicRole, Type: apiv1.RevokeUsageSpecType}}
+}
+
+// metricsExporterConnect returns the entry that grants CONNECT to the metrics
+// exporter. The exporter needs to connect whatever the privileges of PUBLIC
+// are, so the entry is listed before the ones of the user, and PUBLIC cannot
+// lose the privilege before the exporter is granted it. The webhook rejects the
+// entries of the user about the exporter, as they would repeat this one.
+func metricsExporterConnect() []apiv1.UsageSpec {
+	return []apiv1.UsageSpec{{Name: apiv1.MetricsExporterUserName, Type: apiv1.GrantUsageSpecType}}
+}
+
+// listsGrantee returns true if one of the entries is about the grantee
+func listsGrantee(entries []apiv1.UsageSpec, grantee string) bool {
+	return slices.ContainsFunc(entries, func(entry apiv1.UsageSpec) bool {
+		return granteeKey(entry.Name) == granteeKey(grantee)
+	})
 }
 
 // granteeKey returns the key that identifies a grantee, so that every spelling
@@ -295,6 +337,12 @@ func computeDatabasePermissionsPlan(
 		return changes, fmt.Errorf("while reading the permissions of database %q: %w", databaseName, err)
 	}
 
+	// The owner of a database always holds an entry in its ACL, so an empty
+	// ACL means that the database doesn't exist
+	if len(acl) == 0 {
+		return changes, errDatabaseNotFound
+	}
+
 	if err := decorateDatabasePermissions(ctx, db, changes); err != nil {
 		return changes, err
 	}
@@ -310,35 +358,10 @@ func reconcileDatabasePermissions(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) []apiv1.DatabasePermissionStatus {
-	databaseName := obj.Spec.Name
+	changes := applyDatabasePermissions(ctx, db, obj.Spec.Name, obj.Spec.Permissions)
 
-	changes := expandDatabasePermissions(obj.Spec.Permissions)
-	if len(changes) == 0 {
-		return nil
-	}
-
-	plan, err := computeDatabasePermissionsPlan(ctx, db, databaseName, changes)
-	if err != nil {
-		for i := range plan {
-			plan[i].err = err
-		}
-	}
-
-	contextLogger := log.FromContext(ctx)
-	statuses := make([]apiv1.DatabasePermissionStatus, 0, len(plan))
-	for _, change := range plan {
-		if change.err == nil && change.statement != "" {
-			if _, err := db.ExecContext(ctx, change.statement); err != nil {
-				change.err = err
-			} else {
-				contextLogger.Info("applied database permission",
-					"database", databaseName,
-					"privilege", change.privilege,
-					"type", change.changeType,
-					"grantee", change.name)
-			}
-		}
-
+	statuses := make([]apiv1.DatabasePermissionStatus, 0, len(changes))
+	for _, change := range changes {
 		status := apiv1.DatabasePermissionStatus{
 			Privilege: change.privilege,
 			Name:      change.name,
@@ -352,4 +375,72 @@ func reconcileDatabasePermissions(
 	}
 
 	return statuses
+}
+
+// applyDatabasePermissions makes the ACL of the named database match the
+// permissions and returns the outcome of each change
+func applyDatabasePermissions(
+	ctx context.Context,
+	db *sql.DB,
+	databaseName string,
+	permissions *apiv1.DatabasePermissionsSpec,
+) []databasePermissionChange {
+	changes := expandDatabasePermissions(permissions)
+
+	plan, err := computeDatabasePermissionsPlan(ctx, db, databaseName, changes)
+	if err != nil {
+		for i := range plan {
+			plan[i].err = err
+		}
+	}
+
+	contextLogger := log.FromContext(ctx)
+	for i := range plan {
+		change := &plan[i]
+		if change.err != nil || change.statement == "" {
+			continue
+		}
+
+		if _, err := db.ExecContext(ctx, change.statement); err != nil {
+			change.err = err
+			continue
+		}
+
+		contextLogger.Info("applied database permission",
+			"database", databaseName,
+			"privilege", change.privilege,
+			"type", change.changeType,
+			"grantee", change.name)
+	}
+
+	return plan
+}
+
+// applyClusterDatabasePermissions applies the implicit permissions to a
+// database that is not declared with the Database resource, and fails if any
+// of them cannot be applied
+//
+// Nothing is done if the database doesn't exist.
+func applyClusterDatabasePermissions(
+	ctx context.Context,
+	db *sql.DB,
+	databaseName string,
+	revokePublicConnect bool,
+) error {
+	changes := applyDatabasePermissions(ctx, db, databaseName, &apiv1.DatabasePermissionsSpec{
+		RevokePublicConnect: revokePublicConnect,
+	})
+
+	for _, change := range changes {
+		if errors.Is(change.err, errDatabaseNotFound) {
+			return nil
+		}
+
+		if change.err != nil {
+			return fmt.Errorf("while applying %s on database %q to %s: %w",
+				change.privilege, databaseName, change.name, change.err)
+		}
+	}
+
+	return nil
 }

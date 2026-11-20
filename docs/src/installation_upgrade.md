@@ -457,9 +457,12 @@ The fix for `CVE-2026-44477` / `GHSA-423p-g724-fr39` makes the metrics exporter
 authenticate as a dedicated `cnpg_metrics_exporter` role with `pg_monitor`
 privileges only, instead of the `postgres` superuser.
 
-Custom monitoring queries that read user-owned tables, or use
+Custom monitoring queries that read user-owned tables need explicit `GRANT`
+statements to `cnpg_metrics_exporter`. The same applies to the queries that use
 `target_databases: '*'` against databases where `PUBLIC` `CONNECT` has been
-revoked, need explicit `GRANT` statements to `cnpg_metrics_exporter`.
+revoked, unless they are the `postgres` database, the application database, or
+a database declared with the `Database` resource: CloudNativePG grants
+`CONNECT` on those to `cnpg_metrics_exporter` itself.
 See ["Custom query privileges and safety"](monitoring.md#custom-query-privileges-and-safety)
 and ["Manually creating the metrics exporter role"](monitoring.md#manually-creating-the-metrics-exporter-role)
 in the monitoring documentation.

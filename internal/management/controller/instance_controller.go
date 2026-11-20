@@ -375,7 +375,7 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile pgbouncer integration: %w", err)
 	}
 
-	if err := r.reconcileMetricsExporterAuthUser(ctx, postgresDB); err != nil {
+	if err := r.reconcileMetricsExporterAuthUser(ctx, postgresDB, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile metrics exporter integration: %w", err)
 	}
 
@@ -965,10 +965,14 @@ func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
 // reconcileMetricsExporterAuthUser ensures the dedicated cnpg_metrics_exporter
 // PostgreSQL role exists and has pg_monitor granted. This role is used by the
 // metrics exporter instead of the postgres superuser so that session_user is
-// never a superuser and RESET ROLE has no escalation effect.
+// never a superuser and RESET ROLE has no escalation effect. It also grants
+// CONNECT on the databases managed by the cluster, which are the postgres and
+// the application ones, to that role, and revokes it from PUBLIC when
+// requested.
 func (r *InstanceReconciler) reconcileMetricsExporterAuthUser(
 	ctx context.Context,
 	db *sql.DB,
+	cluster *apiv1.Cluster,
 ) error {
 	ok, err := r.instance.IsPrimary()
 	if err != nil {
@@ -977,7 +981,18 @@ func (r *InstanceReconciler) reconcileMetricsExporterAuthUser(
 	if !ok {
 		return nil
 	}
-	return setupMetricsExporterRole(ctx, db)
+	if err := setupMetricsExporterRole(ctx, db); err != nil {
+		return err
+	}
+
+	revokePublicConnect := cluster.Spec.PostgresConfiguration.RevokePublicConnect
+	for _, databaseName := range []string{"postgres", cluster.GetApplicationDatabaseName()} {
+		if err := applyClusterDatabasePermissions(ctx, db, databaseName, revokePublicConnect); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // setupMetricsExporterRole opens a transaction and delegates to the shared

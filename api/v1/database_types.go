@@ -216,6 +216,16 @@ type DatabaseSpec struct {
 // membership of another role. Removing an entry from the specification does
 // not undo a previous grant or revoke.
 type DatabasePermissionsSpec struct {
+	// If this parameter is true, the `CONNECT` privilege on the database is
+	// revoked from `PUBLIC`. The owner of the database can always connect.
+	// The entries of the `connect` list take precedence: the roles listed there
+	// are not affected by this setting. It is independent of the
+	// `.spec.postgresql.revokePublicConnect` setting of the `Cluster`.
+	// Setting it to `false` afterwards does not restore the privilege.
+	// Defaults to false.
+	// +optional
+	RevokePublicConnect bool `json:"revokePublicConnect,omitempty"`
+
 	// List of roles for which the `CONNECT` privilege on the database is granted or revoked.
 	// Maps to `GRANT CONNECT ON DATABASE ... TO ...` / `REVOKE CONNECT ON DATABASE ... FROM ...`.
 	// +optional

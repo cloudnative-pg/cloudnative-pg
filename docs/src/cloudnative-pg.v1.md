@@ -923,6 +923,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
+| `revokePublicConnect` _boolean_ | If this parameter is true, the `CONNECT` privilege on the database is<br />revoked from `PUBLIC`. The owner of the database can always connect.<br />The entries of the `connect` list take precedence: the roles listed there<br />are not affected by this setting. It is independent of the<br />`.spec.postgresql.revokePublicConnect` setting of the `Cluster`.<br />Setting it to `false` afterwards does not restore the privilege.<br />Defaults to false. |  |  |  |
 | `connect` _[UsageSpec](#usagespec) array_ | List of roles for which the `CONNECT` privilege on the database is granted or revoked.<br />Maps to `GRANT CONNECT ON DATABASE ... TO ...` / `REVOKE CONNECT ON DATABASE ... FROM ...`. |  |  |  |
 | `create` _[UsageSpec](#usagespec) array_ | List of roles for which the `CREATE` privilege on the database is granted or revoked.<br />Maps to `GRANT CREATE ON DATABASE ... TO ...` / `REVOKE CREATE ON DATABASE ... FROM ...`. |  |  |  |
 | `temporary` _[UsageSpec](#usagespec) array_ | List of roles for which the `TEMPORARY` privilege on the database is granted or revoked.<br />Maps to `GRANT TEMPORARY ON DATABASE ... TO ...` / `REVOKE TEMPORARY ON DATABASE ... FROM ...`. |  |  |  |
@@ -2417,6 +2418,7 @@ _Appears in:_
 | `ldap` _[LDAPConfig](#ldapconfig)_ | Options to specify LDAP configuration |  |  |  |
 | `promotionTimeout` _integer_ | Specifies the maximum number of seconds to wait when promoting an instance to primary.<br />Default value is 40000000, greater than one year in seconds,<br />big enough to simulate an infinite timeout |  |  |  |
 | `enableAlterSystem` _boolean_ | If this parameter is true, the user will be able to invoke `ALTER SYSTEM`<br />on this CloudNativePG Cluster.<br />This should only be used for debugging and troubleshooting.<br />Defaults to false. |  |  |  |
+| `revokePublicConnect` _boolean_ | If this parameter is true, the operator revokes the `CONNECT` privilege<br />on the `postgres` database and on the bootstrapped database from<br />`PUBLIC`. The owner of a database can always connect, so the<br />application role is not affected. It does not apply to the databases<br />declared with the `Database` resource, which have their own<br />`.spec.permissions.revokePublicConnect` setting.<br />Setting it to `false` afterwards does not restore the privilege.<br />Defaults to false. |  |  |  |
 | `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | The configuration of the extensions to be added |  |  |  |
 
 

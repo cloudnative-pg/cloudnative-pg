@@ -517,9 +517,11 @@ Take care that the referred resources have to be created **in the same namespace
     ```
 
     Every database in `target_databases` must allow
-    `cnpg_metrics_exporter` to `CONNECT`. On clusters that have
-    revoked `CONNECT` from `PUBLIC` for a database, grant it
-    explicitly to that role:
+    `cnpg_metrics_exporter` to `CONNECT`. CloudNativePG grants it on the
+    `postgres` database, on the application database and on the databases
+    declared with the `Database` resource, so it is not lost when `CONNECT` is
+    revoked from `PUBLIC`. For any other database, for example one created
+    with SQL, grant it explicitly to that role if `PUBLIC` has lost it:
 
     ```sql
     GRANT CONNECT ON DATABASE domainapp TO cnpg_metrics_exporter;
@@ -625,9 +627,9 @@ datname FROM pg_catalog.pg_database WHERE datallowconn AND NOT datistemplate
 AND pg_catalog.has_database_privilege(datname, 'CONNECT')` and matching the
 pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
 Databases on which `cnpg_metrics_exporter` lacks the `CONNECT` privilege are
-silently skipped; if you want a database with revoked `PUBLIC` access to be
-scraped, grant `CONNECT` explicitly (see "Custom query privileges and safety"
-above).
+silently skipped; if you want a database that CloudNativePG doesn't manage and
+with revoked `PUBLIC` access to be scraped, grant `CONNECT` explicitly (see
+"Custom query privileges and safety" above).
 
 :::note
     The `*` character has a [special meaning](https://yaml.org/spec/1.2/spec.html#id2786448) in yaml,

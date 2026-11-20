@@ -986,6 +986,32 @@ For further detail on how `pg_ident.conf` is managed by the operator, see the
     Examples assume that the Kubernetes cluster runs in a private and secure network.
 :::
 
+#### Revoking `CONNECT` from `PUBLIC`
+
+By default, PostgreSQL grants the `CONNECT` privilege on every database to the
+`PUBLIC` pseudo-role, so any role that can authenticate can connect to any
+database of the cluster. To remove this privilege from the `postgres` database
+and from the database created by the bootstrap, set
+`.spec.postgresql.revokePublicConnect` to `true`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  postgresql:
+    revokePublicConnect: true
+```
+
+The setting is `false` by default, as enabling it on a running cluster stops
+the connections of any application that relied on `PUBLIC` to reach a database.
+It does not apply to the databases declared with the `Database` resource: each
+of them has its own `.spec.permissions.revokePublicConnect` setting, described
+in the ["Managing Database Permissions"](declarative_database_management.md#managing-database-permissions)
+section. Setting it back to `false` does not give `CONNECT` back to `PUBLIC`.
+
 #### Schema resolution and `search_path` hardening
 
 A user with privileges on a database can plant objects (functions,

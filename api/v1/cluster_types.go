@@ -1727,6 +1727,17 @@ type PostgresConfiguration struct {
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
 
+	// If this parameter is true, the operator revokes the `CONNECT` privilege
+	// on the `postgres` database and on the bootstrapped database from
+	// `PUBLIC`. The owner of a database can always connect, so the
+	// application role is not affected. It does not apply to the databases
+	// declared with the `Database` resource, which have their own
+	// `.spec.permissions.revokePublicConnect` setting.
+	// Setting it to `false` afterwards does not restore the privilege.
+	// Defaults to false.
+	// +optional
+	RevokePublicConnect bool `json:"revokePublicConnect,omitempty"`
+
 	// The configuration of the extensions to be added
 	// +optional
 	// +listType=map

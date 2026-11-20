@@ -49,6 +49,16 @@ const databaseDetectionQuery = `SELECT count(*)
 			FROM pg_catalog.pg_database
 			WHERE datname = $1`
 
+// expectMetricsExporterConnect mocks the queries that ensure the metrics
+// exporter can connect to a database, when it already can
+func expectMetricsExporterConnect(dbMock sqlmock.Sqlmock, databaseName string) {
+	dbMock.ExpectQuery(expectedACLQuery).WithArgs(databaseName).
+		WillReturnRows(sqlmock.NewRows([]string{"grantee", "privilege_type"}).
+			AddRow(10, "CONNECT").AddRow(30, "CONNECT"))
+	dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs(apiv1.MetricsExporterUserName).
+		WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(30))
+}
+
 var _ = Describe("Managed Database status", func() {
 	var (
 		dbMock     sqlmock.Sqlmock
@@ -131,6 +141,7 @@ var _ = Describe("Managed Database status", func() {
 			pgx.Identifier{database.Spec.Owner}.Sanitize(),
 		)
 		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+		expectMetricsExporterConnect(dbMock, database.Spec.Name)
 
 		err := reconcileDatabase(ctx, fakeClient, r, database)
 		Expect(err).ToNot(HaveOccurred())
@@ -178,8 +189,14 @@ var _ = Describe("Managed Database status", func() {
 			dbMock.ExpectQuery(expectedACLQuery).WithArgs(database.Spec.Name).
 				WillReturnRows(sqlmock.NewRows([]string{"grantee", "privilege_type"}).
 					AddRow(0, "CONNECT").AddRow(10, "CONNECT"))
+			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs(apiv1.MetricsExporterUserName).
+				WillReturnRows(sqlmock.NewRows([]string{"oid"}).AddRow(30))
 			dbMock.ExpectQuery(expectedRoleOidQuery).WithArgs("ghost").
 				WillReturnRows(sqlmock.NewRows([]string{"oid"}))
+			dbMock.ExpectExec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				pgx.Identifier{apiv1.MetricsExporterUserName}.Sanitize(),
+			)).WillReturnResult(sqlmock.NewResult(0, 0))
 		})
 
 		It("applies them and is not ready until every entry is applied", func(ctx SpecContext) {
@@ -190,6 +207,10 @@ var _ = Describe("Managed Database status", func() {
 			Expect(reconcileDatabase(ctx, fakeClient, r, database)).To(Succeed())
 
 			Expect(database.Status.Permissions).To(ConsistOf(
+				apiv1.DatabasePermissionStatus{
+					Privilege: "CONNECT", Name: apiv1.MetricsExporterUserName, Type: apiv1.GrantUsageSpecType,
+					Applied: true,
+				},
 				apiv1.DatabasePermissionStatus{
 					Privilege: "CONNECT", Name: "ghost", Type: apiv1.GrantUsageSpecType,
 					Applied: false, Message: "role does not exist",
@@ -218,6 +239,7 @@ var _ = Describe("Managed Database status", func() {
 				pgx.Identifier{database.Spec.Owner}.Sanitize(),
 			)
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			expectMetricsExporterConnect(dbMock, database.Spec.Name)
 
 			// Mocking Drop Database
 			expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
@@ -283,6 +305,7 @@ var _ = Describe("Managed Database status", func() {
 				pgx.Identifier{database.Spec.Owner}.Sanitize(),
 			)
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			expectMetricsExporterConnect(dbMock, database.Spec.Name)
 
 			err := reconcileDatabase(ctx, fakeClient, r, database)
 			Expect(err).ToNot(HaveOccurred())
@@ -561,6 +584,7 @@ var _ = Describe("Managed Database status", func() {
 			pgx.Identifier{database.Spec.Owner}.Sanitize(),
 		)
 		dbMock.ExpectExec(expectedQuery).WillReturnResult(sqlmock.NewResult(0, 1))
+		expectMetricsExporterConnect(dbMock, database.Spec.Name)
 
 		err = reconcileDatabase(ctx, fakeClient, r, database)
 		Expect(err).ToNot(HaveOccurred())
@@ -586,6 +610,7 @@ var _ = Describe("Managed Database status", func() {
 			pgx.Identifier{database.Spec.Owner}.Sanitize(),
 		)
 		dbMock.ExpectExec(expectedQuery).WillReturnResult(sqlmock.NewResult(0, 1))
+		expectMetricsExporterConnect(dbMock, database.Spec.Name)
 
 		err := reconcileDatabase(ctx, fakeClient, r, database)
 		Expect(err).ToNot(HaveOccurred())
