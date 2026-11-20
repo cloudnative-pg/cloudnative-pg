@@ -226,6 +226,12 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				err = objects.Update(env.Ctx, env.Client, cluster)
 				Expect(err).To(HaveOccurred())
 			})
+			By("rejecting a scale down that leaves MaxSyncReplicas without standbys", func() {
+				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=1 -n %v cluster/%v", namespace,
+					clusterName))
+				Expect(err).To(MatchError(ContainSubstring(
+					"maxSyncReplicas must be lower than the number of instances")))
+			})
 		})
 
 		It("will not prevent a cluster with pg_stat_statements from being created", func() {

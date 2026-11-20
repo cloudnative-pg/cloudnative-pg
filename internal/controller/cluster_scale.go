@@ -44,20 +44,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if cluster.Spec.MaxSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MaxSyncReplicas+1) {
-		origCluster := cluster.DeepCopy()
-		cluster.Spec.Instances = cluster.Status.Instances
-		if err := r.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
-			return err
-		}
-
-		r.Recorder.Eventf(cluster, "Warning", "NoScaleDown",
-			"Can't scale down lower than maxSyncReplicas, going back to %v",
-			cluster.Spec.Instances)
-
-		return nil
-	}
-
 	// Is there is an instance to be deleted?
 	instanceName := findDeletableInstance(cluster, resources.instances.Items)
 	if instanceName == "" {
