@@ -447,14 +447,15 @@ func (e *Exporter) updateInstanceMetrics() {
 		// getting required synchronous standby number from postgres itself
 		e.collectFromPrimarySynchronousStandbysNumber(db)
 
-		// getting the first point of recoverability
-		e.collectFromPrimaryFirstPointOnTimeRecovery()
-
-		// getting the last available backup timestamp
-		e.collectFromPrimaryLastAvailableBackupTimestamp()
-
-		e.collectFromPrimaryLastFailedBackupTimestamp()
 	}
+	// getting the first point of recoverability
+	e.collectFirstPointOnTimeRecovery()
+
+	// getting the last available backup timestamp
+	e.collectLastAvailableBackupTimestamp()
+
+	// getting the last failed backup timestamp
+	e.collectLastFailedBackupTimestamp()
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
 		log.Error(err, "while collecting WAL archive metrics", "path", specs.PgWalArchiveStatusPath)
@@ -550,21 +551,21 @@ func (e *Exporter) collectNodesUsed() {
 	e.Metrics.NodesUsed.Set(float64(cluster.Status.Topology.NodesUsed))
 }
 
-func (e *Exporter) collectFromPrimaryLastFailedBackupTimestamp() {
+func (e *Exporter) collectLastFailedBackupTimestamp() {
 	const errorLabel = "Collect.LastFailedBackupTimestamp"
 	e.setTimestampMetric(e.Metrics.LastFailedBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
 		return cluster.Status.LastFailedBackup //nolint:staticcheck
 	})
 }
 
-func (e *Exporter) collectFromPrimaryLastAvailableBackupTimestamp() {
+func (e *Exporter) collectLastAvailableBackupTimestamp() {
 	const errorLabel = "Collect.LastAvailableBackupTimestamp"
 	e.setTimestampMetric(e.Metrics.LastAvailableBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
 		return cluster.Status.LastSuccessfulBackup //nolint:staticcheck
 	})
 }
 
-func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
+func (e *Exporter) collectFirstPointOnTimeRecovery() {
 	const errorLabel = "Collect.FirstRecoverabilityPoint"
 	e.setTimestampMetric(e.Metrics.FirstRecoverabilityPoint, errorLabel, func(cluster *apiv1.Cluster) string {
 		return cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
