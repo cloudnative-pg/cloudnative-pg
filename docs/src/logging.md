@@ -391,6 +391,9 @@ component, in batches that the `OTEL_BLRP_*` environment variables can tune.
 When the collector is unreachable or cannot keep up, the records that don't
 fit in the queue are dropped, so that the export never slows down
 PostgreSQL; the standard output still contains them. Before exiting, each
-process waits up to five seconds for the queued records to be exported: the
-records written after that point, such as the last ones of an online upgrade
-of the instance manager, are only on the standard output.
+process waits up to five seconds for the queued records to be exported. The
+only exception is an instance manager that fences itself because the primary
+lease is about to expire: it exits at once, to stop PostgreSQL in time, and
+its queued records are not exported. The records written after the wait, such
+as the last ones of an online upgrade of the instance manager, are only on the
+standard output.
