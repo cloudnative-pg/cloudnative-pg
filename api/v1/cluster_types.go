@@ -269,6 +269,9 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
+	//
+	// This field is deprecated and will be removed in CloudNativePG 1.33.0.
+	// Use `.spec.postgresql.synchronous` instead.
 	MinSyncReplicas int `json:"minSyncReplicas,omitempty"`
 
 	// The target value for the synchronous replication quorum, that can be
@@ -277,6 +280,9 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
+	//
+	// This field is deprecated and will be removed in CloudNativePG 1.33.0.
+	// Use `.spec.postgresql.synchronous` instead.
 	MaxSyncReplicas int `json:"maxSyncReplicas,omitempty"`
 
 	// Configuration of the PostgreSQL server
@@ -1562,7 +1568,8 @@ const (
 // SynchronousReplicaConfiguration contains the configuration of the
 // PostgreSQL synchronous replication feature.
 // Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
-// need to be considered.
+// need to be considered. Those fields are deprecated and mutually exclusive with
+// this configuration.
 // +kubebuilder:validation:XValidation:rule="self.dataDurability!='preferred' || ((!has(self.standbyNamesPre) || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost) || self.standbyNamesPost.size()==0))",message="dataDurability set to 'preferred' requires empty 'standbyNamesPre' and empty 'standbyNamesPost'"
 // +kubebuilder:validation:XValidation:rule="!(has(self.podFailureDomainKeys) && self.podFailureDomainKeys.size() > 0 && has(self.nodeFailureDomainKeys) && self.nodeFailureDomainKeys.size() > 0)",message="podFailureDomainKeys and nodeFailureDomainKeys are mutually exclusive"
 type SynchronousReplicaConfiguration struct {
@@ -1704,6 +1711,11 @@ type PostgresConfiguration struct {
 	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
 	// set up.
 	// +optional
+	//
+	// This field only applies to the legacy synchronous replication method.
+	// It is deprecated and will be removed in CloudNativePG 1.33.0, along with
+	// the method. Use the failure domain options of
+	// `.spec.postgresql.synchronous` instead.
 	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
 	// Lists of shared preload libraries to add to the default ones

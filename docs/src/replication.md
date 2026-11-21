@@ -240,6 +240,14 @@ spec:
 To prioritize self-healing over strict data durability, set `dataDurability`
 to `preferred` instead.
 
+:::warning
+    The legacy and the new configuration methods are mutually exclusive:
+    remove `minSyncReplicas` and `maxSyncReplicas` from the `Cluster`
+    specification in the same change that adds `.spec.postgresql.synchronous`.
+    If you use `syncReplicaElectionConstraint`, replace it with the
+    [failure domain options](#failure-domain-aware-synchronous-replication).
+:::
+
 ### Priority-based Synchronous Replication
 
 PostgreSQL's priority-based synchronous replication makes transaction commits
@@ -582,13 +590,19 @@ spec:
 
 :::warning
     Prior to CloudNativePG 1.24, only the quorum-based synchronous replication
-    implementation was supported. Although this method is now deprecated, it
-    will not be removed anytime soon.
+    implementation was supported. This method, configured through
+    `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`, is deprecated as of
+    CloudNativePG 1.31. **CloudNativePG 1.32 is the last minor release that
+    ships with it, and it is removed starting from 1.33.0.** Releases up to and
+    including 1.32, and their patch releases, keep supporting it for as long as
+    they are supported. You must migrate to the new method before upgrading to
+    1.33 or later. The operator emits an admission warning when you create or
+    update a `Cluster` that uses the legacy method.
     The new method prioritizes data durability over self-healing and offers more
     robust features, including priority-based synchronous replication and full
     control over the `synchronous_standby_names` option.
-    It is recommended to gradually migrate to the new configuration method for
-    synchronous replication, as explained in the previous paragraph.
+    To migrate, follow
+    ["Migrating from Deprecated Synchronous Replication Implementation"](#migrating-from-deprecated-synchronous-replication-implementation).
 :::
 
 :::info[Important]
@@ -668,7 +682,8 @@ Postgres pod are.
 :::warning
     The `.spec.postgresql.syncReplicaElectionConstraint` option only applies to the
     legacy implementation of synchronous replication
-    (see ["Synchronous Replication (Deprecated)"](replication.md#synchronous-replication-deprecated)).
+    (see ["Synchronous Replication (Deprecated)"](replication.md#synchronous-replication-deprecated))
+    and is deprecated along with it as of CloudNativePG 1.31 (removal in 1.33.0).
 :::
 
 As an example use-case for this feature: in a cluster with a single sync

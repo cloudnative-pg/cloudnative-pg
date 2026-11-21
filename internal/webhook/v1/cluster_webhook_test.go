@@ -7391,6 +7391,84 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 	})
 })
 
+var _ = Describe("getLegacySynchronousReplicationWarnings", func() {
+	It("returns no warning when the legacy fields are not set", func() {
+		cluster := &apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}
+		Expect(getLegacySynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns no warning when the current synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method: apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number: 1,
+					},
+				},
+			},
+		}
+		Expect(getLegacySynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when minSyncReplicas is set", func() {
+		cluster := &apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3, MinSyncReplicas: 1}}
+		warnings := getLegacySynchronousReplicationWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("spec.minSyncReplicas"))
+		Expect(warnings[0]).To(ContainSubstring("1.33.0"))
+	})
+
+	It("lists every legacy field in use in a single warning", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances:       3,
+				MinSyncReplicas: 1,
+				MaxSyncReplicas: 2,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					SyncReplicaElectionConstraint: apiv1.SyncReplicaElectionConstraints{Enabled: true},
+				},
+			},
+		}
+		warnings := getLegacySynchronousReplicationWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("spec.minSyncReplicas, spec.maxSyncReplicas, " +
+			"spec.postgresql.syncReplicaElectionConstraint"))
+	})
+
+	It("returns a warning when only maxSyncReplicas is set", func() {
+		cluster := &apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3, MaxSyncReplicas: 2}}
+		Expect(getLegacySynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("returns a warning when syncReplicaElectionConstraint is enabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					SyncReplicaElectionConstraint: apiv1.SyncReplicaElectionConstraints{
+						Enabled:                true,
+						NodeLabelsAntiAffinity: []string{"topology.kubernetes.io/zone"},
+					},
+				},
+			},
+		}
+		Expect(getLegacySynchronousReplicationWarnings(cluster)).To(HaveLen(1))
+	})
+
+	It("is raised on both creation and update", func() {
+		cluster := &apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3, MinSyncReplicas: 1, MaxSyncReplicas: 1}}
+		v := &ClusterCustomValidator{}
+
+		createWarnings, _ := v.ValidateCreate(context.Background(), cluster)
+		Expect(createWarnings).To(ContainElement(ContainSubstring("spec.minSyncReplicas")))
+
+		updateWarnings, _ := v.ValidateUpdate(context.Background(), cluster, cluster)
+		Expect(updateWarnings).To(ContainElement(ContainSubstring("spec.minSyncReplicas")))
+	})
+})
+
 var _ = Describe("getFailureDomainTopologyWarnings", func() {
 	makeCluster := func(failureDomainKeys []string, conditions []metav1.Condition) *apiv1.Cluster {
 		cluster := &apiv1.Cluster{}
