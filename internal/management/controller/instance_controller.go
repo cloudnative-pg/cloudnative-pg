@@ -1043,8 +1043,9 @@ func (r *InstanceReconciler) reconcileMetrics(
 		}
 	}
 
-	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
-	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
+	minSyncReplicas, maxSyncReplicas := replication.GetSyncReplicasBounds(cluster)
+	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(minSyncReplicas))
+	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(maxSyncReplicas))
 
 	syncReplicas := replication.GetExpectedSyncReplicasNumber(ctx, cluster)
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
