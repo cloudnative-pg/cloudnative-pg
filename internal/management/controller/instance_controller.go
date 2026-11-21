@@ -1043,10 +1043,9 @@ func (r *InstanceReconciler) reconcileMetrics(
 		}
 	}
 
-	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
-	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
-	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
-	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
+	minSyncReplicas, maxSyncReplicas := replication.GetSyncReplicasBounds(cluster)
+	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(minSyncReplicas))
+	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(maxSyncReplicas))
 
 	syncReplicas := replication.GetExpectedSyncReplicasNumber(ctx, cluster)
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
