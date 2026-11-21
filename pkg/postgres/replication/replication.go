@@ -36,6 +36,25 @@ func GetExpectedSyncReplicasNumber(ctx context.Context, cluster *apiv1.Cluster) 
 	return syncReplicas
 }
 
+// GetSyncReplicasBounds returns the minimum and the maximum number of
+// synchronous replicas the cluster is configured to have.
+//
+// With the legacy configuration these are `.spec.minSyncReplicas` and
+// `.spec.maxSyncReplicas`. With `.spec.postgresql.synchronous` the maximum is
+// the configured `number`, and the minimum is the same number when the data
+// durability is required, or zero when it is preferred, as the number of
+// synchronous replicas can then be lowered to what is available.
+func GetSyncReplicasBounds(cluster *apiv1.Cluster) (minReplicas, maxReplicas int) {
+	if config := cluster.Spec.PostgresConfiguration.Synchronous; config != nil {
+		if config.DataDurability == apiv1.DataDurabilityLevelPreferred {
+			return 0, config.Number
+		}
+		return config.Number, config.Number
+	}
+
+	return cluster.Spec.MinSyncReplicas, cluster.Spec.MaxSyncReplicas
+}
+
 // GetSynchronousStandbyNames gets the value to be applied
 // to synchronous_standby_names
 func GetSynchronousStandbyNames(ctx context.Context, cluster *apiv1.Cluster) postgres.SynchronousStandbyNamesConfig {
