@@ -125,15 +125,18 @@ func NewCmd() *cobra.Command {
 			})
 
 			if errors.Is(err, postgres.ErrNoFreeWALSpace) {
+				management.ShutdownLogExport()
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
 			}
 			if errors.Is(err, errWALArchivePluginNotAvailable) {
+				management.ShutdownLogExport()
 				os.Exit(apiv1.MissingWALArchivePlugin)
 			}
 
 			return err
 		},
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
+			management.ShutdownLogExport()
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}
