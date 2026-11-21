@@ -2833,6 +2833,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getMonitoringFieldsWarnings(r)...)
 	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 	list = append(list, getSynchronousReplicationWarnings(r)...)
+	list = append(list, getLegacySynchronousReplicationWarnings(r)...)
 	list = append(list, getPrimaryIsolationTimingWarnings(r)...)
 	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
@@ -3337,6 +3338,36 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		"This cluster has no synchronous replication configured. " +
 			"A primary failure can cause data loss for transactions not yet replicated. " +
 			"Consider configuring .spec.postgresql.synchronous to protect against data loss.",
+	}
+}
+
+// getLegacySynchronousReplicationWarnings warns users who still rely on the
+// legacy synchronous replication method, based on `.spec.minSyncReplicas`
+// and `.spec.maxSyncReplicas`, and on the options that only apply to it.
+func getLegacySynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
+	var paths []string
+
+	if r.Spec.MinSyncReplicas > 0 {
+		paths = append(paths, field.NewPath("spec", "minSyncReplicas").String())
+	}
+
+	if r.Spec.MaxSyncReplicas > 0 {
+		paths = append(paths, field.NewPath("spec", "maxSyncReplicas").String())
+	}
+
+	if r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled {
+		paths = append(paths, field.NewPath("spec", "postgresql", "syncReplicaElectionConstraint").String())
+	}
+
+	if len(paths) == 0 {
+		return nil
+	}
+
+	return admission.Warnings{
+		fmt.Sprintf("The legacy synchronous replication configuration is deprecated and will be "+
+			"completely removed in CloudNativePG 1.33.0. Found usage in: %s. "+
+			"Please migrate existing clusters to .spec.postgresql.synchronous.",
+			strings.Join(paths, ", ")),
 	}
 }
 
