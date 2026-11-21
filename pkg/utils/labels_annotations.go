@@ -204,9 +204,9 @@ const (
 	// SkipWalArchiving is the name of the annotation which turns off WAL archiving
 	SkipWalArchiving = MetadataNamespace + "/skipWalArchiving"
 
-	// skipEmptyWalArchiveCheck is the name of the annotation which turns off the checks that ensure that the WAL
+	// SkipEmptyWalArchiveCheck is the name of the annotation which turns off the checks that ensure that the WAL
 	// archive is empty before writing data
-	skipEmptyWalArchiveCheck = MetadataNamespace + "/skipEmptyWalArchiveCheck"
+	SkipEmptyWalArchiveCheck = MetadataNamespace + "/skipEmptyWalArchiveCheck"
 
 	// ClusterSerialAnnotationName is the name of the annotation containing the
 	// serial number of the node
@@ -353,11 +353,15 @@ const (
 	PasswordPassthroughAnnotationName = MetadataNamespace + "/passwordPassthrough"
 )
 
-type annotationStatus string
+// AnnotationStatus is the value of an annotation that turns a feature on or off
+type AnnotationStatus string
 
 const (
-	annotationStatusDisabled annotationStatus = "disabled"
-	annotationStatusEnabled  annotationStatus = "enabled"
+	// AnnotationStatusDisabled is the value of an annotation that turns a feature off
+	AnnotationStatusDisabled AnnotationStatus = "disabled"
+
+	// AnnotationStatusEnabled is the value of an annotation that turns a feature on
+	AnnotationStatusEnabled AnnotationStatus = "enabled"
 )
 
 // PodRole describes the Role of a given pod
@@ -535,7 +539,7 @@ func AnnotateAppArmor(object *metav1.ObjectMeta, spec *corev1.PodSpec, annotatio
 
 // IsReconciliationDisabled checks if the reconciliation loop is disabled on the given resource
 func IsReconciliationDisabled(object *metav1.ObjectMeta) bool {
-	return object.Annotations[ReconciliationLoopAnnotationName] == string(annotationStatusDisabled)
+	return object.Annotations[ReconciliationLoopAnnotationName] == string(AnnotationStatusDisabled)
 }
 
 // IsPodSpecReconciliationDisabled checks if the pod spec reconciliation is disabled
@@ -543,26 +547,26 @@ func IsPodSpecReconciliationDisabled(object *metav1.ObjectMeta) bool {
 	if object.Annotations == nil {
 		return false
 	}
-	return object.Annotations[ReconcilePodSpecAnnotationName] == string(annotationStatusDisabled)
+	return object.Annotations[ReconcilePodSpecAnnotationName] == string(AnnotationStatusDisabled)
 }
 
 // IsEmptyWalArchiveCheckEnabled returns a boolean indicating if we should run the logic that checks if the WAL archive
 // storage is empty
 func IsEmptyWalArchiveCheckEnabled(object *metav1.ObjectMeta) bool {
-	return object.Annotations[skipEmptyWalArchiveCheck] != string(annotationStatusEnabled)
+	return object.Annotations[SkipEmptyWalArchiveCheck] != string(AnnotationStatusEnabled)
 }
 
 // IsWalArchivingDisabled returns a boolean indicating if PostgreSQL not archive
 // WAL files
 func IsWalArchivingDisabled(object *metav1.ObjectMeta) bool {
-	return object.Annotations[SkipWalArchiving] == string(annotationStatusEnabled)
+	return object.Annotations[SkipWalArchiving] == string(AnnotationStatusEnabled)
 }
 
 // IsPasswordPassthroughEnabled reports whether the given Secret's metadata
 // opts the role reconciler out of client-side SCRAM-SHA-256 encoding and
 // asks the operator to forward the password value verbatim.
 func IsPasswordPassthroughEnabled(object *metav1.ObjectMeta) bool {
-	return object.Annotations[PasswordPassthroughAnnotationName] == string(annotationStatusEnabled)
+	return object.Annotations[PasswordPassthroughAnnotationName] == string(AnnotationStatusEnabled)
 }
 
 // IsOnlineBackupSnapshot reports whether the given VolumeSnapshot's metadata

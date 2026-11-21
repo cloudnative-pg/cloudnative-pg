@@ -170,12 +170,12 @@ var _ = Describe("Pod spec reconciliation", func() {
 	})
 
 	It("is not disabled if annotation exists and its value is not 'disabled'", func() {
-		objectMeta.Annotations[ReconcilePodSpecAnnotationName] = string(annotationStatusEnabled)
+		objectMeta.Annotations[ReconcilePodSpecAnnotationName] = string(AnnotationStatusEnabled)
 		Expect(IsPodSpecReconciliationDisabled(objectMeta)).To(BeFalse())
 	})
 
 	It("is disabled if annotation exists and its value is 'disabled'", func() {
-		objectMeta.Annotations[ReconcilePodSpecAnnotationName] = string(annotationStatusDisabled)
+		objectMeta.Annotations[ReconcilePodSpecAnnotationName] = string(AnnotationStatusDisabled)
 		Expect(IsPodSpecReconciliationDisabled(objectMeta)).To(BeTrue())
 	})
 })
@@ -201,12 +201,12 @@ var _ = Describe("Password passthrough annotation", func() {
 	})
 
 	It("is not enabled when explicitly disabled", func() {
-		objectMeta.Annotations[PasswordPassthroughAnnotationName] = string(annotationStatusDisabled)
+		objectMeta.Annotations[PasswordPassthroughAnnotationName] = string(AnnotationStatusDisabled)
 		Expect(IsPasswordPassthroughEnabled(objectMeta)).To(BeFalse())
 	})
 
 	It("is enabled when the annotation value is 'enabled'", func() {
-		objectMeta.Annotations[PasswordPassthroughAnnotationName] = string(annotationStatusEnabled)
+		objectMeta.Annotations[PasswordPassthroughAnnotationName] = string(AnnotationStatusEnabled)
 		Expect(IsPasswordPassthroughEnabled(objectMeta)).To(BeTrue())
 	})
 })

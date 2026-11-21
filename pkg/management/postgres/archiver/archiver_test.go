@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// skipEmptyWalArchiveCheckAnnotation mirrors the unexported constant in
+// skipEmptyWalArchiveCheckAnnotation mirrors the constant in
 // pkg/utils; the tests deliberately hard-code the literal so a divergence
 // between the annotation the operator honors and the one documented here
 // would surface as a failure.
