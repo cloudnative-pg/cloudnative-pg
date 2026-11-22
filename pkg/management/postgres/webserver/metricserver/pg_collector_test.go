@@ -26,12 +26,12 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/prometheus/client_golang/prometheus"
+	io_prometheus_client "github.com/prometheus/client_model/go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	postgresconf "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -44,6 +44,12 @@ func (f fakePluginCollector) Collect(context.Context, chan<- prometheus.Metric, 
 }
 
 func (f fakePluginCollector) Describe(context.Context, chan<- *prometheus.Desc, *apiv1.Cluster) {
+}
+
+func observedValue(exporter *Exporter) float64 {
+	metric := &io_prometheus_client.Metric{}
+	Expect(exporter.Metrics.SyncReplicas.WithLabelValues("observed").Write(metric)).To(Succeed())
+	return metric.GetGauge().GetValue()
 }
 
 var _ = Describe("test metrics parsing", func() {
@@ -110,90 +116,40 @@ var _ = Describe("test metrics parsing", func() {
 		}
 	})
 
-	It("correctly parses the number of sync replicas when quorum-based", func() {
+	It("reports the number of attached synchronous standbys", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
-		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
-			AddRow(`ANY 2 ( "cluster-example-2","cluster-example-3")`)
-		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+		rows := sqlmock.NewRows([]string{"count"}).AddRow(2)
+		mock.ExpectQuery(synchronousStandbysQuery).WillReturnRows(rows)
 
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
 
-		registry := prometheus.NewRegistry()
-		registry.MustRegister(exporter.Metrics.SyncReplicas)
-		metrics, _ := registry.Gather()
-
-		for _, metric := range metrics {
-			m := metric.GetMetric()
-			Expect(m[0].GetGauge().GetValue()).To(BeEquivalentTo(2))
-		}
+		Expect(observedValue(exporter)).To(BeEquivalentTo(2))
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 
-	It("correctly parses the number of sync replicas when preferential", func() {
+	It("reports zero when no synchronous standby is attached", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
-		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
-			AddRow(`FIRST 2 ( "cluster-example-2","cluster-example-3")`)
-		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+		rows := sqlmock.NewRows([]string{"count"}).AddRow(0)
+		mock.ExpectQuery(synchronousStandbysQuery).WillReturnRows(rows)
 
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
 
-		registry := prometheus.NewRegistry()
-		registry.MustRegister(exporter.Metrics.SyncReplicas)
-		metrics, _ := registry.Gather()
-
-		for _, metric := range metrics {
-			m := metric.GetMetric()
-			Expect(m[0].GetGauge().GetValue()).To(BeEquivalentTo(2))
-		}
+		Expect(observedValue(exporter)).To(BeEquivalentTo(0))
 	})
 
-	It("should return an error when encountering unexpected results", func() {
-		By("not matching the synchronous standby names regex", func() {
-			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-			Expect(err).ToNot(HaveOccurred())
-
-			// This row will generate only two strings in the array
-			rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).AddRow("ANY q (xx)")
-			mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
-			_, err = getRequestedSynchronousStandbysNumber(db)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("not matching synchronous standby names regex: ANY q (xx)"))
-		})
-
-		By("not matching the number of sync replicas", func() {
-			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-			Expect(err).ToNot(HaveOccurred())
-
-			// This row will generate only two strings in the array
-			rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).AddRow("ANY 2 (xx, ")
-			mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
-			_, err = getRequestedSynchronousStandbysNumber(db)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("not matching synchronous standby names regex: ANY 2 (xx"))
-		})
-	})
-
-	It("sets the number of sync replicas as -1 if it can't parse the sync replicas string", func() {
+	It("sets the number of sync replicas as -1 if the query fails", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
-		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
-			AddRow(`( "cluster-example-2","cluster-example-3")`)
-		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+		mock.ExpectQuery(synchronousStandbysQuery).WillReturnError(fmt.Errorf("boom"))
 
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
 
-		registry := prometheus.NewRegistry()
-		registry.MustRegister(exporter.Metrics.SyncReplicas)
-		metrics, _ := registry.Gather()
-
-		for _, metric := range metrics {
-			m := metric.GetMetric()
-			Expect(m[0].GetGauge().GetValue()).To(BeEquivalentTo(-1))
-		}
+		Expect(observedValue(exporter)).To(BeEquivalentTo(-1))
 	})
 
 	Context("collectUsedNodes", func() {

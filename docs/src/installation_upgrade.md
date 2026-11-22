@@ -314,6 +314,27 @@ that uses any of these fields. Migrate those clusters to
 `.spec.postgresql.synchronous` before upgrading to 1.33.0, as explained in
 ["Migrating from Deprecated Synchronous Replication Implementation"](replication.md#migrating-from-deprecated-synchronous-replication-implementation).
 
+#### Meaning of `observed` in `cnpg_collector_sync_replicas` changed
+
+Starting from version 1.31.0, the `observed` value of the
+`cnpg_collector_sync_replicas` metric reports the number of standbys currently
+attached to the primary as synchronous, as shown by `sync_state` in the
+`pg_stat_replication` system view. Previously, it reported the number found in
+the `synchronous_standby_names` setting, which only tells what is requested.
+
+With quorum-based replication (`method: any`), every attached standby that is
+a candidate is reported as `quorum`, so `observed` can be higher than
+`expected`. If you alert or graph on this metric, compare `observed` with
+`expected` using `<`, not `!=`. For example, `observed` now drops to `0` when
+a cluster with `dataDurability: required` loses all its synchronous standbys,
+while commits are blocked, instead of staying at the configured number.
+
+The `min` and `max` values are deprecated and are removed in CloudNativePG
+1.33.0. Until then, they are derived from `.spec.postgresql.synchronous` when
+it is configured, instead of being `0`. Use `expected` and `observed` instead.
+See ["Synchronous replication metrics"](monitoring.md#synchronous-replication-metrics)
+for details and a recommended alert.
+
 ### Upgrading to 1.30.0
 
 :::info[Important]
