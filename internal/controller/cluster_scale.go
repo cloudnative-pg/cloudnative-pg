@@ -44,6 +44,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if cluster.Spec.MaxSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MaxSyncReplicas+1) {
 		origCluster := cluster.DeepCopy()
 		cluster.Spec.Instances = cluster.Status.Instances

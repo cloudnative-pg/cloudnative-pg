@@ -192,6 +192,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 
+					//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 					cluster.Spec.MaxSyncReplicas = 1
 					g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 				}, RetryTimeout, 5).Should(Succeed())
@@ -215,6 +216,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MaxSyncReplicas must be lower than the number of instances
+				//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 				cluster.Spec.MaxSyncReplicas = 2
 				err = objects.Update(env.Ctx, env.Client, cluster)
 				Expect(err).To(HaveOccurred())
@@ -222,6 +224,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas
+				//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 				cluster.Spec.MinSyncReplicas = 2
 				err = objects.Update(env.Ctx, env.Client, cluster)
 				Expect(err).To(HaveOccurred())

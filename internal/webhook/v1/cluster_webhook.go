@@ -1215,6 +1215,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	// We cannot have both old-style synchronous replica configuration
 	// and new-style synchronous replica configuration
 	haveOldStyleSyncReplicaConfig := r.Spec.PostgresConfiguration.Synchronous != nil
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	haveNewStyleSyncReplicaConfig := r.Spec.MinSyncReplicas > 0 || r.Spec.MaxSyncReplicas > 0
 	if haveOldStyleSyncReplicaConfig && haveNewStyleSyncReplicaConfig {
 		result = append(result,
@@ -1347,6 +1348,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 		r.Spec.PostgresConfiguration, r.Spec.WalStorage.GetSizeOrNil())...)
 
 	if err := validateSyncReplicaElectionConstraint(
+		//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
 	); err != nil {
 		result = append(result, err)
@@ -1741,6 +1743,7 @@ func (v *ClusterCustomValidator) validatePrimaryUpdateStrategy(r *apiv1.Cluster)
 func (v *ClusterCustomValidator) validateMaxSyncReplicas(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MaxSyncReplicas < 0 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "maxSyncReplicas"),
@@ -1748,9 +1751,11 @@ func (v *ClusterCustomValidator) validateMaxSyncReplicas(r *apiv1.Cluster) field
 			"maxSyncReplicas must be a non negative integer"))
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MaxSyncReplicas >= r.Spec.Instances {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "maxSyncReplicas"),
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 			r.Spec.MaxSyncReplicas,
 			"maxSyncReplicas must be lower than the number of instances"))
 	}
@@ -1762,6 +1767,7 @@ func (v *ClusterCustomValidator) validateMaxSyncReplicas(r *apiv1.Cluster) field
 func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MinSyncReplicas < 0 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "minSyncReplicas"),
@@ -1769,9 +1775,11 @@ func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field
 			"minSyncReplicas must be a non negative integer"))
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MinSyncReplicas > r.Spec.MaxSyncReplicas {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "minSyncReplicas"),
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 			r.Spec.MinSyncReplicas,
 			"minSyncReplicas cannot be greater than maxSyncReplicas"))
 	}
@@ -3330,6 +3338,7 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		return nil
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MinSyncReplicas > 0 {
 		return nil
 	}
@@ -3347,14 +3356,17 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 func getLegacySynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 	var paths []string
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MinSyncReplicas > 0 {
 		paths = append(paths, field.NewPath("spec", "minSyncReplicas").String())
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MaxSyncReplicas > 0 {
 		paths = append(paths, field.NewPath("spec", "maxSyncReplicas").String())
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled {
 		paths = append(paths, field.NewPath("spec", "postgresql", "syncReplicaElectionConstraint").String())
 	}

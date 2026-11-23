@@ -43,6 +43,7 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		)
 
 		cluster := createFakeCluster("exampleAntiAffinity")
+		//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint = apiv1.SyncReplicaElectionConstraints{
 			Enabled:                true,
 			NodeLabelsAntiAffinity: []string{"az"},
@@ -81,6 +82,7 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 
 		Expect(number).To(BeZero())
 		Expect(names).To(BeEmpty())
+		//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 		Expect(cluster.Spec.MinSyncReplicas).To(Equal(1))
 	})
 
@@ -102,7 +104,9 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 var _ = Describe("legacy synchronous_standby_names configuration", func() {
 	It("generate the correct value for the synchronous_standby_names parameter", func(ctx SpecContext) {
 		cluster := createFakeCluster("exampleNoPods")
+		//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 		cluster.Spec.MinSyncReplicas = 2
+		//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 		cluster.Spec.MaxSyncReplicas = 2
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "example-1",

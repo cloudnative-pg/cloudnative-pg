@@ -3967,7 +3967,7 @@ spec:
                   decreased if the number of ready standbys is lower than this.
                   Undefined or 0 disable synchronous replication.
 
-                  This field is deprecated and will be removed in CloudNativePG 1.33.0.
+                  Deprecated: this field will be removed in CloudNativePG 1.33.0.
                   Use `.spec.postgresql.synchronous` instead.
                 minimum: 0
                 type: integer
@@ -3978,7 +3978,7 @@ spec:
                   primary. Undefined or 0 allow writes to complete when no standby is
                   available.
 
-                  This field is deprecated and will be removed in CloudNativePG 1.33.0.
+                  Deprecated: this field will be removed in CloudNativePG 1.33.0.
                   Use `.spec.postgresql.synchronous` instead.
                 minimum: 0
                 type: integer
@@ -4842,8 +4842,9 @@ spec:
                       set up.
 
                       This field only applies to the legacy synchronous replication method.
-                      It is deprecated and will be removed in CloudNativePG 1.33.0, along with
-                      the method. Use the failure domain options of
+
+                      Deprecated: this field will be removed in CloudNativePG 1.33.0, along
+                      with the method. Use the failure domain options of
                       `.spec.postgresql.synchronous` instead.
                     properties:
                       enabled:

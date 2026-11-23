@@ -266,23 +266,25 @@ type ClusterSpec struct {
 	// Minimum number of instances required in synchronous replication with the
 	// primary. Undefined or 0 allow writes to complete when no standby is
 	// available.
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0.
+	// Use `.spec.postgresql.synchronous` instead.
+	//
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	//
-	// This field is deprecated and will be removed in CloudNativePG 1.33.0.
-	// Use `.spec.postgresql.synchronous` instead.
 	MinSyncReplicas int `json:"minSyncReplicas,omitempty"`
 
 	// The target value for the synchronous replication quorum, that can be
 	// decreased if the number of ready standbys is lower than this.
 	// Undefined or 0 disable synchronous replication.
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0.
+	// Use `.spec.postgresql.synchronous` instead.
+	//
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	//
-	// This field is deprecated and will be removed in CloudNativePG 1.33.0.
-	// Use `.spec.postgresql.synchronous` instead.
 	MaxSyncReplicas int `json:"maxSyncReplicas,omitempty"`
 
 	// Configuration of the PostgreSQL server
@@ -1710,12 +1712,14 @@ type PostgresConfiguration struct {
 
 	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
 	// set up.
-	// +optional
 	//
 	// This field only applies to the legacy synchronous replication method.
-	// It is deprecated and will be removed in CloudNativePG 1.33.0, along with
-	// the method. Use the failure domain options of
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0, along
+	// with the method. Use the failure domain options of
 	// `.spec.postgresql.synchronous` instead.
+	//
+	// +optional
 	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
 	// Lists of shared preload libraries to add to the default ones
