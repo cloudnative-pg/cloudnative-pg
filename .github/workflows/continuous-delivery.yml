@@ -4,6 +4,11 @@ name: continuous-delivery
 on:
   issue_comment:
     types: [created]
+  # Build and publish the artifacts, no E2E
+  push:
+    branches:
+      - main
+      - 'release-*'
   # Manually or triggered by another workflow
   workflow_dispatch:
     inputs:
@@ -12,7 +17,7 @@ on:
         required: true
         default: 'main'
       limit:
-        description: 'Limit to the specified engines list (kind, k3d, eks, aks, gke, openshift)'
+        description: 'Limit to the specified engines list (kind, k3d, eks, aks, gke, openshift), or none to skip the E2E tests'
         required: false
       test_level:
         description: 'Test level: 0(highest) to 4(lowest). Default is 4.'
@@ -42,10 +47,25 @@ on:
         description: 'plugin-barman-cloud version to install: release (default), main, a pinned version like v0.12.0, pr-<number> for a pull request, or a branch name'
         required: false
         default: 'release'
+      force_publish:
+        description: 'Publish the artifacts to cloudnative-pg/artifacts (main and release-* only)'
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron:  '0 1 * * *'
 
 permissions: read-all
+
+# Runs that publish artifacts go one at a time per branch, in order.
+# All the other runs get their own group and never wait.
+concurrency:
+  group: >-
+    ${{ github.workflow }}-${{
+      (github.event_name == 'push' || github.event.inputs.force_publish == 'true')
+      && github.ref || github.run_id
+    }}
+  cancel-in-progress: false
 
 # set up environment variables to be used across all the jobs
 env:
@@ -261,6 +281,7 @@ jobs:
     runs-on: ubuntu-26.04
     if: |
       (
+        github.event_name == 'push' ||
         needs.check_commenter.result == 'success' ||
         needs.test_arguments.result == 'success'
       ) &&
@@ -300,6 +321,7 @@ jobs:
       - name: From command
         env:
           EVENT_NAME: ${{ github.event_name }}
+          PUSH_GITHUB_REF: ${{ github.ref }}
           WD_GITHUB_REF: ${{ needs.test_arguments.outputs.github_ref }}
           WD_DEPTH: ${{ needs.test_arguments.outputs.depth }}
           WD_LIMIT: ${{ needs.test_arguments.outputs.limit }}
@@ -317,6 +339,10 @@ jobs:
           IC_CNPG_DEPLOYMENT_METHOD: ${{ needs.check_commenter.outputs.cnpg_deployment_method }}
           IC_BARMAN_PLUGIN_VERSION: ${{ needs.check_commenter.outputs.barman_plugin_version }}
         run: |
+          # A push only builds and publishes: the E2E options stay empty
+          if [[ "${EVENT_NAME}" == 'push' ]]; then
+            echo "GITHUB_REF=${PUSH_GITHUB_REF}" >> $GITHUB_ENV
+          fi
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]; then
             echo "GITHUB_REF=${WD_GITHUB_REF}" >> $GITHUB_ENV
             echo "DEPTH=${WD_DEPTH}" >> $GITHUB_ENV
@@ -410,7 +436,8 @@ jobs:
           author_email=$(git show -s --format='%ae' "${commit_sha}" | head -n1)
 
           # extract branch name
-          if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]
+          if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]] ||
+            [[ "${EVENT_NAME}" == 'push' ]]
           then
             branch_name=${GITHUB_REF#refs/heads/}
           fi
@@ -572,13 +599,15 @@ jobs:
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
 
-  # This will only execute in cloudnative-pg org
+  # This will only execute in cloudnative-pg org, on a push or when a manual
+  # run sets force_publish. Scheduled and smoke test runs don't publish.
   publish-artifacts:
     name: Publish artifacts
     needs:
       - buildx
     if: |
       (always() && !cancelled()) &&
+      (github.event_name == 'push' || github.event.inputs.force_publish == 'true') &&
       needs.buildx.result == 'success' &&
       needs.buildx.outputs.upload_artifacts == 'true' &&
       github.repository_owner == 'cloudnative-pg'
@@ -646,10 +675,13 @@ jobs:
     # GitHub resources.
     # Currently, it's executed in the following cases:
     # - When dispatched via chatops commands
-    # - On a push in main and release branches
+    # - When dispatched manually or by the release branches smoke test
     # - On scheduled executions
+    # A push in main and release branches only builds and publishes the
+    # artifacts.
     if: |
       (always() && !cancelled()) &&
+      github.event_name != 'push' &&
       needs.buildx.result == 'success'
     runs-on: ubuntu-26.04
     outputs:
