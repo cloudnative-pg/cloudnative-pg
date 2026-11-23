@@ -708,7 +708,8 @@ func (instance *Instance) TryShuttingDownImmediate(ctx context.Context) error {
 	)
 }
 
-// isStatusRunning checks the status of a running server using pg_ctl status
+// isStatusRunning reports whether PostgreSQL is running: pg_ctl status must
+// succeed, and the PID file must not name a live process that is not PostgreSQL
 func (instance *Instance) isStatusRunning() bool {
 	options := []string{
 		"-D",
@@ -717,8 +718,11 @@ func (instance *Instance) isStatusRunning() bool {
 	}
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
-	err := execlog.RunBuffering(pgCtlCmd, pgCtlName)
-	return err == nil
+	if err := execlog.RunBuffering(pgCtlCmd, pgCtlName); err != nil {
+		return false
+	}
+
+	return !instance.pidFileNamesForeignProcess()
 }
 
 // Reload makes a certain active instance reload the configuration
