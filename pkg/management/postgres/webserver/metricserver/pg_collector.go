@@ -464,6 +464,10 @@ func (e *Exporter) updateInstanceMetrics() {
 		e.collectFromPrimaryLastAvailableBackupTimestamp()
 
 		e.collectFromPrimaryLastFailedBackupTimestamp()
+	} else {
+		// A primary can become a standby without the instance manager
+		// restarting, and would keep exposing its last value
+		e.Metrics.SyncReplicas.DeleteLabelValues("observed")
 	}
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
