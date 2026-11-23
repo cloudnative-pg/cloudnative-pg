@@ -42,7 +42,8 @@ const (
 	// promotion gate holds a promotion back
 	promotionHeldBackReason = "PromotionHeldBack"
 
-	// replicaPositionTimeout bounds the reading of the position of the replica
+	// replicaPositionTimeout bounds the reading of the position of the replica,
+	// with the checkpoint that may come in between
 	replicaPositionTimeout = 30 * time.Second
 )
 
@@ -52,28 +53,26 @@ const (
 // it started, and it stays behind when the WAL comes from the archive, hence
 // the GREATEST.
 //
-// There is no function of the current timeline of a replica, and the status of
-// the WAL receiver is empty once the primary is gone: the one of the control
-// file is what is left. It lags until the restartpoint that follows the
-// checkpoint of the primary is done, hence the CHECKPOINT before reading it.
+// No function returns the current timeline of a replica, and
+// pg_stat_wal_receiver is empty once the primary is gone, so the timeline comes
+// from the control file. The two timelines read here never run ahead of the
+// replay, and the greatest is the closest to it. A restartpoint updates the one
+// of the last checkpoint. A CHECKPOINT also updates the one of the minimum
+// recovery point, unless it runs a restartpoint on an older record: the next
+// CHECKPOINT fixes that.
 const replicaPositionQuery = `SELECT
-	(SELECT timeline_id FROM pg_catalog.pg_control_checkpoint()),
+	GREATEST(
+		(SELECT timeline_id FROM pg_catalog.pg_control_checkpoint()),
+		(SELECT min_recovery_end_timeline FROM pg_catalog.pg_control_recovery())),
 	GREATEST(
 		COALESCE(pg_catalog.pg_last_wal_receive_lsn(), '0/0'),
 		COALESCE(pg_catalog.pg_last_wal_replay_lsn(), '0/0'))::text`
 
 // queryReplicaPosition reads the position of this instance, which must be a replica
 func (r *InstanceReconciler) queryReplicaPosition(ctx context.Context) (replicaPosition, error) {
-	ctx, cancel := context.WithTimeout(ctx, replicaPositionTimeout)
-	defer cancel()
-
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
 		return replicaPosition{}, fmt.Errorf("could not get the database connection pool: %w", err)
-	}
-
-	if _, err := db.ExecContext(ctx, "CHECKPOINT"); err != nil {
-		return replicaPosition{}, fmt.Errorf("could not request a checkpoint: %w", err)
 	}
 
 	var result replicaPosition
@@ -84,6 +83,63 @@ func (r *InstanceReconciler) queryReplicaPosition(ctx context.Context) (replicaP
 	result.LSN = types.LSN(lsn)
 
 	return result, nil
+}
+
+// requestCheckpoint requests a checkpoint, which is a restartpoint on a replica
+func (r *InstanceReconciler) requestCheckpoint(ctx context.Context) error {
+	db, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("could not get the database connection pool: %w", err)
+	}
+
+	_, err = db.ExecContext(ctx, "CHECKPOINT")
+	return err
+}
+
+// readReplicaPositionForGate reads the position of this replica, and reads it
+// again after a checkpoint when timelineNeedsRefresh says so. A position that
+// cannot be read is empty, and what the gate does without it is its decision.
+func (r *InstanceReconciler) readReplicaPositionForGate(
+	ctx context.Context,
+	input promotionGateInput,
+) replicaPosition {
+	ctx, cancel := context.WithTimeout(ctx, replicaPositionTimeout)
+	defer cancel()
+
+	contextLogger := log.FromContext(ctx)
+
+	read := r.readReplicaPosition
+	if read == nil {
+		read = r.queryReplicaPosition
+	}
+	checkpoint := r.checkpoint
+	if checkpoint == nil {
+		checkpoint = r.requestCheckpoint
+	}
+
+	position, err := read(ctx)
+	if err != nil {
+		contextLogger.Warning("Cannot read the position of this replica, it is not available to the promotion gate",
+			"err", err)
+		return replicaPosition{}
+	}
+
+	input.Replica = position
+	if !timelineNeedsRefresh(input) {
+		return position
+	}
+
+	if err := checkpoint(ctx); err != nil {
+		contextLogger.Warning("Cannot request a checkpoint to refresh the timeline of this replica", "err", err)
+		return position
+	}
+	refreshed, err := read(ctx)
+	if err != nil {
+		contextLogger.Warning("Cannot read the position of this replica after the checkpoint", "err", err)
+		return position
+	}
+
+	return refreshed
 }
 
 // promoteAfterGate promotes this instance, once the promotion gate allows it.
@@ -97,47 +153,14 @@ func (r *InstanceReconciler) promoteAfterGate(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (reconcile.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	readReplicaPosition := r.readReplicaPosition
-	if readReplicaPosition == nil {
-		readReplicaPosition = r.queryReplicaPosition
-	}
-	replica, err := readReplicaPosition(ctx)
-	if err != nil {
-		// What the gate does without it is its decision: it waits after a
-		// clean shutdown of the previous primary, as it cannot check that the
-		// replica has all the data, and it does not hold back anything else
-		contextLogger.Warning("Cannot read the position of this replica, it is not available to the promotion gate",
-			"err", err)
-		replica = replicaPosition{}
-	}
-
-	if result, err := r.checkPromotionGate(ctx, cluster, replica); err != nil || !result.IsZero() {
-		return result, err
-	}
-
-	cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
-	return reconcile.Result{}, r.handlePromotion(ctx, cluster)
-}
-
-// checkPromotionGate reads what the previous primary published on the primary
-// lease and decides, and logs, whether this replica can promote. It returns a
-// result that is not empty when the promotion has to wait.
-func (r *InstanceReconciler) checkPromotionGate(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	replica replicaPosition,
-) (reconcile.Result, error) {
 	annotation, err := r.primaryLeaseAcquirer.Position(ctx)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("while reading the position of the previous primary: %w", err)
 	}
 
-	decision := decidePromotion(promotionGateInput{
+	input := promotionGateInput{
 		Annotation: annotation,
 		PodName:    r.instance.GetPodName(),
-		Replica:    replica,
 		// The promotion of a replica cluster is validated by its promotion
 		// token, and the position on the lease is the one of an earlier life
 		// of this cluster. Without a token, the designated primary is the
@@ -146,19 +169,38 @@ func (r *InstanceReconciler) checkPromotionGate(
 			cluster.Status.CurrentPrimary == r.instance.GetPodName(),
 		// The operator sets the phase before the target primary
 		Failover: cluster.Status.Phase == apiv1.PhaseFailOver,
-	})
+	}
+
+	input.Replica = r.readReplicaPositionForGate(ctx, input)
+
+	if result := r.checkPromotionGate(ctx, cluster, input); !result.IsZero() {
+		return result, nil
+	}
+
+	cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
+	return reconcile.Result{}, r.handlePromotion(ctx, cluster)
+}
+
+// checkPromotionGate decides, and logs, whether this replica can promote. It
+// returns a result that is not empty when the promotion has to wait.
+func (r *InstanceReconciler) checkPromotionGate(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	input promotionGateInput,
+) reconcile.Result {
+	decision := decidePromotion(input)
 	logPromotionDecision(ctx, decision)
 
 	switch decision.Verdict {
 	case promotionWait:
 		r.reportPromotionHeldBack(cluster, decision)
-		return reconcile.Result{RequeueAfter: cluster.GetPrimaryLeaseRetryPeriod()}, nil
+		return reconcile.Result{RequeueAfter: cluster.GetPrimaryLeaseRetryPeriod()}
 	case promotionBlocked:
 		r.reportPromotionHeldBack(cluster, decision)
-		return reconcile.Result{RequeueAfter: promotionBlockedRetryPeriod}, nil
+		return reconcile.Result{RequeueAfter: promotionBlockedRetryPeriod}
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{}
 }
 
 // reportPromotionHeldBack emits an event on the Cluster saying why the

@@ -191,6 +191,38 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 	return decideAfterFailover(input, leasePosition)
 }
 
+// timelineNeedsRefresh tells whether to request a checkpoint before deciding.
+// The timeline of the replica comes from the control file and lags the replay:
+// a refresh is needed when it is earlier than the one on the lease and
+// decidePromotion decides on it.
+//
+// A failover only reports, and must not wait for a checkpoint. A replica that
+// is missing WAL after a clean shutdown waits whatever its timeline. Not every
+// other case that ignores the timeline is skipped: an unneeded refresh only
+// costs a checkpoint.
+func timelineNeedsRefresh(input promotionGateInput) bool {
+	if input.ReplicaClusterPromotion || input.Failover || input.Annotation == "" {
+		return false
+	}
+
+	leasePosition, err := utils.ParseLeasePosition(input.Annotation)
+	if err != nil || input.Replica.Timeline >= leasePosition.Timeline {
+		return false
+	}
+
+	switch leasePosition.State {
+	case utils.LeasePositionStatePromoting:
+		return leasePosition.Pod != input.PodName
+
+	case utils.PgDataStateShutDown:
+		leaseLSN, leaseErr := types.LSN(leasePosition.LSN).Parse()
+		replicaLSN, replicaErr := input.Replica.LSN.Parse()
+		return leaseErr == nil && replicaErr == nil && leaseLSN <= replicaLSN
+	}
+
+	return false
+}
+
 // decideAfterCleanShutdown is the decision of the gate when the previous
 // primary published a final position
 func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.LeasePosition) promotionDecision {
@@ -224,16 +256,9 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 		}
 	}
 
+	// A later timeline blocks first. Then missing WAL is reported before an
+	// earlier timeline: the replica waits for that WAL in both cases.
 	switch {
-	case input.Replica.Timeline < leasePosition.Timeline:
-		return promotionDecision{
-			Verdict: promotionWait,
-			Level:   promotionLogInfo,
-			Message: "This replica is on an earlier timeline than the one the previous primary stopped on, " +
-				"waiting for it to catch up",
-			Details: details,
-		}
-
 	case input.Replica.Timeline > leasePosition.Timeline:
 		return promotionDecision{
 			Verdict: promotionBlocked,
@@ -252,6 +277,15 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 				"there, waiting for the missing WAL to be delivered by the archive",
 			Details: append(details, "missingBytes", leaseLSN-replicaLSN),
 			Unblock: true,
+		}
+
+	case input.Replica.Timeline < leasePosition.Timeline:
+		return promotionDecision{
+			Verdict: promotionWait,
+			Level:   promotionLogInfo,
+			Message: "This replica is on an earlier timeline than the one the previous primary stopped on, " +
+				"waiting for it to catch up",
+			Details: details,
 		}
 	}
 
@@ -306,7 +340,8 @@ func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePos
 	}
 }
 
-// unblockPromotionHint is what a person can do when the gate blocks a promotion
+// unblockPromotionHint is what a person can do when the gate blocks a promotion,
+// or holds it back for WAL that may not come
 const unblockPromotionHint = "To promote this replica anyway, accepting the loss of the data that only the " +
 	"previous primary has, remove the annotation of the primary lease " +
 	"(kubectl annotate lease <cluster> " + utils.LeasePositionAnnotationName + "-). " +

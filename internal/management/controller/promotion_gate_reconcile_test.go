@@ -286,4 +286,129 @@ var _ = Describe("promoteAfterGate", func() {
 			Expect(promoted).To(HaveLen(1))
 		})
 	})
+
+	When("the timeline of the replica is earlier than the one of the previous primary", func() {
+		var positions []replicaPosition
+		var reads, checkpoints int
+
+		BeforeEach(func() {
+			positions = nil
+			reads, checkpoints = 0, 0
+			r.readReplicaPosition = func(context.Context) (replicaPosition, error) {
+				position := positions[min(reads, len(positions)-1)]
+				reads++
+				return position, nil
+			}
+			r.checkpoint = func(context.Context) error {
+				checkpoints++
+				return nil
+			}
+		})
+
+		It("requests a checkpoint after a clean shutdown, and decides on the position read after it", func(ctx SpecContext) {
+			acquirer.annotation = published(utils.PgDataStateShutDown, "0/8000028", 2)
+			positions = []replicaPosition{{LSN: "0/80000A0", Timeline: 1}, {LSN: "0/80000A0", Timeline: 2}}
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+			Expect(promoted).To(HaveLen(1))
+			Expect(checkpoints).To(Equal(1))
+			Expect(reads).To(Equal(2))
+		})
+
+		It("does not request it when the replica is missing WAL, as it waits anyway", func(ctx SpecContext) {
+			acquirer.annotation = published(utils.PgDataStateShutDown, "0/9000028", 2)
+			positions = []replicaPosition{{LSN: "0/80000A0", Timeline: 1}}
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(cluster.GetPrimaryLeaseRetryPeriod()))
+			Expect(checkpoints).To(BeZero())
+			Expect(recorder.Events).To(Receive(And(
+				ContainSubstring("does not have all the data"),
+				ContainSubstring("kubectl annotate lease"),
+			)))
+		})
+
+		It("waits when it is still earlier after the checkpoint", func(ctx SpecContext) {
+			acquirer.annotation = published(utils.PgDataStateShutDown, "0/8000028", 2)
+			positions = []replicaPosition{{LSN: "0/80000A0", Timeline: 1}}
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(cluster.GetPrimaryLeaseRetryPeriod()))
+			Expect(checkpoints).To(Equal(1))
+			Expect(promoted).To(BeEmpty())
+		})
+
+		It("waits with the position it has when the checkpoint fails", func(ctx SpecContext) {
+			acquirer.annotation = published(utils.PgDataStateShutDown, "0/8000028", 2)
+			positions = []replicaPosition{{LSN: "0/80000A0", Timeline: 1}}
+			r.checkpoint = func(context.Context) error {
+				checkpoints++
+				return errors.New("canceling statement due to statement timeout")
+			}
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(cluster.GetPrimaryLeaseRetryPeriod()))
+			Expect(checkpoints).To(Equal(1))
+			Expect(reads).To(Equal(1))
+		})
+
+		It("decides on the first position when it cannot be read again after the checkpoint", func(ctx SpecContext) {
+			acquirer.annotation = published(utils.PgDataStateShutDown, "0/8000028", 2)
+			r.readReplicaPosition = func(context.Context) (replicaPosition, error) {
+				reads++
+				if reads > 1 {
+					return replicaPosition{}, errors.New("connection refused")
+				}
+				return replicaPosition{LSN: "0/80000A0", Timeline: 1}, nil
+			}
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(cluster.GetPrimaryLeaseRetryPeriod()))
+			Expect(checkpoints).To(Equal(1))
+			Expect(recorder.Events).To(Receive(ContainSubstring("earlier timeline")))
+		})
+
+		It("does not request it in a failover when the position cannot be read", func(ctx SpecContext) {
+			cluster.Status.Phase = apiv1.PhaseFailOver
+			acquirer.annotation = published(utils.PgDataStateInProduction, "0/9000000", 2)
+			r.readReplicaPosition = func(context.Context) (replicaPosition, error) {
+				return replicaPosition{}, errors.New("connection refused")
+			}
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+			Expect(promoted).To(HaveLen(1))
+			Expect(checkpoints).To(BeZero())
+		})
+
+		It("does not request it in a failover, which only reports, and promotes", func(ctx SpecContext) {
+			cluster.Status.Phase = apiv1.PhaseFailOver
+			acquirer.annotation = published(utils.PgDataStateInProduction, "0/9000000", 2)
+			positions = []replicaPosition{{LSN: "0/80000A0", Timeline: 1}, {LSN: "0/80000A0", Timeline: 2}}
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+			Expect(promoted).To(HaveLen(1))
+			Expect(checkpoints).To(BeZero())
+			Expect(reads).To(Equal(1))
+		})
+
+		It("does not request it when the timeline is the one of the previous primary", func(ctx SpecContext) {
+			acquirer.annotation = published(utils.PgDataStateShutDown, "0/8000028", 2)
+			positions = []replicaPosition{{LSN: "0/80000A0", Timeline: 2}}
+
+			_, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(checkpoints).To(BeZero())
+			Expect(reads).To(Equal(1))
+		})
+	})
 })

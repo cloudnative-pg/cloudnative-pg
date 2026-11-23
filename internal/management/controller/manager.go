@@ -104,6 +104,10 @@ type InstanceReconciler struct {
 	// unit tests.
 	readReplicaPosition func(ctx context.Context) (replicaPosition, error)
 
+	// checkpoint requests a checkpoint for the promotion gate. Nil means
+	// requestCheckpoint; tests set a stub.
+	checkpoint func(ctx context.Context) error
+
 	// waitWalReceiverDown is how handlePromotion waits for the WAL receiver of
 	// this replica to stop. Nil means to query PostgreSQL, and is replaced by
 	// a stub in the unit tests.
