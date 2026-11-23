@@ -214,6 +214,9 @@ var _ = BeforeEach(func() {
 	if IsOpenshift() && slices.Contains(CurrentSpecReport().Labels(), tests.LabelPluginBarmanCloud) {
 		Skip("plugin-barman-cloud tests are not applicable on OpenShift clusters")
 	}
+	if IsOpenshift() && slices.Contains(CurrentSpecReport().Labels(), tests.LabelNoOpenshift) {
+		Skip("tests with the NoOpenshift label are not applicable on OpenShift clusters")
+	}
 })
 
 var _ = BeforeEach(func() {

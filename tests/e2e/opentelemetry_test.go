@@ -244,7 +244,7 @@ func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, 
 		readTime := time.Now()
 		exportedAfter := exportedPodRecords(g, collectorNamespace, pod.Name)
 
-		g.Expect(exportedAfter).ToNot(BeEmpty())
+		g.Expect(exportedAfter).ToNot(BeEmpty(), "no records exported for pod %s", pod.Name)
 		firstExported := slices.MinFunc(exportedAfter, func(a, b opentelemetry.Record) int {
 			return a.Time.Compare(b.Time)
 		}).Time
