@@ -158,6 +158,10 @@ func getProbeRunnerFromCluster(probeType probeType, cluster apiv1.Cluster) runne
 // serve reads.
 type notDivergedChecker struct {
 	inner runner
+
+	// replayLSN reads the replay position. When nil, it is read from the
+	// instance's database.
+	replayLSN func(ctx context.Context, instance *postgres.Instance) (types.LSN, error)
 }
 
 func (c notDivergedChecker) IsHealthy(ctx context.Context, instance *postgres.Instance) error {
@@ -165,14 +169,12 @@ func (c notDivergedChecker) IsHealthy(ctx context.Context, instance *postgres.In
 		return err
 	}
 
-	superUserDB, err := instance.GetSuperUserDB()
-	if err != nil {
-		return fmt.Errorf("while getting superuser connection pool: %w", err)
+	readReplayLSN := c.replayLSN
+	if readReplayLSN == nil {
+		readReplayLSN = queryReplayLSN
 	}
-
-	var replayLSN types.LSN
-	if err := superUserDB.QueryRowContext(ctx,
-		"SELECT COALESCE(pg_catalog.pg_last_wal_replay_lsn()::varchar, '')").Scan(&replayLSN); err != nil {
+	replayLSN, err := readReplayLSN(ctx, instance)
+	if err != nil {
 		return fmt.Errorf("while reading the replay position: %w", err)
 	}
 
@@ -187,6 +189,22 @@ func (c notDivergedChecker) IsHealthy(ctx context.Context, instance *postgres.In
 	}
 
 	return nil
+}
+
+// queryReplayLSN reads the replay position from the instance's database. It
+// is empty on a primary.
+func queryReplayLSN(ctx context.Context, instance *postgres.Instance) (types.LSN, error) {
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return "", fmt.Errorf("while getting superuser connection pool: %w", err)
+	}
+
+	var replayLSN types.LSN
+	if err := superUserDB.QueryRowContext(ctx,
+		"SELECT COALESCE(pg_catalog.pg_last_wal_replay_lsn()::varchar, '')").Scan(&replayLSN); err != nil {
+		return "", err
+	}
+	return replayLSN, nil
 }
 
 // newPgIsReadyChecker creates the pg_isready strategy runner for the passed

@@ -416,6 +416,16 @@ var _ = Describe("Timeline divergence detection", func() {
 			}))
 	})
 
+	DescribeTable("reports a standby with no fork point when its history line",
+		func(content string) {
+			Expect(DetectTimelineDivergence(1, 2, content, "0/46210C8")).
+				To(Equal(&TimelineDivergence{TimeLineID: 1, PrimaryTimeLineID: 2, ReplayLSN: "0/46210C8"}))
+		},
+		Entry("has no LSN", "1\n"),
+		Entry("does not start with its timeline", "garbage 0/4000000 reason\n"),
+		Entry("is empty", ""),
+	)
+
 	DescribeTable("reports a standby",
 		func(segmentTLI int, replayLSN string, diverged bool) {
 			Expect(DetectTimelineDivergence(segmentTLI, 4, history, types.LSN(replayLSN)) != nil).
