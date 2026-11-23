@@ -395,6 +395,27 @@ Or you can use the instance node number to promote:
 kubectl cnpg promote CLUSTER INSTANCE
 ```
 
+While a switchover is in progress, the command does not change its target.
+The only allowed action is to cancel it, by promoting the current primary
+back. This needs the `--force` flag:
+
+```sh
+kubectl cnpg promote --force CLUSTER CLUSTER-INSTANCE
+```
+
+This is how to go back to the previous primary when a switchover does not
+complete. If the previous primary does not come back, `--force` also
+promotes another instance in place of a canceled switchover. A failover is
+not a switchover: promoting an instance during a failover works as usual,
+and `--force` has no effect.
+
+:::warning
+    Canceling a switchover is safe as long as the new primary did not
+    promote yet. If it did, the cluster can end up with two primaries, and
+    the data written on the new primary is lost. A promotion that has just
+    started can also overtake the cancellation.
+:::
+
 ### Certificates
 
 Clusters created using the CloudNativePG operator work with a CA to sign
