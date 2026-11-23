@@ -285,9 +285,16 @@ A switchover or a failover is a hand-over between the Operator and the
 Instance Managers, coordinated through two fields of the `Cluster` status and
 the primary `Lease`. The Operator writes `status.targetPrimary`, the instance
 that must become primary (`kubectl cnpg promote` writes it too, to request a
-switchover). Only the Instance Manager of that instance writes
-`status.currentPrimary`, once it has actually promoted. While the two differ,
-a transition is in progress.
+switchover). Only the Instance Manager of that instance writes its own name in
+`status.currentPrimary`, once it is the primary. The one other writer is
+`kubectl cnpg promote --force`, which stores a marker there (see below).
+While the two differ, a transition is in progress.
+
+`kubectl cnpg promote --force` cancels a switchover in progress by setting
+`status.targetPrimary` back to the current primary and `status.currentPrimary`
+to the `cancel` marker, which is the name of no instance. The two still
+differ, so the transition stays in progress, and that instance records itself
+in `status.currentPrimary` once it is the primary again.
 
 ```mermaid
 sequenceDiagram

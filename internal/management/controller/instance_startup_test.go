@@ -91,4 +91,16 @@ var _ = Describe("verifyPgDataCoherenceForPrimary primary lease gate", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(cluster.Status.CurrentPrimary).To(Equal(podName))
 	})
+
+	// A canceled switchover leaves a marker as current primary. The old
+	// primary, made the target again, must start instead of waiting for a
+	// switchover that will not finish.
+	It("starts as primary when its switchover was canceled", func(ctx SpecContext) {
+		r, cluster := newReconciler(nil)
+		cluster.Status.CurrentPrimary = "cancel"
+
+		err := r.verifyPgDataCoherenceForPrimary(ctx, cluster)
+
+		Expect(err).ToNot(HaveOccurred())
+	})
 })
