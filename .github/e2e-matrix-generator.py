@@ -360,13 +360,15 @@ if __name__ == "__main__":
         "--limit",
         type=str,
         default="",
-        help="limit to a list of engines",
+        help="limit to a list of engines, or 'none' to run no engine",
     )
     args = parser.parse_args()
 
     engines = set(ENGINE_MODES.keys())
 
-    if args.limit:
+    if args.limit.strip() == "none":
+        engines = set()
+    elif args.limit:
         required_engines = set(re.split(r"[, ]+", args.limit.strip()))
         if len(wrong_engines := required_engines - engines):
             raise SystemExit(
