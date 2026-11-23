@@ -228,7 +228,9 @@ func exportedPodRecords(g Gomega, collectorNamespace, podName string) []opentele
 // assertContainerLogsAreExported verifies that the collector in the given
 // namespace receives every record that the containers of a pod write on
 // their standard output, and no other one, matching them by message and
-// time.
+// time. The records written before the first exported one are ignored: the
+// exporter drops them when the collector is not reachable yet, and does not
+// retry.
 func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, containers ...string) {
 	GinkgoHelper()
 	Eventually(func(g Gomega) {
@@ -241,6 +243,11 @@ func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, 
 		}
 		readTime := time.Now()
 		exportedAfter := exportedPodRecords(g, collectorNamespace, pod.Name)
+
+		g.Expect(exportedAfter).ToNot(BeEmpty())
+		firstExported := slices.MinFunc(exportedAfter, func(a, b opentelemetry.Record) int {
+			return a.Time.Compare(b.Time)
+		}).Time
 
 		written := make(map[recordKey]int)
 		// The most recent records are left the time to be exported
@@ -256,7 +263,7 @@ func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, 
 			}
 			key := recordKey{message: entry.Message, unixNano: entry.Time.UnixNano()}
 			written[key]++
-			if entry.Time.Before(readTime.Add(-10 * time.Second)) {
+			if !entry.Time.Before(firstExported) && entry.Time.Before(readTime.Add(-10*time.Second)) {
 				writtenBefore[key]++
 			}
 		}
