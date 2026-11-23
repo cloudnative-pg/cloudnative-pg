@@ -24,7 +24,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"go.uber.org/atomic"
@@ -54,11 +53,9 @@ type PrimaryLeaseAcquirer interface {
 	// it over once it goes stale. The next Acquire takes the lease back.
 	Yield(ctx context.Context)
 
-	// Position returns what the previous primary published on the primary lease,
-	// as the value of its annotation (empty if there is none), and how long ago
-	// the lease was last renewed, zero if not known. It fails unless this pod
-	// holds the lease.
-	Position(ctx context.Context) (string, time.Duration, error)
+	// Position returns the position annotation of the primary lease, empty if
+	// there is none. It fails unless this pod holds the lease.
+	Position(ctx context.Context) (string, error)
 
 	// MarkPromoting records on the primary lease that this pod is about to
 	// promote, replacing the position of the previous primary

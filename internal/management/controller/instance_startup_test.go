@@ -24,7 +24,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -48,10 +47,9 @@ type fakeLeaseAcquirer struct {
 	err    error
 	yields int
 
-	annotation    string
-	annotationAge time.Duration
-	positionErr   error
-	markErr       error
+	annotation  string
+	positionErr error
+	markErr     error
 
 	// calls are the names of the methods that the promotion called
 	calls []string
@@ -66,9 +64,9 @@ func (f *fakeLeaseAcquirer) Yield(context.Context) {
 	f.yields++
 }
 
-func (f *fakeLeaseAcquirer) Position(context.Context) (string, time.Duration, error) {
+func (f *fakeLeaseAcquirer) Position(context.Context) (string, error) {
 	f.calls = append(f.calls, "Position")
-	return f.annotation, f.annotationAge, f.positionErr
+	return f.annotation, f.positionErr
 }
 
 func (f *fakeLeaseAcquirer) MarkPromoting(context.Context) error {

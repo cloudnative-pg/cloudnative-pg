@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
-	"time"
-
 	"github.com/cloudnative-pg/machinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -53,10 +51,9 @@ var _ = Describe("decidePromotion", func() {
 
 	decide := func(annotation string, replica replicaPosition) promotionDecision {
 		return decidePromotion(promotionGateInput{
-			Annotation:    annotation,
-			PodName:       thisPod,
-			Replica:       replica,
-			AnnotationAge: 3 * time.Second,
+			Annotation: annotation,
+			PodName:    thisPod,
+			Replica:    replica,
 		})
 	}
 
@@ -222,7 +219,6 @@ var _ = Describe("decidePromotion", func() {
 					"writer", "cluster-example-2",
 					"state", state,
 					"possiblyMissingBytes", uint64(0x100),
-					"age", "3s",
 				))
 			},
 			Entry("in production", utils.PgDataStateInProduction),
@@ -249,15 +245,6 @@ var _ = Describe("decidePromotion", func() {
 				replicaPosition{})
 			Expect(decision.Verdict).To(Equal(promotionProceed))
 			Expect(decision.Details).ToNot(ContainElement("possiblyMissingBytes"))
-		})
-
-		It("leaves the age out when it is not known", func() {
-			decision := decidePromotion(promotionGateInput{
-				Annotation: position(utils.PgDataStateInProduction, "0/8000000", 2),
-				PodName:    thisPod,
-				Replica:    replica("0/7FFFF00", 2),
-			})
-			Expect(decision.Details).ToNot(ContainElement("age"))
 		})
 	})
 

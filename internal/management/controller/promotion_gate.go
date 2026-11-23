@@ -21,7 +21,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/types"
 
@@ -75,9 +74,6 @@ type promotionGateInput struct {
 
 	// Replica is the position of the pod that is about to promote
 	Replica replicaPosition
-
-	// AnnotationAge is how long ago the lease was last written, zero if not known
-	AnnotationAge time.Duration
 
 	// ReplicaClusterPromotion tells that the pod is promoted to end the replica
 	// cluster mode. The caller sets it from the promotion that is happening,
@@ -279,9 +275,6 @@ func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePos
 		"leaseTimeline", leasePosition.Timeline,
 		"replicaLSN", input.Replica.LSN,
 		"replicaTimeline", input.Replica.Timeline,
-	}
-	if input.AnnotationAge > 0 {
-		details = append(details, "age", input.AnnotationAge.Round(time.Millisecond).String())
 	}
 
 	message := "The previous primary did not stop cleanly, proceeding with the promotion"

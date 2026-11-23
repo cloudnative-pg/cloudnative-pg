@@ -129,16 +129,15 @@ func (r *InstanceReconciler) checkPromotionGate(
 	cluster *apiv1.Cluster,
 	replica replicaPosition,
 ) (reconcile.Result, error) {
-	annotation, age, err := r.primaryLeaseAcquirer.Position(ctx)
+	annotation, err := r.primaryLeaseAcquirer.Position(ctx)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("while reading the position of the previous primary: %w", err)
 	}
 
 	decision := decidePromotion(promotionGateInput{
-		Annotation:    annotation,
-		PodName:       r.instance.GetPodName(),
-		Replica:       replica,
-		AnnotationAge: age,
+		Annotation: annotation,
+		PodName:    r.instance.GetPodName(),
+		Replica:    replica,
 		// The promotion of a replica cluster is validated by its promotion
 		// token, and the position on the lease is the one of an earlier life
 		// of this cluster. Without a token, the designated primary is the

@@ -442,42 +442,39 @@ var _ = Describe("Reading the position of the previous primary from the primary 
 			WithClusterName(clusterName))
 	})
 
-	createLease := func(ctx context.Context, holder string, annotations map[string]string, renewed *metav1.MicroTime) {
+	createLease := func(ctx context.Context, holder string, annotations map[string]string) {
 		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Annotations: annotations},
-			Spec:       coordinationv1.LeaseSpec{HolderIdentity: ptr.To(holder), RenewTime: renewed},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: ptr.To(holder)},
 		}, metav1.CreateOptions{})
 		Expect(err).ToNot(HaveOccurred())
 	}
 
-	It("returns the annotation and how long ago the lease was renewed", func(ctx context.Context) {
-		createLease(ctx, thisPod, map[string]string{utils.LeasePositionAnnotationName: previous},
-			ptr.To(metav1.NewMicroTime(time.Now().Add(-10*time.Second))))
+	It("returns the annotation", func(ctx context.Context) {
+		createLease(ctx, thisPod, map[string]string{utils.LeasePositionAnnotationName: previous})
 
-		value, age, err := r.Position(ctx)
+		value, err := r.Position(ctx)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(value).To(Equal(previous))
-		Expect(age).To(BeNumerically(">=", 10*time.Second))
 	})
 
 	It("returns an empty value when the lease has no position", func(ctx context.Context) {
-		createLease(ctx, thisPod, nil, nil)
+		createLease(ctx, thisPod, nil)
 
-		value, age, err := r.Position(ctx)
+		value, err := r.Position(ctx)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(value).To(BeEmpty())
-		Expect(age).To(BeZero())
 	})
 
 	It("fails when another pod holds the lease", func(ctx context.Context) {
-		createLease(ctx, "test-cluster-2", map[string]string{utils.LeasePositionAnnotationName: previous}, nil)
+		createLease(ctx, "test-cluster-2", map[string]string{utils.LeasePositionAnnotationName: previous})
 
-		_, _, err := r.Position(ctx)
+		_, err := r.Position(ctx)
 		Expect(err).To(MatchError(ContainSubstring("not held by " + thisPod)))
 	})
 
 	It("fails when there is no lease", func(ctx context.Context) {
-		_, _, err := r.Position(ctx)
+		_, err := r.Position(ctx)
 		Expect(err).To(HaveOccurred())
 	})
 })
