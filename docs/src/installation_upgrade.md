@@ -333,7 +333,9 @@ In a restricted database, only superusers, the owner (and the roles that inherit
 from it), and the roles that are granted `CONNECT` can connect. A role that
 relied on `PUBLIC` is refused with a `permission denied for database` error.
 This includes [managed roles](declarative_role_management.md) and the roles
-that your applications and tools use to reach the `postgres` database.
+that your applications and tools use to reach the `postgres` database. For
+example, a [Pooler with a custom authentication method](connection_pooling.md#custom-authentication-method)
+needs `CONNECT` on `postgres` for the role that runs its `auth_query`.
 
 We do not recommend granting `CONNECT` back to `PUBLIC` to restore the previous
 behavior. To follow the principle of least privilege, assign the correct
@@ -397,7 +399,8 @@ not continuously.
 :::info
     The `postgres` and `template1` databases are reserved, so they can't be
     managed with a `Database` resource. If a role needs to connect to one of
-    them, grant `CONNECT` to it with a SQL command run as the superuser.
+    them, grant `CONNECT` to it with a SQL command run as the superuser, once
+    the role exists.
 :::
 
 :::warning
