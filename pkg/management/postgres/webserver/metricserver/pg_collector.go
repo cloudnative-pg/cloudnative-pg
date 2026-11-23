@@ -444,31 +444,10 @@ func (e *Exporter) updateInstanceMetrics() {
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
-	isPrimary, err := e.instance.IsPrimary()
-	if err != nil {
-		log.Error(err, "unable to get if primary")
-	}
-
 	e.collectNodesUsed()
 	e.collectReplicasDiverged()
 
-	// metrics collected only on primary server
-	if isPrimary {
-		// getting required synchronous standby number from postgres itself
-		e.collectFromPrimarySynchronousStandbysNumber(db)
-
-		// getting the first point of recoverability
-		e.collectFromPrimaryFirstPointOnTimeRecovery()
-
-		// getting the last available backup timestamp
-		e.collectFromPrimaryLastAvailableBackupTimestamp()
-
-		e.collectFromPrimaryLastFailedBackupTimestamp()
-	} else {
-		// A primary can become a standby without the instance manager
-		// restarting, and would keep exposing its last value
-		e.Metrics.SyncReplicas.DeleteLabelValues("observed")
-	}
+	e.collectFromPrimary(db)
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
 		log.Error(err, "while collecting WAL archive metrics", "path", specs.PgWalArchiveStatusPath)
@@ -577,6 +556,32 @@ func (e *Exporter) collectReplicasDiverged() {
 	}
 
 	e.Metrics.ReplicasDiverged.Set(float64(len(cluster.Status.DivergedInstances)))
+}
+
+// collectFromPrimary updates the metrics collected only on a primary server
+func (e *Exporter) collectFromPrimary(db *sql.DB) {
+	isPrimary, err := e.instance.IsPrimary()
+	if err != nil {
+		log.Error(err, "unable to get if primary")
+	}
+
+	if !isPrimary {
+		// A primary can become a standby without the instance manager
+		// restarting, and would keep exposing its last value
+		e.Metrics.SyncReplicas.DeleteLabelValues("observed")
+		return
+	}
+
+	// getting required synchronous standby number from postgres itself
+	e.collectFromPrimarySynchronousStandbysNumber(db)
+
+	// getting the first point of recoverability
+	e.collectFromPrimaryFirstPointOnTimeRecovery()
+
+	// getting the last available backup timestamp
+	e.collectFromPrimaryLastAvailableBackupTimestamp()
+
+	e.collectFromPrimaryLastFailedBackupTimestamp()
 }
 
 func (e *Exporter) collectFromPrimaryLastFailedBackupTimestamp() {

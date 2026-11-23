@@ -22,6 +22,8 @@ package metricserver
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -50,6 +52,22 @@ func observedValue(exporter *Exporter) float64 {
 	metric := &io_prometheus_client.Metric{}
 	Expect(exporter.Metrics.SyncReplicas.WithLabelValues("observed").Write(metric)).To(Succeed())
 	return metric.GetGauge().GetValue()
+}
+
+// exposedSyncReplicas returns the sync replicas values that are exposed,
+// without creating the missing ones as WithLabelValues would do
+func exposedSyncReplicas(exporter *Exporter) map[string]float64 {
+	ch := make(chan prometheus.Metric, 4)
+	exporter.Metrics.SyncReplicas.Collect(ch)
+	close(ch)
+
+	result := make(map[string]float64)
+	for collected := range ch {
+		metric := &io_prometheus_client.Metric{}
+		Expect(collected.Write(metric)).To(Succeed())
+		result[metric.GetLabel()[0].GetValue()] = metric.GetGauge().GetValue()
+	}
+	return result
 }
 
 var _ = Describe("test metrics parsing", func() {
@@ -150,6 +168,24 @@ var _ = Describe("test metrics parsing", func() {
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
 
 		Expect(observedValue(exporter)).To(BeEquivalentTo(-1))
+	})
+
+	It("stops exposing the attached synchronous standbys when the primary becomes a standby", func() {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		rows := sqlmock.NewRows([]string{"count"}).AddRow(2)
+		mock.ExpectQuery(synchronousStandbysQuery).WillReturnRows(rows)
+
+		exporter.instance.PgData = GinkgoT().TempDir()
+		exporter.collectFromPrimary(db)
+		Expect(exposedSyncReplicas(exporter)).To(HaveKeyWithValue("observed", BeEquivalentTo(2)))
+
+		// standby.signal is what IsPrimary reads
+		Expect(os.WriteFile(filepath.Join(exporter.instance.PgData, "standby.signal"), nil, 0o600)).To(Succeed())
+		exporter.collectFromPrimary(db)
+		Expect(exposedSyncReplicas(exporter)).ToNot(HaveKey("observed"))
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 
 	Context("collectUsedNodes", func() {
