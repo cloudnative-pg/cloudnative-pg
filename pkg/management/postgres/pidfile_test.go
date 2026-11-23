@@ -118,8 +118,8 @@ var _ = Describe("shutting down with a PID file pointing to a live process", fun
 	BeforeEach(func() {
 		tempDir := GinkgoT().TempDir()
 
-		// This fake pg_ctl records every call and always succeeds: like the
-		// real one, "status" reports a running server when the PID is alive.
+		// This fake pg_ctl records every call and always succeeds, so "status"
+		// reports a running server whatever the PID file contains.
 		pgCtlCalls = filepath.Join(tempDir, "calls")
 		script := fmt.Sprintf("#!/bin/sh\necho \"$*\" >> %s\n", pgCtlCalls)
 		//nolint:gosec // executable fake pg_ctl needs the execute bit

@@ -830,7 +830,8 @@ func (instance *Instance) IsImmediateShutdownUnresponsive() bool {
 	return instance.immediateShutdownUnresponsive.Load()
 }
 
-// isStatusRunning checks the status of a running server using pg_ctl status
+// isStatusRunning reports whether PostgreSQL is running: pg_ctl status must
+// succeed, and the PID file must not name a live process that is not PostgreSQL
 func (instance *Instance) isStatusRunning() bool {
 	options := []string{
 		"-D",
