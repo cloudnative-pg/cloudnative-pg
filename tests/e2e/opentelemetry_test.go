@@ -228,9 +228,8 @@ func exportedPodRecords(g Gomega, collectorNamespace, podName string) []opentele
 // assertContainerLogsAreExported verifies that the collector in the given
 // namespace receives every record that the containers of a pod write on
 // their standard output, and no other one, matching them by message and
-// time. The records written before the first exported one are ignored: the
-// exporter drops them when the collector is not reachable yet, and does not
-// retry.
+// time. Records written before the first exported one are ignored: the
+// exporter drops them while the collector is unreachable, and does not retry.
 func assertContainerLogsAreExported(collectorNamespace string, pod *corev1.Pod, containers ...string) {
 	GinkgoHelper()
 	Eventually(func(g Gomega) {

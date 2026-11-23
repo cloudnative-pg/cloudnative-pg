@@ -207,9 +207,10 @@ E2E test configuration:
 	objectStoreEnv.Client = objs["object-store"]
 })
 
-// plugin-barman-cloud is not installed on OpenShift clusters since it isn't
-// available yet via OLM, see https://github.com/cloudnative-pg/plugin-barman-cloud/issues/554.
-// Every test running on Openshift and carrying the plugin-barman-cloud label should be skipped.
+// On OpenShift, skip the tests labeled:
+//   - plugin-barman-cloud: the plugin is not available yet via OLM, see
+//     https://github.com/cloudnative-pg/plugin-barman-cloud/issues/554.
+//   - no-openshift: the test does not apply to OpenShift.
 var _ = BeforeEach(func() {
 	if IsOpenshift() && slices.Contains(CurrentSpecReport().Labels(), tests.LabelPluginBarmanCloud) {
 		Skip("plugin-barman-cloud tests are not applicable on OpenShift clusters")
