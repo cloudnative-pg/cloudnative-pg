@@ -257,7 +257,9 @@ from your secret, you can override it with the `auth_user` parameter (see
     If you declare the role in `.spec.managed.roles`, run the command once the
     role has been created: it doesn't exist while the cluster is bootstrapped,
     so the `postInit` queries can't grant it by name. You can't use a
-    `Database` resource, as `postgres` is a reserved database name.
+    `Database` resource, as `postgres` is a reserved database name. If you
+    can't run the command, see the `allowPublicConnectToPostgres` option in the
+    [`initdb` bootstrap](bootstrap.md#bootstrap-an-empty-cluster-initdb).
 
     The role of the built-in integration, `cnpg_pooler_pgbouncer`, is granted
     `CONNECT` automatically.

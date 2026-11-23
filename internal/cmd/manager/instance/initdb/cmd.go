@@ -52,6 +52,7 @@ func NewCmd() *cobra.Command {
 	var postInitSQLRefsFolder string
 	var postInitApplicationSQLRefsFolder string
 	var postInitTemplateSQLRefsFolder string
+	var allowPublicConnectToPostgres bool
 
 	cmd := &cobra.Command{
 		Use: "init [options]",
@@ -118,6 +119,7 @@ func NewCmd() *cobra.Command {
 				PostInitApplicationSQLRefsFolder: postInitApplicationSQLRefsFolder,
 				PostInitTemplateSQLRefsFolder:    postInitTemplateSQLRefsFolder,
 				PostInitSQLRefsFolder:            postInitSQLRefsFolder,
+				AllowPublicConnectToPostgres:     allowPublicConnectToPostgres,
 			}
 
 			return initSubCommand(ctx, info)
@@ -160,6 +162,8 @@ func NewCmd() *cobra.Command {
 			"against the application database immediately after its creation")
 	cmd.Flags().StringVar(&postInitTemplateSQLRefsFolder, "post-init-template-sql-refs-folder",
 		"", "The folder contains a set of SQL files to be executed in alphabetical order")
+	cmd.Flags().BoolVar(&allowPublicConnectToPostgres, "allow-public-connect-postgres", false,
+		"Do not revoke the CONNECT privilege from PUBLIC on the postgres database")
 	return cmd
 }
 

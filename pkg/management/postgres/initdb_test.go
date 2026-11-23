@@ -397,6 +397,28 @@ var _ = Describe("restricting the CONNECT privilege", func() {
 				WillReturnResult(sqlmock.NewResult(0, 0))
 			mock.ExpectCommit()
 
-			Expect(restrictInitialDatabases(ctx, db)).To(Succeed())
+			Expect(restrictInitialDatabases(ctx, db, false)).To(Succeed())
+		})
+
+	It("leaves PUBLIC connect on postgres when it is allowed, and still restricts template1",
+		func(ctx SpecContext) {
+			mock.ExpectBegin()
+			mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1")).
+				WithArgs("cnpg_metrics_exporter").
+				WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+			mock.ExpectExec("CREATE ROLE cnpg_metrics_exporter").WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(regexp.QuoteMeta(`GRANT CONNECT ON DATABASE "postgres" TO cnpg_metrics_exporter`)).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(regexp.QuoteMeta(`GRANT CONNECT ON DATABASE "template1" TO cnpg_metrics_exporter`)).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectQuery("pg_catalog.pg_authid").WithArgs("cnpg_metrics_exporter").
+				WillReturnRows(sqlmock.NewRows([]string{"a", "b", "c"}).AddRow(true, false, true))
+			mock.ExpectExec("GRANT pg_monitor TO cnpg_metrics_exporter").WillReturnResult(sqlmock.NewResult(0, 0))
+			// No REVOKE on postgres: the next expectation is the one on template1
+			mock.ExpectExec(regexp.QuoteMeta(`REVOKE CONNECT ON DATABASE "template1" FROM PUBLIC`)).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectCommit()
+
+			Expect(restrictInitialDatabases(ctx, db, true)).To(Succeed())
 		})
 })

@@ -196,6 +196,20 @@ The above example of bootstrap will:
    [Managing Database Permissions](declarative_database_management.md#managing-database-permissions)
    for details.
 
+:::warning
+    Every role that needs to connect to the `postgres` database, such as the
+    role that a `Pooler` with a custom authentication method uses to run its
+    `auth_query`, must be granted `CONNECT` on it. We recommend granting it to
+    those roles only, with a SQL command run as the superuser once they exist.
+
+    If you can't do that, for example because the roles are created after the
+    bootstrap and the grant can't be automated, set
+    `.spec.bootstrap.initdb.allowPublicConnectToPostgres` to `true`. The
+    operator then doesn't revoke `CONNECT` from `PUBLIC` on the `postgres`
+    database, which every role can connect to, as in PostgreSQL. The option
+    only applies when the cluster is bootstrapped.
+:::
+
 Thanks to the *convention over configuration paradigm*, you can let the
 operator choose a default database name (`app`) and a default application
 user name (same as the database name), as well as randomly generate a

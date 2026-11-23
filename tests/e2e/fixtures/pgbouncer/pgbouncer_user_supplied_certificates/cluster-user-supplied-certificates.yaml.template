@@ -32,9 +32,8 @@ spec:
       database: app
       owner: app
       # The pooler authenticates with the "pgbouncer" role, which has to connect
-      # to the "postgres" database, and a new cluster doesn't let PUBLIC do it
-      postInitSQL:
-        - GRANT CONNECT ON DATABASE postgres TO PUBLIC
+      # to the "postgres" database
+      allowPublicConnectToPostgres: true
 
   # Persistent storage configuration
   storage:
