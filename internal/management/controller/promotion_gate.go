@@ -98,6 +98,10 @@ type promotionDecision struct {
 
 	// Details are the key/value pairs to log with the message
 	Details []any
+
+	// Unblock tells that waiting may not be enough: the event then says how a
+	// person can go on
+	Unblock bool
 }
 
 // decidePromotion tells whether a replica can promote, given the position that
@@ -239,8 +243,9 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 			Verdict: promotionBlocked,
 			Level:   promotionLogError,
 			Message: "This replica is on a later timeline than the one the previous primary stopped on, " +
-				"it may have diverged, not promoting it. " + unblockPromotionHint,
+				"it may have diverged, not promoting it",
 			Details: details,
+			Unblock: true,
 		}
 
 	case leaseLSN > replicaLSN:
@@ -250,6 +255,7 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 			Message: "This replica does not have all the data of the previous primary, which exists only " +
 				"there, waiting for the missing WAL to be delivered by the archive",
 			Details: append(details, "missingBytes", leaseLSN-replicaLSN),
+			Unblock: true,
 		}
 	}
 

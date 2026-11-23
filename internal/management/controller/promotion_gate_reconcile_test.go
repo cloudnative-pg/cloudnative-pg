@@ -165,7 +165,25 @@ var _ = Describe("promoteAfterGate", func() {
 
 			Expect(acquirer.calls).To(Equal([]string{"Position"}))
 			Expect(promoted).To(BeEmpty())
-			Expect(recorder.Events).To(Receive(HavePrefix("Warning " + promotionHeldBackReason + " ")))
+			Expect(recorder.Events).To(Receive(And(
+				HavePrefix("Warning "+promotionHeldBackReason+" "),
+				ContainSubstring("kubectl annotate lease"),
+			)))
+		})
+	})
+
+	When("the replica waits for something that goes away", func() {
+		It("emits an event that does not tell how to accept a loss, for an earlier timeline", func(ctx SpecContext) {
+			acquirer.annotation = published(utils.PgDataStateShutDown, "0/8000028", 3)
+
+			result, err := r.promoteAfterGate(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(cluster.GetPrimaryLeaseRetryPeriod()))
+			Expect(recorder.Events).To(Receive(And(
+				HavePrefix("Warning "+promotionHeldBackReason+" "),
+				ContainSubstring("earlier timeline"),
+				Not(ContainSubstring("kubectl annotate lease")),
+			)))
 		})
 	})
 

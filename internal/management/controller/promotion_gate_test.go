@@ -188,13 +188,29 @@ var _ = Describe("decidePromotion", func() {
 		Expect(decision.Details).To(ContainElements("missingBytes", uint64(0x100)))
 	})
 
-	It("tells how to unblock a replica that is blocked", func() {
+	It("asks to tell how to unblock a replica that is blocked", func() {
 		decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 1),
 			replica("0/70000A0", 2))
 		Expect(decision.Verdict).To(Equal(promotionBlocked))
-		Expect(decision.Message).To(ContainSubstring("kubectl annotate lease <cluster> cnpg.io/position-)"))
-		Expect(decision.Message).To(ContainSubstring("kubectl cnpg promote --force <cluster> <previous primary>"))
+		Expect(decision.Unblock).To(BeTrue())
 	})
+
+	It("asks to tell how to unblock a replica that is missing WAL", func() {
+		decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 1),
+			replica("0/6FFFF00", 1))
+		Expect(decision.Verdict).To(Equal(promotionWait))
+		Expect(decision.Unblock).To(BeTrue())
+	})
+
+	DescribeTable("does not ask to tell how to unblock a replica that waits for something that goes away",
+		func(replica replicaPosition) {
+			decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 2), replica)
+			Expect(decision.Verdict).To(Equal(promotionWait))
+			Expect(decision.Unblock).To(BeFalse())
+		},
+		Entry("an earlier timeline", replicaPosition{LSN: "0/70000A0", Timeline: 1}),
+		Entry("a position that is not available", replicaPosition{}),
+	)
 
 	Context("when the previous primary did not stop cleanly", func() {
 		DescribeTable("always proceeds, reporting what may be missing",

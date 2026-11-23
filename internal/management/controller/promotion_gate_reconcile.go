@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -173,10 +172,9 @@ func (r *InstanceReconciler) reportPromotionHeldBack(cluster *apiv1.Cluster, dec
 		return
 	}
 
-	// A promotion that waits is not told how to go on anyway by the decision,
-	// the event does: it is where a person looks when the switchover does not complete
+	// A person looks at the events when the switchover does not complete
 	message := decision.Message
-	if !strings.Contains(message, unblockPromotionHint) {
+	if decision.Unblock {
 		message += ". " + unblockPromotionHint
 	}
 
