@@ -30,17 +30,18 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// cancelSwitchoverMarker is what the current primary is set to when a
-// switchover is cancelled. It is not the name of any instance, so the target
-// primary is no longer the current one and the instance that is made the target
-// again promotes itself back, as it does for any switchover.
+// cancelSwitchoverMarker is stored as the current primary when a switchover
+// is canceled. It names no instance, so the current and the target primary
+// still differ and the old primary knows it must act. Setting the target back
+// to the current primary instead would leave the old primary stuck.
 const cancelSwitchoverMarker = "cancel"
 
-// Promote promotes an instance in a cluster. A switchover that is in progress
-// can only be cancelled, by promoting the current primary back, and that
-// needs force.
+// Promote promotes an instance in a cluster. While a switchover is in
+// progress it can only cancel it, by promoting the current primary back, or
+// redirect a canceled one. Both need force.
 func Promote(ctx context.Context, cli client.Client,
 	namespace, clusterName, serverName string, force bool,
 ) error {
@@ -52,16 +53,16 @@ func Promote(ctx context.Context, cli client.Client,
 		return fmt.Errorf("cluster %s not found in namespace %s: %w", clusterName, namespace, err)
 	}
 
-	// A failover waiting for a quorum has the pending marker as target
-	// primary, and promoting an instance is how a person decides to go on
 	currentPrimary := cluster.Status.CurrentPrimary
 	targetPrimary := cluster.Status.TargetPrimary
-	switchoverInProgress := currentPrimary != "" &&
-		currentPrimary != targetPrimary &&
-		targetPrimary != apiv1.PendingFailoverMarker
+	transitionInProgress := currentPrimary != "" && currentPrimary != targetPrimary
+	// A failover is not a switchover: it has no target yet (pending) or has
+	// chosen it. Promoting lets it proceed. There is nothing to cancel.
+	failoverInProgress := transitionInProgress &&
+		(targetPrimary == apiv1.PendingFailoverMarker || cluster.Status.Phase == apiv1.PhaseFailOver)
+	switchoverInProgress := transitionInProgress && !failoverInProgress
 
-	// A cancelled switchover has no current primary to name or to promote
-	// back, until its target takes over
+	// The marker is not an instance: messages must not name it
 	cancelInProgress := currentPrimary == cancelSwitchoverMarker
 
 	// If server name is equal to target primary, there is no need to promote
@@ -69,7 +70,7 @@ func Promote(ctx context.Context, cli client.Client,
 	if targetPrimary == serverName {
 		switch {
 		case cancelInProgress:
-			fmt.Printf("A switchover was cancelled and the promotion of %s is already in progress\n", serverName)
+			fmt.Printf("A switchover was canceled and the promotion of %s is already in progress\n", serverName)
 		case switchoverInProgress:
 			fmt.Printf("A switchover from %s to %s is already in progress\n", currentPrimary, serverName)
 		default:
@@ -88,23 +89,31 @@ func Promote(ctx context.Context, cli client.Client,
 		return fmt.Errorf("new primary node %s not found in namespace %s: %w", serverName, namespace, err)
 	}
 
-	cancelling := false
+	canceling := false
 	if switchoverInProgress {
 		switch {
 		case cancelInProgress:
-			return fmt.Errorf("a switchover was cancelled and the promotion of %s is in progress: "+
-				"%s cannot be promoted until it completes", targetPrimary, serverName)
+			// Redirect the canceled switchover, so that it cannot get
+			// stuck on an old primary that does not come back
+			if !force {
+				return fmt.Errorf("a switchover was canceled and %s is being promoted back: "+
+					"promoting %s now changes that. Use --force to promote it anyway",
+					targetPrimary, serverName)
+			}
 		case serverName != currentPrimary:
 			return fmt.Errorf("a switchover from %s to %s is in progress and %s cannot be promoted until "+
 				"it completes: to cancel it, promote %s back",
 				currentPrimary, targetPrimary, serverName, currentPrimary)
 		case !force:
 			return fmt.Errorf("a switchover from %s to %s is in progress: promoting %s now cancels it. "+
-				"Nothing is lost if %s did not promote yet, but if it did, the cluster ends up with two primaries. "+
-				"Use --force to cancel the switchover",
+				"If %s already promoted, the cluster can end up with two primaries "+
+				"and the data written on it is lost. Use --force to cancel the switchover",
 				currentPrimary, targetPrimary, serverName, targetPrimary)
+		case !utils.IsPodActive(pod):
+			return fmt.Errorf("%s is not active and cannot take the primary role back", serverName)
+		default:
+			canceling = true
 		}
-		cancelling = true
 	}
 
 	// The Pod exists, let's update the cluster's status with the new target primary.
@@ -117,13 +126,16 @@ func Promote(ctx context.Context, cli client.Client,
 		if primaryChanged {
 			return
 		}
-		if cancelling {
+		if canceling {
 			cluster.Status.CurrentPrimary = cancelSwitchoverMarker
 		}
 		cluster.Status.TargetPrimary = serverName
 		cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
-		cluster.Status.Phase = apiv1.PhaseSwitchover
-		cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
+		// A failover stays a failover, or the next promote would see a switchover
+		if !failoverInProgress {
+			cluster.Status.Phase = apiv1.PhaseSwitchover
+			cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
+		}
 		status.SetClusterReadyCondition(cluster)
 	}
 	if err := status.PatchWithOptimisticLock(ctx, cli, &cluster, reconcileTargetPrimaryFunc); err != nil {
@@ -133,8 +145,8 @@ func Promote(ctx context.Context, cli client.Client,
 		return fmt.Errorf("the primary of cluster %s changed while promoting %s: "+
 			"nothing was done, check the status of the cluster and try again", clusterName, serverName)
 	}
-	if cancelling {
-		fmt.Printf("The switchover to %s in cluster %s is cancelled, node %s will be promoted back\n",
+	if canceling {
+		fmt.Printf("The switchover to %s in cluster %s is canceled, node %s will be promoted back\n",
 			targetPrimary, clusterName, serverName)
 		return nil
 	}

@@ -158,19 +158,84 @@ var _ = Describe("promote subcommand tests", func() {
 		})
 	})
 
-	It("does not name the marker of a cancelled switchover as an instance to promote back", func(ctx SpecContext) {
+	It("refuses another instance without force after a cancel, without naming the marker", func(ctx SpecContext) {
 		var cl apiv1.Cluster
 		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
 		cl.Status.CurrentPrimary = cancelSwitchoverMarker
 		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
 
-		err := Promote(ctx, client, namespace, "cluster1", "cluster1-3", true)
-		Expect(err).To(MatchError(ContainSubstring("promotion of cluster1-1 is in progress")))
+		err := Promote(ctx, client, namespace, "cluster1", "cluster1-3", false)
+		Expect(err).To(MatchError(ContainSubstring("cluster1-1 is being promoted back")))
 		Expect(err).ToNot(MatchError(ContainSubstring("promote " + cancelSwitchoverMarker)))
 
 		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
 		Expect(cl.Status.CurrentPrimary).To(Equal(cancelSwitchoverMarker))
 		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-1"))
+	})
+
+	It("redirects a canceled switchover to another instance with force", func(ctx SpecContext) {
+		var cl apiv1.Cluster
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		cl.Status.CurrentPrimary = cancelSwitchoverMarker
+		cl.Status.Phase = apiv1.PhaseSwitchover
+		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
+
+		Expect(Promote(ctx, client, namespace, "cluster1", "cluster1-3", true)).To(Succeed())
+
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		Expect(cl.Status.CurrentPrimary).To(Equal(cancelSwitchoverMarker))
+		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-3"))
+	})
+
+	It("does not treat a failover that chose its target as a switchover to cancel", func(ctx SpecContext) {
+		var cl apiv1.Cluster
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		cl.Status.TargetPrimary = "cluster1-2"
+		cl.Status.Phase = apiv1.PhaseFailOver
+		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
+
+		Expect(Promote(ctx, client, namespace, "cluster1", "cluster1-1", true)).To(Succeed())
+
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		Expect(cl.Status.CurrentPrimary).To(Equal("cluster1-1"))
+		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-1"))
+	})
+
+	It("keeps a failover a failover when a person chooses its new primary", func(ctx SpecContext) {
+		var cl apiv1.Cluster
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		cl.Status.TargetPrimary = "cluster1-2"
+		cl.Status.Phase = apiv1.PhaseFailOver
+		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
+
+		Expect(Promote(ctx, client, namespace, "cluster1", "cluster1-3", false)).To(Succeed())
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		Expect(cl.Status.Phase).To(Equal(apiv1.PhaseFailOver))
+
+		// The failed primary is not a switchover to cancel, so the choice can still change
+		Expect(Promote(ctx, client, namespace, "cluster1", "cluster1-2", false)).To(Succeed())
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-2"))
+	})
+
+	It("does not cancel a switchover if the current primary is not active", func(ctx SpecContext) {
+		var cl apiv1.Cluster
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		cl.Status.TargetPrimary = "cluster1-2"
+		cl.Status.Phase = apiv1.PhaseSwitchover
+		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
+
+		var pod corev1.Pod
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1-1"}, &pod)).To(Succeed())
+		pod.Status.Phase = corev1.PodFailed
+		Expect(client.Status().Update(ctx, &pod)).To(Succeed())
+
+		err := Promote(ctx, client, namespace, "cluster1", "cluster1-1", true)
+		Expect(err).To(MatchError(ContainSubstring("not active")))
+
+		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
+		Expect(cl.Status.CurrentPrimary).To(Equal("cluster1-1"))
+		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-2"))
 	})
 
 	// changingStatusAfterRead returns a client that changes the status of the
@@ -226,7 +291,7 @@ var _ = Describe("promote subcommand tests", func() {
 			To(BeTrue())
 	})
 
-	It("lets a person choose the new primary of a failover that is waiting for the quorum", func(ctx SpecContext) {
+	It("lets a person choose the new primary of a failover that has no target yet", func(ctx SpecContext) {
 		var cl apiv1.Cluster
 		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
 		cl.Status.TargetPrimary = apiv1.PendingFailoverMarker

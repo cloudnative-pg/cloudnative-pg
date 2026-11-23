@@ -51,7 +51,8 @@ func NewCmd() *cobra.Command {
 
 	promoteCmd.Flags().BoolVar(&force, "force", false,
 		"cancel the switchover that is in progress by promoting the current primary back, "+
-			"which loses data if the new primary already promoted")
+			"or redirect a canceled one. If the new primary already promoted, the cluster "+
+			"can end up with two primaries and the data written on it is lost")
 
 	return promoteCmd
 }
