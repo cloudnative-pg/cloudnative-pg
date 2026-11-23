@@ -598,9 +598,10 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// No switchover or failover is in progress and none was just triggered
 	// this pass (both cases returned above), so it is safe to contain any
-	// replica confirmed diverged: fence it, unless doing so would break
-	// synchronous quorum.
-	if err := r.reconcileDivergedReplicaContainment(ctx, cluster, resources.pvcs.Items); err != nil {
+	// replica confirmed diverged: it is kept fenced on every pass.
+	if err := r.reconcileDivergedReplicaContainment(
+		ctx, cluster, resources.pvcs.Items, resources.instances.Items,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 

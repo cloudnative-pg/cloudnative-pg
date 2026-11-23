@@ -132,6 +132,42 @@ var _ = Describe("evaluateReplicaDivergence", func() {
 		}, true),
 	)
 
+	DescribeTable("a parked entry",
+		func(status func() postgres.PostgresqlStatus) {
+			parked := apiv1.DivergedInstanceStatus{TimeLineID: 1, PrimaryTimeLineID: 2, Parked: true, PVCUID: "uid"}
+			cluster.Status.DivergedInstances = map[apiv1.PodName]apiv1.DivergedInstanceStatus{"replica-1": parked}
+
+			env.clusterReconciler.evaluateReplicaDivergence(cluster,
+				postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{status()}})
+
+			Expect(cluster.Status.DivergedInstances).To(HaveKeyWithValue(apiv1.PodName("replica-1"), parked))
+		},
+		// the data stays diverged until its PVC is replaced
+		Entry("is kept when the instance reports no divergence", func() postgres.PostgresqlStatus {
+			return replica(nil)
+		}),
+		// PostgreSQL is starting after the fence was lifted by hand, and
+		// reports nothing yet
+		Entry("is kept while the instance might be unavailable", func() postgres.PostgresqlStatus {
+			starting := replica(nil)
+			starting.MightBeUnavailable = true
+			return starting
+		}),
+	)
+
+	It("keeps an unparked entry while the instance might be unavailable", func() {
+		cluster.Status.DivergedInstances = map[apiv1.PodName]apiv1.DivergedInstanceStatus{
+			"replica-1": {TimeLineID: 1, PrimaryTimeLineID: 2},
+		}
+		starting := replica(nil)
+		starting.MightBeUnavailable = true
+
+		env.clusterReconciler.evaluateReplicaDivergence(cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{starting}})
+
+		Expect(cluster.Status.DivergedInstances).To(HaveKey(apiv1.PodName("replica-1")))
+	})
+
 	It("does nothing for a replica cluster", func() {
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{Enabled: ptr.To(true)}
 
@@ -166,6 +202,15 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 		Expect(utils.NewFencingMetadataExecutor(env.client).AddFencing().ForInstance(instance).
 			Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
 	}
+	unfence := func(ctx context.Context, instance string) {
+		Expect(utils.NewFencingMetadataExecutor(env.client).RemoveFencing().ForInstance(instance).
+			Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+	}
+	annotation := func() string {
+		var fresh apiv1.Cluster
+		Expect(env.client.Get(context.Background(), client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
+		return fresh.Annotations[utils.FencedInstanceAnnotation]
+	}
 	setEntry := func(ctx context.Context, name apiv1.PodName, entry apiv1.DivergedInstanceStatus) {
 		cluster.Status.DivergedInstances = map[apiv1.PodName]apiv1.DivergedInstanceStatus{name: entry}
 		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
@@ -184,7 +229,7 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 
 	It("fences a diverged replica, recording its PGDATA PVC UID", func(ctx SpecContext) {
 		Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
-			[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-1")})).To(Succeed())
+			[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-1")}, nil)).To(Succeed())
 
 		Expect(isFenced("replica-1")).To(BeTrue())
 		Expect(cluster.Status.DivergedInstances["replica-1"].Parked).To(BeTrue())
@@ -199,7 +244,7 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
 
 		Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
-			[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-1")})).To(Succeed())
+			[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-1")}, nil)).To(Succeed())
 
 		Expect(cluster.Status.DivergedInstances["replica-1"].Parked).To(BeTrue())
 		Expect(events()).ToNot(Receive())
@@ -214,7 +259,7 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 			}
 
 			Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
-				claims)).To(Succeed())
+				claims, nil)).To(Succeed())
 
 			Expect(isFenced(name)).To(BeFalse())
 			Expect(cluster.Status.DivergedInstances[apiv1.PodName(name)].Parked).To(BeFalse())
@@ -225,27 +270,108 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 		}, "primary", []string{"primary"}),
 	)
 
+	It("parks a replica covered by a fence on the whole cluster, leaving the annotation alone", func(ctx SpecContext) {
+		fence(ctx, utils.FenceAllInstances)
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+
+		Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
+			[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-1")}, nil)).To(Succeed())
+
+		Expect(annotation()).To(Equal(`["*"]`))
+		Expect(cluster.Status.DivergedInstances["replica-1"].Parked).To(BeTrue())
+		Expect(cluster.Status.DivergedInstances["replica-1"].PVCUID).To(Equal("pvc-uid-1"))
+		Expect(events()).ToNot(Receive())
+	})
+
+	It("changes nothing on a second pass", func(ctx SpecContext) {
+		pvcs := []corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-1")}
+		Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, pvcs, nil)).To(Succeed())
+		Expect(events()).To(Receive())
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+		entry := cluster.Status.DivergedInstances["replica-1"]
+		resourceVersion := cluster.ResourceVersion
+
+		Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, pvcs, nil)).To(Succeed())
+
+		Expect(cluster.ResourceVersion).To(Equal(resourceVersion))
+		Expect(isFenced("replica-1")).To(BeTrue())
+		Expect(cluster.Status.DivergedInstances).To(HaveKeyWithValue(apiv1.PodName("replica-1"), entry))
+		Expect(events()).ToNot(Receive())
+	})
+
 	DescribeTable("a parked instance",
-		func(ctx SpecContext, currentPVCUID types.UID, released bool) {
-			parked := apiv1.DivergedInstanceStatus{
-				TimeLineID: 1, PrimaryTimeLineID: 2, Parked: true, PVCUID: "pvc-uid-old",
+		func(ctx SpecContext, setup func(context.Context), pvcs func() []corev1.PersistentVolumeClaim,
+			podExists bool, released bool, annotationAfter string,
+		) {
+			var pods []corev1.Pod
+			if podExists {
+				pods = []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "replica-1"}}}
 			}
-			setEntry(ctx, "replica-1", parked)
-			fence(ctx, "replica-1")
+			setEntry(ctx, "replica-1", apiv1.DivergedInstanceStatus{
+				TimeLineID: 1, PrimaryTimeLineID: 2, Parked: true, PVCUID: "pvc-uid-old",
+			})
+			setup(ctx)
+			// a reconcile starts from a fresh read of the cluster
+			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
 
-			Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster,
-				[]corev1.PersistentVolumeClaim{pgDataPVC("replica-1", currentPVCUID)})).To(Succeed())
+			Expect(env.clusterReconciler.reconcileDivergedReplicaContainment(ctx, cluster, pvcs(), pods)).To(Succeed())
 
-			Expect(isFenced("replica-1")).To(Equal(!released))
+			Expect(annotation()).To(Equal(annotationAfter))
 			if released {
 				Expect(cluster.Status.DivergedInstances).To(BeEmpty())
+				Expect(meta.IsStatusConditionTrue(cluster.Status.Conditions,
+					string(apiv1.ConditionReplicasHealthy))).To(BeTrue())
 			} else {
-				Expect(cluster.Status.DivergedInstances).To(HaveKeyWithValue(apiv1.PodName("replica-1"), parked))
+				Expect(cluster.Status.DivergedInstances["replica-1"].Parked).To(BeTrue())
 			}
 		},
 		Entry("is released once its PGDATA PVC is replaced, as kubectl cnpg destroy does",
-			types.UID("pvc-uid-new"), true),
+			func(ctx context.Context) { fence(ctx, "replica-1") },
+			func() []corev1.PersistentVolumeClaim {
+				return []corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-new")}
+			}, false, true, ""),
+		Entry("is released once its PGDATA PVC is gone",
+			func(ctx context.Context) { fence(ctx, "replica-1") },
+			func() []corev1.PersistentVolumeClaim { return nil }, false, true, ""),
+		Entry("is released, keeping a fence on the whole cluster, once its PGDATA PVC is replaced",
+			func(ctx context.Context) { fence(ctx, utils.FenceAllInstances) },
+			func() []corev1.PersistentVolumeClaim {
+				return []corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-new")}
+			}, false, true, `["*"]`),
+		Entry("is released, keeping a fence on the whole cluster, once its PGDATA PVC is gone",
+			func(ctx context.Context) { fence(ctx, utils.FenceAllInstances) },
+			func() []corev1.PersistentVolumeClaim { return nil }, false, true, `["*"]`),
 		Entry("stays fenced when only its Pod is recreated over the same PVC",
-			types.UID("pvc-uid-old"), false),
+			func(ctx context.Context) { fence(ctx, "replica-1") },
+			func() []corev1.PersistentVolumeClaim {
+				return []corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-old")}
+			}, false, false, `["replica-1"]`),
+		Entry("is fenced again after its fence was lifted by hand",
+			func(ctx context.Context) {
+				fence(ctx, "replica-1")
+				unfence(ctx, "replica-1")
+			},
+			func() []corev1.PersistentVolumeClaim {
+				return []corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-old")}
+			}, false, false, `["replica-1"]`),
+		Entry("is fenced again after a fence on the whole cluster was set and lifted",
+			func(ctx context.Context) {
+				fence(ctx, "replica-1")
+				fence(ctx, utils.FenceAllInstances)
+				unfence(ctx, utils.FenceAllInstances)
+			},
+			func() []corev1.PersistentVolumeClaim {
+				return []corev1.PersistentVolumeClaim{pgDataPVC("replica-1", "pvc-uid-old")}
+			}, false, false, `["replica-1"]`),
+		// kubectl cnpg destroy --keep-pvc detaches the PVC before it deletes the Pod
+		Entry("stays fenced while its PVC is missing from the list and its Pod still exists",
+			func(ctx context.Context) { fence(ctx, "replica-1") },
+			func() []corev1.PersistentVolumeClaim { return nil }, true, false, `["replica-1"]`),
+		Entry("is fenced again while its PVC is missing from the list and its Pod still exists",
+			func(ctx context.Context) {
+				fence(ctx, "replica-1")
+				unfence(ctx, "replica-1")
+			},
+			func() []corev1.PersistentVolumeClaim { return nil }, true, false, `["replica-1"]`),
 	)
 })

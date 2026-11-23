@@ -73,6 +73,12 @@ To recover, rebuild the instance from the current primary with the
 kubectl cnpg destroy CLUSTER INSTANCE
 ```
 
+The operator keeps a diverged replica fenced until it is rebuilt or removed. If
+you lift its fence, PostgreSQL starts again on the diverged data until the
+operator fences the replica again, which happens on the next reconciliation.
+A fence on the whole cluster (`*`) is not changed by the operator: it stays
+while you rebuild the replica.
+
 ### Disabling Reconciliation
 
 The `cnpg.io/reconciliationLoop` annotation allows you to temporarily disable

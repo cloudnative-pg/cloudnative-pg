@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -44,7 +45,8 @@ import (
 // the operator only mirrors what the instances report:
 //   - a reporting instance with a divergence gets an entry, created the
 //     first time with an event and left as it is afterwards;
-//   - a reporting instance without one, or running as primary, has its
+//   - a reporting instance running as primary, or one that reports no
+//     divergence while it is available and its entry is not parked, has its
 //     entry removed;
 //   - an instance that is not reporting, or is fenced (and so does not run
 //     PostgreSQL), keeps its entry untouched, since there is nothing new to
@@ -73,8 +75,19 @@ func (r *ClusterReconciler) evaluateReplicaDivergence(
 		// A primary follows no other timeline: an entry for it is left over
 		// from before it was promoted.
 		name := apiv1.PodName(item.Pod.Name)
-		if item.IsPrimary || item.Divergence == nil {
+		if item.IsPrimary {
 			delete(cluster.Status.DivergedInstances, name)
+			continue
+		}
+
+		// No report of a divergence clears the entry, unless the instance
+		// might be unavailable (it is starting after its fence was lifted, so
+		// it cannot tell) or its data is parked: that data stays diverged
+		// until its PVC is replaced.
+		if item.Divergence == nil {
+			if !item.MightBeUnavailable && !cluster.Status.DivergedInstances[name].Parked {
+				delete(cluster.Status.DivergedInstances, name)
+			}
 			continue
 		}
 
@@ -129,10 +142,14 @@ func updateReplicasHealthyCondition(cluster *apiv1.Cluster) {
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 }
 
-// reconcileDivergedReplicaContainment fences every instance in
-// cluster.Status.DivergedInstances that isn't already fenced, and lifts
-// containment for one whose PGDATA PVC has since been replaced by a fresh
-// clone (e.g. via `kubectl cnpg destroy`).
+// reconcileDivergedReplicaContainment keeps every instance in
+// cluster.Status.DivergedInstances fenced until its PGDATA PVC is replaced
+// (for example via `kubectl cnpg destroy`) or removed.
+//
+// The entry is the source of truth and the fence is asserted on every pass,
+// so a fence lifted by hand, or wiped by a fence on the whole cluster that
+// was later lifted, is set again. The fence on the whole cluster is never
+// added or removed here: while it is set it keeps PostgreSQL down.
 //
 // Called once no switchover or failover is in progress and no primary
 // transition happened this reconcile pass (see the call site in
@@ -142,6 +159,7 @@ func (r *ClusterReconciler) reconcileDivergedReplicaContainment(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
+	pods []corev1.Pod,
 ) error {
 	for _, name := range slices.Collect(maps.Keys(cluster.Status.DivergedInstances)) {
 		// Re-read after every mutation below: the fencing executor refreshes
@@ -151,14 +169,22 @@ func (r *ClusterReconciler) reconcileDivergedReplicaContainment(
 			continue
 		}
 
-		if diverged.Parked {
-			if err := r.liftContainmentIfRebuilt(ctx, cluster, name, diverged, pvcs); err != nil {
+		// The PVC list only holds the PVCs owned by the cluster: a PVC
+		// detached by `kubectl cnpg destroy --keep-pvc` is missing from it
+		// while its Pod is still running, so a missing PVC proves nothing
+		// until the Pod is gone too.
+		currentPVC := findPgDataPVC(pvcs, string(name))
+		podExists := slices.ContainsFunc(pods, func(pod corev1.Pod) bool { return pod.Name == string(name) })
+		rebuilt := currentPVC != nil && string(currentPVC.UID) != diverged.PVCUID
+		removed := currentPVC == nil && !podExists
+		if diverged.Parked && (rebuilt || removed) {
+			if err := r.liftContainment(ctx, cluster, name); err != nil {
 				return err
 			}
 			continue
 		}
 
-		if err := r.parkDivergedReplica(ctx, cluster, name, pvcs); err != nil {
+		if err := r.containDivergedReplica(ctx, cluster, name, currentPVC); err != nil {
 			return err
 		}
 	}
@@ -166,27 +192,22 @@ func (r *ClusterReconciler) reconcileDivergedReplicaContainment(
 	return nil
 }
 
-// liftContainmentIfRebuilt lifts fencing and forgets a parked instance's
-// entry once its PGDATA PVC has been replaced by a fresh clone (e.g. via
-// `kubectl cnpg destroy`, which deletes and recreates the PVC). A Pod
-// recreation alone (node failure, eviction, rollout) reuses the same PVC and
-// must NOT lift containment, since the data is still diverged: only a PVC
-// UID change proves the data was actually rebuilt.
-func (r *ClusterReconciler) liftContainmentIfRebuilt(
+// liftContainment lifts the fencing and forgets the entry of a parked
+// instance whose PGDATA PVC was replaced by a fresh clone (e.g. via
+// `kubectl cnpg destroy`, which deletes and recreates the PVC) or removed.
+// A Pod recreation alone (node failure, eviction, rollout) reuses the same
+// PVC and must NOT lift containment, since the data is still diverged: only
+// a PVC change proves the diverged data is gone.
+func (r *ClusterReconciler) liftContainment(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	name apiv1.PodName,
-	diverged apiv1.DivergedInstanceStatus,
-	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	currentPVC := findPgDataPVC(pvcs, string(name))
-	if currentPVC == nil || string(currentPVC.UID) == diverged.PVCUID {
-		return nil
-	}
-
-	if err := utils.NewFencingMetadataExecutor(r.Client).RemoveFencing().ForInstance(string(name)).
-		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
-		return fmt.Errorf("lifting containment for rebuilt instance %s: %w", name, err)
+	err := utils.NewFencingMetadataExecutor(r.Client).RemoveFencing().ForInstance(string(name)).
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)
+	// A fence on the whole cluster is not ours to lift
+	if err != nil && !errors.Is(err, utils.ErrorSingleInstanceUnfencing) {
+		return fmt.Errorf("lifting containment for instance %s: %w", name, err)
 	}
 
 	origCluster := cluster.DeepCopy()
@@ -196,21 +217,22 @@ func (r *ClusterReconciler) liftContainmentIfRebuilt(
 		return err
 	}
 
-	log.FromContext(ctx).Info("Lifted containment for a diverged replica whose data has been rebuilt",
-		"instance", name)
+	log.FromContext(ctx).Info("Lifted containment for a diverged replica whose data is gone", "instance", name)
 	return nil
 }
 
-// parkDivergedReplica fences name as containment for a divergence and
-// records its PGDATA PVC's UID, unless name is a primary-role instance or its
-// PGDATA PVC could not be found this pass.
-func (r *ClusterReconciler) parkDivergedReplica(
+// containDivergedReplica fences name if it isn't fenced, and records the UID
+// of its PGDATA PVC in its entry. It does nothing for a primary-role
+// instance, or when the PGDATA PVC of an unparked entry could not be found
+// this pass.
+func (r *ClusterReconciler) containDivergedReplica(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	name apiv1.PodName,
-	pvcs []corev1.PersistentVolumeClaim,
+	currentPVC *corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
+	parked := cluster.Status.DivergedInstances[name].Parked
 
 	if string(name) == cluster.Status.CurrentPrimary || string(name) == cluster.Status.TargetPrimary {
 		// Should never happen: detection already excludes primary-role
@@ -220,8 +242,7 @@ func (r *ClusterReconciler) parkDivergedReplica(
 		return nil
 	}
 
-	currentPVC := findPgDataPVC(pvcs, string(name))
-	if currentPVC == nil {
+	if currentPVC == nil && !parked {
 		contextLogger.Warning(
 			"Deferring containment of a diverged replica: its PGDATA PVC was not found this pass",
 			"instance", name)
@@ -230,15 +251,17 @@ func (r *ClusterReconciler) parkDivergedReplica(
 
 	// A pass reading a cache that has the previous pass's fence but not yet
 	// its parked entry only has the bookkeeping left to record.
-	alreadyFenced := cluster.IsInstanceFenced(string(name))
-	if err := utils.NewFencingMetadataExecutor(r.Client).AddFencing().ForInstance(string(name)).
-		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
-		return fmt.Errorf("fencing diverged replica %s: %w", name, err)
+	wasFenced := cluster.IsInstanceFenced(string(name))
+	if !wasFenced {
+		if err := utils.NewFencingMetadataExecutor(r.Client).AddFencing().ForInstance(string(name)).
+			Execute(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
+			return fmt.Errorf("fencing diverged replica %s: %w", name, err)
+		}
 	}
 
 	// The PVC UID tells a Pod recreated over the same, still diverged data
 	// apart from a rebuild from a fresh clone.
-	if diverged, ok := cluster.Status.DivergedInstances[name]; ok && !diverged.Parked {
+	if diverged, ok := cluster.Status.DivergedInstances[name]; ok && !diverged.Parked && currentPVC != nil {
 		origCluster := cluster.DeepCopy()
 		diverged.Parked = true
 		diverged.PVCUID = string(currentPVC.UID)
@@ -247,7 +270,7 @@ func (r *ClusterReconciler) parkDivergedReplica(
 			return err
 		}
 	}
-	if alreadyFenced {
+	if wasFenced {
 		return nil
 	}
 

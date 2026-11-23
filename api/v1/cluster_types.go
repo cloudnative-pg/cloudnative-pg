@@ -1106,7 +1106,8 @@ type ClusterStatus struct {
 	// theirs, so they can never follow it again. Each instance detects this
 	// from its own pg_wal. The operator fences it and drops its replication
 	// slot on the primary. The entry is removed when the instance stops
-	// reporting a divergence or when its data is rebuilt from a fresh clone.
+	// reporting a divergence or, once parked, when its PGDATA PVC is replaced
+	// or removed.
 	// +optional
 	DivergedInstances map[PodName]DivergedInstanceStatus `json:"divergedInstances,omitempty"`
 
@@ -1236,12 +1237,13 @@ type DivergedInstanceStatus struct {
 	// DetectedAt is when the divergence was first reported.
 	DetectedAt string `json:"detectedAt"`
 
-	// Parked is true once the instance has been fenced as containment.
+	// Parked is true once the operator has recorded the PGDATA PVC of the
+	// instance and keeps the instance fenced.
 	// +optional
 	Parked bool `json:"parked,omitempty"`
 
 	// PVCUID is the UID of the instance's PGDATA PersistentVolumeClaim when
-	// it was fenced. A different UID means the data was rebuilt, for example
+	// it was parked. A different UID means the data was rebuilt, for example
 	// by `kubectl cnpg destroy`. A Pod recreated over the same PVC stays
 	// contained.
 	// +optional

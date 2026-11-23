@@ -112,3 +112,7 @@ This consists of an initial fast shutdown with a timeout set to
 If a fenced instance is deleted, the pod will be recreated normally, but the
 postmaster won't be started. This can be extremely helpful when instances
 are `Crashlooping`.
+
+A replica that the operator fenced because it diverged from the primary is
+fenced again after you lift its fence. Rebuild it instead, as described in
+[Rebuilding a Diverged Replica](failure_modes.md#rebuilding-a-diverged-replica).
