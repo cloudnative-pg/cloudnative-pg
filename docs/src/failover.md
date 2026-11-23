@@ -153,8 +153,9 @@ metadata:
     cnpg.io/position: '{"lsn":"0/7000028","timeline":3,"state":"in production","pod":"cluster-example-1"}'
 ```
 
-The annotation is refreshed every time the primary writes the lease, and a
-final value is written when the lease is released on shutdown. It contains:
+The annotation is refreshed every time the primary writes the lease and can
+read the position, and a final value is written when the lease is released on
+shutdown. It contains:
 
 * `lsn`: the position in the WAL, in the PostgreSQL text format.
 * `timeline`: the PostgreSQL timeline.
