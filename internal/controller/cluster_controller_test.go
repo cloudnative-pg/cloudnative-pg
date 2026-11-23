@@ -1161,6 +1161,88 @@ var _ = Describe("Updating target primary", func() {
 		Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
 	})
 
+	It("keeps the phase of a failover when the instance elected by it fails before promoting",
+		func(ctx SpecContext) {
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+
+			jobs := generateFakeInitDBJobs(env.client, cluster)
+			instances := generateFakeClusterPods(env.client, cluster, true)
+			pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+			resources := &managedResources{
+				nodes:     nil,
+				instances: corev1.PodList{Items: instances},
+				pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+				jobs:      batchv1.JobList{Items: jobs},
+			}
+
+			// The failover elected instances[1], which is not healthy anymore
+			cluster.Status.CurrentPrimary = instances[0].Name
+			cluster.Status.TargetPrimary = instances[1].Name
+			cluster.Status.Phase = apiv1.PhaseFailOver
+
+			statusList := postgres.PostgresqlStatusList{
+				Items: []postgres.PostgresqlStatus{
+					{
+						CurrentLsn:  cnpgTypes.LSN("0/0"),
+						ReceivedLsn: cnpgTypes.LSN("0/0"),
+						ReplayLsn:   cnpgTypes.LSN("0/0"),
+						IsPodReady:  true,
+						Pod:         &instances[2],
+					},
+					{Pod: &instances[1], Error: fmt.Errorf("instance is not working")},
+				},
+			}
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, resources)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(instances[2].Name))
+			Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
+			Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseFailOver))
+			Expect(cluster.Status.PhaseReason).To(Equal("Failing over to " + instances[2].Name))
+		})
+
+	It("is a switchover when the target of a switchover fails before promoting", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+		resources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[1].Name
+		cluster.Status.Phase = apiv1.PhaseSwitchover
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
+					IsPodReady:  true,
+					Pod:         &instances[2],
+				},
+				{Pod: &instances[1], Error: fmt.Errorf("instance is not working")},
+			},
+		}
+
+		_, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, resources)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseSwitchover))
+		Expect(cluster.Status.PhaseReason).To(Equal("Switching over to " + instances[2].Name))
+	})
+
 	It("skips a fenced instance and elects the healthy replica even if the fenced one sorts first", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
