@@ -571,6 +571,12 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 // can still switch to the newest timeline its WAL receiver learned about from
 // the primary. See postgres.DetectTimelineDivergence.
 func (instance *Instance) DetectTimelineDivergence(replayLSN types.LSN) (*postgres.TimelineDivergence, error) {
+	// A primary, or a standby that replayed nothing, has no divergence: skip
+	// listing pg_wal, which grows with the retained WAL
+	if replayLSN == "" {
+		return nil, nil
+	}
+
 	walDir := filepath.Join(instance.PgData, pgWalDirectory)
 	entries, err := os.ReadDir(walDir)
 	if err != nil {

@@ -134,6 +134,15 @@ var _ = Describe("DetectTimelineDivergence", func() {
 		Expect(divergence).To(BeNil())
 	})
 
+	It("does not list pg_wal when nothing was replayed, as on a primary", func() {
+		// unlistable on purpose: listing it would fail the probe
+		Expect(os.RemoveAll(filepath.Join(instance.PgData, pgWalDirectory))).To(Succeed())
+
+		divergence, err := instance.DetectTimelineDivergence("")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(divergence).To(BeNil())
+	})
+
 	It("fails when pg_wal cannot be listed", func() {
 		Expect(os.RemoveAll(filepath.Join(instance.PgData, pgWalDirectory))).To(Succeed())
 
