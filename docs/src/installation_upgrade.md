@@ -302,6 +302,18 @@ spec:
 Make sure `.spec.stopDelay` is greater than `.spec.smartShutdownTimeout`,
 otherwise the smart shutdown is skipped.
 
+#### Deprecation of the legacy synchronous replication method
+
+The legacy synchronous replication method, configured through
+`.spec.minSyncReplicas` and `.spec.maxSyncReplicas`, is deprecated starting
+from version 1.31.0 and will be removed in version 1.33.0, together with the
+`.spec.postgresql.syncReplicaElectionConstraint` option.
+
+The operator returns an admission warning when you create or update a `Cluster`
+that uses any of these fields. Migrate those clusters to
+`.spec.postgresql.synchronous` before upgrading to 1.33.0, as explained in
+["Migrating from Deprecated Synchronous Replication Implementation"](replication.md#migrating-from-deprecated-synchronous-replication-implementation).
+
 ### Upgrading to 1.30.0
 
 :::info[Important]
