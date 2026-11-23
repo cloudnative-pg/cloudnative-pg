@@ -160,6 +160,13 @@ var _ = Describe("Diverged replica", Label(tests.LabelSelfHealing), func() {
 				g.Expect(getCluster(g).Status.ReadyInstances).To(Equal(1))
 			}, RetryTimeout).Should(Succeed())
 
+			// The failover waits for the stopped WAL receiver, so it stays pending
+			// until the receiver resumes. Resuming it earlier could let it reach
+			// the former primary again and catch up.
+			Eventually(func(g Gomega) {
+				g.Expect(getCluster(g).Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
+			}, RetryTimeout).Should(Succeed())
+
 			pod, err := podutils.Get(env.Ctx, env.Client, namespace, newPrimary)
 			Expect(err).ToNot(HaveOccurred())
 			_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
