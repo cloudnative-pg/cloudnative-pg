@@ -79,6 +79,9 @@ operator fences the replica again, which happens on the next reconciliation.
 A fence on the whole cluster (`*`) is not changed by the operator: it stays
 while you rebuild the replica.
 
+In a replica cluster, a diverged instance leaves the `-r` and `-ro` services
+as well, but the operator does not report or fence it.
+
 ### Disabling Reconciliation
 
 The `cnpg.io/reconciliationLoop` annotation allows you to temporarily disable

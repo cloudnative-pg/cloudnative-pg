@@ -56,8 +56,9 @@ import (
 // replication slots) is handled separately by
 // reconcileDivergedReplicaContainment.
 //
-// Replica-cluster topologies are out of scope: every instance there is a
-// standby of an external primary.
+// Replica-cluster topologies are not reported or contained: every instance
+// there is a standby of an external primary. Their instances still fail the
+// readiness probe when they diverge.
 func (r *ClusterReconciler) evaluateReplicaDivergence(
 	cluster *apiv1.Cluster,
 	statuses postgres.PostgresqlStatusList,
