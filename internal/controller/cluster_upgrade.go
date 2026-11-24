@@ -643,7 +643,7 @@ func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster
 		return rollout{}, nil
 	}
 
-	opCurrentImageName, err := renderedImage(pod, specs.GetBootstrapControllerImageName)
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(*pod)
 	if err != nil {
 		return rollout{}, err
 	}
