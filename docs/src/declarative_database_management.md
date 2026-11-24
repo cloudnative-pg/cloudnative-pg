@@ -199,6 +199,133 @@ spec:
 This manifest ensures that the `database-to-drop` database is removed from the
 `cluster-example` cluster.
 
+## Managing Database Permissions
+
+CloudNativePG can grant and revoke the privileges that PostgreSQL defines on
+the database itself: `CONNECT`, `CREATE` and `TEMPORARY`.
+
+The most common use is hardening. PostgreSQL grants `CONNECT` and `TEMPORARY`
+on every new database to `PUBLIC`, so a production setup usually revokes
+`CONNECT` from `PUBLIC` and grants it back to specific roles.
+
+To enable this feature, define the `spec.permissions` field, as shown in the
+following example:
+
+```yaml
+# ...
+spec:
+  permissions:
+    connect:
+      - name: app
+        type: grant
+      # the metrics exporter needs it, see the warning below
+      - name: cnpg_metrics_exporter
+        type: grant
+      - name: public
+        type: revoke
+    create:
+      - name: app
+        type: grant
+    temporary:
+      - name: public
+        type: revoke
+# ...
+```
+
+The `permissions` stanza supports the following lists, one for each privilege:
+
+- `connect`: `CONNECT` privilege specifications.
+- `create`: `CREATE` privilege specifications.
+- `temporary`: `TEMPORARY` privilege specifications.
+- `all`: a shortcut for `connect`, `create` and `temporary` together.
+
+Every item of these lists accepts the following fields:
+
+- `name` *(required, string)*: The target role name. Using `public` targets the
+  PostgreSQL `PUBLIC` pseudo-role (which applies to all existing and future
+  roles). PostgreSQL reserves `public`, so no role can have this name.
+  CloudNativePG matches it in any letter case, as it does for schemas and
+  foreign data wrappers, so a role named `Public` or `PUBLIC` cannot be
+  targeted: an entry with that name applies to every role.
+- `type` *(string)*: The action to take on the privilege. Accepts `grant` or
+  `revoke` (default: `grant`).
+
+The `all` list is only a shortcut. It is expanded into `connect`, `create` and
+`temporary` before the database is reconciled, and the status reports the
+expanded entries.
+
+A role can appear only once for each privilege, once `all` has been expanded.
+Repeating a role, whether with the same or a different `type`, is rejected when
+the resource is created or updated.
+
+For each privilege and role, CloudNativePG reads the privileges currently held
+on the database and runs a `GRANT` or `REVOKE` only when it is needed. The
+outcome of every entry is reported in `status.permissions`:
+
+```yaml
+status:
+  applied: false
+  permissions:
+    - privilege: CONNECT
+      name: public
+      type: revoke
+      applied: true
+    - privilege: CONNECT
+      name: reporting
+      type: grant
+      applied: false
+      message: role does not exist
+```
+
+The entries are applied in the order they are listed, grouped by privilege.
+Within each privilege, the entries of the `all` list are applied after the
+entries of the list of that privilege, wherever `all` appears in the manifest.
+They are independent: if a role does not exist, which is reported for both
+`grant` and `revoke`, the other entries are still applied. The `Database` is
+retried until all of them succeed.
+
+When you revoke a privilege from `public` and grant it to specific roles, list
+the `grant` entries first. This way, the roles receive the privilege before
+`public` loses it. If a grant fails, the revoke is still applied and the
+failed grant is retried.
+
+:::info
+    CloudNativePG manages database permissions using the
+    [`GRANT`](https://www.postgresql.org/docs/current/sql-grant.html) and
+    [`REVOKE`](https://www.postgresql.org/docs/current/sql-revoke.html)
+    PostgreSQL commands. `WITH GRANT OPTION` and `GRANTED BY` are not supported.
+    A `revoke` is run without `CASCADE`: it fails, and is retried, while the
+    role has granted the privilege to other roles.
+:::
+
+:::warning
+    A `revoke` removes only the privilege that was granted to the named role
+    itself, and only if the owner of the database granted it. It has no effect
+    on privileges the role holds through `PUBLIC`, through the membership of
+    another role, or through a grant made by another role holding `WITH GRANT
+    OPTION`. For example, revoking `CONNECT` from `app` does not prevent `app`
+    from connecting while `PUBLIC` still has it: revoke it from `public` too.
+
+    Privileges are applied when the `Database` spec changes, not continuously,
+    so one changed directly in PostgreSQL is not brought back to the declared
+    state until the spec is modified, or until a failed reconciliation is
+    retried. Removing an entry from the spec revokes nothing: to remove a
+    privilege, set the `type` field to `revoke`.
+
+    Revoking `CONNECT` from the application role while `public` does not have it,
+    or from `public` when the application role has no other way to connect,
+    refuses the new connections of the application.
+
+    The instance manager is not affected, as it connects as the superuser. The
+    metrics exporter is, as it connects as the `cnpg_metrics_exporter` role. It
+    queries the application database of the cluster by default, so if that
+    database loses `CONNECT`, all the [default metrics](monitoring.md#default-set-of-metrics) and the
+    user-defined ones without `target_databases` stop. For any other database,
+    only the user-defined metrics that target it fail or are skipped. Grant
+    `CONNECT` to `cnpg_metrics_exporter` too, for example with an entry in the
+    `connect` list.
+:::
+
 ## Managing Extensions in a Database
 
 :::info

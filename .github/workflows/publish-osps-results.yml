@@ -1,0 +1,70 @@
+# OSPS Baseline results published to grc.store, for the Security Slam
+# Mechanizer badge (Option 2) and the Defender badge.
+# Target page: https://grc.store/targets/cloudnative-pg/cloudnative-pg
+name: Publish OSPS Baseline results to grc.store
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run the scan but publish nothing (bundles land in the pvtr-bundles artifact)"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 6 * * 1" # Weekly, Mondays 06:17 UTC
+  # Never push or pull_request: the hub stores one log per target and catalog
+  # every ten minutes and refuses the rest with rate_limited, which fails the
+  # run. Merges that land minutes apart would turn main red. After merging a
+  # fix, publish with `gh workflow run` instead.
+
+permissions: {}
+
+jobs:
+  version:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read # Read the latest release tag
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Latest release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || echo v0.0.0)
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+  results:
+    needs: version
+    permissions:
+      contents: read # The scanner reads this repository through the job token
+      id-token: write # Trusted publishing to the hub and the Sigstore signing identity
+      # The called workflow's report job declares it, and GitHub checks every
+      # called job at startup, even one that upload-sarif: false skips.
+      security-events: write
+    # By tag, not SHA, on purpose: the hub compares the signing certificate's
+    # workflow ref to this exact tag and rejects a SHA-pinned call.
+    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@v1 # zizmor: ignore[unpinned-uses] the hub requires the tag
+    with:
+      target: cloudnative-pg/cloudnative-pg@${{ needs.version.outputs.version }}
+      license: CC0-1.0 # SPDX expression the result is published under
+      dry-run: ${{ inputs.dry-run == true }}
+    secrets:
+      # Inline because the plugin reads its token only from these config vars.
+      # The job token is read-only and scoped to this repository; settings it
+      # cannot read (org MFA, some admin settings) report "Needs Review".
+      config: |
+        targets:
+          cloudnative-pg:
+            plugin: openssf/github-repo
+            policy:
+              catalogs:
+                - osps-baseline
+              applicability:
+                - maturity-2 # The project's Baseline level: maturity-1, maturity-2, or maturity-3
+            vars:
+              owner: cloudnative-pg
+              repo: cloudnative-pg
+              token: ${{ secrets.GITHUB_TOKEN }}

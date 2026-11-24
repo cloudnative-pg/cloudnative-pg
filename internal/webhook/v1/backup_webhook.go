@@ -84,12 +84,14 @@ type BackupCustomValidator struct{}
 func (v *BackupCustomValidator) ValidateCreate(_ context.Context, backup *apiv1.Backup) (admission.Warnings, error) {
 	backupLog.Info("Validation for Backup upon creation", "name", backup.GetName(), "namespace", backup.GetNamespace())
 
+	warnings := getInTreeBarmanMethodWarnings(backup.Spec.Method)
+
 	allErrs := v.validate(backup)
 	if len(allErrs) == 0 {
-		return nil, nil
+		return warnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return warnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Backup"},
 		backup.Name, allErrs)
 }
@@ -101,12 +103,14 @@ func (v *BackupCustomValidator) ValidateUpdate(
 ) (admission.Warnings, error) {
 	backupLog.Info("Validation for Backup upon update", "name", backup.GetName(), "namespace", backup.GetNamespace())
 
+	warnings := getInTreeBarmanMethodWarnings(backup.Spec.Method)
+
 	allErrs := v.validate(backup)
 	if len(allErrs) == 0 {
-		return nil, nil
+		return warnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return warnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Backup"},
 		backup.Name, allErrs)
 }
@@ -118,6 +122,21 @@ func (v *BackupCustomValidator) ValidateDelete(_ context.Context, backup *apiv1.
 	// TODO(user): fill in your validation logic upon object deletion.
 
 	return nil, nil
+}
+
+// getInTreeBarmanMethodWarnings warns when a Backup or ScheduledBackup relies on the
+// in-tree Barman Cloud support, which is going away. The CRD defaults the method to
+// barmanObjectStore, so an unset method reaches the webhook already set.
+func getInTreeBarmanMethodWarnings(method apiv1.BackupMethod) admission.Warnings {
+	if method != apiv1.BackupMethodBarmanObjectStore {
+		return nil
+	}
+
+	return admission.Warnings{
+		"The barmanObjectStore backup method relies on the native Barman Cloud support, which is " +
+			"deprecated and will be completely removed in CloudNativePG 1.32.0. " +
+			"Please migrate to the Barman Cloud Plugin and use the plugin backup method.",
+	}
 }
 
 func (v *BackupCustomValidator) validate(r *apiv1.Backup) field.ErrorList {

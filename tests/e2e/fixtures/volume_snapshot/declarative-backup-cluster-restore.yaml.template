@@ -16,12 +16,19 @@ spec:
 
   bootstrap:
     recovery:
+      # The online backup has no WAL storage snapshot: the WAL files are fetched
+      # through plugin-barman-cloud from the archive of the source cluster.
+      source: cluster-declarative-backup
       volumeSnapshots:
         storage:
           name: ${SNAPSHOT_NAME_PGDATA}
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
-        walStorage:
-         name: ${SNAPSHOT_NAME_PGWAL}
-         kind: VolumeSnapshot
-         apiGroup: snapshot.storage.k8s.io
+
+  externalClusters:
+    - name: cluster-declarative-backup
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cluster-declarative-backup
+          serverName: cluster-declarative-backup

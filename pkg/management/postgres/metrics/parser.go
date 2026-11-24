@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // UserQueries is a collection of custom queries

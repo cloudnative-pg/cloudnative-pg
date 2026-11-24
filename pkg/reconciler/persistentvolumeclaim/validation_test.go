@@ -148,7 +148,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 			WithLists(&snapshots).
 			Build()
 
-		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource)
+		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource, false)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(status).To(Equal(ValidationStatus{
 			Errors: []ValidationMessage{
@@ -206,7 +206,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 			WithLists(&snapshots).
 			Build()
 
-		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource)
+		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource, false)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(status.ContainsErrors()).To(BeFalse())
 	})
@@ -240,7 +240,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 			WithLists(&snapshots).
 			Build()
 
-		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource)
+		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource, false)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(status.ContainsErrors()).To(BeFalse())
 	})
@@ -279,7 +279,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 			WithLists(&snapshots).
 			Build()
 
-		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource)
+		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource, false)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(status.ContainsErrors()).To(BeTrue())
 		Expect(status).To(Equal(ValidationStatus{

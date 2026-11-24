@@ -156,6 +156,7 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
+// +kubebuilder:rbac:groups="",resources=pods/resize,verbs=patch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update;list;watch;get
@@ -538,6 +539,10 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
+	if res, err := r.requireWALArchivingPluginOrDelete(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
+		return res, err
+	}
+
 	if res, err := replicaclusterswitch.Reconcile(
 		ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
@@ -591,6 +596,15 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 	if result != nil {
 		return *result, nil
+	}
+
+	// No switchover or failover is in progress and none was just triggered
+	// this pass (both cases returned above), so it is safe to contain any
+	// replica confirmed diverged: it is kept fenced on every pass.
+	if err := r.reconcileDivergedReplicaContainment(
+		ctx, cluster, resources.pvcs.Items, resources.instances.Items,
+	); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Updates all the objects managed by the controller
@@ -651,20 +665,24 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 
 	contextLogger := log.FromContext(ctx)
 
-	firstInstance := instancesStatus.Items[0]
-	hasHTTPStatus := firstInstance.HasHTTPStatus()
-	isPodReady := firstInstance.IsPodReady
+	// A diverged replica is never elected, so it must not hold the guard back:
+	// it never becomes ready and its containment runs later in the reconciliation
+	if candidates := instancesStatus.ExcludingDiverged(); candidates.Len() > 0 {
+		firstInstance := candidates.Items[0]
+		hasHTTPStatus := firstInstance.HasHTTPStatus()
+		isPodReady := firstInstance.IsPodReady
 
-	if hasHTTPStatus && !isPodReady && !firstInstance.IsFenced {
-		// The readiness probe status from the kubelet has not been refreshed
-		// yet, so we wait rather than electing a primary that Kubernetes will
-		// refuse to route traffic to.
-		contextLogger.Info(
-			"Waiting for the Kubelet to refresh the readiness probe",
-			"instanceName", firstInstance.Pod.Name,
-			"hasHTTPStatus", hasHTTPStatus,
-			"isPodReady", isPodReady)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}
+		if hasHTTPStatus && !isPodReady && !firstInstance.IsFenced {
+			// The readiness probe status from the kubelet has not been refreshed
+			// yet, so we wait rather than electing a primary that Kubernetes will
+			// refuse to route traffic to.
+			contextLogger.Info(
+				"Waiting for the Kubelet to refresh the readiness probe",
+				"instanceName", firstInstance.Pod.Name,
+				"hasHTTPStatus", hasHTTPStatus,
+				"isPodReady", isPodReady)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}
+		}
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
@@ -725,6 +743,43 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+// requireWALArchivingPluginOrDelete deletes the replicas whose instance manager
+// quit because the WAL archiving plugin has no sidecar in their Pod. This
+// happens to a former primary that was demoted by a switchover before the
+// plugin was enabled: it must archive its pending WALs before rewinding, and
+// it can't until it's recreated with the sidecar.
+//
+// The primary is never deleted here: when the operator rolls it out because
+// of a missing sidecar, it recreates it in place, without a failover.
+func (r *ClusterReconciler) requireWALArchivingPluginOrDelete(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instances postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("require_wal_archiving_plugin_delete")
+
+	for _, state := range instances.Items {
+		if state.Pod.Name == cluster.Status.CurrentPrimary || state.Pod.Name == cluster.Status.TargetPrimary {
+			continue
+		}
+
+		if isTerminatedBecauseOfMissingWALArchivePlugin(state.Pod) {
+			contextLogger.Warning(
+				"Detected instance manager initialization procedure that failed "+
+					"because the required WAL archive plugin is missing. Deleting it to trigger rollout",
+				"targetPod", state.Pod.Name)
+			if err := r.Delete(ctx, state.Pod); err != nil && !apierrs.IsNotFound(err) {
+				contextLogger.Error(err, "Cannot delete the pod", "pod", state.Pod.Name)
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+	}
+
+	return ctrl.Result{}, nil
 }
 
 func (r *ClusterReconciler) handleSwitchover(

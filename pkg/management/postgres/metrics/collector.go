@@ -34,6 +34,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/cnpg-i/pkg/metrics"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/prometheus/client_golang/prometheus"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -671,13 +672,21 @@ type PluginCollector interface {
 
 type pluginCollector struct {
 	pluginRepository repository.Interface
+
+	// availablePluginNames are the plugins whose sidecar this Pod has: their
+	// sockets are registered once, when the instance manager starts
+	availablePluginNames []string
 }
 
 // NewPluginCollector creates a new PluginCollector that collects metrics from plugins
 func NewPluginCollector(
 	pluginRepository repository.Interface,
+	availablePluginNames []string,
 ) PluginCollector {
-	return &pluginCollector{pluginRepository: pluginRepository}
+	return &pluginCollector{
+		pluginRepository:     pluginRepository,
+		availablePluginNames: availablePluginNames,
+	}
 }
 
 func (p *pluginCollector) Describe(ctx context.Context, ch chan<- *prometheus.Desc, cluster *apiv1.Cluster) {
@@ -775,5 +784,6 @@ func (p *pluginCollector) getEnabledPluginNames(cluster *apiv1.Cluster) []string
 		}
 	}
 
-	return enabledPluginNames
+	// Skip plugins this Pod has no sidecar for, they would fail every scrape.
+	return stringset.From(p.availablePluginNames).Intersect(stringset.From(enabledPluginNames)).ToList()
 }

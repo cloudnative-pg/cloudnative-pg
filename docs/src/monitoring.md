@@ -252,6 +252,10 @@ cnpg_collector_pg_wal_archive_status{value="ready"} 0
 # TYPE cnpg_collector_replica_mode gauge
 cnpg_collector_replica_mode 0
 
+# HELP cnpg_collector_replicas_diverged Number of replicas that replayed WAL past the point where the current primary's timeline forked away from theirs. Such a replica cannot follow the primary and is fenced until it is rebuilt.
+# TYPE cnpg_collector_replicas_diverged gauge
+cnpg_collector_replicas_diverged 0
+
 # HELP cnpg_collector_sync_replicas Number of requested synchronous replicas (synchronous_standby_names)
 # TYPE cnpg_collector_sync_replicas gauge
 cnpg_collector_sync_replicas{value="expected"} 0
@@ -265,7 +269,7 @@ cnpg_collector_up{cluster="cluster-example"} 1
 
 # HELP cnpg_collector_postgres_version Postgres version
 # TYPE cnpg_collector_postgres_version gauge
-cnpg_collector_postgres_version{cluster="cluster-example",full="18.6"} 18.6
+cnpg_collector_postgres_version{cluster="cluster-example",full="19.0"} 19.0
 
 # HELP cnpg_collector_last_failed_backup_timestamp The last failed backup as a unix timestamp (Deprecated)
 # TYPE cnpg_collector_last_failed_backup_timestamp gauge

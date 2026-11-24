@@ -23,10 +23,6 @@ spec:
           name: ${SNAPSHOT_PITR_PGDATA}
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
-        walStorage:
-          name: ${SNAPSHOT_PITR_PGWAL}
-          kind: VolumeSnapshot
-          apiGroup: snapshot.storage.k8s.io
 
 
   externalClusters:

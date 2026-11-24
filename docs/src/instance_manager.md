@@ -426,20 +426,27 @@ instance manager, and the instance manager will take care of shutting down
 PostgreSQL in an appropriate way.
 The `.spec.smartShutdownTimeout` and `.spec.stopDelay` options, expressed in seconds,
 control the amount of time given to PostgreSQL to shut down. The values default
-to 180 and 1800 seconds, respectively.
+to 0 and 1800 seconds, respectively.
 
-The shutdown procedure is composed of two steps:
+The shutdown procedure is composed of three steps:
 
-1. The instance manager first issues a `CHECKPOINT`, then initiates a **smart**
-shut down, disallowing any new connection to PostgreSQL. This step will last
-for up to `.spec.smartShutdownTimeout` seconds.
+1. The instance manager issues a `CHECKPOINT`, to reduce the amount of work
+left to PostgreSQL while shutting down.
 
-2. If PostgreSQL is still up, the instance manager requests a **fast**
+2. The instance manager initiates a **smart** shut down, disallowing any new
+connection to PostgreSQL. This step will last for up to
+`.spec.smartShutdownTimeout` seconds. When set to `0` (the default), this step
+is skipped and the instance manager goes straight to step 3.
+
+3. If PostgreSQL is still up, the instance manager requests a **fast**
 shut down, terminating any existing connection and exiting promptly.
 If the instance is archiving and/or streaming WAL files, the process
 will wait for up to the remaining time set in `.spec.stopDelay` to complete the
 operation and then forcibly shut down. Such a timeout needs to be at least 15
 seconds.
+
+The same procedure applies to an in-place restart of the primary, where
+PostgreSQL is restarted without deleting the Pod.
 
 :::info[Important]
     In order to avoid any data loss in the Postgres cluster, which impacts

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
@@ -67,7 +68,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-var scheme = runtime.NewScheme()
+var (
+	scheme = runtime.NewScheme()
+
+	// errWALArchivePluginNotAvailable is returned when the configured
+	// WAL archiving plugin is not available or cannot be found.
+	errWALArchivePluginNotAvailable = errors.New("WAL archive plugin not available")
+)
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -118,12 +125,18 @@ func NewCmd() *cobra.Command {
 			})
 
 			if errors.Is(err, postgres.ErrNoFreeWALSpace) {
+				management.ShutdownLogExport()
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
+			}
+			if errors.Is(err, errWALArchivePluginNotAvailable) {
+				management.ShutdownLogExport()
+				os.Exit(apiv1.MissingWALArchivePlugin)
 			}
 
 			return err
 		},
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
+			management.ShutdownLogExport()
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}
@@ -148,14 +161,12 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&metricsPortTLS, "metrics-port-tls", false,
 		"Enable TLS for metrics scraping")
 
-	// An in-place instance manager upgrade re-execs this binary with the argv of
-	// the Pod, which was chosen by the operator that created it. Pods created
-	// before 1.31 pass --status-port-tls, and rejecting it would crash-loop the
-	// instance manager.
-	//
-	// TODO: delete after minor version 1.30 is discontinued
-	cmd.Flags().Bool("status-port-tls", false, "Deprecated: the status port always uses TLS")
-	_ = cmd.Flags().MarkDeprecated("status-port-tls", "the status port always uses TLS")
+	// The status port always uses TLS and this flag is ignored. Keep it
+	// registered as a safety net: an in-place upgrade re-execs this binary with
+	// the argv of the Pod, and rejecting a flag the Pod still carries would
+	// crash-loop the instance manager. Accepting it costs nothing.
+	cmd.Flags().Bool("status-port-tls", false, "Ignored: the status port always uses TLS")
+	_ = cmd.Flags().MarkHidden("status-port-tls")
 
 	return cmd
 }
@@ -251,21 +262,26 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	exitedConditions := concurrency.MultipleExecuted{}
 
 	pluginRepository := repository.New()
-	if _, err = pluginRepository.RegisterUnixSocketPluginsInPath(
+	availablePluginNames, err := pluginRepository.RegisterUnixSocketPluginsInPath(
 		configuration.Current.PluginSocketDir,
-	); err != nil {
+	)
+	if err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
 	defer pluginRepository.Close()
 
 	leaseRunnable := lease.New(kubeClientset, instance)
 
-	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
+	metricsExporter := metricserver.NewExporter(
+		instance,
+		metrics.NewPluginCollector(pluginRepository, availablePluginNames),
+	)
 	reconciler := controller.NewInstanceReconciler(
 		instance,
 		mgr.GetClient(),
 		metricsExporter,
 		pluginRepository,
+		availablePluginNames,
 		leaseRunnable,
 		webhookv1.NewClusterAdmissionGuard(),
 	)
@@ -469,6 +485,15 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	} else if !hasDiskSpaceForWals {
 		contextLogger.Info("Detected low-disk space condition")
 		return makeUnretryableError(postgres.ErrNoFreeWALSpace)
+	}
+
+	enabledArchiverPluginName := instance.GetClusterOrDefault().GetEnabledWALArchivePluginName()
+	if enabledArchiverPluginName != "" && !slices.Contains(availablePluginNames, enabledArchiverPluginName) {
+		contextLogger.Info(
+			"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",
+			"enabledArchiverPluginName", enabledArchiverPluginName,
+			"loadedPluginNames", availablePluginNames)
+		return makeUnretryableError(errWALArchivePluginNotAvailable)
 	}
 
 	return nil

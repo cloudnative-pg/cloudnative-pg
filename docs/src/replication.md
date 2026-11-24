@@ -116,6 +116,19 @@ transparently configures replicas to take advantage of `restore_command` when in
 continuous recovery. As a result, PostgreSQL can use the WAL archive as a
 fallback option whenever pulling WALs via streaming replication fails.
 
+PostgreSQL switches a standby from the WAL archive back to streaming
+replication only when `restore_command` fails. While the archive keeps up with
+the standby, for example on a busy primary, this may never happen: the standby
+has no WAL receiver, its replication slot stays inactive, and it cannot take
+part in synchronous replication.
+
+To avoid this, once a standby has been restoring WAL files from the archive for
+30 seconds, the instance manager makes `restore_command` fail, so that
+PostgreSQL tries streaming replication. If streaming replication does not
+hold, the interval doubles, up to 5 minutes. This applies to the designated
+primary of a replica cluster as well, when it can stream from its source, and
+never happens outside standby mode or while a promotion is pending.
+
 ## Synchronous Replication
 
 CloudNativePG supports both
@@ -226,6 +239,14 @@ spec:
 
 To prioritize self-healing over strict data durability, set `dataDurability`
 to `preferred` instead.
+
+:::warning
+    The legacy and the new configuration methods are mutually exclusive:
+    remove `minSyncReplicas` and `maxSyncReplicas` from the `Cluster`
+    specification in the same change that adds `.spec.postgresql.synchronous`.
+    If you use `syncReplicaElectionConstraint`, replace it with the
+    [failure domain options](#failure-domain-aware-synchronous-replication).
+:::
 
 ### Priority-based Synchronous Replication
 
@@ -569,13 +590,19 @@ spec:
 
 :::warning
     Prior to CloudNativePG 1.24, only the quorum-based synchronous replication
-    implementation was supported. Although this method is now deprecated, it
-    will not be removed anytime soon.
+    implementation was supported. This method, configured through
+    `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`, is deprecated as of
+    CloudNativePG 1.31. **CloudNativePG 1.32 is the last minor release that
+    ships with it, and it is removed starting from 1.33.0.** Releases up to and
+    including 1.32, and their patch releases, keep supporting it for as long as
+    they are supported. You must migrate to the new method before upgrading to
+    1.33 or later. The operator emits an admission warning when you create or
+    update a `Cluster` that uses the legacy method.
     The new method prioritizes data durability over self-healing and offers more
     robust features, including priority-based synchronous replication and full
     control over the `synchronous_standby_names` option.
-    It is recommended to gradually migrate to the new configuration method for
-    synchronous replication, as explained in the previous paragraph.
+    To migrate, follow
+    ["Migrating from Deprecated Synchronous Replication Implementation"](#migrating-from-deprecated-synchronous-replication-implementation).
 :::
 
 :::info[Important]
@@ -655,7 +682,8 @@ Postgres pod are.
 :::warning
     The `.spec.postgresql.syncReplicaElectionConstraint` option only applies to the
     legacy implementation of synchronous replication
-    (see ["Synchronous Replication (Deprecated)"](replication.md#synchronous-replication-deprecated)).
+    (see ["Synchronous Replication (Deprecated)"](replication.md#synchronous-replication-deprecated))
+    and is deprecated along with it as of CloudNativePG 1.31 (removal in 1.33.0).
 :::
 
 As an example use-case for this feature: in a cluster with a single sync

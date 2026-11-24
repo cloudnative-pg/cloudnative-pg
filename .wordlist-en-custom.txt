@@ -140,6 +140,8 @@ DataDurabilityLevelRequired
 DataSource
 DatabaseObjectSpec
 DatabaseObjectStatus
+DatabasePermissionStatus
+DatabasePermissionsSpec
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
@@ -157,11 +159,14 @@ DatabaseStatus
 DefaultAzureCredential
 DemotionToken
 DeploymentStrategy
+DetectedAt
 DevOps
 DevSecOps
 DigitalOcean
 DisablePassword
 DisabledDefaultServices
+DivergedInstanceStatus
+DivergedInstances
 DoD
 DoS
 DockerHub
@@ -204,6 +209,7 @@ FailureDomainKeys
 Fei
 Filesystem
 Fluentd
+ForkLSN
 Francesco
 GC
 GCE
@@ -344,6 +350,7 @@ OLAP
 OLTP
 OOM
 OSPS
+OTLP
 OU
 ObjectMeta
 OnlineConfiguration
@@ -354,6 +361,7 @@ OpenID
 OpenSSF
 OpenSSL
 OpenShift
+OpenTelemetry
 Openshift
 OperatorCapabilities
 OperatorCertificateFingerprint
@@ -374,6 +382,7 @@ PODNAME
 PPROF
 PSA
 PV
+PVCUID
 PVCs
 PascalBourdier
 PasswordConfiguration
@@ -439,6 +448,7 @@ Postgres
 PostgresCapabilities
 PostgresConfiguration
 PrimaryLeaseConfiguration
+PrimaryTimeLineID
 PrimaryUpdateMethod
 PrimaryUpdateMethodRestart
 PrimaryUpdateMethodSwitchover
@@ -482,6 +492,7 @@ ReadWriteOnce
 RedHat
 RelabelConfig
 RenewBefore
+ReplayLSN
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationSlotsConfiguration
@@ -490,6 +501,9 @@ ReplicationTLSSecret
 ResizingPVC
 ResourceRequirements
 ResourceVersion
+ResourcesUpdateStrategy
+ResourcesUpdateStrategyInPlace
+ResourcesUpdateStrategyRecreate
 RestoreJobHook
 RestoreJobHookCapabilities
 RetentionPolicy
@@ -695,6 +709,7 @@ appsv
 appuser
 archiveAdditionalCommandArgs
 archiver
+ardentperf
 args
 armru
 async
@@ -894,6 +909,8 @@ databaseReclaimPolicy
 databaseRoleReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
+databasepermissionsspec
+databasepermissionstatus
 databasereclaimpolicy
 databaserole
 databaserolelist
@@ -937,6 +954,7 @@ displayName
 distro
 distroless
 distros
+divergedinstancestatus
 dl
 dn
 dns
@@ -1058,6 +1076,7 @@ httpGet
 https
 hu
 hugepages
+ichibahn
 icu
 icuLocale
 icuRules
@@ -1078,6 +1097,7 @@ img
 immediateCheckpoint
 impactful
 importsource
+inPlace
 inProgress
 inRoles
 indistinctively
@@ -1123,6 +1143,7 @@ jq
 json
 jsonpath
 juliamertz
+kabbydriver
 kb
 kbytes
 kdautrey
@@ -1274,6 +1295,7 @@ onlineUpdateEnabled
 onlineconfiguration
 openldap
 openshift
+opentelemetry
 operability
 operativity
 operatorCapabilities
@@ -1479,13 +1501,16 @@ reportNonRedacted
 reportRedacted
 req
 requestTimeout
+requeue
 requeued
+requeues
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
 resourceRequirements
 resourceVersion
 resourcerequirements
+resourcesupdatestrategy
 restoreAdditionalCommandArgs
 restoreJobHookCapabilities
 resync
@@ -1730,6 +1755,7 @@ usename
 usernamepassword
 usr
 utils
+valeriodelsarto
 validUntil
 validatingwebhookconfigurations
 validator

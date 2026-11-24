@@ -40,7 +40,9 @@ func createFakeCluster(name string) *apiv1.Cluster {
 	cluster.Name = name
 	cluster.Default()
 	cluster.Spec.Instances = 3
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	cluster.Spec.MaxSyncReplicas = 2
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	cluster.Spec.MinSyncReplicas = 1
 	cluster.Status = apiv1.ClusterStatus{
 		CurrentPrimary: primaryPod,

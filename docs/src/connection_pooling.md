@@ -923,6 +923,9 @@ following example:
 }
 ```
 
+The logs can also be exported to an OpenTelemetry Collector, as described in
+["Exporting Logs via OpenTelemetry"](logging.md#exporting-logs-via-opentelemetry).
+
 ## Pausing connections
 
 The `Pooler` specification allows you to take advantage of PgBouncer's `PAUSE`

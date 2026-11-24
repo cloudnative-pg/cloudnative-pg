@@ -91,6 +91,26 @@ func (instance *Instance) CheckForExistingPostmaster(postgresExecutables ...stri
 	return os.FindProcess(pid)
 }
 
+// pidFileNamesForeignProcess reports whether the PID file points to a live
+// process that is not PostgreSQL. This happens when the file survives a
+// container restart and the PID is reused: pg_ctl only checks that the PID
+// is alive, so it would signal that process and wait for it.
+func (instance *Instance) pidFileNamesForeignProcess() bool {
+	_, pid, err := instance.GetPostmasterPidFromFile(path.Join(instance.PgData, PostgresqlPidFile))
+	if err != nil {
+		return false
+	}
+
+	process, err := ps.FindProcess(pid)
+	if err != nil || process == nil || process.Executable() == GetPostgresExecutableName() {
+		return false
+	}
+
+	log.Info("The PID file belongs to a process that is not PostgreSQL, the instance is not running",
+		"pid", pid, "executable", process.Executable())
+	return true
+}
+
 // CleanUpStalePid cleans up the files left around by a crashed PostgreSQL instance.
 // It removes the default PostgreSQL pid file and the content of the socket directory.
 func (instance *Instance) CleanUpStalePid() error {

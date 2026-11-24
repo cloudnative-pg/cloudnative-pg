@@ -99,7 +99,7 @@ Three image flavors are available, each extending the previous one:
     Barman Cloud plugin, or another supported backup solution.
 :::
 
-By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie`.
+By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:19.0-system-trixie`.
 
 All images are signed and shipped with SBOM and provenance attestations.
 Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.
@@ -120,8 +120,8 @@ For details and support, see the [`postgres-containers` project](https://github.
 - Declarative management of key PostgreSQL configurations, including:
     - PostgreSQL settings.
     - Roles, users, and groups.
-    - Databases, extensions, schemas, foreign data wrappers (FDW), and foreign
-      servers.
+    - Databases, extensions, schemas, foreign data wrappers (FDW), foreign
+      servers, and the privileges granted on the database itself.
     - Tablespaces (including temporary tablespaces).
 - Flexible instance definition, supporting any number of instances (minimum 1
   primary server).
@@ -215,6 +215,6 @@ of Canada, and used with their permission.*
 ---
 
 CloudNativePG is a
-[Cloud Native Computing Foundation Sandbox project](https://www.cncf.io/sandbox-projects/).
+[Cloud Native Computing Foundation Incubating project](https://www.cncf.io/projects/cloudnativepg/).
 
 ![](https://github.com/cncf/artwork/blob/main/other/cncf/horizontal/color/cncf-color.png?raw=true)

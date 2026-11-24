@@ -255,7 +255,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			extensionConfig := apiv1.ExtensionConfiguration{
 				Name: "pgvector",
 				ImageVolumeSource: corev1.ImageVolumeSource{
-					Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
+					Reference: env.PgvectorExtensionImage(),
 				},
 			}
 			additionalGucParams := map[string]string{
@@ -315,7 +315,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 								{
 									Name: "postgis",
 									ImageVolumeSource: corev1.ImageVolumeSource{
-										Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/postgis-extension:3.6.1-%d-trixie", env.PostgresVersion),
+										Reference: env.PostgisExtensionImage(),
 									},
 									LdLibraryPath: []string{"/system"},
 								},
@@ -401,7 +401,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			catalog.Spec.Images[0].Extensions = append(catalog.Spec.Images[0].Extensions, apiv1.ExtensionConfiguration{
 				Name: "pgvector",
 				ImageVolumeSource: corev1.ImageVolumeSource{
-					Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
+					Reference: env.PgvectorExtensionImage(),
 				},
 			})
 			err = objects.Update(env.Ctx, env.Client, catalog)

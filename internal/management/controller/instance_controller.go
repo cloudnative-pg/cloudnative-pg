@@ -145,10 +145,15 @@ func (r *InstanceReconciler) Reconcile(
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPluginLoading()
 
+	// A Pod created before a plugin was enabled has no sidecar for it.
+	// Requiring it would block every loop, including the one that demotes
+	// this instance in a switchover.
 	pluginClient, err := cnpgiclient.WithPlugins(
 		pluginLoadingContext,
 		r.pluginRepository,
-		cluster.GetInstanceEnabledPluginNames()...,
+		stringset.From(r.availablePluginNames).
+			Intersect(stringset.From(cluster.GetInstanceEnabledPluginNames())).
+			ToList()...,
 	)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
@@ -1040,8 +1045,9 @@ func (r *InstanceReconciler) reconcileMetrics(
 		}
 	}
 
-	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
-	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
+	minSyncReplicas, maxSyncReplicas := replication.GetSyncReplicasBounds(cluster)
+	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(minSyncReplicas))
+	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(maxSyncReplicas))
 
 	syncReplicas := replication.GetExpectedSyncReplicasNumber(ctx, cluster)
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
@@ -1418,6 +1424,10 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
 
+	if err := r.primaryLeaseAcquirer.MarkPromoting(ctx); err != nil {
+		return fmt.Errorf("marking the promotion on the primary lease: %w", err)
+	}
+
 	// I must promote my instance here
 	r.promotionRequested = true
 
@@ -1615,6 +1625,7 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(
 ) shoudRequeue {
 	contextLogger := log.FromContext(ctx)
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	syncReplicaConstraint := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
 	failureDomainsConfigured := syncReplicaConstraint.Enabled ||

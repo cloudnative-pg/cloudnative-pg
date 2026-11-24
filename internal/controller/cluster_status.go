@@ -253,6 +253,63 @@ func (r *ClusterReconciler) getManagedJobs(
 	return childJobs, nil
 }
 
+// resetUnavailableTargetPrimary sends the target primary back to the current
+// primary when the switchover or the failover in progress cannot complete.
+func (r *ClusterReconciler) resetUnavailableTargetPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) {
+	// Ignore this check if the current primary is empty (it happens during the bootstrap)
+	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary ||
+		cluster.Status.CurrentPrimary == "" ||
+		isTargetPrimaryAvailable(cluster, resources) {
+		return
+	}
+
+	contextLogger := log.FromContext(ctx)
+	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
+		contextLogger.Info("No instance is ready, cancelling the failover "+
+			"to let the current primary start again",
+			"currentPrimary", cluster.Status.CurrentPrimary)
+		r.Recorder.Eventf(cluster, "Normal", "FailoverCancelled",
+			"No instance is ready, cancelling the pending failover from %s", cluster.Status.CurrentPrimary)
+	} else {
+		contextLogger.Info("Wrong target primary, the chosen one is not active or not present",
+			"targetPrimary", cluster.Status.TargetPrimary)
+	}
+	contextLogger.Debug("Instances status dump", "instances", resources.instances.Items)
+	cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+	cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
+}
+
+// isTargetPrimaryAvailable tells if the switchover or the failover in progress
+// can still complete
+func isTargetPrimaryAvailable(cluster *apiv1.Cluster, resources *managedResources) bool {
+	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
+		// A pending failover has no target Pod to look for. Keep it,
+		// unless no instance is ready and the current primary Pod has not
+		// been deleted or evicted: it can start again, and no replica may
+		// be promoted before it does.
+		return cluster.Status.ReadyInstances > 0 ||
+			!slices.ContainsFunc(resources.instances.Items, func(pod corev1.Pod) bool {
+				return pod.Name == cluster.Status.CurrentPrimary &&
+					pod.DeletionTimestamp.IsZero() &&
+					pod.Status.Phase != corev1.PodFailed
+			})
+	}
+
+	if cluster.Status.ReadyInstances == 0 {
+		return false
+	}
+
+	// If the target primary is not active, it will never be promoted
+	// since is will not be scheduled anymore
+	return slices.ContainsFunc(utils.FilterActivePods(resources.instances.Items), func(pod corev1.Pod) bool {
+		return pod.Name == cluster.Status.TargetPrimary
+	})
+}
+
 func (r *ClusterReconciler) updateResourceStatus(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -284,6 +341,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.JobCount = newJobs
 
 	var podLabelKeys []string
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	nodeLabelKeys := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.NodeLabelsAntiAffinity
 	if sync := cluster.Spec.PostgresConfiguration.Synchronous; sync != nil &&
 		(len(sync.PodFailureDomainKeys) > 0 || len(sync.NodeFailureDomainKeys) > 0) {
@@ -307,33 +365,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// (HPA, VPA) can discover the instance pods managed by this cluster.
 	cluster.Status.Selector = cluster.GetInstancesSelector()
 
-	// If we are switching, check if the target primary is still active
-	// Ignore this check if current primary is empty (it happens during the bootstrap)
-	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary &&
-		cluster.Status.CurrentPrimary != "" &&
-		cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker {
-		found := false
-		if cluster.Status.ReadyInstances > 0 {
-			for _, instance := range utils.FilterActivePods(resources.instances.Items) {
-				// If the target primary is not active, it will never be promoted
-				// since is will not be scheduled anymore
-				if instance.Name == cluster.Status.TargetPrimary {
-					found = true
-					break
-				}
-			}
-		}
-
-		if !found {
-			// Reset the target primary, since the available one is not active
-			// or not present
-			contextLogger.Info("Wrong target primary, the chosen one is not active or not present",
-				"targetPrimary", cluster.Status.TargetPrimary)
-			contextLogger.Debug("Instances status dump", "instances", resources.instances.Items)
-			cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
-			cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
-		}
-	}
+	r.resetUnavailableTargetPrimary(ctx, cluster, resources)
 
 	// set server CA secret,TLS secret and alternative DNS names with default values
 	cluster.Status.Certificates.ServerCASecret = cluster.GetServerCASecretName()
@@ -821,6 +853,11 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		}
 	}
 
+	// Surface any replica reporting it diverged from the current primary's
+	// timeline. Always runs; containment is handled separately, see
+	// reconcileDivergedReplicaContainment.
+	r.evaluateReplicaDivergence(cluster, statuses)
+
 	// we update the system ID field in the cluster status
 	switch detectedSystemID.Len() {
 	case 0:
@@ -991,6 +1028,15 @@ func isWALSpaceAvailableOnPod(pod *corev1.Pod) bool {
 	}
 	// Return true if WAL space IS available (i.e., NOT terminated for missing disk space)
 	return !hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
+}
+
+// isTerminatedBecauseOfMissingWALArchivePlugin reports whether a Pod terminated because
+// the WAL archiving plugin has no sidecar in it.
+func isTerminatedBecauseOfMissingWALArchivePlugin(pod *corev1.Pod) bool {
+	isTerminatedForMissingWALArchivePlugin := func(state *corev1.ContainerState) bool {
+		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALArchivePlugin
+	}
+	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALArchivePlugin)
 }
 
 func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *corev1.ContainerState) bool) bool {

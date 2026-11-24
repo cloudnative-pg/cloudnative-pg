@@ -115,7 +115,10 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv
 	clusterLog.Debug("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
-	allErrs := v.validate(cluster)
+	allErrs := append(
+		v.validate(cluster),
+		v.validateBootstrapRecoveryWalSource(cluster)...,
+	)
 	allWarnings := v.getAdmissionWarnings(cluster)
 
 	if len(allErrs) == 0 {
@@ -887,6 +890,28 @@ func (v *ClusterCustomValidator) validateBootstrapRecoveryDataSource(r *apiv1.Cl
 	return result
 }
 
+// validateBootstrapRecoveryWalSource ensures that a recovery from volume
+// snapshots without a WAL storage snapshot can fetch the WAL files from the
+// WAL archive. As a WAL storage can be added once the cluster is bootstrapped,
+// this is checked only when the cluster is created.
+func (v *ClusterCustomValidator) validateBootstrapRecoveryWalSource(r *apiv1.Cluster) field.ErrorList {
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+		return nil
+	}
+
+	recoverySection := r.Spec.Bootstrap.Recovery
+	if recoverySection.VolumeSnapshots.WalStorage != nil || r.Spec.WalStorage == nil || recoverySection.Source != "" {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Required(
+			field.NewPath("spec", "bootstrap", "recovery", "source"),
+			"A recovery source is required to fetch the WAL files when recovering "+
+				"without a WAL storage snapshot"),
+	}
+}
+
 // validateVolumeSnapshotSource validates a source of a recovery snapshot.
 // The supported resources are VolumeSnapshots and PersistentVolumeClaim
 func validateVolumeSnapshotSource(
@@ -1190,6 +1215,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	// We cannot have both old-style synchronous replica configuration
 	// and new-style synchronous replica configuration
 	haveOldStyleSyncReplicaConfig := r.Spec.PostgresConfiguration.Synchronous != nil
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	haveNewStyleSyncReplicaConfig := r.Spec.MinSyncReplicas > 0 || r.Spec.MaxSyncReplicas > 0
 	if haveOldStyleSyncReplicaConfig && haveNewStyleSyncReplicaConfig {
 		result = append(result,
@@ -1322,6 +1348,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 		r.Spec.PostgresConfiguration, r.Spec.WalStorage.GetSizeOrNil())...)
 
 	if err := validateSyncReplicaElectionConstraint(
+		//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
 	); err != nil {
 		result = append(result, err)
@@ -1716,6 +1743,7 @@ func (v *ClusterCustomValidator) validatePrimaryUpdateStrategy(r *apiv1.Cluster)
 func (v *ClusterCustomValidator) validateMaxSyncReplicas(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MaxSyncReplicas < 0 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "maxSyncReplicas"),
@@ -1723,9 +1751,11 @@ func (v *ClusterCustomValidator) validateMaxSyncReplicas(r *apiv1.Cluster) field
 			"maxSyncReplicas must be a non negative integer"))
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MaxSyncReplicas >= r.Spec.Instances {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "maxSyncReplicas"),
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 			r.Spec.MaxSyncReplicas,
 			"maxSyncReplicas must be lower than the number of instances"))
 	}
@@ -1737,6 +1767,7 @@ func (v *ClusterCustomValidator) validateMaxSyncReplicas(r *apiv1.Cluster) field
 func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MinSyncReplicas < 0 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "minSyncReplicas"),
@@ -1744,9 +1775,11 @@ func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field
 			"minSyncReplicas must be a non negative integer"))
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MinSyncReplicas > r.Spec.MaxSyncReplicas {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "minSyncReplicas"),
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 			r.Spec.MinSyncReplicas,
 			"minSyncReplicas cannot be greater than maxSyncReplicas"))
 	}
@@ -2808,6 +2841,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getMonitoringFieldsWarnings(r)...)
 	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 	list = append(list, getSynchronousReplicationWarnings(r)...)
+	list = append(list, getLegacySynchronousReplicationWarnings(r)...)
 	list = append(list, getPrimaryIsolationTimingWarnings(r)...)
 	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
@@ -3304,6 +3338,7 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		return nil
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if r.Spec.MinSyncReplicas > 0 {
 		return nil
 	}
@@ -3312,6 +3347,39 @@ func getSynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
 		"This cluster has no synchronous replication configured. " +
 			"A primary failure can cause data loss for transactions not yet replicated. " +
 			"Consider configuring .spec.postgresql.synchronous to protect against data loss.",
+	}
+}
+
+// getLegacySynchronousReplicationWarnings warns users who still rely on the
+// legacy synchronous replication method, based on `.spec.minSyncReplicas`
+// and `.spec.maxSyncReplicas`, and on the options that only apply to it.
+func getLegacySynchronousReplicationWarnings(r *apiv1.Cluster) admission.Warnings {
+	var paths []string
+
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+	if r.Spec.MinSyncReplicas > 0 {
+		paths = append(paths, field.NewPath("spec", "minSyncReplicas").String())
+	}
+
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+	if r.Spec.MaxSyncReplicas > 0 {
+		paths = append(paths, field.NewPath("spec", "maxSyncReplicas").String())
+	}
+
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+	if r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled {
+		paths = append(paths, field.NewPath("spec", "postgresql", "syncReplicaElectionConstraint").String())
+	}
+
+	if len(paths) == 0 {
+		return nil
+	}
+
+	return admission.Warnings{
+		fmt.Sprintf("The legacy synchronous replication configuration is deprecated and will be "+
+			"completely removed in CloudNativePG 1.33.0. Found usage in: %s. "+
+			"Please migrate existing clusters to .spec.postgresql.synchronous.",
+			strings.Join(paths, ", ")),
 	}
 }
 

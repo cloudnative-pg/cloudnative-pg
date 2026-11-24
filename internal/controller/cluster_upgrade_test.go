@@ -299,6 +299,41 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				},
 			},
 		}
+		DescribeTable("recreates only a pod whose in-place resize is infeasible",
+			func(ctx SpecContext, condition corev1.PodCondition, recreated bool) {
+				cluster := clusterWithResources.DeepCopy()
+				pod, err := specs.NewInstance(ctx, *cluster, 1)
+				Expect(err).ToNot(HaveOccurred())
+				pod.Status.Conditions = []corev1.PodCondition{condition}
+				status := postgres.PostgresqlStatus{Pod: pod, IsPodReady: true, ExecutableHash: "test_hash"}
+
+				// with the recreate strategy the resize was issued by someone else
+				Expect(isInstanceNeedingRollout(ctx, status, cluster).required).To(BeFalse())
+
+				cluster.Spec.ResourcesUpdateStrategy = apiv1.ResourcesUpdateStrategyInPlace
+				Expect(isInstanceNeedingRollout(ctx, status, cluster).required).To(Equal(recreated))
+
+				cluster.Annotations = map[string]string{utils.ReconcilePodSpecAnnotationName: "disabled"}
+				Expect(isInstanceNeedingRollout(ctx, status, cluster).required).To(BeFalse())
+			},
+			Entry("infeasible",
+				corev1.PodCondition{
+					Type: corev1.PodResizePending, Status: corev1.ConditionTrue, Reason: corev1.PodReasonInfeasible,
+				}, true),
+			Entry("infeasible, but no longer pending",
+				corev1.PodCondition{
+					Type: corev1.PodResizePending, Status: corev1.ConditionFalse, Reason: corev1.PodReasonInfeasible,
+				}, false),
+			Entry("deferred",
+				corev1.PodCondition{
+					Type: corev1.PodResizePending, Status: corev1.ConditionTrue, Reason: corev1.PodReasonDeferred,
+				}, false),
+			Entry("failed while being applied",
+				corev1.PodCondition{
+					Type: corev1.PodResizeInProgress, Status: corev1.ConditionTrue, Reason: corev1.PodReasonError,
+				}, false),
+		)
+
 		It("should trigger a rollout when the cluster has a Resource changed", func(ctx SpecContext) {
 			pod, err := specs.NewInstance(
 				context.TODO(),

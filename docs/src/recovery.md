@@ -169,8 +169,20 @@ spec:
           serverName: cluster-example
 ```
 
-In case the backed-up cluster was using a separate PVC to store the WAL files,
-the recovery must include that too:
+For an online backup, the example above is all you need, whether or not the
+backed-up cluster stored its WAL files in a separate PVC, and whether or not
+the new cluster defines `.spec.walStorage`. CloudNativePG does not snapshot the
+WAL volume of an online backup: the `Backup` status has no `PG_WAL` element.
+See [Online backups and the WAL volume](appendixes/backup_volumesnapshot.md#online-backups-and-the-wal-volume)
+for details.
+Reference only the `storage` snapshot: if the new cluster defines
+`.spec.walStorage`, it starts with an empty WAL volume, and PostgreSQL fetches
+the WAL files from the archive defined in the `source` of the recovery, which
+is therefore required.
+
+If the backup does include a snapshot of the WAL volume (for example, a cold
+backup), reference it in `.spec.bootstrap.recovery.volumeSnapshots.walStorage`
+too:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -193,6 +205,12 @@ spec:
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 ```
+
+:::note
+    When you reference a snapshot of the WAL volume, the recovered cluster
+    must define `.spec.walStorage` too, as the snapshots don't carry the
+    storage configuration of the new WAL volume.
+:::
 
 The previous example assumes that the application database and its owning user
 are named `app` by default. If the PostgreSQL cluster being restored uses
@@ -384,8 +402,8 @@ snapshot and apply WAL segments from the object store to reach the desired
 recovery target.
 
 :::note
-    If the backed-up cluster had `walStorage` enabled, you also must specify
-    the volume snapshot containing the `PGWAL` directory, as mentioned in
+    For a cold backup of a cluster with `walStorage`, also reference the volume
+    snapshot of the WAL volume, as described in
     [Recovery from VolumeSnapshot objects](#recovery-from-volumesnapshot-objects).
 :::
 

@@ -14,12 +14,12 @@ title: Installation and upgrades
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.2.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.2.yaml
 ```
 
 You can verify that with:
@@ -267,28 +267,70 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
-### Upgrading to 1.30.0, 1.29.2, or 1.28.4
+### Upgrading to 1.31.0
+
+#### Default of `.spec.smartShutdownTimeout` changed to 0
+
+Starting from version 1.31.0, the default value of `.spec.smartShutdownTimeout`
+is `0` seconds instead of `180`. In a cluster using the new default, when a
+PostgreSQL Pod is terminated or the primary is restarted in place, the instance
+manager no longer waits for clients to disconnect during a smart shutdown: it
+issues a `CHECKPOINT` and requests a fast shutdown right away.
+See ["Shutdown control"](instance_manager.md#shutdown-control) for details.
+
+Existing clusters are not affected, as the previous default is already stored
+in their `.spec`. The new default applies to new `Cluster` resources, and
+to resources created without the field. This includes clusters you recreate,
+for example from a GitOps repository or a backup tool, if their manifests don't
+set it explicitly. The new default also applies to an existing cluster when the
+whole resource is replaced, rather than patched, with a definition that doesn't
+set the field.
+
+If you want new clusters to keep the previous behavior, set the field
+explicitly in their manifests:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  smartShutdownTimeout: 180
+  # <snip>
+```
+
+Make sure `.spec.stopDelay` is greater than `.spec.smartShutdownTimeout`,
+otherwise the smart shutdown is skipped.
+
+#### Deprecation of the legacy synchronous replication method
+
+The legacy synchronous replication method, configured through
+`.spec.minSyncReplicas` and `.spec.maxSyncReplicas`, is deprecated starting
+from version 1.31.0 and will be removed in version 1.33.0, together with the
+`.spec.postgresql.syncReplicaElectionConstraint` option.
+
+The operator returns an admission warning when you create or update a `Cluster`
+that uses any of these fields. Migrate those clusters to
+`.spec.postgresql.synchronous` before upgrading to 1.33.0, as explained in
+["Migrating from Deprecated Synchronous Replication Implementation"](replication.md#migrating-from-deprecated-synchronous-replication-implementation).
+
+### Upgrading to 1.30.0
 
 :::info[Important]
-    We strongly recommend that all CloudNativePG users upgrade to version
-    1.30.0, or at least to the latest stable version of your current minor release
-    (e.g., 1.29.2 or 1.28.4).
+    We strongly recommend that all CloudNativePG users upgrade to the latest
+    1.30 patch release.
 :::
 
-These releases introduce changes worth reviewing before you upgrade. Two are
-security changes that apply to **1.30.0, 1.29.2, and 1.28.4**: operator-side
-password encoding (`CVE-2026-55765`) and `search_path` hardening
-(`CVE-2026-55769`). The other three are new in
-**1.30.0** only: the `DatabaseRole` resource for declarative role management,
+This release introduces changes worth reviewing before you upgrade: operator-side
+password encoding (`CVE-2026-55765`), `search_path` hardening
+(`CVE-2026-55769`), the `DatabaseRole` resource for declarative role management,
 safe primary election via a per-cluster Lease, and operator-to-instance
 authentication on the instance manager's status port (`GHSA-7qwx-x8ff-3px9`).
-In addition, if you are upgrading from a release **older than 1.29.1 or 1.28.3**,
-the metrics-exporter privilege separation from `CVE-2026-44477` also applies.
 Each is covered in its own subsection below.
 
 #### Operator-side password encoding (`CVE-2026-55765`)
 
-Starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons
+Starting from version 1.30.0, for security reasons
 (`CVE-2026-55765` / `GHSA-w3gf-xc94-wvmj`), CloudNativePG SCRAM-SHA-256 encodes
 role passwords **operator-side**
 (client-side from PostgreSQL's point of view) before issuing
@@ -332,7 +374,7 @@ for details.
 
 #### `search_path` hardening (`CVE-2026-55769`)
 
-Also starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons
+Also starting from version 1.30.0, for security reasons
 (`CVE-2026-55769` / `GHSA-x8c2-3p4r-v9r6`), CloudNativePG pins the `search_path`
 to a fixed `pg_catalog, public,
 pg_temp` on every connection it opens to PostgreSQL, so that a
@@ -411,23 +453,6 @@ port (TCP 8000) with a `NetworkPolicy`, which remains its security boundary
 there. See
 [Operator-to-instance authentication](security.md#operator-to-instance-authentication)
 for details.
-
-#### Metrics exporter privilege separation (`CVE-2026-44477`)
-
-This applies only if you are upgrading from a release **older than 1.29.1 or
-1.28.3** (for example 1.29.0, 1.28.2, or any earlier version); installations
-already on 1.29.1, 1.28.3, or later already have this change.
-
-The fix for `CVE-2026-44477` / `GHSA-423p-g724-fr39` makes the metrics exporter
-authenticate as a dedicated `cnpg_metrics_exporter` role with `pg_monitor`
-privileges only, instead of the `postgres` superuser.
-
-Custom monitoring queries that read user-owned tables, or use
-`target_databases: '*'` against databases where `PUBLIC` `CONNECT` has been
-revoked, need explicit `GRANT` statements to `cnpg_metrics_exporter`.
-See ["Custom query privileges and safety"](monitoring.md#custom-query-privileges-and-safety)
-and ["Manually creating the metrics exporter role"](monitoring.md#manually-creating-the-metrics-exporter-role)
-in the monitoring documentation.
 
 ## Verifying release assets
 

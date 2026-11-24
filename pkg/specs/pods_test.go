@@ -1003,6 +1003,17 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 })
 
 var _ = Describe("NewInstance", func() {
+	It("passes --status-port-tls so that plugins before 1.31 detect TLS", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+			Spec:       apiv1.ClusterSpec{ImageName: "postgres:18.0"},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod.Spec.Containers[0].Command).To(ContainElement("--status-port-tls"))
+	})
+
 	It("applies correct labels", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
