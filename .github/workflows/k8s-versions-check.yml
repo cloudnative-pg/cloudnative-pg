@@ -25,7 +25,7 @@ defaults:
 
 env:
   # The minimal k8s version supported, k8s version smaller than this one will be removed from vendor
-  MINIMAL_K8S: "1.31"
+  MINIMAL_K8S: "1.33"
   MINIMAL_OCP: "4.22"
 
 jobs:
