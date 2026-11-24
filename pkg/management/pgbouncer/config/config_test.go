@@ -188,7 +188,12 @@ var _ = Describe("BuildConfigurationFiles", func() {
 		files, err := BuildConfigurationFiles(pooler, secrets)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(string(files[iniPath])).ToNot(ContainSubstring("\x00"))
+		ini := string(files[iniPath])
+		Expect(ini).ToNot(ContainSubstring("\x00"))
+		// Nothing is dropped nor emptied: every field keeps its line
+		Expect(ini).To(ContainSubstring("\nauth_user = test-username\nauth_query = SELECT 1\nauth_dbname = "))
+		Expect(ini).To(ContainSubstring("\nmax_client_conn = 100\n"))
+		Expect(string(files[userListPath])).To(ContainSubstring(`"test-username" "test-password"`))
 	})
 
 	It("does not let a parameter name with trailing whitespace override a forced parameter", func() {
