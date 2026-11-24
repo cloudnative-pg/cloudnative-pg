@@ -323,6 +323,24 @@ allows `superuser: true` and membership of any existing role through
 access on the PostgreSQL clusters in that namespace, and deserves the same
 care as write access to the `Cluster` resource.
 
+A `DatabaseRole` can also name the Secret that holds its password
+(`password.secret`, or the deprecated `passwordSecret`). The operator adds
+that name to the Kubernetes RBAC `Role` of the ServiceAccount of the instance
+Pods, so that the instance manager can read the password. It does not check
+that the author of the `DatabaseRole` is allowed to read that Secret. A user
+who can write `DatabaseRole` objects can therefore give that ServiceAccount
+`get` and `watch` on any Secret in the namespace, if they know its name.
+Anything running with that ServiceAccount can then read the Secret, for
+example a shell opened through `pods/exec` on an instance Pod. The same
+applies to the `passwordSecret` of the
+[inline managed roles](declarative_role_management.md#inline-managed-roles)
+of a `Cluster`.
+
+:::warning
+    Give write access to `DatabaseRole` only to users who are allowed to
+    read every Secret in the namespace.
+:::
+
 A similar consideration applies to the `Pooler` resource: its `authQuery`
 field accepts arbitrary SQL that PgBouncer runs against the `postgres`
 database to authenticate client connections, and the `auth_user` parameter (see
