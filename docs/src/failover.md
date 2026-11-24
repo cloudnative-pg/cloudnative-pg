@@ -169,38 +169,43 @@ shutdown. It contains:
 
 :::note
 The annotation is written by CloudNativePG and its format may change in future
-releases. Do not edit it: the only supported change is removing it, as
+releases. Please avoid editing it: the only supported change is removing it, as
 described in [Promotion held back](#promotion-held-back).
 :::
 
 #### Promotion held back
 
-During a switchover, after the clean shutdown of the previous primary, the
-replica that is about to become the primary compares its own position with the
-final one on the lease. If it is missing some of that WAL, it does not promote,
-and the cluster has no primary until the missing WAL is restored from the
-archive. A failover is not held back. While the replica waits, a
-`PromotionHeldBack` warning event on the `Cluster` reports why:
+During a switchover, the previous primary shuts down cleanly and leaves its
+final position on the lease. The replica that is about to become the primary
+compares its own position with it. If the replica is missing some of that WAL,
+it does not promote yet, so that no transactions are lost. The cluster has no
+primary in the meantime, and the promotion goes ahead as soon as the missing WAL
+arrives from the archive. A failover is never held back.
+
+While the replica waits, a `PromotionHeldBack` event on the `Cluster` tells
+why:
 
 ```sh
 kubectl describe cluster cluster-example
 ```
 
-There are two ways to go on without waiting for the WAL:
+Waiting is usually all that is needed. If the WAL is not going to arrive, you
+can go on in one of two ways:
 
-* cancel the switchover, by promoting the previous primary back with
-  [`kubectl cnpg promote --force`](kubectl-plugin.md#promote);
-* remove the annotation, accepting the loss of the data that the replica is
-  missing. The replica then promotes:
+- Cancel the switchover by promoting the previous primary back with
+  [`kubectl cnpg promote --force`](kubectl-plugin.md#promote). No data is lost.
+- Remove the annotation, and the replica promotes without the data that only the
+  previous primary has:
 
   ```sh
   kubectl annotate lease cluster-example cnpg.io/position-
   ```
 
-:::warning
+:::note
 After the annotation is removed, the other replicas that received the WAL the
-new primary is missing stay on the previous timeline and cannot follow the new
-primary.
+new primary is missing stay on the previous timeline and cannot follow it.
+See [Rebuilding a Diverged Replica](failure_modes.md#rebuilding-a-diverged-replica)
+to bring them back.
 :::
 
 ### Tuning the primary lease
