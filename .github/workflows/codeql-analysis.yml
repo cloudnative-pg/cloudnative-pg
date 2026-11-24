@@ -64,14 +64,14 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
     - name: Install Go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
       with:
         go-version-file: go.mod
         check-latest: true
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+      uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4
       with:
         languages: "go"
         build-mode: manual
@@ -88,6 +88,6 @@ jobs:
         make
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+      uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4
       with:
         category: "/language:go"
