@@ -51,7 +51,7 @@ type LeasePosition struct {
 	// State qualifies the position. Only PgDataStateShutDown is a final one.
 	State PgDataState `json:"state"`
 
-	// Pod is the pod that wrote the position. Informational.
+	// Pod is the pod that wrote the position.
 	Pod string `json:"pod,omitempty"`
 }
 

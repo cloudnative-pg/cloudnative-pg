@@ -153,8 +153,9 @@ metadata:
     cnpg.io/position: '{"lsn":"0/7000028","timeline":3,"state":"in production","pod":"cluster-example-1"}'
 ```
 
-The annotation is refreshed every time the primary writes the lease, and a
-final value is written when the lease is released on shutdown. It contains:
+The annotation is refreshed every time the primary writes the lease and can
+read the position, and a final value is written when the lease is released on
+shutdown. It contains:
 
 * `lsn`: the position in the WAL, in the PostgreSQL text format.
 * `timeline`: the PostgreSQL timeline.
@@ -167,8 +168,44 @@ final value is written when the lease is released on shutdown. It contains:
 * `pod`: the pod that wrote the position.
 
 :::note
-The annotation is read-only and meant to be used by CloudNativePG. Its
-format may change in future releases.
+The annotation is written by CloudNativePG and its format may change in future
+releases. Please avoid editing it: the only supported change is removing it, as
+described in [Promotion held back](#promotion-held-back).
+:::
+
+#### Promotion held back
+
+During a switchover, the previous primary shuts down cleanly and leaves its
+final position on the lease. The replica that is about to become the primary
+compares its own position with it. If the replica is missing some of that WAL,
+it does not promote yet, so that no transactions are lost. The cluster has no
+primary in the meantime, and the promotion goes ahead as soon as the missing WAL
+arrives from the archive. A failover is never held back.
+
+While the replica waits, a `PromotionHeldBack` event on the `Cluster` tells
+why:
+
+```sh
+kubectl describe cluster cluster-example
+```
+
+Waiting is usually all that is needed. If the WAL is not going to arrive, you
+can go on in one of two ways:
+
+- Cancel the switchover by promoting the previous primary back with
+  [`kubectl cnpg promote --force`](kubectl-plugin.md#promote). No data is lost.
+- Remove the annotation, and the replica promotes without the data that only the
+  previous primary has:
+
+  ```sh
+  kubectl annotate lease cluster-example cnpg.io/position-
+  ```
+
+:::note
+After the annotation is removed, the other replicas that received the WAL the
+new primary is missing stay on the previous timeline and cannot follow it.
+See [Rebuilding a Diverged Replica](failure_modes.md#rebuilding-a-diverged-replica)
+to bring them back.
 :::
 
 ### Tuning the primary lease

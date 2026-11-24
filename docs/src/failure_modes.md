@@ -61,11 +61,11 @@ may be required.
 ### Rebuilding a Diverged Replica
 
 In rare cases, after a failover, a replica may have replayed more WAL than the
-replica that was promoted. Such a replica cannot follow the new primary, and
-CloudNativePG handles it automatically: it removes the replica from the `-r`
+replica that was promoted. Such a replica cannot follow the new primary.
+CloudNativePG detects it and contains it: it removes the replica from the `-r`
 and `-ro` services, excludes it from promotion, and fences it. It also sets the
 `ReplicasHealthy` condition of the `Cluster` to `False` and raises a
-`ReplicaDiverged` event. The primary and the other replicas are not affected.
+`ReplicaDiverged` event. The primary keeps running.
 
 To bring the replica back, rebuild it from the current primary with the
 [`cnpg` plugin](kubectl-plugin.md#destroy):

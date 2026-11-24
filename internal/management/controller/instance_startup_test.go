@@ -40,12 +40,20 @@ import (
 )
 
 // fakeLeaseAcquirer reports whatever acquirePrimaryLease's caller should see
-// and counts the yields it is asked for.
+// and counts the yields it is asked for. It also stands for what the previous
+// primary published on the lease, and records the calls that the promotion
+// makes on it, in order.
 type fakeLeaseAcquirer struct {
-	err     error
-	yields  int
-	markErr error
-	marks   int
+	err    error
+	yields int
+
+	annotation  string
+	positionErr error
+	markErr     error
+
+	// calls are the names of the methods that the promotion called
+	calls []string
+	marks int
 }
 
 func (f *fakeLeaseAcquirer) Acquire(context.Context, lease.Config) error {
@@ -56,7 +64,13 @@ func (f *fakeLeaseAcquirer) Yield(context.Context) {
 	f.yields++
 }
 
+func (f *fakeLeaseAcquirer) Position(context.Context) (string, error) {
+	f.calls = append(f.calls, "Position")
+	return f.annotation, f.positionErr
+}
+
 func (f *fakeLeaseAcquirer) MarkPromoting(context.Context) error {
+	f.calls = append(f.calls, "MarkPromoting")
 	f.marks++
 	return f.markErr
 }

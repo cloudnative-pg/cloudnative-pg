@@ -216,8 +216,9 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Target primary isn't healthy, switching target from %v to %v",
 			cluster.Status.TargetPrimary, mostAdvancedInstance.Pod.Name)
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
-			fmt.Sprintf("Switching over to %v", mostAdvancedInstance.Pod.Name)); err != nil {
+		phase, reason := phaseOfNewTarget(cluster)
+		if err := r.RegisterPhase(ctx, cluster, phase,
+			fmt.Sprintf("%s to %v", reason, mostAdvancedInstance.Pod.Name)); err != nil {
 			return "", err
 		}
 	}
@@ -548,4 +549,15 @@ func findDeletableInstance(cluster *apiv1.Cluster, instances []corev1.Pod) strin
 	}
 
 	return instances[resultIdx].Name
+}
+
+// phaseOfNewTarget is the phase, and its reason, when an unhealthy target
+// primary is replaced. If the target of a failover failed before promoting, the
+// phase stays a failover, so the promotion gate does not hold the new target
+// back.
+func phaseOfNewTarget(cluster *apiv1.Cluster) (phase, reason string) {
+	if cluster.Status.Phase == apiv1.PhaseFailOver {
+		return apiv1.PhaseFailOver, "Failing over"
+	}
+	return apiv1.PhaseSwitchover, "Switching over"
 }
