@@ -7325,6 +7325,68 @@ spec:
                   TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
                   WAL file, and Time of latest checkpoint
                 type: string
+              divergedInstances:
+                additionalProperties:
+                  description: |-
+                    DivergedInstanceStatus describes a non-primary instance that replayed WAL
+                    past the point where the current primary's timeline forked away from its
+                    own. See ClusterStatus.DivergedInstances. The details are those of the
+                    first report and are not updated afterwards.
+                  properties:
+                    detectedAt:
+                      description: DetectedAt is when the divergence was first reported.
+                      type: string
+                    forkLSN:
+                      description: |-
+                        ForkLSN is where PrimaryTimeLineID forked away from TimeLineID. Empty
+                        when TimeLineID is not an ancestor of PrimaryTimeLineID at all.
+                      type: string
+                    parked:
+                      description: |-
+                        Parked is true once the operator has recorded the PGDATA PVC of the
+                        instance and keeps the instance fenced.
+                      type: boolean
+                    primaryTimeLineID:
+                      description: |-
+                        PrimaryTimeLineID is the newest timeline the instance had learned
+                        about from the primary, and could not switch to, when the divergence
+                        was first reported.
+                      minimum: 1
+                      type: integer
+                    pvcUID:
+                      description: |-
+                        PVCUID is the UID of the instance's PGDATA PersistentVolumeClaim when
+                        it was parked. A different UID means the data was rebuilt, for example
+                        by `kubectl cnpg destroy`. A Pod recreated over the same PVC stays
+                        contained.
+                      type: string
+                    replayLSN:
+                      description: |-
+                        ReplayLSN is how far the instance had replayed when the divergence
+                        was first reported. Together with ForkLSN it bounds the WAL
+                        (ForkLSN, ReplayLSN] the instance held that the primary did not.
+                      type: string
+                    timeLineID:
+                      description: |-
+                        TimeLineID is the timeline of the WAL the instance held when the
+                        divergence was first reported.
+                      minimum: 1
+                      type: integer
+                  required:
+                  - detectedAt
+                  - primaryTimeLineID
+                  - replayLSN
+                  - timeLineID
+                  type: object
+                description: |-
+                  DivergedInstances reports the non-primary instances that replayed WAL
+                  past the point where the current primary's timeline forked away from
+                  theirs, so they can never follow it again. Each instance detects this
+                  from its own pg_wal. The operator fences it and drops its replication
+                  slot on the primary. The entry is removed when the instance stops
+                  reporting a divergence or, once parked, when its PGDATA PVC is replaced
+                  or removed.
+                type: object
               firstRecoverabilityPoint:
                 description: |-
                   The first recoverability point, stored as a date in RFC3339 format.

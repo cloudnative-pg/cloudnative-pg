@@ -735,6 +735,7 @@ _Appears in:_
 | `cloudNativePGCommitHash` _string_ | The commit hash number of which this operator running |  |  |  |
 | `currentPrimaryTimestamp` _string_ | The timestamp when the last actual promotion to primary has occurred |  |  |  |
 | `currentPrimaryFailingSinceTimestamp` _string_ | The timestamp when the primary was detected to be unhealthy<br />This field is reported when `.spec.failoverDelay` is populated or during online upgrades |  |  |  |
+| `divergedInstances` _object (keys:[PodName](#podname), values:[DivergedInstanceStatus](#divergedinstancestatus))_ | DivergedInstances reports the non-primary instances that replayed WAL<br />past the point where the current primary's timeline forked away from<br />theirs, so they can never follow it again. Each instance detects this<br />from its own pg_wal. The operator fences it and drops its replication<br />slot on the primary. The entry is removed when the instance stops<br />reporting a divergence or, once parked, when its PGDATA PVC is replaced<br />or removed. |  |  |  |
 | `targetPrimaryTimestamp` _string_ | The timestamp when the last request for a new primary has occurred |  |  |  |
 | `poolerIntegrations` _[PoolerIntegrations](#poolerintegrations)_ | The integration needed by poolers referencing the cluster |  |  |  |
 | `cloudNativePGOperatorHash` _string_ | The hash of the binary of the operator |  |  |  |
@@ -1145,6 +1146,32 @@ _Appears in:_
 | `fdws` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | FDWs is the status of the managed FDWs |  |  |  |
 | `servers` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | Servers is the status of the managed servers |  |  |  |
 | `permissions` _[DatabasePermissionStatus](#databasepermissionstatus) array_ | Permissions is the status of the managed database permissions, with<br />one entry per privilege and role (`all` is reported expanded) |  |  |  |
+
+
+#### DivergedInstanceStatus
+
+
+
+DivergedInstanceStatus describes a non-primary instance that replayed WAL
+past the point where the current primary's timeline forked away from its
+own. See ClusterStatus.DivergedInstances. The details are those of the
+first report and are not updated afterwards.
+
+
+
+_Appears in:_
+
+- [ClusterStatus](#clusterstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `timeLineID` _integer_ | TimeLineID is the timeline of the WAL the instance held when the<br />divergence was first reported. | True |  | Minimum: 1 <br /> |
+| `primaryTimeLineID` _integer_ | PrimaryTimeLineID is the newest timeline the instance had learned<br />about from the primary, and could not switch to, when the divergence<br />was first reported. | True |  | Minimum: 1 <br /> |
+| `forkLSN` _string_ | ForkLSN is where PrimaryTimeLineID forked away from TimeLineID. Empty<br />when TimeLineID is not an ancestor of PrimaryTimeLineID at all. |  |  |  |
+| `replayLSN` _string_ | ReplayLSN is how far the instance had replayed when the divergence<br />was first reported. Together with ForkLSN it bounds the WAL<br />(ForkLSN, ReplayLSN] the instance held that the primary did not. | True |  |  |
+| `detectedAt` _string_ | DetectedAt is when the divergence was first reported. | True |  |  |
+| `parked` _boolean_ | Parked is true once the operator has recorded the PGDATA PVC of the<br />instance and keeps the instance fenced. |  |  |  |
+| `pvcUID` _string_ | PVCUID is the UID of the instance's PGDATA PersistentVolumeClaim when<br />it was parked. A different UID means the data was rebuilt, for example<br />by `kubectl cnpg destroy`. A Pod recreated over the same PVC stays<br />contained. |  |  |  |
 
 
 #### EmbeddedObjectMetadata

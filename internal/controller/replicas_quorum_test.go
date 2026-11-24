@@ -66,6 +66,38 @@ var _ = Describe("quorum promotion control", func() {
 		})
 	})
 
+	When("a ready replica of the synchronous set has diverged", func() {
+		sync := &apiv1.FailoverQuorum{
+			Status: apiv1.FailoverQuorumStatus{
+				StandbyNumber: 1,
+				StandbyNames: []string{
+					"postgres-2",
+					"postgres-3",
+				},
+			},
+		}
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "postgres-2"}},
+					IsPodReady: true,
+					Divergence: &postgres.TimelineDivergence{TimeLineID: 1, PrimaryTimeLineID: 2},
+				},
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "postgres-3"}},
+					IsPodReady: true,
+				},
+			},
+		}
+
+		It("denies a failover, as it can't be promoted", func(ctx SpecContext) {
+			status, err := r.evaluateQuorumCheckWithStatus(ctx, sync, statusList)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(status).To(BeFalse())
+		})
+	})
+
 	When("there is no quorum", func() {
 		sync := &apiv1.FailoverQuorum{
 			Status: apiv1.FailoverQuorumStatus{
