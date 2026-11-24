@@ -1046,6 +1046,27 @@ var _ = Describe("isConfigNonUniformityFromUpgrade", func() {
 		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
 	})
 
+	It("same version with one image rewritten by an admission webhook, config still propagating", func() {
+		// The webhook was enabled after pod-1 was created: only pod-2 has
+		// its image rewritten, while both record the image the operator
+		// rendered in the `cnpg.io/podSpec` annotation
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", oldOperatorImage, oldExecHash, "hash-a"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-b"),
+			},
+		}
+		for i := range statusList.Items {
+			pod := statusList.Items[i].Pod
+			podSpec, err := json.Marshal(pod.Spec)
+			Expect(err).ToNot(HaveOccurred())
+			pod.Annotations = map[string]string{utils.PodSpecAnnotationName: string(podSpec)}
+		}
+		statusList.Items[1].Pod.Spec.InitContainers[0].Image = "registry.internal.example/mirror/" + oldOperatorImage
+
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
 	It("config propagation within old-version group during upgrade", func() {
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{

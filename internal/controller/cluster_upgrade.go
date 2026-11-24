@@ -388,7 +388,10 @@ func isConfigNonUniformityFromUpgrade(instancesStatus postgres.PostgresqlStatusL
 		if pod == nil {
 			continue
 		}
-		opImage, err := specs.GetBootstrapControllerImageName(*pod)
+		// The rendered image: a mutating admission webhook enabled after
+		// some of the Pods were created rewrites the image of the newer
+		// ones only, and would split a single operator version in two.
+		opImage, err := renderedImage(pod, specs.GetBootstrapControllerImageName)
 		if err != nil {
 			continue
 		}
