@@ -781,7 +781,7 @@ func checkPodSpecIsOutdated(
 
 	// the bootstrap init-container could change image after an operator upgrade.
 	// If in-place upgrades of the instance manager are enabled, we don't need rollout.
-	opCurrentImageName, err := renderedImage(pod, specs.GetBootstrapControllerImageName)
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(corev1.Pod{Spec: storedPodSpec})
 	if err != nil {
 		return rollout{}, err
 	}
