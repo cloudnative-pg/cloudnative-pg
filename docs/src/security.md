@@ -323,24 +323,22 @@ allows `superuser: true` and membership of any existing role through
 access on the PostgreSQL clusters in that namespace, and deserves the same
 care as write access to the `Cluster` resource.
 
-In addition, a `DatabaseRole` can name the Secret that holds its password
-(through `password` with `mode: secret`, or the deprecated `passwordSecret`
-field). The operator does not check that the author of the `DatabaseRole` is
-allowed to read that Secret: it adds the name to the Kubernetes RBAC `Role` of
-the cluster's ServiceAccount, so that the instance manager can read the
-password. A principal that can write `DatabaseRole` objects can therefore have
-the ServiceAccount of the Pods of the `Cluster` granted `get` and `watch` on
-any Secret in the namespace whose name they know, and reach it from anything
-that runs with that ServiceAccount, such as through `pods/exec` on the
-instance Pods. The same applies to the `passwordSecret` of the
+A `DatabaseRole` can also name the Secret that holds its password
+(`password.secret`, or the deprecated `passwordSecret`). The operator adds
+that name to the Kubernetes RBAC `Role` of the ServiceAccount of the instance
+Pods, so that the instance manager can read the password. It does not check
+that the author of the `DatabaseRole` is allowed to read that Secret. A user
+who can write `DatabaseRole` objects can therefore give that ServiceAccount
+`get` and `watch` on any Secret in the namespace, if they know its name.
+Anything running with that ServiceAccount can then read the Secret, for
+example a shell opened through `pods/exec` on an instance Pod. The same
+applies to the `passwordSecret` of the
 [inline managed roles](declarative_role_management.md#inline-managed-roles)
-(`spec.managed.roles`) of a `Cluster`, which is one more reason to treat write
-access to `Cluster` as high privilege.
+of a `Cluster`.
 
 :::warning
-    Do not delegate write access to `DatabaseRole` to principals that must not
-    be able to read Secrets in the namespace, as they could obtain that access
-    indirectly.
+    Give write access to `DatabaseRole` only to users who are allowed to
+    read every Secret in the namespace.
 :::
 
 A similar consideration applies to the `Pooler` resource: its `authQuery`
