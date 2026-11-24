@@ -330,13 +330,17 @@ allowed to read that Secret: it adds the name to the Kubernetes RBAC `Role` of
 the cluster's ServiceAccount, so that the instance manager can read the
 password. A principal that can write `DatabaseRole` objects can therefore have
 the ServiceAccount of the Pods of the `Cluster` granted `get` and `watch` on
-any Secret of the namespace whose name they know, and reach it from anything
+any Secret in the namespace whose name they know, and reach it from anything
 that runs with that ServiceAccount, such as through `pods/exec` on the
-instance Pods.
+instance Pods. The same applies to the `passwordSecret` of the
+[inline managed roles](declarative_role_management.md#inline-managed-roles)
+(`spec.managed.roles`) of a `Cluster`, which is one more reason to treat write
+access to `Cluster` as high privilege.
 
 :::warning
     Do not delegate write access to `DatabaseRole` to principals that must not
-    be able to read the Secrets of the namespace.
+    be able to read Secrets in the namespace, as they could obtain that access
+    indirectly.
 :::
 
 A similar consideration applies to the `Pooler` resource: its `authQuery`
