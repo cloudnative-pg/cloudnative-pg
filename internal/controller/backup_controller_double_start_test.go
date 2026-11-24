@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -216,6 +217,22 @@ var _ = Describe("backup_controller starting a backup", func() {
 		res := reconcileOnce(ctx)
 
 		Expect(res.RequeueAfter).To(Equal(time.Second))
+		expectStartedOnce(ctx)
+	})
+
+	It("starts the backup when an admission webhook rewrote the image of the target", func(ctx context.Context) {
+		// The Pod records the image the operator rendered in the
+		// `cnpg.io/podSpec` annotation, the webhook rewrites the live one
+		var pod corev1.Pod
+		Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: podName}, &pod)).To(Succeed())
+		podSpec, err := json.Marshal(pod.Spec)
+		Expect(err).ToNot(HaveOccurred())
+		pod.Annotations = map[string]string{utils.PodSpecAnnotationName: string(podSpec)}
+		pod.Spec.Containers[0].Image = "registry.internal.example/mirror/" + image
+		Expect(store.Update(ctx, &pod)).To(Succeed())
+
+		reconcileOnce(ctx)
+
 		expectStartedOnce(ctx)
 	})
 

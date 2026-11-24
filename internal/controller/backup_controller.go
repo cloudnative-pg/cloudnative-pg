@@ -887,13 +887,15 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: goc
 			return false
 		}
 
-		pgContainer, err := getPostgresContainer(pod)
+		// The rendered image: the one of the running Pod may have been
+		// rewritten by a mutating admission webhook
+		pgImage, err := renderedImage(pod, specs.GetPostgresImageName)
 		if err != nil {
 			contextLogger.Warning("Instance has no postgres container, discarded as target for backup")
 			return false
 		}
 
-		if pgContainer.Image != cluster.Status.Image {
+		if pgImage != cluster.Status.Image {
 			contextLogger.Debug("Instance not having expected image, discarded as target for backup")
 			return false
 		}
@@ -985,16 +987,6 @@ func getPostgresContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, error
 		}
 	}
 	return nil, fmt.Errorf("postgres container status not found in pod %s", pod.Name)
-}
-
-// getPostgresContainer returns the postgres container spec from a pod
-func getPostgresContainer(pod *corev1.Pod) (*corev1.Container, error) {
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
-			return &pod.Spec.Containers[i], nil
-		}
-	}
-	return nil, fmt.Errorf("postgres container not found in pod %s", pod.Name)
 }
 
 // startInstanceManagerBackup request a backup in a Pod and marks the backup started
