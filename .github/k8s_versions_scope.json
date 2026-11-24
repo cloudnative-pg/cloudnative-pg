@@ -5,7 +5,7 @@
     "AKS": {"min": "1.33", "max": ""},
     "EKS": {"min": "1.33", "max": ""},
     "GKE": {"min": "1.33", "max": ""},
-    "OPENSHIFT": {"min":  "4.22", "max": ""}
+    "OPENSHIFT": {"min":  "4.20", "max": ""}
   },
   "unit_test": {"min":  "1.33", "max":  "1.37"}
 }

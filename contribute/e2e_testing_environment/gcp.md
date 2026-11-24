@@ -32,7 +32,7 @@ The machine types used here are larger than the defaults in that table.
 
 A scheduled run starts one cluster for each version listed in
 `.github/openshift_versions.json` and `.github/gke_versions.json`, all at the
-same time. Today that is 2 OpenShift clusters (14 VMs, 112 vCPUs) and 3 GKE
+same time. Today that is 4 OpenShift clusters (28 VMs, 224 vCPUs) and 3 GKE
 clusters (9 VMs, 36 vCPUs). Size the quotas for that peak, or shorten the
 lists in your fork.
 

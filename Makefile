@@ -80,7 +80,7 @@ FUZZ_TIME ?= 30s
 # OPENSHIFT_VERSIONS differs per release branch, unlike the renovate-managed
 # versions above that stay identical. The blank lines around it keep it out of
 # their diff context, so backport cherry-picks of a version bump don't conflict.
-OPENSHIFT_VERSIONS ?= v4.22-v5.0
+OPENSHIFT_VERSIONS ?= v4.20-v5.0
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
