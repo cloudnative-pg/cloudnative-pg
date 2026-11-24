@@ -341,6 +341,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.JobCount = newJobs
 
 	var podLabelKeys []string
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	nodeLabelKeys := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.NodeLabelsAntiAffinity
 	if sync := cluster.Spec.PostgresConfiguration.Synchronous; sync != nil &&
 		(len(sync.PodFailureDomainKeys) > 0 || len(sync.NodeFailureDomainKeys) > 0) {

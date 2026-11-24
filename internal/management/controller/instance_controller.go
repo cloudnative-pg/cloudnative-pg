@@ -1043,7 +1043,9 @@ func (r *InstanceReconciler) reconcileMetrics(
 		}
 	}
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
 
 	syncReplicas := replication.GetExpectedSyncReplicasNumber(ctx, cluster)
@@ -1622,6 +1624,7 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(
 ) shoudRequeue {
 	contextLogger := log.FromContext(ctx)
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	syncReplicaConstraint := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
 	failureDomainsConfigured := syncReplicaConstraint.Enabled ||

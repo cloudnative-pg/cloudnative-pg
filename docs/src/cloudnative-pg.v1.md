@@ -634,8 +634,8 @@ _Appears in:_
 | `postgresUID` _integer_ | The UID of the `postgres` user inside the image, defaults to `26` |  | 26 |  |
 | `postgresGID` _integer_ | The GID of the `postgres` user inside the image, defaults to `26` |  | 26 |  |
 | `instances` _integer_ | Number of instances required in the cluster | True | 1 | Minimum: 1 <br /> |
-| `minSyncReplicas` _integer_ | Minimum number of instances required in synchronous replication with the<br />primary. Undefined or 0 allow writes to complete when no standby is<br />available. |  | 0 | Minimum: 0 <br /> |
-| `maxSyncReplicas` _integer_ | The target value for the synchronous replication quorum, that can be<br />decreased if the number of ready standbys is lower than this.<br />Undefined or 0 disable synchronous replication. |  | 0 | Minimum: 0 <br /> |
+| `minSyncReplicas` _integer_ | Minimum number of instances required in synchronous replication with the<br />primary. Undefined or 0 allow writes to complete when no standby is<br />available.<br />Deprecated: this field will be removed in CloudNativePG 1.33.0.<br />Use `.spec.postgresql.synchronous` instead. |  | 0 | Minimum: 0 <br /> |
+| `maxSyncReplicas` _integer_ | The target value for the synchronous replication quorum, that can be<br />decreased if the number of ready standbys is lower than this.<br />Undefined or 0 disable synchronous replication.<br />Deprecated: this field will be removed in CloudNativePG 1.33.0.<br />Use `.spec.postgresql.synchronous` instead. |  | 0 | Minimum: 0 <br /> |
 | `postgresql` _[PostgresConfiguration](#postgresconfiguration)_ | Configuration of the PostgreSQL server |  |  |  |
 | `podSelectorRefs` _[PodSelectorRef](#podselectorref) array_ | PodSelectorRefs defines named pod label selectors that can be referenced<br />in pg_hba rules using the $\{podselector:NAME\} syntax in the address field.<br />The operator resolves matching pod IPs and the instance manager expands<br />pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered. |  |  |  |
 | `replicationSlots` _[ReplicationSlotsConfiguration](#replicationslotsconfiguration)_ | Replication slots management configuration |  | \{ highAvailability\: \{ enabled:true \} \} |  |
@@ -2412,7 +2412,7 @@ _Appears in:_
 | `synchronous` _[SynchronousReplicaConfiguration](#synchronousreplicaconfiguration)_ | Configuration of the PostgreSQL synchronous replication feature |  |  |  |
 | `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file).<br />Use the $\{podselector:NAME\} syntax to reference a pod selector;<br />the rule will be expanded for each Pod IP matching that selector. |  |  |  |
 | `pg_ident` _string array_ | PostgreSQL User Name Maps rules (lines to be appended<br />to the pg_ident.conf file) |  |  |  |
-| `syncReplicaElectionConstraint` _[SyncReplicaElectionConstraints](#syncreplicaelectionconstraints)_ | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be<br />set up. |  |  |  |
+| `syncReplicaElectionConstraint` _[SyncReplicaElectionConstraints](#syncreplicaelectionconstraints)_ | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be<br />set up.<br />This field only applies to the legacy synchronous replication method.<br />Deprecated: this field will be removed in CloudNativePG 1.33.0, along<br />with the method. Use the failure domain options of<br />`.spec.postgresql.synchronous` instead. |  |  |  |
 | `shared_preload_libraries` _string array_ | Lists of shared preload libraries to add to the default ones |  |  |  |
 | `ldap` _[LDAPConfig](#ldapconfig)_ | Options to specify LDAP configuration |  |  |  |
 | `promotionTimeout` _integer_ | Specifies the maximum number of seconds to wait when promoting an instance to primary.<br />Default value is 40000000, greater than one year in seconds,<br />big enough to simulate an infinite timeout |  |  |  |
@@ -3354,7 +3354,8 @@ _Appears in:_
 SynchronousReplicaConfiguration contains the configuration of the
 PostgreSQL synchronous replication feature.
 Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
-need to be considered.
+need to be considered. Those fields are deprecated and mutually exclusive with
+this configuration.
 
 
 

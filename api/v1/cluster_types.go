@@ -266,6 +266,10 @@ type ClusterSpec struct {
 	// Minimum number of instances required in synchronous replication with the
 	// primary. Undefined or 0 allow writes to complete when no standby is
 	// available.
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0.
+	// Use `.spec.postgresql.synchronous` instead.
+	//
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -274,6 +278,10 @@ type ClusterSpec struct {
 	// The target value for the synchronous replication quorum, that can be
 	// decreased if the number of ready standbys is lower than this.
 	// Undefined or 0 disable synchronous replication.
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0.
+	// Use `.spec.postgresql.synchronous` instead.
+	//
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -1562,7 +1570,8 @@ const (
 // SynchronousReplicaConfiguration contains the configuration of the
 // PostgreSQL synchronous replication feature.
 // Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
-// need to be considered.
+// need to be considered. Those fields are deprecated and mutually exclusive with
+// this configuration.
 // +kubebuilder:validation:XValidation:rule="self.dataDurability!='preferred' || ((!has(self.standbyNamesPre) || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost) || self.standbyNamesPost.size()==0))",message="dataDurability set to 'preferred' requires empty 'standbyNamesPre' and empty 'standbyNamesPost'"
 // +kubebuilder:validation:XValidation:rule="!(has(self.podFailureDomainKeys) && self.podFailureDomainKeys.size() > 0 && has(self.nodeFailureDomainKeys) && self.nodeFailureDomainKeys.size() > 0)",message="podFailureDomainKeys and nodeFailureDomainKeys are mutually exclusive"
 type SynchronousReplicaConfiguration struct {
@@ -1703,6 +1712,13 @@ type PostgresConfiguration struct {
 
 	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
 	// set up.
+	//
+	// This field only applies to the legacy synchronous replication method.
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0, along
+	// with the method. Use the failure domain options of
+	// `.spec.postgresql.synchronous` instead.
+	//
 	// +optional
 	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
