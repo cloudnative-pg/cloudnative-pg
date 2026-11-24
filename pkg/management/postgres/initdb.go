@@ -403,6 +403,12 @@ func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 	if existsDB {
 		return nil
 	}
+
+	// The metrics exporter role is missing after a recovery or a
+	// pg_basebackup from a source that doesn't have it
+	if err = EnsureMetricsExporterRole(context.Background(), dbSuperUser); err != nil {
+		return fmt.Errorf("while setting up the metrics exporter role: %w", err)
+	}
 	_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
 		pgx.Identifier{info.ApplicationDatabase}.Sanitize(),
 		pgx.Identifier{info.ApplicationUser}.Sanitize()))

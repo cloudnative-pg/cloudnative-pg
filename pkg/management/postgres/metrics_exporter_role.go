@@ -94,6 +94,25 @@ func MetricsExporterRoleExists(ctx context.Context, db *sql.DB) (bool, error) {
 	return exists, err
 }
 
+// EnsureMetricsExporterRole opens a transaction and creates or repairs the
+// cnpg_metrics_exporter role in it
+func EnsureMetricsExporterRole(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// This is a no-op when the transaction is committed
+		_ = tx.Rollback()
+	}()
+
+	if err := SetupMetricsExporterRole(ctx, tx); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 // SetupMetricsExporterRole creates or repairs the cnpg_metrics_exporter role
 // inside the supplied transaction: ensures it exists, enforces its attributes,
 // and grants pg_monitor membership. When the role is created, it is also

@@ -231,40 +231,70 @@ var _ = Describe("ConfigureNewInstance role creation", func() {
 	})
 })
 
+// expectExistingMetricsExporterRole expects the checks on a metrics exporter
+// role that exists and needs no change
+func expectExistingMetricsExporterRole(mock sqlmock.Sqlmock) {
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1")).
+		WithArgs("cnpg_metrics_exporter").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectQuery("pg_catalog.pg_authid").WithArgs("cnpg_metrics_exporter").
+		WillReturnRows(sqlmock.NewRows([]string{"a", "b", "c"}).AddRow(true, true, true))
+}
+
 var _ = Describe("ConfigureNewInstance application database", func() {
-	It("restricts the CONNECT privilege on the application database it creates", func() {
-		superUserDB, mock, err := sqlmock.New()
-		Expect(err).NotTo(HaveOccurred())
-		mock.MatchExpectationsInOrder(true)
-		appDB, _, err := sqlmock.New()
-		Expect(err).NotTo(HaveOccurred())
-		mi := &mockInstance{superUserDB: superUserDB, appDB: appDB}
+	DescribeTable("restricts the CONNECT privilege on the application database it creates",
+		func(expectMetricsExporterRole func(sqlmock.Sqlmock)) {
+			superUserDB, mock, err := sqlmock.New()
+			Expect(err).NotTo(HaveOccurred())
+			mock.MatchExpectationsInOrder(true)
+			appDB, _, err := sqlmock.New()
+			Expect(err).NotTo(HaveOccurred())
+			mi := &mockInstance{superUserDB: superUserDB, appDB: appDB}
 
-		info := InitInfo{
-			ApplicationUser:     "app_user",
-			ApplicationDatabase: "app",
-			PgData:              GinkgoT().TempDir(),
-		}
+			info := InitInfo{
+				ApplicationUser:     "app_user",
+				ApplicationDatabase: "app",
+				PgData:              GinkgoT().TempDir(),
+			}
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1")).
-			WithArgs("app_user").
-			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-		mock.ExpectQuery(regexp.QuoteMeta(
-			"SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1")).
-			WithArgs("app").
-			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
-		mock.ExpectExec(regexp.QuoteMeta(`CREATE DATABASE "app" OWNER "app_user"`)).
-			WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectBegin()
-		mock.ExpectExec(regexp.QuoteMeta(`REVOKE CONNECT ON DATABASE "app" FROM PUBLIC`)).
-			WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec(regexp.QuoteMeta(`GRANT CONNECT ON DATABASE "app" TO cnpg_metrics_exporter`)).
-			WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectCommit()
+			mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1")).
+				WithArgs("app_user").
+				WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+			mock.ExpectQuery(regexp.QuoteMeta(
+				"SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1")).
+				WithArgs("app").
+				WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+			mock.ExpectBegin()
+			expectMetricsExporterRole(mock)
+			mock.ExpectCommit()
+			mock.ExpectExec(regexp.QuoteMeta(`CREATE DATABASE "app" OWNER "app_user"`)).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectBegin()
+			mock.ExpectExec(regexp.QuoteMeta(`REVOKE CONNECT ON DATABASE "app" FROM PUBLIC`)).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectExec(regexp.QuoteMeta(`GRANT CONNECT ON DATABASE "app" TO cnpg_metrics_exporter`)).
+				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectCommit()
 
-		Expect(info.ConfigureNewInstance(mi)).To(Succeed())
-		Expect(mock.ExpectationsWereMet()).To(Succeed())
-	})
+			Expect(info.ConfigureNewInstance(mi)).To(Succeed())
+			Expect(mock.ExpectationsWereMet()).To(Succeed())
+		},
+		Entry("when the metrics exporter role exists, as after initdb", expectExistingMetricsExporterRole),
+		Entry("when the instance was restored from a source without the metrics exporter role",
+			func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1")).
+					WithArgs("cnpg_metrics_exporter").
+					WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+				mock.ExpectExec("CREATE ROLE cnpg_metrics_exporter").WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectExec(regexp.QuoteMeta(`GRANT CONNECT ON DATABASE "postgres" TO cnpg_metrics_exporter`)).
+					WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectExec(regexp.QuoteMeta(`GRANT CONNECT ON DATABASE "template1" TO cnpg_metrics_exporter`)).
+					WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectQuery("pg_catalog.pg_authid").WithArgs("cnpg_metrics_exporter").
+					WillReturnRows(sqlmock.NewRows([]string{"a", "b", "c"}).AddRow(true, false, true))
+				mock.ExpectExec("GRANT pg_monitor TO cnpg_metrics_exporter").WillReturnResult(sqlmock.NewResult(0, 0))
+			}),
+	)
 })
 
 var _ = Describe("executeQueries search_path bracketing", func() {

@@ -17,7 +17,7 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package controller
+package postgres
 
 import (
 	"database/sql"
@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("setupMetricsExporterRole", func() {
+var _ = Describe("EnsureMetricsExporterRole", func() {
 	const (
 		existsQuery = `SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1`
 		attrsQuery  = `SELECT rolinherit AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
@@ -77,7 +77,7 @@ var _ = Describe("setupMetricsExporterRole", func() {
 		dbMock.ExpectExec(grantSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 		dbMock.ExpectCommit()
 
-		Expect(setupMetricsExporterRole(ctx, db)).To(Succeed())
+		Expect(EnsureMetricsExporterRole(ctx, db)).To(Succeed())
 	})
 
 	It("is a no-op when the role exists with correct attributes, pg_monitor and no password", func(ctx SpecContext) {
@@ -90,7 +90,7 @@ var _ = Describe("setupMetricsExporterRole", func() {
 			WillReturnRows(sqlmock.NewRows([]string{"attrs", "membership", "no_password"}).AddRow(true, true, true))
 		dbMock.ExpectCommit()
 
-		Expect(setupMetricsExporterRole(ctx, db)).To(Succeed())
+		Expect(EnsureMetricsExporterRole(ctx, db)).To(Succeed())
 	})
 
 	It("repairs attributes when the role drifts", func(ctx SpecContext) {
@@ -104,7 +104,7 @@ var _ = Describe("setupMetricsExporterRole", func() {
 		dbMock.ExpectExec(alterSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 		dbMock.ExpectCommit()
 
-		Expect(setupMetricsExporterRole(ctx, db)).To(Succeed())
+		Expect(EnsureMetricsExporterRole(ctx, db)).To(Succeed())
 	})
 
 	It("grants pg_monitor when missing on an existing role", func(ctx SpecContext) {
@@ -118,7 +118,7 @@ var _ = Describe("setupMetricsExporterRole", func() {
 		dbMock.ExpectExec(grantSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 		dbMock.ExpectCommit()
 
-		Expect(setupMetricsExporterRole(ctx, db)).To(Succeed())
+		Expect(EnsureMetricsExporterRole(ctx, db)).To(Succeed())
 	})
 
 	It("clears the password when the role has one", func(ctx SpecContext) {
@@ -132,7 +132,7 @@ var _ = Describe("setupMetricsExporterRole", func() {
 		dbMock.ExpectExec(clearPasswordSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 		dbMock.ExpectCommit()
 
-		Expect(setupMetricsExporterRole(ctx, db)).To(Succeed())
+		Expect(EnsureMetricsExporterRole(ctx, db)).To(Succeed())
 	})
 
 	It("repairs everything when attributes, pg_monitor and password all drift", func(ctx SpecContext) {
@@ -148,6 +148,6 @@ var _ = Describe("setupMetricsExporterRole", func() {
 		dbMock.ExpectExec(clearPasswordSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 		dbMock.ExpectCommit()
 
-		Expect(setupMetricsExporterRole(ctx, db)).To(Succeed())
+		Expect(EnsureMetricsExporterRole(ctx, db)).To(Succeed())
 	})
 })
