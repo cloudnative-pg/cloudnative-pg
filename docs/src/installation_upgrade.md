@@ -404,7 +404,6 @@ run as the superuser, once the roles exist.
     CloudNativePG grants it when it creates the role, so new clusters already
     have it, while existing ones don't.
 :::
->>>>>>> f8d438d63 (docs: describe the default `CONNECT` privileges of new databases)
 
 ##### Restoring the previous behavior for new clusters
 
