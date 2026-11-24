@@ -326,7 +326,8 @@ func (r *InstanceReconciler) Reconcile(
 		}
 	}
 
-	if err = r.updateFailoverQuorumObject(ctx, cluster); err != nil {
+	waitingForFailoverQuorum, err := r.updateFailoverQuorumObject(ctx, cluster)
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -399,6 +400,15 @@ func (r *InstanceReconciler) Reconcile(
 	//    operator. Without another reconciliation loop we would have an incoherent
 	//    state of electable synchronous_names inside the configuration.
 	//    (this is only relevant if syncReplicaElectionConstraint is enabled)
+	//
+	// 3. The FailoverQuorum status is not published yet, because the standbys
+	//    are still catching up with the primary. This has the shortest delay
+	//    and, as every loop evaluates the other conditions again, it doesn't
+	//    hide them.
+	if waitingForFailoverQuorum {
+		return reconcile.Result{RequeueAfter: failoverQuorumRequeueDelay}, nil
+	}
+
 	if requeueOnMissingPermissions || r.shouldRequeueForMissingTopology(ctx, cluster) {
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}

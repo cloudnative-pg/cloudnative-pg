@@ -81,6 +81,12 @@ type InstanceReconciler struct {
 	// and PostgreSQL has not been reloaded yet
 	pendingReload bool
 
+	// pendingFailoverQuorum is the FailoverQuorum status waiting for the
+	// standbys to be aligned with the primary before being published.
+	// Written and read only by Reconcile. Losing it is safe: a new one
+	// is captured at a later WAL position.
+	pendingFailoverQuorum *pendingFailoverQuorum
+
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
 	primaryLeaseAcquirer  PrimaryLeaseAcquirer

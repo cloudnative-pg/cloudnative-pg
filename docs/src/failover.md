@@ -505,6 +505,13 @@ replication.
     PostgreSQL configuration changes, when it is not possible to determine the
     configuration, the `FailoverQuorum` resource will be reset, preventing any
     failover until the new configuration is applied.
+
+    Even after the new configuration is applied, the primary lists the
+    synchronous replicas in the `FailoverQuorum` resource only when at least
+    as many of them as the configured synchronous number have received and
+    flushed all the WAL generated up to that point. Until then, for example
+    while the replicas are catching up with a newly promoted primary, the
+    resource stays empty and no failover is allowed.
 :::
 
 The `FailoverQuorum` resource works in conjunction with PostgreSQL synchronous
