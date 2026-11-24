@@ -48,8 +48,17 @@ func stringifyPgBouncerParameters(parameters map[string]string) (paramsString st
 func buildPgBouncerParameters(userParameters map[string]string) map[string]string {
 	params := make(map[string]string, len(userParameters))
 
-	for k, v := range userParameters {
-		params[cleanupPgBouncerValue(k)] = cleanupPgBouncerValue(v)
+	// Names are cleaned too, so different user keys may end up being the
+	// same one. Visit them in a stable order to have a deterministic winner
+	// and avoid spurious rollouts of the Pods.
+	userKeys := make([]string, 0, len(userParameters))
+	for k := range userParameters {
+		userKeys = append(userKeys, k)
+	}
+	sort.Strings(userKeys)
+
+	for _, k := range userKeys {
+		params[cleanupPgBouncerValue(k)] = cleanupPgBouncerValue(userParameters[k])
 	}
 
 	for k, defaultValue := range defaultPgBouncerParameters {

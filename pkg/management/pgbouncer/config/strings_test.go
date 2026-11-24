@@ -47,4 +47,20 @@ var _ = Describe("PgBouncer configuration", func() {
 		Expect(params).NotTo(MatchRegexp("^pool_mode.*"))
 		Expect(params).NotTo(MatchRegexp("^pid_file.*"))
 	})
+
+	It("resolves parameter names that clean to the same name deterministically", func() {
+		collidingParams := map[string]string{
+			"max_client_conn":   "100",
+			"max_client_conn\n": "200",
+			"max_client_conn\r": "300",
+		}
+
+		expected := buildPgBouncerParameters(collidingParams)
+		// When names collide, the value of the last key in sorted order wins
+		Expect(expected["max_client_conn"]).To(Equal("300"))
+
+		for range 100 {
+			Expect(buildPgBouncerParameters(collidingParams)).To(Equal(expected))
+		}
+	})
 })
