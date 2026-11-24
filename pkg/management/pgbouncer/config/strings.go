@@ -69,18 +69,19 @@ func buildPgBouncerParameters(userParameters map[string]string) map[string]strin
 	return params
 }
 
-// The following regexp will match any newline character. PgBouncer
-// doesn't admit newlines inside the configuration at all
-var newlineRegexp = regexp.MustCompile(`\r\n|[\r\n\v\f\x{0085}\x{2028}\x{2029}]`)
+// The following regexp will match any newline character and the NUL byte.
+// PgBouncer doesn't admit newlines inside the configuration at all, and
+// ignores everything that follows a NUL byte
+var newlineRegexp = regexp.MustCompile(`\r\n|[\r\n\v\f\x00\x{0085}\x{2028}\x{2029}]`)
 
-// cleanupPgBouncerValue removes any newline character from a configuration value.
-// The parser used by libusual doesn't support that.
+// cleanupPgBouncerValue removes any newline character and NUL byte from a
+// configuration value. The parser used by libusual doesn't support that.
 func cleanupPgBouncerValue(parameter string) (escaped string) {
 	// See:
 	// https://github.com/libusual/libusual/blob/master/usual/cfparser.c  //wokeignore:rule=master
 	//
 	// The PgBouncer ini file parser doesn't admit any newline character
-	// so we are just removing from the value
+	// or NUL byte so we are just removing them from the value
 	return newlineRegexp.ReplaceAllString(parameter, "")
 }
 
