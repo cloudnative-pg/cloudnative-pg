@@ -48,7 +48,9 @@ import (
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
 	operatorImageName := config.Current.OperatorImageName
 
-	poolerHash, err := computeTemplateHash(pooler, operatorImageName)
+	securityContexts := createSecurityContexts(pooler, cluster)
+
+	poolerHash, err := computeTemplateHash(pooler, operatorImageName, securityContexts)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +79,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 				},
 			},
 		}).
-		WithSecurityContext(createPodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
+		WithSecurityContext(securityContexts.pod, true).
 		WithContainerImage("pgbouncer", pooler.Status.Image, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
@@ -98,7 +100,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			true).
 		WithInitContainerResources(specs.BootstrapControllerContainerName, pooler.GetResourcesRequirements(), false).
 		WithInitContainerSecurityContext(specs.BootstrapControllerContainerName,
-			specs.GetSecurityContext(cluster), true).
+			securityContexts.bootstrapController, true).
 		WithVolume(&corev1.Volume{
 			Name: "scratch-data",
 			VolumeSource: corev1.VolumeSource{
@@ -126,7 +128,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:  "METRICS_PORT_TLS",
 			Value: strconv.FormatBool(pooler.IsMetricsTLSEnabled()),
 		}, true).
-		WithContainerSecurityContext("pgbouncer", specs.GetSecurityContext(cluster), true).
+		WithContainerSecurityContext("pgbouncer", securityContexts.pgbouncer, true).
 		WithServiceAccountName(pooler.GetServiceAccountName(), true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
 			TimeoutSeconds: 5,
@@ -174,12 +176,17 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 	}, nil
 }
 
-func computeTemplateHash(pooler *apiv1.Pooler, operatorImageName string) (string, error) {
+func computeTemplateHash(
+	pooler *apiv1.Pooler,
+	operatorImageName string,
+	securityContexts poolerSecurityContexts,
+) (string, error) {
 	type deploymentHash struct {
 		poolerSpec                      apiv1.PoolerSpec
 		operatorImageName               string
 		pgbouncerImage                  string
 		isPodSpecReconciliationDisabled bool
+		securityContexts                poolerSecurityContexts
 	}
 
 	return hash.ComputeHash(deploymentHash{
@@ -187,6 +194,7 @@ func computeTemplateHash(pooler *apiv1.Pooler, operatorImageName string) (string
 		operatorImageName:               operatorImageName,
 		pgbouncerImage:                  pooler.Status.Image,
 		isPodSpecReconciliationDisabled: utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta),
+		securityContexts:                securityContexts,
 	})
 }
 
@@ -197,19 +205,207 @@ func getDeploymentStrategy(strategy *appsv1.DeploymentStrategy) appsv1.Deploymen
 	return appsv1.DeploymentStrategy{}
 }
 
-// createPodSecurityContext defines the security context under which the containers are running
-func createPodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group int64) *corev1.PodSecurityContext {
-	// Under Openshift we inherit SecurityContext from the restricted security context constraint
-	if utils.HaveSecurityContextConstraints() {
-		return nil
+const (
+	// pgbouncerUID is the ID of the user running PgBouncer
+	pgbouncerUID int64 = 998
+
+	// pgbouncerGID is the ID of the group running PgBouncer
+	pgbouncerGID int64 = 996
+)
+
+// poolerSecurityContexts contains the security contexts of the PgBouncer pods
+type poolerSecurityContexts struct {
+	pod                 *corev1.PodSecurityContext
+	pgbouncer           *corev1.SecurityContext
+	bootstrapController *corev1.SecurityContext
+}
+
+// createSecurityContexts computes the security contexts of the PgBouncer pods.
+// The security contexts defined in the Pooler template take precedence, and the
+// fields they leave unset are filled with the defaults derived from the Cluster
+func createSecurityContexts(pooler *apiv1.Pooler, cluster *apiv1.Cluster) poolerSecurityContexts {
+	var templateSpec corev1.PodSpec
+	if pooler.Spec.Template != nil {
+		templateSpec = pooler.Spec.Template.Spec
 	}
 
-	trueValue := true
-	return &corev1.PodSecurityContext{
-		RunAsNonRoot:   &trueValue,
-		RunAsUser:      &user,
-		RunAsGroup:     &group,
-		FSGroup:        &group,
-		SeccompProfile: seccompProfile,
+	return poolerSecurityContexts{
+		pod: createPodSecurityContext(templateSpec.SecurityContext, cluster),
+		pgbouncer: mergeContainerSecurityContext(
+			getContainerSecurityContext(templateSpec.Containers, "pgbouncer"),
+			defaultContainerSecurityContext(cluster)),
+		bootstrapController: mergeContainerSecurityContext(
+			getContainerSecurityContext(templateSpec.InitContainers, specs.BootstrapControllerContainerName),
+			defaultContainerSecurityContext(cluster)),
 	}
+}
+
+// createPodSecurityContext defines the security context under which the containers are running
+func createPodSecurityContext(
+	templateContext *corev1.PodSecurityContext,
+	cluster *apiv1.Cluster,
+) *corev1.PodSecurityContext {
+	// Under Openshift we inherit SecurityContext from the restricted security context constraint
+	if utils.HaveSecurityContextConstraints() {
+		return templateContext.DeepCopy()
+	}
+
+	return mergePodSecurityContext(templateContext, defaultPodSecurityContext(cluster))
+}
+
+// defaultPodSecurityContext returns the pod security context of the Cluster,
+// with the PostgreSQL identity replaced by the PgBouncer one.
+// The sysctls are removed.
+func defaultPodSecurityContext(cluster *apiv1.Cluster) *corev1.PodSecurityContext {
+	podSecurityContext := cluster.Spec.PodSecurityContext.DeepCopy()
+	if podSecurityContext == nil {
+		podSecurityContext = &corev1.PodSecurityContext{}
+	}
+
+	podSecurityContext.RunAsNonRoot = new(true)
+	podSecurityContext.RunAsUser = new(pgbouncerUID)
+	podSecurityContext.RunAsGroup = new(pgbouncerGID)
+	podSecurityContext.FSGroup = new(pgbouncerGID)
+	podSecurityContext.Sysctls = nil
+	if podSecurityContext.SeccompProfile == nil {
+		podSecurityContext.SeccompProfile = cluster.GetSeccompProfile()
+	}
+
+	return podSecurityContext
+}
+
+// defaultContainerSecurityContext returns the container security context of the
+// Cluster, without the PostgreSQL identity, which is defined at the pod level
+func defaultContainerSecurityContext(cluster *apiv1.Cluster) *corev1.SecurityContext {
+	containerSecurityContext := specs.GetSecurityContext(cluster)
+	containerSecurityContext.RunAsNonRoot = new(true)
+	containerSecurityContext.RunAsUser = nil
+	containerSecurityContext.RunAsGroup = nil
+
+	return containerSecurityContext
+}
+
+// mergePodSecurityContext honors the pod security context defined
+// in the Pooler template, filling the fields it leaves unset with the defaults
+func mergePodSecurityContext(
+	definedContext *corev1.PodSecurityContext,
+	defaultContext *corev1.PodSecurityContext,
+) *corev1.PodSecurityContext {
+	if definedContext == nil {
+		return defaultContext
+	}
+
+	mergedContext := definedContext.DeepCopy()
+	if defaultContext == nil {
+		return mergedContext
+	}
+
+	if mergedContext.SELinuxOptions == nil {
+		mergedContext.SELinuxOptions = defaultContext.SELinuxOptions
+	}
+	if mergedContext.WindowsOptions == nil {
+		mergedContext.WindowsOptions = defaultContext.WindowsOptions
+	}
+	if mergedContext.RunAsUser == nil {
+		mergedContext.RunAsUser = defaultContext.RunAsUser
+	}
+	if mergedContext.RunAsGroup == nil {
+		mergedContext.RunAsGroup = defaultContext.RunAsGroup
+	}
+	if mergedContext.RunAsNonRoot == nil {
+		mergedContext.RunAsNonRoot = defaultContext.RunAsNonRoot
+	}
+	if mergedContext.SupplementalGroups == nil {
+		mergedContext.SupplementalGroups = defaultContext.SupplementalGroups
+	}
+	if mergedContext.SupplementalGroupsPolicy == nil {
+		mergedContext.SupplementalGroupsPolicy = defaultContext.SupplementalGroupsPolicy
+	}
+	if mergedContext.FSGroup == nil {
+		mergedContext.FSGroup = defaultContext.FSGroup
+	}
+	if mergedContext.Sysctls == nil {
+		mergedContext.Sysctls = defaultContext.Sysctls
+	}
+	if mergedContext.FSGroupChangePolicy == nil {
+		mergedContext.FSGroupChangePolicy = defaultContext.FSGroupChangePolicy
+	}
+	if mergedContext.SeccompProfile == nil {
+		mergedContext.SeccompProfile = defaultContext.SeccompProfile
+	}
+	if mergedContext.AppArmorProfile == nil {
+		mergedContext.AppArmorProfile = defaultContext.AppArmorProfile
+	}
+	if mergedContext.SELinuxChangePolicy == nil {
+		mergedContext.SELinuxChangePolicy = defaultContext.SELinuxChangePolicy
+	}
+
+	return mergedContext
+}
+
+// getContainerSecurityContext returns the security context of the container
+// with the passed name, or nil if there is no such container
+func getContainerSecurityContext(containers []corev1.Container, name string) *corev1.SecurityContext {
+	for _, container := range containers {
+		if container.Name == name {
+			return container.SecurityContext
+		}
+	}
+
+	return nil
+}
+
+// mergeContainerSecurityContext honors the container security context defined
+// in the Pooler template, filling the fields it leaves unset with the defaults
+func mergeContainerSecurityContext(
+	definedContext *corev1.SecurityContext,
+	defaultContext *corev1.SecurityContext,
+) *corev1.SecurityContext {
+	if definedContext == nil {
+		return defaultContext
+	}
+
+	mergedContext := definedContext.DeepCopy()
+	if defaultContext == nil {
+		return mergedContext
+	}
+
+	if mergedContext.Capabilities == nil {
+		mergedContext.Capabilities = defaultContext.Capabilities
+	}
+	if mergedContext.Privileged == nil {
+		mergedContext.Privileged = defaultContext.Privileged
+	}
+	if mergedContext.SELinuxOptions == nil {
+		mergedContext.SELinuxOptions = defaultContext.SELinuxOptions
+	}
+	if mergedContext.WindowsOptions == nil {
+		mergedContext.WindowsOptions = defaultContext.WindowsOptions
+	}
+	if mergedContext.RunAsUser == nil {
+		mergedContext.RunAsUser = defaultContext.RunAsUser
+	}
+	if mergedContext.RunAsGroup == nil {
+		mergedContext.RunAsGroup = defaultContext.RunAsGroup
+	}
+	if mergedContext.RunAsNonRoot == nil {
+		mergedContext.RunAsNonRoot = defaultContext.RunAsNonRoot
+	}
+	if mergedContext.ReadOnlyRootFilesystem == nil {
+		mergedContext.ReadOnlyRootFilesystem = defaultContext.ReadOnlyRootFilesystem
+	}
+	if mergedContext.AllowPrivilegeEscalation == nil {
+		mergedContext.AllowPrivilegeEscalation = defaultContext.AllowPrivilegeEscalation
+	}
+	if mergedContext.ProcMount == nil {
+		mergedContext.ProcMount = defaultContext.ProcMount
+	}
+	if mergedContext.SeccompProfile == nil {
+		mergedContext.SeccompProfile = defaultContext.SeccompProfile
+	}
+	if mergedContext.AppArmorProfile == nil {
+		mergedContext.AppArmorProfile = defaultContext.AppArmorProfile
+	}
+
+	return mergedContext
 }

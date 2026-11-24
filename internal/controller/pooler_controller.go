@@ -193,6 +193,11 @@ func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogToPoolers()),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClusterToPoolers()),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		Complete(r)
 }
 
@@ -374,6 +379,38 @@ func (r *PoolerReconciler) setPoolerPhase(
 	pooler.Status.Phase = phase
 	pooler.Status.PhaseReason = reason
 	return r.Status().Update(ctx, pooler)
+}
+
+// mapClusterToPoolers returns a function mapping cluster events to the poolers using them.
+// The poolerClusterKey index is created by the Cluster controller
+func (r *PoolerReconciler) mapClusterToPoolers() handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+		cluster, ok := obj.(*apiv1.Cluster)
+		if !ok {
+			return nil
+		}
+
+		var poolers apiv1.PoolerList
+		if err := r.List(ctx, &poolers,
+			client.InNamespace(cluster.Namespace),
+			client.MatchingFields{poolerClusterKey: cluster.Name},
+		); err != nil {
+			log.FromContext(ctx).Error(err, "while getting pooler list for cluster",
+				"namespace", cluster.Namespace, "cluster", cluster.Name)
+			return nil
+		}
+
+		requests := make([]reconcile.Request, len(poolers.Items))
+		for i, pooler := range poolers.Items {
+			requests[i] = reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      pooler.Name,
+					Namespace: pooler.Namespace,
+				},
+			}
+		}
+		return requests
+	}
 }
 
 // mapSecretToPooler returns a function mapping secrets events to the poolers using them

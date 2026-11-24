@@ -807,6 +807,13 @@ spec:
 :::
 
 :::note
+    Both fields also apply to the PgBouncer pods of the `Pooler` resources
+    using the cluster, except for `runAsUser`, `runAsGroup`, `fsGroup` and
+    `sysctls`. See
+    ["Security contexts" in the connection pooling documentation](connection_pooling.md#security-contexts).
+:::
+
+:::note
     These fields are particularly useful when working with the
     [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
     `restricted` profile, which has strict requirements for pod and container
