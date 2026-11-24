@@ -126,7 +126,18 @@ var _ = Describe("BuildConfigurationFiles", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(string(files[iniPath])).To(ContainSubstring(
-			"\nauth_query = SELECT 1[databases]injected = host=example\nauth_dbname = "))
+			"\nauth_query = SELECT 1 [databases] injected = host=example\nauth_dbname = "))
+	})
+
+	It("keeps the words of a multi-line authQuery apart", func() {
+		pooler := newPooler(nil)
+		pooler.Spec.PgBouncer.AuthQuery = "SELECT usename, passwd\nFROM public.user_search($1)"
+
+		files, err := BuildConfigurationFiles(pooler, newSecrets())
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(string(files[iniPath])).To(ContainSubstring(
+			"\nauth_query = SELECT usename, passwd FROM public.user_search($1)\nauth_dbname = "))
 	})
 
 	It("keeps an auth query secret username containing newlines on the auth_user line", func() {

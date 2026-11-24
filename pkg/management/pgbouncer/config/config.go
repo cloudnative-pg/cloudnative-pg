@@ -225,7 +225,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		PgHba             []string
 	}{
 		Pooler:            pooler,
-		AuthQuery:         cleanupPgBouncerValue(pooler.GetAuthQuery()),
+		AuthQuery:         cleanupPgBouncerQuery(pooler.GetAuthQuery()),
 		AuthQueryUser:     authQueryUser,
 		AuthQueryPassword: authQueryPassword,
 		AuthDBName:        apiv1.PoolerAuthDBName,

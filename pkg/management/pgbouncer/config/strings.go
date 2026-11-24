@@ -100,3 +100,11 @@ func cleanupPgBouncerValue(parameter string) (escaped string) {
 func escapePgBouncerUserListValue(value string) string {
 	return strings.ReplaceAll(value, "\"", "\"\"")
 }
+
+// cleanupPgBouncerQuery removes any NUL byte from a query and replaces every
+// newline character with a space. The ini file parser doesn't admit newlines,
+// and unlike for the other values, removing them would glue together the
+// words around them, e.g. turning "passwd\nFROM" into "passwdFROM".
+func cleanupPgBouncerQuery(query string) string {
+	return newlineRegexp.ReplaceAllString(strings.ReplaceAll(query, "\x00", ""), " ")
+}
