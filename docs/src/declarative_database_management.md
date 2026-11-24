@@ -222,7 +222,9 @@ that already exists.
     The default is applied only when the database is created. A database that
     already exists is never changed. This includes upgrading the operator, and
     bootstrapping a cluster with `recovery` or `pg_basebackup`, as the databases
-    keep the privileges they had in the source.
+    keep the privileges they had in the source. If the source doesn't have the
+    application database, CloudNativePG creates it after the bootstrap and
+    applies the default to it.
 
     The entries of `spec.permissions` are reconciled after the default, so they
     can override it. For example, a `grant` of `CONNECT` to `public` restores

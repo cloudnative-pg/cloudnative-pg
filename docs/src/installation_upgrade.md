@@ -326,6 +326,8 @@ upgrading:
   bootstrapped with `initdb`
 - every database created from a `Database` resource, including in a cluster
   that already exists
+- the application database of a cluster bootstrapped with `recovery` or
+  `pg_basebackup`, when the source doesn't have it and CloudNativePG creates it
 
 Existing databases are not affected. This includes the databases of the clusters
 that you upgrade, and those of a cluster bootstrapped with `recovery` or
@@ -397,9 +399,10 @@ run as the superuser, once the roles exist.
     ```
 
     `pg_rewind` connects to the `postgres` database as that role, and a demoted
-    primary can't rejoin the cluster without it. CloudNativePG grants it when it
-    creates the role, so new clusters already have it, while existing ones
-    don't.
+    primary can't rejoin the cluster without it. The replicas connect in the
+    same way to synchronize the replication slots from the primary.
+    CloudNativePG grants it when it creates the role, so new clusters already
+    have it, while existing ones don't.
 :::
 >>>>>>> f8d438d63 (docs: describe the default `CONNECT` privileges of new databases)
 
