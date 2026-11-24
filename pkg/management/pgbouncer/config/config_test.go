@@ -143,8 +143,18 @@ var _ = Describe("BuildConfigurationFiles", func() {
 			`"test-usernamelogfile = /tmp/injected" "test-password"`))
 	})
 
-	It("removes NUL bytes from the values rendered into pgbouncer.ini", func() {
-		pooler := newPooler(map[string]string{"max_client_conn": "100\x00"})
+	It("keeps a parameter name containing newlines on a single line", func() {
+		files, err := BuildConfigurationFiles(
+			newPooler(map[string]string{"max_client_conn = 100\nstats_period": "83"}),
+			newSecrets(),
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(string(files[iniPath])).To(ContainSubstring("\nmax_client_conn = 100stats_period = 83\n"))
+	})
+
+	It("removes NUL bytes from the names and values rendered into pgbouncer.ini", func() {
+		pooler := newPooler(map[string]string{"max_client_conn\x00": "100\x00"})
 		pooler.Spec.PgBouncer.AuthQuery = "SELECT 1\x00"
 		secrets := newSecrets()
 		secrets.AuthQuery.Data[corev1.BasicAuthUsernameKey] = []byte("test-username\x00")

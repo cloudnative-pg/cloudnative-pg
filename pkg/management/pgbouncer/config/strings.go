@@ -49,7 +49,7 @@ func buildPgBouncerParameters(userParameters map[string]string) map[string]strin
 	params := make(map[string]string, len(userParameters))
 
 	for k, v := range userParameters {
-		params[k] = cleanupPgBouncerValue(v)
+		params[cleanupPgBouncerValue(k)] = cleanupPgBouncerValue(v)
 	}
 
 	for k, defaultValue := range defaultPgBouncerParameters {
