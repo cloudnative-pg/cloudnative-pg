@@ -108,6 +108,19 @@ var _ = Describe("BuildConfigurationFiles", func() {
 		Expect(ini).ToNot(ContainSubstring("auth_user = \n"))
 	})
 
+	It("keeps an auth_user parameter containing newlines on the auth_user line", func() {
+		files, err := BuildConfigurationFiles(
+			newPooler(map[string]string{"auth_user": "pg-user\nlogfile = /tmp/injected"}),
+			newSecrets(),
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(string(files[iniPath])).To(ContainSubstring(
+			"\nauth_user = pg-userlogfile = /tmp/injected\nauth_query = "))
+		Expect(string(files[userListPath])).To(ContainSubstring(
+			`"pg-userlogfile = /tmp/injected" "test-password"`))
+	})
+
 	It("escapes double quotes in the auth_user override for userlist.txt", func() {
 		files, err := BuildConfigurationFiles(
 			newPooler(map[string]string{"auth_user": `pg"bouncer`}),
@@ -116,6 +129,8 @@ var _ = Describe("BuildConfigurationFiles", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(string(files[userListPath])).To(ContainSubstring(`"pg""bouncer" "test-password"`))
+		// pgbouncer.ini takes the raw value: no quoting rules apply there
+		Expect(string(files[iniPath])).To(ContainSubstring("\nauth_user = pg\"bouncer\n"))
 	})
 
 	It("keeps an authQuery containing newlines on the auth_query line", func() {
