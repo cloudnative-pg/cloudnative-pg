@@ -127,6 +127,10 @@ type InitInfo struct {
 
 	// TablespaceMapFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
 	TablespaceMapFile []byte
+
+	// AllowPublicConnectToPostgres, when true, doesn't revoke the CONNECT
+	// privilege from PUBLIC on the `postgres` database
+	AllowPublicConnectToPostgres bool
 }
 
 // IsBootstrapCompleted reports whether the bootstrap already completed, that
@@ -399,11 +403,20 @@ func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 	if existsDB {
 		return nil
 	}
+
+	// The metrics exporter role is missing after a recovery or a
+	// pg_basebackup from a source that doesn't have it
+	if err = EnsureMetricsExporterRole(context.Background(), dbSuperUser); err != nil {
+		return fmt.Errorf("while setting up the metrics exporter role: %w", err)
+	}
 	_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
 		pgx.Identifier{info.ApplicationDatabase}.Sanitize(),
 		pgx.Identifier{info.ApplicationUser}.Sanitize()))
 	if err != nil {
 		return fmt.Errorf("could not create ApplicationDatabase: %w", err)
+	}
+	if err = SetupNewDatabase(context.Background(), dbSuperUser, info.ApplicationDatabase); err != nil {
+		return err
 	}
 	appDB, err := instance.ConnectionPool().Connection(info.ApplicationDatabase)
 	if err != nil {
@@ -420,6 +433,54 @@ func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 	}
 
 	return nil
+}
+
+// restrictInstanceInitialDatabases restricts the databases created by initdb
+// in the given instance
+func restrictInstanceInitialDatabases(
+	ctx context.Context,
+	instance *Instance,
+	allowPublicConnectToPostgres bool,
+) error {
+	dbSuperUser, err := instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while getting superuser database: %w", err)
+	}
+
+	return restrictInitialDatabases(ctx, dbSuperUser, allowPublicConnectToPostgres)
+}
+
+// restrictInitialDatabases creates the metrics exporter role and revokes
+// CONNECT on the `postgres` and `template1` databases from PUBLIC. The
+// `postgres` database is left alone when allowPublicConnectToPostgres is true.
+//
+// There is no explicit grant to the exporter here: SetupMetricsExporterRole
+// grants it on these databases when it creates the role, which always
+// happens on a new data directory. Creating the role and revoking PUBLIC in
+// the same transaction means that the exporter is never left without access.
+func restrictInitialDatabases(ctx context.Context, db *sql.DB, allowPublicConnectToPostgres bool) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("while starting a transaction to restrict the initial databases: %w", err)
+	}
+	defer func() {
+		// This is a no-op when the transaction is committed
+		_ = tx.Rollback()
+	}()
+
+	if err := SetupMetricsExporterRole(ctx, tx); err != nil {
+		return fmt.Errorf("while setting up the metrics exporter role: %w", err)
+	}
+	for _, database := range metricsExporterDefaultDatabases {
+		if allowPublicConnectToPostgres && database == "postgres" {
+			continue
+		}
+		if err := RestrictDatabaseConnect(ctx, tx, database); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (info InitInfo) executeSQLRefs(sqlUser *sql.DB, directory string) error {
@@ -562,7 +623,13 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 	// Configure the instance and run the logical import process
 	if err := instance.WithActiveInstance(func() error {
-		err = info.ConfigureNewInstance(instance)
+		// Restrict the databases created by initdb before running any user's
+		// SQL, which is then able to change it.
+		if err := restrictInstanceInitialDatabases(ctx, instance, info.AllowPublicConnectToPostgres); err != nil {
+			return err
+		}
+
+		err := info.ConfigureNewInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}

@@ -977,26 +977,7 @@ func (r *InstanceReconciler) reconcileMetricsExporterAuthUser(
 	if !ok {
 		return nil
 	}
-	return setupMetricsExporterRole(ctx, db)
-}
-
-// setupMetricsExporterRole opens a transaction and delegates to the shared
-// helper that creates or repairs the cnpg_metrics_exporter role.
-func setupMetricsExporterRole(ctx context.Context, db *sql.DB) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		// This is a no-op when the transaction is committed
-		_ = tx.Rollback()
-	}()
-
-	if err := postgresManagement.SetupMetricsExporterRole(ctx, tx); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return postgresManagement.EnsureMetricsExporterRole(ctx, db)
 }
 
 // reconcileClusterRoleWithoutDB updates this instance's configuration files

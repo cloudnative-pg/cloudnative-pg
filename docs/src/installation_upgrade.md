@@ -314,6 +314,130 @@ that uses any of these fields. Migrate those clusters to
 `.spec.postgresql.synchronous` before upgrading to 1.33.0, as explained in
 ["Migrating from Deprecated Synchronous Replication Implementation"](replication.md#migrating-from-deprecated-synchronous-replication-implementation).
 
+#### New databases no longer allow `PUBLIC` to connect
+
+Starting from version 1.31.0, CloudNativePG revokes `CONNECT` from `PUBLIC` on
+the databases it creates, instead of letting every role connect to them, and
+grants it to the `cnpg_metrics_exporter` role so that monitoring keeps working.
+This is a change for the clusters and databases that you create after
+upgrading:
+
+- the `postgres`, `template1` and application databases of a new cluster
+  bootstrapped with `initdb`
+- every database created from a `Database` resource, including in a cluster
+  that already exists
+- the application database of a cluster bootstrapped with `recovery` or
+  `pg_basebackup`, when the source doesn't have it and CloudNativePG creates it
+
+Existing databases are not affected. This includes the databases of the clusters
+that you upgrade, and those of a cluster bootstrapped with `recovery` or
+`pg_basebackup`, which keep the privileges they had in the source.
+
+In a restricted database, only superusers, the owner (and the roles that inherit
+from it), and the roles that are granted `CONNECT` can connect. Any other role
+is refused with a `permission denied for database` error. This includes
+[managed roles](declarative_role_management.md) and the roles that your
+applications and tools use to reach the `postgres` database. For example, a
+[Pooler with a custom authentication method](connection_pooling.md#custom-authentication-method)
+needs `CONNECT` on `postgres` for the role that runs its `auth_query`.
+
+##### Granting access to the roles that need it
+
+Following the principle of least privilege, grant `CONNECT` only to the roles
+that need it, with the `permissions` field of a `Database` resource. See
+[Managing Database Permissions](declarative_database_management.md#managing-database-permissions)
+for details. For example, the following manifest grants `CONNECT` on the `app`
+database of a new cluster to the `reporting` role:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cluster-example-app
+spec:
+  name: app
+  owner: app
+  cluster:
+    name: cluster-example
+  permissions:
+    connect:
+      - name: reporting
+        type: grant
+```
+
+A `Database` resource without `permissions` leaves the privileges of an existing
+database as they are. To close a database that already exists, such as one
+created before the upgrade, also revoke `CONNECT` from `public`, and list the
+grants first. Include `cnpg_metrics_exporter`: existing databases are not
+granted `CONNECT` for it, so without that entry the `revoke` stops the metrics
+of the database. The privileges are applied when the `Database` resource is
+created or changed, not continuously:
+
+```yaml
+spec:
+  # <snip>
+  permissions:
+    connect:
+      - name: cnpg_metrics_exporter
+        type: grant
+      - name: reporting
+        type: grant
+      - name: public
+        type: revoke
+```
+
+The `postgres` and `template1` databases are reserved, so a `Database` resource
+can't manage them. Grant `CONNECT` to the roles that need it with a SQL command
+run as the superuser, once the roles exist.
+
+:::warning
+    If you revoke `CONNECT` from `PUBLIC` on the `postgres` database of an
+    existing cluster, grant it to the `streaming_replica` role first:
+
+    ```sql
+    GRANT CONNECT ON DATABASE postgres TO streaming_replica;
+    ```
+
+    `pg_rewind` connects to the `postgres` database as that role, and a demoted
+    primary can't rejoin the cluster without it. The replicas connect in the
+    same way to synchronize the replication slots from the primary.
+    CloudNativePG grants it when it creates the role, so new clusters already
+    have it, while existing ones don't.
+:::
+
+##### Restoring the previous behavior for new clusters
+
+Letting every role connect goes against the principle of least privilege, so we
+don't recommend it. If you need it, restore it for each database:
+
+- `postgres`: set `allowPublicConnectToPostgres` to `true` in the `initdb`
+  bootstrap of the cluster, so that the operator doesn't revoke `CONNECT` from
+  `PUBLIC`:
+
+  ```yaml
+  spec:
+    bootstrap:
+      initdb:
+        allowPublicConnectToPostgres: true
+    # <snip>
+  ```
+
+- the application database, and the databases created from a `Database`
+  resource: grant `CONNECT` to `public` in the `Database` resource, which you
+  create for the application database after the cluster:
+
+  ```yaml
+  spec:
+    # <snip>
+    permissions:
+      connect:
+        - name: public
+          type: grant
+  ```
+
+- `template1`: run `GRANT CONNECT ON DATABASE template1 TO PUBLIC;` as the
+  superuser.
+
 #### Meaning of `observed` in `cnpg_collector_sync_replicas` changed
 
 Starting from version 1.31.0, the `observed` value of the

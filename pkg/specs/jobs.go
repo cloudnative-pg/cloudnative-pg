@@ -97,6 +97,10 @@ func BuildPrimaryBootstrapCommandViaInitdb(cluster apiv1.Cluster) *InstanceBoots
 			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner)
 	}
 
+	if cluster.Spec.Bootstrap.InitDB.AllowPublicConnectToPostgres {
+		initCommand = append(initCommand, "--allow-public-connect-postgres")
+	}
+
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {

@@ -1558,6 +1558,14 @@ spec:
                   initdb:
                     description: Bootstrap the cluster via initdb
                     properties:
+                      allowPublicConnectToPostgres:
+                        description: |-
+                          Allows the `PUBLIC` pseudo-role to keep the `CONNECT` privilege on the
+                          `postgres` database, as PostgreSQL grants it by default. When `false`
+                          (the default), the operator revokes it when the cluster is bootstrapped.
+                          It only applies when the cluster is bootstrapped with `initdb`: the
+                          privileges of existing databases are never changed.
+                        type: boolean
                       builtinLocale:
                         description: |-
                           Specifies the locale name when the builtin provider is used.

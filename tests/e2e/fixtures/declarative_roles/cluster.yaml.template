@@ -28,6 +28,9 @@ spec:
     initdb:
       database: app
       owner: app
+      # This suite connects to the "postgres" database with roles that have no
+      # other grants: it tests the roles, not the access to the database
+      allowPublicConnectToPostgres: true
 
   # Persistent storage configuration
   storage:
