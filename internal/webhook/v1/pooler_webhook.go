@@ -309,7 +309,7 @@ func (v *PoolerCustomValidator) validatePgbouncerGenericParameters(r *apiv1.Pool
 		if !AllowedPgbouncerGenericConfigurationParameters.Has(param) {
 			result = append(result,
 				field.Invalid(
-					field.NewPath("spec", "cluster", "parameters"),
+					field.NewPath("spec", "pgbouncer", "parameters"),
 					param, "Invalid or reserved parameter"))
 		}
 	}
