@@ -191,7 +191,10 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		}
 	}
 
-	parameters := buildPgBouncerParameters(pooler.Spec.PgBouncer.Parameters)
+	parameters, err := buildPgBouncerParameters(pooler.Spec.PgBouncer.Parameters)
+	if err != nil {
+		return nil, err
+	}
 
 	// auth_user has its own slot in the pgbouncer.ini template, so an override
 	// is applied to that value and the key is removed from the generic

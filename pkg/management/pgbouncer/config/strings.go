@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // stringifyPgBouncerParameters will take map of PgBouncer parameters and emit
@@ -45,7 +46,7 @@ func stringifyPgBouncerParameters(parameters map[string]string) (paramsString st
 // buildPgBouncerParameters will build a PgBouncer configuration applying any
 // default parameters and forcing any required parameter needed for the
 // controller to work correctly
-func buildPgBouncerParameters(userParameters map[string]string) map[string]string {
+func buildPgBouncerParameters(userParameters map[string]string) (map[string]string, error) {
 	params := make(map[string]string, len(userParameters))
 
 	// Names are cleaned too, so different user keys may end up being the
@@ -58,7 +59,11 @@ func buildPgBouncerParameters(userParameters map[string]string) map[string]strin
 	sort.Strings(userKeys)
 
 	for _, k := range userKeys {
-		params[cleanupPgBouncerValue(k)] = cleanupPgBouncerValue(userParameters[k])
+		name, err := cleanupPgBouncerName(k)
+		if err != nil {
+			return nil, err
+		}
+		params[name] = cleanupPgBouncerValue(userParameters[k])
 	}
 
 	for k, defaultValue := range defaultPgBouncerParameters {
@@ -75,7 +80,7 @@ func buildPgBouncerParameters(userParameters map[string]string) map[string]strin
 		params[k] = v
 	}
 
-	return params
+	return params, nil
 }
 
 // The following regexp will match any newline character and the NUL byte.
@@ -92,6 +97,26 @@ func cleanupPgBouncerValue(parameter string) (escaped string) {
 	// The PgBouncer ini file parser doesn't admit any newline character
 	// or NUL byte so we are just removing them from the value
 	return newlineRegexp.ReplaceAllString(parameter, "")
+}
+
+// cleanupPgBouncerName returns the name of a configuration parameter as it can
+// be written in pgbouncer.ini. It removes newlines and NUL bytes like
+// cleanupPgBouncerValue does, and the whitespace around the name, which
+// PgBouncer ignores: "listen_port " is the parameter "listen_port", so it must
+// not be told apart from it, or it would shadow the parameters we force.
+//
+// A name that still cannot be the key of a line is rejected, instead of being
+// rendered into something PgBouncer would read differently than we do.
+func cleanupPgBouncerName(name string) (string, error) {
+	cleaned := strings.TrimSpace(cleanupPgBouncerValue(name))
+
+	if cleaned == "" ||
+		strings.ContainsFunc(cleaned, func(r rune) bool { return r == '=' || unicode.IsSpace(r) }) ||
+		strings.ContainsRune("[;#", rune(cleaned[0])) {
+		return "", fmt.Errorf("invalid PgBouncer parameter name %q", name)
+	}
+
+	return cleaned, nil
 }
 
 // escapePgBouncerUserListValue doubles any double quote in a value so it can

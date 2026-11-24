@@ -171,12 +171,12 @@ var _ = Describe("BuildConfigurationFiles", func() {
 
 	It("keeps a parameter name containing newlines on a single line", func() {
 		files, err := BuildConfigurationFiles(
-			newPooler(map[string]string{"max_client_conn = 100\nstats_period": "83"}),
+			newPooler(map[string]string{"max_client_conn\nstats_period": "83"}),
 			newSecrets(),
 		)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(string(files[iniPath])).To(ContainSubstring("\nmax_client_conn = 100stats_period = 83\n"))
+		Expect(string(files[iniPath])).To(ContainSubstring("\nmax_client_connstats_period = 83\n"))
 	})
 
 	It("removes NUL bytes from the names and values rendered into pgbouncer.ini", func() {
@@ -189,5 +189,25 @@ var _ = Describe("BuildConfigurationFiles", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(string(files[iniPath])).ToNot(ContainSubstring("\x00"))
+	})
+
+	It("does not let a parameter name with trailing whitespace override a forced parameter", func() {
+		files, err := BuildConfigurationFiles(
+			newPooler(map[string]string{"listen_port ": "6543"}),
+			newSecrets(),
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		ini := string(files[iniPath])
+		Expect(ini).To(ContainSubstring("\nlisten_port = 5432\n"))
+		Expect(ini).ToNot(ContainSubstring("6543"))
+	})
+
+	It("fails when a parameter name cannot be rendered safely", func() {
+		_, err := BuildConfigurationFiles(
+			newPooler(map[string]string{"max_client_conn = 100\nstats_period": "83"}),
+			newSecrets(),
+		)
+		Expect(err).To(HaveOccurred())
 	})
 })
