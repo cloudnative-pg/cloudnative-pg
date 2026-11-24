@@ -117,4 +117,29 @@ var _ = Describe("BuildConfigurationFiles", func() {
 
 		Expect(string(files[userListPath])).To(ContainSubstring(`"pg""bouncer" "test-password"`))
 	})
+
+	It("keeps an authQuery containing newlines on the auth_query line", func() {
+		pooler := newPooler(nil)
+		pooler.Spec.PgBouncer.AuthQuery = "SELECT 1\n[databases]\r\ninjected = host=example"
+
+		files, err := BuildConfigurationFiles(pooler, newSecrets())
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(string(files[iniPath])).To(ContainSubstring(
+			"\nauth_query = SELECT 1[databases]injected = host=example\nauth_dbname = "))
+	})
+
+	It("keeps an auth query secret username containing newlines on the auth_user line", func() {
+		secrets := newSecrets()
+		secrets.AuthQuery.Data[corev1.BasicAuthUsernameKey] = []byte("test-username\nlogfile = /tmp/injected")
+
+		files, err := BuildConfigurationFiles(newPooler(nil), secrets)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(string(files[iniPath])).To(ContainSubstring(
+			"\nauth_user = test-usernamelogfile = /tmp/injected\nauth_query = "))
+		// userlist.txt must carry the same user name pgbouncer.ini refers to.
+		Expect(string(files[userListPath])).To(ContainSubstring(
+			`"test-usernamelogfile = /tmp/injected" "test-password"`))
+	})
 })

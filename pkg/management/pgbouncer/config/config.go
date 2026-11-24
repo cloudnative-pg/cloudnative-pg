@@ -201,7 +201,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		authQueryUser = explicitAuthUser
 	}
 	delete(parameters, "auth_user")
-	authQueryUser = escapePgBouncerUserListValue(authQueryUser)
+	authQueryUser = escapePgBouncerUserListValue(cleanupPgBouncerValue(authQueryUser))
 
 	if isCertAuth {
 		parameters["server_tls_cert_file"] = authUserCrtPath
@@ -225,7 +225,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		PgHba             []string
 	}{
 		Pooler:            pooler,
-		AuthQuery:         pooler.GetAuthQuery(),
+		AuthQuery:         cleanupPgBouncerValue(pooler.GetAuthQuery()),
 		AuthQueryUser:     authQueryUser,
 		AuthQueryPassword: authQueryPassword,
 		AuthDBName:        apiv1.PoolerAuthDBName,
