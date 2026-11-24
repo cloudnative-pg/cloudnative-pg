@@ -60,27 +60,27 @@ may be required.
 
 ### Rebuilding a Diverged Replica
 
-After a failover to a replica that was not the most up to date, another
-replica can hold data the new primary never received, and can no longer
-follow it. CloudNativePG removes such a replica from the `-r` and `-ro`
-services, never promotes it, fences it, sets the `ReplicasHealthy` condition
-of the `Cluster` to `False`, and raises a `ReplicaDiverged` event.
+In rare cases, after a failover, a replica may have replayed more WAL than the
+replica that was promoted. Such a replica cannot follow the new primary, and
+CloudNativePG handles it automatically: it removes the replica from the `-r`
+and `-ro` services, excludes it from promotion, and fences it. It also sets the
+`ReplicasHealthy` condition of the `Cluster` to `False` and raises a
+`ReplicaDiverged` event. The primary and the other replicas are not affected.
 
-To recover, rebuild the instance from the current primary with the
+To bring the replica back, rebuild it from the current primary with the
 [`cnpg` plugin](kubectl-plugin.md#destroy):
 
 ```sh
 kubectl cnpg destroy CLUSTER INSTANCE
 ```
 
-The operator keeps a diverged replica fenced until it is rebuilt or removed. If
-you lift its fence, PostgreSQL starts again on the diverged data until the
-operator fences the replica again, which happens on the next reconciliation.
-A fence on the whole cluster (`*`) is not changed by the operator: it stays
-while you rebuild the replica.
+The operator keeps the replica fenced until it is rebuilt or removed. If you
+lift the fence, the operator applies it again on the next reconciliation.
+A fence on the whole cluster (`*`) is left untouched by the operator and stays
+in place while you rebuild the replica.
 
-In a replica cluster, a diverged instance leaves the `-r` and `-ro` services
-as well, but the operator does not report or fence it.
+In a replica cluster, a diverged instance is also removed from the `-r` and
+`-ro` services, but the operator does not report or fence it.
 
 ### Disabling Reconciliation
 

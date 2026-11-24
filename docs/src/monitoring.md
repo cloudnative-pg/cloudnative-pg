@@ -252,7 +252,7 @@ cnpg_collector_pg_wal_archive_status{value="ready"} 0
 # TYPE cnpg_collector_replica_mode gauge
 cnpg_collector_replica_mode 0
 
-# HELP cnpg_collector_replicas_diverged Number of replicas confirmed to have progressed past the point where the current primary's timeline forked away from theirs. Such a replica can never catch up and is fenced pending a manual rebuild.
+# HELP cnpg_collector_replicas_diverged Number of replicas that replayed WAL past the point where the current primary's timeline forked away from theirs. Such a replica cannot follow the primary and is fenced until it is rebuilt.
 # TYPE cnpg_collector_replicas_diverged gauge
 cnpg_collector_replicas_diverged 0
 

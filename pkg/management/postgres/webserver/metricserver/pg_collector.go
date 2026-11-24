@@ -218,9 +218,9 @@ func newMetrics() *metrics {
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "replicas_diverged",
-			Help: "Number of replicas confirmed to have progressed past the point where the " +
-				"current primary's timeline forked away from theirs. Such a replica can never " +
-				"catch up and is fenced pending a manual rebuild.",
+			Help: "Number of replicas that replayed WAL past the point where the current " +
+				"primary's timeline forked away from theirs. Such a replica cannot follow " +
+				"the primary and is fenced until it is rebuilt.",
 		}),
 		PgStatWalMetrics: PgStatWalMetrics{
 			WalRecords: prometheus.NewGaugeVec(prometheus.GaugeOpts{
