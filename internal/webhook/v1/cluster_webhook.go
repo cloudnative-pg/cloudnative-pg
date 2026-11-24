@@ -213,7 +213,6 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateManagedExtensions,
 		v.validateResources,
 		v.validateHibernationAnnotation,
-		v.validateSkipEmptyWalArchiveCheckAnnotation,
 		v.validatePodPatchAnnotation,
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
@@ -2835,6 +2834,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 	list = append(list, getSynchronousReplicationWarnings(r)...)
 	list = append(list, getPrimaryIsolationTimingWarnings(r)...)
+	list = append(list, getSkipEmptyWalArchiveCheckWarnings(r)...)
 	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
 
@@ -3020,8 +3020,11 @@ func (v *ClusterCustomValidator) validateHibernationAnnotation(r *apiv1.Cluster)
 	}
 }
 
-// validate whether the skipEmptyWalArchiveCheck annotation has a known value
-func (v *ClusterCustomValidator) validateSkipEmptyWalArchiveCheckAnnotation(r *apiv1.Cluster) field.ErrorList {
+// getSkipEmptyWalArchiveCheckWarnings warns when the skipEmptyWalArchiveCheck
+// annotation has a value other than "enabled" or "disabled". This is a warning
+// and not a validation error because the reconciliation loop validates existing
+// clusters too, and would stop reconciling a cluster that already has such a value.
+func getSkipEmptyWalArchiveCheckWarnings(r *apiv1.Cluster) admission.Warnings {
 	value, ok := r.Annotations[utils.SkipEmptyWalArchiveCheck]
 	isKnownValue := value == string(utils.AnnotationStatusEnabled) ||
 		value == string(utils.AnnotationStatusDisabled)
@@ -3029,14 +3032,13 @@ func (v *ClusterCustomValidator) validateSkipEmptyWalArchiveCheckAnnotation(r *a
 		return nil
 	}
 
-	return field.ErrorList{
-		field.Invalid(
+	return admission.Warnings{
+		fmt.Sprintf("%s is set to %q, which does not skip the empty WAL archive check. "+
+			"Allowed values are %q and %q",
 			field.NewPath("metadata", "annotations", utils.SkipEmptyWalArchiveCheck),
 			value,
-			fmt.Sprintf("Annotation value for skipEmptyWalArchiveCheck should be %q or %q",
-				utils.AnnotationStatusEnabled,
-				utils.AnnotationStatusDisabled,
-			),
+			utils.AnnotationStatusEnabled,
+			utils.AnnotationStatusDisabled,
 		),
 	}
 }

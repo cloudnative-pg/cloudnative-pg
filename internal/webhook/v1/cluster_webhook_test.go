@@ -5521,35 +5521,50 @@ var _ = Describe("Validate skipEmptyWalArchiveCheck", func() {
 		}
 	}
 
-	It("should succeed if the annotation is not set", func() {
-		Expect(v.validateSkipEmptyWalArchiveCheckAnnotation(&apiv1.Cluster{})).To(BeEmpty())
+	annotationPath := field.NewPath("metadata", "annotations", utils.SkipEmptyWalArchiveCheck).String()
+
+	It("should not warn if the annotation is not set", func() {
+		Expect(getSkipEmptyWalArchiveCheckWarnings(&apiv1.Cluster{})).To(BeEmpty())
 	})
 
-	DescribeTable("should succeed if the annotation has an allowed value",
+	DescribeTable("should not warn if the annotation has an allowed value",
 		func(value utils.AnnotationStatus) {
-			Expect(v.validateSkipEmptyWalArchiveCheckAnnotation(newCluster(string(value)))).To(BeEmpty())
+			Expect(getSkipEmptyWalArchiveCheckWarnings(newCluster(string(value)))).To(BeEmpty())
 		},
 		Entry("enabled", utils.AnnotationStatusEnabled),
 		Entry("disabled", utils.AnnotationStatusDisabled),
 	)
 
-	DescribeTable("should fail and list the allowed values if the annotation has any other value",
+	DescribeTable("should warn and list the allowed values if the annotation has any other value",
 		func(value string) {
-			errs := v.validateSkipEmptyWalArchiveCheckAnnotation(newCluster(value))
-			Expect(errs).To(HaveLen(1))
-			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
-			Expect(errs[0].Field).To(ContainSubstring(utils.SkipEmptyWalArchiveCheck))
-			Expect(errs[0].Detail).To(ContainSubstring(`"enabled"`))
-			Expect(errs[0].Detail).To(ContainSubstring(`"disabled"`))
+			warnings := getSkipEmptyWalArchiveCheckWarnings(newCluster(value))
+			Expect(warnings).To(HaveLen(1))
+			Expect(warnings[0]).To(ContainSubstring(annotationPath))
+			Expect(warnings[0]).To(ContainSubstring(`%q`, value))
+			Expect(warnings[0]).To(ContainSubstring(`"enabled"`))
+			Expect(warnings[0]).To(ContainSubstring(`"disabled"`))
 		},
 		Entry("a misspelled value", "enable"),
 		Entry("a boolean", "true"),
 		Entry("an empty value", ""),
 	)
 
-	It("is checked when the cluster is validated", func() {
-		Expect(v.validate(newCluster("enable"))).To(ContainElement(HaveField(
-			"Field", field.NewPath("metadata", "annotations", utils.SkipEmptyWalArchiveCheck).String())))
+	// The reconciliation loop validates existing clusters as if they were being
+	// created, and stops reconciling a cluster that fails validation.
+	It("is a warning and not an error on both creation and update", func() {
+		cluster := newCluster("enable")
+		cluster.Name = "cluster-example"
+		cluster.Spec.Instances = 3
+		cluster.Spec.StorageConfiguration.Size = "1Gi"
+		cluster.SetDefaults()
+
+		createWarnings, err := v.ValidateCreate(context.Background(), cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(createWarnings).To(ContainElement(ContainSubstring(annotationPath)))
+
+		updateWarnings, err := v.ValidateUpdate(context.Background(), cluster.DeepCopy(), cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updateWarnings).To(ContainElement(ContainSubstring(annotationPath)))
 	})
 })
 
