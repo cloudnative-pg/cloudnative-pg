@@ -272,10 +272,10 @@ only the operator itself.
 #### The `ServiceAccount` token is no longer mounted automatically
 
 Starting from version 1.31.0, CloudNativePG sets
-`automountServiceAccountToken: false` on the instance Pods, on the Jobs it
-runs (including the one for major version upgrades), and on the `ServiceAccount`
-it generates. Clusters therefore comply out of the box with admission policies
-that forbid the automatic mount of the token.
+`automountServiceAccountToken: false` on the instance Pods, on the `Job` that
+runs a major version upgrade, and on the `ServiceAccount` it generates.
+Clusters therefore comply out of the box with admission policies that forbid
+the automatic mount of the token.
 
 The instance manager keeps accessing the Kubernetes API as before, through an
 explicit `kube-api-access` projected volume that the operator adds at the
@@ -302,8 +302,10 @@ Existing instances are not affected. If you have monitoring, alerts, or
 automation that watches the `initdb`, `join`, `pgbasebackup`, `full-recovery`,
 or `snapshot-recovery` Jobs, update them to follow the init container of the
 instance Pod and the phase of the `Cluster` instead. A bootstrap that cannot
-complete is reported with the `PhaseUnrecoverable` phase, and a replica that
-resumes a stalled bootstrap reports `PhaseCreatingReplica` with an event.
+complete is reported with the phase
+`Cluster is unrecoverable and needs manual intervention`, and a replica that
+resumes a stalled bootstrap reports the phase `Creating a new replica`, with
+an event.
 
 #### Online volume snapshot backups no longer include the WAL volume
 
