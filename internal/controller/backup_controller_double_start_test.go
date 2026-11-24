@@ -221,8 +221,7 @@ var _ = Describe("backup_controller starting a backup", func() {
 	})
 
 	It("starts the backup when an admission webhook rewrote the image of the target", func(ctx context.Context) {
-		// The Pod records the image the operator rendered in the
-		// `cnpg.io/podSpec` annotation, the webhook rewrites the live one
+		// The annotation keeps the rendered image, the live one is rewritten
 		var pod corev1.Pod
 		Expect(store.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: podName}, &pod)).To(Succeed())
 		podSpec, err := json.Marshal(pod.Spec)

@@ -388,9 +388,8 @@ func isConfigNonUniformityFromUpgrade(instancesStatus postgres.PostgresqlStatusL
 		if pod == nil {
 			continue
 		}
-		// The rendered image: a mutating admission webhook enabled after
-		// some of the Pods were created rewrites the image of the newer
-		// ones only, and would split a single operator version in two.
+		// Rendered image: a webhook enabled after some Pods were created
+		// would otherwise split one operator version in two.
 		opImage, err := renderedImage(pod, specs.GetBootstrapControllerImageName)
 		if err != nil {
 			continue
@@ -498,12 +497,7 @@ func isPodNeedingRollout(
 }
 
 // recordedPodSpec returns the PodSpec the operator rendered for this Pod, as
-// stored in the `cnpg.io/podSpec` annotation when the Pod was created, and
-// whether such a record is available and parseable.
-//
-// The record is written by specs.NewInstance before the Pod is submitted to the
-// API server, so it holds the operator's own intent, untouched by any mutating
-// admission webhook that rewrote the persisted Pod afterwards.
+// stored in the `cnpg.io/podSpec` annotation, and whether a valid record exists.
 func recordedPodSpec(pod *corev1.Pod) (*corev1.PodSpec, bool) {
 	podSpecAnnotation, hasStoredPodSpec := pod.Annotations[utils.PodSpecAnnotationName]
 	if !hasStoredPodSpec {
@@ -525,19 +519,10 @@ func hasValidPodSpec(pod *corev1.Pod) bool {
 }
 
 // renderedImage extracts a container image from the PodSpec the operator
-// rendered for this Pod, falling back to the live Pod when no record is
-// available (Pods created by an operator version that predates the
-// `cnpg.io/podSpec` annotation).
-//
-// Image drift must be evaluated against the rendered spec rather than the live
-// one: a mutating admission webhook (a registry mirror or pull-through cache,
-// for instance) rewrites container images on the persisted Pod, and comparing
-// that rewritten value against the operator's target can never match. The
-// operator would then delete the Pod on every pass, the webhook would rewrite
-// its replacement, and the cluster would never converge.
-//
-// This mirrors what checkPodSpecIsOutdated already does for every other field:
-// ComparePodSpecs diffs the recorded spec, not the live one.
+// rendered for this Pod. A mutating admission webhook (a registry mirror, for
+// instance) can rewrite the live image, which would then never match the
+// target and make the operator replace the Pod forever. It falls back to the
+// live Pod when there is no valid record.
 func renderedImage(pod *corev1.Pod, extract func(corev1.Pod) (string, error)) (string, error) {
 	if storedPodSpec, ok := recordedPodSpec(pod); ok {
 		return extract(corev1.Pod{Spec: *storedPodSpec})
@@ -638,6 +623,8 @@ func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.
 	}, nil
 }
 
+// checkPodBootstrapImage is only reached for Pods without a valid podSpec
+// annotation, so the live Pod is the only source for the image.
 func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster) (rollout, error) {
 	if configuration.Current.EnableInstanceManagerInplaceUpdates {
 		return rollout{}, nil

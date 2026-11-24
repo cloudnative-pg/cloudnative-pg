@@ -887,8 +887,7 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: goc
 			return false
 		}
 
-		// The rendered image: the one of the running Pod may have been
-		// rewritten by a mutating admission webhook
+		// See renderedImage
 		pgImage, err := renderedImage(pod, specs.GetPostgresImageName)
 		if err != nil {
 			contextLogger.Warning("Instance has no postgres container, discarded as target for backup")

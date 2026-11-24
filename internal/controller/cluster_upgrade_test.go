@@ -89,9 +89,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when running a different image name", func(ctx SpecContext) {
-		// Render the Pod from an older operand image, then move the cluster
-		// forward: this is how an image change actually reaches the operator,
-		// and the recorded `cnpg.io/podSpec` annotation carries the old image.
+		// Render the Pod from the old image: the recorded podSpec carries it.
 		oldCluster := cluster.DeepCopy()
 		oldCluster.Spec.ImageName = "postgres:13.10"
 		oldCluster.Status.Image = "postgres:13.10"
@@ -149,9 +147,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.required).To(BeFalse())
 		Expect(rollout.reason).To(BeEmpty())
 
-		// Render a Pod from an older operand image to trigger a full rollout:
-		// the recorded `cnpg.io/podSpec` annotation carries the old image, which
-		// is what the image check compares against.
+		// Render the Pod from the old image: the recorded podSpec carries it.
 		oldCluster := cluster.DeepCopy()
 		oldCluster.Spec.ImageName = "postgres:13.10"
 		oldCluster.Status.Image = "postgres:13.10"
@@ -829,12 +825,9 @@ var _ = Describe("hasValidPodSpec", func() {
 })
 
 var _ = Describe("Pod image mutated by an admission webhook", func() {
-	// A mutating admission webhook (registry mirror, pull-through cache,
-	// air-gapped relocation) rewrites container images on the persisted Pod.
-	// The operator must compare its own rendered spec, kept in the
-	// `cnpg.io/podSpec` annotation, rather than the rewritten live Pod:
-	// comparing the latter can never match, so the operator would delete the
-	// Pod on every pass while the webhook rewrites every replacement.
+	// A mutating admission webhook (registry mirror, pull-through cache) rewrites
+	// container images on the persisted Pod. The operator must compare the spec
+	// it rendered, kept in the `cnpg.io/podSpec` annotation, not the live Pod.
 	const mirrorPrefix = "registry.internal.example/mirror/"
 
 	var cluster apiv1.Cluster
@@ -855,9 +848,7 @@ var _ = Describe("Pod image mutated by an admission webhook", func() {
 		configuration.Current = configuration.NewConfiguration()
 	})
 
-	// rewriteImages simulates the admission webhook: it prefixes every
-	// container image on the persisted Pod, leaving the `cnpg.io/podSpec`
-	// annotation written at render time untouched.
+	// rewriteImages simulates the webhook, leaving the annotation untouched.
 	rewriteImages := func(pod *corev1.Pod) {
 		for i := range pod.Spec.Containers {
 			pod.Spec.Containers[i].Image = mirrorPrefix + pod.Spec.Containers[i].Image
@@ -1047,9 +1038,7 @@ var _ = Describe("isConfigNonUniformityFromUpgrade", func() {
 	})
 
 	It("same version with one image rewritten by an admission webhook, config still propagating", func() {
-		// The webhook was enabled after pod-1 was created: only pod-2 has
-		// its image rewritten, while both record the image the operator
-		// rendered in the `cnpg.io/podSpec` annotation
+		// The webhook was enabled after pod-1 was created: only pod-2 is rewritten
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				makeStatus("pod-1", oldOperatorImage, oldExecHash, "hash-a"),
