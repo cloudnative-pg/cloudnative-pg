@@ -41,10 +41,10 @@ import (
 
 const (
 	// collectorImage is the image used to run the OpenTelemetry Collector
-	collectorImage = "docker.io/otel/opentelemetry-collector-contrib:0.166.0"
+	collectorImage = "docker.io/otel/opentelemetry-collector-contrib:0.166.0@sha256:3e18fe04181de50bdd72e23ad4a4d6214b54351e63d496f1c58127cc4541ad7f"
 	// busyboxImage is the image used to read the records written by the
 	// collector, whose image has no shell
-	busyboxImage = "docker.io/library/busybox:1.38.0"
+	busyboxImage = "docker.io/library/busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4"
 
 	// CollectorName is the name of the Deployment and of the Service of the
 	// collector, which receives OTLP via gRPC on port 4317 and via HTTP on

@@ -114,8 +114,8 @@
         '/^tests\\/utils\\/opentelemetry\\/collector\\.go$/',
       ],
       matchStrings: [
-        'collectorImage = "(?<depName>.+?):(?<currentValue>.*?)"',
-        'busyboxImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'collectorImage = "(?<depName>.+?):(?<currentValue>.*?)(@(?<currentDigest>sha256:[a-f0-9]+))?"',
+        'busyboxImage = "(?<depName>.+?):(?<currentValue>.*?)(@(?<currentDigest>sha256:[a-f0-9]+))?"',
       ],
       datasourceTemplate: 'docker',
       versioningTemplate: 'semver',
