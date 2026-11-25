@@ -125,7 +125,9 @@ var _ = Describe("Pooler validation", func() {
 				},
 			},
 		}
-		Expect(v.validatePgbouncerGenericParameters(pooler)).NotTo(BeEmpty())
+		errs := v.validatePgbouncerGenericParameters(pooler)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.pgbouncer.parameters"))
 	})
 
 	It("does not complain when given a valid parameter", func() {

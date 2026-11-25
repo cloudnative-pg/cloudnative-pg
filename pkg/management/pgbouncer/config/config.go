@@ -103,7 +103,7 @@ host all all ::/0 md5
 `
 
 	pgBouncerUserListTemplateString = `
-"{{ .AuthQueryUser }}" "{{ .AuthQueryPassword }}"
+"{{ .AuthQueryUserListUser }}" "{{ .AuthQueryPassword }}"
 `
 )
 
@@ -191,7 +191,10 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		}
 	}
 
-	parameters := buildPgBouncerParameters(pooler.Spec.PgBouncer.Parameters)
+	parameters, err := buildPgBouncerParameters(pooler.Spec.PgBouncer.Parameters)
+	if err != nil {
+		return nil, err
+	}
 
 	// auth_user has its own slot in the pgbouncer.ini template, so an override
 	// is applied to that value and the key is removed from the generic
@@ -201,7 +204,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		authQueryUser = explicitAuthUser
 	}
 	delete(parameters, "auth_user")
-	authQueryUser = escapePgBouncerUserListValue(authQueryUser)
+	authQueryUser = cleanupPgBouncerValue(authQueryUser)
 
 	if isCertAuth {
 		parameters["server_tls_cert_file"] = authUserCrtPath
@@ -216,19 +219,23 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	}
 
 	templateData := struct {
-		Pooler            *apiv1.Pooler
-		AuthQuery         string
-		AuthQueryUser     string
-		AuthQueryPassword string
-		AuthDBName        string
-		Parameters        string
-		PgHba             []string
+		Pooler                *apiv1.Pooler
+		AuthQuery             string
+		AuthQueryUser         string
+		AuthQueryUserListUser string
+		AuthQueryPassword     string
+		AuthDBName            string
+		Parameters            string
+		PgHba                 []string
 	}{
-		Pooler:            pooler,
-		AuthQuery:         pooler.GetAuthQuery(),
-		AuthQueryUser:     authQueryUser,
-		AuthQueryPassword: authQueryPassword,
-		AuthDBName:        apiv1.PoolerAuthDBName,
+		Pooler:        pooler,
+		AuthQuery:     cleanupPgBouncerQuery(pooler.GetAuthQuery()),
+		AuthQueryUser: authQueryUser,
+		// userlist.txt wants the auth user inside double-quoted fields, while
+		// pgbouncer.ini takes the raw value
+		AuthQueryUserListUser: escapePgBouncerUserListValue(authQueryUser),
+		AuthQueryPassword:     authQueryPassword,
+		AuthDBName:            apiv1.PoolerAuthDBName,
 		// We are not directly passing the map of parameters inside the template
 		// because the iteration order of the entries inside a map is undefined
 		// and this could lead to the secret being rewritten where isn't really
