@@ -71,7 +71,7 @@ OPM_VERSION ?= v1.74.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.23.0
 # renovate: datasource=docker depName=cuelang/cue versioning=docker
-CUE_VERSION ?= 0.17.1@sha256:520f883dcc92642389b3b75e8befe4e5a233a1aa903a8c846c4a3b338b202635
+CUE_VERSION ?= 0.18.0@sha256:6e394433bfcfb87848ab824f294264b667535c3de53051715637d328d01eddc7
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
 GEMARA_VERSION ?= v1.6.0
 ARCH ?= amd64
