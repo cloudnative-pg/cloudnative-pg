@@ -856,6 +856,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	// timeline. Always runs; containment is handled separately, see
 	// reconcileDivergedReplicaContainment.
 	r.evaluateReplicaDivergence(cluster, statuses)
+	updateNoPromotableInstanceCondition(cluster, statuses)
 
 	// we update the system ID field in the cluster status
 	switch detectedSystemID.Len() {

@@ -300,6 +300,40 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(condition.Message).To(Equal("No instances are present in the cluster to report a system ID."))
 	})
 
+	It("tells that no instance is promotable while only diverged instances are active", func(ctx SpecContext) {
+		noPromotableInstance := func() *metav1.Condition {
+			stored := &apiv1.Cluster{}
+			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), stored)).To(Succeed())
+			return meta.FindStatusCondition(stored.Status.Conditions, string(apiv1.ConditionNoPromotableInstance))
+		}
+		primary := postgres.PostgresqlStatus{
+			Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+			IsPrimary: true,
+		}
+		// A diverged instance is fenced: PostgreSQL is down, so it reports no divergence
+		diverged := postgres.PostgresqlStatus{
+			Pod:                &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-2"}},
+			IsFenced:           true,
+			MightBeUnavailable: true,
+		}
+		cluster.Status.CurrentPrimary = "pod-1"
+		cluster.Status.DivergedInstances = map[apiv1.PodName]apiv1.DivergedInstanceStatus{"pod-2": {}}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{diverged}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(noPromotableInstance()).ToNot(BeNil())
+		Expect(noPromotableInstance().Status).To(Equal(metav1.ConditionTrue))
+		Expect(noPromotableInstance().Message).To(Equal(
+			"No instance can replace the primary pod-1: the only active instances are diverged, " +
+				"and a diverged instance is never promoted: pod-2"))
+
+		err = env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary, diverged}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(noPromotableInstance()).To(BeNil())
+	})
+
 	It("should handle instances without SystemID", func(ctx SpecContext) {
 		statuses := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{

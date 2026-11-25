@@ -1281,6 +1281,12 @@ const (
 	// instance is reported in ClusterStatus.DivergedInstances, and True
 	// otherwise.
 	ConditionReplicasHealthy ClusterConditionType = "ReplicasHealthy"
+
+	// ConditionNoPromotableInstance is True while every active instance is
+	// in ClusterStatus.DivergedInstances: a diverged instance is never
+	// promoted, so no instance can replace the primary. Only set while that
+	// holds.
+	ConditionNoPromotableInstance ClusterConditionType = "NoPromotableInstance"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1360,6 +1366,10 @@ const (
 	// ConditionReplicasHealthy=False when at least one instance is reported
 	// in ClusterStatus.DivergedInstances.
 	ConditionReasonReplicasDiverged ConditionReason = "ReplicasDiverged"
+
+	// ConditionReasonOnlyDivergedInstances is the reason set on
+	// ConditionNoPromotableInstance=True.
+	ConditionReasonOnlyDivergedInstances ConditionReason = "OnlyDivergedInstances"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
