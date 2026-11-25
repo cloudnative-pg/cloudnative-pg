@@ -30,13 +30,28 @@ spec:
       source: cluster-tablespaces-volume-snapshot
       backup:
         name: ${BACKUP_NAME}
+        # With the in-tree barmanObjectStore, when recovering from a volume
+        # snapshot Backup whose WALs come from a source with an endpointCA, the
+        # operator looks for the CA in the Backup status only, and volume
+        # snapshot Backups don't set status.endpointCA. The CA of the source is
+        # never consulted, so the CA file that AWS_CA_BUNDLE points to is not
+        # written. Set it here too so it's injected.
+        endpointCA:
+          name: object-store-ca-secret
+          key: ca.crt
 
-  # Fetch the WAL files through plugin-barman-cloud. The ObjectStore is created
-  # by the test and points at the bucket the source cluster archived to.
   externalClusters:
   - name: cluster-tablespaces-volume-snapshot
-    plugin:
-      name: barman-cloud.cloudnative-pg.io
-      parameters:
-        barmanObjectName: cluster-tablespaces-volume-snapshot
-        serverName: cluster-tablespaces-volume-snapshot
+    barmanObjectStore:
+      destinationPath: s3://cluster-tablespaces-volume-snapshot/
+      endpointURL: https://object-store.object-store:9000
+      endpointCA:
+        key: ca.crt
+        name: object-store-ca-secret
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
