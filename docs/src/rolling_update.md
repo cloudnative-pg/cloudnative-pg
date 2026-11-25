@@ -24,6 +24,9 @@ Rolling upgrades are triggered when:
 
 - you change the `Cluster` `.spec.resources` values;
 
+- you add a pull secret to `.spec.imagePullSecrets` that the running Pods do
+  not have yet (unless `.spec.serviceAccountName` is set);
+
 - the operator is updated, ensuring Pods run the latest instance manager
   (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
 
