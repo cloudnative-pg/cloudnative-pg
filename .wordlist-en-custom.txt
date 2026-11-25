@@ -30,6 +30,7 @@ AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
 BDR
+BRGOVIND
 BUSL
 BackupCapabilities
 BackupConfiguration
@@ -89,6 +90,7 @@ Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
+Chenal
 CiliumNetworkPolicy
 ClassName
 ClientCASecret
@@ -132,6 +134,7 @@ DBAs
 DBaaS
 DISA
 DNS
+DaemonSet
 DataBackupConfiguration
 DataBase
 DataDurabilityLevel

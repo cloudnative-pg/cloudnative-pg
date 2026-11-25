@@ -269,6 +269,70 @@ only the operator itself.
 
 ### Upgrading to 1.31.0
 
+#### The `ServiceAccount` token is no longer mounted automatically
+
+Starting from version 1.31.0, CloudNativePG sets
+`automountServiceAccountToken: false` on the instance Pods, on the `Job` that
+runs a major version upgrade, and on the `ServiceAccount` it generates.
+Clusters therefore comply out of the box with admission policies that forbid
+the automatic mount of the token.
+
+The instance manager keeps accessing the Kubernetes API as before, through an
+explicit `kube-api-access` projected volume that the operator adds at the
+canonical path `/var/run/secrets/kubernetes.io/serviceaccount` of the
+containers that need it.
+A `ServiceAccount` that you provide through `serviceAccountName` is left
+untouched. Existing Pods don't have the new setting, so upgrading the operator
+triggers a one-time rolling update of every cluster, governed by the
+`primaryUpdateStrategy` option, as described in the
+["Upgrades"](#upgrades) section. You can plan it in a maintenance window.
+If you have policies, sidecars, or tooling that depend on the automatic mount
+in the instance Pods, review them before upgrading.
+
+#### Instances are bootstrapped by an init container
+
+Starting from version 1.31.0, a new primary or replica instance is bootstrapped
+(`initdb`, recovery, `pg_basebackup`, join, and restore from a volume snapshot)
+by an init container of the instance Pod, instead of by a separate Kubernetes
+`Job` that ran before the Pod. As a result, CloudNativePG no longer creates a
+`Job` and a Pod for each new instance, and the instance starts without waiting
+for the `Job` to complete.
+
+Existing instances are not affected. If you have monitoring, alerts, or
+automation that watches the `initdb`, `join`, `pgbasebackup`, `full-recovery`,
+or `snapshot-recovery` Jobs, update them to follow the init container of the
+instance Pod and the phase of the `Cluster` instead. A bootstrap that cannot
+complete is reported with the phase
+`Cluster is unrecoverable and needs manual intervention`, and a replica that
+resumes a stalled bootstrap reports the phase `Creating a new replica`, with
+an event.
+
+#### Online volume snapshot backups no longer include the WAL volume
+
+Starting from version 1.31.0, an online volume snapshot backup of a cluster with
+a dedicated WAL volume (`.spec.walStorage`) snapshots only `PGDATA` and the
+tablespaces. The WAL volume is left out, because recovering an online backup
+requires the WAL archive anyway. Cold backups still include the WAL volume, and
+the existing backups are not affected.
+
+The snapshot set of these clusters therefore changes after the upgrade: the
+`PG_WAL` element is missing from `.status.snapshotBackupStatus.elements` of a
+new online `Backup`. Restoring such a backup creates an empty WAL volume and
+fetches the WAL files from the archive, so make sure the recovery has a `source`
+that points to a working WAL archive. If you copy volume snapshots to another
+region or account, or script restores that expect a `PG_WAL` snapshot, review
+them. See
+["Online backups and the WAL volume"](appendixes/backup_volumesnapshot.md#online-backups-and-the-wal-volume)
+for details.
+
+#### The status port always uses TLS
+
+All instances have used TLS for the operator communication since version 1.24,
+so the HTTP fallback has been removed in 1.31.0. This only matters in the
+unlikely event that some Pods were created by an operator older than 1.24: if
+you notice a problem after upgrading, perform a manual rolling update of the
+affected Pods to recreate them with a TLS-enabled status port.
+
 #### Default of `.spec.smartShutdownTimeout` changed to 0
 
 Starting from version 1.31.0, the default value of `.spec.smartShutdownTimeout`
