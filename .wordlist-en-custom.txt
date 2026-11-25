@@ -1,3 +1,4 @@
+ABI
 AES
 API's
 APIGroup
@@ -1609,6 +1610,7 @@ snapshotownerreference
 snapshotted
 snapshotting
 snapshottype
+soname
 sourceNamespace
 specDescriptors
 sql
