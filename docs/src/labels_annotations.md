@@ -251,6 +251,12 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/poolerSpecHash`
 :   Hash of the pooler resource.
 
+`cnpg.io/position`
+:   Position of the primary in the WAL, set by the instance manager on the
+    primary `Lease` object. It must not be edited, and can only be removed as
+    described in [Promotion held back](failover.md#promotion-held-back).
+    See [Position of the primary](failover.md#position-of-the-primary) for details.
+
 `cnpg.io/pvcStatus`
 :   Current status of the PVC: `initializing`, `ready`, or `detached`.
 

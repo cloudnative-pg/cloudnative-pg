@@ -142,6 +142,72 @@ last renewal time, use:
 kubectl get lease cluster-example -o yaml
 ```
 
+#### Position of the primary
+
+The instance manager publishes where the WAL of the primary ends in the
+`cnpg.io/position` annotation of the lease:
+
+```yaml
+metadata:
+  annotations:
+    cnpg.io/position: '{"lsn":"0/7000028","timeline":3,"state":"in production","pod":"cluster-example-1"}'
+```
+
+The annotation is refreshed every time the primary writes the lease and can
+read the position, and a final value is written when the lease is released on
+shutdown. It contains:
+
+* `lsn`: the position in the WAL, in the PostgreSQL text format.
+* `timeline`: the PostgreSQL timeline.
+* `state`: how far the position can be trusted. `shut down` means that
+  PostgreSQL stopped cleanly and the position is final. `in production` is the
+  position of a running primary, `shutting down` a position that is only a lower
+  bound, `promoting` that a replica is about to promote, and `unknown` means
+  that the position could not be determined. A `promoting` position keeps the
+  last final one, if there was any.
+* `pod`: the pod that wrote the position.
+
+:::note
+The annotation is written by CloudNativePG and its format may change in future
+releases. Please avoid editing it: the only supported change is removing it, as
+described in [Promotion held back](#promotion-held-back).
+:::
+
+#### Promotion held back
+
+During a switchover, the previous primary shuts down cleanly and leaves its
+final position on the lease. The replica that is about to become the primary
+compares its own position with it. If the replica is missing some of that WAL,
+it does not promote yet, so that no transactions are lost. The cluster has no
+primary in the meantime, and the promotion goes ahead as soon as the missing WAL
+arrives from the archive. A failover is never held back.
+
+While the replica waits, a `PromotionHeldBack` event on the `Cluster` tells
+why:
+
+```sh
+kubectl describe cluster cluster-example
+```
+
+Waiting is usually all that is needed. If the WAL is not going to arrive, you
+can go on in one of two ways:
+
+- Cancel the switchover by promoting the previous primary back with
+  [`kubectl cnpg promote --force`](kubectl-plugin.md#promote). No data is lost.
+- Remove the annotation, and the replica promotes without the data that only the
+  previous primary has:
+
+  ```sh
+  kubectl annotate lease cluster-example cnpg.io/position-
+  ```
+
+:::note
+After the annotation is removed, the other replicas that received the WAL the
+new primary is missing stay on the previous timeline and cannot follow it.
+See [Rebuilding a Diverged Replica](failure_modes.md#rebuilding-a-diverged-replica)
+to bring them back.
+:::
+
 ### Tuning the primary lease
 
 The lease timings are exposed under `.spec.primaryLease` and default to values
@@ -186,8 +252,9 @@ keep between them and the isolation check `requestTimeout`.
 `leaseDurationSeconds` and `retryPeriodSeconds` govern two different timings.
 After an abrupt primary loss (the previous primary did not release the lease), the
 candidate must observe the lease unchanged for a full `leaseDurationSeconds`
-before it may take over, counted from the moment it becomes the target primary:
-this is what holds back a premature promotion while the former primary may still
+before it may take over, counted from the moment the operator marks the failover
+as `pending` (or names the replica as target, in a switchover): this is what
+holds back a premature promotion while the former primary may still
 be alive. After a clean switchover (the previous primary
 released the lease), there is no such wait; the candidate simply notices the
 released lease on its next poll, so the hand-over latency is bounded by
@@ -302,6 +369,21 @@ kubelet restarts the container, so the step-down shows up as a container
 restart, not as a liveness probe failure. Full high availability (recreation of
 the old primary on a healthy node by the operator) is still gated on the
 taint-based eviction actually deleting the pod.
+
+The step-down needs a working instance manager, and the container restart
+needs a working kubelet. If both hang while the kernel and the network of the
+node stay up, the WAL senders of the old primary keep sending keepalive
+messages. The WAL receivers on the replicas stay connected, and the failover
+waits for them, so no replica is promoted. To recover, enable
+the
+[kubelet systemd watchdog](https://kubernetes.io/docs/reference/node/systemd-watchdog/)
+(`WatchdogSec`, for example `15s`, in the kubelet unit) and set
+`.spec.probes.liveness.terminationGracePeriodSeconds` to a short value, for
+example `30`. systemd restarts the hung kubelet, which fails the liveness probe
+and kills the container when the probe grace period ends. Without this value,
+the kill waits for the pod grace period (`.spec.stopDelay`, 1800 seconds by
+default). Check that `systemctl show kubelet -p WatchdogUSec` shows the value
+you set.
 
 ## Failover Quorum (Quorum-based Failover)
 

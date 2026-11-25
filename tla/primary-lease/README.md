@@ -9,7 +9,9 @@ confirmed lease write is older than `RenewDeadline` it runs a peer
 check, and once it has decided to step down it is stopped before its
 lease age reaches `LeaseDuration`, by the hard stop
 (`killPostgresAndExit`) if the soft stop did not land first. A leader
-whose lease loop has wedged is stopped by the liveness watchdog instead.
+whose lease loop has wedged is stopped the same way when a peer
+disagrees. When every peer agrees, only the liveness watchdog stops it,
+later and without a peer check.
 
 Background: `docs/src/failover.md` ("Safe primary election").
 

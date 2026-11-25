@@ -65,6 +65,29 @@ var _ = Describe("Job created via InitDB", func() {
 			postInitApplicationSQLRefsFolder.toString()))
 	})
 
+	DescribeTable("passes the flag that keeps PUBLIC connect on postgres only when requested",
+		func(allow bool) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						InitDB: &apiv1.BootstrapInitDB{
+							AllowPublicConnectToPostgres: allow,
+						},
+					},
+				},
+			}
+			cmd := BuildPrimaryBootstrapCommandViaInitdb(cluster)
+
+			if allow {
+				Expect(cmd.Command).Should(ContainElement("--allow-public-connect-postgres"))
+			} else {
+				Expect(cmd.Command).ShouldNot(ContainElement("--allow-public-connect-postgres"))
+			}
+		},
+		Entry("is set", true),
+		Entry("is not set", false),
+	)
+
 	It("contains icu configuration", func() {
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{

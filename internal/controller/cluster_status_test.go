@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -42,6 +44,17 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// podsChange alters the Pods of a cluster before its status is updated
+type podsChange func(pods []corev1.Pod) []corev1.Pod
+
+// changePrimary applies a change to the primary Pod only
+func changePrimary(change func(pod *corev1.Pod)) podsChange {
+	return func(pods []corev1.Pod) []corev1.Pod {
+		change(&pods[0])
+		return pods
+	}
+}
 
 var _ = Describe("cluster_status unit tests", func() {
 	var env *testingEnvironment
@@ -121,6 +134,53 @@ var _ = Describe("cluster_status unit tests", func() {
 			Expect(remoteCluster.Status.TargetPrimary).To(Equal(podName))
 		})
 	})
+
+	DescribeTable("resetUnavailableTargetPrimary with a switchover or a failover in progress",
+		func(ctx SpecContext, pendingFailover, replicaReady bool, changePods podsChange, expectReset bool) {
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			pods := generateFakeClusterPods(env.client, cluster, true)
+			for i := range pods {
+				if i != 1 || !replicaReady {
+					pods[i].Status.Conditions = nil
+				}
+			}
+
+			primary, replica := pods[0].Name, pods[1].Name
+			if changePods != nil {
+				pods = changePods(pods)
+			}
+
+			target := replica
+			if pendingFailover {
+				target = apiv1.PendingFailoverMarker
+			}
+			cluster.Status.CurrentPrimary = primary
+			cluster.Status.TargetPrimary = target
+
+			cluster.Status.ReadyInstances = utils.CountReadyPods(utils.FilterActivePods(pods))
+
+			env.clusterReconciler.resetUnavailableTargetPrimary(ctx, cluster,
+				&managedResources{instances: corev1.PodList{Items: pods}})
+
+			if expectReset {
+				target = primary
+			}
+			Expect(cluster.Status.TargetPrimary).To(Equal(target))
+		},
+		Entry("cancels a switchover when no instance is ready", false, false, nil, true),
+		Entry("keeps a switchover when the target is ready", false, true, nil, false),
+		Entry("cancels a pending failover when no instance is ready", true, false, nil, true),
+		Entry("keeps a pending failover when a replica is ready", true, true, nil, false),
+		Entry("cancels a pending failover when the primary is starting", true, false,
+			changePrimary(func(pod *corev1.Pod) { pod.Status.Phase = corev1.PodPending }), true),
+		Entry("keeps a pending failover when the primary is being deleted", true, false,
+			changePrimary(func(pod *corev1.Pod) { pod.DeletionTimestamp = &metav1.Time{Time: time.Now()} }), false),
+		Entry("keeps a pending failover when the primary was evicted", true, false,
+			changePrimary(func(pod *corev1.Pod) { pod.Status.Phase = corev1.PodFailed }), false),
+		Entry("keeps a pending failover when the primary Pod is missing", true, false,
+			func(pods []corev1.Pod) []corev1.Pod { return pods[1:] }, false),
+	)
 
 	It("makes sure RegisterPhase works correctly", func() {
 		const phaseReason = "testing"
@@ -452,6 +512,46 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(condition.Message).To(Equal("No instances are present in the cluster to report a system ID."))
 	})
 
+	// A second pass over the same instances, where the in-place deletion from
+	// the DivergedInstances map is the only change the persist gate can see.
+	It("persists the removal of a divergence once the replica no longer reports it", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "primary", Namespace: cluster.Namespace}},
+				IsPrimary:  true,
+				IsPodReady: true,
+				TimeLineID: 2,
+			},
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-healed", Namespace: cluster.Namespace}},
+				TimeLineID: 2,
+			},
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-diverged", Namespace: cluster.Namespace}},
+				TimeLineID: 1,
+				Divergence: &postgres.TimelineDivergence{
+					TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/7000110", ReplayLSN: "0/7500000",
+				},
+			},
+		}}
+		Expect(env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)).To(Succeed())
+
+		// a stale entry left over from before the replica was rebuilt
+		cluster.Status.DivergedInstances["replica-healed"] = apiv1.DivergedInstanceStatus{
+			TimeLineID: 1, PrimaryTimeLineID: 2,
+		}
+		Expect(env.client.Status().Update(ctx, cluster)).To(Succeed())
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		var fresh apiv1.Cluster
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(cluster), &fresh)).To(Succeed())
+		Expect(fresh.Status.DivergedInstances).ToNot(HaveKey(apiv1.PodName("replica-healed")))
+		Expect(fresh.Status.DivergedInstances).To(HaveKey(apiv1.PodName("replica-diverged")))
+	})
+
 	Context("Pod termination reason detection", func() {
 		It("should detect when a pod has no PostgreSQL container", func() {
 			pod := &corev1.Pod{
@@ -491,6 +591,30 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 				return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
 			})
 			Expect(result).To(BeTrue())
+		})
+
+		It("isTerminatedBecauseOfMissingWALArchivePlugin should detect a restarted container", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+							Ready: false,
+							LastTerminationState: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: apiv1.MissingWALArchivePlugin,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeTrue())
 		})
 
 		It("should return false when termination reason does not match", func() {
@@ -580,6 +704,46 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			}
 
 			Expect(isWALSpaceAvailableOnPod(pod)).To(BeFalse())
+		})
+
+		It("isTerminatedBecauseOfMissingWALArchivePlugin should return true when terminated due to missing plugin",
+			func() {
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+					Status: corev1.PodStatus{
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: "postgres",
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: apiv1.MissingWALArchivePlugin,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeTrue())
+			})
+
+		It("isTerminatedBecauseOfMissingWALArchivePlugin should return false when not terminated", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "postgres",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+							Ready: true,
+						},
+					},
+				},
+			}
+
+			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeFalse())
 		})
 	})
 

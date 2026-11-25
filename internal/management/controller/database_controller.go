@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -91,6 +92,15 @@ var serverObjectManager = databaseObjectManager[apiv1.ServerSpec, serverInfo]{
 // databaseReconciliationInterval is the time between the
 // database reconciliation loop failures
 const databaseReconciliationInterval = 30 * time.Second
+
+// metricsExporterRoleRetryInterval is how long to wait before retrying a
+// database that can't be created until the metrics exporter role exists
+const metricsExporterRoleRetryInterval = 5 * time.Second
+
+// errMetricsExporterRoleNotReady is raised when a database has to be created
+// but the metrics exporter role is not there yet
+var errMetricsExporterRoleNotReady = fmt.Errorf("waiting for the %s role to be created",
+	apiv1.MetricsExporterUserName)
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databases/status,verbs=get;update;patch
@@ -193,6 +203,16 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if err := r.reconcileDatabaseResource(ctx, &database); err != nil {
+		// This is expected on a new cluster, so it is not a failure
+		if errors.Is(err, errMetricsExporterRoleNotReady) {
+			contextLogger.Info("waiting for the metrics exporter role before creating the database",
+				"database", database.Spec.Name)
+			if markErr := markAsUnknown(ctx, r.Client, &database, err); markErr != nil {
+				return ctrl.Result{}, markErr
+			}
+			return ctrl.Result{RequeueAfter: metricsExporterRoleRetryInterval}, nil
+		}
+
 		if markErr := markAsFailed(ctx, r.Client, &database, err); markErr != nil {
 			contextLogger.Error(err, "while marking as failed the database resource",
 				"error", err,
@@ -304,6 +324,10 @@ func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj 
 		return err
 	}
 
+	// GRANT and REVOKE on a database act on the shared pg_database catalog,
+	// so the superuser connection to the postgres database is enough
+	obj.Status.Permissions = reconcileDatabasePermissions(ctx, db, obj)
+
 	if err := r.reconcileDatabaseObjects(ctx, obj); err != nil {
 		return err
 	}
@@ -324,6 +348,11 @@ func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj 
 		}
 	}
 	for _, status := range obj.Status.Servers {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
+	}
+	for _, status := range obj.Status.Permissions {
 		if !status.Applied {
 			return ErrFailedDatabaseObjectReconciliation
 		}
@@ -368,5 +397,22 @@ func (r *DatabaseReconciler) reconcilePostgresDatabase(ctx context.Context, db *
 		return updateDatabase(ctx, db, obj)
 	}
 
-	return createDatabase(ctx, db, obj)
+	// The exporter must exist before creating the database, otherwise a failure
+	// would leave a database that is not restricted and is never retried
+	exporterExists, err := postgres.MetricsExporterRoleExists(ctx, db)
+	if err != nil {
+		return fmt.Errorf("while checking the metrics exporter role: %w", err)
+	}
+	if !exporterExists {
+		return errMetricsExporterRoleNotReady
+	}
+
+	if err := createDatabase(ctx, db, obj); err != nil {
+		return err
+	}
+
+	// New databases don't allow PUBLIC to connect, but the metrics exporter
+	// can. The permissions of the resource are reconciled afterwards, so they
+	// can override this.
+	return postgres.SetupNewDatabase(ctx, db, obj.Spec.Name)
 }

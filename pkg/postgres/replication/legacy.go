@@ -70,21 +70,26 @@ func getSyncReplicasData(
 	}
 
 	// Initially set it to the max sync replicas requested by user
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	syncReplicas = cluster.Spec.MaxSyncReplicas
 
 	// Lower to min sync replicas if not enough ready replicas
 	if readyReplicas < syncReplicas {
+		//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 		syncReplicas = cluster.Spec.MinSyncReplicas
 	}
 
 	// Lower to ready replicas if min sync replicas is too high
 	// (this is a self-healing procedure that prevents from a
 	// temporarily unresponsive system)
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if readyReplicas < cluster.Spec.MinSyncReplicas {
 		syncReplicas = readyReplicas
 		contextLogger.Warning("Ignore minSyncReplicas to enforce self-healing",
 			"syncReplicas", readyReplicas,
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 			"minSyncReplicas", cluster.Spec.MinSyncReplicas,
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas)
 	}
 
@@ -95,6 +100,7 @@ func getSyncReplicasData(
 			"given the constraints",
 			"electableSyncReplicasWithoutConstraints", syncReplicas,
 			"electableSyncReplicasWithConstraints", numberOfElectableSyncReplicas,
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 			"constraints", cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint)
 		syncReplicas = numberOfElectableSyncReplicas
 	}
@@ -112,6 +118,7 @@ func getElectableSyncReplicas(ctx context.Context, cluster *apiv1.Cluster) []str
 	// We need to include every replica inside the list of possible synchronous standbys if we have no constraints
 	// or the topology extraction is failing. This avoids a continuous operator crash.
 	// One case this could happen is while draining nodes
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	if !cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled {
 		return nonPrimaryInstances
 	}

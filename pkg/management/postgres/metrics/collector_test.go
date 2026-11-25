@@ -21,13 +21,18 @@ package metrics
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
+	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -360,6 +365,60 @@ var _ = Describe("sendPluginMetrics tests", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ch).To(BeEmpty())
 	})
+})
+
+var _ = Describe("pluginCollector Collect", func() {
+	const (
+		sidecarPlugin  = "sidecar.example.io"
+		archiverPlugin = "archiver.example.io"
+	)
+
+	var pluginRepository repository.Interface
+
+	BeforeEach(func() {
+		pluginRepository = repository.New()
+		DeferCleanup(pluginRepository.Close)
+	})
+
+	sidecarCluster := &apiv1.Cluster{
+		Spec: apiv1.ClusterSpec{
+			Plugins: []apiv1.PluginConfiguration{{Name: sidecarPlugin}},
+		},
+		Status: apiv1.ClusterStatus{
+			PluginStatus: []apiv1.PluginStatus{{
+				Name:         sidecarPlugin,
+				Capabilities: []string{identity.PluginCapability_Service_TYPE_INSTANCE_SIDECAR_INJECTION.String()},
+			}},
+		},
+	}
+	archiverCluster := &apiv1.Cluster{
+		Spec: apiv1.ClusterSpec{
+			Plugins: []apiv1.PluginConfiguration{{Name: archiverPlugin, IsWALArchiver: ptr.To(true)}},
+		},
+	}
+
+	DescribeTable("skips the enabled plugins whose socket this Pod lacks",
+		func(ctx SpecContext, cluster *apiv1.Cluster) {
+			collector := NewPluginCollector(pluginRepository, nil)
+			Expect(collector.Collect(ctx, make(chan prometheus.Metric, 10), cluster)).To(Succeed())
+		},
+		Entry("with a sidecar plugin", sidecarCluster),
+		Entry("with a WAL archiver plugin", archiverCluster),
+	)
+
+	DescribeTable("requires the enabled plugins whose socket this Pod has",
+		func(ctx SpecContext, cluster *apiv1.Cluster, pluginName string) {
+			collector := NewPluginCollector(pluginRepository, []string{pluginName})
+			err := collector.Collect(ctx, make(chan prometheus.Metric, 10), cluster)
+
+			// The repository is empty, so loading the plugin fails
+			var unknownPluginErr *repository.ErrUnknownPlugin
+			Expect(errors.As(err, &unknownPluginErr)).To(BeTrue())
+			Expect(unknownPluginErr.Name).To(Equal(pluginName))
+		},
+		Entry("with a sidecar plugin", sidecarCluster, sidecarPlugin),
+		Entry("with a WAL archiver plugin", archiverCluster, archiverPlugin),
+	)
 })
 
 var _ = Describe("QueriesCollector timestamp metric tests", func() {

@@ -1161,6 +1161,88 @@ var _ = Describe("Updating target primary", func() {
 		Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
 	})
 
+	It("keeps the phase of a failover when the instance elected by it fails before promoting",
+		func(ctx SpecContext) {
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+
+			jobs := generateFakeInitDBJobs(env.client, cluster)
+			instances := generateFakeClusterPods(env.client, cluster, true)
+			pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+			resources := &managedResources{
+				nodes:     nil,
+				instances: corev1.PodList{Items: instances},
+				pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+				jobs:      batchv1.JobList{Items: jobs},
+			}
+
+			// The failover elected instances[1], which is not healthy anymore
+			cluster.Status.CurrentPrimary = instances[0].Name
+			cluster.Status.TargetPrimary = instances[1].Name
+			cluster.Status.Phase = apiv1.PhaseFailOver
+
+			statusList := postgres.PostgresqlStatusList{
+				Items: []postgres.PostgresqlStatus{
+					{
+						CurrentLsn:  cnpgTypes.LSN("0/0"),
+						ReceivedLsn: cnpgTypes.LSN("0/0"),
+						ReplayLsn:   cnpgTypes.LSN("0/0"),
+						IsPodReady:  true,
+						Pod:         &instances[2],
+					},
+					{Pod: &instances[1], Error: fmt.Errorf("instance is not working")},
+				},
+			}
+
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+				ctx, cluster, statusList, resources)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(selectedPrimary).To(Equal(instances[2].Name))
+			Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
+			Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseFailOver))
+			Expect(cluster.Status.PhaseReason).To(Equal("Failing over to " + instances[2].Name))
+		})
+
+	It("is a switchover when the target of a switchover fails before promoting", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+		resources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+
+		cluster.Status.CurrentPrimary = instances[0].Name
+		cluster.Status.TargetPrimary = instances[1].Name
+		cluster.Status.Phase = apiv1.PhaseSwitchover
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
+					IsPodReady:  true,
+					Pod:         &instances[2],
+				},
+				{Pod: &instances[1], Error: fmt.Errorf("instance is not working")},
+			},
+		}
+
+		_, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, resources)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseSwitchover))
+		Expect(cluster.Status.PhaseReason).To(Equal("Switching over to " + instances[2].Name))
+	})
+
 	It("skips a fenced instance and elects the healthy replica even if the fenced one sorts first", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
@@ -1220,6 +1302,100 @@ var _ = Describe("Updating target primary", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(selectedPrimary).To(Equal(instances[2].Name))
 		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
+	})
+
+	It("never elects a diverged replica, even when it is the most advanced one", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+
+		By("simulating a failover already in progress after the old primary disappeared", func() {
+			cluster.Status.CurrentPrimary = instances[0].Name
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+		})
+
+		divergence := &postgres.TimelineDivergence{TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/10", ReplayLSN: "0/30"}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					ReceivedLsn: cnpgTypes.LSN("0/30"),
+					ReplayLsn:   cnpgTypes.LSN("0/30"),
+					IsPodReady:  true,
+					Divergence:  divergence,
+					Pod:         &instances[1], // diverged, but the most advanced
+				},
+				{
+					ReceivedLsn: cnpgTypes.LSN("0/20"),
+					ReplayLsn:   cnpgTypes.LSN("0/20"),
+					IsPodReady:  true,
+					Pod:         &instances[2],
+				},
+			},
+		}
+		sort.Sort(&statusList)
+		Expect(statusList.Items[0].Pod.Name).To(Equal(instances[1].Name),
+			"the diverged replica must sort first for this test to be meaningful")
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(Equal(instances[2].Name))
+		Expect(cluster.Status.TargetPrimary).To(Equal(instances[2].Name))
+	})
+
+	It("skips the election when every remaining replica has diverged", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+
+		By("simulating a failover already in progress after the old primary disappeared", func() {
+			cluster.Status.CurrentPrimary = instances[0].Name
+			cluster.Status.TargetPrimary = apiv1.PendingFailoverMarker
+		})
+
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					ReceivedLsn: cnpgTypes.LSN("0/30"),
+					ReplayLsn:   cnpgTypes.LSN("0/30"),
+					IsPodReady:  true,
+					Divergence: &postgres.TimelineDivergence{
+						TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/10", ReplayLSN: "0/30",
+					},
+					Pod: &instances[1],
+				},
+			},
+		}
+
+		selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
+			ctx, cluster, statusList, managedResources)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(selectedPrimary).To(BeEmpty())
+		Expect(cluster.Status.TargetPrimary).To(Equal(apiv1.PendingFailoverMarker))
 	})
 
 	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func(ctx SpecContext) {
@@ -1709,6 +1885,28 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 	})
 
+	It("does not wait on a diverged replica that sorts first, as it never becomes ready", func(ctx SpecContext) {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+					IsPodReady:  false,
+					ReceivedLsn: cnpgTypes.LSN("0/30"),
+					ReplayLsn:   cnpgTypes.LSN("0/30"),
+					Divergence: &postgres.TimelineDivergence{
+						TimeLineID: 1, PrimaryTimeLineID: 2, ForkLSN: "0/10", ReplayLSN: "0/30",
+					},
+				},
+			},
+		}
+
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
+		Expect(result.IsZero()).To(BeTrue())
+	})
+
 	It("emits a Warning event when the primary is Ready but /pg/status is failing", func(ctx SpecContext) {
 		cluster.Status.CurrentPrimary = primaryName
 		cluster.Status.TargetPrimary = primaryName
@@ -1953,5 +2151,102 @@ var _ = Describe("mapClusterOwnedResourceToCluster", func() {
 
 	It("returns nil for an object that does not reference a cluster", func(ctx SpecContext) {
 		Expect(mapClusterOwnedResourceToCluster(ctx, &corev1.Secret{})).To(BeNil())
+	})
+})
+
+var _ = Describe("requireWALArchivingPluginOrDelete", func() {
+	var env *testingEnvironment
+	var namespace string
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace = newFakeNamespace(env.client)
+	})
+
+	// Creates the Pod of the given instance serial, with its postgres
+	// container terminated with the given exit code, and returns its status
+	newInstanceStatus := func(
+		ctx SpecContext,
+		cluster *apiv1.Cluster,
+		serial int,
+		exitCode int32,
+	) postgres.PostgresqlStatus {
+		pod, err := specs.NewInstance(ctx, *cluster, serial)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(env.client.Create(ctx, pod)).To(Succeed())
+
+		pod.Status = corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name: specs.PostgresContainerName,
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{ExitCode: exitCode},
+				},
+			}},
+		}
+		return postgres.PostgresqlStatus{Pod: pod}
+	}
+
+	podExists := func(ctx SpecContext, name string) bool {
+		var pod corev1.Pod
+		err := env.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &pod)
+		return err == nil
+	}
+
+	It("deletes a replica that quit because the WAL archiving plugin is missing", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		primary := newInstanceStatus(ctx, cluster, 1, 0)
+		formerPrimary := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary, formerPrimary}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(10 * time.Second))
+		Expect(podExists(ctx, formerPrimary.Pod.Name)).To(BeFalse())
+		Expect(podExists(ctx, primary.Pod.Name)).To(BeTrue())
+	})
+
+	It("never deletes the current primary", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		primary := newInstanceStatus(ctx, cluster, 1, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{primary}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, primary.Pod.Name)).To(BeTrue())
+	})
+
+	It("never deletes the target primary", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = specs.GetInstanceName(cluster.Name, 2)
+
+		target := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALArchivePlugin)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{target}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, target.Pod.Name)).To(BeTrue())
+	})
+
+	It("leaves alone the replicas that quit for another reason", func(ctx SpecContext) {
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = specs.GetInstanceName(cluster.Name, 1)
+		cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
+
+		replica := newInstanceStatus(ctx, cluster, 2, apiv1.MissingWALDiskSpaceExitCode)
+
+		res, err := env.clusterReconciler.requireWALArchivingPluginOrDelete(ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{replica}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(podExists(ctx, replica.Pod.Name)).To(BeTrue())
 	})
 })

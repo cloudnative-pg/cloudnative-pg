@@ -252,7 +252,11 @@ cnpg_collector_pg_wal_archive_status{value="ready"} 0
 # TYPE cnpg_collector_replica_mode gauge
 cnpg_collector_replica_mode 0
 
-# HELP cnpg_collector_sync_replicas Number of requested synchronous replicas (synchronous_standby_names)
+# HELP cnpg_collector_replicas_diverged Number of replicas that replayed WAL past the point where the current primary's timeline forked away from theirs. Such a replica cannot follow the primary and is fenced until it is rebuilt.
+# TYPE cnpg_collector_replicas_diverged gauge
+cnpg_collector_replicas_diverged 0
+
+# HELP cnpg_collector_sync_replicas Number of synchronous replicas: expected is the configured number, observed is the number of standbys currently attached as synchronous (min and max are deprecated and will be removed in 1.33.0)
 # TYPE cnpg_collector_sync_replicas gauge
 cnpg_collector_sync_replicas{value="expected"} 0
 cnpg_collector_sync_replicas{value="max"} 0
@@ -265,7 +269,7 @@ cnpg_collector_up{cluster="cluster-example"} 1
 
 # HELP cnpg_collector_postgres_version Postgres version
 # TYPE cnpg_collector_postgres_version gauge
-cnpg_collector_postgres_version{cluster="cluster-example",full="18.6"} 18.6
+cnpg_collector_postgres_version{cluster="cluster-example",full="19.0"} 19.0
 
 # HELP cnpg_collector_last_failed_backup_timestamp The last failed backup as a unix timestamp (Deprecated)
 # TYPE cnpg_collector_last_failed_backup_timestamp gauge
@@ -458,6 +462,59 @@ go_threads 18
     archiving.
 :::
 
+### Synchronous replication metrics
+
+The `cnpg_collector_sync_replicas` metric reports the state of synchronous
+replication through the `value` label:
+
+- `expected`: the number of synchronous replicas the cluster is configured to
+  have, as set in `.spec.postgresql.synchronous.number` (or computed from
+  `minSyncReplicas`, `maxSyncReplicas` and the number of ready replicas when
+  using the legacy method). It is `0` when synchronous replication is not
+  configured, which, on a cluster with more than one instance, is a
+  configuration problem worth alerting on.
+- `observed`: the number of standbys currently attached to the primary as
+  synchronous, as reported by `sync_state` in the `pg_stat_replication` system
+  view (`sync` for priority-based replication, `quorum` for quorum-based
+  replication). Unlike `expected`, it reflects what is happening right now.
+  With quorum-based replication, every attached standby that is a candidate is
+  reported as `quorum`, so `observed` can be higher than `expected`.
+  It is `-1` if the value cannot be collected. Only the primary exposes it.
+- `min` and `max` (**deprecated**): the lower and upper bound of synchronous
+  replicas. With the legacy method they are `minSyncReplicas` and
+  `maxSyncReplicas`. With `.spec.postgresql.synchronous` they are derived from
+  `number`, and `min` is `0` when `dataDurability` is `preferred`. These two
+  values are removed in CloudNativePG 1.33.0: use `expected` and `observed`
+  instead.
+
+:::warning
+    Before CloudNativePG 1.31, `observed` reported the number found in the
+    `synchronous_standby_names` setting, which says what is requested, not
+    whether synchronous replication is actually working.
+:::
+
+To be alerted when a cluster is not protected by the synchronous standbys it
+is configured for, compare `observed` with `expected`:
+
+```yaml
+- alert: SynchronousReplicationDegraded
+  expr: |-
+    cnpg_collector_sync_replicas{value="observed"}
+      < ignoring(value)
+    (cnpg_collector_sync_replicas{value="expected"} > 0)
+  for: 1m
+  labels:
+    severity: warning
+```
+
+When `dataDurability` is `required`, writes are blocked while this alert is
+firing, as PostgreSQL waits for the missing standbys. When it is `preferred`,
+the operator relaxes the requirement instead, and the cluster continues
+accepting writes with reduced durability.
+
+With the legacy method, `expected` never exceeds the number of ready replicas,
+so this alert does not fire when replicas are down.
+
 ### User defined metrics
 
 This feature is currently in *beta* state and the format is inspired by the
@@ -517,8 +574,10 @@ Take care that the referred resources have to be created **in the same namespace
     ```
 
     Every database in `target_databases` must allow
-    `cnpg_metrics_exporter` to `CONNECT`. On clusters that have
-    revoked `CONNECT` from `PUBLIC` for a database, grant it
+    `cnpg_metrics_exporter` to `CONNECT`. CloudNativePG grants it on the new
+    databases on which it revokes `CONNECT` from `PUBLIC`, as described in
+    [Managing Database Permissions](declarative_database_management.md#managing-database-permissions).
+    For any other database that has revoked `CONNECT` from `PUBLIC`, grant it
     explicitly to that role:
 
     ```sql

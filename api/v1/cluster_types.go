@@ -119,6 +119,11 @@ const (
 	// MissingWALDiskSpaceExitCode is the exit code the instance manager
 	// will use to signal that there's no more WAL disk space
 	MissingWALDiskSpaceExitCode = 4
+
+	// MissingWALArchivePlugin is the exit code used by the instance manager
+	// to indicate that it started successfully, but the configured WAL
+	// archiving plugin is not available.
+	MissingWALArchivePlugin = 5
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.
@@ -261,6 +266,10 @@ type ClusterSpec struct {
 	// Minimum number of instances required in synchronous replication with the
 	// primary. Undefined or 0 allow writes to complete when no standby is
 	// available.
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0.
+	// Use `.spec.postgresql.synchronous` instead.
+	//
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -269,6 +278,10 @@ type ClusterSpec struct {
 	// The target value for the synchronous replication quorum, that can be
 	// decreased if the number of ready standbys is lower than this.
 	// Undefined or 0 disable synchronous replication.
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0.
+	// Use `.spec.postgresql.synchronous` instead.
+	//
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -367,8 +380,9 @@ type ClusterSpec struct {
 
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-	// (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
-	// +kubebuilder:default:=180
+	// (that is: `stopDelay` - `smartShutdownTimeout`). Default is 0 seconds, which
+	// skips the smart shutdown and requests a fast shutdown right away.
+	// +kubebuilder:default:=0
 	// +optional
 	SmartShutdownTimeout *int32 `json:"smartShutdownTimeout,omitempty"`
 
@@ -417,6 +431,13 @@ type ClusterSpec struct {
 	// for more information.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// How changes to `resources` reach running instances: `recreate`
+	// (default) rolls the Pods, `inPlace` resizes them when possible and
+	// rolls them otherwise. `inPlace` requires Kubernetes 1.33 or later.
+	// +kubebuilder:validation:Enum=recreate;inPlace
+	// +optional
+	ResourcesUpdateStrategy ResourcesUpdateStrategy `json:"resourcesUpdateStrategy,omitempty"`
 
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
@@ -1080,6 +1101,16 @@ type ClusterStatus struct {
 	// +optional
 	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 
+	// DivergedInstances reports the non-primary instances that replayed WAL
+	// past the point where the current primary's timeline forked away from
+	// theirs, so they can never follow it again. Each instance detects this
+	// from its own pg_wal. The operator fences it and drops its replication
+	// slot on the primary. The entry is removed when the instance stops
+	// reporting a divergence or, once parked, when its PGDATA PVC is replaced
+	// or removed.
+	// +optional
+	DivergedInstances map[PodName]DivergedInstanceStatus `json:"divergedInstances,omitempty"`
+
 	// The timestamp when the last request for a new primary has occurred
 	// +optional
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
@@ -1177,6 +1208,48 @@ type InstanceReportedState struct {
 	IP string `json:"ip,omitempty"`
 }
 
+// DivergedInstanceStatus describes a non-primary instance that replayed WAL
+// past the point where the current primary's timeline forked away from its
+// own. See ClusterStatus.DivergedInstances. The details are those of the
+// first report and are not updated afterwards.
+type DivergedInstanceStatus struct {
+	// TimeLineID is the timeline of the WAL the instance held when the
+	// divergence was first reported.
+	// +kubebuilder:validation:Minimum=1
+	TimeLineID int `json:"timeLineID"`
+
+	// PrimaryTimeLineID is the newest timeline the instance had learned
+	// about from the primary, and could not switch to, when the divergence
+	// was first reported.
+	// +kubebuilder:validation:Minimum=1
+	PrimaryTimeLineID int `json:"primaryTimeLineID"`
+
+	// ForkLSN is where PrimaryTimeLineID forked away from TimeLineID. Empty
+	// when TimeLineID is not an ancestor of PrimaryTimeLineID at all.
+	// +optional
+	ForkLSN string `json:"forkLSN,omitempty"`
+
+	// ReplayLSN is how far the instance had replayed when the divergence
+	// was first reported. Together with ForkLSN it bounds the WAL
+	// (ForkLSN, ReplayLSN] the instance held that the primary did not.
+	ReplayLSN string `json:"replayLSN"`
+
+	// DetectedAt is when the divergence was first reported.
+	DetectedAt string `json:"detectedAt"`
+
+	// Parked is true once the operator has recorded the PGDATA PVC of the
+	// instance and keeps the instance fenced.
+	// +optional
+	Parked bool `json:"parked,omitempty"`
+
+	// PVCUID is the UID of the instance's PGDATA PersistentVolumeClaim when
+	// it was parked. A different UID means the data was rebuilt, for example
+	// by `kubectl cnpg destroy`. A Pod recreated over the same PVC stays
+	// contained.
+	// +optional
+	PVCUID string `json:"pvcUID,omitempty"`
+}
+
 // ClusterConditionType defines types of cluster conditions
 type ClusterConditionType string
 
@@ -1203,6 +1276,11 @@ const (
 	// or .spec.postgresql.synchronous.nodeFailureDomainKeys.
 	// Only set when one of those fields is configured.
 	ConditionSyncReplicationTopologySatisfied ClusterConditionType = "SyncReplicationTopologySatisfied"
+
+	// ConditionReplicasHealthy is False when at least one non-primary
+	// instance is reported in ClusterStatus.DivergedInstances, and True
+	// otherwise.
+	ConditionReplicasHealthy ClusterConditionType = "ReplicasHealthy"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1272,6 +1350,16 @@ const (
 	// are set but no synchronous replica in a different failure domain than
 	// the primary exists.
 	ConditionReasonInsufficientCrossDomainReplicas ConditionReason = "InsufficientCrossDomainReplicas"
+
+	// ConditionReasonAllReplicasHealthy is the reason set on
+	// ConditionReplicasHealthy=True when no instance is reported in
+	// ClusterStatus.DivergedInstances.
+	ConditionReasonAllReplicasHealthy ConditionReason = "AllReplicasHealthy"
+
+	// ConditionReasonReplicasDiverged is the reason set on
+	// ConditionReplicasHealthy=False when at least one instance is reported
+	// in ClusterStatus.DivergedInstances.
+	ConditionReasonReplicasDiverged ConditionReason = "ReplicasDiverged"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
@@ -1454,7 +1542,16 @@ type PrimaryUpdateStrategy string
 // The default method is "restart"
 type PrimaryUpdateMethod string
 
+// ResourcesUpdateStrategy defines how changes to `resources` reach running instances
+type ResourcesUpdateStrategy string
+
 const (
+	// ResourcesUpdateStrategyRecreate rolls the Pods (`recreate`, default)
+	ResourcesUpdateStrategyRecreate ResourcesUpdateStrategy = "recreate"
+
+	// ResourcesUpdateStrategyInPlace resizes the Pods when possible, and rolls them otherwise (`inPlace`)
+	ResourcesUpdateStrategyInPlace ResourcesUpdateStrategy = "inPlace"
+
 	// PrimaryUpdateStrategySupervised means that the operator need to wait for the
 	// user to manually issue a switchover request before updating the primary
 	// server (`supervised`)
@@ -1540,7 +1637,8 @@ const (
 // SynchronousReplicaConfiguration contains the configuration of the
 // PostgreSQL synchronous replication feature.
 // Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
-// need to be considered.
+// need to be considered. Those fields are deprecated and mutually exclusive with
+// this configuration.
 // +kubebuilder:validation:XValidation:rule="self.dataDurability!='preferred' || ((!has(self.standbyNamesPre) || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost) || self.standbyNamesPost.size()==0))",message="dataDurability set to 'preferred' requires empty 'standbyNamesPre' and empty 'standbyNamesPost'"
 // +kubebuilder:validation:XValidation:rule="!(has(self.podFailureDomainKeys) && self.podFailureDomainKeys.size() > 0 && has(self.nodeFailureDomainKeys) && self.nodeFailureDomainKeys.size() > 0)",message="podFailureDomainKeys and nodeFailureDomainKeys are mutually exclusive"
 type SynchronousReplicaConfiguration struct {
@@ -1681,6 +1779,13 @@ type PostgresConfiguration struct {
 
 	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
 	// set up.
+	//
+	// This field only applies to the legacy synchronous replication method.
+	//
+	// Deprecated: this field will be removed in CloudNativePG 1.33.0, along
+	// with the method. Use the failure domain options of
+	// `.spec.postgresql.synchronous` instead.
+	//
 	// +optional
 	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
@@ -1943,6 +2048,14 @@ type BootstrapInitDB struct {
 	// created from scratch
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
+
+	// Allows the `PUBLIC` pseudo-role to keep the `CONNECT` privilege on the
+	// `postgres` database, as PostgreSQL grants it by default. When `false`
+	// (the default), the operator revokes it when the cluster is bootstrapped.
+	// It only applies when the cluster is bootstrapped with `initdb`: the
+	// privileges of existing databases are never changed.
+	// +optional
+	AllowPublicConnectToPostgres bool `json:"allowPublicConnectToPostgres,omitempty"`
 
 	// The list of options that must be passed to initdb when creating the cluster.
 	//

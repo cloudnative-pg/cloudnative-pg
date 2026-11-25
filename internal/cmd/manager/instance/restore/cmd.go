@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 )
@@ -121,6 +122,7 @@ func NewCmd() *cobra.Command {
 		},
 
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
+			management.ShutdownLogExport()
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}

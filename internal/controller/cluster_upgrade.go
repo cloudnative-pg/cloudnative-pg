@@ -79,6 +79,16 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 			continue
 		}
 
+		// A resized pod takes no rollout slot. A rejected resize is tried
+		// again at every pass until the pod is rolled out.
+		resized, err := r.resizeInstanceInPlace(ctx, cluster, postgresqlStatus.Pod, podRollout.resizedPod)
+		if err != nil {
+			return false, err
+		}
+		if resized {
+			continue
+		}
+
 		managerResult := r.rolloutManager.CoordinateRollout(client.ObjectKeyFromObject(cluster), postgresqlStatus.Pod.Name)
 		if !managerResult.RolloutAllowed {
 			r.Recorder.Eventf(
@@ -123,6 +133,12 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	// it should be restarted by the instance manager itself
 	if primaryPostgresqlStatus.PendingRestartForDecrease {
 		return false, nil
+	}
+
+	// Nothing restarts, so a resized primary needs no switchover.
+	resized, err := r.resizeInstanceInPlace(ctx, cluster, primaryPostgresqlStatus.Pod, podRollout.resizedPod)
+	if resized || err != nil {
+		return false, err
 	}
 
 	// If the primary update strategy is supervised, we should not consume a rollout slot.
@@ -307,6 +323,11 @@ type rollout struct {
 	needsToChangeOperatorImage bool
 	needsToChangeOperandImage  bool
 
+	// resizedPod is set when the rollout can be avoided by resizing the pod
+	// in place. It is the pod with the new container resources, and with
+	// the pod spec annotation recording them. Ignoring it recreates the pod.
+	resizedPod *corev1.Pod
+
 	reason string
 }
 
@@ -367,7 +388,9 @@ func isConfigNonUniformityFromUpgrade(instancesStatus postgres.PostgresqlStatusL
 		if pod == nil {
 			continue
 		}
-		opImage, err := specs.GetBootstrapControllerImageName(*pod)
+		// Rendered image: a webhook enabled after some Pods were created
+		// would otherwise split one operator version in two.
+		opImage, err := renderedImage(pod, specs.GetBootstrapControllerImageName)
 		if err != nil {
 			continue
 		}
@@ -421,7 +444,11 @@ func isPodNeedingRollout(
 				if podRollout.reason == "" {
 					podRollout.reason = message
 				}
-				contextLogger.Info("Pod rollout required", "podName", pod.Name, "reason", podRollout.reason)
+				if podRollout.resizedPod != nil {
+					contextLogger.Info("Pod in-place resize required", "podName", pod.Name, "reason", podRollout.reason)
+				} else {
+					contextLogger.Info("Pod rollout required", "podName", pod.Name, "reason", podRollout.reason)
+				}
 				return podRollout
 			}
 		}
@@ -469,14 +496,39 @@ func isPodNeedingRollout(
 	return rollout{}
 }
 
-// check if the pod has a valid podSpec
-func hasValidPodSpec(pod *corev1.Pod) bool {
+// recordedPodSpec returns the PodSpec the operator rendered for this Pod, as
+// stored in the `cnpg.io/podSpec` annotation, and whether a valid record exists.
+func recordedPodSpec(pod *corev1.Pod) (*corev1.PodSpec, bool) {
 	podSpecAnnotation, hasStoredPodSpec := pod.Annotations[utils.PodSpecAnnotationName]
 	if !hasStoredPodSpec {
-		return false
+		return nil, false
 	}
-	err := json.Unmarshal([]byte(podSpecAnnotation), &corev1.PodSpec{})
-	return err == nil
+
+	var storedPodSpec corev1.PodSpec
+	if err := json.Unmarshal([]byte(podSpecAnnotation), &storedPodSpec); err != nil {
+		return nil, false
+	}
+
+	return &storedPodSpec, true
+}
+
+// check if the pod has a valid podSpec
+func hasValidPodSpec(pod *corev1.Pod) bool {
+	_, ok := recordedPodSpec(pod)
+	return ok
+}
+
+// renderedImage extracts a container image from the PodSpec the operator
+// rendered for this Pod. A mutating admission webhook (a registry mirror, for
+// instance) can rewrite the live image, which would then never match the
+// target and make the operator replace the Pod forever. It falls back to the
+// live Pod when there is no valid record.
+func renderedImage(pod *corev1.Pod, extract func(corev1.Pod) (string, error)) (string, error) {
+	if storedPodSpec, ok := recordedPodSpec(pod); ok {
+		return extract(corev1.Pod{Spec: *storedPodSpec})
+	}
+
+	return extract(*pod)
 }
 
 func checkPodNeedsUpdatedTopology(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
@@ -554,7 +606,7 @@ func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVol
 func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
 	targetImageName := cluster.Status.Image
 
-	pgCurrentImageName, err := specs.GetPostgresImageName(*pod)
+	pgCurrentImageName, err := renderedImage(pod, specs.GetPostgresImageName)
 	if err != nil {
 		return rollout{}, err
 	}
@@ -571,6 +623,8 @@ func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.
 	}, nil
 }
 
+// checkPodBootstrapImage is only reached for Pods without a valid podSpec
+// annotation, so the live Pod is the only source for the image.
 func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster) (rollout, error) {
 	if configuration.Current.EnableInstanceManagerInplaceUpdates {
 		return rollout{}, nil
@@ -717,7 +771,7 @@ func checkPodSpecIsOutdated(
 
 	// the bootstrap init-container could change image after an operator upgrade.
 	// If in-place upgrades of the instance manager are enabled, we don't need rollout.
-	opCurrentImageName, err := specs.GetBootstrapControllerImageName(*pod)
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(corev1.Pod{Spec: storedPodSpec})
 	if err != nil {
 		return rollout{}, err
 	}
@@ -731,12 +785,35 @@ func checkPodSpecIsOutdated(
 		}, nil
 	}
 
+	inPlace := cluster.Spec.ResourcesUpdateStrategy == apiv1.ResourcesUpdateStrategyInPlace
 	match, diff := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec)
 	if !match {
-		return rollout{
+		podRollout := rollout{
 			required: true,
 			reason:   "original and target PodSpec differ in " + diff,
-		}, nil
+		}
+		if inPlace {
+			var blocker string
+			if podRollout.resizedPod, blocker = specs.ResizePod(pod, &storedPodSpec, &targetPod.Spec); blocker != "" {
+				podRollout.reason += ", not resizable in place: " + blocker
+			}
+		}
+		return podRollout, nil
+	}
+
+	// The node can never satisfy an infeasible resize. A new pod lets the
+	// scheduler choose another node. Since Kubernetes 1.36 the API server
+	// rejects such a resize instead.
+	if inPlace {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodResizePending && condition.Status == corev1.ConditionTrue &&
+				condition.Reason == corev1.PodReasonInfeasible {
+				return rollout{
+					required: true,
+					reason:   "the in-place resize is infeasible on the node: " + condition.Message,
+				}, nil
+			}
+		}
 	}
 
 	return rollout{}, nil

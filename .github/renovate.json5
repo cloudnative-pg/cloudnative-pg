@@ -111,6 +111,18 @@
     {
       customType: 'regex',
       managerFilePatterns: [
+        '/^tests\\/utils\\/opentelemetry\\/collector\\.go$/',
+      ],
+      matchStrings: [
+        'collectorImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'busyboxImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'semver',
+    },
+    {
+      customType: 'regex',
+      managerFilePatterns: [
         '/^docs\\/src\\/monitoring\\.md$/',
       ],
       matchStrings: [
@@ -129,6 +141,17 @@
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+go install ([^@]+?)@(?<currentValue>.+)',
       ],
+    },
+    {
+      // Extension image versions pinned in the e2e testing environment.
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^tests\\/utils\\/environment\\/environment\\.go$/',
+      ],
+      matchStrings: [
+        '// renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9]+ = "(?<currentValue>[^"]+?)"',
+      ],
+      versioningTemplate: 'semver',
     },
   ],
   packageRules: [
@@ -269,6 +292,16 @@
       allowedVersions: '/^\\d+\\.\\d+\\.\\d+-glibc$/',
     },
     {
+      // Extension image tags are templated on the PostgreSQL major,
+      // so they cannot carry a digest.
+      matchPackageNames: [
+        'ghcr.io/cloudnative-pg/postgis-extension',
+        'ghcr.io/cloudnative-pg/pgvector',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
       groupName: 'operator framework',
       separateMajorMinor: false,
       pinDigests: false,
@@ -329,6 +362,14 @@
       ],
       pinDigests: false,
       separateMajorMinor: false,
+    },
+    {
+      // The hub compares the signing certificate's workflow ref to this exact
+      // tag and rejects a SHA-pinned call.
+      matchPackageNames: [
+        'revanite-io/pvtr-publish-results',
+      ],
+      pinDigests: false,
     },
     {
       groupName: 'workflow requirements',

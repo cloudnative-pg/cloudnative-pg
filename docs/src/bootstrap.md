@@ -188,7 +188,27 @@ The above example of bootstrap will:
 2. create an *unprivileged* user named `app`
 3. set the password of the latter (`app`) using the one in the `app-secret`
    secret (make sure that `username` matches the same name of the `owner`)
-4. create a database called `app` owned by the `app` user.
+4. create a database called `app` owned by the `app` user
+5. revoke `CONNECT` from `PUBLIC` on the `postgres`, `template1` and `app`
+   databases, and grant it to the `cnpg_metrics_exporter` role. On the
+   `postgres` database, `CONNECT` is also granted to the `streaming_replica`
+   role, which `pg_rewind` uses. See
+   [Managing Database Permissions](declarative_database_management.md#managing-database-permissions)
+   for details.
+
+:::warning
+    Every role that needs to connect to the `postgres` database, such as the
+    role that a `Pooler` with a custom authentication method uses to run its
+    `auth_query`, must be granted `CONNECT` on it. We recommend granting it to
+    those roles only, with a SQL command run as the superuser once they exist.
+
+    If you can't do that, for example because the roles are created after the
+    bootstrap and the grant can't be automated, set
+    `.spec.bootstrap.initdb.allowPublicConnectToPostgres` to `true`. The
+    operator then doesn't revoke `CONNECT` from `PUBLIC` on the `postgres`
+    database, which every role can connect to, as in PostgreSQL. The option
+    only applies when the cluster is bootstrapped.
+:::
 
 Thanks to the *convention over configuration paradigm*, you can let the
 operator choose a default database name (`app`) and a default application
@@ -380,6 +400,14 @@ queries, executed in the following order:
   `postInitApplicationSQLRefs` stanzas). Secrets are processed before ConfigMaps.
 
 Objects in each list will be processed sequentially.
+
+The default `CONNECT` privileges of the `postgres`, `template1` and application
+databases are applied before these queries run. To give other roles access to
+the application database, we recommend assigning the privileges through a
+`Database` resource, following the principle of least privilege, instead of
+granting `CONNECT` to `PUBLIC` with these queries. See
+[Managing Database Permissions](declarative_database_management.md#managing-database-permissions)
+for details.
 
 :::warning
     Use the `postInit`, `postInitTemplate`, and `postInitApplication` options
@@ -634,7 +662,7 @@ file on the source PostgreSQL instance:
 host replication streaming_replica all md5
 ```
 
-The following manifest creates a new PostgreSQL 18.6 cluster,
+The following manifest creates a new PostgreSQL 19.0 cluster,
 called `target-db`, using the `pg_basebackup` bootstrap method
 to clone an external PostgreSQL cluster defined as `source-db`
 (in the `externalClusters` array). As you can see, the `source-db`
@@ -649,7 +677,7 @@ metadata:
   name: target-db
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:19.0-system-trixie
 
   bootstrap:
     pg_basebackup:
@@ -669,7 +697,7 @@ spec:
 ```
 
 All the requirements must be met for the clone operation to work, including
-the same PostgreSQL version (in our case 18.6).
+the same PostgreSQL version (in our case 19.0).
 
 #### TLS certificate authentication
 
@@ -685,7 +713,7 @@ in the same Kubernetes cluster.
     outside the Kubernetes cluster.
 :::
 
-The manifest defines a new PostgreSQL 18.6 cluster called `cluster-clone-tls`,
+The manifest defines a new PostgreSQL 19.0 cluster called `cluster-clone-tls`,
 which is bootstrapped using the `pg_basebackup` method from the `cluster-example`
 external cluster. The host is identified by the read/write service
 in the same cluster, while the `streaming_replica` user is authenticated
@@ -700,7 +728,7 @@ metadata:
   name: cluster-clone-tls
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:19.0-system-trixie
 
   bootstrap:
     pg_basebackup:

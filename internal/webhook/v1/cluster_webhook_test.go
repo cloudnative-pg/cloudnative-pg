@@ -2003,8 +2003,10 @@ var _ = Describe("Number of synchronous replicas", func() {
 		It("can't have both new-style configuration and legacy one", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					Instances:       3,
+					Instances: 3,
+					//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 					MinSyncReplicas: 1,
+					//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 					MaxSyncReplicas: 2,
 					PostgresConfiguration: apiv1.PostgresConfiguration{
 						Synchronous: &apiv1.SynchronousReplicaConfiguration{
@@ -2021,7 +2023,8 @@ var _ = Describe("Number of synchronous replicas", func() {
 		It("should be a positive integer", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					Instances:       3,
+					Instances: 3,
+					//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 					MaxSyncReplicas: -3,
 				},
 			}
@@ -2031,7 +2034,8 @@ var _ = Describe("Number of synchronous replicas", func() {
 		It("should not be equal than the number of replicas", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					Instances:       3,
+					Instances: 3,
+					//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 					MaxSyncReplicas: 3,
 				},
 			}
@@ -2041,7 +2045,8 @@ var _ = Describe("Number of synchronous replicas", func() {
 		It("should not be greater than the number of replicas", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					Instances:       3,
+					Instances: 3,
+					//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 					MaxSyncReplicas: 5,
 				},
 			}
@@ -2051,7 +2056,8 @@ var _ = Describe("Number of synchronous replicas", func() {
 		It("can be zero", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					Instances:       3,
+					Instances: 3,
+					//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 					MaxSyncReplicas: 0,
 				},
 			}
@@ -2061,7 +2067,8 @@ var _ = Describe("Number of synchronous replicas", func() {
 		It("can be lower than the number of replicas", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					Instances:       3,
+					Instances: 3,
+					//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 					MaxSyncReplicas: 2,
 				},
 			}
@@ -7336,7 +7343,8 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 	It("returns no warning when the legacy synchronous replication API is configured", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				Instances:       3,
+				Instances: 3,
+				//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 				MinSyncReplicas: 1,
 			},
 		}
@@ -7351,7 +7359,8 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 		// not guarantee durability.
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				Instances:       3,
+				Instances: 3,
+				//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 				MaxSyncReplicas: 2,
 			},
 		}
@@ -7389,6 +7398,54 @@ var _ = Describe("getSynchronousReplicationWarnings", func() {
 		updateWarnings, _ := v.ValidateUpdate(context.Background(), cluster, cluster)
 		Expect(updateWarnings).To(ContainElement(ContainSubstring("no synchronous replication configured")))
 	})
+})
+
+var _ = Describe("getLegacySynchronousReplicationWarnings", func() {
+	It("returns no warning when only the current synchronous replication API is configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Method: apiv1.SynchronousReplicaConfigurationMethodAny,
+						Number: 1,
+					},
+				},
+			},
+		}
+		Expect(getLegacySynchronousReplicationWarnings(cluster)).To(BeEmpty())
+	})
+
+	DescribeTable("lists the legacy fields in use in a single warning",
+		func(configure func(*apiv1.Cluster), expectedPaths string) {
+			cluster := &apiv1.Cluster{Spec: apiv1.ClusterSpec{Instances: 3}}
+			configure(cluster)
+
+			warnings := getLegacySynchronousReplicationWarnings(cluster)
+			Expect(warnings).To(HaveLen(1))
+			Expect(warnings[0]).To(ContainSubstring("Found usage in: " + expectedPaths + "."))
+		},
+		Entry("minSyncReplicas", func(c *apiv1.Cluster) {
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+			c.Spec.MinSyncReplicas = 1
+		}, "spec.minSyncReplicas"),
+		Entry("maxSyncReplicas", func(c *apiv1.Cluster) {
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+			c.Spec.MaxSyncReplicas = 2
+		}, "spec.maxSyncReplicas"),
+		Entry("syncReplicaElectionConstraint", func(c *apiv1.Cluster) {
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+			c.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled = true
+		}, "spec.postgresql.syncReplicaElectionConstraint"),
+		Entry("all of them", func(c *apiv1.Cluster) {
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+			c.Spec.MinSyncReplicas = 1
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+			c.Spec.MaxSyncReplicas = 2
+			//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
+			c.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled = true
+		}, "spec.minSyncReplicas, spec.maxSyncReplicas, spec.postgresql.syncReplicaElectionConstraint"),
+	)
 })
 
 var _ = Describe("getFailureDomainTopologyWarnings", func() {

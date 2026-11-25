@@ -101,9 +101,10 @@ func (l *confirmingLock) stamp(ler resourcelock.LeaderElectionRecord, started ti
 // preAcquire takes over the retries.
 //
 // The stop lands before a replica can claim the lease only if RenewDeadline +
-// RetryPeriod + the peer probe timeout is below LeaseDuration, which the
-// admission webhook checks. A probe that outlasts the margin delays the stop
-// past it, and the hard stop cannot make up for that. The stop comes at an age
+// RetryPeriod + the peer probe timeout is below LeaseDuration. The admission
+// webhook only warns about it, and only with the isolation check enabled. A
+// probe that outlasts the margin delays the stop past it, and the hard stop
+// cannot make up for that. The stop comes at an age
 // in [LeaseDuration - RetryPeriod, LeaseDuration), so its margin to the earliest
 // claim by a replica depends on the tick phase and can be small.
 func (r *Runnable) monitorLeaseAge(ctx context.Context) {
@@ -214,7 +215,7 @@ func (r *Runnable) monitorLeaseAge(ctx context.Context) {
 // primaryLeaseLostExitCode is the exit code of the instance manager when it
 // fences itself because the primary lease is about to expire. It lets the
 // kubelet's last state tell this exit apart from a crash.
-const primaryLeaseLostExitCode = 5
+const primaryLeaseLostExitCode = 6
 
 // killPostgresAndExit is the last resort fence. The instance manager is PID 1
 // of its container, so exiting makes the kernel SIGKILL whatever is left in the

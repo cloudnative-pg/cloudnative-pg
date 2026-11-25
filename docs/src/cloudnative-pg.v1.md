@@ -359,6 +359,7 @@ _Appears in:_
 | `database` _string_ | Name of the database used by the application. Default: `app`. |  |  |  |
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
+| `allowPublicConnectToPostgres` _boolean_ | Allows the `PUBLIC` pseudo-role to keep the `CONNECT` privilege on the<br />`postgres` database, as PostgreSQL grants it by default. When `false`<br />(the default), the operator revokes it when the cluster is bootstrapped.<br />It only applies when the cluster is bootstrapped with `initdb`: the<br />privileges of existing databases are never changed. |  |  |  |
 | `options` _string array_ | The list of options that must be passed to initdb when creating the cluster.<br />Deprecated: This could lead to inconsistent configurations,<br />please use the explicit provided parameters instead.<br />If defined, explicit values will be ignored. |  |  |  |
 | `dataChecksums` _boolean_ | Whether data checksums are enabled on data pages, to help detect<br />corruption by the I/O system that would otherwise be silent<br />(default: `false` before PostgreSQL 18, `true` from PostgreSQL 18 on,<br />matching the initdb default in each case). |  |  |  |
 | `encoding` _string_ | The value to be passed as option `--encoding` for initdb (default:`UTF8`) |  |  |  |
@@ -634,8 +635,8 @@ _Appears in:_
 | `postgresUID` _integer_ | The UID of the `postgres` user inside the image, defaults to `26` |  | 26 |  |
 | `postgresGID` _integer_ | The GID of the `postgres` user inside the image, defaults to `26` |  | 26 |  |
 | `instances` _integer_ | Number of instances required in the cluster | True | 1 | Minimum: 1 <br /> |
-| `minSyncReplicas` _integer_ | Minimum number of instances required in synchronous replication with the<br />primary. Undefined or 0 allow writes to complete when no standby is<br />available. |  | 0 | Minimum: 0 <br /> |
-| `maxSyncReplicas` _integer_ | The target value for the synchronous replication quorum, that can be<br />decreased if the number of ready standbys is lower than this.<br />Undefined or 0 disable synchronous replication. |  | 0 | Minimum: 0 <br /> |
+| `minSyncReplicas` _integer_ | Minimum number of instances required in synchronous replication with the<br />primary. Undefined or 0 allow writes to complete when no standby is<br />available.<br />Deprecated: this field will be removed in CloudNativePG 1.33.0.<br />Use `.spec.postgresql.synchronous` instead. |  | 0 | Minimum: 0 <br /> |
+| `maxSyncReplicas` _integer_ | The target value for the synchronous replication quorum, that can be<br />decreased if the number of ready standbys is lower than this.<br />Undefined or 0 disable synchronous replication.<br />Deprecated: this field will be removed in CloudNativePG 1.33.0.<br />Use `.spec.postgresql.synchronous` instead. |  | 0 | Minimum: 0 <br /> |
 | `postgresql` _[PostgresConfiguration](#postgresconfiguration)_ | Configuration of the PostgreSQL server |  |  |  |
 | `podSelectorRefs` _[PodSelectorRef](#podselectorref) array_ | PodSelectorRefs defines named pod label selectors that can be referenced<br />in pg_hba rules using the $\{podselector:NAME\} syntax in the address field.<br />The operator resolves matching pod IPs and the instance manager expands<br />pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered. |  |  |  |
 | `replicationSlots` _[ReplicationSlotsConfiguration](#replicationslotsconfiguration)_ | Replication slots management configuration |  | \{ highAvailability\: \{ enabled:true \} \} |  |
@@ -652,7 +653,7 @@ _Appears in:_
 | `ephemeralVolumeSource` _[EphemeralVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#ephemeralvolumesource-v1-core)_ | EphemeralVolumeSource allows the user to configure the source of ephemeral volumes. |  |  |  |
 | `startDelay` _integer_ | The time in seconds that is allowed for a PostgreSQL instance to<br />successfully start up (default 3600).<br />The startup probe failure threshold is derived from this value using the formula:<br />ceiling(startDelay / 10). |  | 3600 |  |
 | `stopDelay` _integer_ | The time in seconds that is allowed for a PostgreSQL instance to<br />gracefully shutdown (default 1800) |  | 1800 |  |
-| `smartShutdownTimeout` _integer_ | The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.<br />Make sure you reserve enough time for the operator to request a fast shutdown of Postgres<br />(that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds. |  | 180 |  |
+| `smartShutdownTimeout` _integer_ | The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.<br />Make sure you reserve enough time for the operator to request a fast shutdown of Postgres<br />(that is: `stopDelay` - `smartShutdownTimeout`). Default is 0 seconds, which<br />skips the smart shutdown and requests a fast shutdown right away. |  | 0 |  |
 | `switchoverDelay` _integer_ | The time in seconds that is allowed for a primary PostgreSQL instance<br />to gracefully shutdown during a switchover.<br />Default value is 3600 seconds (1 hour). |  | 3600 |  |
 | `immediateShutdownTimeout` _integer_ | The time in seconds that is allowed for a PostgreSQL instance to stop<br />after an immediate shutdown request (used, for example, when a primary<br />must step down and cannot wait for a graceful shutdown). Once this time<br />has passed with PostgreSQL still running, the instance is considered<br />unresponsive. Default value is 30 seconds. |  | 30 |  |
 | `failoverDelay` _integer_ | The amount of time (in seconds) to wait before triggering a failover<br />after the primary PostgreSQL instance in the cluster was detected<br />to be unhealthy |  | 0 |  |
@@ -660,6 +661,7 @@ _Appears in:_
 | `affinity` _[AffinityConfiguration](#affinityconfiguration)_ | Affinity/Anti-affinity rules for Pods |  |  |  |
 | `topologySpreadConstraints` _[TopologySpreadConstraint](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#topologyspreadconstraint-v1-core) array_ | TopologySpreadConstraints specifies how to spread matching pods among the given topology.<br />More info:<br />https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/ |  |  |  |
 | `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#resourcerequirements-v1-core)_ | Resources requirements of every generated Pod. Please refer to<br />https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/<br />for more information. |  |  |  |
+| `resourcesUpdateStrategy` _[ResourcesUpdateStrategy](#resourcesupdatestrategy)_ | How changes to `resources` reach running instances: `recreate`<br />(default) rolls the Pods, `inPlace` resizes them when possible and<br />rolls them otherwise. `inPlace` requires Kubernetes 1.33 or later. |  |  | Enum: [recreate inPlace] <br /> |
 | `ephemeralVolumesSizeLimit` _[EphemeralVolumesSizeLimitConfiguration](#ephemeralvolumessizelimitconfiguration)_ | EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral<br />volumes |  |  |  |
 | `priorityClassName` _string_ | Name of the priority class which will be used in every generated Pod, if the PriorityClass<br />specified does not exist, the pod will not be able to schedule.  Please refer to<br />https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass<br />for more information |  |  |  |
 | `primaryUpdateStrategy` _[PrimaryUpdateStrategy](#primaryupdatestrategy)_ | Deployment strategy to follow to upgrade the primary server during a rolling<br />update procedure, after all replicas have been successfully updated:<br />it can be automated (`unsupervised` - default) or manual (`supervised`) |  | unsupervised | Enum: [unsupervised supervised] <br /> |
@@ -734,6 +736,7 @@ _Appears in:_
 | `cloudNativePGCommitHash` _string_ | The commit hash number of which this operator running |  |  |  |
 | `currentPrimaryTimestamp` _string_ | The timestamp when the last actual promotion to primary has occurred |  |  |  |
 | `currentPrimaryFailingSinceTimestamp` _string_ | The timestamp when the primary was detected to be unhealthy<br />This field is reported when `.spec.failoverDelay` is populated or during online upgrades |  |  |  |
+| `divergedInstances` _object (keys:[PodName](#podname), values:[DivergedInstanceStatus](#divergedinstancestatus))_ | DivergedInstances reports the non-primary instances that replayed WAL<br />past the point where the current primary's timeline forked away from<br />theirs, so they can never follow it again. Each instance detects this<br />from its own pg_wal. The operator fences it and drops its replication<br />slot on the primary. The entry is removed when the instance stops<br />reporting a divergence or, once parked, when its PGDATA PVC is replaced<br />or removed. |  |  |  |
 | `targetPrimaryTimestamp` _string_ | The timestamp when the last request for a new primary has occurred |  |  |  |
 | `poolerIntegrations` _[PoolerIntegrations](#poolerintegrations)_ | The integration needed by poolers referencing the cluster |  |  |  |
 | `cloudNativePGOperatorHash` _string_ | The hash of the binary of the operator |  |  |  |
@@ -874,6 +877,58 @@ _Appears in:_
 | `name` _string_ | The name of the object | True |  |  |
 | `applied` _boolean_ | True of the object has been installed successfully in<br />the database | True |  |  |
 | `message` _string_ | Message is the object reconciliation message |  |  |  |
+
+
+#### DatabasePermissionStatus
+
+
+
+DatabasePermissionStatus is the status of a single privilege granted to
+or revoked from a role on the database
+
+
+
+_Appears in:_
+
+- [DatabaseStatus](#databasestatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `privilege` _string_ | The privilege: `CONNECT`, `CREATE` or `TEMPORARY` | True |  |  |
+| `name` _string_ | The name of the role | True |  |  |
+| `type` _[UsageSpecType](#usagespectype)_ | The requested change | True |  |  |
+| `applied` _boolean_ | True if the privilege granted by the database owner to the role<br />matches the requested change | True |  |  |
+| `message` _string_ | Message is the reconciliation message of this entry |  |  |  |
+
+
+#### DatabasePermissionsSpec
+
+
+
+DatabasePermissionsSpec groups the privileges that can be granted or revoked
+on a database, keyed by privilege. Each entry reuses the `grant`/`revoke`
+model already used for foreign data wrapper and server usage.
+
+The role name `public` refers to the `PUBLIC` pseudo-role, meaning every
+role.
+
+A `revoke` only removes the privilege granted to the named role itself:
+it has no effect on privileges the role holds through `PUBLIC` or through
+membership of another role. Removing an entry from the specification does
+not undo a previous grant or revoke.
+
+
+
+_Appears in:_
+
+- [DatabaseSpec](#databasespec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `connect` _[UsageSpec](#usagespec) array_ | List of roles for which the `CONNECT` privilege on the database is granted or revoked.<br />Maps to `GRANT CONNECT ON DATABASE ... TO ...` / `REVOKE CONNECT ON DATABASE ... FROM ...`. |  |  |  |
+| `create` _[UsageSpec](#usagespec) array_ | List of roles for which the `CREATE` privilege on the database is granted or revoked.<br />Maps to `GRANT CREATE ON DATABASE ... TO ...` / `REVOKE CREATE ON DATABASE ... FROM ...`. |  |  |  |
+| `temporary` _[UsageSpec](#usagespec) array_ | List of roles for which the `TEMPORARY` privilege on the database is granted or revoked.<br />Maps to `GRANT TEMPORARY ON DATABASE ... TO ...` / `REVOKE TEMPORARY ON DATABASE ... FROM ...`. |  |  |  |
+| `all` _[UsageSpec](#usagespec) array_ | List of roles for which every database privilege (`CONNECT`, `CREATE`<br />and `TEMPORARY`) is granted or revoked. This is only a shortcut: it is<br />expanded into the three individual privileges before reconciliation, and<br />the status reports the expanded entries. |  |  |  |
 
 
 #### DatabaseReclaimPolicy
@@ -1067,6 +1122,7 @@ _Appears in:_
 | `extensions` _[ExtensionSpec](#extensionspec) array_ | The list of extensions to be managed in the database |  |  |  |
 | `fdws` _[FDWSpec](#fdwspec) array_ | The list of foreign data wrappers to be managed in the database |  |  |  |
 | `servers` _[ServerSpec](#serverspec) array_ | The list of foreign servers to be managed in the database |  |  |  |
+| `permissions` _[DatabasePermissionsSpec](#databasepermissionsspec)_ | Permissions defines the privileges to grant or revoke on the database<br />itself, keyed by privilege. Each entry carries a role name and a type of<br />`grant` (default) or `revoke`, mirroring the existing usage model. |  |  |  |
 
 
 #### DatabaseStatus
@@ -1090,6 +1146,33 @@ _Appears in:_
 | `extensions` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | Extensions is the status of the managed extensions |  |  |  |
 | `fdws` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | FDWs is the status of the managed FDWs |  |  |  |
 | `servers` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | Servers is the status of the managed servers |  |  |  |
+| `permissions` _[DatabasePermissionStatus](#databasepermissionstatus) array_ | Permissions is the status of the managed database permissions, with<br />one entry per privilege and role (`all` is reported expanded) |  |  |  |
+
+
+#### DivergedInstanceStatus
+
+
+
+DivergedInstanceStatus describes a non-primary instance that replayed WAL
+past the point where the current primary's timeline forked away from its
+own. See ClusterStatus.DivergedInstances. The details are those of the
+first report and are not updated afterwards.
+
+
+
+_Appears in:_
+
+- [ClusterStatus](#clusterstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `timeLineID` _integer_ | TimeLineID is the timeline of the WAL the instance held when the<br />divergence was first reported. | True |  | Minimum: 1 <br /> |
+| `primaryTimeLineID` _integer_ | PrimaryTimeLineID is the newest timeline the instance had learned<br />about from the primary, and could not switch to, when the divergence<br />was first reported. | True |  | Minimum: 1 <br /> |
+| `forkLSN` _string_ | ForkLSN is where PrimaryTimeLineID forked away from TimeLineID. Empty<br />when TimeLineID is not an ancestor of PrimaryTimeLineID at all. |  |  |  |
+| `replayLSN` _string_ | ReplayLSN is how far the instance had replayed when the divergence<br />was first reported. Together with ForkLSN it bounds the WAL<br />(ForkLSN, ReplayLSN] the instance held that the primary did not. | True |  |  |
+| `detectedAt` _string_ | DetectedAt is when the divergence was first reported. | True |  |  |
+| `parked` _boolean_ | Parked is true once the operator has recorded the PGDATA PVC of the<br />instance and keeps the instance fenced. |  |  |  |
+| `pvcUID` _string_ | PVCUID is the UID of the instance's PGDATA PersistentVolumeClaim when<br />it was parked. A different UID means the data was rebuilt, for example<br />by `kubectl cnpg destroy`. A Pod recreated over the same PVC stays<br />contained. |  |  |  |
 
 
 #### EmbeddedObjectMetadata
@@ -2357,7 +2440,7 @@ _Appears in:_
 | `synchronous` _[SynchronousReplicaConfiguration](#synchronousreplicaconfiguration)_ | Configuration of the PostgreSQL synchronous replication feature |  |  |  |
 | `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file).<br />Use the $\{podselector:NAME\} syntax to reference a pod selector;<br />the rule will be expanded for each Pod IP matching that selector. |  |  |  |
 | `pg_ident` _string array_ | PostgreSQL User Name Maps rules (lines to be appended<br />to the pg_ident.conf file) |  |  |  |
-| `syncReplicaElectionConstraint` _[SyncReplicaElectionConstraints](#syncreplicaelectionconstraints)_ | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be<br />set up. |  |  |  |
+| `syncReplicaElectionConstraint` _[SyncReplicaElectionConstraints](#syncreplicaelectionconstraints)_ | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be<br />set up.<br />This field only applies to the legacy synchronous replication method.<br />Deprecated: this field will be removed in CloudNativePG 1.33.0, along<br />with the method. Use the failure domain options of<br />`.spec.postgresql.synchronous` instead. |  |  |  |
 | `shared_preload_libraries` _string array_ | Lists of shared preload libraries to add to the default ones |  |  |  |
 | `ldap` _[LDAPConfig](#ldapconfig)_ | Options to specify LDAP configuration |  |  |  |
 | `promotionTimeout` _integer_ | Specifies the maximum number of seconds to wait when promoting an instance to primary.<br />Default value is 40000000, greater than one year in seconds,<br />big enough to simulate an infinite timeout |  |  |  |
@@ -2741,6 +2824,24 @@ _Appears in:_
 | `enabled` _boolean_ | If enabled (default), the operator will automatically manage replication slots<br />on the primary instance and use them in streaming replication<br />connections with all the standby instances that are part of the HA<br />cluster. If disabled, the operator will not take advantage<br />of replication slots in streaming connections with the replicas.<br />This feature also controls replication slots in replica cluster,<br />from the designated primary to its cascading replicas. |  | true |  |
 | `slotPrefix` _string_ | Prefix for replication slots managed by the operator for HA.<br />It may only contain lower case letters, numbers, and the underscore character.<br />This can only be set at creation time. By default set to `_cnpg_`. |  | _cnpg_ | Pattern: `^[0-9a-z_]*$` <br /> |
 | `synchronizeLogicalDecoding` _boolean_ | When enabled, the operator automatically manages synchronization of logical<br />decoding (replication) slots across high-availability clusters.<br />Requires one of the following conditions:<br />- PostgreSQL version 17 or later<br />- PostgreSQL version < 17 with pg_failover_slots extension enabled |  |  |  |
+
+
+#### ResourcesUpdateStrategy
+
+_Underlying type:_ _string_
+
+ResourcesUpdateStrategy defines how changes to `resources` reach running instances
+
+
+
+_Appears in:_
+
+- [ClusterSpec](#clusterspec)
+
+| Field | Description |
+| --- | --- |
+| `recreate` | ResourcesUpdateStrategyRecreate rolls the Pods (`recreate`, default)<br /> |
+| `inPlace` | ResourcesUpdateStrategyInPlace resizes the Pods when possible, and rolls them otherwise (`inPlace`)<br /> |
 
 
 #### RoleConfiguration
@@ -3281,7 +3382,8 @@ _Appears in:_
 SynchronousReplicaConfiguration contains the configuration of the
 PostgreSQL synchronous replication feature.
 Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
-need to be considered.
+need to be considered. Those fields are deprecated and mutually exclusive with
+this configuration.
 
 
 
@@ -3419,39 +3521,41 @@ _Appears in:_
 
 
 
-UsageSpec configures a usage for a foreign data wrapper
+UsageSpec grants or revokes a privilege for a role, or for `public`
 
 
 
 _Appears in:_
 
+- [DatabasePermissionsSpec](#databasepermissionsspec)
 - [FDWSpec](#fdwspec)
 - [SchemaPermissionsSpec](#schemapermissionsspec)
 - [ServerSpec](#serverspec)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | Name of the usage | True |  |  |
-| `type` _[UsageSpecType](#usagespectype)_ | The type of usage |  | grant | Enum: [grant revoke] <br /> |
+| `name` _string_ | Name of the role, or `public` to target all roles | True |  |  |
+| `type` _[UsageSpecType](#usagespectype)_ | Whether the privilege is granted to or revoked from the role |  | grant | Enum: [grant revoke] <br /> |
 
 
 #### UsageSpecType
 
 _Underlying type:_ _string_
 
-UsageSpecType describes the type of usage specified in the `usage` field of the
-`Database` object.
+UsageSpecType describes whether a privilege is granted to or revoked from a
+role in the `Database` object.
 
 
 
 _Appears in:_
 
+- [DatabasePermissionStatus](#databasepermissionstatus)
 - [UsageSpec](#usagespec)
 
 | Field | Description |
 | --- | --- |
-| `grant` | GrantUsageSpecType indicates a grant usage permission.<br />The default usage permission is grant.<br /> |
-| `revoke` | RevokeUsageSpecType indicates a revoke usage permission.<br /> |
+| `grant` | GrantUsageSpecType indicates a grant of the privilege.<br />The default is grant.<br /> |
+| `revoke` | RevokeUsageSpecType indicates a revoke of the privilege.<br /> |
 
 
 #### VolumeSnapshotConfiguration

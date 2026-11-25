@@ -24,7 +24,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -36,15 +35,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	m "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
-	postgresconf "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances
 // or the operator
 const PrometheusNamespace = "cnpg"
-
-var synchronousStandbyNamesRegex = regexp.MustCompile(`(?:ANY|FIRST) ([0-9]+) \(.*\)`)
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
@@ -80,6 +76,7 @@ type metrics struct {
 	FencingOn                    prometheus.Gauge
 	PgStatWalMetrics             PgStatWalMetrics
 	NodesUsed                    prometheus.Gauge
+	ReplicasDiverged             prometheus.Gauge
 }
 
 // PgStatWalMetrics is available from PG14+
@@ -149,7 +146,9 @@ func newMetrics() *metrics {
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sync_replicas",
-			Help:      "Number of requested synchronous replicas (synchronous_standby_names)",
+			Help: "Number of synchronous replicas: expected is the configured number, observed is the number of " +
+				"standbys currently attached as synchronous (min and max are deprecated and will be removed " +
+				"in 1.33.0)",
 		}, []string{"value"}),
 		ReplicaCluster: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
@@ -212,6 +211,14 @@ func newMetrics() *metrics {
 				"A value of '1' suggests that all instances are hosted on a single node, " +
 				"implying the absence of High Availability (HA). Ideally this value " +
 				"should match the number of instances in the cluster.",
+		}),
+		ReplicasDiverged: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "replicas_diverged",
+			Help: "Number of replicas that replayed WAL past the point where the current " +
+				"primary's timeline forked away from theirs. Such a replica cannot follow " +
+				"the primary and is fenced until it is rebuilt.",
 		}),
 		PgStatWalMetrics: PgStatWalMetrics{
 			WalRecords: prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -292,6 +299,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.LastFailedBackupTimestamp.Describe(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Describe(ch)
 	e.Metrics.NodesUsed.Describe(ch)
+	e.Metrics.ReplicasDiverged.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -375,6 +383,7 @@ func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.LastFailedBackupTimestamp.Collect(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
 	e.Metrics.NodesUsed.Collect(ch)
+	e.Metrics.ReplicasDiverged.Collect(ch)
 
 	if version, _ := e.instance.GetPgVersion(); version.Major() >= 14 {
 		e.Metrics.PgStatWalMetrics.WalRecords.Collect(ch)
@@ -435,26 +444,10 @@ func (e *Exporter) updateInstanceMetrics() {
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
-	isPrimary, err := e.instance.IsPrimary()
-	if err != nil {
-		log.Error(err, "unable to get if primary")
-	}
-
 	e.collectNodesUsed()
+	e.collectReplicasDiverged()
 
-	// metrics collected only on primary server
-	if isPrimary {
-		// getting required synchronous standby number from postgres itself
-		e.collectFromPrimarySynchronousStandbysNumber(db)
-
-		// getting the first point of recoverability
-		e.collectFromPrimaryFirstPointOnTimeRecovery()
-
-		// getting the last available backup timestamp
-		e.collectFromPrimaryLastAvailableBackupTimestamp()
-
-		e.collectFromPrimaryLastFailedBackupTimestamp()
-	}
+	e.collectFromPrimary(db)
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
 		log.Error(err, "while collecting WAL archive metrics", "path", specs.PgWalArchiveStatusPath)
@@ -550,6 +543,47 @@ func (e *Exporter) collectNodesUsed() {
 	e.Metrics.NodesUsed.Set(float64(cluster.Status.Topology.NodesUsed))
 }
 
+func (e *Exporter) collectReplicasDiverged() {
+	cluster, err := e.getCluster()
+	if errors.Is(err, cache.ErrCacheMiss) {
+		return
+	}
+	if err != nil {
+		log.Error(err, "unable to collect metrics")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.ReplicasDiverged").Inc()
+		return
+	}
+
+	e.Metrics.ReplicasDiverged.Set(float64(len(cluster.Status.DivergedInstances)))
+}
+
+// collectFromPrimary updates the metrics collected only on a primary server
+func (e *Exporter) collectFromPrimary(db *sql.DB) {
+	isPrimary, err := e.instance.IsPrimary()
+	if err != nil {
+		log.Error(err, "unable to get if primary")
+	}
+
+	if !isPrimary {
+		// A primary can become a standby without the instance manager
+		// restarting, and would keep exposing its last value
+		e.Metrics.SyncReplicas.DeleteLabelValues("observed")
+		return
+	}
+
+	// getting required synchronous standby number from postgres itself
+	e.collectFromPrimarySynchronousStandbysNumber(db)
+
+	// getting the first point of recoverability
+	e.collectFromPrimaryFirstPointOnTimeRecovery()
+
+	// getting the last available backup timestamp
+	e.collectFromPrimaryLastAvailableBackupTimestamp()
+
+	e.collectFromPrimaryLastFailedBackupTimestamp()
+}
+
 func (e *Exporter) collectFromPrimaryLastFailedBackupTimestamp() {
 	const errorLabel = "Collect.LastFailedBackupTimestamp"
 	e.setTimestampMetric(e.Metrics.LastFailedBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
@@ -572,7 +606,7 @@ func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 }
 
 func (e *Exporter) collectFromPrimarySynchronousStandbysNumber(db *sql.DB) {
-	nStandbys, err := getRequestedSynchronousStandbysNumber(db)
+	nStandbys, err := getSynchronousStandbysNumber(db)
 	if err != nil {
 		log.Error(err, "unable to collect metrics")
 		e.Metrics.Error.Set(1)
@@ -601,20 +635,24 @@ func collectPGVersion(e *Exporter) error {
 	return nil
 }
 
-// getRequestedSynchronousStandbysNumber returns the number of requested synchronous standbys
-// Example: FIRST 2 (node1,node2) will return 2, ANY 4 (node1) will return 4.
+// synchronousStandbysQuery counts the standbys that are currently attached to
+// the primary and participate in synchronous replication: `sync` is reported
+// for priority-based replication (FIRST), `quorum` for quorum-based
+// replication (ANY). Standbys in `potential` or `async` state don't count.
+const synchronousStandbysQuery = "SELECT count(*) FROM pg_catalog.pg_stat_replication " +
+	"WHERE sync_state IN ('sync', 'quorum')"
+
+// getSynchronousStandbysNumber returns the number of standbys that are
+// currently attached to the primary as synchronous. With quorum-based
+// replication every attached candidate is reported as `quorum`, so the
+// result can be higher than the number of acknowledgments required.
 // If the query fails, it will return 0 and an error.
-func getRequestedSynchronousStandbysNumber(db *sql.DB) (int, error) {
-	var syncReplicasFromConfig string
-	err := db.QueryRow(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).
-		Scan(&syncReplicasFromConfig)
-	if err != nil || syncReplicasFromConfig == "" {
+func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
+	var nStandbys int
+	if err := db.QueryRow(synchronousStandbysQuery).Scan(&nStandbys); err != nil {
 		return 0, err
 	}
-	if !synchronousStandbyNamesRegex.MatchString(syncReplicasFromConfig) {
-		return 0, fmt.Errorf("not matching synchronous standby names regex: %s", syncReplicasFromConfig)
-	}
-	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[1])
+	return nStandbys, nil
 }
 
 // PgCollector is the interface for all the collectors that need to do queries

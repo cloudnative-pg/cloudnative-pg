@@ -219,6 +219,30 @@ func SchemaPrivilegeQuery(roleName, schemaName, privilege string) string {
 	return fmt.Sprintf("SELECT has_schema_privilege('%v', '%v', '%v')", roleName, schemaName, privilege)
 }
 
+// DatabasePrivilegeHeldQuery builds a query checking whether the role itself
+// holds the given privilege (CONNECT, CREATE or TEMPORARY) on the named
+// database, where the role `public` is PUBLIC. has_database_privilege() cannot
+// be used here: it doesn't accept PUBLIC, and a privilege held by PUBLIC
+// satisfies it for every other role. The result is NULL, and so it matches
+// neither true nor false, if the database or the role doesn't exist.
+func DatabasePrivilegeHeldQuery(databaseName, roleName, privilege string) string {
+	literal := func(value string) string {
+		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	}
+
+	grantee := "0"
+	exists := "EXISTS (SELECT 1 FROM pg_catalog.pg_database WHERE datname = " + literal(databaseName) + ")"
+	if !strings.EqualFold(roleName, "public") {
+		grantee = "(SELECT oid FROM pg_catalog.pg_roles WHERE rolname = " + literal(roleName) + ")"
+		exists += " AND " + grantee + " IS NOT NULL"
+	}
+
+	return "SELECT CASE WHEN " + exists + " THEN EXISTS (SELECT 1 FROM pg_catalog.pg_database d, " +
+		"pg_catalog.aclexplode(coalesce(d.datacl, pg_catalog.acldefault('d', d.datdba))) a " +
+		"WHERE d.datname = " + literal(databaseName) + " AND a.privilege_type = " + literal(privilege) +
+		" AND a.grantee = " + grantee + ") END"
+}
+
 // AssertDataExpectedCount verifies that the named table has exactly
 // expectedValue rows.
 func AssertDataExpectedCount(

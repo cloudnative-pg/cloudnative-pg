@@ -318,6 +318,15 @@ var _ = Describe("checkImmediateShutdownUnresponsive", func() {
 		Expect(instance.TryShuttingDownStepDown(ctx)).To(MatchError(ContainSubstring("not retrying")))
 		Expect(stops()).To(HaveLen(2))
 	})
+
+	It("requests a fast shutdown right away when the smart shutdown timeout is not set", func(ctx context.Context) {
+		stops := fakePgCtlFailingToStop()
+
+		instance := &Instance{}
+		Expect(instance.TryShuttingDownSmartFast(ctx)).To(HaveOccurred())
+		Expect(stops()).To(HaveLen(1))
+		Expect(stops()[0]).To(ContainSubstring("-m fast"))
+	})
 })
 
 var _ = Describe("testing environment variables", func() {

@@ -380,7 +380,7 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 		})
 
-		Context("Declarative Volume Snapshot", Ordered, func() {
+		Context("Declarative Volume Snapshot", Ordered, Label(tests.LabelPluginBarmanCloud), func() {
 			// test env constants
 			const (
 				namespacePrefix = "declarative-snapshot-backup"

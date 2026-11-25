@@ -31,6 +31,9 @@ spec:
     initdb:
       database: app
       owner: app
+      # The pooler authenticates with the "pgbouncer" role, which has to connect
+      # to the "postgres" database
+      allowPublicConnectToPostgres: true
 
   # Persistent storage configuration
   storage:

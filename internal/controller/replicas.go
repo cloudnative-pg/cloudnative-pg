@@ -100,7 +100,15 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	mostAdvancedInstance := status.Items[0]
+	// A diverged replica is never promoted, whatever its LSN
+	candidates := status.ExcludingDiverged()
+	if candidates.Len() == 0 {
+		contextLogger.Info("No promotable candidate found, every instance has diverged, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
+
+	mostAdvancedInstance := candidates.Items[0]
 	if mostAdvancedInstance.IsFenced {
 		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
 			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
@@ -208,8 +216,9 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Target primary isn't healthy, switching target from %v to %v",
 			cluster.Status.TargetPrimary, mostAdvancedInstance.Pod.Name)
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
-			fmt.Sprintf("Switching over to %v", mostAdvancedInstance.Pod.Name)); err != nil {
+		phase, reason := phaseOfNewTarget(cluster)
+		if err := r.RegisterPhase(ctx, cluster, phase,
+			fmt.Sprintf("%s to %v", reason, mostAdvancedInstance.Pod.Name)); err != nil {
 			return "", err
 		}
 	}
@@ -393,27 +402,35 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 		return "", ErrWalReceiversRunning
 	}
 
-	if status.Items[0].IsFenced {
+	// A diverged replica is never promoted, whatever its LSN
+	candidates := status.ExcludingDiverged()
+	if candidates.Len() == 0 {
+		contextLogger.Info("No promotable candidate found, every instance has diverged, "+
+			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
+		return "", nil
+	}
+
+	if candidates.Items[0].IsFenced {
 		contextLogger.Info("No promotable candidate found, every instance is fenced, "+
 			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
 		return "", nil
 	}
 
-	if !status.Items[0].HasHTTPStatus() {
+	if !candidates.Items[0].HasHTTPStatus() {
 		contextLogger.Info("No promotable candidate found, status not being reported, "+
 			"skipping the election", "targetPrimary", cluster.Status.TargetPrimary)
 		return "", nil
 	}
 
 	contextLogger.Info("Current target primary isn't healthy, failing over",
-		"newPrimary", status.Items[0].Pod.Name)
+		"newPrimary", candidates.Items[0].Pod.Name)
 	status.LogStatus(ctx)
 	contextLogger.Debug("Cluster status before failover", "instances", resources.instances)
 	r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 		"Current target primary isn't healthy, failing over from %v to %v",
-		cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
+		cluster.Status.TargetPrimary, candidates.Items[0].Pod.Name)
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-		fmt.Sprintf("Failing over to %v", status.Items[0].Pod.Name)); err != nil {
+		fmt.Sprintf("Failing over to %v", candidates.Items[0].Pod.Name)); err != nil {
 		return "", err
 	}
 
@@ -422,7 +439,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	// service, so the split-brain window #10403 guards against does not
 	// apply. The retryable call in the reconcile loop's failover guard still
 	// relabels the pod on its next pass.
-	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
+	return candidates.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, candidates.Items[0].Pod.Name)
 }
 
 // GetPodsNotOnPrimaryNode filters out only pods that are not on the same node as the primary one
@@ -532,4 +549,15 @@ func findDeletableInstance(cluster *apiv1.Cluster, instances []corev1.Pod) strin
 	}
 
 	return instances[resultIdx].Name
+}
+
+// phaseOfNewTarget is the phase, and its reason, when an unhealthy target
+// primary is replaced. If the target of a failover failed before promoting, the
+// phase stays a failover, so the promotion gate does not hold the new target
+// back.
+func phaseOfNewTarget(cluster *apiv1.Cluster) (phase, reason string) {
+	if cluster.Status.Phase == apiv1.PhaseFailOver {
+		return apiv1.PhaseFailOver, "Failing over"
+	}
+	return apiv1.PhaseSwitchover, "Switching over"
 }

@@ -71,6 +71,19 @@ var _ = Describe("PostgreSQL cluster type", func() {
 	})
 })
 
+var _ = Describe("Smart shutdown timeout", func() {
+	It("defaults to 0 when unset", func() {
+		cluster := Cluster{}
+		Expect(cluster.GetSmartShutdownTimeout()).To(BeZero())
+	})
+
+	It("returns the configured value", func() {
+		timeout := int32(30)
+		cluster := Cluster{Spec: ClusterSpec{SmartShutdownTimeout: &timeout}}
+		Expect(cluster.GetSmartShutdownTimeout()).To(Equal(int32(30)))
+	})
+})
+
 var _ = Describe("PostgreSQL services name", func() {
 	postgresql := Cluster{
 		ObjectMeta: metav1.ObjectMeta{

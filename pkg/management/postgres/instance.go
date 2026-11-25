@@ -830,7 +830,8 @@ func (instance *Instance) IsImmediateShutdownUnresponsive() bool {
 	return instance.immediateShutdownUnresponsive.Load()
 }
 
-// isStatusRunning checks the status of a running server using pg_ctl status
+// isStatusRunning reports whether PostgreSQL is running: pg_ctl status must
+// succeed, and the PID file must not name a live process that is not PostgreSQL
 func (instance *Instance) isStatusRunning() bool {
 	options := []string{
 		"-D",
@@ -839,8 +840,11 @@ func (instance *Instance) isStatusRunning() bool {
 	}
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
-	err := execlog.RunBuffering(pgCtlCmd, pgCtlName)
-	return err == nil
+	if err := execlog.RunBuffering(pgCtlCmd, pgCtlName); err != nil {
+		return false
+	}
+
+	return !instance.pidFileNamesForeignProcess()
 }
 
 // Reload makes a certain active instance reload the configuration
@@ -960,8 +964,15 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
+	// Each pipe logs its exit as Start returns, which the exited condition
+	// doesn't wait for. Wait for Start too, so that the record is written
+	// before the caller stops the log export
+	var pipes sync.WaitGroup
+	pipes.Add(3)
+
 	csvPipe := logpipe.NewLogPipe()
 	go func() {
+		defer pipes.Done()
 		if err := csvPipe.Start(ctx); err != nil {
 			log.Info("csv log pipe encountered an error", "err", err)
 		}
@@ -972,6 +983,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 		logpipe.LoggingCollectorRecordName,
 	)
 	go func() {
+		defer pipes.Done()
 		if err := rawPipe.Start(ctx); err != nil {
 			log.Info("raw log pipe encountered an error", "err", err)
 		}
@@ -981,6 +993,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 		filepath.Join(postgres.LogPath, postgres.LogFileName+".json"),
 	)
 	go func() {
+		defer pipes.Done()
 		if err := jsonPipe.Start(ctx); err != nil {
 			log.Info("json log pipe encountered an error", "err", err)
 		}
@@ -988,6 +1001,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 
 	defer func() {
 		ctxCancel()
+		pipes.Wait()
 		csvPipe.GetExitedCondition().Wait()
 		rawPipe.GetExitedCondition().Wait()
 		jsonPipe.GetExitedCondition().Wait()

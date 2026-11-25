@@ -14,12 +14,12 @@ title: Installation and upgrades
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.2.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.2.yaml
 ```
 
 You can verify that with:
@@ -267,28 +267,215 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
-### Upgrading to 1.30.0, 1.29.2, or 1.28.4
+### Upgrading to 1.31.0
 
-:::info[Important]
-    We strongly recommend that all CloudNativePG users upgrade to version
-    1.30.0, or at least to the latest stable version of your current minor release
-    (e.g., 1.29.2 or 1.28.4).
+#### Default of `.spec.smartShutdownTimeout` changed to 0
+
+Starting from version 1.31.0, the default value of `.spec.smartShutdownTimeout`
+is `0` seconds instead of `180`. In a cluster using the new default, when a
+PostgreSQL Pod is terminated or the primary is restarted in place, the instance
+manager no longer waits for clients to disconnect during a smart shutdown: it
+issues a `CHECKPOINT` and requests a fast shutdown right away.
+See ["Shutdown control"](instance_manager.md#shutdown-control) for details.
+
+Existing clusters are not affected, as the previous default is already stored
+in their `.spec`. The new default applies to new `Cluster` resources, and
+to resources created without the field. This includes clusters you recreate,
+for example from a GitOps repository or a backup tool, if their manifests don't
+set it explicitly. The new default also applies to an existing cluster when the
+whole resource is replaced, rather than patched, with a definition that doesn't
+set the field.
+
+If you want new clusters to keep the previous behavior, set the field
+explicitly in their manifests:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  smartShutdownTimeout: 180
+  # <snip>
+```
+
+Make sure `.spec.stopDelay` is greater than `.spec.smartShutdownTimeout`,
+otherwise the smart shutdown is skipped.
+
+#### Deprecation of the legacy synchronous replication method
+
+The legacy synchronous replication method, configured through
+`.spec.minSyncReplicas` and `.spec.maxSyncReplicas`, is deprecated starting
+from version 1.31.0 and will be removed in version 1.33.0, together with the
+`.spec.postgresql.syncReplicaElectionConstraint` option.
+
+The operator returns an admission warning when you create or update a `Cluster`
+that uses any of these fields. Migrate those clusters to
+`.spec.postgresql.synchronous` before upgrading to 1.33.0, as explained in
+["Migrating from Deprecated Synchronous Replication Implementation"](replication.md#migrating-from-deprecated-synchronous-replication-implementation).
+
+#### New databases no longer allow `PUBLIC` to connect
+
+Starting from version 1.31.0, CloudNativePG revokes `CONNECT` from `PUBLIC` on
+the databases it creates, instead of letting every role connect to them, and
+grants it to the `cnpg_metrics_exporter` role so that monitoring keeps working.
+This is a change for the clusters and databases that you create after
+upgrading:
+
+- the `postgres`, `template1` and application databases of a new cluster
+  bootstrapped with `initdb`
+- every database created from a `Database` resource, including in a cluster
+  that already exists
+- the application database of a cluster bootstrapped with `recovery` or
+  `pg_basebackup`, when the source doesn't have it and CloudNativePG creates it
+
+Existing databases are not affected. This includes the databases of the clusters
+that you upgrade, and those of a cluster bootstrapped with `recovery` or
+`pg_basebackup`, which keep the privileges they had in the source.
+
+In a restricted database, only superusers, the owner (and the roles that inherit
+from it), and the roles that are granted `CONNECT` can connect. Any other role
+is refused with a `permission denied for database` error. This includes
+[managed roles](declarative_role_management.md) and the roles that your
+applications and tools use to reach the `postgres` database. For example, a
+[Pooler with a custom authentication method](connection_pooling.md#custom-authentication-method)
+needs `CONNECT` on `postgres` for the role that runs its `auth_query`.
+
+##### Granting access to the roles that need it
+
+Following the principle of least privilege, grant `CONNECT` only to the roles
+that need it, with the `permissions` field of a `Database` resource. See
+[Managing Database Permissions](declarative_database_management.md#managing-database-permissions)
+for details. For example, the following manifest grants `CONNECT` on the `app`
+database of a new cluster to the `reporting` role:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cluster-example-app
+spec:
+  name: app
+  owner: app
+  cluster:
+    name: cluster-example
+  permissions:
+    connect:
+      - name: reporting
+        type: grant
+```
+
+A `Database` resource without `permissions` leaves the privileges of an existing
+database as they are. To close a database that already exists, such as one
+created before the upgrade, also revoke `CONNECT` from `public`, and list the
+grants first. Include `cnpg_metrics_exporter`: existing databases are not
+granted `CONNECT` for it, so without that entry the `revoke` stops the metrics
+of the database. The privileges are applied when the `Database` resource is
+created or changed, not continuously:
+
+```yaml
+spec:
+  # <snip>
+  permissions:
+    connect:
+      - name: cnpg_metrics_exporter
+        type: grant
+      - name: reporting
+        type: grant
+      - name: public
+        type: revoke
+```
+
+The `postgres` and `template1` databases are reserved, so a `Database` resource
+can't manage them. Grant `CONNECT` to the roles that need it with a SQL command
+run as the superuser, once the roles exist.
+
+:::warning
+    If you revoke `CONNECT` from `PUBLIC` on the `postgres` database of an
+    existing cluster, grant it to the `streaming_replica` role first:
+
+    ```sql
+    GRANT CONNECT ON DATABASE postgres TO streaming_replica;
+    ```
+
+    `pg_rewind` connects to the `postgres` database as that role, and a demoted
+    primary can't rejoin the cluster without it. The replicas connect in the
+    same way to synchronize the replication slots from the primary.
+    CloudNativePG grants it when it creates the role, so new clusters already
+    have it, while existing ones don't.
 :::
 
-These releases introduce changes worth reviewing before you upgrade. Two are
-security changes that apply to **1.30.0, 1.29.2, and 1.28.4**: operator-side
-password encoding (`CVE-2026-55765`) and `search_path` hardening
-(`CVE-2026-55769`). The other three are new in
-**1.30.0** only: the `DatabaseRole` resource for declarative role management,
+##### Restoring the previous behavior for new clusters
+
+Letting every role connect goes against the principle of least privilege, so we
+don't recommend it. If you need it, restore it for each database:
+
+- `postgres`: set `allowPublicConnectToPostgres` to `true` in the `initdb`
+  bootstrap of the cluster, so that the operator doesn't revoke `CONNECT` from
+  `PUBLIC`:
+
+  ```yaml
+  spec:
+    bootstrap:
+      initdb:
+        allowPublicConnectToPostgres: true
+    # <snip>
+  ```
+
+- the application database, and the databases created from a `Database`
+  resource: grant `CONNECT` to `public` in the `Database` resource, which you
+  create for the application database after the cluster:
+
+  ```yaml
+  spec:
+    # <snip>
+    permissions:
+      connect:
+        - name: public
+          type: grant
+  ```
+
+- `template1`: run `GRANT CONNECT ON DATABASE template1 TO PUBLIC;` as the
+  superuser.
+
+#### Meaning of `observed` in `cnpg_collector_sync_replicas` changed
+
+Starting from version 1.31.0, the `observed` value of the
+`cnpg_collector_sync_replicas` metric reports the number of standbys currently
+attached to the primary as synchronous, as shown by `sync_state` in the
+`pg_stat_replication` system view. Previously, it reported the number found in
+the `synchronous_standby_names` setting, which only tells what is requested.
+
+With quorum-based replication (`method: any`), every attached standby that is
+a candidate is reported as `quorum`, so `observed` can be higher than
+`expected`. If you alert or graph on this metric, compare `observed` with
+`expected` using `<`, not `!=`. For example, `observed` now drops to `0` when
+a cluster with `dataDurability: required` loses all its synchronous standbys,
+while commits are blocked, instead of staying at the configured number.
+
+The `min` and `max` values are deprecated and are removed in CloudNativePG
+1.33.0. Until then, they are derived from `.spec.postgresql.synchronous` when
+it is configured, instead of being `0`. Use `expected` and `observed` instead.
+See ["Synchronous replication metrics"](monitoring.md#synchronous-replication-metrics)
+for details and a recommended alert.
+
+### Upgrading to 1.30.0
+
+:::info[Important]
+    We strongly recommend that all CloudNativePG users upgrade to the latest
+    1.30 patch release.
+:::
+
+This release introduces changes worth reviewing before you upgrade: operator-side
+password encoding (`CVE-2026-55765`), `search_path` hardening
+(`CVE-2026-55769`), the `DatabaseRole` resource for declarative role management,
 safe primary election via a per-cluster Lease, and operator-to-instance
 authentication on the instance manager's status port (`GHSA-7qwx-x8ff-3px9`).
-In addition, if you are upgrading from a release **older than 1.29.1 or 1.28.3**,
-the metrics-exporter privilege separation from `CVE-2026-44477` also applies.
 Each is covered in its own subsection below.
 
 #### Operator-side password encoding (`CVE-2026-55765`)
 
-Starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons
+Starting from version 1.30.0, for security reasons
 (`CVE-2026-55765` / `GHSA-w3gf-xc94-wvmj`), CloudNativePG SCRAM-SHA-256 encodes
 role passwords **operator-side**
 (client-side from PostgreSQL's point of view) before issuing
@@ -332,7 +519,7 @@ for details.
 
 #### `search_path` hardening (`CVE-2026-55769`)
 
-Also starting from versions 1.30.0, 1.29.2, and 1.28.4, for security reasons
+Also starting from version 1.30.0, for security reasons
 (`CVE-2026-55769` / `GHSA-x8c2-3p4r-v9r6`), CloudNativePG pins the `search_path`
 to a fixed `pg_catalog, public,
 pg_temp` on every connection it opens to PostgreSQL, so that a
@@ -411,23 +598,6 @@ port (TCP 8000) with a `NetworkPolicy`, which remains its security boundary
 there. See
 [Operator-to-instance authentication](security.md#operator-to-instance-authentication)
 for details.
-
-#### Metrics exporter privilege separation (`CVE-2026-44477`)
-
-This applies only if you are upgrading from a release **older than 1.29.1 or
-1.28.3** (for example 1.29.0, 1.28.2, or any earlier version); installations
-already on 1.29.1, 1.28.3, or later already have this change.
-
-The fix for `CVE-2026-44477` / `GHSA-423p-g724-fr39` makes the metrics exporter
-authenticate as a dedicated `cnpg_metrics_exporter` role with `pg_monitor`
-privileges only, instead of the `postgres` superuser.
-
-Custom monitoring queries that read user-owned tables, or use
-`target_databases: '*'` against databases where `PUBLIC` `CONNECT` has been
-revoked, need explicit `GRANT` statements to `cnpg_metrics_exporter`.
-See ["Custom query privileges and safety"](monitoring.md#custom-query-privileges-and-safety)
-and ["Manually creating the metrics exporter role"](monitoring.md#manually-creating-the-metrics-exporter-role)
-in the monitoring documentation.
 
 ## Verifying release assets
 

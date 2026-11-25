@@ -126,9 +126,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		if config.Current().SkipUpgradeSuite {
 			Skip("Skipping upgrade test because skipUpgradeSuite is set in the e2e configuration")
 		}
-		if IsOpenshift() {
-			Skip("This test case is not applicable on OpenShift clusters")
-		}
 	})
 
 	BeforeEach(func() {

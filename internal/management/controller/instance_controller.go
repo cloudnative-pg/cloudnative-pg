@@ -145,10 +145,15 @@ func (r *InstanceReconciler) Reconcile(
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPluginLoading()
 
+	// A Pod created before a plugin was enabled has no sidecar for it.
+	// Requiring it would block every loop, including the one that demotes
+	// this instance in a switchover.
 	pluginClient, err := cnpgiclient.WithPlugins(
 		pluginLoadingContext,
 		r.pluginRepository,
-		cluster.GetInstanceEnabledPluginNames()...,
+		stringset.From(r.availablePluginNames).
+			Intersect(stringset.From(cluster.GetInstanceEnabledPluginNames())).
+			ToList()...,
 	)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
@@ -972,26 +977,7 @@ func (r *InstanceReconciler) reconcileMetricsExporterAuthUser(
 	if !ok {
 		return nil
 	}
-	return setupMetricsExporterRole(ctx, db)
-}
-
-// setupMetricsExporterRole opens a transaction and delegates to the shared
-// helper that creates or repairs the cnpg_metrics_exporter role.
-func setupMetricsExporterRole(ctx context.Context, db *sql.DB) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		// This is a no-op when the transaction is committed
-		_ = tx.Rollback()
-	}()
-
-	if err := postgresManagement.SetupMetricsExporterRole(ctx, tx); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return postgresManagement.EnsureMetricsExporterRole(ctx, db)
 }
 
 // reconcileClusterRoleWithoutDB updates this instance's configuration files
@@ -1038,8 +1024,9 @@ func (r *InstanceReconciler) reconcileMetrics(
 		}
 	}
 
-	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
-	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
+	minSyncReplicas, maxSyncReplicas := replication.GetSyncReplicasBounds(cluster)
+	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(minSyncReplicas))
+	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(maxSyncReplicas))
 
 	syncReplicas := replication.GetExpectedSyncReplicasNumber(ctx, cluster)
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
@@ -1362,9 +1349,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			return reconcile.Result{}, err
 		}
 
-		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
-		if err := r.handlePromotion(ctx, cluster); err != nil {
-			return reconcile.Result{}, err
+		if result, err := r.promoteAfterGate(ctx, cluster); err != nil || !result.IsZero() {
+			return result, err
 		}
 	}
 
@@ -1408,13 +1394,20 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down
-		err := r.waitForWalReceiverDown(ctx)
-		if err != nil {
+		waitWalReceiverDown := r.waitWalReceiverDown
+		if waitWalReceiverDown == nil {
+			waitWalReceiverDown = r.waitForWalReceiverDown
+		}
+		if err := waitWalReceiverDown(ctx); err != nil {
 			return err
 		}
 	}
 
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
+
+	if err := r.primaryLeaseAcquirer.MarkPromoting(ctx); err != nil {
+		return fmt.Errorf("marking the promotion on the primary lease: %w", err)
+	}
 
 	// I must promote my instance here
 	r.promotionRequested = true
@@ -1613,6 +1606,7 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(
 ) shoudRequeue {
 	contextLogger := log.FromContext(ctx)
 
+	//nolint:staticcheck // legacy synchronous replication, deprecated but still supported until 1.33
 	syncReplicaConstraint := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint
 	sync := cluster.Spec.PostgresConfiguration.Synchronous
 	failureDomainsConfigured := syncReplicaConstraint.Enabled ||
