@@ -89,10 +89,13 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when running a different image name", func(ctx SpecContext) {
-		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		// Render the Pod from the old image: the recorded podSpec carries it.
+		oldCluster := cluster.DeepCopy()
+		oldCluster.Spec.ImageName = "postgres:13.10"
+		oldCluster.Status.Image = "postgres:13.10"
+		pod, err := specs.NewInstance(ctx, *oldCluster, 1, true)
 		Expect(err).ToNot(HaveOccurred())
 
-		pod.Spec.Containers[0].Image = "postgres:13.10"
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
 			IsPodReady:     true,
@@ -144,8 +147,12 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.required).To(BeFalse())
 		Expect(rollout.reason).To(BeEmpty())
 
-		// Set a different image to trigger a full rollout
-		pod.Spec.Containers[0].Image = "postgres:13.10"
+		// Render the Pod from the old image: the recorded podSpec carries it.
+		oldCluster := cluster.DeepCopy()
+		oldCluster.Spec.ImageName = "postgres:13.10"
+		oldCluster.Status.Image = "postgres:13.10"
+		pod, err = specs.NewInstance(ctx, *oldCluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
 
 		// Set pending restart to true in the status
 		status = postgres.PostgresqlStatus{
@@ -783,6 +790,114 @@ var _ = Describe("hasValidPodSpec", func() {
 	})
 })
 
+var _ = Describe("Pod image mutated by an admission webhook", func() {
+	// A mutating admission webhook (registry mirror, pull-through cache) rewrites
+	// container images on the persisted Pod. The operator must compare the spec
+	// it rendered, kept in the `cnpg.io/podSpec` annotation, not the live Pod.
+	const mirrorPrefix = "registry.internal.example/mirror/"
+
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.11",
+			},
+			Status: apiv1.ClusterStatus{
+				Image: "postgres:13.11",
+			},
+		}
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	// rewriteImages simulates the webhook, leaving the annotation untouched.
+	rewriteImages := func(pod *corev1.Pod) {
+		for i := range pod.Spec.Containers {
+			pod.Spec.Containers[i].Image = mirrorPrefix + pod.Spec.Containers[i].Image
+		}
+		for i := range pod.Spec.InitContainers {
+			pod.Spec.InitContainers[i].Image = mirrorPrefix + pod.Spec.InitContainers[i].Image
+		}
+	}
+
+	It("does not require a rollout when only the live images were rewritten", func(ctx SpecContext) {
+		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		rewriteImages(pod)
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeFalse(), "reason: %s", rollout.reason)
+	})
+
+	It("still requires a rollout when the operand image actually changes", func(ctx SpecContext) {
+		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		rewriteImages(pod)
+
+		cluster := cluster.DeepCopy()
+		cluster.Spec.ImageName = "postgres:13.12"
+		cluster.Status.Image = "postgres:13.12"
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("the instance is using a different image"))
+		Expect(rollout.needsToChangeOperandImage).To(BeTrue())
+	})
+
+	It("still requires a rollout when the operator image actually changes", func(ctx SpecContext) {
+		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		rewriteImages(pod)
+
+		configuration.Current.OperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
+		configuration.Current.EnableInstanceManagerInplaceUpdates = false
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("old bootstrap container image"))
+		Expect(rollout.needsToChangeOperatorImage).To(BeTrue())
+	})
+
+	It("falls back to the live Pod when no podSpec annotation is recorded", func(ctx SpecContext) {
+		pod, err := specs.NewInstance(ctx, cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+		delete(pod.Annotations, utils.PodSpecAnnotationName)
+		pod.Spec.Containers[0].Image = "postgres:13.10"
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("the instance is using a different image"))
+	})
+})
+
 var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() {
 	var cluster apiv1.Cluster
 
@@ -885,6 +1000,25 @@ var _ = Describe("isConfigNonUniformityFromUpgrade", func() {
 				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-a"),
 			},
 		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("same version with one image rewritten by an admission webhook, config still propagating", func() {
+		// The webhook was enabled after pod-1 was created: only pod-2 is rewritten
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", oldOperatorImage, oldExecHash, "hash-a"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-b"),
+			},
+		}
+		for i := range statusList.Items {
+			pod := statusList.Items[i].Pod
+			podSpec, err := json.Marshal(pod.Spec)
+			Expect(err).ToNot(HaveOccurred())
+			pod.Annotations = map[string]string{utils.PodSpecAnnotationName: string(podSpec)}
+		}
+		statusList.Items[1].Pod.Spec.InitContainers[0].Image = "registry.internal.example/mirror/" + oldOperatorImage
+
 		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
 	})
 
