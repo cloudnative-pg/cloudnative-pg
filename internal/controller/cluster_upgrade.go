@@ -367,7 +367,9 @@ func isConfigNonUniformityFromUpgrade(instancesStatus postgres.PostgresqlStatusL
 		if pod == nil {
 			continue
 		}
-		opImage, err := specs.GetBootstrapControllerImageName(*pod)
+		// Rendered image: a webhook enabled after some Pods were created
+		// would otherwise split one operator version in two.
+		opImage, err := renderedImage(pod, specs.GetBootstrapControllerImageName)
 		if err != nil {
 			continue
 		}
@@ -469,14 +471,39 @@ func isPodNeedingRollout(
 	return rollout{}
 }
 
-// check if the pod has a valid podSpec
-func hasValidPodSpec(pod *corev1.Pod) bool {
+// recordedPodSpec returns the PodSpec the operator rendered for this Pod, as
+// stored in the `cnpg.io/podSpec` annotation, and whether a valid record exists.
+func recordedPodSpec(pod *corev1.Pod) (*corev1.PodSpec, bool) {
 	podSpecAnnotation, hasStoredPodSpec := pod.Annotations[utils.PodSpecAnnotationName]
 	if !hasStoredPodSpec {
-		return false
+		return nil, false
 	}
-	err := json.Unmarshal([]byte(podSpecAnnotation), &corev1.PodSpec{})
-	return err == nil
+
+	var storedPodSpec corev1.PodSpec
+	if err := json.Unmarshal([]byte(podSpecAnnotation), &storedPodSpec); err != nil {
+		return nil, false
+	}
+
+	return &storedPodSpec, true
+}
+
+// check if the pod has a valid podSpec
+func hasValidPodSpec(pod *corev1.Pod) bool {
+	_, ok := recordedPodSpec(pod)
+	return ok
+}
+
+// renderedImage extracts a container image from the PodSpec the operator
+// rendered for this Pod. A mutating admission webhook (a registry mirror, for
+// instance) can rewrite the live image, which would then never match the
+// target and make the operator replace the Pod forever. It falls back to the
+// live Pod when there is no valid record.
+func renderedImage(pod *corev1.Pod, extract func(corev1.Pod) (string, error)) (string, error) {
+	if storedPodSpec, ok := recordedPodSpec(pod); ok {
+		return extract(corev1.Pod{Spec: *storedPodSpec})
+	}
+
+	return extract(*pod)
 }
 
 func checkPodNeedsUpdatedTopology(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
@@ -554,7 +581,7 @@ func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVol
 func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
 	targetImageName := cluster.Status.Image
 
-	pgCurrentImageName, err := specs.GetPostgresImageName(*pod)
+	pgCurrentImageName, err := renderedImage(pod, specs.GetPostgresImageName)
 	if err != nil {
 		return rollout{}, err
 	}
@@ -571,6 +598,8 @@ func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.
 	}, nil
 }
 
+// checkPodBootstrapImage is only reached for Pods without a valid podSpec
+// annotation, so the live Pod is the only source for the image.
 func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster) (rollout, error) {
 	if configuration.Current.EnableInstanceManagerInplaceUpdates {
 		return rollout{}, nil
@@ -718,7 +747,7 @@ func checkPodSpecIsOutdated(
 
 	// the bootstrap init-container could change image after an operator upgrade.
 	// If in-place upgrades of the instance manager are enabled, we don't need rollout.
-	opCurrentImageName, err := specs.GetBootstrapControllerImageName(*pod)
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(corev1.Pod{Spec: storedPodSpec})
 	if err != nil {
 		return rollout{}, err
 	}
