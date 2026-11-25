@@ -8,9 +8,9 @@ boto3==1.44.3 \
     --hash=sha256:8c9c4844c7ce184494b102983696d6cdb09f5307ec7f238ca4ad5849fb14e26b \
     --hash=sha256:bba566b5cba78db05c5f6c44d219c8f6fb2cd2b923106f767289e4cd0b87b093
     # via -r workflow-requirements.in
-botocore==1.44.3 \
-    --hash=sha256:44d86fff55ce2d014bd72183ebc164b21b36598253b8234d4f59e8600e09b8b3 \
-    --hash=sha256:793eac2a7ca167e9376b136cf000e1675e9ffe8d7ec609160cc1ee00b93ace28
+botocore==1.44.11 \
+    --hash=sha256:441c5ebbad9bb2911120d12bda448d4b55793fc52fc7425d9392ebb02f4814a4 \
+    --hash=sha256:c889792a88e04cc9f0b6eebc742112e5edb2710fe932f4c9a3ba784f92f09d75
     # via
     #   boto3
     #   s3transfer
