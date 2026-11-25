@@ -85,6 +85,9 @@ func buildTestEnvironment() *testingEnvironment {
 		WithIndex(&apiv1.Backup{}, backupPhase, func(rawObj client.Object) []string {
 			return []string{string(rawObj.(*apiv1.Backup).Status.Phase)}
 		}).
+		WithIndex(&apiv1.Pooler{}, poolerClusterKey, func(rawObj client.Object) []string {
+			return []string{rawObj.(*apiv1.Pooler).Spec.Cluster.Name}
+		}).
 		Build()
 	Expect(err).ToNot(HaveOccurred())
 

@@ -449,6 +449,35 @@ var _ = Describe("isOwnedByPooler function tests", func() {
 		result := isOwnedByPooler(pooler.Name, &ownedResource)
 		Expect(result).To(BeFalse())
 	})
+
+	It("should map a cluster to the poolers using it", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler1 := newFakePooler(env.client, cluster)
+		pooler2 := newFakePooler(env.client, cluster)
+
+		// a pooler using another cluster in the same namespace
+		otherCluster := newFakeCNPGCluster(env.client, namespace)
+		_ = newFakePooler(env.client, otherCluster)
+
+		// a pooler using a cluster with the same name in another namespace
+		sameNameCluster := cluster.DeepCopy()
+		sameNameCluster.Namespace = newFakeNamespace(env.client)
+		_ = newFakePooler(env.client, sameNameCluster)
+
+		requests := env.poolerReconciler.mapClusterToPoolers()(ctx, cluster)
+		Expect(requests).To(ConsistOf(
+			reconcile.Request{NamespacedName: types.NamespacedName{Name: pooler1.Name, Namespace: namespace}},
+			reconcile.Request{NamespacedName: types.NamespacedName{Name: pooler2.Name, Namespace: namespace}},
+		))
+	})
+
+	It("should not map objects that are not clusters", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret", Namespace: namespace}}
+
+		Expect(env.poolerReconciler.mapClusterToPoolers()(ctx, secret)).To(BeEmpty())
+	})
 })
 
 var _ = Describe("poolerImageCatalogIndexer", func() {

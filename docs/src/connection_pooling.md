@@ -352,6 +352,55 @@ You can define resource requests and limits by adding a container named
               memory: 500Mi
 ```
 
+#### Security contexts
+
+The security contexts of the PgBouncer pods, and of their `pgbouncer` and
+`bootstrap-controller` containers, are derived from the ones of the `Cluster`
+(see ["Customizing Security Contexts"](security.md#customizing-security-contexts)),
+and can be customized through the `template` section.
+
+The pod security context is built as follows, from the highest to the lowest
+precedence:
+
+1. `spec.template.spec.securityContext` of the `Pooler`.
+2. The PgBouncer identity, which always replaces the one defined in the
+   `Cluster`: `runAsNonRoot: true`, `runAsUser: 998`, `runAsGroup: 996` and
+   `fsGroup: 996`.
+3. `spec.podSecurityContext` of the `Cluster`, except for `sysctls`, which are
+   meant to tune PostgreSQL and are not applied to the PgBouncer pods.
+4. `spec.seccompProfile` of the `Cluster`, or `RuntimeDefault` if not set.
+
+The security context of the `pgbouncer` and `bootstrap-controller` containers
+is built as follows, from the highest to the lowest precedence:
+
+1. The `securityContext` of the container in `spec.template.spec.containers`
+   (or `spec.template.spec.initContainers`) of the `Pooler`.
+2. `runAsNonRoot: true`. The `runAsUser` and `runAsGroup` defined in the
+   `Cluster` are not applied, as the user is defined at the pod level.
+3. `spec.securityContext` of the `Cluster`, and the operator defaults for the
+   fields it leaves unset.
+
+Each field is replaced as a whole: for example, setting `capabilities` in the
+`template` replaces the default `capabilities` entirely.
+
+```yaml
+# ...
+  template:
+    spec:
+      securityContext:
+        supplementalGroups: [2000]
+```
+
+Changes to the security contexts of the `Cluster` are propagated to the
+PgBouncer pods through a rolling update of the `Pooler` deployment.
+
+:::note
+    When running on OpenShift, the pod security context defined in the
+    template is used as is: the security contexts of the `Cluster` are not
+    applied, and the remaining fields are assigned by the Security Context
+    Constraints.
+:::
+
 ## PgBouncer image
 
 By default, CloudNativePG deploys the
