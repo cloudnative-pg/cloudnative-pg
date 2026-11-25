@@ -64,11 +64,10 @@ var _ = Describe("setupExtensionEnvironment", func() {
 		Expect(setupExtensionEnvironment(cluster)).To(Succeed())
 	})
 
-	// Regression test for https://github.com/cloudnative-pg/cloudnative-pg/issues/11285:
-	// when the same extension is mounted from both the source and target images during a
-	// major upgrade, the TARGET paths must precede the SOURCE paths on LD_LIBRARY_PATH and
-	// PATH, so a newer native dependency (e.g. GEOS) shipped in the target image wins over
-	// the older copy in the source image instead of being shadowed by it.
+	// During major upgrades, both SOURCE and TARGET version extensions are mounted inside the job.
+	// The TARGET paths must precede the SOURCE paths on LD_LIBRARY_PATH and PATH, so a newer
+	// native dependency (e.g. GEOS) shipped in the target image wins over the older copy in the
+	// source image instead of being shadowed by it.
 	It("orders target (new) extension paths before source (old) on LD_LIBRARY_PATH and PATH", func() {
 		// Establish a known-empty baseline; GinkgoT().Setenv restores prior values afterwards.
 		GinkgoT().Setenv("LD_LIBRARY_PATH", "")

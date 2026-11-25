@@ -634,7 +634,7 @@ func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 	// across the GEOS 3.x series), so preferring the newer copy satisfies both servers. With
 	// source-first ordering the older library shadowed the newer one, breaking the new
 	// server's extension load with "undefined symbol" during a major upgrade that also changes
-	// the extension version. See https://github.com/cloudnative-pg/cloudnative-pg/issues/11285.
+	// the extension version.
 	libPaths := slices.Concat(
 		extensions.CollectLibraryPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
 		extensions.CollectLibraryPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
