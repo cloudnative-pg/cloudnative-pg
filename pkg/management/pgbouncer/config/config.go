@@ -219,21 +219,20 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	}
 
 	templateData := struct {
-		Pooler        *apiv1.Pooler
-		AuthQuery     string
-		AuthQueryUser string
-		// AuthQueryUserListUser is the auth user as it has to be written inside
-		// the double-quoted fields of userlist.txt, while pgbouncer.ini takes
-		// the raw value
+		Pooler                *apiv1.Pooler
+		AuthQuery             string
+		AuthQueryUser         string
 		AuthQueryUserListUser string
 		AuthQueryPassword     string
 		AuthDBName            string
 		Parameters            string
 		PgHba                 []string
 	}{
-		Pooler:                pooler,
-		AuthQuery:             cleanupPgBouncerQuery(pooler.GetAuthQuery()),
-		AuthQueryUser:         authQueryUser,
+		Pooler:        pooler,
+		AuthQuery:     cleanupPgBouncerQuery(pooler.GetAuthQuery()),
+		AuthQueryUser: authQueryUser,
+		// userlist.txt wants the auth user inside double-quoted fields, while
+		// pgbouncer.ini takes the raw value
 		AuthQueryUserListUser: escapePgBouncerUserListValue(authQueryUser),
 		AuthQueryPassword:     authQueryPassword,
 		AuthDBName:            apiv1.PoolerAuthDBName,
