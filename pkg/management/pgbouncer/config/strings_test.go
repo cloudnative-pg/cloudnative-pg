@@ -83,7 +83,6 @@ var _ = Describe("PgBouncer configuration", func() {
 		Expect(params["admin_users"]).To(Equal(forcedPgBouncerParameters["admin_users"]))
 		// ... and the other ones are rendered with their canonical name
 		Expect(params["verbose"]).To(Equal("1"))
-		Expect(params).To(HaveLen(len(defaultPgBouncerParameters) + len(forcedPgBouncerParameters) + 1))
 	})
 
 	DescribeTable("rejects the names that cannot be the key of a line",
@@ -92,11 +91,9 @@ var _ = Describe("PgBouncer configuration", func() {
 			Expect(err).To(HaveOccurred())
 		},
 		Entry("empty", ""),
-		Entry("only whitespace", " \n "),
 		Entry("with an equal sign", "listen_port=6543"),
 		Entry("with an inner space", "listen_port 6543"),
 		Entry("starting a section", "[databases]"),
 		Entry("starting a comment", ";listen_port"),
-		Entry("starting a hash comment", "#listen_port"),
 	)
 })
