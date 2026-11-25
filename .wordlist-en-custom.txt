@@ -90,6 +90,7 @@ Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
+Chenal
 CiliumNetworkPolicy
 ClassName
 ClientCASecret
