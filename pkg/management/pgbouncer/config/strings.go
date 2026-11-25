@@ -83,30 +83,21 @@ func buildPgBouncerParameters(userParameters map[string]string) (map[string]stri
 	return params, nil
 }
 
-// The following regexp will match any newline character and the NUL byte.
-// PgBouncer doesn't admit newlines inside the configuration at all, and
-// ignores everything that follows a NUL byte
+// newlineRegexp matches any newline character and the NUL byte.
 var newlineRegexp = regexp.MustCompile(`\r\n|[\r\n\v\f\x00\x{0085}\x{2028}\x{2029}]`)
 
-// cleanupPgBouncerValue removes any newline character and NUL byte from a
-// configuration value. The parser used by libusual doesn't support that.
+// cleanupPgBouncerValue removes newlines and NUL bytes from a value. PgBouncer
+// has no line continuation and stops reading the file at the first NUL byte.
 func cleanupPgBouncerValue(parameter string) (escaped string) {
 	// See:
 	// https://github.com/libusual/libusual/blob/master/usual/cfparser.c  //wokeignore:rule=master
-	//
-	// The PgBouncer ini file parser doesn't admit any newline character
-	// or NUL byte so we are just removing them from the value
 	return newlineRegexp.ReplaceAllString(parameter, "")
 }
 
-// cleanupPgBouncerName returns the name of a configuration parameter as it can
-// be written in pgbouncer.ini. It removes newlines and NUL bytes like
-// cleanupPgBouncerValue does, and the whitespace around the name, which
-// PgBouncer ignores: "listen_port " is the parameter "listen_port", so it must
-// not be told apart from it, or it would shadow the parameters we force.
-//
-// A name that still cannot be the key of a line is rejected, instead of being
-// rendered into something PgBouncer would read differently than we do.
+// cleanupPgBouncerName cleans a parameter name like a value, and trims the
+// whitespace PgBouncer ignores: "listen_port " is "listen_port", and must not
+// shadow the forced parameters. A name that still cannot be the key of a line
+// is rejected.
 func cleanupPgBouncerName(name string) (string, error) {
 	cleaned := strings.TrimSpace(cleanupPgBouncerValue(name))
 
