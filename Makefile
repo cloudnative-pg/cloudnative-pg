@@ -61,7 +61,7 @@ CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.20.3
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.70.0@sha256:27c0fa859c369e58b7f17b0b742f6005d40f46aca3dfbe894a3ab6f28c911636
+SPELLCHECK_VERSION ?= 0.71.0@sha256:18d7bd36dc8c7dfa4108de91fd3d6af0710f92d40184e51bed3e18866909275a
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0@sha256:5cdd550a166c9e11f2f53c3f6c23dfafdf879e9bcaffd07c2f8bfef095c1b579
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
