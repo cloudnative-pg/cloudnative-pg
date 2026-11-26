@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -55,6 +56,12 @@ func (r *InstanceReconciler) resetFailoverQuorumObject(ctx context.Context, clus
 // standbys are aligned with the primary
 const failoverQuorumRequeueDelay = time.Second
 
+// failoverQuorumCheckpointTimeout is how long a reconciliation loop waits for
+// the checkpoint requested to make the synchronous standbys effective. The
+// checkpoint is not interrupted when the timeout expires: it is waited for in
+// the following loops, without requesting it again.
+const failoverQuorumCheckpointTimeout = 15 * time.Second
+
 // updateFailoverQuorumObject updates the sync quorum object reading the
 // current synchronous replica metadata from the PG instance.
 //
@@ -72,12 +79,19 @@ func (r *InstanceReconciler) updateFailoverQuorumObject(
 
 	if !r.shouldManageFailoverQuorumObject(cluster) {
 		r.pendingFailoverQuorum = nil
+		r.forgetSyncStandbysEffective()
 		return false, nil
 	}
 
 	desired, err := r.getDesiredFailoverQuorumStatus(ctx)
 	if err != nil {
 		return false, err
+	}
+
+	if equality.Semantic.DeepEqual(desired, apiv1.FailoverQuorumStatus{}) {
+		// Synchronous replication is not configured: when it will be, backends
+		// may not wait for the standbys until the checkpointer notices.
+		r.forgetSyncStandbysEffective()
 	}
 
 	published, err := r.getFailoverQuorumStatus(ctx, cluster)
@@ -125,27 +139,135 @@ func (r *InstanceReconciler) updateFailoverQuorumObject(
 			return true, nil
 
 		case failoverQuorumActionCapture:
-			// The published status refers to a previous configuration, and
-			// it can't be trusted anymore.
-			if !equality.Semantic.DeepEqual(published, apiv1.FailoverQuorumStatus{}) {
-				if err := r.setFailoverQuorumStatus(ctx, cluster, apiv1.FailoverQuorumStatus{}); err != nil {
-					return false, err
-				}
-				published = apiv1.FailoverQuorumStatus{}
+			waiting, err := r.captureFailoverQuorum(ctx, cluster, desired, published)
+			if err != nil || waiting {
+				return waiting, err
 			}
-
-			lsn, err := r.instance.GetCurrentWALInsertLSN(ctx)
-			if err != nil {
-				return false, err
-			}
-			contextLogger.Info(
-				"Failover quorum status changed, waiting for the standbys to reach the current WAL position",
-				"lsn", lsn,
-				"desired", desired,
-			)
-			r.pendingFailoverQuorum = &pendingFailoverQuorum{desired: desired, lsn: lsn}
+			published = apiv1.FailoverQuorumStatus{}
 		}
 	}
+}
+
+// captureFailoverQuorum empties the published status, which refers to a
+// previous configuration and can't be trusted anymore, and records the
+// WAL position the standbys have to reach before the desired status is
+// published. It returns true when the caller should retry later.
+func (r *InstanceReconciler) captureFailoverQuorum(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	desired apiv1.FailoverQuorumStatus,
+	published apiv1.FailoverQuorumStatus,
+) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if !equality.Semantic.DeepEqual(published, apiv1.FailoverQuorumStatus{}) {
+		if err := r.setFailoverQuorumStatus(ctx, cluster, apiv1.FailoverQuorumStatus{}); err != nil {
+			return false, err
+		}
+	}
+
+	// The LSN is taken only when the backends are known to wait
+	// for the synchronous standbys.
+	effective, err := r.ensureSyncStandbysEffective(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !effective {
+		return true, nil
+	}
+
+	lsn, err := r.instance.GetCurrentWALInsertLSN(ctx)
+	if err != nil {
+		return false, err
+	}
+	contextLogger.Info(
+		"Failover quorum status changed, waiting for the standbys to reach the current WAL position",
+		"lsn", lsn,
+		"desired", desired,
+	)
+	r.pendingFailoverQuorum = &pendingFailoverQuorum{desired: desired, lsn: lsn}
+
+	return false, nil
+}
+
+// ensureSyncStandbysEffective makes sure that, after a reload that defined the
+// synchronous standbys, the committing backends really wait for them. It
+// returns false when this is not guaranteed yet and the caller should retry.
+//
+// Backends don't read synchronous_standby_names: they look at a flag in shared
+// memory that only the checkpointer updates, and it applies a pending reload
+// only between checkpoints, or while a paced checkpoint is not behind
+// schedule. Until then commits return without waiting for the standbys, even
+// if they are listed. See the "sync_standbys_defined and pg_stat_replication"
+// thread on pgsql-hackers (Oct 2025):
+// https://www.postgresql.org/message-id/CANwKhkMTkckNSoz0kUYFvaMDA_6g2uuABcvhoowu64e9e%2Bop%3DA%40mail.gmail.com
+//
+// There is no way to observe the flag, so we request a checkpoint: it is fast,
+// it completes only after one started after the request, and the checkpointer
+// applies the pending reload before starting it. The flag stays set for the
+// whole PostgreSQL run, until synchronous replication is disabled, so the
+// checkpoint is requested only when we don't know that it is. A restarted
+// postmaster starts from the configuration on disk, with no reload pending.
+//
+// The checkpoint can take long, and requesting it again while the requested
+// one is running makes the checkpointer run yet another one. So it is
+// requested once: if the request times out, the next loops check if a
+// checkpoint started after it was requested has completed, looking at the
+// redo location of the last checkpoint.
+func (r *InstanceReconciler) ensureSyncStandbysEffective(ctx context.Context) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if r.syncStandbysEffective {
+		return true, nil
+	}
+
+	if r.checkpointRequestedAtLSN != "" {
+		started, err := r.instance.HasCheckpointStartedAtOrAfter(ctx, r.checkpointRequestedAtLSN)
+		if err != nil {
+			return false, err
+		}
+		if !started {
+			return false, nil
+		}
+
+		r.syncStandbysEffective = true
+		r.checkpointRequestedAtLSN = ""
+		return true, nil
+	}
+
+	lsn, err := r.instance.GetCurrentWALInsertLSN(ctx)
+	if err != nil {
+		return false, err
+	}
+	r.checkpointRequestedAtLSN = lsn
+
+	contextLogger.Info("Requesting a checkpoint to ensure the synchronous standbys are effective", "lsn", lsn)
+
+	checkpointCtx, cancel := context.WithTimeout(ctx, failoverQuorumCheckpointTimeout)
+	defer cancel()
+
+	if err := r.instance.RequestCheckpoint(checkpointCtx); err != nil {
+		if errors.Is(checkpointCtx.Err(), context.DeadlineExceeded) {
+			contextLogger.Info("The checkpoint is taking long, will wait for it",
+				"timeout", failoverQuorumCheckpointTimeout)
+			return false, nil
+		}
+
+		// We don't know if the request has been received
+		r.checkpointRequestedAtLSN = ""
+		return false, err
+	}
+
+	r.syncStandbysEffective = true
+	r.checkpointRequestedAtLSN = ""
+	return true, nil
+}
+
+// forgetSyncStandbysEffective forgets that the synchronous standbys are
+// effective, and any checkpoint requested to make them so
+func (r *InstanceReconciler) forgetSyncStandbysEffective() {
+	r.syncStandbysEffective = false
+	r.checkpointRequestedAtLSN = ""
 }
 
 // getDesiredFailoverQuorumStatus computes the FailoverQuorum status
@@ -225,7 +347,8 @@ type pendingFailoverQuorum struct {
 	desired apiv1.FailoverQuorumStatus
 
 	// lsn is the WAL insert position of the primary, taken after the
-	// configuration backing `desired` became effective. Every transaction
+	// configuration backing `desired` became effective (see
+	// ensureSyncStandbysEffective). Every transaction
 	// acknowledged under a previous configuration has its commit record
 	// before this position.
 	lsn string

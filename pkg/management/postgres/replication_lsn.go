@@ -100,3 +100,52 @@ func countStandbysFlushedAtLeast(
 
 	return count, nil
 }
+
+// RequestCheckpoint requests a checkpoint and waits for it to complete.
+//
+// A requested checkpoint is fast: it completes much sooner than a paced one.
+// If the context expires the checkpoint is not interrupted, it keeps running
+// on the server.
+func (instance *Instance) RequestCheckpoint(ctx context.Context) error {
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	return requestCheckpoint(ctx, db)
+}
+
+// HasCheckpointStartedAtOrAfter returns true if the last completed checkpoint
+// started at or after the passed LSN, that is a position of the WAL insert
+// pointer read before requesting a checkpoint. The redo location is used
+// because it is where a checkpoint starts: the checkpoint that was already
+// running when the request was made started before it, and it doesn't count.
+func (instance *Instance) HasCheckpointStartedAtOrAfter(ctx context.Context, lsn string) (bool, error) {
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return false, err
+	}
+
+	return hasCheckpointStartedAtOrAfter(ctx, db, lsn)
+}
+
+func hasCheckpointStartedAtOrAfter(ctx context.Context, db *sql.DB, lsn string) (bool, error) {
+	var result bool
+	if err := db.QueryRowContext(
+		ctx,
+		"SELECT redo_lsn >= $1::pg_catalog.pg_lsn FROM pg_catalog.pg_control_checkpoint()",
+		lsn,
+	).Scan(&result); err != nil {
+		return false, fmt.Errorf("while checking the last checkpoint against LSN %s: %w", lsn, err)
+	}
+
+	return result, nil
+}
+
+func requestCheckpoint(ctx context.Context, db *sql.DB) error {
+	if _, err := db.ExecContext(ctx, "CHECKPOINT"); err != nil {
+		return fmt.Errorf("while requesting a checkpoint: %w", err)
+	}
+
+	return nil
+}

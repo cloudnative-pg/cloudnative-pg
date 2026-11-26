@@ -89,4 +89,47 @@ var _ = Describe("replication LSN helpers", func() {
 			Expect(err).To(MatchError(ContainSubstring("boom")))
 		})
 	})
+
+	Describe("requestCheckpoint", func() {
+		It("executes a checkpoint", func(ctx context.Context) {
+			mock.ExpectExec("CHECKPOINT").WillReturnResult(sqlmock.NewResult(0, 0))
+
+			Expect(requestCheckpoint(ctx, db)).To(Succeed())
+		})
+
+		It("wraps the errors", func(ctx context.Context) {
+			mock.ExpectExec("CHECKPOINT").WillReturnError(errors.New("boom"))
+
+			Expect(requestCheckpoint(ctx, db)).To(MatchError(ContainSubstring("boom")))
+		})
+	})
+
+	Describe("hasCheckpointStartedAtOrAfter", func() {
+		It("returns the comparison made by the database", func(ctx context.Context) {
+			mock.ExpectQuery("FROM pg_catalog.pg_control_checkpoint").
+				WithArgs("0/5000060").
+				WillReturnRows(sqlmock.NewRows([]string{"started"}).AddRow(true))
+
+			started, err := hasCheckpointStartedAtOrAfter(ctx, db, "0/5000060")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(started).To(BeTrue())
+		})
+
+		It("returns false when the last checkpoint is older", func(ctx context.Context) {
+			mock.ExpectQuery("FROM pg_catalog.pg_control_checkpoint").
+				WithArgs("0/5000060").
+				WillReturnRows(sqlmock.NewRows([]string{"started"}).AddRow(false))
+
+			started, err := hasCheckpointStartedAtOrAfter(ctx, db, "0/5000060")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(started).To(BeFalse())
+		})
+
+		It("wraps the query errors", func(ctx context.Context) {
+			mock.ExpectQuery("FROM pg_catalog.pg_control_checkpoint").WillReturnError(errors.New("boom"))
+
+			_, err := hasCheckpointStartedAtOrAfter(ctx, db, "0/5000060")
+			Expect(err).To(MatchError(ContainSubstring("boom")))
+		})
+	})
 })

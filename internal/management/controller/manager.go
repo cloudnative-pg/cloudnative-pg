@@ -87,6 +87,18 @@ type InstanceReconciler struct {
 	// is captured at a later WAL position.
 	pendingFailoverQuorum *pendingFailoverQuorum
 
+	// syncStandbysEffective is true when we know that backends wait for the
+	// synchronous standbys. It is reset when synchronous replication is
+	// disabled or when this instance doesn't manage the FailoverQuorum object.
+	// Written and read only by Reconcile.
+	syncStandbysEffective bool
+
+	// checkpointRequestedAtLSN is the WAL insert LSN read right before
+	// requesting the checkpoint that makes the synchronous standbys effective.
+	// It is empty when no such checkpoint is pending. Written and read only by
+	// Reconcile.
+	checkpointRequestedAtLSN string
+
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
 	primaryLeaseAcquirer  PrimaryLeaseAcquirer
