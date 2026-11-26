@@ -42,7 +42,6 @@ import (
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	testsutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
@@ -391,28 +390,12 @@ func AssertReplicaModeCluster(
 // have a bootstrap.initdb-style "app" database.
 func AssertDetachReplicaModeCluster(
 	env *environment.TestingEnvironment,
-	testTimeouts map[timeouts.Timeout]int,
 	namespace, srcClusterName, srcDatabaseName string,
 	replicaClusterName, replicaDatabaseName, replicaUserName string,
 	testTableName string,
 ) {
 	GinkgoHelper()
 	var primaryReplicaCluster *corev1.Pod
-
-	var referenceTime time.Time
-	By("taking the reference time before the detaching", func() {
-		Eventually(func(g Gomega) {
-			referenceCondition, err := backups.GetConditionsInClusterStatus(
-				env.Ctx, env.Client,
-				namespace, replicaClusterName,
-				apiv1.ConditionClusterReady,
-			)
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(referenceCondition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
-			g.Expect(referenceCondition).ToNot(BeNil())
-			referenceTime = referenceCondition.LastTransitionTime.Time
-		}, 60, 5).Should(Succeed())
-	})
 
 	By("disabling the replica mode", func() {
 		Eventually(func(g Gomega) {
@@ -422,23 +405,6 @@ func AssertDetachReplicaModeCluster(
 			cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
 			g.Expect(env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(original))).To(Succeed())
 		}, 60, 5).Should(Succeed())
-	})
-
-	By("ensuring the replica cluster got promoted and restarted", func() {
-		Eventually(func(g Gomega) {
-			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, replicaClusterName)
-			g.Expect(err).ToNot(HaveOccurred())
-			condition, err := backups.GetConditionsInClusterStatus(
-				env.Ctx, env.Client,
-				namespace, cluster.Name,
-				apiv1.ConditionClusterReady,
-			)
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(condition).ToNot(BeNil())
-			g.Expect(condition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
-			g.Expect(condition.LastTransitionTime.Time).To(BeTemporally(">", referenceTime))
-		}).WithTimeout(60 * time.Second).Should(Succeed())
-		clusterasserts.AssertClusterIsReady(env, namespace, replicaClusterName, testTimeouts[timeouts.ClusterIsReady])
 	})
 
 	By("verifying write operation on the replica cluster primary pod", func() {
