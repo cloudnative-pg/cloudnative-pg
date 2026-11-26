@@ -29,6 +29,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,33 +152,40 @@ func divergedInstanceNames(cluster *apiv1.Cluster) []string {
 }
 
 // updateNoPromotableInstanceCondition sets the ConditionNoPromotableInstance
-// condition while the only active instances are diverged, and removes it
-// otherwise. A diverged instance is fenced, and with
-// PostgreSQL down it no longer reports its divergence:
-// cluster.Status.DivergedInstances tells which ones they are.
+// condition while every active instance is diverged, and removes it
+// otherwise.
+//
+// The diverged instances are taken from cluster.Status.DivergedInstances
+// rather than from the statuses: a diverged instance is fenced, so PostgreSQL
+// is down and it cannot report its own divergence.
 func updateNoPromotableInstanceCondition(cluster *apiv1.Cluster, statuses postgres.PostgresqlStatusList) {
 	// With no active instance there is nothing new to say
 	if len(statuses.Items) == 0 {
 		return
 	}
 
-	onlyDivergedInstances := !slices.ContainsFunc(statuses.Items, func(item postgres.PostgresqlStatus) bool {
-		_, diverged := cluster.Status.DivergedInstances[apiv1.PodName(item.Pod.Name)]
-		return !diverged
-	})
+	activeInstances := stringset.New()
+	for _, item := range statuses.Items {
+		activeInstances.Put(item.Pod.Name)
+	}
+	divergedNames := divergedInstanceNames(cluster)
+	onlyDivergedInstances := activeInstances.Subtract(stringset.From(divergedNames)).Len() == 0
 	if !onlyDivergedInstances {
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, string(apiv1.ConditionNoPromotableInstance))
 		return
 	}
 
+	message := fmt.Sprintf(
+		"No instance can replace the primary %v: the only active instances are diverged, "+
+			"and a diverged instance is never promoted: %v",
+		cluster.Status.CurrentPrimary,
+		strings.Join(divergedNames, ", "),
+	)
 	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:   string(apiv1.ConditionNoPromotableInstance),
-		Status: metav1.ConditionTrue,
-		Reason: string(apiv1.ConditionReasonOnlyDivergedInstances),
-		Message: fmt.Sprintf(
-			"No instance can replace the primary %v: the only active instances are diverged, "+
-				"and a diverged instance is never promoted: %v",
-			cluster.Status.CurrentPrimary, strings.Join(divergedInstanceNames(cluster), ", ")),
+		Type:    string(apiv1.ConditionNoPromotableInstance),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.ConditionReasonOnlyDivergedInstances),
+		Message: message,
 	})
 }
 
