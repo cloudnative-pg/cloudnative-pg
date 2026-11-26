@@ -163,7 +163,7 @@ type Instance struct {
 	StartupOptions []string
 
 	// Pool of DB connections pointing to every used database
-	pool pool.Pooler
+	pool *pool.ConnectionPool
 
 	// Pool of DB connections for the metrics exporter (connects as cnpg_metrics_exporter)
 	initializeMetricsPool sync.Once

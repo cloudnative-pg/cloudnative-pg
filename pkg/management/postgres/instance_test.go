@@ -27,12 +27,13 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -905,28 +906,131 @@ var _ = Describe("local connections", func() {
 })
 
 var _ = Describe("GetSynchronousReplicationMetadata", func() {
-	const query = "SELECT COALESCE(current_setting($1, true), '')"
+	const parameter = "cnpg.synchronous_standby_names_metadata"
 
-	var (
-		instance *Instance
-		mock     sqlmock.Sqlmock
-	)
+	// servePostgres answers one connection of the instance like a PostgreSQL
+	// having the given settings: SHOW fails on a parameter it does not know,
+	// while current_setting with missing_ok yields NULL for it.
+	servePostgres := func(conn net.Conn, settings map[string]string) {
+		defer func() { _ = conn.Close() }()
 
-	BeforeEach(func() {
-		db, dbMock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		backend := pgproto3.NewBackend(conn, conn)
+		if _, err := backend.ReceiveStartupMessage(); err != nil {
+			return
+		}
+		backend.Send(&pgproto3.AuthenticationOk{})
+		backend.Send(&pgproto3.ReadyForQuery{TxStatus: 'I'})
+
+		const textOID = 25
+		var (
+			value      string
+			parameters int
+			failed     bool
+		)
+		for backend.Flush() == nil {
+			message, err := backend.Receive()
+			if err != nil {
+				return
+			}
+
+			switch message := message.(type) {
+			case *pgproto3.Sync:
+				failed = false
+				backend.Send(&pgproto3.ReadyForQuery{TxStatus: 'I'})
+			case *pgproto3.Parse:
+				name, isShow := strings.CutPrefix(message.Query, "SHOW ")
+				value = settings[name]
+				parameters = strings.Count(message.Query, "$1")
+				if _, known := settings[name]; isShow && !known {
+					failed = true
+					backend.Send(&pgproto3.ErrorResponse{
+						Severity: "ERROR",
+						Code:     "42704",
+						Message:  fmt.Sprintf("unrecognized configuration parameter %q", name),
+					})
+					continue
+				}
+				backend.Send(&pgproto3.ParseComplete{})
+			case *pgproto3.Describe:
+				if failed {
+					continue
+				}
+				if message.ObjectType == 'S' {
+					backend.Send(&pgproto3.ParameterDescription{
+						ParameterOIDs: slices.Repeat([]uint32{textOID}, parameters),
+					})
+				}
+				backend.Send(&pgproto3.RowDescription{Fields: []pgproto3.FieldDescription{
+					{Name: []byte("current_setting"), DataTypeOID: textOID, DataTypeSize: -1, TypeModifier: -1},
+				}})
+			case *pgproto3.Bind:
+				if failed {
+					continue
+				}
+				// current_setting($1, true), with NULL turned into ''
+				if len(message.Parameters) == 1 {
+					value = settings[string(message.Parameters[0])]
+				}
+				backend.Send(&pgproto3.BindComplete{})
+			case *pgproto3.Execute:
+				if failed {
+					continue
+				}
+				backend.Send(&pgproto3.DataRow{Values: [][]byte{[]byte(value)}})
+				backend.Send(&pgproto3.CommandComplete{CommandTag: []byte("SELECT 1")})
+			case *pgproto3.Terminate:
+				return
+			}
+		}
+	}
+
+	// newInstance returns an instance whose own connection pool reaches the
+	// given handler through the PostgreSQL Unix socket.
+	newInstance := func(handle func(net.Conn)) *Instance {
+		// Short enough for the Unix socket path limit on every platform.
+		socketDir, err := os.MkdirTemp("/tmp", "pgsock")
 		Expect(err).ToNot(HaveOccurred())
-		mock = dbMock
-		instance = &Instance{pool: fakePooler{db: db}}
+		DeferCleanup(os.RemoveAll, socketDir)
+		GinkgoT().Setenv("PGHOST", socketDir)
+
+		listener, err := net.Listen("unix", filepath.Join(socketDir, fmt.Sprintf(".s.PGSQL.%d", GetServerPort())))
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(listener.Close)
+		go func() {
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					return
+				}
+				go handle(conn)
+			}
+		}()
+
+		instance := &Instance{}
+		DeferCleanup(instance.ShutdownConnections)
+		return instance
+	}
+
+	withSettings := func(settings map[string]string) *Instance {
+		return newInstance(func(conn net.Conn) { servePostgres(conn, settings) })
+	}
+
+	It("returns no metadata when PostgreSQL does not know the parameter", func(ctx SpecContext) {
+		metadata, err := withSettings(nil).GetSynchronousReplicationMetadata(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(metadata).To(BeNil())
 	})
 
-	AfterEach(func() {
-		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	It("returns no metadata when the parameter is empty", func(ctx SpecContext) {
+		metadata, err := withSettings(map[string]string{parameter: ""}).GetSynchronousReplicationMetadata(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(metadata).To(BeNil())
 	})
 
 	It("decodes the metadata", func(ctx SpecContext) {
-		mock.ExpectQuery(query).WithArgs(postgres.CNPGSynchronousStandbyNamesMetadata).
-			WillReturnRows(sqlmock.NewRows([]string{"metadata"}).
-				AddRow(`{"method":"ANY","number":1,"standbyNames":["cluster-2","cluster-3"]}`))
+		instance := withSettings(map[string]string{
+			parameter: `{"method":"ANY","number":1,"standbyNames":["cluster-2","cluster-3"]}`,
+		})
 
 		metadata, err := instance.GetSynchronousReplicationMetadata(ctx)
 		Expect(err).ToNot(HaveOccurred())
@@ -937,27 +1041,14 @@ var _ = Describe("GetSynchronousReplicationMetadata", func() {
 		}))
 	})
 
-	It("returns no metadata when the parameter is empty", func(ctx SpecContext) {
-		mock.ExpectQuery(query).WithArgs(postgres.CNPGSynchronousStandbyNamesMetadata).
-			WillReturnRows(sqlmock.NewRows([]string{"metadata"}).AddRow(""))
-
-		metadata, err := instance.GetSynchronousReplicationMetadata(ctx)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(metadata).To(BeNil())
-	})
-
-	It("returns the error of a failed query", func(ctx SpecContext) {
-		queryErr := errors.New("connection refused")
-		mock.ExpectQuery(query).WithArgs(postgres.CNPGSynchronousStandbyNamesMetadata).WillReturnError(queryErr)
-
-		metadata, err := instance.GetSynchronousReplicationMetadata(ctx)
-		Expect(err).To(MatchError(queryErr))
-		Expect(metadata).To(BeNil())
-	})
-
 	It("fails on metadata that is not valid JSON", func(ctx SpecContext) {
-		mock.ExpectQuery(query).WithArgs(postgres.CNPGSynchronousStandbyNamesMetadata).
-			WillReturnRows(sqlmock.NewRows([]string{"metadata"}).AddRow("{"))
+		metadata, err := withSettings(map[string]string{parameter: "{"}).GetSynchronousReplicationMetadata(ctx)
+		Expect(err).To(HaveOccurred())
+		Expect(metadata).To(BeNil())
+	})
+
+	It("returns the error when PostgreSQL does not answer", func(ctx SpecContext) {
+		instance := newInstance(func(conn net.Conn) { _ = conn.Close() })
 
 		metadata, err := instance.GetSynchronousReplicationMetadata(ctx)
 		Expect(err).To(HaveOccurred())
