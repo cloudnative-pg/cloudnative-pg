@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: publication-except
+spec:
+  name: pub-except
+  dbname: app
+  cluster:
+    name: cluster-pub-except
+  target:
+    allTables: true
+    except:
+      - name: excluded_table
