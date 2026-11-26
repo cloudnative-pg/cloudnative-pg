@@ -14,12 +14,12 @@ title: Installation and upgrades
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.2.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.31.0-rc1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.2.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.31.0-rc1.yaml
 ```
 
 You can verify that with:
@@ -81,7 +81,7 @@ specific minor release, you can just run:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.30/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.31/manifests/operator-manifest.yaml | \
   kubectl apply --server-side -f -
 ```
 
@@ -269,6 +269,70 @@ only the operator itself.
 
 ### Upgrading to 1.31.0
 
+#### The `ServiceAccount` token is no longer mounted automatically
+
+Starting from version 1.31.0, CloudNativePG sets
+`automountServiceAccountToken: false` on the instance Pods, on the `Job` that
+runs a major version upgrade, and on the `ServiceAccount` it generates.
+Clusters therefore comply out of the box with admission policies that forbid
+the automatic mount of the token.
+
+The instance manager keeps accessing the Kubernetes API as before, through an
+explicit `kube-api-access` projected volume that the operator adds at the
+canonical path `/var/run/secrets/kubernetes.io/serviceaccount` of the
+containers that need it.
+A `ServiceAccount` that you provide through `serviceAccountName` is left
+untouched. Existing Pods don't have the new setting, so upgrading the operator
+triggers a one-time rolling update of every cluster, governed by the
+`primaryUpdateStrategy` option, as described in the
+["Upgrades"](#upgrades) section. You can plan it in a maintenance window.
+If you have policies, sidecars, or tooling that depend on the automatic mount
+in the instance Pods, review them before upgrading.
+
+#### Instances are bootstrapped by an init container
+
+Starting from version 1.31.0, a new primary or replica instance is bootstrapped
+(`initdb`, recovery, `pg_basebackup`, join, and restore from a volume snapshot)
+by an init container of the instance Pod, instead of by a separate Kubernetes
+`Job` that ran before the Pod. As a result, CloudNativePG no longer creates a
+`Job` and a Pod for each new instance, and the instance starts without waiting
+for the `Job` to complete.
+
+Existing instances are not affected. If you have monitoring, alerts, or
+automation that watches the `initdb`, `join`, `pgbasebackup`, `full-recovery`,
+or `snapshot-recovery` Jobs, update them to follow the init container of the
+instance Pod and the phase of the `Cluster` instead. A bootstrap that cannot
+complete is reported with the phase
+`Cluster is unrecoverable and needs manual intervention`, and a replica that
+resumes a stalled bootstrap reports the phase `Creating a new replica`, with
+an event.
+
+#### Online volume snapshot backups no longer include the WAL volume
+
+Starting from version 1.31.0, an online volume snapshot backup of a cluster with
+a dedicated WAL volume (`.spec.walStorage`) snapshots only `PGDATA` and the
+tablespaces. The WAL volume is left out, because recovering an online backup
+requires the WAL archive anyway. Cold backups still include the WAL volume, and
+the existing backups are not affected.
+
+The snapshot set of these clusters therefore changes after the upgrade: the
+`PG_WAL` element is missing from `.status.snapshotBackupStatus.elements` of a
+new online `Backup`. Restoring such a backup creates an empty WAL volume and
+fetches the WAL files from the archive, so make sure the recovery has a `source`
+that points to a working WAL archive. If you copy volume snapshots to another
+region or account, or script restores that expect a `PG_WAL` snapshot, review
+them. See
+["Online backups and the WAL volume"](appendixes/backup_volumesnapshot.md#online-backups-and-the-wal-volume)
+for details.
+
+#### The status port always uses TLS
+
+All instances have used TLS for the operator communication since version 1.24,
+so the HTTP fallback has been removed in 1.31.0. This only matters in the
+unlikely event that some Pods were created by an operator older than 1.24: if
+you notice a problem after upgrading, perform a manual rolling update of the
+affected Pods to recreate them with a TLS-enabled status port.
+
 #### Default of `.spec.smartShutdownTimeout` changed to 0
 
 Starting from version 1.31.0, the default value of `.spec.smartShutdownTimeout`
@@ -313,6 +377,151 @@ The operator returns an admission warning when you create or update a `Cluster`
 that uses any of these fields. Migrate those clusters to
 `.spec.postgresql.synchronous` before upgrading to 1.33.0, as explained in
 ["Migrating from Deprecated Synchronous Replication Implementation"](replication.md#migrating-from-deprecated-synchronous-replication-implementation).
+
+#### New databases no longer allow `PUBLIC` to connect
+
+Starting from version 1.31.0, CloudNativePG revokes `CONNECT` from `PUBLIC` on
+the databases it creates, instead of letting every role connect to them, and
+grants it to the `cnpg_metrics_exporter` role so that monitoring keeps working.
+This is a change for the clusters and databases that you create after
+upgrading:
+
+- the `postgres`, `template1` and application databases of a new cluster
+  bootstrapped with `initdb`
+- every database created from a `Database` resource, including in a cluster
+  that already exists
+- the application database of a cluster bootstrapped with `recovery` or
+  `pg_basebackup`, when the source doesn't have it and CloudNativePG creates it
+
+Existing databases are not affected. This includes the databases of the clusters
+that you upgrade, and those of a cluster bootstrapped with `recovery` or
+`pg_basebackup`, which keep the privileges they had in the source.
+
+In a restricted database, only superusers, the owner (and the roles that inherit
+from it), and the roles that are granted `CONNECT` can connect. Any other role
+is refused with a `permission denied for database` error. This includes
+[managed roles](declarative_role_management.md) and the roles that your
+applications and tools use to reach the `postgres` database. For example, a
+[Pooler with a custom authentication method](connection_pooling.md#custom-authentication-method)
+needs `CONNECT` on `postgres` for the role that runs its `auth_query`.
+
+##### Granting access to the roles that need it
+
+Following the principle of least privilege, grant `CONNECT` only to the roles
+that need it, with the `permissions` field of a `Database` resource. See
+[Managing Database Permissions](declarative_database_management.md#managing-database-permissions)
+for details. For example, the following manifest grants `CONNECT` on the `app`
+database of a new cluster to the `reporting` role:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cluster-example-app
+spec:
+  name: app
+  owner: app
+  cluster:
+    name: cluster-example
+  permissions:
+    connect:
+      - name: reporting
+        type: grant
+```
+
+A `Database` resource without `permissions` leaves the privileges of an existing
+database as they are. To close a database that already exists, such as one
+created before the upgrade, also revoke `CONNECT` from `public`, and list the
+grants first. Include `cnpg_metrics_exporter`: existing databases are not
+granted `CONNECT` for it, so without that entry the `revoke` stops the metrics
+of the database. The privileges are applied when the `Database` resource is
+created or changed, not continuously:
+
+```yaml
+spec:
+  # <snip>
+  permissions:
+    connect:
+      - name: cnpg_metrics_exporter
+        type: grant
+      - name: reporting
+        type: grant
+      - name: public
+        type: revoke
+```
+
+The `postgres` and `template1` databases are reserved, so a `Database` resource
+can't manage them. Grant `CONNECT` to the roles that need it with a SQL command
+run as the superuser, once the roles exist.
+
+:::warning
+    If you revoke `CONNECT` from `PUBLIC` on the `postgres` database of an
+    existing cluster, grant it to the `streaming_replica` role first:
+
+    ```sql
+    GRANT CONNECT ON DATABASE postgres TO streaming_replica;
+    ```
+
+    `pg_rewind` connects to the `postgres` database as that role, and a demoted
+    primary can't rejoin the cluster without it. The replicas connect in the
+    same way to synchronize the replication slots from the primary.
+    CloudNativePG grants it when it creates the role, so new clusters already
+    have it, while existing ones don't.
+:::
+
+##### Restoring the previous behavior for new clusters
+
+Letting every role connect goes against the principle of least privilege, so we
+don't recommend it. If you need it, restore it for each database:
+
+- `postgres`: set `allowPublicConnectToPostgres` to `true` in the `initdb`
+  bootstrap of the cluster, so that the operator doesn't revoke `CONNECT` from
+  `PUBLIC`:
+
+  ```yaml
+  spec:
+    bootstrap:
+      initdb:
+        allowPublicConnectToPostgres: true
+    # <snip>
+  ```
+
+- the application database, and the databases created from a `Database`
+  resource: grant `CONNECT` to `public` in the `Database` resource, which you
+  create for the application database after the cluster:
+
+  ```yaml
+  spec:
+    # <snip>
+    permissions:
+      connect:
+        - name: public
+          type: grant
+  ```
+
+- `template1`: run `GRANT CONNECT ON DATABASE template1 TO PUBLIC;` as the
+  superuser.
+
+#### Meaning of `observed` in `cnpg_collector_sync_replicas` changed
+
+Starting from version 1.31.0, the `observed` value of the
+`cnpg_collector_sync_replicas` metric reports the number of standbys currently
+attached to the primary as synchronous, as shown by `sync_state` in the
+`pg_stat_replication` system view. Previously, it reported the number found in
+the `synchronous_standby_names` setting, which only tells what is requested.
+
+With quorum-based replication (`method: any`), every attached standby that is
+a candidate is reported as `quorum`, so `observed` can be higher than
+`expected`. If you alert or graph on this metric, compare `observed` with
+`expected` using `<`, not `!=`. For example, `observed` now drops to `0` when
+a cluster with `dataDurability: required` loses all its synchronous standbys,
+while commits are blocked, instead of staying at the configured number.
+
+The `min` and `max` values are deprecated and are removed in CloudNativePG
+1.33.0. Until then, they are derived from `.spec.postgresql.synchronous` when
+it is configured, instead of being `0`. Use `expected` and `observed` instead.
+See ["Synchronous replication metrics"](monitoring.md#synchronous-replication-metrics)
+for details and a recommended alert.
 
 ### Upgrading to 1.30.0
 

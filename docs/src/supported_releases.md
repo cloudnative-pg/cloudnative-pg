@@ -35,7 +35,7 @@ Subsequent patch releases on a minor release contain backward-compatible changes
 
 CloudNativePG produces new builds for each commit.
 
-Approximately every two months, we create a minor release that undergoes
+Approximately every three months, we create a minor release that undergoes
 several additional tests and a thorough release qualification process. We
 release patch versions for issues found in supported minor releases.
 
@@ -64,8 +64,6 @@ You can find available releases on the [releases page](https://github.com/cloudn
 You can find high-level more information for each minor and patch release in
 the [release notes](release_notes.md).
 
-Sure, here’s an improved version of the naming scheme section:
-
 ## Naming Scheme
 
 Our naming scheme follows [Semantic Versioning 2.0.0](https://semver.org/) and
@@ -89,8 +87,9 @@ Git tags for versions are prefixed with `v`.
 <!-- TODO: Complete dates and versions below -->
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
+| 1.31.x          | No, preview (RC)     | ~ Dec 2026   | ~  Jun 2027     | 1.35, 1.36, 1.37              | 1.34, 1.33                | 15 - 19                     |
 | 1.30.x          | Yes                  | 29 Jun 2026  | ~  Mar 2027     | 1.34, 1.35, 1.36              | 1.37, 1.33, 1.32, 1.31    | 15 - 18                     |
-| main            | No, development only |              |                 |                               |                           | 15 - 18                     |
+| main            | No, development only |              |                 |                               |                           | 15 - 19                     |
 
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
@@ -175,9 +174,9 @@ version of PostgreSQL, we might not be able to help you.
 
 ## What we mean by support
 
-Our support window is roughly five/six months for each release branch (latest
+Our support window is roughly six months for each release branch (latest
 minor release, plus 3 additional months), given that we produce a new final
-release every two/three months.
+release every three months.
 
 In the following diagram, `release-1.27` is an example of a release branch.
 

@@ -20,16 +20,13 @@ intended for public testing prior to the final release.
 
 ## Current Preview Version
 
-There are currently no preview versions available.
-
-<!--
 The current preview version is **1.31.0-rc1**.
 
 For more information on the current preview version and how to test, please view the links below:
 
 - [Announcement](https://cloudnative-pg.io/releases/cloudnative-pg-1-31.0-rc1-released/)
-- [Documentation](https://cloudnative-pg.io/docs/1.31/)
--->
+- [Documentation](https://cloudnative-pg.io/docs/preview/)
+- [Upgrade instructions](installation_upgrade.md#upgrading-to-1310)
 
 ## Purpose of Release Candidates
 
@@ -71,6 +68,8 @@ non-production environment:
 - **Upgrade Test (Crucial):** **Upgrade an existing cluster** (from the
   preceding stable minor version) to the RC version, and verify all key
   operational aspects (scaling, failover, backup/restore) function correctly.
+  Read the upgrade instructions linked in the
+  [current preview version](#current-preview-version) section first.
 - **Basic Operations:** Verify key features like rolling update,
   backup/restore, instance failover, and connection pooling function as
   expected.

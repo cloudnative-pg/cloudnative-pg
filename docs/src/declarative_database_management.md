@@ -205,8 +205,34 @@ CloudNativePG can grant and revoke the privileges that PostgreSQL defines on
 the database itself: `CONNECT`, `CREATE` and `TEMPORARY`.
 
 The most common use is hardening. PostgreSQL grants `CONNECT` and `TEMPORARY`
-on every new database to `PUBLIC`, so a production setup usually revokes
-`CONNECT` from `PUBLIC` and grants it back to specific roles.
+on every new database to `PUBLIC`. CloudNativePG already revokes `CONNECT` from
+`PUBLIC` on the databases it creates, as described below. Use `spec.permissions`
+to change that default, to manage the other privileges, or to manage a database
+that already exists.
+
+:::info[Default for new databases]
+    On a new cluster bootstrapped with `initdb`, CloudNativePG revokes
+    `CONNECT` from `PUBLIC` on the `postgres` and `template1` databases and on
+    the application database. It does the same on every database it creates
+    from a `Database` resource. In all these cases, it grants `CONNECT` to the
+    `cnpg_metrics_exporter` role, so that monitoring keeps working. Other roles
+    can connect only if they are superusers, own the database (or inherit from
+    its owner), or are granted `CONNECT`, for example with `spec.permissions`.
+
+    The default is applied only when the database is created. A database that
+    already exists is never changed. This includes upgrading the operator, and
+    bootstrapping a cluster with `recovery` or `pg_basebackup`, as the databases
+    keep the privileges they had in the source. If the source doesn't have the
+    application database, CloudNativePG creates it after the bootstrap and
+    applies the default to it.
+
+    The entries of `spec.permissions` are reconciled after the default, so they
+    can override it. For example, a `grant` of `CONNECT` to `public` restores
+    the PostgreSQL behavior on a new database, while a `revoke` from `public`
+    is already satisfied. Do not revoke `CONNECT` from `cnpg_metrics_exporter`
+    on the application database, otherwise the default metrics stop: see the
+    last warning of this section.
+:::
 
 To enable this feature, define the `spec.permissions` field, as shown in the
 following example:

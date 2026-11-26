@@ -21,7 +21,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/types"
 
@@ -76,13 +75,14 @@ type promotionGateInput struct {
 	// Replica is the position of the pod that is about to promote
 	Replica replicaPosition
 
-	// AnnotationAge is how long ago the lease was last written, zero if not known
-	AnnotationAge time.Duration
-
 	// ReplicaClusterPromotion tells that the pod is promoted to end the replica
 	// cluster mode. The caller sets it from the promotion that is happening,
 	// not from the replica cluster configuration, which stays after it.
 	ReplicaClusterPromotion bool
+
+	// Failover tells that the operator is failing over to this pod, because
+	// the previous primary is not working
+	Failover bool
 }
 
 // promotionDecision is the result of the promotion gate, with what to log
@@ -94,6 +94,10 @@ type promotionDecision struct {
 
 	// Details are the key/value pairs to log with the message
 	Details []any
+
+	// Unblock tells that waiting may not be enough: the event then says how a
+	// person can go on
+	Unblock bool
 }
 
 // decidePromotion tells whether a replica can promote, given the position that
@@ -104,6 +108,10 @@ type promotionDecision struct {
 // replica is either missing some of it or is on a timeline that is not the one
 // the previous primary stopped on. Everything else is a failover, or a position
 // that is not known, and the replica proceeds: it is reported, not prevented.
+//
+// A failover is not held back, also when the previous primary stopped
+// cleanly, as when its pod is deleted: the operator is waiting for this
+// promotion, and does not bring the previous primary back before it.
 func decidePromotion(input promotionGateInput) promotionDecision {
 	// The annotation was left by the primary of this cluster before it was
 	// demoted, and the pod has followed another cluster since, on other
@@ -159,7 +167,7 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 		// The pod that started to promote may have left the final position of
 		// the previous primary. It is checked on the timeline it was written
 		// on, as a pod on a later one has followed a promotion that happened.
-		if leasePosition.Timeline != 0 && leasePosition.Timeline == input.Replica.Timeline {
+		if !input.Failover && leasePosition.Timeline != 0 && leasePosition.Timeline == input.Replica.Timeline {
 			return decideAfterCleanShutdown(input, leasePosition)
 		}
 
@@ -175,10 +183,44 @@ func decidePromotion(input promotionGateInput) promotionDecision {
 		}
 
 	case utils.PgDataStateShutDown:
-		return decideAfterCleanShutdown(input, leasePosition)
+		if !input.Failover {
+			return decideAfterCleanShutdown(input, leasePosition)
+		}
 	}
 
 	return decideAfterFailover(input, leasePosition)
+}
+
+// timelineNeedsRefresh tells whether to request a checkpoint before deciding.
+// The timeline of the replica comes from the control file and lags the replay:
+// a refresh is needed when it is earlier than the one on the lease and
+// decidePromotion decides on it.
+//
+// A failover only reports, and must not wait for a checkpoint. A replica that
+// is missing WAL after a clean shutdown waits whatever its timeline. Not every
+// other case that ignores the timeline is skipped: an unneeded refresh only
+// costs a checkpoint.
+func timelineNeedsRefresh(input promotionGateInput) bool {
+	if input.ReplicaClusterPromotion || input.Failover || input.Annotation == "" {
+		return false
+	}
+
+	leasePosition, err := utils.ParseLeasePosition(input.Annotation)
+	if err != nil || input.Replica.Timeline >= leasePosition.Timeline {
+		return false
+	}
+
+	switch leasePosition.State {
+	case utils.LeasePositionStatePromoting:
+		return leasePosition.Pod != input.PodName
+
+	case utils.PgDataStateShutDown:
+		leaseLSN, leaseErr := types.LSN(leasePosition.LSN).Parse()
+		replicaLSN, replicaErr := input.Replica.LSN.Parse()
+		return leaseErr == nil && replicaErr == nil && leaseLSN <= replicaLSN
+	}
+
+	return false
 }
 
 // decideAfterCleanShutdown is the decision of the gate when the previous
@@ -214,23 +256,17 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 		}
 	}
 
+	// A later timeline blocks first. Then missing WAL is reported before an
+	// earlier timeline: the replica waits for that WAL in both cases.
 	switch {
-	case input.Replica.Timeline < leasePosition.Timeline:
-		return promotionDecision{
-			Verdict: promotionWait,
-			Level:   promotionLogInfo,
-			Message: "This replica is on an earlier timeline than the one the previous primary stopped on, " +
-				"waiting for it to catch up",
-			Details: details,
-		}
-
 	case input.Replica.Timeline > leasePosition.Timeline:
 		return promotionDecision{
 			Verdict: promotionBlocked,
 			Level:   promotionLogError,
 			Message: "This replica is on a later timeline than the one the previous primary stopped on, " +
-				"it may have diverged, not promoting it. " + unblockPromotionHint,
+				"it may have diverged, not promoting it",
 			Details: details,
+			Unblock: true,
 		}
 
 	case leaseLSN > replicaLSN:
@@ -240,6 +276,16 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 			Message: "This replica does not have all the data of the previous primary, which exists only " +
 				"there, waiting for the missing WAL to be delivered by the archive",
 			Details: append(details, "missingBytes", leaseLSN-replicaLSN),
+			Unblock: true,
+		}
+
+	case input.Replica.Timeline < leasePosition.Timeline:
+		return promotionDecision{
+			Verdict: promotionWait,
+			Level:   promotionLogInfo,
+			Message: "This replica is on an earlier timeline than the one the previous primary stopped on, " +
+				"waiting for it to catch up",
+			Details: details,
 		}
 	}
 
@@ -252,9 +298,9 @@ func decideAfterCleanShutdown(input promotionGateInput, leasePosition *utils.Lea
 }
 
 // decideAfterFailover is the decision of the gate when the previous primary did
-// not publish a final position, which is what a failover looks like. The
-// replica promotes, and what is known about the data it may be missing is
-// reported.
+// not publish a final position, which is what a failover looks like, or when
+// the operator is failing over. The replica promotes, and what is known about
+// the data it may be missing is reported.
 func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePosition) promotionDecision {
 	details := []any{
 		"writer", leasePosition.Pod,
@@ -264,11 +310,12 @@ func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePos
 		"replicaLSN", input.Replica.LSN,
 		"replicaTimeline", input.Replica.Timeline,
 	}
-	if input.AnnotationAge > 0 {
-		details = append(details, "age", input.AnnotationAge.Round(time.Millisecond).String())
-	}
 
 	message := "The previous primary did not stop cleanly, proceeding with the promotion"
+	if leasePosition.State == utils.PgDataStateShutDown {
+		message = "The previous primary stopped cleanly, but a failover is not held back, " +
+			"proceeding with the promotion"
+	}
 
 	// The positions can be compared only on the same timeline. The difference
 	// is a lower bound: the previous primary may have written for up to about
@@ -293,9 +340,10 @@ func decideAfterFailover(input promotionGateInput, leasePosition *utils.LeasePos
 	}
 }
 
-// unblockPromotionHint is what a person can do when the gate blocks a promotion
+// unblockPromotionHint is what a person can do when the gate blocks a promotion,
+// or holds it back for WAL that may not come
 const unblockPromotionHint = "To promote this replica anyway, accepting the loss of the data that only the " +
 	"previous primary has, remove the annotation of the primary lease " +
 	"(kubectl annotate lease <cluster> " + utils.LeasePositionAnnotationName + "-). " +
 	"To avoid that loss, promote the previous primary back " +
-	"(kubectl cnpg promote <cluster> <previous primary>)"
+	"(kubectl cnpg promote --force <cluster> <previous primary>)"

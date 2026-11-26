@@ -240,6 +240,31 @@ If PgBouncer needs to authenticate as a different user than the one derived
 from your secret, you can override it with the `auth_user` parameter (see
 [PgBouncer configuration options](#pgbouncer-configuration-options)).
 
+:::warning
+    The role that PgBouncer uses to run the `auth_query` connects to the
+    `postgres` database. A new cluster doesn't let `PUBLIC` connect to that
+    database, so grant `CONNECT` to the role, in addition to the privileges it
+    needs to run the query:
+
+    ```sql
+    GRANT CONNECT ON DATABASE postgres TO pgbouncer;
+    ```
+
+    Replace `pgbouncer` with the name of your role. Without the grant,
+    PgBouncer can't authenticate the clients, and logs `permission denied for
+    database "postgres"`.
+
+    If you declare the role in `.spec.managed.roles`, run the command once the
+    role has been created: it doesn't exist while the cluster is bootstrapped,
+    so the `postInit` queries can't grant it by name. You can't use a
+    `Database` resource, as `postgres` is a reserved database name. If you
+    can't run the command, see the `allowPublicConnectToPostgres` option in the
+    [`initdb` bootstrap](bootstrap.md#bootstrap-an-empty-cluster-initdb).
+
+    The role of the built-in integration, `cnpg_pooler_pgbouncer`, is granted
+    `CONNECT` automatically.
+:::
+
 ## Pod templates
 
 

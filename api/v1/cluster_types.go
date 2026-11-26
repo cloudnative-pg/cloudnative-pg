@@ -2049,6 +2049,14 @@ type BootstrapInitDB struct {
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
 
+	// Allows the `PUBLIC` pseudo-role to keep the `CONNECT` privilege on the
+	// `postgres` database, as PostgreSQL grants it by default. When `false`
+	// (the default), the operator revokes it when the cluster is bootstrapped.
+	// It only applies when the cluster is bootstrapped with `initdb`: the
+	// privileges of existing databases are never changed.
+	// +optional
+	AllowPublicConnectToPostgres bool `json:"allowPublicConnectToPostgres,omitempty"`
+
 	// The list of options that must be passed to initdb when creating the cluster.
 	//
 	// Deprecated: This could lead to inconsistent configurations,

@@ -188,7 +188,27 @@ The above example of bootstrap will:
 2. create an *unprivileged* user named `app`
 3. set the password of the latter (`app`) using the one in the `app-secret`
    secret (make sure that `username` matches the same name of the `owner`)
-4. create a database called `app` owned by the `app` user.
+4. create a database called `app` owned by the `app` user
+5. revoke `CONNECT` from `PUBLIC` on the `postgres`, `template1` and `app`
+   databases, and grant it to the `cnpg_metrics_exporter` role. On the
+   `postgres` database, `CONNECT` is also granted to the `streaming_replica`
+   role, which `pg_rewind` uses. See
+   [Managing Database Permissions](declarative_database_management.md#managing-database-permissions)
+   for details.
+
+:::warning
+    Every role that needs to connect to the `postgres` database, such as the
+    role that a `Pooler` with a custom authentication method uses to run its
+    `auth_query`, must be granted `CONNECT` on it. We recommend granting it to
+    those roles only, with a SQL command run as the superuser once they exist.
+
+    If you can't do that, for example because the roles are created after the
+    bootstrap and the grant can't be automated, set
+    `.spec.bootstrap.initdb.allowPublicConnectToPostgres` to `true`. The
+    operator then doesn't revoke `CONNECT` from `PUBLIC` on the `postgres`
+    database, which every role can connect to, as in PostgreSQL. The option
+    only applies when the cluster is bootstrapped.
+:::
 
 Thanks to the *convention over configuration paradigm*, you can let the
 operator choose a default database name (`app`) and a default application
@@ -380,6 +400,14 @@ queries, executed in the following order:
   `postInitApplicationSQLRefs` stanzas). Secrets are processed before ConfigMaps.
 
 Objects in each list will be processed sequentially.
+
+The default `CONNECT` privileges of the `postgres`, `template1` and application
+databases are applied before these queries run. To give other roles access to
+the application database, we recommend assigning the privileges through a
+`Database` resource, following the principle of least privilege, instead of
+granting `CONNECT` to `PUBLIC` with these queries. See
+[Managing Database Permissions](declarative_database_management.md#managing-database-permissions)
+for details.
 
 :::warning
     Use the `postInit`, `postInitTemplate`, and `postInitApplication` options

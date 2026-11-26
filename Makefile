@@ -59,7 +59,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.23.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
 CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.20.2
+GORELEASER_VERSION ?= v2.20.3
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
 SPELLCHECK_VERSION ?= 0.70.0@sha256:27c0fa859c369e58b7f17b0b742f6005d40f46aca3dfbe894a3ab6f28c911636
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
@@ -69,9 +69,9 @@ OPERATOR_SDK_VERSION ?= v1.42.3
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
 OPM_VERSION ?= v1.74.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.22.0
+PREFLIGHT_VERSION ?= 1.23.0
 # renovate: datasource=docker depName=cuelang/cue versioning=docker
-CUE_VERSION ?= 0.17.1@sha256:520f883dcc92642389b3b75e8befe4e5a233a1aa903a8c846c4a3b338b202635
+CUE_VERSION ?= 0.18.0@sha256:6e394433bfcfb87848ab824f294264b667535c3de53051715637d328d01eddc7
 # renovate: datasource=go depName=github.com/gemaraproj/gemara
 GEMARA_VERSION ?= v1.6.0
 ARCH ?= amd64
@@ -80,7 +80,7 @@ FUZZ_TIME ?= 30s
 # OPENSHIFT_VERSIONS differs per release branch, unlike the renovate-managed
 # versions above that stay identical. The blank lines around it keep it out of
 # their diff context, so backport cherry-picks of a version bump don't conflict.
-OPENSHIFT_VERSIONS ?= v4.18-v4.22
+OPENSHIFT_VERSIONS ?= v4.20-v5.0
 
 export CONTROLLER_IMG
 export BUILD_IMAGE

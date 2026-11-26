@@ -20,7 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
-	"time"
+	"fmt"
+	"reflect"
 
 	"github.com/cloudnative-pg/machinery/pkg/types"
 
@@ -53,10 +54,9 @@ var _ = Describe("decidePromotion", func() {
 
 	decide := func(annotation string, replica replicaPosition) promotionDecision {
 		return decidePromotion(promotionGateInput{
-			Annotation:    annotation,
-			PodName:       thisPod,
-			Replica:       replica,
-			AnnotationAge: 3 * time.Second,
+			Annotation: annotation,
+			PodName:    thisPod,
+			Replica:    replica,
 		})
 	}
 
@@ -167,8 +167,10 @@ var _ = Describe("decidePromotion", func() {
 			"1/00000000", 1, "0/FFFFFFF0", 1, promotionWait, promotionLogWarning),
 		Entry("the replica is behind the lease",
 			"0/8000000", 2, "0/7004FA0", 2, promotionWait, promotionLogWarning),
+		Entry("the replica is on an earlier timeline, and behind the lease",
+			"0/8000000", 2, "0/70000A0", 1, promotionWait, promotionLogWarning),
 		Entry("the replica is on an earlier timeline",
-			"0/8000000", 2, "0/70000A0", 1, promotionWait, promotionLogInfo),
+			"0/8000000", 2, "0/80000A0", 1, promotionWait, promotionLogInfo),
 		Entry("the replica is on an earlier timeline, with a higher LSN",
 			"0/8000000", 2, "0/9000000", 1, promotionWait, promotionLogInfo),
 		Entry("the replica is on a later timeline",
@@ -188,13 +190,29 @@ var _ = Describe("decidePromotion", func() {
 		Expect(decision.Details).To(ContainElements("missingBytes", uint64(0x100)))
 	})
 
-	It("tells how to unblock a replica that is blocked", func() {
+	It("asks to tell how to unblock a replica that is blocked", func() {
 		decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 1),
 			replica("0/70000A0", 2))
 		Expect(decision.Verdict).To(Equal(promotionBlocked))
-		Expect(decision.Message).To(ContainSubstring("kubectl annotate lease <cluster> cnpg.io/position-)"))
-		Expect(decision.Message).To(ContainSubstring("kubectl cnpg promote <cluster> <previous primary>"))
+		Expect(decision.Unblock).To(BeTrue())
 	})
+
+	It("asks to tell how to unblock a replica that is missing WAL", func() {
+		decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 1),
+			replica("0/6FFFF00", 1))
+		Expect(decision.Verdict).To(Equal(promotionWait))
+		Expect(decision.Unblock).To(BeTrue())
+	})
+
+	DescribeTable("does not ask to tell how to unblock a replica that waits for something that goes away",
+		func(replica replicaPosition) {
+			decision := decide(position(utils.PgDataStateShutDown, "0/7000000", 2), replica)
+			Expect(decision.Verdict).To(Equal(promotionWait))
+			Expect(decision.Unblock).To(BeFalse())
+		},
+		Entry("an earlier timeline", replicaPosition{LSN: "0/70000A0", Timeline: 1}),
+		Entry("a position that is not available", replicaPosition{}),
+	)
 
 	Context("when the previous primary did not stop cleanly", func() {
 		DescribeTable("always proceeds, reporting what may be missing",
@@ -206,7 +224,6 @@ var _ = Describe("decidePromotion", func() {
 					"writer", "cluster-example-2",
 					"state", state,
 					"possiblyMissingBytes", uint64(0x100),
-					"age", "3s",
 				))
 			},
 			Entry("in production", utils.PgDataStateInProduction),
@@ -234,14 +251,193 @@ var _ = Describe("decidePromotion", func() {
 			Expect(decision.Verdict).To(Equal(promotionProceed))
 			Expect(decision.Details).ToNot(ContainElement("possiblyMissingBytes"))
 		})
+	})
 
-		It("leaves the age out when it is not known", func() {
-			decision := decidePromotion(promotionGateInput{
-				Annotation: position(utils.PgDataStateInProduction, "0/8000000", 2),
+	Context("when the operator is failing over", func() {
+		failover := func(annotation string, replica replicaPosition) promotionDecision {
+			return decidePromotion(promotionGateInput{
+				Annotation: annotation,
 				PodName:    thisPod,
-				Replica:    replica("0/7FFFF00", 2),
+				Replica:    replica,
+				Failover:   true,
 			})
-			Expect(decision.Details).ToNot(ContainElement("age"))
+		}
+
+		DescribeTable("never holds the replica back, also after a clean shutdown of the previous primary",
+			func(annotation string, replica replicaPosition) {
+				decision := failover(annotation, replica)
+				Expect(decision.Verdict).To(Equal(promotionProceed))
+				Expect(decision.Level).To(Equal(promotionLogWarning))
+			},
+			Entry("the replica is behind the lease",
+				position(utils.PgDataStateShutDown, "0/8000000", 2), replica("0/7FFFF00", 2)),
+			Entry("the replica is on an earlier timeline",
+				position(utils.PgDataStateShutDown, "0/8000000", 2), replica("0/7000000", 1)),
+			Entry("the replica is on a later timeline",
+				position(utils.PgDataStateShutDown, "0/8000000", 2), replica("0/7000000", 3)),
+			Entry("the position of the replica is not available",
+				position(utils.PgDataStateShutDown, "0/8000000", 2), replicaPosition{}),
+			Entry("another pod started to promote and left the final position of the previous primary",
+				position(utils.LeasePositionStatePromoting, "0/8000000", 2), replica("0/7FFFF00", 2)),
+		)
+
+		It("reports what the replica is missing, and that the previous primary stopped cleanly", func() {
+			decision := failover(position(utils.PgDataStateShutDown, "0/8000000", 2), replica("0/7FFFF00", 2))
+			Expect(decision.Details).To(ContainElements("possiblyMissingBytes", uint64(0x100)))
+			Expect(decision.Message).To(ContainSubstring("stopped cleanly"))
+			Expect(decision.Message).ToNot(ContainSubstring("did not stop cleanly"))
 		})
 	})
+})
+
+var _ = Describe("timelineNeedsRefresh", func() {
+	const thisPod = "cluster-example-3"
+
+	publishedBy := func(pod string, state utils.PgDataState, lsn string, timeline int) string {
+		value, err := utils.LeasePosition{LSN: lsn, Timeline: timeline, State: state, Pod: pod}.Marshal()
+		Expect(err).ToNot(HaveOccurred())
+		return value
+	}
+	published := func(state utils.PgDataState, lsn string, timeline int) string {
+		return publishedBy("cluster-example-2", state, lsn, timeline)
+	}
+
+	// withoutReplicaTimeline drops the timeline of the replica from the details
+	// of a decision, which always differs when the timeline does
+	withoutReplicaTimeline := func(details []any) []any {
+		var result []any
+		for i := 0; i+1 < len(details); i += 2 {
+			if details[i] != "replicaTimeline" {
+				result = append(result, details[i], details[i+1])
+			}
+		}
+		return result
+	}
+
+	// This keeps timelineNeedsRefresh in step with decidePromotion: whenever a
+	// timeline that is behind changes the verdict, or what is reported when
+	// the promotion waits, a refresh has to be asked for. A promotion that
+	// proceeds only reports, so a different message is not worth a refresh.
+	It("asks for a refresh whenever a timeline that is behind changes the decision", func() {
+		const leaseTimeline = 3
+
+		states := []utils.PgDataState{
+			utils.PgDataStateShutDown, utils.PgDataStateShutDownInRecovery, utils.PgDataStateStartingUp,
+			utils.PgDataStateShuttingDown, utils.PgDataStateInCrashRecovery, utils.PgDataStateInArchiveRecovery,
+			utils.PgDataStateInProduction, utils.LeasePositionStateUnknown, utils.LeasePositionStatePromoting,
+		}
+		for _, state := range states {
+			for _, writer := range []string{"cluster-example-2", thisPod} {
+				for _, failover := range []bool{false, true} {
+					for _, replicaClusterPromotion := range []bool{false, true} {
+						for _, replicaLSN := range []string{"0/8000000", "0/9000028", "0/A000000"} {
+							input := promotionGateInput{
+								Annotation:              publishedBy(writer, state, "0/9000028", leaseTimeline),
+								PodName:                 thisPod,
+								Failover:                failover,
+								ReplicaClusterPromotion: replicaClusterPromotion,
+							}
+							input.Replica = replicaPosition{LSN: types.LSN(replicaLSN), Timeline: leaseTimeline}
+							actual := decidePromotion(input)
+							input.Replica.Timeline = leaseTimeline - 1
+							stale := decidePromotion(input)
+
+							changed := stale.Verdict != actual.Verdict ||
+								(actual.Verdict != promotionProceed &&
+									(stale.Message != actual.Message || stale.Unblock != actual.Unblock ||
+										!reflect.DeepEqual(withoutReplicaTimeline(stale.Details),
+											withoutReplicaTimeline(actual.Details))))
+							if changed {
+								Expect(timelineNeedsRefresh(input)).To(BeTrue(), fmt.Sprintf(
+									"state=%s writer=%s failover=%t replicaClusterPromotion=%t replicaLSN=%s",
+									state, writer, failover, replicaClusterPromotion, replicaLSN))
+							}
+						}
+					}
+				}
+			}
+		}
+	})
+
+	DescribeTable("tells whether the timeline of the replica is worth a checkpoint",
+		func(input promotionGateInput, expected bool) {
+			Expect(timelineNeedsRefresh(input)).To(Equal(expected))
+		},
+		Entry("when it is earlier and the replica has the WAL, after a clean shutdown",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "0/8000028", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+			}, true),
+		Entry("not when the replica is missing WAL, after a clean shutdown: it waits anyway",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "0/9000028", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+			}, false),
+		Entry("not in a failover, which only reports what may be missing",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "0/8000028", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+				Failover:   true,
+			}, false),
+		Entry("not when the previous primary did not stop cleanly, which only reports",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateInProduction, "0/8000028", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+			}, false),
+		Entry("when it is earlier and another pod started to promote",
+			promotionGateInput{
+				Annotation: published(utils.LeasePositionStatePromoting, "0/9000028", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+			}, true),
+		Entry("when the replica is exactly at the position of the lease, after a clean shutdown",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "0/8000028", 3),
+				Replica:    replicaPosition{LSN: "0/8000028", Timeline: 2},
+			}, true),
+		Entry("not when the position on the lease has an LSN that is not one",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "garbage", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+			}, false),
+		Entry("not when the position of the replica has an LSN that is not one",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "0/8000028", 3),
+				Replica:    replicaPosition{LSN: "garbage", Timeline: 2},
+			}, false),
+		Entry("not when the position is not known",
+			promotionGateInput{
+				Annotation: published(utils.LeasePositionStateUnknown, "0/8000028", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+			}, false),
+		Entry("not when this pod started to promote",
+			promotionGateInput{
+				Annotation: publishedBy(thisPod, utils.LeasePositionStatePromoting, "0/9000028", 3),
+				PodName:    thisPod,
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+			}, false),
+		Entry("not when it is the one of the position",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "0/8000028", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 3},
+			}, false),
+		Entry("not when it is later than the one of the position",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "0/8000028", 3),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 4},
+			}, false),
+		Entry("not for the promotion of a replica cluster",
+			promotionGateInput{
+				Annotation:              published(utils.PgDataStateShutDown, "0/8000028", 3),
+				Replica:                 replicaPosition{LSN: "0/80000A0", Timeline: 2},
+				ReplicaClusterPromotion: true,
+			}, false),
+		Entry("not without a position on the lease", promotionGateInput{Replica: replicaPosition{Timeline: 2}}, false),
+		Entry("not when the position on the lease cannot be understood",
+			promotionGateInput{Annotation: "{", Replica: replicaPosition{Timeline: 2}}, false),
+		Entry("not when the timeline of the position is not known",
+			promotionGateInput{
+				Annotation: published(utils.PgDataStateShutDown, "0/8000028", 0),
+				Replica:    replicaPosition{LSN: "0/80000A0", Timeline: 2},
+			}, false),
+	)
 })

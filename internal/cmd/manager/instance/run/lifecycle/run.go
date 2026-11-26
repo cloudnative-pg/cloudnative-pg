@@ -241,6 +241,16 @@ func configureStreamingReplicaUser(tx *sql.Tx) error {
 		if err != nil {
 			return fmt.Errorf("COMMENT ON ROLE %v error: %w", apiv1.StreamingReplicationUser, err)
 		}
+
+		// pg_rewind connects to the postgres database with this user, which
+		// needs CONNECT on it even when it is revoked from PUBLIC. The grant
+		// is done only when the role is created, so that it can be changed.
+		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE postgres TO %v",
+			identifierStreamingReplicationUser))
+		if err != nil {
+			return fmt.Errorf("GRANT CONNECT ON DATABASE postgres TO %v error: %w",
+				apiv1.StreamingReplicationUser, err)
+		}
 	}
 
 	if !hasLoginRight || !hasReplicationRight {

@@ -979,26 +979,7 @@ func (r *InstanceReconciler) reconcileMetricsExporterAuthUser(
 	if !ok {
 		return nil
 	}
-	return setupMetricsExporterRole(ctx, db)
-}
-
-// setupMetricsExporterRole opens a transaction and delegates to the shared
-// helper that creates or repairs the cnpg_metrics_exporter role.
-func setupMetricsExporterRole(ctx context.Context, db *sql.DB) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		// This is a no-op when the transaction is committed
-		_ = tx.Rollback()
-	}()
-
-	if err := postgresManagement.SetupMetricsExporterRole(ctx, tx); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return postgresManagement.EnsureMetricsExporterRole(ctx, db)
 }
 
 // reconcileClusterRoleWithoutDB updates this instance's configuration files
@@ -1370,9 +1351,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			return reconcile.Result{}, err
 		}
 
-		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
-		if err := r.handlePromotion(ctx, cluster); err != nil {
-			return reconcile.Result{}, err
+		if result, err := r.promoteAfterGate(ctx, cluster); err != nil || !result.IsZero() {
+			return result, err
 		}
 	}
 
@@ -1416,8 +1396,11 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down
-		err := r.waitForWalReceiverDown(ctx)
-		if err != nil {
+		waitWalReceiverDown := r.waitWalReceiverDown
+		if waitWalReceiverDown == nil {
+			waitWalReceiverDown = r.waitForWalReceiverDown
+		}
+		if err := waitWalReceiverDown(ctx); err != nil {
 			return err
 		}
 	}

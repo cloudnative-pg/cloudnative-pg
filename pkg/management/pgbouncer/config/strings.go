@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // stringifyPgBouncerParameters will take map of PgBouncer parameters and emit
@@ -45,11 +46,24 @@ func stringifyPgBouncerParameters(parameters map[string]string) (paramsString st
 // buildPgBouncerParameters will build a PgBouncer configuration applying any
 // default parameters and forcing any required parameter needed for the
 // controller to work correctly
-func buildPgBouncerParameters(userParameters map[string]string) map[string]string {
+func buildPgBouncerParameters(userParameters map[string]string) (map[string]string, error) {
 	params := make(map[string]string, len(userParameters))
 
-	for k, v := range userParameters {
-		params[k] = cleanupPgBouncerValue(v)
+	// Names are cleaned too, so different user keys may end up being the
+	// same one. Visit them in a stable order to have a deterministic winner
+	// and avoid spurious rollouts of the Pods.
+	userKeys := make([]string, 0, len(userParameters))
+	for k := range userParameters {
+		userKeys = append(userKeys, k)
+	}
+	sort.Strings(userKeys)
+
+	for _, k := range userKeys {
+		name, err := cleanupPgBouncerName(k)
+		if err != nil {
+			return nil, err
+		}
+		params[name] = cleanupPgBouncerValue(userParameters[k])
 	}
 
 	for k, defaultValue := range defaultPgBouncerParameters {
@@ -66,22 +80,34 @@ func buildPgBouncerParameters(userParameters map[string]string) map[string]strin
 		params[k] = v
 	}
 
-	return params
+	return params, nil
 }
 
-// The following regexp will match any newline character. PgBouncer
-// doesn't admit newlines inside the configuration at all
-var newlineRegexp = regexp.MustCompile(`\r\n|[\r\n\v\f\x{0085}\x{2028}\x{2029}]`)
+// newlineRegexp matches any newline character and the NUL byte.
+var newlineRegexp = regexp.MustCompile(`\r\n|[\r\n\v\f\x00\x{0085}\x{2028}\x{2029}]`)
 
-// cleanupPgBouncerValue removes any newline character from a configuration value.
-// The parser used by libusual doesn't support that.
+// cleanupPgBouncerValue removes newlines and NUL bytes from a value. PgBouncer
+// has no line continuation and stops reading the file at the first NUL byte.
 func cleanupPgBouncerValue(parameter string) (escaped string) {
 	// See:
 	// https://github.com/libusual/libusual/blob/master/usual/cfparser.c  //wokeignore:rule=master
-	//
-	// The PgBouncer ini file parser doesn't admit any newline character
-	// so we are just removing from the value
 	return newlineRegexp.ReplaceAllString(parameter, "")
+}
+
+// cleanupPgBouncerName cleans a parameter name like a value, and trims the
+// whitespace PgBouncer ignores: "listen_port " is "listen_port", and must not
+// shadow the forced parameters. A name that still cannot be the key of a line
+// is rejected.
+func cleanupPgBouncerName(name string) (string, error) {
+	cleaned := strings.TrimSpace(cleanupPgBouncerValue(name))
+
+	if cleaned == "" ||
+		strings.ContainsFunc(cleaned, func(r rune) bool { return r == '=' || unicode.IsSpace(r) }) ||
+		strings.ContainsRune("[;#", rune(cleaned[0])) {
+		return "", fmt.Errorf("invalid PgBouncer parameter name %q", name)
+	}
+
+	return cleaned, nil
 }
 
 // escapePgBouncerUserListValue doubles any double quote in a value so it can
@@ -89,4 +115,12 @@ func cleanupPgBouncerValue(parameter string) (escaped string) {
 // desyncing the line.
 func escapePgBouncerUserListValue(value string) string {
 	return strings.ReplaceAll(value, "\"", "\"\"")
+}
+
+// cleanupPgBouncerQuery removes any NUL byte from a query and replaces every
+// newline character with a space. The ini file parser doesn't admit newlines,
+// and unlike for the other values, removing them would glue together the
+// words around them, e.g. turning "passwd\nFROM" into "passwdFROM".
+func cleanupPgBouncerQuery(query string) string {
+	return newlineRegexp.ReplaceAllString(strings.ReplaceAll(query, "\x00", ""), " ")
 }

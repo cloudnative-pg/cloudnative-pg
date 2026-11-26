@@ -30,7 +30,8 @@ var _ = Describe("PgBouncer configuration", func() {
 			"verbose":                  "10",
 			ignoreStartupParametersKey: "test",
 		}
-		params := buildPgBouncerParameters(validParams)
+		params, err := buildPgBouncerParameters(validParams)
+		Expect(err).ToNot(HaveOccurred())
 		Expect(params[ignoreStartupParametersKey]).To(ContainSubstring("test"))
 		Expect(params[ignoreStartupParametersKey]).
 			To(ContainSubstring(defaultPgBouncerParameters[ignoreStartupParametersKey]))
@@ -43,8 +44,56 @@ var _ = Describe("PgBouncer configuration", func() {
 			"verbose":             "10\npool_mode: test",
 			"autodb_idle_timeout": "10\\npid_file: test",
 		}
-		params := stringifyPgBouncerParameters(buildPgBouncerParameters(validParams))
+		built, err := buildPgBouncerParameters(validParams)
+		Expect(err).ToNot(HaveOccurred())
+		params := stringifyPgBouncerParameters(built)
 		Expect(params).NotTo(MatchRegexp("^pool_mode.*"))
 		Expect(params).NotTo(MatchRegexp("^pid_file.*"))
 	})
+
+	It("resolves parameter names that clean to the same name deterministically", func() {
+		collidingParams := map[string]string{
+			"max_client_conn":   "100",
+			"max_client_conn\n": "200",
+			"max_client_conn\r": "300",
+		}
+
+		expected, err := buildPgBouncerParameters(collidingParams)
+		Expect(err).ToNot(HaveOccurred())
+		// When names collide, the value of the last key in sorted order wins
+		Expect(expected["max_client_conn"]).To(Equal("300"))
+
+		for range 100 {
+			params, err := buildPgBouncerParameters(collidingParams)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(params).To(Equal(expected))
+		}
+	})
+
+	It("does not tell apart a name from the same name surrounded by whitespace", func() {
+		params, err := buildPgBouncerParameters(map[string]string{
+			"listen_port ": "6543",
+			" admin_users": "someone",
+			"verbose\t":    "1",
+		})
+		Expect(err).ToNot(HaveOccurred())
+
+		// The parameters we force cannot be shadowed ...
+		Expect(params["listen_port"]).To(Equal(forcedPgBouncerParameters["listen_port"]))
+		Expect(params["admin_users"]).To(Equal(forcedPgBouncerParameters["admin_users"]))
+		// ... and the other ones are rendered with their canonical name
+		Expect(params["verbose"]).To(Equal("1"))
+	})
+
+	DescribeTable("rejects the names that cannot be the key of a line",
+		func(name string) {
+			_, err := buildPgBouncerParameters(map[string]string{name: "1"})
+			Expect(err).To(HaveOccurred())
+		},
+		Entry("empty", ""),
+		Entry("with an equal sign", "listen_port=6543"),
+		Entry("with an inner space", "listen_port 6543"),
+		Entry("starting a section", "[databases]"),
+		Entry("starting a comment", ";listen_port"),
+	)
 })

@@ -41,7 +41,7 @@ import (
 
 const (
 	// collectorImage is the image used to run the OpenTelemetry Collector
-	collectorImage = "docker.io/otel/opentelemetry-collector-contrib:0.163.2"
+	collectorImage = "docker.io/otel/opentelemetry-collector-contrib:0.166.0"
 	// busyboxImage is the image used to read the records written by the
 	// collector, whose image has no shell
 	busyboxImage = "docker.io/library/busybox:1.38.0"
