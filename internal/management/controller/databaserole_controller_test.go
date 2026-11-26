@@ -505,6 +505,43 @@ var _ = Describe("DatabaseRole reconcileRole VALID UNTIL", func() {
 	})
 })
 
+var _ = Describe("DatabaseRole reconcileRole membership grantors", func() {
+	It("revokes the grant another role made of a membership the role no longer lists", func() {
+		db, dbMock, err := sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+		// The order of attributes and memberships is not what this checks
+		dbMock.MatchExpectationsInOrder(false)
+
+		role := newTestDatabaseRole()
+		dbMock.ExpectQuery("FROM pg_catalog.pg_authid as auth").WillReturnRows(sqlmock.NewRows([]string{
+			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword",
+			"rolvaliduntil", "rolbypassrls", "comment", "xmin", "inroles",
+		}).AddRow(testRoleName, false, true, false, false, false, false, -1, nil, nil, false, nil, 1, []byte(`{foo}`)))
+		dbMock.ExpectExec(`^ALTER ROLE "app_role" `).WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectQuery("pg_get_userbyid\\(am.grantor\\)").
+			WillReturnRows(sqlmock.NewRows([]string{"name", "grantor"}).AddRow("foo", "admin_role"))
+		dbMock.ExpectBegin()
+		dbMock.ExpectExec(`^REVOKE "foo" FROM "app_role" GRANTED BY "admin_role"$`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		dbMock.ExpectCommit()
+
+		cli := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(role).
+			WithStatusSubresource(&apiv1.DatabaseRole{}).
+			Build()
+		r := &DatabaseRoleReconciler{
+			Client:                  cli,
+			instance:                &fakeRoleInstance{db: db},
+			getPostgresMajorVersion: func() (int, error) { return 16, nil },
+		}
+		_, err = r.reconcileRole(context.Background(), role)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+})
+
 var _ = Describe("DatabaseRole handleDeletion", func() {
 	var (
 		db     *sql.DB
