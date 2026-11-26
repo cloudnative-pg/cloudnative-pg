@@ -321,6 +321,8 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					updatedValidUntil := metav1.NewTime(time.Date(2050, 6, 15, 12, 0, 0, 0, time.UTC))
 					role.Spec.ValidUntil = &updatedValidUntil
 					role.Spec.Comment = "updated comment"
+					role.Spec.Inherit = ptr.To(false)
+					role.Spec.InRoles = []string{"pg_monitor"}
 					Expect(objects.Patch(env.Ctx, env.Client, role, client.MergeFrom(oldRole))).To(Succeed())
 				})
 
@@ -339,7 +341,20 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					}, 300).WithPolling(10 * time.Second).Should(Succeed())
 
 					assertRoleHasExpectedFields(namespace, primaryPodInfo.Name, *role)
+					assertInRoles(namespace, primaryPodInfo.Name, pgRoleName, []string{"pg_monitor"})
 				})
+
+				if env.PostgresVersion >= 16 {
+					By("verifying the new membership takes its inherit option from the updated role", func() {
+						primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+						Expect(err).ToNot(HaveOccurred())
+						Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+							"SELECT am.inherit_option FROM pg_catalog.pg_auth_members AS am "+
+								"JOIN pg_catalog.pg_roles AS r ON r.oid = am.member "+
+								"WHERE am.roleid = 'pg_monitor'::regrole AND r.rolname = "+pq.QuoteLiteral(pgRoleName),
+							"f"), 30).Should(Succeed())
+					})
+				}
 
 				By("cleaning up", func() {
 					Expect(objects.Delete(env.Ctx, env.Client, role)).To(Succeed())
