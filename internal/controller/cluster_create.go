@@ -1314,6 +1314,8 @@ func (r *ClusterReconciler) buildPrimaryBootstrapCommand(
 ) (*specs.InstanceBootstrapCommand, error) {
 	isBootstrappingFromRecovery := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil
 	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
+	isBootstrappingViaPgCreateSubscriber := cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.PgCreateSubscriber != nil
 
 	var backup *apiv1.Backup
 	if isBootstrappingFromRecovery {
@@ -1362,6 +1364,11 @@ func (r *ClusterReconciler) buildPrimaryBootstrapCommand(
 	case isBootstrappingFromBaseBackup:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
 		return specs.BuildPrimaryBootstrapCommandViaPgBaseBackup(*cluster), nil
+
+	case isBootstrappingViaPgCreateSubscriber:
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance",
+			"Primary instance (physical clone converted into a logical subscriber)")
+		return specs.BuildPrimaryBootstrapCommandViaPgCreateSubscriber(*cluster), nil
 
 	default:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")

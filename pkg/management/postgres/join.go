@@ -83,6 +83,18 @@ func ClonePgData(
 	return nil
 }
 
+// ClonePgDataWithSlot clones an external server with a persistent physical slot,
+// retaining the WAL needed by the subsequent conversion to a logical subscriber.
+func ClonePgDataWithSlot(ctx context.Context, connectionString, targetPgData, walDir, slotName string) error {
+	return ClonePgData(ctx, connectionString, targetPgData, walDir, pgBaseBackupSlotOptions(slotName))
+}
+
+// pgBaseBackupSlotOptions requests a fast checkpoint and streams WAL through a
+// new physical slot. ClonePgData supplies the connection and directory options.
+func pgBaseBackupSlotOptions(slotName string) []string {
+	return []string{"--checkpoint=fast", "-X", "stream", "-C", "-S", slotName}
+}
+
 // Join creates a new instance joined to an existing PostgreSQL cluster
 func (info InitInfo) Join(ctx context.Context, cluster *apiv1.Cluster) error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
