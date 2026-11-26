@@ -299,7 +299,12 @@ func isTargetPrimaryAvailable(cluster *apiv1.Cluster, resources *managedResource
 			})
 	}
 
-	if cluster.Status.ReadyInstances == 0 {
+	// With no ready instance the target cannot be promoted, and the current
+	// primary is the one that can start again. After a canceled switchover
+	// that instance is already the target, and the current primary is a
+	// marker: sending the target back to it would leave no instance to start.
+	if cluster.Status.ReadyInstances == 0 &&
+		cluster.Status.CurrentPrimary != apiv1.CanceledSwitchoverMarker {
 		return false
 	}
 

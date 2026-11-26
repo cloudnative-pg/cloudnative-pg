@@ -107,6 +107,12 @@ const (
 	// PendingFailoverMarker is used as target primary to signal that a failover is required
 	PendingFailoverMarker = "pending"
 
+	// CanceledSwitchoverMarker is used as current primary when a switchover
+	// is canceled. It names no instance, so the current and the target primary
+	// still differ and the old primary, which is the target again, knows it
+	// must act
+	CanceledSwitchoverMarker = "cancel"
+
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 
