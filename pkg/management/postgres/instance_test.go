@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/jackc/pgx/v5/pgconn"
 	corev1 "k8s.io/api/core/v1"
@@ -901,4 +902,65 @@ var _ = Describe("local connections", func() {
 			return newWalArchiveBootstrapperForPrimary().dbFactory()
 		}),
 	)
+})
+
+var _ = Describe("GetSynchronousReplicationMetadata", func() {
+	const query = "SELECT COALESCE(current_setting($1, true), '')"
+
+	var (
+		instance *Instance
+		mock     sqlmock.Sqlmock
+	)
+
+	BeforeEach(func() {
+		db, dbMock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		mock = dbMock
+		instance = &Instance{pool: fakePooler{db: db}}
+	})
+
+	AfterEach(func() {
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("decodes the metadata", func(ctx SpecContext) {
+		mock.ExpectQuery(query).WithArgs(postgres.CNPGSynchronousStandbyNamesMetadata).
+			WillReturnRows(sqlmock.NewRows([]string{"metadata"}).
+				AddRow(`{"method":"ANY","number":1,"standbyNames":["cluster-2","cluster-3"]}`))
+
+		metadata, err := instance.GetSynchronousReplicationMetadata(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(metadata).To(Equal(&postgres.SynchronousStandbyNamesConfig{
+			Method:       "ANY",
+			NumSync:      1,
+			StandbyNames: []string{"cluster-2", "cluster-3"},
+		}))
+	})
+
+	It("returns no metadata when the parameter is empty", func(ctx SpecContext) {
+		mock.ExpectQuery(query).WithArgs(postgres.CNPGSynchronousStandbyNamesMetadata).
+			WillReturnRows(sqlmock.NewRows([]string{"metadata"}).AddRow(""))
+
+		metadata, err := instance.GetSynchronousReplicationMetadata(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(metadata).To(BeNil())
+	})
+
+	It("returns the error of a failed query", func(ctx SpecContext) {
+		queryErr := errors.New("connection refused")
+		mock.ExpectQuery(query).WithArgs(postgres.CNPGSynchronousStandbyNamesMetadata).WillReturnError(queryErr)
+
+		metadata, err := instance.GetSynchronousReplicationMetadata(ctx)
+		Expect(err).To(MatchError(queryErr))
+		Expect(metadata).To(BeNil())
+	})
+
+	It("fails on metadata that is not valid JSON", func(ctx SpecContext) {
+		mock.ExpectQuery(query).WithArgs(postgres.CNPGSynchronousStandbyNamesMetadata).
+			WillReturnRows(sqlmock.NewRows([]string{"metadata"}).AddRow("{"))
+
+		metadata, err := instance.GetSynchronousReplicationMetadata(ctx)
+		Expect(err).To(HaveOccurred())
+		Expect(metadata).To(BeNil())
+	})
 })
