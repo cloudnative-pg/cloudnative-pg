@@ -150,7 +150,10 @@ func (r *PgBouncerReconciler) Reconcile(ctx context.Context, event *watch.Event)
 // specification matches the PgBouncer status
 func (r *PgBouncerReconciler) synchronizePause(pooler *apiv1.Pooler) error {
 	isPaused := r.instance.Paused()
-	shouldBePaused := pooler.Spec.PgBouncer.IsPaused()
+	// Pause when the user requested it via spec, or when the operator paused this
+	// pooler for a switchover/failover. The latter is status-driven so the operator
+	// never mutates the user-owned spec, which would otherwise cause GitOps drift.
+	shouldBePaused := pooler.Spec.PgBouncer.IsPaused() || pooler.Status.PausedForSwitchover
 	if shouldBePaused && !isPaused {
 		if err := r.instance.Pause(); err != nil {
 			return fmt.Errorf("while pausing instance: %w", err)
