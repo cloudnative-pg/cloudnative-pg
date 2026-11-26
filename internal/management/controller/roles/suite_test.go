@@ -38,7 +38,7 @@ const (
 		mem.inroles
 	FROM pg_catalog.pg_authid as auth
 	LEFT JOIN (
-		SELECT pg_catalog.array_agg(pg_catalog.pg_get_userbyid(roleid)) as inroles, member
+		SELECT pg_catalog.array_agg(DISTINCT pg_catalog.pg_get_userbyid(roleid)) as inroles, member
 		FROM pg_catalog.pg_auth_members GROUP BY member
 	) mem ON member = oid
 	WHERE rolname not like 'pg\_%'`
@@ -46,7 +46,7 @@ const (
 	expectedMembershipStmt = `SELECT mem.inroles 
 	FROM pg_catalog.pg_authid as auth
 	LEFT JOIN (
-		SELECT pg_catalog.array_agg(pg_catalog.pg_get_userbyid(roleid)) as inroles, member
+		SELECT pg_catalog.array_agg(DISTINCT pg_catalog.pg_get_userbyid(roleid)) as inroles, member
 		FROM pg_catalog.pg_auth_members GROUP BY member
 	) mem ON member = oid
 	WHERE rolname = $1`
