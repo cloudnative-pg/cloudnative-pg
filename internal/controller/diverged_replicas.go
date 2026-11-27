@@ -159,7 +159,7 @@ func divergedInstanceNames(cluster *apiv1.Cluster) []string {
 // rather than from the statuses: a diverged instance is fenced, so PostgreSQL
 // is down and it cannot report its own divergence.
 func updateNoPromotableInstanceCondition(cluster *apiv1.Cluster, statuses postgres.PostgresqlStatusList) {
-	// With no active instance there is nothing new to say
+	// With no active instance, keep the condition as it is
 	if len(statuses.Items) == 0 {
 		return
 	}

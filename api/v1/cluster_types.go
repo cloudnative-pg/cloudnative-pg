@@ -1284,8 +1284,7 @@ const (
 
 	// ConditionNoPromotableInstance is True while every active instance is
 	// in ClusterStatus.DivergedInstances: a diverged instance is never
-	// promoted, so no instance can replace the primary. Only set while that
-	// holds.
+	// promoted, so no instance can replace the primary.
 	ConditionNoPromotableInstance ClusterConditionType = "NoPromotableInstance"
 )
 
