@@ -238,7 +238,7 @@ each pod. Since version 1.29, the recommended approach is to leverage [image
 catalogs](image_catalog.md), which allow the operator to automatically resolve
 image references and directory paths based on the PostgreSQL version.
 Image volumes require the `extension_control_path` parameter (PostgreSQL 18+)
-and the `ImageVolume` feature (Kubernetes 1.35+, or 1.33+ with feature gate).
+and the `ImageVolume` feature (Kubernetes 1.35+).
 If these requirements are not met, extensions must be included directly in the
 operand image.
 Once available on the system, the [`Database` resource](declarative_database_management.md#managing-extensions-in-a-database)
