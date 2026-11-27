@@ -111,3 +111,50 @@ func Delete(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 	_, err := db.ExecContext(ctx, "SELECT pg_catalog.pg_drop_replication_slot($1)", slot.SlotName)
 	return err
 }
+
+// IsInRecovery reports whether the instance is in recovery
+func IsInRecovery(ctx context.Context, db *sql.DB) (bool, error) {
+	var inRecovery bool
+	err := db.QueryRowContext(ctx, "SELECT pg_catalog.pg_is_in_recovery()").Scan(&inRecovery)
+	return inRecovery, err
+}
+
+// ListOrphanedFailoverSlots lists the logical failover slots of a standby that
+// are not synced and not in use. PostgreSQL enables failover on a slot during
+// recovery only in the slot sync worker, which marks its slots as synced, so
+// these slots were created while the instance was a primary. The worker errors
+// out instead of overwriting them.
+// It lists nothing when sync_replication_slots is off: there is no worker to
+// unblock, and pg_failover_slots keeps using the slots of a former primary.
+// It requires PostgreSQL 17 or later.
+func ListOrphanedFailoverSlots(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT slot_name
+            FROM pg_catalog.pg_replication_slots
+            WHERE slot_type = 'logical' AND failover AND NOT synced AND NOT active
+            AND pg_catalog.pg_is_in_recovery()
+            AND pg_catalog.current_setting('sync_replication_slots')::bool`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var slotNames []string
+	for rows.Next() {
+		var slotName string
+		if err := rows.Scan(&slotName); err != nil {
+			return nil, err
+		}
+		slotNames = append(slotNames, slotName)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return slotNames, nil
+}
