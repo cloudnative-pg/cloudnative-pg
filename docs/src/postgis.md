@@ -35,8 +35,7 @@ must still enable and manage it inside the database (see the
 
 ## Method 1: Image Volume Extensions
 
-Starting with **PostgreSQL 18** and **Kubernetes 1.35** (1.33 and 1.34 with the
-`ImageVolume` feature gate enabled), you can leverage
+Starting with **PostgreSQL 18** and **Kubernetes 1.35**, you can leverage
 [image volume extensions](imagevolume_extensions.md).
 
 This is the modern way to manage extensions, as it allows you to use an
