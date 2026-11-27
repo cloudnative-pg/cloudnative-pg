@@ -190,6 +190,14 @@ func reconcileOrphanedFailoverSlots(
 // primary. A slot in use is dropped by a later run, after its client disconnects.
 // A failure on one slot doesn't stop the rest; errors are collected and returned together.
 func dropOrphanedFailoverSlots(ctx context.Context, primaryDB, localDB *sql.DB) error {
+	slotNames, err := infrastructure.ListOrphanedFailoverSlots(ctx, localDB)
+	if err != nil {
+		return fmt.Errorf("listing orphaned failover slots: %w", err)
+	}
+	if len(slotNames) == 0 {
+		return nil
+	}
+
 	// PostgreSQL synchronizes the slots only from a primary: in a replica
 	// cluster nothing would recreate the slots dropped here
 	inRecovery, err := infrastructure.IsInRecovery(ctx, primaryDB)
@@ -198,11 +206,6 @@ func dropOrphanedFailoverSlots(ctx context.Context, primaryDB, localDB *sql.DB) 
 	}
 	if inRecovery {
 		return nil
-	}
-
-	slotNames, err := infrastructure.ListOrphanedFailoverSlots(ctx, localDB)
-	if err != nil {
-		return fmt.Errorf("listing orphaned failover slots: %w", err)
 	}
 
 	var errs error

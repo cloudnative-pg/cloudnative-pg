@@ -309,6 +309,14 @@ var _ = Describe("Orphaned failover slots", func() {
 			WillReturnRows(sqlmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(inRecovery))
 	}
 
+	expectOrphanedSlots := func(slotNames ...string) {
+		rows := sqlmock.NewRows([]string{"slot_name"})
+		for _, slotName := range slotNames {
+			rows.AddRow(slotName)
+		}
+		localMock.ExpectQuery(selectOrphanedFailoverSlots).WillReturnRows(rows)
+	}
+
 	BeforeEach(func() {
 		var err error
 		primaryDB, primaryMock, err = sqlmock.New()
@@ -323,23 +331,31 @@ var _ = Describe("Orphaned failover slots", func() {
 	})
 
 	It("drops the orphaned failover slots", func(ctx SpecContext) {
+		expectOrphanedSlots("orphan1", "orphan2")
 		expectPrimaryInRecovery(false)
-		localMock.ExpectQuery(selectOrphanedFailoverSlots).
-			WillReturnRows(sqlmock.NewRows([]string{"slot_name"}).AddRow("orphan1").AddRow("orphan2"))
 		localMock.ExpectExec(dropSlot).WithArgs("orphan1").WillReturnResult(sqlmock.NewResult(1, 1))
 		localMock.ExpectExec(dropSlot).WithArgs("orphan2").WillReturnResult(sqlmock.NewResult(1, 1))
 
 		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).To(Succeed())
 	})
 
+	It("doesn't query the primary without orphaned failover slots", func(ctx SpecContext) {
+		// the primary mock has no expectations: any query on it fails the spec
+		expectOrphanedSlots()
+
+		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).To(Succeed())
+	})
+
 	It("keeps the slots when the primary is in recovery", func(ctx SpecContext) {
-		// the local mock has no expectations: any query on it fails the spec
+		// the local mock expects no drop: one would fail the spec
+		expectOrphanedSlots("orphan1")
 		expectPrimaryInRecovery(true)
 
 		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).To(Succeed())
 	})
 
 	It("keeps the slots when the recovery status of the primary is unknown", func(ctx SpecContext) {
+		expectOrphanedSlots("orphan1")
 		primaryMock.ExpectQuery(selectIsInRecovery).WillReturnError(errors.New("mock primary failure"))
 
 		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).
@@ -347,9 +363,8 @@ var _ = Describe("Orphaned failover slots", func() {
 	})
 
 	It("keeps dropping after a failure and returns it", func(ctx SpecContext) {
+		expectOrphanedSlots("orphan1", "orphan2")
 		expectPrimaryInRecovery(false)
-		localMock.ExpectQuery(selectOrphanedFailoverSlots).
-			WillReturnRows(sqlmock.NewRows([]string{"slot_name"}).AddRow("orphan1").AddRow("orphan2"))
 		localMock.ExpectExec(dropSlot).WithArgs("orphan1").WillReturnError(errors.New("mock drop failure"))
 		localMock.ExpectExec(dropSlot).WithArgs("orphan2").WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -359,7 +374,6 @@ var _ = Describe("Orphaned failover slots", func() {
 	})
 
 	It("returns the listing error", func(ctx SpecContext) {
-		expectPrimaryInRecovery(false)
 		localMock.ExpectQuery(selectOrphanedFailoverSlots).WillReturnError(errors.New("mock list failure"))
 
 		Expect(dropOrphanedFailoverSlots(ctx, primaryDB, localDB)).
