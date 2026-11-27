@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"go.uber.org/multierr"
 
@@ -140,14 +141,84 @@ func (sr *Replicator) reconcile(
 		"local", localPool.GetDsn("postgres"),
 		"podName", sr.instance.GetPodName(),
 		"config", config)
-	err = synchronizeReplicationSlots(
+	syncErr := synchronizeReplicationSlots(
 		ctx,
 		primaryDB,
 		localDB,
 		sr.instance.GetPodName(),
 		config,
 	)
-	return err
+
+	orphansErr := reconcileOrphanedFailoverSlots(ctx, primaryDB, localDB, config, sr.instance.GetPgVersion)
+
+	return multierr.Append(syncErr, orphansErr)
+}
+
+// reconcileOrphanedFailoverSlots drops the orphaned failover slots when the
+// cluster is configured to synchronize the logical slots and PostgreSQL
+// supports the failover slots
+func reconcileOrphanedFailoverSlots(
+	ctx context.Context,
+	primaryDB, localDB *sql.DB,
+	config *apiv1.ReplicationSlotsConfiguration,
+	getPgVersion func() (semver.Version, error),
+) error {
+	// Without the HA slots there is no primary_slot_name, and the slot sync
+	// worker doesn't run
+	ha := config.HighAvailability
+	if ha == nil || !ha.GetEnabled() || !ha.SynchronizeLogicalDecoding {
+		return nil
+	}
+
+	pgVersion, err := getPgVersion()
+	if err != nil {
+		return fmt.Errorf("getting the PostgreSQL version: %w", err)
+	}
+
+	// The failover and synced columns exist from PostgreSQL 17
+	if pgVersion.Major() < 17 {
+		return nil
+	}
+
+	return dropOrphanedFailoverSlots(ctx, primaryDB, localDB)
+}
+
+// dropOrphanedFailoverSlots drops the failover slots this standby didn't
+// receive from the primary. A former primary keeps the failover slots it
+// created, and the slot sync worker refuses to overwrite a slot that is not
+// marked as synced: once they are dropped, the worker recreates them from the
+// primary. A slot in use is dropped by a later run, after its client
+// disconnects. A failure on one slot doesn't stop the rest; errors are
+// collected and returned together.
+func dropOrphanedFailoverSlots(ctx context.Context, primaryDB, localDB *sql.DB) error {
+	slotNames, err := infrastructure.ListOrphanedFailoverSlots(ctx, localDB)
+	if err != nil {
+		return fmt.Errorf("listing orphaned failover slots: %w", err)
+	}
+	if len(slotNames) == 0 {
+		return nil
+	}
+
+	// PostgreSQL synchronizes the slots only from a primary: in a replica
+	// cluster nothing would recreate the slots dropped here
+	inRecovery, err := infrastructure.IsInRecovery(ctx, primaryDB)
+	if err != nil {
+		return fmt.Errorf("checking if the primary is in recovery: %w", err)
+	}
+	if inRecovery {
+		return nil
+	}
+
+	var errs error
+	for _, slotName := range slotNames {
+		log.FromContext(ctx).Info("Dropping orphaned failover slot", "slotName", slotName)
+		slot := infrastructure.ReplicationSlot{SlotName: slotName}
+		if err := infrastructure.Delete(ctx, localDB, slot); err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("dropping orphaned failover slot %q: %w", slotName, err))
+		}
+	}
+
+	return errs
 }
 
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary.
