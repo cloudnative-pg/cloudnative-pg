@@ -314,6 +314,10 @@ func (r *InstanceReconciler) Reconcile(
 		// For this reason, before applying a new configuration we
 		// reset the FailoverQuorum object - de facto preventing any failover -
 		// and we update it after.
+		//
+		// These are the first two steps of the protocol described in
+		// updateFailoverQuorumObject, which also explains why the object
+		// is not filled in right after the reload.
 		if err = r.resetFailoverQuorumObject(ctx, cluster); err != nil {
 			return reconcile.Result{}, err
 		}

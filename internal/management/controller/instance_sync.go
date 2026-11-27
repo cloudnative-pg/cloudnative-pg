@@ -62,12 +62,69 @@ const failoverQuorumRequeueDelay = time.Second
 // the following loops, without requesting it again.
 const failoverQuorumCheckpointTimeout = 15 * time.Second
 
-// updateFailoverQuorumObject updates the sync quorum object reading the
-// current synchronous replica metadata from the PG instance.
+// updateFailoverQuorumObject keeps the FailoverQuorum object in line with the
+// synchronous replication configuration of the PostgreSQL instance. It runs in
+// the primary, at every reconciliation loop, after the configuration has been
+// loaded.
 //
-// A status listing some standbys is published only when enough of them are
-// aligned with the primary (see decideFailoverQuorumAction). Until then the
-// object is left empty, so no failover is allowed.
+// # The invariant
+//
+// A published status lists some standbys and a number k. It tells the operator
+// that every transaction acknowledged to a client is present on at least k of
+// the listed standbys, and the operator relies on it to decide that a failover
+// can't lose acknowledged transactions. An empty status promises nothing, and
+// the operator refuses any failover.
+//
+// # The protocol
+//
+// The status is not published as soon as the configuration changes, but only
+// after these steps:
+//
+//  1. Reset. The object is emptied before the configuration is reloaded,
+//     because while the new configuration is being applied we can't tell
+//     which standbys the transactions wait for. This is done by the
+//     reconciliation loop right before the reload. It is emptied again when
+//     a change is detected and we start waiting (captureFailoverQuorum), to
+//     not leave a status that refers to the previous configuration.
+//  2. Reload. PostgreSQL loads the new configuration, and the reconciliation
+//     loop waits for that to happen.
+//  3. Checkpoint. Loading the configuration is not enough to make committing
+//     backends wait for the standbys (see ensureSyncStandbysEffective), so a
+//     checkpoint is requested to make sure they do. This is skipped when we
+//     already know it is the case (syncStandbysEffective), and the request is
+//     made once, even if the checkpoint takes long (checkpointRequestedAtLSN).
+//  4. Align. The current WAL insert position is read, and we wait until at
+//     least NumSync of the listed standbys have flushed it. Not all of them:
+//     k is what the invariant needs. While waiting, the object stays empty
+//     and the caller is asked to run another loop.
+//  5. Publish. The status is written.
+//
+// # Why each step exists
+//
+// Steps 1 and 5 bracket the period in which the invariant is not known to
+// hold. Without them the operator could trust a status describing a
+// configuration that is not in force.
+//
+// Step 4 exists because the transactions acknowledged under the previous
+// configuration were acknowledged by a different set of standbys. A standby
+// that is catching up, for example with a newly promoted primary, lacks some
+// of them, and promoting it would lose them. Once at least k of the listed
+// standbys have the WAL up to a given position, every transaction committed
+// before it is on at least k of them. The transactions committed after it
+// are on k of them because they wait for the standbys.
+//
+// That last statement is true only when the position is read after step 3.
+// Until the checkpointer has applied the configuration, committing backends
+// return without waiting for the standbys, even if they are listed. The
+// commits that returned that way can be anywhere in the WAL before that
+// moment, and a position read earlier would not cover them. Once the
+// configuration is in force, all the following commits wait, and the
+// position read afterwards covers everything before them.
+//
+// Step 3 exists because backends don't read synchronous_standby_names: they
+// look at a flag in shared memory that only the checkpointer updates, and it
+// can take as long as a checkpoint to do it. ensureSyncStandbysEffective
+// describes the details, including the limits of what we can guarantee.
 //
 // The returned boolean is true when the caller should schedule another
 // reconciliation loop to check again.
@@ -191,29 +248,68 @@ func (r *InstanceReconciler) captureFailoverQuorum(
 }
 
 // ensureSyncStandbysEffective makes sure that, after a reload that defined the
-// synchronous standbys, the committing backends really wait for them. It
-// returns false when this is not guaranteed yet and the caller should retry.
+// synchronous standbys, committing backends really wait for them. It returns
+// false when this is not guaranteed yet and the caller should retry.
 //
-// Backends don't read synchronous_standby_names: they look at a flag in shared
-// memory that only the checkpointer updates, and it applies a pending reload
-// only between checkpoints, or while a paced checkpoint is not behind
-// schedule. Until then commits return without waiting for the standbys, even
-// if they are listed. See the "sync_standbys_defined and pg_stat_replication"
-// thread on pgsql-hackers (Oct 2025):
+// # Why a checkpoint is needed
+//
+// Committing backends don't read synchronous_standby_names. SyncRepWaitForLSN
+// returns immediately when the sync_standbys_status flag in shared memory has
+// SYNC_STANDBY_INIT set and SYNC_STANDBY_DEFINED unset, whatever the setting
+// says.
+//
+// Only the checkpointer updates that flag, in UpdateSharedMemoryConfig, which
+// calls SyncRepUpdateSyncStandbysDefined. It does so when it starts, in
+// ProcessCheckpointerInterrupts after each checkpoint, and in
+// CheckpointWriteDelay, but there only if the checkpoint is neither fast nor
+// behind schedule.
+//
+// A reload reaches the checkpointer through the postmaster:
+// process_pm_reload_request loads the configuration in the postmaster and then
+// forwards SIGHUP to its children with SignalChildren. The handler in the
+// checkpointer only sets ConfigReloadPending.
+//
+// An idle checkpointer, or one running a paced checkpoint that is on
+// schedule, applies the reload promptly. A checkpoint that is behind schedule
+// or fast doesn't until it ends, which was measured at 51 seconds in the
+// discussion below. During that time commits return without waiting for the
+// standbys, even if they are listed.
+//
+// Walsenders are not affected: they reload on their own
+// (WalSndHandleConfigReload and SyncRepInitConfig) and decide which standbys
+// count with their own copy of the setting. The flag is the only part that
+// depends on the checkpointer. See the "sync_standbys_defined and
+// pg_stat_replication" thread on pgsql-hackers (October 2025):
 // https://www.postgresql.org/message-id/CANwKhkMTkckNSoz0kUYFvaMDA_6g2uuABcvhoowu64e9e%2Bop%3DA%40mail.gmail.com
 //
-// There is no way to observe the flag, so we request a checkpoint: it is fast,
-// it completes only after one started after the request, and the checkpointer
-// applies the pending reload before starting it. The flag stays set for the
-// whole PostgreSQL run, until synchronous replication is disabled, so the
-// checkpoint is requested only when we don't know that it is. A restarted
-// postmaster starts from the configuration on disk, with no reload pending.
+// # What we do
+//
+// There is no way to observe the flag, so we request a checkpoint. It is
+// fast, and it completes only after a checkpoint that started after the
+// request. The checkpointer applies a pending reload before starting a
+// checkpoint, so when it completes the flag is in force.
+//
+// The flag stays set for the whole PostgreSQL run, until synchronous
+// replication is disabled, so the checkpoint is requested only when we don't
+// know that it is. A restarted postmaster starts from the configuration on
+// disk, and the checkpointer applies it when it starts, with no reload
+// pending.
 //
 // The checkpoint can take long, and requesting it again while the requested
-// one is running makes the checkpointer run yet another one. So it is
+// one is running makes PostgreSQL run yet another checkpoint. So it is
 // requested once: if the request times out, the next loops check if a
 // checkpoint started after it was requested has completed, looking at the
 // redo location of the last checkpoint.
+//
+// # Limits
+//
+//   - A reload can reach the checkpointer after our checkpoint has been
+//     requested, because the postmaster forwards it asynchronously. We wait
+//     for the new configuration to be loaded before requesting the checkpoint,
+//     which makes this very unlikely, but it is not excluded.
+//   - If the request fails with an error other than the timeout, we can't
+//     know whether it was received. It is made again, and PostgreSQL may run
+//     an extra checkpoint.
 func (r *InstanceReconciler) ensureSyncStandbysEffective(ctx context.Context) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
