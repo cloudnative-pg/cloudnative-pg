@@ -1287,6 +1287,14 @@ func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.Po
 // GetSynchronousReplicationMetadata reads the current PostgreSQL configuration
 // and extracts the parameters that were used to compute the synchronous_standby_names
 // GUC.
+//
+// It returns (nil, nil) when synchronous replication is not configured:
+// the metadata parameter is empty, or PostgreSQL has never seen it. The
+// latter happens with "preferred" data durability while no replica is
+// healthy, as the operator then writes neither synchronous_standby_names
+// nor the metadata parameter. SHOW fails on a parameter PostgreSQL does not
+// know, so we read it with current_setting and missing_ok, which yields
+// NULL instead.
 func (instance *Instance) GetSynchronousReplicationMetadata(
 	ctx context.Context,
 ) (*postgres.SynchronousStandbyNamesConfig, error) {
@@ -1297,9 +1305,11 @@ func (instance *Instance) GetSynchronousReplicationMetadata(
 
 	var metadata string
 	row := db.QueryRowContext(
-		ctx, fmt.Sprintf("SHOW %s", postgres.CNPGSynchronousStandbyNamesMetadata))
-	err = row.Scan(&metadata)
-	if err != nil {
+		ctx,
+		"SELECT COALESCE(current_setting($1, true), '')",
+		postgres.CNPGSynchronousStandbyNamesMetadata,
+	)
+	if err := row.Scan(&metadata); err != nil {
 		return nil, err
 	}
 
