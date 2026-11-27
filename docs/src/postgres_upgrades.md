@@ -176,14 +176,24 @@ present so that `pg_upgrade` can properly perform the upgrade to the new major:
   just during the upgrade job, and `dynamic_library_path` and `extension_control_path`
   are configured accordingly for the `PGDATA` of the new major.
 
-`LD_LIBRARY_PATH` and `PATH` are extended with both sets, so binaries and
-shared objects from either version are reachable.
-Environment variables declared via `extensions[].env` obey the rules
-described in [Precedence and Conflict Resolution](imagevolume_extensions.md#precedence-and-conflict-resolution).
+`LD_LIBRARY_PATH` and `PATH` are extended with both sets, so that binaries and
+shared libraries from either version can be found.
 
 :::note
-Target-version entries are applied **after** source-version entries. When the
-same variable is defined for both, the target-version value takes precedence.
+Target-version entries are placed **before** source-version entries.
+A target-version library is expected to be ABI-compatible with the
+source-version one that shares its `soname`, as it is a newer release of the
+same dependency. Resolving to the newer library therefore works for both the old
+and the new server.
+:::
+
+Environment variables declared in `extensions[].env` follow the rules described
+in [Precedence and Conflict Resolution](imagevolume_extensions.md#precedence-and-conflict-resolution).
+
+:::note
+Target-version environment variables are applied **after** source-version ones.
+When the same variable is defined for both, the target-version value takes
+precedence.
 :::
 
 #### When `pg_upgrade` emits `update_extensions.sql`
