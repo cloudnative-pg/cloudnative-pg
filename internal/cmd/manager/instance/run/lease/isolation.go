@@ -249,6 +249,18 @@ func (e *SupersededError) Error() string {
 // instance. On any step-down verdict or checker build failure, reason carries
 // the specific cause for the caller to log.
 func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, reason error) {
+	if cluster.Spec.Instances == 1 {
+		return false, nil
+	}
+
+	if cluster.Status.TargetPrimary != "" && cluster.Status.TargetPrimary != ourIdentity {
+		return true, &SupersededError{
+			Host:          ourIdentity,
+			TargetPrimary: cluster.Status.TargetPrimary,
+			OurIdentity:   ourIdentity,
+		}
+	}
+
 	var cfg *apiv1.IsolationCheckConfiguration
 	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
 		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
@@ -259,9 +271,6 @@ func shouldStepDown(cluster *apiv1.Cluster, ourIdentity string) (stepDown bool, 
 	// empty placeholder from GetClusterOrDefault. There is nothing to check
 	// in that case.
 	if cfg == nil {
-		return false, nil
-	}
-	if cluster.Spec.Instances == 1 {
 		return false, nil
 	}
 

@@ -115,4 +115,28 @@ var _ = Describe("livenessExecutor", func() {
 		Expect(w.Code).To(Equal(500))
 		Expect(w.Body.String()).To(ContainSubstring("unresponsive to immediate shutdown"))
 	})
+
+	It("fails when primary storage is not writable", func() {
+		tempDir, err := os.MkdirTemp("", "liveness-storage-test-*")
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _ = os.RemoveAll(tempDir) }()
+
+		readOnlyDir := filepath.Join(tempDir, "ro")
+		Expect(os.Mkdir(readOnlyDir, 0o500)).To(Succeed())
+
+		instance := &postgres.Instance{
+			PgData: readOnlyDir,
+		}
+
+		executor := &livenessExecutor{
+			instance:      instance,
+			leaseWatchdog: watchdog.NewLeaseWatchdog(time.Minute),
+		}
+		w := httptest.NewRecorder()
+
+		executor.IsHealthy(context.Background(), w)
+
+		Expect(w.Code).To(Equal(500))
+		Expect(w.Body.String()).To(ContainSubstring("primary storage is not writable"))
+	})
 })

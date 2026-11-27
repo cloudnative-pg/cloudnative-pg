@@ -90,6 +90,13 @@ func (e *livenessExecutor) IsHealthy(
 		http.Error(w, "PostgreSQL unresponsive to immediate shutdown", http.StatusInternalServerError)
 		return
 	}
+	if isPrimary, _ := e.instance.IsPrimary(); isPrimary {
+		if err := e.instance.CheckStorageWritability(ctx); err != nil {
+			contextLogger.Warning("liveness probe failing: primary storage is not writable", "err", err.Error())
+			http.Error(w, fmt.Sprintf("primary storage is not writable: %s", err), http.StatusInternalServerError)
+			return
+		}
+	}
 
 	_, _ = fmt.Fprint(w, "OK")
 }

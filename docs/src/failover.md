@@ -370,6 +370,13 @@ restart, not as a liveness probe failure. Full high availability (recreation of
 the old primary on a healthy node by the operator) is still gated on the
 taint-based eviction actually deleting the pod.
 
+Similarly, with `.spec.probes.liveness.dataVolumeCheck.enabled: true` (the default),
+the instance manager actively tests writability of the primary data volume.
+If the underlying volume hangs, the liveness probe fails and lease renewals stop,
+allowing a replica to safely take over as primary even while network connectivity
+to the API server is intact (see
+[Data Volume Writability Check](instance_manager.md#data-volume-writability-check)).
+
 The step-down needs a working instance manager, and the container restart
 needs a working kubelet. If both hang while the kernel and the network of the
 node stay up, the WAL senders of the old primary keep sending keepalive
