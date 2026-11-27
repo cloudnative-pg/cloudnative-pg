@@ -375,3 +375,58 @@ var _ = Describe("reconcileDivergedReplicaContainment", func() {
 			func() []corev1.PersistentVolumeClaim { return nil }, true, false, `["replica-1"]`),
 	)
 })
+
+var _ = Describe("updateNoPromotableInstanceCondition", func() {
+	active := func(names ...string) postgres.PostgresqlStatusList {
+		var list postgres.PostgresqlStatusList
+		for _, name := range names {
+			list.Items = append(list.Items, postgres.PostgresqlStatus{
+				Pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}},
+			})
+		}
+		return list
+	}
+	existing := metav1.Condition{
+		Type:    string(apiv1.ConditionNoPromotableInstance),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.ConditionReasonOnlyDivergedInstances),
+		Message: "set by an earlier pass",
+	}
+
+	DescribeTable("with instance-1 as primary",
+		func(diverged []string, statuses postgres.PostgresqlStatusList, conditions []metav1.Condition, message string) {
+			cluster := &apiv1.Cluster{Status: apiv1.ClusterStatus{
+				CurrentPrimary: "instance-1",
+				Conditions:     conditions,
+			}}
+			for _, name := range diverged {
+				if cluster.Status.DivergedInstances == nil {
+					cluster.Status.DivergedInstances = make(map[apiv1.PodName]apiv1.DivergedInstanceStatus)
+				}
+				cluster.Status.DivergedInstances[apiv1.PodName(name)] = apiv1.DivergedInstanceStatus{}
+			}
+
+			updateNoPromotableInstanceCondition(cluster, statuses)
+
+			cond := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionNoPromotableInstance))
+			if message == "" {
+				Expect(cond).To(BeNil())
+				return
+			}
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).To(Equal(string(apiv1.ConditionReasonOnlyDivergedInstances)))
+			Expect(cond.Message).To(Equal(message))
+		},
+		Entry("sets the condition while only diverged instances are active",
+			[]string{"instance-3", "instance-2"}, active("instance-2"), nil,
+			"No instance can replace the primary instance-1: the only active instances are diverged, "+
+				"and a diverged instance is never promoted: instance-2, instance-3"),
+		Entry("removes the condition when another instance is active",
+			[]string{"instance-2"}, active("instance-2", "instance-3"), []metav1.Condition{existing}, ""),
+		Entry("removes the condition when no instance is recorded as diverged",
+			nil, active("instance-2"), []metav1.Condition{existing}, ""),
+		Entry("leaves the condition as it is when no instance is active",
+			[]string{"instance-2"}, active(), []metav1.Condition{existing}, existing.Message),
+	)
+})

@@ -67,6 +67,10 @@ and `-ro` services, excludes it from promotion, and fences it. It also sets the
 `ReplicasHealthy` condition of the `Cluster` to `False` and raises a
 `ReplicaDiverged` event. The primary keeps running.
 
+If the primary is then lost and only diverged replicas are left, no instance
+can be promoted. CloudNativePG reports it with the `NoPromotableInstance`
+condition of the `Cluster`, which lists the diverged instances.
+
 To bring the replica back, rebuild it from the current primary with the
 [`cnpg` plugin](kubectl-plugin.md#destroy):
 
