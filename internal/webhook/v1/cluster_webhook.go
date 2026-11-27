@@ -2843,6 +2843,7 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getSynchronousReplicationWarnings(r)...)
 	list = append(list, getLegacySynchronousReplicationWarnings(r)...)
 	list = append(list, getPrimaryIsolationTimingWarnings(r)...)
+	list = append(list, getSkipEmptyWalArchiveCheckWarnings(r)...)
 	return append(list, getFailureDomainTopologyWarnings(r)...)
 }
 
@@ -3024,6 +3025,29 @@ func (v *ClusterCustomValidator) validateHibernationAnnotation(r *apiv1.Cluster)
 				utils.HibernationAnnotationValueOn,
 				utils.HibernationAnnotationValueOff,
 			),
+		),
+	}
+}
+
+// getSkipEmptyWalArchiveCheckWarnings warns when the skipEmptyWalArchiveCheck
+// annotation has a value other than "enabled" or "disabled". This is a warning
+// and not a validation error because the reconciliation loop validates existing
+// clusters too, and would stop reconciling a cluster that already has such a value.
+func getSkipEmptyWalArchiveCheckWarnings(r *apiv1.Cluster) admission.Warnings {
+	value, ok := r.Annotations[utils.SkipEmptyWalArchiveCheck]
+	isKnownValue := value == string(utils.AnnotationStatusEnabled) ||
+		value == string(utils.AnnotationStatusDisabled)
+	if !ok || isKnownValue {
+		return nil
+	}
+
+	return admission.Warnings{
+		fmt.Sprintf("%s is set to %q, which does not skip the empty WAL archive check. "+
+			"Allowed values are %q and %q",
+			field.NewPath("metadata", "annotations", utils.SkipEmptyWalArchiveCheck),
+			value,
+			utils.AnnotationStatusEnabled,
+			utils.AnnotationStatusDisabled,
 		),
 	}
 }

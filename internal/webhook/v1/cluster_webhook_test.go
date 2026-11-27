@@ -5512,6 +5512,69 @@ var _ = Describe("Validate hibernation", func() {
 	})
 })
 
+var _ = Describe("Validate skipEmptyWalArchiveCheck", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	newCluster := func(value string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipEmptyWalArchiveCheck: value,
+				},
+			},
+		}
+	}
+
+	annotationPath := field.NewPath("metadata", "annotations", utils.SkipEmptyWalArchiveCheck).String()
+
+	It("should not warn if the annotation is not set", func() {
+		Expect(getSkipEmptyWalArchiveCheckWarnings(&apiv1.Cluster{})).To(BeEmpty())
+	})
+
+	DescribeTable("should not warn if the annotation has an allowed value",
+		func(value utils.AnnotationStatus) {
+			Expect(getSkipEmptyWalArchiveCheckWarnings(newCluster(string(value)))).To(BeEmpty())
+		},
+		Entry("enabled", utils.AnnotationStatusEnabled),
+		Entry("disabled", utils.AnnotationStatusDisabled),
+	)
+
+	DescribeTable("should warn and list the allowed values if the annotation has any other value",
+		func(value string) {
+			warnings := getSkipEmptyWalArchiveCheckWarnings(newCluster(value))
+			Expect(warnings).To(HaveLen(1))
+			Expect(warnings[0]).To(ContainSubstring(annotationPath))
+			Expect(warnings[0]).To(ContainSubstring(`%q`, value))
+			Expect(warnings[0]).To(ContainSubstring(`"enabled"`))
+			Expect(warnings[0]).To(ContainSubstring(`"disabled"`))
+		},
+		Entry("a misspelled value", "enable"),
+		Entry("a boolean", "true"),
+		Entry("an empty value", ""),
+	)
+
+	// The reconciliation loop validates existing clusters as if they were being
+	// created, and stops reconciling a cluster that fails validation.
+	It("is a warning and not an error on both creation and update", func() {
+		cluster := newCluster("enable")
+		cluster.Name = "cluster-example"
+		cluster.Spec.Instances = 3
+		cluster.Spec.StorageConfiguration.Size = "1Gi"
+		cluster.SetDefaults()
+
+		createWarnings, err := v.ValidateCreate(context.Background(), cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(createWarnings).To(ContainElement(ContainSubstring(annotationPath)))
+
+		updateWarnings, err := v.ValidateUpdate(context.Background(), cluster.DeepCopy(), cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updateWarnings).To(ContainElement(ContainSubstring(annotationPath)))
+	})
+})
+
 var _ = Describe("validateManagedServices", func() {
 	var cluster *apiv1.Cluster
 	var v *ClusterCustomValidator
