@@ -51,17 +51,15 @@ import (
 // has to be on the same timeline and attached to the new primary.
 var _ = Describe("Failover after an OOM", Serial, Label(tests.LabelSelfHealing), func() {
 	const (
-		sampleFile      = fixturesDir + "/oom_failover/cluster-oom-failover.yaml.template"
-		namespacePrefix = "oom-failover"
-		level           = tests.Medium
-
-		// oomQuery allocates in the backend much more than the memory limit
-		// of the Pod. Nothing is replicated, so only the primary is affected.
-		oomQuery = "SELECT cardinality(array_agg(i)) FROM generate_series(1, 100000000) AS i"
+		level = tests.Medium
 
 		// maxOOMAttempts is how many times the primary runs out of memory,
 		// at most, waiting for the operator to fail over
 		maxOOMAttempts = 5
+
+		// restartBackoffTimeout is how long to wait for an instance killed by
+		// the OOM killer, again and again, to be restarted by the kubelet
+		restartBackoffTimeout = 3 * time.Minute
 
 		// failingOverReason is the reason of the event of a failover starting
 		failingOverReason = "FailingOver"
@@ -76,6 +74,18 @@ var _ = Describe("Failover after an OOM", Serial, Label(tests.LabelSelfHealing),
 	// from a timeline that is newer than the one of the position it needs
 	timelineFatal := regexp.MustCompile(
 		`belongs to timeline \d+, but previous recovered WAL file came from timeline \d+`)
+
+	// oomScenario is a way to make the instances run out of memory
+	type oomScenario struct {
+		sampleFile      string
+		namespacePrefix string
+
+		// replica tells if a replica runs out of memory together with the
+		// primary, the first time. It is not repeated: the failover quorum
+		// check needs the replicas to be ready to promote one of them, so a
+		// replica that is down again and again would prevent the failover.
+		replica bool
+	}
 
 	var namespace, clusterName string
 
@@ -171,17 +181,34 @@ var _ = Describe("Failover after an OOM", Serial, Label(tests.LabelSelfHealing),
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-
-		var err error
-		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
-		Expect(err).ToNot(HaveOccurred())
-		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 	})
 
-	It("ends up with every instance on the same timeline, attached to the primary", func() {
-		var oldPrimary string
+	// outOfMemory runs a query that allocates in the backend much more than
+	// the memory limit of the Pod. Nothing is replicated, so no other instance
+	// is affected.
+	outOfMemory := func(podName string) {
+		GinkgoHelper()
+		_, stderr, err := exec.QueryInInstancePodWithTimeout(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			exec.PodLocator{Namespace: namespace, PodName: podName},
+			postgres.PostgresDBName,
+			"SELECT cardinality(array_agg(i)) FROM generate_series(1, 100000000) AS i", 2*time.Minute)
+		Expect(err).To(HaveOccurred(),
+			"the query was expected to be interrupted by the OOM killer on %v, stderr: %v", podName, stderr)
+	}
+
+	DescribeTable("ends up with every instance on the same timeline, attached to the primary", func(scenario oomScenario) {
+		By("having a running cluster", func() {
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, scenario.namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			sampleFile := fixturesDir + "/oom_failover/" + scenario.sampleFile
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+		})
+
+		var oldPrimary, replica string
 		var oldTimeline int
 		var oldRestarts int32
 		var oldPostmasterStart string
@@ -193,13 +220,23 @@ var _ = Describe("Failover after an OOM", Serial, Label(tests.LabelSelfHealing),
 			var err error
 			oldPostmasterStart, err = postmasterStart(oldPrimary)
 			Expect(err).ToNot(HaveOccurred())
+
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			for i := range podList.Items {
+				if name := podList.Items[i].Name; name != oldPrimary && (replica == "" || name < replica) {
+					replica = name
+				}
+			}
 		})
 
 		By("running out of memory on the primary until the operator fails over", func() {
 			// A single OOM is usually over before the operator reacts. Every
 			// new one makes the kubelet wait longer before restarting the
 			// container, until the primary is down for long enough.
-			wait := testTimeouts[timeouts.NewPrimaryAfterFailover]
+			// The wait grows with every OOM, because the kubelet backs off
+			// before restarting a container that keeps being killed.
+			wait := int(restartBackoffTimeout.Seconds())
 			failedOver := func(g Gomega) bool { return failingOverEvents(g) > 0 }
 
 			restarts, start := oldRestarts, oldPostmasterStart
@@ -213,19 +250,22 @@ var _ = Describe("Failover after an OOM", Serial, Label(tests.LabelSelfHealing),
 						var err error
 						start, err = postmasterStart(oldPrimary)
 						g.Expect(err).ToNot(HaveOccurred())
-					}, wait, PollingTime).Should(Succeed())
+						if scenario.replica {
+							_, err = postmasterStart(replica)
+							g.Expect(err).ToNot(HaveOccurred())
+						}
+					}, wait, PollingTime).Should(Succeed(),
+						"the instances do not accept queries again and the operator did not fail over")
 				})
 				if failedOver(Default) {
 					break
 				}
 
-				By(fmt.Sprintf("running a query that runs out of memory (attempt %d)", attempt), func() {
-					_, stderr, err := exec.QueryInInstancePodWithTimeout(
-						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{Namespace: namespace, PodName: oldPrimary},
-						postgres.PostgresDBName, oomQuery, 2*time.Minute)
-					Expect(err).To(HaveOccurred(),
-						"the query was expected to be interrupted by the OOM killer, stderr: %v", stderr)
+				By(fmt.Sprintf("running out of memory (attempt %d)", attempt), func() {
+					if scenario.replica && attempt == 1 {
+						outOfMemory(replica)
+					}
+					outOfMemory(oldPrimary)
 				})
 
 				By(fmt.Sprintf("seeing PostgreSQL restart (attempt %d)", attempt), func() {
@@ -319,5 +359,15 @@ var _ = Describe("Failover after an OOM", Serial, Label(tests.LabelSelfHealing),
 			}, RetryTimeout, PollingTime).Should(Equal(strings.Join(replicas, ",")),
 				fmt.Sprintf("the replicas of %v are expected to be streaming from it", primary))
 		})
-	})
+	},
+		Entry("when the primary runs out of memory", oomScenario{
+			sampleFile:      "cluster-oom-primary.yaml.template",
+			namespacePrefix: "oom-primary",
+		}),
+		Entry("when the primary and a replica run out of memory", oomScenario{
+			sampleFile:      "cluster-oom-primary-replica.yaml.template",
+			namespacePrefix: "oom-primary-replica",
+			replica:         true,
+		}),
+	)
 })

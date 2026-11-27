@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-oom-failover
+  name: cluster-oom-primary-replica
 spec:
   instances: 3
 
