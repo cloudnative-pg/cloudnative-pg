@@ -84,7 +84,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	err = r.createRoleBinding(ctx, cluster)
+	err = r.createOrPatchRoleBinding(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -1101,6 +1101,41 @@ func (r *ClusterReconciler) createRole(
 	if err != nil && !apierrs.IsAlreadyExists(err) {
 		log.FromContext(ctx).Error(err, "Unable to create the Role", "object", role)
 		return err
+	}
+
+	return nil
+}
+
+// createOrPatchRoleBinding ensures that the role binding exists and that it
+// binds the cluster role to the ServiceAccount the instances run as, also when
+// spec.serviceAccountName changes after the cluster was created
+func (r *ClusterReconciler) createOrPatchRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
+	var roleBinding rbacv1.RoleBinding
+	if err := r.Get(
+		ctx,
+		client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace},
+		&roleBinding,
+	); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting role binding: %w", err)
+		}
+
+		return r.createRoleBinding(ctx, cluster)
+	}
+
+	generatedRoleBinding := specs.CreateRoleBinding(cluster.ObjectMeta, cluster.GetServiceAccountName())
+	if equality.Semantic.DeepEqual(generatedRoleBinding.Subjects, roleBinding.Subjects) {
+		return nil
+	}
+
+	r.Recorder.Event(cluster, "Normal", "UpdatingRoleBinding", "Updating Cluster RoleBinding")
+
+	// The role reference of a role binding cannot be changed, and it always
+	// points to the cluster role, so only the subjects need to be patched
+	patchedRoleBinding := roleBinding.DeepCopy()
+	patchedRoleBinding.Subjects = generatedRoleBinding.Subjects
+	if err := r.Patch(ctx, patchedRoleBinding, client.MergeFrom(&roleBinding)); err != nil {
+		return fmt.Errorf("while patching role binding: %w", err)
 	}
 
 	return nil
