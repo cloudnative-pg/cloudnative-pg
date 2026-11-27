@@ -227,6 +227,29 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
 }
 
+// markOldPrimaryAsUnhealthyOnFailover is the retryable call of
+// markOldPrimaryAsUnhealthy used by the reconcile loop. It acts only while a
+// failover is in progress: the operator registers PhaseFailOver before it
+// changes the target primary, and the pending marker is only ever set by a
+// failover, which covers a phase overwritten while waiting for the WAL
+// receivers to stop.
+//
+// During a switchover (PhaseSwitchover, PhaseUpgrade) the old primary is
+// healthy and is running a fast shutdown. The standbys stream from it through
+// the -rw service, and they need it reachable until they have received its
+// shutdown checkpoint, so it must keep the primary label.
+func (r *ClusterReconciler) markOldPrimaryAsUnhealthyOnFailover(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instances []corev1.Pod,
+) error {
+	if cluster.Status.Phase != apiv1.PhaseFailOver &&
+		cluster.Status.TargetPrimary != apiv1.PendingFailoverMarker {
+		return nil
+	}
+	return r.markOldPrimaryAsUnhealthy(ctx, cluster.Status.CurrentPrimary, instances)
+}
+
 // markOldPrimaryAsUnhealthy labels the old primary pod as unhealthy when failover
 // starts, removing it from both the -rw and -ro service selectors until
 // ReconcileMetadata restores the correct label after promotion completes.
