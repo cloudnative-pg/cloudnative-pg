@@ -182,6 +182,28 @@ var _ = Describe("cluster_status unit tests", func() {
 			func(pods []corev1.Pod) []corev1.Pod { return pods[1:] }, false),
 	)
 
+	// A canceled switchover leaves a marker as current primary, and the old
+	// primary as target: it is the instance that can start again.
+	It("keeps the target of a canceled switchover when no instance is ready", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pods := generateFakeClusterPods(env.client, cluster, true)
+		for i := range pods {
+			pods[i].Status.Conditions = nil
+		}
+
+		oldPrimary := pods[0].Name
+		cluster.Status.CurrentPrimary = apiv1.CanceledSwitchoverMarker
+		cluster.Status.TargetPrimary = oldPrimary
+		cluster.Status.ReadyInstances = utils.CountReadyPods(utils.FilterActivePods(pods))
+		Expect(cluster.Status.ReadyInstances).To(BeZero())
+
+		env.clusterReconciler.resetUnavailableTargetPrimary(ctx, cluster,
+			&managedResources{instances: corev1.PodList{Items: pods}})
+
+		Expect(cluster.Status.TargetPrimary).To(Equal(oldPrimary))
+	})
+
 	It("makes sure RegisterPhase works correctly", func() {
 		const phaseReason = "testing"
 		ctx := context.Background()

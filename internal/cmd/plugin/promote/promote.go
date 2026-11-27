@@ -33,12 +33,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// cancelSwitchoverMarker is stored as the current primary when a switchover
-// is canceled. It names no instance, so the current and the target primary
-// still differ and the old primary knows it must act. Setting the target back
-// to the current primary instead would leave the old primary stuck.
-const cancelSwitchoverMarker = "cancel"
-
 // Promote promotes an instance in a cluster. While a switchover is in
 // progress it can only cancel it, by promoting the current primary back, or
 // redirect a canceled one. Both need force.
@@ -63,7 +57,7 @@ func Promote(ctx context.Context, cli client.Client,
 	switchoverInProgress := transitionInProgress && !failoverInProgress
 
 	// The marker is not an instance: messages must not name it
-	cancelInProgress := currentPrimary == cancelSwitchoverMarker
+	cancelInProgress := currentPrimary == apiv1.CanceledSwitchoverMarker
 
 	// If server name is equal to target primary, there is no need to promote
 	// that instance
@@ -127,7 +121,7 @@ func Promote(ctx context.Context, cli client.Client,
 			return
 		}
 		if canceling {
-			cluster.Status.CurrentPrimary = cancelSwitchoverMarker
+			cluster.Status.CurrentPrimary = apiv1.CanceledSwitchoverMarker
 		}
 		cluster.Status.TargetPrimary = serverName
 		cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()

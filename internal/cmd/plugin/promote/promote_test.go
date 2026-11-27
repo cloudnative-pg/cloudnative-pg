@@ -143,7 +143,7 @@ var _ = Describe("promote subcommand tests", func() {
 			Expect(Promote(ctx, client, namespace, "cluster1", "cluster1-1", true)).To(Succeed())
 
 			cl := getCluster(ctx)
-			Expect(cl.Status.CurrentPrimary).To(Equal(cancelSwitchoverMarker))
+			Expect(cl.Status.CurrentPrimary).To(Equal(apiv1.CanceledSwitchoverMarker))
 			Expect(cl.Status.TargetPrimary).To(Equal("cluster1-1"))
 			Expect(cl.Status.Phase).To(Equal(apiv1.PhaseSwitchover))
 		})
@@ -161,29 +161,29 @@ var _ = Describe("promote subcommand tests", func() {
 	It("refuses another instance without force after a cancel, without naming the marker", func(ctx SpecContext) {
 		var cl apiv1.Cluster
 		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
-		cl.Status.CurrentPrimary = cancelSwitchoverMarker
+		cl.Status.CurrentPrimary = apiv1.CanceledSwitchoverMarker
 		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
 
 		err := Promote(ctx, client, namespace, "cluster1", "cluster1-3", false)
 		Expect(err).To(MatchError(ContainSubstring("cluster1-1 is being promoted back")))
-		Expect(err).ToNot(MatchError(ContainSubstring("promote " + cancelSwitchoverMarker)))
+		Expect(err).ToNot(MatchError(ContainSubstring("promote " + apiv1.CanceledSwitchoverMarker)))
 
 		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
-		Expect(cl.Status.CurrentPrimary).To(Equal(cancelSwitchoverMarker))
+		Expect(cl.Status.CurrentPrimary).To(Equal(apiv1.CanceledSwitchoverMarker))
 		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-1"))
 	})
 
 	It("redirects a canceled switchover to another instance with force", func(ctx SpecContext) {
 		var cl apiv1.Cluster
 		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
-		cl.Status.CurrentPrimary = cancelSwitchoverMarker
+		cl.Status.CurrentPrimary = apiv1.CanceledSwitchoverMarker
 		cl.Status.Phase = apiv1.PhaseSwitchover
 		Expect(client.Status().Update(ctx, &cl)).To(Succeed())
 
 		Expect(Promote(ctx, client, namespace, "cluster1", "cluster1-3", true)).To(Succeed())
 
 		Expect(client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "cluster1"}, &cl)).To(Succeed())
-		Expect(cl.Status.CurrentPrimary).To(Equal(cancelSwitchoverMarker))
+		Expect(cl.Status.CurrentPrimary).To(Equal(apiv1.CanceledSwitchoverMarker))
 		Expect(cl.Status.TargetPrimary).To(Equal("cluster1-3"))
 	})
 
