@@ -132,7 +132,7 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionAlterSQL(obj, connString, defaultPostgresMajorVersion)
+		sqls := toSubscriptionAlterSQL(obj, connString, defaultPostgresMajorVersion, nil)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
 	})
@@ -152,7 +152,7 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionAlterSQL(obj, connString, 17)
+		sqls := toSubscriptionAlterSQL(obj, connString, 17, nil)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("failover" = 'true', "origin" = 'none')`))
@@ -173,7 +173,7 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionAlterSQL(obj, connString, 18)
+		sqls := toSubscriptionAlterSQL(obj, connString, 18, nil)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
 		Expect(sqls).To(ContainElement(
@@ -189,8 +189,78 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionAlterSQL(obj, connString, defaultPostgresMajorVersion)
+		sqls := toSubscriptionAlterSQL(obj, connString, defaultPostgresMajorVersion, nil)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
+	})
+
+	Context("when a parameter cannot be altered on an enabled subscription", func() {
+		const connString = "host=localhost user=test dbname=test"
+
+		newSubscription := func(parameters map[string]string) *apiv1.Subscription {
+			return &apiv1.Subscription{
+				Spec: apiv1.SubscriptionSpec{
+					Name:            "test_sub",
+					PublicationName: "test_pub",
+					Parameters:      parameters,
+				},
+			}
+		}
+
+		It("does not re-send failover when it already matches the catalog", func() {
+			obj := newSubscription(map[string]string{
+				"failover": "true",
+				"binary":   "true",
+			})
+
+			sqls := toSubscriptionAlterSQL(obj, connString, 17, map[string]string{"failover": "true"})
+			Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("binary" = 'true')`))
+			Expect(sqls).ToNot(ContainElement(ContainSubstring("failover")))
+		})
+
+		It("omits the SET entirely when failover was the only parameter left", func() {
+			obj := newSubscription(map[string]string{"failover": "true"})
+
+			sqls := toSubscriptionAlterSQL(obj, connString, 17, map[string]string{"failover": "true"})
+			Expect(sqls).To(HaveLen(2))
+			Expect(sqls).ToNot(ContainElement(ContainSubstring("SET (")))
+		})
+
+		It("still sends failover when the requested value differs", func() {
+			obj := newSubscription(map[string]string{"failover": "true"})
+
+			sqls := toSubscriptionAlterSQL(obj, connString, 17, map[string]string{"failover": "false"})
+			Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("failover" = 'true')`))
+		})
+
+		It("treats equivalent boolean spellings as unchanged", func() {
+			obj := newSubscription(map[string]string{"failover": "on"})
+
+			sqls := toSubscriptionAlterSQL(obj, connString, 17, map[string]string{"failover": "true"})
+			Expect(sqls).ToNot(ContainElement(ContainSubstring("failover")))
+		})
+
+		It("keeps the parameter when the catalog value is unknown", func() {
+			obj := newSubscription(map[string]string{"failover": "true"})
+
+			sqls := toSubscriptionAlterSQL(obj, connString, 17, nil)
+			Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("failover" = 'true')`))
+		})
+
+		It("drops two_phase as well on PostgreSQL 18", func() {
+			obj := newSubscription(map[string]string{
+				"failover":  "true",
+				"two_phase": "true",
+				"origin":    "none",
+			})
+
+			sqls := toSubscriptionAlterSQL(obj, connString, 18, map[string]string{
+				"failover":  "true",
+				"two_phase": "true",
+			})
+			Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("origin" = 'none')`))
+			Expect(sqls).ToNot(ContainElement(ContainSubstring("failover")))
+			Expect(sqls).ToNot(ContainElement(ContainSubstring("two_phase")))
+		})
 	})
 })
