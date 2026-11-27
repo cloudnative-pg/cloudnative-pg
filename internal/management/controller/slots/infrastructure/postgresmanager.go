@@ -119,14 +119,13 @@ func IsInRecovery(ctx context.Context, db *sql.DB) (bool, error) {
 	return inRecovery, err
 }
 
-// ListOrphanedFailoverSlots lists the names of the logical slots enabled for
-// failover that a standby holds without having received them from the primary. PostgreSQL
-// refuses to enable failover on a slot during recovery, except in the slot sync
-// worker, which marks its slots as synced: these slots were created while the
-// instance was a primary, and the slot sync worker won't overwrite them.
-// The slots in use are left out, and so is every slot when
-// sync_replication_slots is off: there is no slot sync worker to unblock, and
-// pg_failover_slots keeps using the slots of a former primary.
+// ListOrphanedFailoverSlots lists the logical failover slots of a standby that
+// are not synced and not in use. PostgreSQL enables failover on a slot during
+// recovery only in the slot sync worker, which marks its slots as synced, so
+// these slots were created while the instance was a primary. The worker errors
+// out instead of overwriting them.
+// It lists nothing when sync_replication_slots is off: there is no worker to
+// unblock, and pg_failover_slots keeps using the slots of a former primary.
 // It requires PostgreSQL 17 or later.
 func ListOrphanedFailoverSlots(ctx context.Context, db *sql.DB) ([]string, error) {
 	rows, err := db.QueryContext(

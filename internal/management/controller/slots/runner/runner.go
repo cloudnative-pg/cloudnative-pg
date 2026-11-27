@@ -187,8 +187,9 @@ func reconcileOrphanedFailoverSlots(
 // receive from the primary. A former primary keeps the failover slots it
 // created, and the slot sync worker refuses to overwrite a slot that is not
 // marked as synced: once they are dropped, the worker recreates them from the
-// primary. A slot in use is dropped by a later run, after its client disconnects.
-// A failure on one slot doesn't stop the rest; errors are collected and returned together.
+// primary. A slot in use is dropped by a later run, after its client
+// disconnects. A failure on one slot doesn't stop the rest; errors are
+// collected and returned together.
 func dropOrphanedFailoverSlots(ctx context.Context, primaryDB, localDB *sql.DB) error {
 	slotNames, err := infrastructure.ListOrphanedFailoverSlots(ctx, localDB)
 	if err != nil {
