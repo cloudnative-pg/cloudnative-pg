@@ -81,6 +81,24 @@ type InstanceReconciler struct {
 	// and PostgreSQL has not been reloaded yet
 	pendingReload bool
 
+	// pendingFailoverQuorum is the FailoverQuorum status waiting for the
+	// standbys to be aligned with the primary before being published.
+	// Written and read only by Reconcile. Losing it is safe: a new one
+	// is captured at a later WAL position.
+	pendingFailoverQuorum *pendingFailoverQuorum
+
+	// syncStandbysEffective is true when we know that backends wait for the
+	// synchronous standbys. It is reset when synchronous replication is
+	// disabled or when this instance doesn't manage the FailoverQuorum object.
+	// Written and read only by Reconcile.
+	syncStandbysEffective bool
+
+	// checkpointRequestedAtLSN is the WAL insert LSN read right before
+	// requesting the checkpoint that makes the synchronous standbys effective.
+	// It is empty when no such checkpoint is pending. Written and read only by
+	// Reconcile.
+	checkpointRequestedAtLSN string
+
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
 	primaryLeaseAcquirer  PrimaryLeaseAcquirer
