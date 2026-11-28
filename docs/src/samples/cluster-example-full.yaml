@@ -103,7 +103,7 @@ spec:
 
   affinity:
     enablePodAntiAffinity: true
-    topologyKey: failure-domain.beta.kubernetes.io/zone
+    topologyKey: topology.kubernetes.io/zone
 
   nodeMaintenanceWindow:
     inProgress: false
