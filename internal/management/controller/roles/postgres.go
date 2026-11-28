@@ -30,6 +30,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
+	"k8s.io/utils/ptr"
 
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
@@ -249,30 +250,39 @@ func UpdateMembership(
 	ctx context.Context,
 	db *sql.DB,
 	role DatabaseRole,
-	rolesToGrant []string,
-	rolesToRevoke []string,
+	changes MembershipChanges,
+	pgMajorVersion int,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while updating memberships for role %s with role reconciler: %w", role.Name, err)
 	}
-	if len(rolesToRevoke)+len(rolesToGrant) == 0 {
+	if changes.isEmpty() {
 		contextLog.Debug("No membership change query to execute for role")
 		return nil
 	}
-	queries := make([]string, 0, len(rolesToRevoke)+len(rolesToGrant))
-	for _, r := range rolesToGrant {
-		queries = append(queries, fmt.Sprintf(`GRANT %s TO %s`,
-			pgx.Identifier{r}.Sanitize(),
-			pgx.Identifier{role.Name}.Sanitize()),
-		)
+	member := pgx.Identifier{role.Name}.Sanitize()
+	var queries []string
+	for _, m := range changes.Grant {
+		query, _ := grantMembershipQuery(m, member)
+		queries = append(queries, query)
 	}
-	for _, r := range rolesToRevoke {
+	for _, m := range changes.Update {
+		if query, hasOptions := grantMembershipQuery(m, member); hasOptions {
+			queries = append(queries, query+grantedBy(m, pgMajorVersion))
+		}
+		// The form every supported PostgreSQL version accepts, which from
+		// PostgreSQL 16 also refuses to drop an option other grants depend
+		// on, where WITH ADMIN FALSE drops it anyway
+		if m.Admin != nil && !*m.Admin {
+			queries = append(queries, fmt.Sprintf(`REVOKE ADMIN OPTION FOR %s FROM %s`,
+				pgx.Identifier{m.Name}.Sanitize(), member)+grantedBy(m, pgMajorVersion))
+		}
+	}
+	for _, m := range changes.Revoke {
 		queries = append(queries, fmt.Sprintf(`REVOKE %s FROM %s`,
-			pgx.Identifier{r}.Sanitize(),
-			pgx.Identifier{role.Name}.Sanitize()),
-		)
+			pgx.Identifier{m.Name}.Sanitize(), member)+grantedBy(m, pgMajorVersion))
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -296,28 +306,82 @@ func UpdateMembership(
 	return tx.Commit()
 }
 
-// GetParentRoles get the in roles of this role
-func GetParentRoles(ctx context.Context, db *sql.DB, role DatabaseRole) ([]string, error) {
+// grantMembershipQuery returns the GRANT making member a member of the role
+// of m with the options m turns on or sets, and whether it has any
+func grantMembershipQuery(m Membership, member string) (string, bool) {
+	var options []string
+	if ptr.Deref(m.Admin, false) {
+		options = append(options, "ADMIN OPTION")
+	}
+	if m.Inherit != nil {
+		options = append(options, fmt.Sprintf("INHERIT %t", *m.Inherit))
+	}
+	if m.Set != nil {
+		options = append(options, fmt.Sprintf("SET %t", *m.Set))
+	}
+
+	query := fmt.Sprintf(`GRANT %s TO %s`, pgx.Identifier{m.Name}.Sanitize(), member)
+	if len(options) > 0 {
+		query += " WITH " + strings.Join(options, ", ")
+	}
+	return query, len(options) > 0
+}
+
+// grantedBy returns the clause naming the grantor of the grant a statement
+// acts on. Before PostgreSQL 16 a membership has a single grant, which a
+// superuser statement acts on whoever granted it.
+func grantedBy(m Membership, pgMajorVersion int) string {
+	if pgMajorVersion < 16 {
+		return ""
+	}
+	return fmt.Sprintf(` GRANTED BY %s`, pgx.Identifier{m.Grantor}.Sanitize())
+}
+
+// GetParentRoles gets the grants of membership of this role, with their
+// options
+func GetParentRoles(
+	ctx context.Context,
+	db *sql.DB,
+	role DatabaseRole,
+	pgMajorVersion int,
+) ([]Membership, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while getting parents for role %s with role reconciler: %w", role.Name, err)
 	}
-	query := `SELECT mem.inroles 
-		FROM pg_catalog.pg_authid as auth
-		LEFT JOIN (
-			SELECT pg_catalog.array_agg(pg_catalog.pg_get_userbyid(roleid)) as inroles, member
-			FROM pg_catalog.pg_auth_members GROUP BY member
-		) mem ON member = oid
-		WHERE rolname = $1`
-	contextLog.Debug("get parent role", "query", query)
-	var parentRoles pq.StringArray
-	err := db.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, wrapErr(err)
+	optionColumns := "NULL::boolean, NULL::boolean"
+	if pgMajorVersion >= 16 {
+		optionColumns = "am.inherit_option, am.set_option"
 	}
+	query := fmt.Sprintf(`SELECT pg_catalog.pg_get_userbyid(am.roleid), pg_catalog.pg_get_userbyid(am.grantor),
+		am.admin_option, %s
+		FROM pg_catalog.pg_auth_members AS am
+		JOIN pg_catalog.pg_authid AS auth ON auth.oid = am.member
+		WHERE auth.rolname = $1`, optionColumns)
+	contextLog.Debug("get parent role", "query", query)
+	rows, err := db.QueryContext(ctx, query, role.Name)
 	if err != nil {
 		return nil, wrapErr(err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			contextLog.Info("Ignorable error while querying pg_catalog.pg_auth_members", "err", err)
+		}
+	}()
+
+	var parentRoles []Membership
+	for rows.Next() {
+		var parentRole Membership
+		if err := rows.Scan(
+			&parentRole.Name, &parentRole.Grantor, &parentRole.Admin, &parentRole.Inherit, &parentRole.Set,
+		); err != nil {
+			return nil, wrapErr(err)
+		}
+		parentRoles = append(parentRoles, parentRole)
+	}
+	if rows.Err() != nil {
+		return nil, wrapErr(rows.Err())
 	}
 
 	return parentRoles, nil

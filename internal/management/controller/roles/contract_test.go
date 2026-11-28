@@ -26,6 +26,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -239,11 +240,66 @@ var _ = Describe("DatabaseRole implementation test", func() {
 	})
 
 	It("should return Correct Role to grant/revoke", func() {
-		rolesInDB := []string{"role1", "DBRole1", "DBRoleABC"}
-		rolesInSpec := []string{"role1", "role2", "roleabc"}
-		rolesToRevoke := getRolesToRevoke(rolesInDB, rolesInSpec)
-		rolesToGrant := getRolesToGrant(rolesInDB, rolesInSpec)
-		Expect(rolesToRevoke).To(BeEquivalentTo([]string{"DBRole1", "DBRoleABC"}))
-		Expect(rolesToGrant).To(BeEquivalentTo([]string{"role2", "roleabc"}))
+		rolesInDB := []Membership{
+			{Name: "role1", Grantor: "postgres"},
+			{Name: "DBRole1", Grantor: "postgres"},
+			{Name: "DBRoleABC", Grantor: "postgres"},
+		}
+		rolesInSpec := []apiv1.RoleGrant{{Name: "role1"}, {Name: "role2"}, {Name: "roleabc"}}
+		Expect(getMembershipChanges(rolesInDB, rolesInSpec)).To(Equal(MembershipChanges{
+			Grant: []Membership{{Name: "role2"}, {Name: "roleabc"}},
+			Revoke: []Membership{
+				{Name: "DBRole1", Grantor: "postgres"},
+				{Name: "DBRoleABC", Grantor: "postgres"},
+			},
+		}))
+	})
+
+	It("revokes every grant of a membership, and grants none already granted by another role", func() {
+		rolesInDB := []Membership{
+			{Name: "kept", Grantor: "admin_role"},
+			{Name: "removed", Grantor: "admin_role"},
+			{Name: "removed", Grantor: "postgres"},
+		}
+		rolesInSpec := []apiv1.RoleGrant{{Name: "kept"}}
+		Expect(getMembershipChanges(rolesInDB, rolesInSpec)).To(Equal(MembershipChanges{
+			Revoke: rolesInDB[1:],
+		}))
+	})
+
+	It("grants a new membership with the options the spec sets, and the admin option only when on", func() {
+		rolesInSpec := []apiv1.RoleGrant{
+			{Name: "admin", Admin: ptr.To(true)},
+			{Name: "no_admin", Admin: ptr.To(false), Inherit: ptr.To(false), Set: ptr.To(true)},
+		}
+		Expect(getMembershipChanges(nil, rolesInSpec)).To(Equal(MembershipChanges{
+			Grant: []Membership{
+				{Name: "admin", Admin: ptr.To(true)},
+				{Name: "no_admin", Inherit: ptr.To(false), Set: ptr.To(true)},
+			},
+		}))
+	})
+
+	It("changes every grant of a membership to the options the spec sets, and only those", func() {
+		rolesInDB := []Membership{
+			{Name: "role1", Grantor: "admin_role", Admin: ptr.To(true), Inherit: ptr.To(true), Set: ptr.To(true)},
+			{Name: "role1", Grantor: "postgres", Admin: ptr.To(false), Inherit: ptr.To(false), Set: ptr.To(true)},
+			{Name: "role2", Grantor: "postgres", Admin: ptr.To(true), Inherit: ptr.To(true), Set: ptr.To(true)},
+		}
+		rolesInSpec := []apiv1.RoleGrant{
+			{Name: "role1", Admin: ptr.To(false), Inherit: ptr.To(false)},
+			{Name: "role2"},
+		}
+		Expect(getMembershipChanges(rolesInDB, rolesInSpec)).To(Equal(MembershipChanges{
+			Update: []Membership{
+				{Name: "role1", Grantor: "admin_role", Admin: ptr.To(false), Inherit: ptr.To(false)},
+			},
+		}))
+	})
+
+	It("changes nothing on a grant that already has the options the spec sets", func() {
+		rolesInDB := []Membership{{Name: "role1", Grantor: "postgres", Admin: ptr.To(true)}}
+		rolesInSpec := []apiv1.RoleGrant{{Name: "role1", Admin: ptr.To(true)}}
+		Expect(getMembershipChanges(rolesInDB, rolesInSpec).isEmpty()).To(BeTrue())
 	})
 })

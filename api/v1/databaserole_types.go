@@ -76,6 +76,17 @@ type DatabaseRoleSpec struct {
 	// in the `cluster.spec.managed.roles` definition.
 	RoleConfiguration `json:",inline"`
 
+	// RoleGrants lists the roles this role is a member of, like `inRoles`,
+	// with the options of each membership. An entry carrying only a `name`
+	// is the same as listing the role in `inRoles`. A role listed in both
+	// fails the reconciliation, rather than one of the two entries silently
+	// winning. Changes are applied through `GRANT` and `REVOKE` statements,
+	// and removing an entry revokes the membership.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	RoleGrants []RoleGrant `json:"roleGrants,omitempty"`
+
 	// The corresponding cluster
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster reference is immutable after creation"
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
@@ -98,6 +109,35 @@ type DatabaseRoleSpec struct {
 	// disabling it through `disablePassword`. Mutually exclusive with both.
 	// +optional
 	Password *PasswordConfiguration `json:"password,omitempty"`
+}
+
+// RoleGrant is the membership of a role in another role, with its options.
+// An option left out is not managed: PostgreSQL applies its default when the
+// membership is granted, and removing an option later leaves the membership
+// as it is, rather than resetting the option to its default.
+type RoleGrant struct {
+	// Name of the role to be a member of
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Admin allows the member to grant membership in the role to other roles,
+	// and to revoke it from them (`WITH ADMIN OPTION`), which makes it a
+	// privileged option. PostgreSQL defaults to false.
+	// +optional
+	Admin *bool `json:"admin,omitempty"`
+
+	// Inherit makes the member inherit the privileges of the role
+	// (`WITH INHERIT`). PostgreSQL defaults to the `inherit` attribute of
+	// the member at the time the membership is granted. Requires PostgreSQL
+	// 16 or later.
+	// +optional
+	Inherit *bool `json:"inherit,omitempty"`
+
+	// Set allows the member to switch to the role through `SET ROLE`
+	// (`WITH SET`). PostgreSQL defaults to true. Requires PostgreSQL 16 or
+	// later.
+	// +optional
+	Set *bool `json:"set,omitempty"`
 }
 
 // PasswordMode governs how the operator manages the password of a DatabaseRole.

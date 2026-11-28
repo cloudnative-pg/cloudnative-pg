@@ -43,13 +43,17 @@ const (
 	) mem ON member = oid
 	WHERE rolname not like 'pg\_%'`
 
-	expectedMembershipStmt = `SELECT mem.inroles 
-	FROM pg_catalog.pg_authid as auth
-	LEFT JOIN (
-		SELECT pg_catalog.array_agg(pg_catalog.pg_get_userbyid(roleid)) as inroles, member
-		FROM pg_catalog.pg_auth_members GROUP BY member
-	) mem ON member = oid
-	WHERE rolname = $1`
+	expectedMembershipStmt = `SELECT pg_catalog.pg_get_userbyid(am.roleid), pg_catalog.pg_get_userbyid(am.grantor),
+		am.admin_option, am.inherit_option, am.set_option
+		FROM pg_catalog.pg_auth_members AS am
+		JOIN pg_catalog.pg_authid AS auth ON auth.oid = am.member
+		WHERE auth.rolname = $1`
+
+	expectedMembershipStmtBefore16 = `SELECT pg_catalog.pg_get_userbyid(am.roleid), pg_catalog.pg_get_userbyid(am.grantor),
+		am.admin_option, NULL::boolean, NULL::boolean
+		FROM pg_catalog.pg_auth_members AS am
+		JOIN pg_catalog.pg_authid AS auth ON auth.oid = am.member
+		WHERE auth.rolname = $1`
 
 	wantedRoleCommentTpl = "COMMENT ON ROLE \"%s\" IS %s"
 )
@@ -83,6 +87,12 @@ var scramAwareMatcher = sqlmock.QueryMatcherFunc(func(expectedSQL, actualSQL str
 	}
 	return nil
 })
+
+// membershipRows returns the rows of the grants of membership GetParentRoles
+// reads, to which each test adds its grants
+func membershipRows() *sqlmock.Rows {
+	return sqlmock.NewRows([]string{"name", "grantor", "admin", "inherit", "set"})
+}
 
 func TestReconciler(t *testing.T) {
 	RegisterFailHandler(Fail)

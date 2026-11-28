@@ -360,6 +360,51 @@ spec:
                   should only be used on roles actually used for replication. Default
                   is `false`.
                 type: boolean
+              roleGrants:
+                description: |-
+                  RoleGrants lists the roles this role is a member of, like `inRoles`,
+                  with the options of each membership. An entry carrying only a `name`
+                  is the same as listing the role in `inRoles`. A role listed in both
+                  fails the reconciliation, rather than one of the two entries silently
+                  winning. Changes are applied through `GRANT` and `REVOKE` statements,
+                  and removing an entry revokes the membership.
+                items:
+                  description: |-
+                    RoleGrant is the membership of a role in another role, with its options.
+                    An option left out is not managed: PostgreSQL applies its default when the
+                    membership is granted, and removing an option later leaves the membership
+                    as it is, rather than resetting the option to its default.
+                  properties:
+                    admin:
+                      description: |-
+                        Admin allows the member to grant membership in the role to other roles,
+                        and to revoke it from them (`WITH ADMIN OPTION`), which makes it a
+                        privileged option. PostgreSQL defaults to false.
+                      type: boolean
+                    inherit:
+                      description: |-
+                        Inherit makes the member inherit the privileges of the role
+                        (`WITH INHERIT`). PostgreSQL defaults to the `inherit` attribute of
+                        the member at the time the membership is granted. Requires PostgreSQL
+                        16 or later.
+                      type: boolean
+                    name:
+                      description: Name of the role to be a member of
+                      minLength: 1
+                      type: string
+                    set:
+                      description: |-
+                        Set allows the member to switch to the role through `SET ROLE`
+                        (`WITH SET`). PostgreSQL defaults to true. Requires PostgreSQL 16 or
+                        later.
+                      type: boolean
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               superuser:
                 description: |-
                   Whether the role is a `superuser` who can override all access
